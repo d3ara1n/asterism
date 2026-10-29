@@ -5,10 +5,10 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { DirectoryExec } from "./exec-contract";
-import type { ExecResult } from "../shell/contract";
-import { shellMessages as messages } from "../messages/shell";
+import type { ExecResult } from "@asterism-app/sdk/contracts";
+import { shellMessages as messages } from "@asterism-app/ui/messages/shell";
 import { inputText } from "../shared/tool-preview";
-import { useBuiltinRendererServices } from "../renderer-context";
+import { useRendererApplication } from "@asterism-app/sdk/renderer";
 
 function Header({ phase, invocation, result }: ToolRenderProps<ExecResult>) {
   const i18n = useI18n(), data = result?.data;
@@ -27,7 +27,7 @@ function Header({ phase, invocation, result }: ToolRenderProps<ExecResult>) {
 }
 
 function Body({ args, phase, result }: ToolRenderProps<ExecResult>) {
-  const i18n = useI18n(), services = useBuiltinRendererServices();
+  const i18n = useI18n(), services = useRendererApplication();
   const [opening, setOpening] = useState(false), [error, setError] = useState(false);
   const data = result?.data;
   const settled = phase === "settled", command = inputText(args, "command");

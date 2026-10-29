@@ -8,7 +8,7 @@ import { definePlugin, defineModule, implementCreation, implementResource, imple
 import { agentCreations, defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { CreateAgent, ReadAgentCreations } from "@asterism-app/builtin-api/contracts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
-import { ApplicationService } from "../runtime/service.ts";
+import { BuiltinApplicationService as ApplicationService, configureBuiltin } from "../../packages/builtin/src/testing.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 import { placementGap } from "../shared/workbench-layout.ts";
 
@@ -56,7 +56,7 @@ async function model(app: ApplicationService) {
     providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
     capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
-  return { role: "default", model: saved.savedId! };
+  return { provider: "test", model: "test" };
 }
 function adapter(next: () => { name: string; args: Json }[]): ModelAdapter {
   return { version: "test/1", validate() {}, prepare() {
@@ -349,11 +349,11 @@ describe("Agent resource operation entries", () => {
   it("agent_list exposes selection fields while isolating system prompts and execution configuration", async () => {
     const f = open({ adapter: adapter(() => [{ name: "agent_list", args: {} }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
-    await f.app.configuration.execute({ type: "agent.save", id: "worker", value: { id: "worker",
+    await configureBuiltin(f.app, { type: "agent.save", id: "worker", value: { id: "worker",
       description: "Public purpose", examples: ["Public example"],
       systemPrompt: "PRIVATE_AGENT_INSTRUCTIONS", maxTurns: 123,
     } });
-    await f.app.configuration.execute({ type: "agent.save", id: "reviewer", value: { id: "reviewer", enabled: false } });
+    await configureBuiltin(f.app, { type: "agent.save", id: "reviewer", value: { id: "reviewer", enabled: false } });
     const result = await runner(f, actor, target)();
     expect(result.tools[0]?.kind).toBe("succeeded");
     const entries = result.tools[0]!.data as { id: string }[];

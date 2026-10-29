@@ -1,3 +1,4 @@
+import { pathWithin } from "../storage/paths.ts";
 import { parse } from "@formatjs/icu-messageformat-parser";
 import { createHash } from "node:crypto";
 import { readFileSync, realpathSync } from "node:fs";
@@ -5,10 +6,7 @@ import { resolve, relative, isAbsolute, sep } from "node:path";
 
 import { canonicalLocale, type TranslationCatalog } from "../shared/i18n.ts";
 
-function inside(base: string, file: string): boolean {
-  const path = relative(base, file);
-  return path !== ".." && !path.startsWith(`..${sep}`) && !isAbsolute(path);
-}
+const inside = (base: string, file: string) => pathWithin(base, file) !== null;
 
 /** Static catalog reads are independent of business assembly; normalized and real paths remain inside package roots. */
 export function loadCatalogs(

@@ -1,4 +1,4 @@
-import { thinkingLevels, describeError, type ModelItem, type ModelTarget, type ModelEvent } from "@asterism-app/sdk/contracts";
+import { thinkingLevels, describeError, formatModelExpression, type ModelItem, type ModelTarget, type ModelEvent } from "@asterism-app/sdk/contracts";
 import type { ModelServices, ObjectExecutor } from "@asterism-app/sdk/runtime";
 import { ContextSummary, Execution } from "@asterism-app/builtin-api/contracts";
 import { feedbackOrigin, type AgentFeedback } from "./feedback.ts";
@@ -62,13 +62,12 @@ export function planCompression(context: AgentContext): CompressionPlan | null {
 /** Runs within an agent-managed task; only a fully successful summary is committed, in one operation, and cancellation follows the agent lifecycle. */
 export async function compressContext(
   object: ObjectExecutor, target: ModelTarget, systemTokens: number,
-  models: Pick<ModelServices, "stream" | "list" | "roles">, signal: AbortSignal,
+  models: Pick<ModelServices, "stream" | "list">, signal: AbortSignal,
   feedback: (value: AgentFeedback) => void, userAgent?: string,
   onStart?: () => (status: "completed" | "failed" | "cancelled") => void,
 ): Promise<boolean> {
   signal.throwIfAborted();
-  const model = target.model ?? models.roles().find(role => role.id === target.role)?.model;
-  if (!model) return false;
+  const model = formatModelExpression(target);
   const window = models.list().find(entry => entry.model === model)?.contextWindow;
   if (!window) return false;
   const context = projectAgentContext(object.session.snapshot(), object.ref.id);
@@ -97,9 +96,9 @@ async function summarizeContext(
   const parts = new Map<string, { kind: "text" | "thinking"; ended: boolean }>();
   let finish: Extract<ModelEvent, { type: "finish" }> | undefined;
   try {
-    for await (const event of models.stream({ target: { ...target, model, thinking: "off" },
+    for await (const event of models.stream({ target: { ...target, thinking: "off" },
       userAgent, sessionId: object.ref.sessionId,
-      system: { blocks: [{ id: "context-summary", kind: "system", from: "asterism.builtin", text: summarySystemPrompt }] },
+      system: { blocks: [{ id: "context-summary", text: summarySystemPrompt }] },
       messages: [{ kind: "input", parts: [{ kind: "text", text: summaryPrompt(plan) }] }],
       maxOutputTokens: COMPRESSION_MAX_OUTPUT, signal,
     })) {

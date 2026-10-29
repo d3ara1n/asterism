@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useRendererCalls, useRendererEvents } from "@asterism-app/sdk/renderer";
 import type { PluginCalls, EventSubscription } from "@asterism-app/sdk/contracts";
-import { ReadUsage, UsageChanged } from "./contract";
+import { ReadUsage, UsageChanged } from "@asterism-app/sdk/contracts";
 import { ProviderUsageClient } from "./client";
 
 /** A single frontend communication instance shares the card cache; the last card's unmount releases subscriptions and timers. */

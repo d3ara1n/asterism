@@ -1,5 +1,5 @@
 import { posix, win32 } from "node:path";
-import type { ManualSource } from "@asterism-app/builtin-api/runtime";
+import type { ManualSource } from "@asterism-app/sdk/runtime";
 import { failed, FilesystemError, rejected } from "../filesystem/errors.ts";
 
 export interface ManualScope { source: ManualSource; path: string }

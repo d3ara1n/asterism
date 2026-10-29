@@ -58,3 +58,9 @@ export interface UsageServices {
   query(providerId: string, context: UsageQueryContext): Promise<UsageItem[]>;
   parseHeaders(providerId: string, context: UsageHeadersContext): UsageItem[] | null;
 }
+
+/** Host cache and shared queries; consumers supply response headers they obtained themselves. */
+export interface ProviderUsage {
+  query(id: string, options?: { signal?: AbortSignal; refresh?: boolean }): Promise<import("./usage-state.ts").ProviderUsageState>;
+  consume(response: import("./models.ts").ModelResponse): void;
+}

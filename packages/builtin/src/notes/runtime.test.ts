@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApplicationService } from "../../../../src/runtime/service.ts";
-import * as runtimeModules from "../../../../src/runtime/builtin.ts";
+import { BuiltinApplicationService as ApplicationService } from "../testing.ts";
+import * as runtimeModules from "../../../../src/plugins/loader.ts";
 import { foldWorkbench } from "../../../../src/session/fold.ts";
 import { flat } from "../../../../src/session/test-nodes.ts";
 import type { SessionDataStore } from "../../../../src/session/data.ts";
@@ -24,11 +24,11 @@ function open() {
 // Expectations come from the note current-value contract; host tests cover generic SDK data validation and transactions.
 describe("current note body", () => {
   it("typed note state supports an empty body; missing or corrupt state makes the card fall back and prevents tool overwrites", async () => {
-    let modules!: ReturnType<typeof runtimeModules.createModules>;
+    let modules!: ReturnType<typeof runtimeModules.loadPlugins>;
     let data!: SessionDataStore;
-    const createModules = runtimeModules.createModules;
-    vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {
-      data = args[0].data; modules = createModules(...args); return modules;
+    const createModules = runtimeModules.loadPlugins;
+    vi.spyOn(runtimeModules, "loadPlugins").mockImplementation((...args) => {
+      data = args[1].data; modules = createModules(...args); return modules;
     });
     const { service, sessionId } = open();
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind, creation: { id: "asterism.builtin/note.create" }, input: {}, position: { x: 0, y: 0 } });

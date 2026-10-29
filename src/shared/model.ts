@@ -20,4 +20,3 @@ export function modelScope(settings: ModelSettings): string {
 export function modelExpression(settings: Pick<ModelSettings, "thinking"> & { provider: { id: string }; model: { modelId: string } }): string {
   return `${settings.provider.id}/${settings.model.modelId}${settings.thinking ? `:${settings.thinking}` : ""}`;
 }
-export { agentSelectionSchema, type AgentSelection } from "@asterism-app/builtin-api/contracts";

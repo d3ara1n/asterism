@@ -29,14 +29,14 @@ const calls = (ids: string[], name = "resource_list", args = {}) => [
 ];
 function input(events: ModelRunEvent[], extra: Partial<ModelRunRequest> = {}): ModelRunRequest {
   return { object: { id: "a", sessionId: "s", kind: "example.agent/worker" }, requestParentId: "origin",
-    target: { role: "default" }, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Input" }] }],
+    target: { provider: "p", model: "m" }, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Input" }] }],
     signal: new AbortController().signal, observer: { event(event) { events.push(event); } }, ...extra };
 }
 function model(events: ModelEvent[], prepare = () => {}): ModelAdapter {
   return { validate() {}, version: "test-adapter", prepare() { prepare(); return { async *stream() { yield* events; } }; } };
 }
 async function execute(request: ModelRunRequest, adapter: ModelAdapter, capabilities = empty()) {
-  return runModelRequest(request, Promise.resolve({ adapter, settings, capabilities, system: request.system, messages: await resolveInput(request.messages, undefined, request.signal) }));
+  return runModelRequest(request, Promise.resolve({ adapter, settings, capabilities, system: typeof request.system === "function" ? request.system([]) : request.system, messages: await resolveInput(request.messages, undefined, request.signal) }));
 }
 const resource = { id: "r", kind: "example.resource/item", title: "Item", data: {} };
 const write = defineImplementation({ ...defineData("example.resource/write", z.number().describe("Current value.")),

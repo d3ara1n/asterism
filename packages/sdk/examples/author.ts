@@ -128,8 +128,8 @@ export async function modelWork(plugin: PluginContext, object: ObjectExecutor, s
   for (let request = 0; request < 8; request++) {
     const snapshot = object.session.snapshot();
     const result = await plugin.models.run({
-      object: object.ref, requestParentId: snapshot.position.nodeId, target: { role: "default" },
-      system: { blocks: [{ id: research.name("instruction"), kind: "system", from: research.id, text: "Inspect linked materials and report findings." }] },
+      object: object.ref, requestParentId: snapshot.position.nodeId, target: { provider: "configured-provider", model: "configured-model" },
+      system: { blocks: [{ id: research.name("instruction"), text: "Inspect linked materials and report findings." }] },
       messages: projectOwnContext(snapshot, object.ref), cache: { expectHit: request > 0 }, signal,
       observer: { event(event) {
         if (event.type === "progress") return;

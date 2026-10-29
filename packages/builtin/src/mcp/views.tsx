@@ -2,9 +2,9 @@ import { Virtualizer } from "virtua";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
 import { cn } from "@asterism-app/ui/utils";
-import type { ConnectionPhase } from "./contract";
-import { mcpMessages as messages } from "../messages/mcp";
-import { phaseTone } from "./status";
+import type { ConnectionPhase } from "@asterism-app/sdk/contracts";
+import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
+import { phaseTone } from "@asterism-app/ui/mcp-status";
 
 /** Server summary shared by host cards, catalog results, and connection results: status, name, and tool count (unindexed when no catalog has been established). */
 export interface ServerSummaryData { name: string; enabled: boolean; connection: ConnectionPhase; indexed: boolean; toolCount: number; error: string | null }

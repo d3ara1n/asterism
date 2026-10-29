@@ -6,7 +6,7 @@ import { errorDisplay } from "../../../shared/error-display";
 import { runtime } from "../../runtime";
 import { useI18n } from "../../shared/i18n";
 import { commonMessages } from "@asterism-app/ui/messages/common";
-import { formsMessages } from "../../messages/forms";
+import { formsMessages } from "@asterism-app/ui/messages/forms";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Checkbox } from "@asterism-app/ui/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";

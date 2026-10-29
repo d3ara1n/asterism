@@ -8,7 +8,7 @@ export async function describeFile(models: ModelServices, content: ContentScope,
     { kind: "text", text: "Describe the image." },
     { kind: "file", file, mediaType: "image/png", filename: "screenshot.png" },
   ] }];
-  const request = { target: { role: "utility" }, system: { blocks: [] }, messages, signal };
+  const request = { target: { provider: "configured-provider", model: "configured-model" }, system: { blocks: [] }, messages, signal };
   await models.validate(request, { content });
   for await (const event of models.stream(request, { content })) {
     if (event.type === "part.delta") void event.delta;

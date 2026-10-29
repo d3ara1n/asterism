@@ -6,9 +6,9 @@ This document owns domain semantics. TypeScript declarations, database schemas, 
 
 A workspace owns global configuration, capability providers, sessions, templates, and application data. Its storage directory grants no implicit model access to files.
 
-A session is the unit of ongoing work. Its generated ID is identity; its title is presentation. Home has no session identity. Accepting the first input or instantiating a template creates one.
+A session is the time and space of ongoing work: its history and workbench. Its generated ID is identity; its title is presentation. Home has no session identity. A plugin-provided entry assembles a session and supplies its initial title, or the host creates one from a template. Session creation must not require a conversation message or an Agent resource.
 
-Each session owns one history tree and an execution cursor. A conversation is an agent-specific projection of that tree’s current timeline, not an independently stored message array. A session can exist without an agent.
+Each session owns one history tree and an execution cursor. Builtin conversations project that tree's current timeline rather than storing an independent message array. Other paradigms own their conversation representation. A session can exist without an agent.
 
 Archiving ends the session’s object lifetimes before marking it archived. Normal session and resource lookup then treats it as absent. A separate recycle-bin directory exposes archived sessions for restoration. Restoration clears the archive marker and reattaches objects.
 
@@ -18,15 +18,15 @@ Startup collection deletes sessions older than the retention threshold. It remov
 
 A template is workspace-owned static data: selected resource types, reusable titles, creation data, explicitly selected object-scoped current data, links, and card arrangement. Resources opt into this copying behavior and declare their reusable current-data contracts. A resource may also declare title generation for template instances: saving then omits its title, and each instance receives a generated title. Resources without this declaration retain their saved titles. It contains no conversation history, session-scoped current data, private files, viewport, local panel state, or running external instance.
 
-Saving captures current values independently of later source changes. Instantiation creates a session and fresh resource identities in one transaction. Internal object references in the template’s relationship structure map to new identities; arbitrary domain JSON retains its values.
+Saving captures current values independently of later source changes. Instantiation creates a session and fresh resource identities in one transaction, independently of the selected Home entry or an initial conversation. Internal object references in the template’s relationship structure map to new identities; arbitrary domain JSON retains its values.
 
 The host validates resource availability, template support, creation data, declared current data, and link eligibility. Saved data that the installed resource no longer accepts fails explicitly. The host initializes objects from saved data without rerunning creation forms or handlers. Failure rolls back the transaction. New history records object creation and links.
 
 Templates independently retain the immutable bytes referenced by their saved data. Deleting a template does not affect sessions already created from it.
 
-## Agents
+## Builtin Agents
 
-An agent is an execution object and can also be a linked resource. Its controller projects context, resolves the request environment, and drives model and tool calls.
+Builtin defines an Agent as an execution object that can also be a linked resource. Its controller projects context, resolves the request environment, and drives model and tool calls. This representation belongs to builtin; the host does not require other paradigms to represent Agents as resources.
 
 Agents have no intrinsic parent-child hierarchy. Delegation composes creation, links, and communication. Creating another agent does not expand the caller’s own tool policy.
 
@@ -48,7 +48,7 @@ Resource categories differ in what Asterism owns:
 | --- | --- | --- |
 | External reference | A path or other locator | Inspection reads current external state |
 | Self-contained object | Current domain data | Historical reconstruction requires explicit records and projection |
-| Agent | Configuration selection and controller state | Conversation projects the current timeline |
+| Builtin Agent | Configuration selection and controller state | Conversation projects the current timeline |
 
 Current session and object data is scoped by typed data contracts. Saving it does not append a historical event. Cursor changes and branches do not copy or restore these values.
 

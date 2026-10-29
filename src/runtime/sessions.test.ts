@@ -11,15 +11,16 @@ afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-// Plugin package management contract: change only package lists, taking effect after restart; built-ins are outside the manageable list.
+// Bundled packages and user-added packages share the same persisted enablement and removal operations.
 it("application commands register and remove plugin packages and represent restart markers correctly", () => {
   const root = mkdtempSync(join(tmpdir(), "core-session-")); roots.push(root);
   const service = new ApplicationService(root); services.push(service);
   const dir = join(root, "pkg"); mkdirSync(dir);
-  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { id: "acme.p" } }));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { displayName: "Test plugin", id: "acme.p" } }));
   const added = service.execute({ type: "plugin.add", path: dir });
-  expect(added.plugins.filter(p => p.index !== null).map(p => [p.source, p.status, p.enabled])).toEqual([[dir, "pending", true]]);
-  expect(added.plugins.find(p => p.index === null)).toMatchObject({ id: "asterism.builtin", status: "loaded" });
+  expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([["bundled:builtin", "pending", true], [dir, "pending", true]]);
+  expect(added.plugins[0]).toMatchObject({ id: "asterism.builtin", index: 0, bundled: true });
   expect(added.restartRequired).toBe(true);
-  expect(service.execute({ type: "plugin.remove", index: 0 }).restartRequired).toBe(false);
+  expect(service.execute({ type: "plugin.remove", index: 1 }).restartRequired).toBe(false);
+  expect(service.execute({ type: "plugin.enable", index: 0, enabled: false }).plugins[0]?.enabled).toBe(false);
 });

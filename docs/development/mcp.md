@@ -1,10 +1,10 @@
 # MCP host
 
-The built-in Model Context Protocol module owns server configuration, connections, cached tool discovery, and remote dispatch. MCP Host resources expose that shared service through ordinary resource links.
+The host owns Model Context Protocol server configuration, credentials, connections, cached discovery, and remote dispatch. The SDK exposes those capabilities to plugins. Builtin's MCP Host resources expose them to Agents through ordinary resource links.
 
 ## Shared service and access
 
-All MCP Host objects use the same application-wide server collection. Each server has at most one connection and one stdio process at a time. Removing a resource or moving the history cursor does not close shared servers; plugin shutdown does.
+Plugins share one application-wide server collection. Each server has at most one connection and one stdio process at a time. Removing a resource, moving the history cursor, or ending a consuming plugin does not close shared servers. Application shutdown owns their final cleanup.
 
 Linking an MCP Host exposes enabled servers through its fixed resource tools. Remote tool definitions stay inside the MCP module and do not dynamically register protocol tools or host resource-tool implementations.
 
@@ -12,17 +12,17 @@ External server state can be shared across sessions and agents. The host does no
 
 ## Configuration and authentication
 
-Asterism owns server configuration and connection actions in the built-in settings page. MCP Host cards display shared status and cached tools, with one settings entry point. Stable server IDs distinguish identity from editable display names.
+Asterism owns server configuration and connection actions in a host settings page, available independently of builtin. MCP Host cards display shared status and cached tools and open that page. Stable server IDs distinguish identity from editable display names.
 
 Stdio uses an executable and argument array without shell concatenation, with the application environment plus configured overrides. Streamable HTTP supports the declared authentication methods, including headers and OAuth.
 
-Environment values, headers, and OAuth material use encrypted plugin credentials. Changes invalidate affected discovery and connections. A newly created server does not inherit old credentials merely because it reuses an ID.
+Environment values, headers, and OAuth material use the application credential vault, with references retained in host configuration. Changes invalidate affected discovery and connections. A newly created server does not inherit old credentials merely because it reuses an ID.
 
 OAuth discovery, registration, exchange, and refresh use the official SDK. A connection that needs browser authorization waits for the user to start it in settings. Starting authorization opens the local callback listener before the browser and starts a bounded wait. Reopening the browser uses the same attempt and deadline.
 
 The connection transition owns authorization independently of individual transports. Replacing a failed transport preserves the callback listener. A valid callback returns the server to connecting while the SDK exchanges the response and the client loads its tools. Authorization timeout or failure ends the attempt; explicit cancellation returns to disconnected. No separate completion, cancellation, or timeout connection phases are needed.
 
-Callback completion, timeout, cancellation, and plugin shutdown release the listener and timer. Leaving settings does not cancel authorization. Cancellation from settings closes the shared transition; a single caller cancelling its own wait does not cancel unrelated waiters. Cancelling a connection does not delete saved credentials.
+Callback completion, timeout, cancellation, and application shutdown release the listener and timer. Leaving settings does not cancel authorization. Cancellation from settings closes the shared transition; a single caller cancelling its own wait does not cancel unrelated waiters. Cancelling a connection does not delete saved credentials.
 
 The client advertises implemented capabilities. Legacy transports and unsupported server-initiated features are not implicitly enabled.
 
@@ -42,7 +42,7 @@ Unexpected disconnects retain a visible error, and a later call can reconnect. S
 
 ## Discovery and invocation
 
-Fixed resource tools list servers or cached tools, search, inspect, connect, and call.
+The SDK supplies raw server and discovery state and binds a call handle to its selected server instance and tool. The handle retains that identity throughout the call. Builtin supplies listing, search ranking, inspection presentation, and fixed resource tools.
 
 Remote identity uses `server_id/tool_name`, split at the first slash. Discovery supplies summaries; inspection supplies full descriptions, schemas, annotations, and server instructions.
 

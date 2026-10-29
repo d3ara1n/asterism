@@ -7,7 +7,17 @@ export const contentChunkSize = 1024 * 1024;
 export const contentReadLimit = 16 * 1024 * 1024;
 const id = z.string().uuid();
 const identity = z.string().min(1).max(160);
-export const contentTargetSchema = z.strictObject({ contractId: identity, resourceKind: identity, sessionId: identity.optional(), objectId: identity.optional() });
+export const contentTargetSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("resource"), contractId: identity, resourceKind: identity, sessionId: identity.optional(), objectId: identity.optional() }),
+  z.strictObject({ kind: z.literal("call"), contractId: identity }),
+]);
+export type ContentTarget = z.infer<typeof contentTargetSchema>;
+export function sameContentTarget(left: ContentTarget, right: ContentTarget, allowSessionBinding = false): boolean {
+  if (left.kind !== right.kind || left.contractId !== right.contractId) return false;
+  if (left.kind === "call" || right.kind === "call") return true;
+  return left.resourceKind === right.resourceKind && left.objectId === right.objectId
+    && (left.sessionId === right.sessionId || allowSessionBinding && left.sessionId === undefined);
+}
 const source = z.union([
   z.strictObject({ scopeId: id }),
   z.strictObject({ sessionId: identity, objectId: identity }),

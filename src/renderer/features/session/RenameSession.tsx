@@ -4,7 +4,7 @@ import type { SessionResult } from "../../../shared/session";
 import { errorDisplay } from "../../../shared/error-display";
 import { appMessages } from "../../messages/app";
 import { commonMessages } from "@asterism-app/ui/messages/common";
-import { formsMessages } from "../../messages/forms";
+import { formsMessages } from "@asterism-app/ui/messages/forms";
 import { useI18n } from "../../shared/i18n";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Button } from "@asterism-app/ui/ui/button";

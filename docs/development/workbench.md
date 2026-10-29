@@ -4,13 +4,15 @@ The workbench presents objects and their execution while keeping frontend state 
 
 ## Home, navigation, and settings
 
-Startup opens Home without automatically loading an existing session. The sidebar lists session summaries. Selecting a session loads its workbench; accepting a first input creates the session, Agent, and input atomically.
+Startup opens Home without automatically loading an existing session. The sidebar lists session summaries. Selecting a session loads its workbench. Home hosts a plugin-provided entry interface; that plugin owns the interaction, business validation, and assembly of a new session with its initial title. The host imposes no initial-message or Agent-resource requirement.
 
-Onboarding points to missing provider, model, or role configuration. It is guidance, not an independent request-validity check or stored completion flag.
+The sole entry is displayed directly. With several entries, General settings holds the user's choice. An unavailable selection requires a new choice rather than silent replacement. Without an entry, Home explains that an Agent paradigm plugin is required. Host template access remains independent of entry availability.
 
-Home and conversations support text and file input, including file-only messages. Attachments remain input parts rather than implicit resource cards. Draft attachments retain names and media types; previews load on demand.
+Builtin's entry owns Agent/model controls and setup guidance for its configuration. Its composer and conversations support text and file input, including file-only messages. Attachments remain input parts rather than implicit resource cards. Draft attachments retain names and media types; previews load on demand. Other plugins can provide directory selection, forms, terminals, or other entry interactions.
 
-Settings separates application categories from plugin cards. Plugin metadata and management remain available when a plugin has no settings page or fails to load. Internal navigation and ordinary card opening reach the same plugin settings page.
+Settings home contains application pages and plugin-declared configuration-page entries with contributor attribution. Roles, for example, opens builtin's configuration page and identifies builtin as its source. Plugins can declare several pages or none.
+
+A normal Plugins card opens a plain management list with plugin information and enablement controls. There is no separate plugin list beneath the settings home and no plugin-card route to configuration pages. Plugin management remains available when a plugin has no configuration page or fails to load.
 
 About owns version, update state, channel selection, and log access. The titlebar update indicator consumes the same state. General settings owns the session recycle-bin entry.
 

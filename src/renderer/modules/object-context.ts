@@ -1,8 +1,7 @@
 import { createElement, useCallback, useMemo, type ReactNode } from "react";
 import { RendererCatalogsProvider, RendererModelsProvider, RendererPreferencesProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@asterism-app/sdk/renderer";
-import { pluginOf, resourceCall, reference } from "@asterism-app/sdk/contracts";
+import { pluginOf, resourceCall, reference, ModelCatalog, TerminalProfilesCatalog } from "@asterism-app/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
-import { ModelConfiguration } from "@asterism-app/builtin-api/contracts";
 import { sessionSnapshot } from "../../plugins/records";
 import { nodeView } from "../../session/view";
 import { useWorkbench } from "../features/workbench/context";
@@ -20,7 +19,8 @@ export function RendererCatalogProvider({ ready, children }: { ready: boolean; c
   const value = useMemo<RendererCatalogs>(() => ({
     error: configuration.readError,
     get(contract) {
-      const raw = Object.is(contract, ModelConfiguration) ? configuration.snapshot : null;
+      const raw = Object.is(contract, ModelCatalog) ? configuration.snapshot
+        : Object.is(contract, TerminalProfilesCatalog) ? configuration.snapshot?.shell : null;
       const parsed = contract.schema.safeParse(raw);
       return parsed.success ? parsed.data : null;
     },
@@ -44,18 +44,18 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
   return {
     ref: { sessionId: controller.sessionId, id: object.id, kind: object.kind },
     content,
-    input: contract => contentInput({ sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id,
+    input: contract => contentInput({ kind: "resource", sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id,
       ...(contract.kind === "action" ? { objectId: object.id } : {}) }),
     view: { ready: workbench.ready, error: state.readError, missing: state.missing },
     session: {
       snapshot: () => records, subscribe: controller.subscribe,
       create: (contract, input, position, options) => contentCommand(options?.content,
-        { sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id },
+        { kind: "resource", sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id },
         contentScopeId => controller.execute({ type: "resource.create", sessionId: controller.sessionId, kind: contract.resource.kind, creation: reference(contract), input, position, contentScopeId })),
       refresh: controller.refresh,
     },
     invoke: (contract, input, options) => contentCommand(options?.content,
-      { sessionId: controller.sessionId, objectId: object.id, resourceKind: contract.resource.kind, contractId: contract.id },
+      { kind: "resource", sessionId: controller.sessionId, objectId: object.id, resourceKind: contract.resource.kind, contractId: contract.id },
       contentScopeId => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input), contentScopeId })),
     openChannel,
     retained,

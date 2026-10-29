@@ -1,5 +1,5 @@
 import { recordRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
-import { withValues } from "@asterism-app/sdk/contracts";
+import { withValues, SessionTitleAssigned } from "@asterism-app/sdk/contracts";
 import { Link, Unlink, Plus, Minus, PanelsTopLeft, PenLine } from "lucide-react";
 
 import { historyMessages } from "../../messages/history";
@@ -9,6 +9,8 @@ import { ResourceCreated, ResourceRenamed, ObjectAdded, ObjectRemoved, ResourceA
 export const workbenchRecordViews: RendererModule = {
   resources: [], cards: [], tools: [],
   records: [
+    recordRenderer(SessionTitleAssigned, { icon: <PenLine className="size-4" />,
+      label: data => withValues(historyMessages.eventRenamed, { title: data.title }) }),
     recordRenderer(ResourceCreated, { icon: <PanelsTopLeft className="size-4" />,
       label: (data, ctx) => withValues(historyMessages.eventCreated, { kind: ctx.text(ctx.resourceLabel(data.type)), title: ctx.resourceTitle(data.id) }) }),
     recordRenderer(ResourceRenamed, { icon: <PenLine className="size-4" />,

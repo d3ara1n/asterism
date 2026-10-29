@@ -4,33 +4,30 @@ import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
-import { agentOverridesSchema, canEditModelProviderField, modelReference, modelRoleOverridesSchema, modelSchema, modelProviderInputSchema,
-  type AgentOverrides, type ModelRoleOverrides, type ModelProviderInput, type ProviderModel } from "../shared/configuration.ts";
-import { modelCostSchema, webProviderStateSchema, type WebProviderState } from "@asterism-app/sdk/contracts";
-import { configurationIdSchema } from "@asterism-app/builtin-api/contracts";
-import { defaultAgents, defaultRoles } from "./defaults.ts";
+import { canEditModelProviderField, modelReference, modelSchema, modelProviderInputSchema, sessionEntrySelectionSchema,
+  type ModelProviderInput, type ProviderModel } from "../shared/configuration.ts";
+import { mcpSettingsSchema, defaultMcpSettings, shellSettingsSchema, defaultShellSettings, modelCostSchema, webProviderStateSchema, type WebProviderState } from "@asterism-app/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
-import { normalizeOverrides, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 import { jsonStorage } from "../storage/migrations.ts";
 
 /** Global configuration format; increment on changes and append an n → n+1 migration to `configurationStorage`. */
-export const configurationVersion = 11;
-const identity = { id: configurationIdSchema };
+export const configurationVersion = 12;
 const storedProviderSchema = modelProviderInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
 const storedWebProviderSchema = webProviderStateSchema.extend({ credentialRef: z.string().uuid().nullable() });
-const storedRoleSchema = z.object({ ...identity, builtin: z.boolean(), overrides: modelRoleOverridesSchema });
-const storedAgentSchema = z.object({ ...identity, builtin: z.boolean(), overrides: agentOverridesSchema });
 const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
 /** Models use `<providerId>/<modelId>` identities; other entries use id. */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
   version: z.literal(configurationVersion),
+  mcp: mcpSettingsSchema,
+  mcpCredentialRefs: z.record(z.string(), z.string().uuid()),
+  shell: shellSettingsSchema,
   webProviders: z.array(storedWebProviderSchema),
   modelProviders: z.array(storedProviderSchema), models: z.array(storedModelSchema),
-  roles: z.array(storedRoleSchema), agents: z.array(storedAgentSchema),
+  sessionEntry: sessionEntrySelectionSchema.nullable(),
 }).superRefine((document, context) => {
-  for (const key of ["modelProviders", "webProviders", "models", "roles", "agents"] as const) {
+  for (const key of ["modelProviders", "webProviders", "models"] as const) {
     const ids = new Set<string>();
     document[key].forEach((item, index) => {
       const key_ = keyOf(item);
@@ -42,31 +39,17 @@ const documentSchema = z.strictObject({
 
 type ConfigurationDocument = z.infer<typeof documentSchema>;
 export type StoredModelProvider = z.infer<typeof storedProviderSchema>;
-const collections = { modelProvider: "modelProviders", webProvider: "webProviders", model: "models", role: "roles", agent: "agents" } as const;
+const collections = { modelProvider: "modelProviders", webProvider: "webProviders", model: "models" } as const;
 export type ConfigurationKind = keyof typeof collections;
 type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collections)[K]][number] };
 type ConfigurationSave =
   | { kind: "webProvider"; id: string; value: WebProviderState; credentialRef: string | null }
   | { kind: "modelProvider"; id: string | null; value: ModelProviderInput; credentialRef: string | null }
-  | { kind: "model"; id: string | null; value: ProviderModel }
-  | { kind: "role"; id: string | null; value: ModelRoleOverrides & { id: string } }
-  | { kind: "agent"; id: string | null; value: AgentOverrides & { id: string } };
-
-function validate(raw: unknown): ConfigurationDocument {
-  const document = documentSchema.parse(raw);
-  for (const role of document.roles) {
-    resolveRoleConfiguration(role);
-  }
-  for (const agent of document.agents) {
-    resolveAgentConfiguration(agent);
-  }
-  return document;
-}
+  | { kind: "model"; id: string | null; value: ProviderModel };
 
 function initialConfiguration(): ConfigurationDocument {
-  return { version: configurationVersion, modelProviders: [], webProviders: [], models: [],
-    roles: defaultRoles.map(({ id, builtin }) => ({ id, builtin, overrides: {} })),
-    agents: defaultAgents.map(({ id, builtin }) => ({ id, builtin, overrides: {} })) };
+  return { version: configurationVersion, mcp: structuredClone(defaultMcpSettings), mcpCredentialRefs: {},
+    shell: structuredClone(defaultShellSettings), modelProviders: [], webProviders: [], models: [], sessionEntry: null };
 }
 /** Append conversions for released formats here; business reads and writes always consume the current document. */
 export function configurationStorage(root: string) {
@@ -97,9 +80,21 @@ export class ConfigurationStore {
       this.commit(this.document);
       return;
     }
-    try { this.document = validate(JSON.parse(content)); }
+    try { this.document = documentSchema.parse(JSON.parse(content)); }
     catch { throw new ConfigurationError("unavailable", "The application configuration is invalid or unsupported. Back up and repair configuration.json before restarting."); }
   }
+  mcp() { return structuredClone(this.document.mcp); }
+  mcpCredentialReference(key: string) { return this.document.mcpCredentialRefs[key] ?? null; }
+  setMcpCredentialReference(key: string, reference: string | null) {
+    const refs = { ...this.document.mcpCredentialRefs };
+    if (reference === null) delete refs[key]; else refs[key] = reference;
+    this.commit({ ...this.document, mcpCredentialRefs: refs });
+  }
+  setMcp(value: z.infer<typeof mcpSettingsSchema>) { this.commit({ ...this.document, mcp: value }); }
+  shell() { return structuredClone(this.document.shell); }
+  setShell(value: z.infer<typeof shellSettingsSchema>) { this.commit({ ...this.document, shell: value }); }
+  sessionEntry() { return structuredClone(this.document.sessionEntry); }
+  selectSessionEntry(value: z.infer<typeof sessionEntrySelectionSchema>) { this.commit({ ...this.document, sessionEntry: value }); }
   list<K extends ConfigurationKind>(kind: K): Entry[K][] {
     return structuredClone(this.document[collections[kind]]) as Entry[K][];
   }
@@ -115,17 +110,11 @@ export class ConfigurationStore {
       case "webProvider": upsert(next.webProviders, input.id, { ...input.value, credentialRef: input.credentialRef }); break;
       case "modelProvider":
         upsert(next.modelProviders, id, { ...input.value, credentialRef: input.credentialRef });
-        // Providers own their models: renaming moves models with them without rewriting references such as roles.
+        // Providers own their models: renaming moves models with them without rewriting saved model references.
         if (id !== null && id !== input.value.id) for (const model of next.models) if (model.providerId === id) model.providerId = input.value.id;
         break;
       case "model": upsert(next.models, id, input.value); break;
-      case "role": case "agent": {
-        const { id: nextId, ...overrides } = input.value;
-        const builtin = id !== null && (this.get(input.kind, id)?.builtin ?? false);
-        if (builtin && id !== nextId) throw new ConfigurationError("invalid_request", "Built-in configuration IDs are fixed.");
-        upsert(next[collections[input.kind]], id, { id: nextId, builtin, overrides: normalizeOverrides(overrides) });
-        break;
-      }
+
     }
     this.commit(next);
   }
@@ -160,15 +149,12 @@ export class ConfigurationStore {
   remove(kind: ConfigurationKind, id: string): { credentialRef: string | null } {
     const old = this.get(kind, id);
     if (!old) throw new ConfigurationError("not_found", "This configuration no longer exists.");
-    if (kind === "role" && this.get("role", id)?.builtin) throw new ConfigurationError("invalid_request", "Built-in model roles cannot be deleted.");
     const next = structuredClone(this.document);
-    // Delete the provider and its models in one save without changing role or session selections.
+    // Delete the provider and its models in one save without changing saved session selections.
     switch (kind) {
       case "webProvider": next.webProviders = next.webProviders.filter(item => item.id !== id); break;
       case "modelProvider": next.modelProviders = next.modelProviders.filter(item => item.id !== id); next.models = next.models.filter(item => item.providerId !== id); break;
       case "model": next.models = next.models.filter(item => modelReference(item) !== id); break;
-      case "role": next.roles = next.roles.filter(item => item.id !== id); break;
-      case "agent": next.agents = next.agents.filter(item => item.id !== id); break;
     }
     this.commit(next);
     return { credentialRef: "credentialRef" in old ? old.credentialRef : null };
@@ -185,8 +171,8 @@ export class ConfigurationStore {
   }
   private commit(raw: ConfigurationDocument): void {
     let next: ConfigurationDocument;
-    // Validate structure and effective configuration together before writing; failure leaves the current document unchanged.
-    try { next = validate(raw); }
+    // Validate the document before writing; failure leaves the current document unchanged.
+    try { next = documentSchema.parse(raw); }
     catch (error) {
       if (error instanceof ConfigurationError) throw error;
       throw new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values.");

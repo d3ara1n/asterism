@@ -1,8 +1,9 @@
+import { pathWithin } from "../storage/paths.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, relative, resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BuildOptions, Plugin } from "esbuild";
 import { publicModuleSource, type PublicProvider, type ModuleRealm } from "../shared/public-modules.ts";
 import { PluginBuildCache } from "./build-cache.ts";
@@ -13,12 +14,14 @@ export interface PackageModule {
   name: string;
   root: string;
   public: boolean;
+  publicPackages?: readonly string[];
+  runtimeExternals?: readonly string[];
   runtime?: string;
   renderer?: string;
   /** Storage declaration entry; shares the backend runtime build without depending on the plugin runtime. */
   storage?: string;
 }
-export function packageModule(root: string, entry: { id: string; runtime?: string; renderer?: string; storage?: string }): PackageModule {
+export function packageModule(root: string, entry: { id: string; runtime?: string; renderer?: string; storage?: string; publicPackages?: readonly string[]; runtimeExternals?: readonly string[] }): PackageModule {
   const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
   const exported = pkg.exports && typeof pkg.exports === "object" && "./public" in pkg.exports;
   if (exported && (typeof pkg.name !== "string" || !/^(?:@[^/\s]+\/)?[^/\s]+$/u.test(pkg.name)))
@@ -44,6 +47,11 @@ export function unpackedArchivePath(entry: string): string | null {
   if (archive < 0) return null;
   const separator = entry.match(/[\\/]/u)?.[0] ?? "/";
   return [...segments.slice(0, archive), `${segments[archive]}.unpacked`, ...segments.slice(archive + 1)].join(separator);
+}
+/** Directory shipped with the application, relative to the repository root; packaged builds read its unpacked copy. */
+export function applicationDirectory(path: string): string {
+  const directory = fileURLToPath(new URL(`../../${path}/`, import.meta.url));
+  return unpackedArchivePath(directory) ?? directory;
 }
 
 /** Storage and backend entries share a runtime build; plugin IDs contain no `@`, so output names cannot conflict. */
@@ -79,9 +87,9 @@ export async function compileModules(packages: readonly PackageModule[], enabled
   }
   const result: CompiledModules = { runtime: new Map(), storage: new Map(), renderer: new Map(), stylesheets: new Map(), dependencies: new Map(), runtimeDependencies: new Map(), rendererDependencies: new Map(), failures: new Map() };
   if (!packages.some(pkg => enabled.has(pkg.id))) return result;
-  const cache = new PluginBuildCache(cacheRoot, packages.filter(pkg => enabled.has(pkg.id)).map(pkg => pkg.root), {
+  const cache = new PluginBuildCache(cacheRoot, {
     // Increment the recipe version when build options, resolvers, or host bridging rules change.
-    recipe: 5, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
+    recipe: 7, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
     cwd: process.cwd(), nodePath: process.env.NODE_PATH,
     packages, enabled: [...enabled], publicProviders, hostIdentity,
   });
@@ -92,10 +100,19 @@ export async function compileModules(packages: readonly PackageModule[], enabled
   const outputFiles: string[] = [];
   try {
     const providers = new Map<string, PackageModule>();
+    const libraries = new Map<string, PackageModule>();
     for (const pkg of packages.filter(pkg => enabled.has(pkg.id))) {
       if (preloaded.has(pkg.name)) {
         result.failures.set(pkg.id, `Public package ${pkg.name} is already provided by the application.`);
         continue;
+      }
+      for (const name of pkg.publicPackages ?? []) {
+        const previous = libraries.get(name);
+        if (previous && previous.id !== pkg.id || preloaded.has(name)) {
+          const error = `Multiple plugins provide public package ${name}.`;
+          result.failures.set(pkg.id, error);
+          if (previous) result.failures.set(previous.id, error);
+        } else libraries.set(name, pkg);
       }
       if (!pkg.public) continue;
       const previous = providers.get(pkg.name);
@@ -104,8 +121,16 @@ export async function compileModules(packages: readonly PackageModule[], enabled
         result.failures.set(previous.id, error); result.failures.set(pkg.id, error);
       } else providers.set(pkg.name, pkg);
     }
+    for (const [name, library] of libraries) {
+      const provider = providers.get(name);
+      if (provider && provider.id !== library.id) {
+        const error = `Multiple plugins provide public package ${name}: ${library.id}, ${provider.id}.`;
+        result.failures.set(library.id, error);
+        result.failures.set(provider.id, error);
+      }
+    }
     const roots = [...packages].sort((a, b) => b.root.length - a.root.length);
-    const pluginOwner = (path: string) => roots.find(pkg => { const r = relative(pkg.root, path); return r === "" || (!r.startsWith("..") && !r.startsWith("/")); });
+    const pluginOwner = (path: string) => roots.find(pkg => pathWithin(pkg.root, path) !== null);
     const resolver = (realm: ModuleRealm, entry?: PackageModule): Plugin => ({ name: "asterism-public-modules", setup(build) {
       const depend = (source: PackageModule | undefined, provider: string) => {
         for (const consumer of [source, entry]) if (consumer && consumer.id !== provider) {
@@ -131,6 +156,19 @@ export async function compileModules(packages: readonly PackageModule[], enabled
             return { errors: [{ text: `Public module ${args.path} is not exported in ${realm}.` }] };
           depend(source, loaded.pluginId);
           return { path: args.path, namespace: "asterism-public" };
+        }
+        const library = libraries.get(name) ?? (!providers.has(name) ? packages.find(pkg => pkg.publicPackages?.includes(name)) : undefined);
+        if (library) {
+          if (!enabled.has(library.id) || result.failures.has(library.id))
+            return { errors: [{ text: `Public package ${name} has no available enabled provider.` }] };
+          depend(source, library.id);
+          return build.resolve(args.path, { kind: args.kind, resolveDir: library.root, pluginData: { publicResolution: true } });
+        }
+        if (realm === "runtime" && packages.some(pkg => enabled.has(pkg.id) && pkg.runtimeExternals?.includes(name))) {
+          const resolved = await build.resolve(args.path, { kind: args.kind, resolveDir: args.resolveDir, pluginData: { publicResolution: true } });
+          if (resolved.errors.length) return resolved;
+          const path = unpackedArchivePath(resolved.path) ?? resolved.path;
+          return { path: pathToFileURL(path).href, external: true };
         }
         if (source?.name === name && subpath !== "/public") return;
         const candidate = providers.get(name) ?? packages.find(pkg => pkg.name === name && pkg.public);
@@ -160,7 +198,6 @@ export async function compileModules(packages: readonly PackageModule[], enabled
           ".wasm": "file", ".mp3": "file", ".ogg": "file",
         } }),
       plugins: [{ name: "asterism-cache-inputs", setup(build) {
-        build.onResolve({ filter: /.*/ }, args => { cache.resolution(args.path, args.importer, args.resolveDir); });
         build.onEnd(result => { if (result.metafile) cache.inputs(Object.keys(result.metafile.inputs)); });
       } }, hostModule(realm), resolver(realm, entries.length === 1 ? entries[0] : undefined)],
     });

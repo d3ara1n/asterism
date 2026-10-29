@@ -1,5 +1,5 @@
 import { StrictMode, useEffect } from "react";
-import { RendererEventsProvider, RendererCallsProvider } from "@asterism-app/sdk/renderer";
+import { RendererEventsProvider, RendererCallsProvider, RendererApplicationProvider } from "@asterism-app/sdk/renderer";
 import { EventClient } from "../shared/event-client";
 import { CallClient } from "../shared/call-client";
 import { HostI18nProvider, setLanguageCatalogs } from "./shared/i18n";
@@ -14,24 +14,20 @@ import type { Root } from "react-dom/client";
 
 import { ApplicationController } from "./app/controller";
 
-import { builtinRenderer, BuiltinRendererProvider } from "@asterism-app/builtin/renderer";
-import * as builtinRendererAPI from "@asterism-app/builtin-api/renderer";
 import { ViewRegistry } from "./modules/registry";
 import { workbenchRecordViews } from "./features/workbench/records";
 import { loadPluginRenderers } from "./modules/plugins";
 import { pluginPreferences } from "./features/creation/preferences";
 import { preparePlugin } from "./app/startup";
-import { PluginSettingsProvider } from "./modules/settings";
-import type { PluginSettingsPage } from "@asterism-app/sdk/renderer";
+import { pluginName } from "../shared/plugin-name";
+import { PluginSettingsProvider, settingsPageKey, type RegisteredSettingsPage, type RegisteredSessionEntry } from "./modules/settings";
 import { getI18n, useI18n } from "./shared/i18n";
 import { toast } from "./shared/toast";
 import { startupMessages } from "../shared/error-display";
 import type { UiText } from "@asterism-app/sdk/contracts";
-import { builtin } from "@asterism-app/builtin-api/contracts";
-import { bindPublicProvider } from "../shared/public-modules";
-import { builtinPublicProvider, builtinPublicModules } from "../builtin-public";
 
 import { runtime } from "./runtime";
+import { contentInput, contentScopeId } from "./features/creation/content";
 
 /** Retrieve startup notices once after the home page mounts: plugins disabled due to storage preparation failure appear as persistent errors. */
 function StartupNotification() {
@@ -48,7 +44,10 @@ function StartupNotification() {
 export async function startApplication(root: Root, progress: (message: UiText, detail?: string) => void, signal: AbortSignal): Promise<void> {
   signal.throwIfAborted();
   const events = new EventClient(runtime.events);
-  const calls = new CallClient(runtime.calls);
+  const calls = new CallClient(runtime.calls, {
+    input: contract => contentInput({ kind: "call", contractId: contract.id }),
+    scope: (input, contract) => contentScopeId(input, { kind: "call", contractId: contract.id }),
+  });
   const controller = new ApplicationController({ execute: runtime.execute, session: runtime.session, onStatus: window.host.onStatus }, events);
   const stopEventStatus = window.host.onStatus(status => { if (status !== "ready") { events.disconnect(); calls.disconnect(); } });
   signal.addEventListener("abort", () => { events.close(); calls.close(); stopEventStatus(); }, { once: true });
@@ -61,32 +60,29 @@ export async function startApplication(root: Root, progress: (message: UiText, d
   if (!initial.snapshot || initial.error) throw new Error(initial.error ? getI18n().text(initial.error) : "The workspace could not be read.");
   setLanguageCatalogs(initial.snapshot.catalogs ?? []);
   progress(startupMessages.plugins);
+  const names = new Map(initial.snapshot.plugins.flatMap(p => p.id ? [[p.id, pluginName(p)] as const] : []));
   const plugins = initial.snapshot.plugins.flatMap(p => p.status === "loaded" && p.id ? [{ id: p.id, renderer: p.renderer, stylesheet: p.stylesheet, dependencies: p.dependencies }] : []);
-  const accepted = [...builtinRenderer.modules ?? [], workbenchRecordViews];
-  const pages = new Map<string, PluginSettingsPage>();
+  const accepted = [workbenchRecordViews];
+  const pages = new Map<string, RegisteredSettingsPage>();
+  const sessionEntries: RegisteredSessionEntry[] = [];
   const cleanup: (() => Promise<void>)[] = [];
   signal.addEventListener("abort", () => { void (async () => {
     for (const close of cleanup.reverse()) {
       try { await close(); } catch (error) { console.error("Renderer plugin cleanup failed.", error); }
     }
   })(); }, { once: true });
-  await preparePlugin(builtinRenderer, events, signal, undefined, close => cleanup.push(close), calls);
-  if (builtinRenderer.settings) pages.set(builtin.id, builtinRenderer.settings);
-  new ViewRegistry(accepted);
-  const releasePublic = bindPublicProvider("renderer", builtinPublicProvider, {
-    ...builtinPublicModules,
-    "@asterism-app/builtin-api/renderer": builtinRendererAPI,
-  });
-  signal.addEventListener("abort", releasePublic, { once: true });
-  const rendererPlugins = await loadPluginRenderers(plugins, { available: [builtin.id], signal,
+  const rendererPlugins = await loadPluginRenderers(plugins, { signal,
     progress: id => progress(startupMessages.plugins, id), async accept(plugin, id) {
       new ViewRegistry([...accepted, ...plugin.modules ?? []]);
       await preparePlugin(plugin, events, signal, undefined, close => cleanup.push(close), calls);
       accepted.push(...plugin.modules ?? []);
-      if (plugin.settings) pages.set(id, plugin.settings);
+      const name = names.get(id) ?? id;
+      for (const page of plugin.settings ?? []) pages.set(settingsPageKey(id, page.id), { ...page, pluginId: id, pluginName: name });
+      for (const entry of plugin.sessionEntries ?? []) sessionEntries.push({ ...entry, pluginId: id, pluginName: name });
     } });
   const moduleViews = new ViewRegistry(accepted);
-  const builtinRendererServices = { preferences: pluginPreferences, async openLocalFile(path: string) {
+  const applicationServices = { platform: window.host.platform, preferences: pluginPreferences,
+    pickDirectory: (initialPath?: string) => window.host.pickDirectory(initialPath), async openLocalFile(path: string) {
     const error = await window.host.openLocalFile(path);
     if (error) throw new Error(error);
   } };
@@ -101,12 +97,12 @@ export async function startApplication(root: Root, progress: (message: UiText, d
                 <RendererCallsProvider value={calls}>
                   <HostConfigsProvider>
                     <ModuleViewsProvider registry={moduleViews}>
-                      <BuiltinRendererProvider services={builtinRendererServices}>
-                        <PluginSettingsProvider value={{ pages, failures: new Map(rendererPlugins.failures.map(failure => [failure.id, failure.error])) }}>
+                      <RendererApplicationProvider value={applicationServices}>
+                        <PluginSettingsProvider value={{ pages, sessionEntries, failures: new Map(rendererPlugins.failures.map(failure => [failure.id, failure.error])) }}>
                           <App controller={controller} />
                           <StartupNotification />
                         </PluginSettingsProvider>
-                      </BuiltinRendererProvider>
+                      </RendererApplicationProvider>
                     </ModuleViewsProvider>
                   </HostConfigsProvider>
                 </RendererCallsProvider>

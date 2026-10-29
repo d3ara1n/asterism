@@ -1,58 +1,10 @@
 import { z } from "zod";
-import { defineCall, defineCreation, defineImplementation, defineTool, jsonSchema, modelInputPartsSchema, type Json } from "@asterism-app/sdk/contracts";
+import { defineCreation, defineImplementation, defineTool, jsonSchema, modelInputPartsSchema, mcpServerStateSchema, type Json } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 
-/** The server ID is a readable slug fixed at creation; together with the remote tool name it forms a `server_id/tool_name` handle. The display name can change at any time. */
-export const SERVER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/u;
-export const serverIdSchema = z.string().min(1).max(64).regex(SERVER_ID_PATTERN);
-
-/** Asterism manages connection parameters; environment variables and HTTP headers go into credential storage separately. */
-export const mcpServerSchema = z.strictObject({
-  id: serverIdSchema, name: z.string().trim().min(1), enabled: z.boolean(),
-  mode: z.enum(["eager", "lazy"]), idleSeconds: z.number().int().min(1).max(86_400),
-  transport: z.enum(["stdio", "http"]), command: z.string(), args: z.array(z.string()), cwd: z.string(),
-  url: z.string(), auth: z.enum(["none", "oauth"]),
-}).superRefine((value, ctx) => {
-  if (value.transport === "stdio" && !value.command.trim()) ctx.addIssue({ code: "custom", path: ["command"], message: "An executable is required." });
-  if (value.transport === "http") {
-    try { const url = new URL(value.url); if (!["http:", "https:"].includes(url.protocol)) throw new Error(); }
-    catch { ctx.addIssue({ code: "custom", path: ["url"], message: "An HTTP or HTTPS MCP URL is required." }); }
-  }
-});
-export type McpServerConfig = z.infer<typeof mcpServerSchema>;
-export const mcpSettingsSchema = z.object({ servers: z.array(mcpServerSchema).refine(values => new Set(values.map(value => value.id)).size === values.length, "Server IDs are unique.") });
-export const defaultMcpSettings = { servers: [] };
-export const credentialsSchema = z.record(z.string(), z.string());
-export const connectionPhases = ["disconnected", "connecting", "awaiting_auth", "authorizing", "connected", "error"] as const;
-export type ConnectionPhase = typeof connectionPhases[number];
-export const mcpServerStateSchema = z.object({
-  id: z.string(), name: z.string(), enabled: z.boolean(), mode: z.enum(["eager", "lazy"]),
-  connection: z.enum(connectionPhases),
-  indexed: z.boolean(), toolCount: z.number(), error: z.string().nullable(), authorizationUrl: z.string().nullable(),
-  authorizationExpiresAt: z.number().nullable(),
-});
-export type McpServerState = z.infer<typeof mcpServerStateSchema>;
 export const McpHost = builtin.resource("mcp", z.object({}));
 export const CreateMcpHost = defineCreation(McpHost, { id: builtin.name("mcp.create"), schema: z.object({ title: z.string().trim().min(1).default("MCP Host") }) });
 export const McpHostView = builtin.data("mcp.card", z.object({ servers: z.array(mcpServerStateSchema) }));
-export const McpChanged = builtin.event("mcp.changed", { schema: z.object({}), source: "plugin", semantics: { kind: "snapshot", key: [] } });
-export const ReadMcp = defineCall(builtin.name("mcp.status"), { scope: "plugin", input: z.object({}), output: z.array(mcpServerStateSchema) });
-/** The edit form writes back environment variables/headers as a whole; create distinguishes creation from editing and rejects creation when the ID already exists. */
-export const SaveMcpServer = defineCall(builtin.name("mcp.save-server"), { scope: "plugin",
-  input: z.object({ server: mcpServerSchema, create: z.boolean(), credentials: credentialsSchema }), output: z.null() });
-/** The settings page reads back the plaintext environment variables/headers it saved; vault guarantees only encryption at rest. */
-export const ReadMcpCredentials = defineCall(builtin.name("mcp.read-credentials"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: credentialsSchema });
-export const mcpToolSummarySchema = z.object({ name: z.string(), title: z.string().optional(), description: z.string().optional() });
-export type McpToolSummary = z.infer<typeof mcpToolSummarySchema>;
-/** Display summary of the cached catalog; null when no catalog has been established. */
-export const ReadMcpTools = defineCall(builtin.name("mcp.read-tools"), { scope: "plugin", input: z.object({ serverId: z.string() }),
-  output: z.object({ tools: z.array(mcpToolSummarySchema), instructions: z.string().optional() }).nullable() });
-export const SetMcpServerEnabled = defineCall(builtin.name("mcp.set-enabled"), { scope: "plugin", input: z.object({ serverId: z.string(), enabled: z.boolean() }), output: z.null() });
-export const RemoveMcpServer = defineCall(builtin.name("mcp.remove-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
-export const ConnectMcpServer = defineCall(builtin.name("mcp.connect-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
-export const AuthorizeMcpServer = defineCall(builtin.name("mcp.authorize-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.object({ url: z.string() }) });
-export const DisconnectMcpServer = defineCall(builtin.name("mcp.disconnect-server"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
-export const ResetMcpAuth = defineCall(builtin.name("mcp.reset-auth"), { scope: "plugin", input: z.object({ serverId: z.string() }), output: z.null() });
 
 const page = { offset: z.number().int().nonnegative().default(0).describe("Zero-based offset in the matching entries."), limit: z.number().int().min(1).max(50).default(20).describe("Maximum entries returned in this page.") };
 const serverId = z.string().min(1).describe("Server ID returned by mcp_list or mcp_search.");

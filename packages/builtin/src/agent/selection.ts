@@ -1,6 +1,7 @@
 import { AgentSelection } from "./data.ts";
 import { PluginApiError, type ObjectReader } from "@asterism-app/sdk/runtime";
-import type { AgentSelection as Selection, AgentConfiguration } from "@asterism-app/builtin-api/contracts";
+import type { AgentSelection as Selection, AgentConfiguration, ModelRole } from "@asterism-app/builtin-api/contracts";
+import { resolveRoleTarget } from "../configuration/runtime.ts";
 
 
 export function selectionOf(object: ObjectReader) {
@@ -9,7 +10,7 @@ export function selectionOf(object: ObjectReader) {
   return value;
 }
 /** Configuration reads always use current values; link descriptions and requests use the same policy rules. */
-export function createSelection(deps: { agents(): readonly AgentConfiguration[] }) {
+export function createSelection(deps: { agents(): readonly AgentConfiguration[]; roles(): readonly ModelRole[] }) {
   const configurations = () => deps.agents().filter(agent => agent.enabled);
   const agentOf = (selection: Selection) => {
     const agent = configurations().find(value => value.id === selection.agent);
@@ -23,7 +24,7 @@ export function createSelection(deps: { agents(): readonly AgentConfiguration[] 
         throw new PluginApiError("unavailable", "The selected agent configuration is unavailable.");
     },
     target(selection: Selection) {
-      return { role: agentOf(selection).modelRole ?? "default", model: selection.model ?? undefined, thinking: selection.thinking ?? undefined };
+      return resolveRoleTarget(deps.roles(), agentOf(selection).modelRole ?? "default", selection);
     },
     tools(agent: AgentConfiguration) {
       return { ...(agent.tools === null ? {} : { allow: agent.tools }), ...(agent.excludeTools === null ? {} : { exclude: agent.excludeTools }) };

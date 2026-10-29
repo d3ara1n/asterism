@@ -4,14 +4,13 @@ export const pluginsMessages = pluginNamespace("asterism.host").messages("en", d
   application: { id: "settings.application", defaultMessage: "Application" },
   applicationSummary: { id: "settings.applicationSummary", defaultMessage: "Manage Asterism’s preferences and shared configuration." },
   plugins: { id: "settings.plugins", defaultMessage: "Plugins" },
-  pluginsSummary: { id: "settings.pluginsSummary", defaultMessage: "Plugins provide Asterism’s core features and extensions. Find their settings in the corresponding plugin." },
+  pluginsSummary: { id: "settings.pluginsSummary", defaultMessage: "Manage installed plugins and their availability." },
+  contributedBy: { id: "settings.contributedBy", defaultMessage: "From {plugin_name}" },
   search: { id: "plugins.search", defaultMessage: "Search plugins…" },
   filter: { id: "plugins.filter", defaultMessage: "Filter plugins" },
   all: { id: "plugins.all", defaultMessage: "All plugins" },
   builtIn: { id: "plugins.builtIn", defaultMessage: "Built-in" },
   noResults: { id: "plugins.noResults", defaultMessage: "No matching plugins" },
-  noPage: { id: "plugins.noPage", defaultMessage: "This plugin does not provide a settings page." },
-  pageUnavailable: { id: "plugins.pageUnavailable", defaultMessage: "The settings page is unavailable. Check the plugin status above." },
   pageFailed: { id: "plugins.pageFailed", defaultMessage: "The plugin settings page could not be displayed." },
   retry: { id: "plugins.retry", defaultMessage: "Try again" },
   removeTitle: { id: "plugins.removeTitle", defaultMessage: "Remove this plugin?" },
@@ -42,10 +41,6 @@ export const pluginsMessages = pluginNamespace("asterism.host").messages("en", d
   restartHint: {
     id: "features_plugins_PluginsSettings_7",
     defaultMessage: "Restart Asterism to apply plugin changes.",
-  },
-  unknownPlugin: {
-    id: "features_plugins_PluginsSettings_9",
-    defaultMessage: "Unknown plugin",
   },
   enablePlugin: {
     id: "features_plugins_PluginsSettings_21",

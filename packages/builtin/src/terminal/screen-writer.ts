@@ -1,5 +1,5 @@
 import type { Terminal } from "@xterm/xterm";
-import type { TerminalDown } from "./contract.ts";
+import type { TerminalDown } from "@asterism-app/sdk/contracts";
 
 type ScreenFrame = Exclude<TerminalDown, { type: "status" }>;
 interface PendingFrame { frame: ScreenFrame; done(): void }

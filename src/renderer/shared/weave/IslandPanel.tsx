@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { useState, type ReactNode, type Ref } from "react";
 
 import { commonMessages } from "@asterism-app/ui/messages/common";
-import { formsMessages } from "../../messages/forms";
+import { formsMessages } from "@asterism-app/ui/messages/forms";
 import { useI18n } from "../i18n";
 import { useCloseGuard, useIsland } from "./Screen";
 import type { IslandWidth } from "./model";

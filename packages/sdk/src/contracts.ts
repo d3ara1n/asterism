@@ -22,8 +22,17 @@ export * from "./content.ts";
 export * from "./model-input.ts";
 
 export * from "./model-selection.ts";
+export * from "./model-catalog.ts";
 export * from "./model-cost.ts";
 export * from "./model-cost-estimate.ts";
 export * from "./model-media.ts";
 export * from "./provider-usage.ts";
 export * from "./web.ts";
+
+export * from "./session-title.ts";
+
+export * from "./usage-state.ts";
+
+export * from "./shell.ts";
+export * from "./terminal.ts";
+export * from "./mcp.ts";

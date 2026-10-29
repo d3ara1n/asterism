@@ -1,11 +1,10 @@
 import { jsonSchema, type ModelInputPart } from "@asterism-app/sdk/contracts";
-import type { ContentScope } from "@asterism-app/sdk/runtime";
-import type { CallToolResult } from "@modelcontextprotocol/client";
+import type { ContentScope, McpCallResult } from "@asterism-app/sdk/runtime";
 import type { McpCallData } from "./contract.ts";
 import { extraStructured } from "./content.ts";
 
 /** MCP bytes enter immutable host content; history and the model share the same references. Resource links retain their URIs and are not read automatically. */
-export async function convertMcpResult(result: CallToolResult, content: ContentScope): Promise<Pick<McpCallData, "parts" | "structuredContent">> {
+export async function convertMcpResult(result: McpCallResult, content: ContentScope): Promise<Pick<McpCallData, "parts" | "structuredContent">> {
   const parts: ModelInputPart[] = [];
   for (const block of result.content ?? []) {
     switch (block.type) {

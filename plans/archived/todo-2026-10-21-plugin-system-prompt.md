@@ -2,7 +2,7 @@
 
 Filed on 2026-10-21. Direction only; no public contribution interface is established.
 
-Archived on 2026-10-28. Superseded by `plans/todo-2026-10-28-agent-skills-instructions.md` under the layering in `plans/ref-2026-10-28-plugin-paradigm-layering.md`. Implementation remains deferred; the original scope below is preserved.
+Archived on 2026-10-28. Superseded by `plans/archived/todo-2026-10-28-agent-skills-instructions.md` under the layering in `plans/archived/ref-2026-10-28-plugin-paradigm-layering.md`. Implementation was deferred at archival and subsequently completed under that scope; the original scope below is preserved.
 
 Plugins should be able to contribute instructions that the Agent composes at a request boundary. Built-in descriptions such as message-envelope meaning should use the same mechanism.
 

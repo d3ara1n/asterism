@@ -1,13 +1,10 @@
+import { pathWithin } from "./paths.ts";
+import { applicationPackages } from "../plugins/distribution.ts";
 import { isAbsolute, join, relative, resolve } from "node:path";
-import { builtin } from "@asterism-app/builtin-api/contracts";
-import builtinStorage from "@asterism-app/builtin/storage";
 import type { PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
 import { configurationStorage } from "../configuration/store.ts";
 import { workspaceStorage } from "../runtime/storage.ts";
-import { loadPackages, PackageList, packageListStorage } from "../plugins/packages.ts";
-import { builtinPublicProvider } from "../builtin-public.ts";
-import { builtinRuntimePublicModules } from "../builtin-runtime-public.ts";
-import { bindPublicProvider } from "../shared/public-modules.ts";
+import { loadPackages, packageListStorage } from "../plugins/packages.ts";
 import { applicationStorage, preferenceVersion } from "../shared/application.ts";
 import { jsonStorage, sqliteStorage, type StorageDefinition } from "./migrations.ts";
 import { prepareData, restorePoint, startFresh, type DataPath, type PluginStorageGroup } from "./preparation.ts";
@@ -41,8 +38,8 @@ export function hostStorages(root: string): StorageDefinition[] {
 export function pluginStorages(root: string, id: string, declarations: readonly PluginStorageDeclaration[]): StorageDefinition[] {
   const directory = resolve(root, "extensions", id);
   return declarations.map(declaration => {
-    const file = resolve(directory, declaration.path), inside = relative(directory, file);
-    if (!inside || inside === ".." || inside.startsWith("../") || inside.startsWith("..\\") || isAbsolute(inside))
+    const file = resolve(directory, declaration.path);
+    if (!pathWithin(directory, file))
       throw new Error(`Storage path is outside plugin ${id}: ${declaration.path}.`);
     const identity = `${id}/${declaration.path}`;
     return declaration.kind === "json"
@@ -53,9 +50,9 @@ export function pluginStorages(root: string, id: string, declarations: readonly 
 
 /** Build and import storage entries only; task processes own plugin runtime and setup. */
 async function discoverPluginStorage(root: string, onProgress?: (progress: PreparationProgress) => void): Promise<PluginStorageGroup[]> {
-  const packages = await loadPackages(new PackageList(join(root, "plugins.json")), join(root, "plugins"), join(root, "plugins", ".cache"),
-    [builtin.id], [builtinPublicProvider], id => onProgress?.({ stage: "dataPlugins", detail: id }), { runtime: false });
-  const groups: PluginStorageGroup[] = [{ id: builtin.id, stores: pluginStorages(root, builtin.id, builtinStorage) }];
+  const packages = await loadPackages(applicationPackages(root), join(root, "plugins"), join(root, "plugins", ".cache"),
+    [], [], id => onProgress?.({ stage: "dataPlugins", detail: id }), { runtime: false });
+  const groups: PluginStorageGroup[] = [];
   for (const item of packages) {
     if (!item.manifest?.storage || item.status === "disabled") continue;
     const id = item.manifest.id;
@@ -69,11 +66,8 @@ async function discoverPluginStorage(root: string, onProgress?: (progress: Prepa
 
 export async function prepareApplicationData(root: string, version: string, onHost?: (status: "migrating" | "ready") => void,
   onProgress?: (progress: PreparationProgress) => void) {
-  const release = bindPublicProvider("runtime", builtinPublicProvider, builtinRuntimePublicModules);
-  try {
-    return await prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root), onHost, onProgress,
-      discover: () => discoverPluginStorage(root, onProgress) });
-  } finally { release(); }
+  return prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root), onHost, onProgress,
+    discover: () => discoverPluginStorage(root, onProgress) });
 }
 export function restoreApplicationData(root: string, point: string, version: string): void {
   restorePoint(root, applicationDataPaths, point, version);

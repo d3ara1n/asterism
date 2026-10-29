@@ -19,13 +19,14 @@ export class CallPeer {
       this.pending.delete(control.id);
       this.send(frame);
     };
-    void this.calls.invoke(control.contract, control.input, { object: control.object, signal: controller.signal }, null).then(
+    void this.calls.invoke(control.contract, control.input, { object: control.object, signal: controller.signal, contentScopeId: control.contentScopeId }, null).then(
       data => deliver({ type: "result", id: control.id, data }),
       error => {
         if (!controller.signal.aborted && !(error instanceof PluginApiError)) console.error("Plugin call failed.", error);
         deliver({ type: "error", id: control.id,
           code: controller.signal.aborted ? "cancelled" : error instanceof PluginApiError ? error.code : "failed",
-          message: error instanceof PluginApiError ? error.message : controller.signal.aborted ? "The call was cancelled." : "The plugin call failed." });
+          message: error instanceof PluginApiError ? error.message : controller.signal.aborted ? "The call was cancelled." : "The plugin call failed.",
+          ...(!controller.signal.aborted && error instanceof PluginApiError && error.display ? { display: error.display } : {}) });
       },
     );
   }

@@ -1,20 +1,21 @@
 import { z } from "zod";
 import { defineModule, defineTopLevelTool, type ModelServices } from "@asterism-app/sdk/runtime";
-import { inputSummary, builtin, SessionNamed, type NamingApi } from "@asterism-app/builtin-api/contracts";
-import type { SessionSnapshot } from "@asterism-app/sdk/contracts";
+import { inputSummary, builtin, AutomaticSessionName } from "@asterism-app/builtin-api/contracts";
+import { SessionTitleAssigned, present, type SessionSnapshot, type ModelTarget } from "@asterism-app/sdk/contracts";
+import { builtinConfiguration, resolveRoleTarget } from "../configuration/runtime.ts";
 import { cleanTitle, collectTurns, namingInstruction, namingPrompt, userMessages } from "./policy.ts";
 import { SessionNameResult, SessionRenameResult } from "./contract.ts";
 
 const timeoutMs = 10_000;
 const responseLimit = 4000;
 
-async function generateTitle(models: Pick<ModelServices, "stream">, prompt: string, signal: AbortSignal, sessionId: string, userAgent?: string): Promise<string> {
+async function generateTitle(models: Pick<ModelServices, "stream">, target: ModelTarget, prompt: string, signal: AbortSignal, sessionId: string, userAgent?: string): Promise<string> {
   let text = "", finished = false;
   const textParts = new Set<string>();
   for await (const event of models.stream({
-    target: { role: "utility" }, signal,
+    target, signal,
     userAgent, sessionId,
-    system: { blocks: [{ id: builtin.name("session-naming"), kind: "system", from: builtin.id, text: namingInstruction }] },
+    system: { blocks: [{ id: builtin.name("session-naming"), text: namingInstruction }] },
     messages: [{ kind: "input", parts: [{ kind: "text", text: prompt }] }],
   })) {
     signal.throwIfAborted();
@@ -34,24 +35,23 @@ async function generateTitle(models: Pick<ModelServices, "stream">, prompt: stri
   return title;
 }
 
-/** Provides an identified interface during actual plugin setup; the module lifecycle owns connection cleanup. */
-export function createNamingModule(connect: (api: NamingApi) => () => void, userAgent?: string) {
+/** Builtin naming policy observes Agent input and writes through the host title capability. */
+export function createNamingModule(userAgent?: string) {
   return defineModule(plugin => {
-    function nameSession(sessionId: string, input: string, source: "user" | "agent") {
+    function nameSession(sessionId: string, input: string) {
       const title = input.replace(/\s+/gu, " ").trim();
-      plugin.session(sessionId).commit(writer => {
-        writer.append(SessionNamed, { title, source });
-      });
+      plugin.session(sessionId).title.set(title);
       return { title };
     }
-    const disconnect = connect({
-      nameByUser(sessionId, title) {
-        nameSession(sessionId, title, "user");
-      },
-    });
-    plugin.lifetime.defer(disconnect);
+    function naming(snapshot: SessionSnapshot) {
+      const record = snapshot.records.last(SessionTitleAssigned, { scope: "timeline" });
+      if (!record) return { explicit: false, automatic: null };
+      const detail = record.status === "known" ? record.data.detail : undefined;
+      const automatic = detail?.contract.id === AutomaticSessionName.id
+        ? AutomaticSessionName.schema.safeParse(detail.data) : null;
+      return { explicit: !automatic?.success, automatic: automatic?.success ? automatic.data : null };
+    }
     return {
-      records: [SessionNamed],
       topLevelTools: [
         defineTopLevelTool({
           id: SessionNameResult.id, name: "session_name",
@@ -77,7 +77,7 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           resultSchema: SessionRenameResult.schema,
           effect: "write", execution: "sequential",
           async execute({ title }, { session }) {
-            return { kind: "succeeded", data: nameSession(session.id, title, "agent") };
+            return { kind: "succeeded", data: nameSession(session.id, title) };
           },
         }),
       ],
@@ -87,39 +87,31 @@ export function createNamingModule(connect: (api: NamingApi) => () => void, user
           const inputs = userMessages(snapshot, "timeline");
           const latest = inputs.at(-1);
           if (latest?.status !== "known" || !records.some(record => record.id === latest.record.id)) return;
-          const named = snapshot.records.last(SessionNamed, { scope: "timeline" });
-          if (named && (named.status === "unknown" || named.data.source !== "auto")) return;
+          const named = naming(snapshot);
+          if (named.explicit) return;
           const first = userMessages(snapshot, "session")[0];
           const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
           const message = initial ? first : latest;
           const level = initial ? "initial" : "refined";
           if (level === "refined" && inputs.length !== 5 && inputs.length % 10 !== 0) return;
-          if (named?.data.auto?.messageId === message.record.id) return;
-          const model = plugin.models.roles().find(role => role.id === "utility")?.model ?? null;
+          if (named.automatic?.messageId === message.record.id) return;
+          const roles = builtinConfiguration(plugin).roles;
+          const model = roles.find(role => role.id === "utility" && role.enabled)?.model ?? null;
           if (model === null) return;
+          const target = resolveRoleTarget(roles, "utility");
           const prompt = namingPrompt(level === "initial" ? [{ user: inputSummary(message.data.parts) }]
             : collectTurns(snapshot.records.all({ scope: "timeline" })));
           const applicable = (view: SessionSnapshot) => {
-            const named = view.records.last(SessionNamed, { scope: "timeline" });
-            return (!named || (named.status === "known" && named.data.source === "auto")) &&
+            return !naming(view).explicit &&
               userMessages(view, "timeline").some(input => input.record.id === message.record.id);
           };
           plugin.tasks.start(`naming:${session.id}:${message.record.id}`, async signal => {
-            const title = await generateTitle(plugin.models, prompt, signal, session.id, userAgent);
-            // Check and append within the same synchronous commit; the cursor observer synchronizes the title independently.
-            session.commit(writer => {
-              if (applicable(session.snapshot())) writer.append(SessionNamed, {
-                title, source: "auto", auto: { level, messageId: message.record.id, model } });
+            const title = await generateTitle(plugin.models, target, prompt, signal, session.id, userAgent);
+            session.commit(() => {
+              if (applicable(session.snapshot())) session.title.set(title,
+                present(AutomaticSessionName, { level, messageId: message.record.id, model }));
             });
           }, { timeoutMs });
-        },
-        cursorChanged({ snapshot, session }) {
-          // Title = the latest naming on the current timeline, otherwise a truncation of its first input; leave it unchanged if neither exists.
-          const named = snapshot.records.last(SessionNamed, { scope: "timeline" });
-          if (named?.status === "unknown") return;
-          const first = named ? null : userMessages(snapshot, "timeline")[0];
-          const title = named?.data.title ?? (first?.status === "known" ? inputSummary(first.data.parts).slice(0, 72) : null);
-          if (title !== null) session.title.set(title);
         },
       }],
     };

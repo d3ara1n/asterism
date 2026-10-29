@@ -16,19 +16,17 @@ import { FocusIsland } from "../features/workbench/FocusIsland";
 import { focusIslandId, focusIslandWidth } from "../features/workbench/focus";
 import { Sidebar } from "./Sidebar";
 
-import { HomePage, type StartInput } from "../features/home/HomePage";
-import { createMessageDraft, SubmissionIdentity } from "@asterism-app/builtin/renderer";
-import { startAgentContentTarget } from "@asterism-app/builtin-api/contracts";
-import { contentInput, contentScopeId } from "../features/creation/content";
-import { RendererSettingsNavigationProvider, type RendererContentInput } from "@asterism-app/sdk/renderer";
+import { HomePage } from "../features/home/HomePage";
+import { RendererSettingsNavigationProvider } from "@asterism-app/sdk/renderer";
 import { Window, Titlebar } from "./Window";
 import { UpdateIndicator } from "./UpdateIndicator";
 import { UpdatesProvider } from "../features/updates/state";
 
 import { Space } from "../shared/weave/Space";
-import { SettingsPage, type SettingsTarget } from "../features/settings/SettingsPage";
+import { SettingsPage, isSettingsCategory, type SettingsTarget } from "../features/settings/SettingsPage";
 import { SessionArchiveContext } from "../features/settings/SessionsSettings";
-import { usePluginSettingsRegistry } from "../modules/settings";
+import { settingsPageKey, usePluginSettingsRegistry } from "../modules/settings";
+import { RendererCatalogProvider } from "../modules/object-context";
 import { Screen, type IslandSpec } from "../shared/weave/Screen";
 import { Toaster } from "../shared/ui/sonner";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -70,10 +68,8 @@ export function App({ controller }: { controller: ApplicationController }) {
   const pluginSettings = usePluginSettingsRegistry();
   const [view, setView] = useState<MainView>({ kind: "home" });
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [draft] = useState(() => createMessageDraft(() => contentInput(startAgentContentTarget)));
   // Environment outlet for the current workbench: deeper islands on the right and the focus island on the left obtain the session environment through it.
   const [workbenchStore] = useState(() => new WorkbenchStore());
-  const start = useStart();
   // Increment on each navigation; when asynchronous creation completes, use this to determine whether the user has left, without taking over the current view.
   const navigation = useRef(0);
   const run = useCallback(async (command: WorkbenchOperation) => operationSucceeded(await sessionController(command.sessionId).execute(command)), []);
@@ -138,15 +134,11 @@ export function App({ controller }: { controller: ApplicationController }) {
     void controller.refresh();
     return result;
   };
-  const startConversation = async (input: StartInput) => {
-    if (!ready) return;
-    const token = navigation.current;
-    const created = await start.submit(input, draft.content());
-    if (!created) return;
-    draft.accepted();
-    if (token === navigation.current) openSession(created);
+  const sessionCreated = (sessionId: string) => {
+    openSession(sessionId);
     void controller.refresh();
   };
+
   const startTemplate = async (templateId: string) => {
     const token = navigation.current;
     const result = await runtime.session.execute({ type: "template.start", templateId });
@@ -236,12 +228,12 @@ export function App({ controller }: { controller: ApplicationController }) {
       {view.kind === "home"
         ? <motion.div key="home" className="h-full" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 1.04 }} transition={islandTransition}>
-          <HomePage active={!inSettings} draft={draft} onSettings={category => {
+          <HomePage active={!inSettings} onSettings={() => {
             go("settings");
-            setSettingsTarget({ category, sequence: ++navigation.current });
+            setSettingsTarget({ category: "general", sequence: ++navigation.current });
           }}
             templates={snapshot?.templates ?? []} onTemplateStart={startTemplate} onTemplatesChanged={() => { void controller.refresh({ quiet: true }); }}
-            ready={ready} busy={start.busy} submitError={start.error} onStart={startConversation} /></motion.div>
+            ready={ready} onCreated={sessionCreated} /></motion.div>
         : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
           {conversation}</motion.div>}
@@ -255,12 +247,16 @@ export function App({ controller }: { controller: ApplicationController }) {
     onDismiss: controller.clearError,
   });
 
-  return <UpdatesProvider><RendererSettingsNavigationProvider value={{ open(pluginId, location) {
-    const settings = pluginSettings.pages.get(pluginId);
-    if (!settings) throw new Error(`Plugin ${pluginId} has no available settings page.`);
+  return <RendererCatalogProvider ready={ready}><UpdatesProvider><RendererSettingsNavigationProvider value={{ open(pluginId, pageId, location) {
+    const settings = pluginSettings.pages.get(settingsPageKey(pluginId, pageId));
+    if (!settings) throw new Error(`Plugin ${pluginId} has no available settings page ${pageId}.`);
     if (location !== undefined && !settings.locations?.includes(location)) throw new Error(`Unknown settings location: ${location}`);
     go("settings");
-    setSettingsTarget({ pluginId, location, sequence: ++navigation.current });
+    setSettingsTarget({ pluginId, pageId, location, sequence: ++navigation.current });
+  }, openHost(category) {
+    if (!isSettingsCategory(category)) throw new Error(`Unknown host settings page: ${category}`);
+    go("settings");
+    setSettingsTarget({ category, sequence: ++navigation.current });
   } }}>
     <Window skipTarget={`screen-${page}`} titlebar={<Titlebar navigation={titleNavigation} actions={actions} actionsHidden={inSettings} />}>
       <Space active={page} screens={[
@@ -274,31 +270,5 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}
       toastOptions={{ closeButtonAriaLabel: i18n.formatMessage(commonMessages.close) }} />
     {creation.element}
-  </RendererSettingsNavigationProvider></UpdatesProvider>;
-}
-
-/** First send: submit only once at a time; after a connection interruption, reuse the submission identity for identical input to recover the created session. */
-function useStart() {
-
-  const identity = useRef(new SubmissionIdentity());
-  const pending = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<UiText | null>(null);
-  const submit = async (input: StartInput, content: RendererContentInput): Promise<string | null> => {
-    if (pending.current) return null;
-    pending.current = true; setBusy(true); setError(null);
-    try {
-      const result = await runtime.session.execute({ type: "start", ...input, submissionId: identity.current.forInput(input),
-        contentScopeId: await contentScopeId(content, startAgentContentTarget) });
-      if (!result.ok) { setError(errorDisplay(result.error)); return null; }
-      if (result.reply.kind !== "accepted") throw new Error("Invalid session receipt.");
-      identity.current.accepted();
-      await content.close();
-      return result.reply.sessionId;
-    } catch {
-      setError(appMessages.connectionLost);
-      return null;
-    } finally { pending.current = false; setBusy(false); }
-  };
-  return { busy, error, submit };
+  </RendererSettingsNavigationProvider></UpdatesProvider></RendererCatalogProvider>;
 }

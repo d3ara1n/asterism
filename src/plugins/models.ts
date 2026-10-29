@@ -3,22 +3,21 @@ import type { ContentLease } from "../runtime/content-store.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import { runModelRequest } from "../execution/request.ts";
-import { resolveModelSelection, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest } from "@asterism-app/sdk/contracts";
+import { formatModelExpression, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest } from "@asterism-app/sdk/contracts";
 import type { AgentCapabilities } from "../execution/capabilities.ts";
 import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
 import { PluginApiError } from "@asterism-app/sdk/runtime";
 import type { ModelServices } from "@asterism-app/sdk/runtime";
 import { coreDeclarations } from "../execution/core.ts";
-import { coreId } from "../shared/core.ts";
 import { inputReferences, validateInput, resolveInput, type ModelContent } from "../model/input.ts";
 import type { ModelItem } from "@asterism-app/sdk/contracts";
 import { errorMessages } from "../shared/error-display.ts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
 
-/** Model target: select a role and optionally override model expression or reasoning level; omitted values inherit the role. */
+/** Model targets identify concrete provider/model pairs; paradigms resolve their own configuration. */
 export type { ModelTarget, StreamRequest } from "@asterism-app/sdk/contracts";
-export type ModelTargetError = "role_unavailable" | "model_unavailable" | "credential_unavailable";
+export type ModelTargetError = "model_unavailable" | "credential_unavailable";
 export class ModelTargetFailure extends PluginApiError {
   constructor(readonly reason: ModelTargetError, message: string) { super("unavailable", message); }
 }
@@ -40,17 +39,16 @@ export interface HostModels {
   stream(request: StreamRequest, options?: HostInputOptions): AsyncIterable<ModelEvent>;
   run(request: RunRequest): Promise<ModelRunResult>;
   validate(request: Parameters<ModelServices["validate"]>[0], options?: HostInputOptions): Promise<void>;
-  roles: ModelServices["roles"];
   list: ModelServices["list"];
 }
 
-/** Resolve roles and overrides; the model adapter interprets reasoning-level encoding and request filtering. */
-export function resolveTarget(snapshot: ConfigurationSnapshot, target: ModelTarget):
+/** Resolve the requested provider/model pair; adapters interpret reasoning-level encoding and request filtering. */
+export function resolveTarget(snapshot: Pick<ConfigurationSnapshot, "modelProviders" | "models">, target: ModelTarget):
   { ok: true; model: string; thinking: ThinkingLevel | null } | { ok: false; reason: ModelTargetError } {
-  const role = snapshot.roles.find(item => item.id === target.role);
-  if (!role?.enabled) return { ok: false, reason: "role_unavailable" };
-  const { model, thinking } = resolveModelSelection(role, target);
-  if (!model || !parseModelExpression(model)) return { ok: false, reason: "model_unavailable" };
+  const model = formatModelExpression(target), thinking = target.thinking ?? null;
+  const parsed = parseModelExpression(model);
+  if (!parsed || parsed.provider !== target.provider || parsed.model !== target.model)
+    return { ok: false, reason: "model_unavailable" };
   const resolved = resolveProviderModel(snapshot, model);
   if (!resolved) return { ok: false, reason: "model_unavailable" };
   const { provider } = resolved;
@@ -65,7 +63,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
     await configuration.execute({ type: "read" });
     const config = current();
     const result = resolveTarget(config, target);
-    if (!result.ok) throw new ModelTargetFailure(result.reason, `The model target for role ${target.role} is unavailable (${result.reason}).`);
+    if (!result.ok) throw new ModelTargetFailure(result.reason, `The model target ${target.provider}/${target.model} is unavailable (${result.reason}).`);
     const { model, provider } = resolveProviderModel(config, result.model)!;
     const { credentialState: _state, ...connection } = provider;
     const settings: ModelSettings = { provider: connection, model, thinking: result.thinking };
@@ -75,8 +73,6 @@ export function createModelServices(configuration: ConfigurationService, adapter
     return { settings, adapter };
   };
   const catalog = {
-    roles: () => current().roles.filter(role => role.enabled).map(role => ({ id: role.id, description: role.description,
-      hidden: role.hidden, model: role.model, thinking: role.thinking })),
     models: () => {
       const config = current();
       return config.models.filter(model => resolveProviderModel(config, modelReference(model))).map(model => ({ model: modelReference(model),
@@ -94,7 +90,6 @@ export function createModelServices(configuration: ConfigurationService, adapter
     }
   };
   return {
-    roles: catalog.roles,
     list: catalog.models,
     async validate(request, options) {
       request.signal.throwIfAborted();
@@ -136,8 +131,9 @@ export function createModelServices(configuration: ConfigurationService, adapter
       } finally { await content?.close(); }
     },
     run(request) {
-      const { system, messages, target, userAgent, sessionId } = structuredClone({
-        system: request.system, messages: request.messages, target: request.target, userAgent: request.userAgent, sessionId: request.object.sessionId,
+      const system = typeof request.system === "function" ? request.system : structuredClone(request.system);
+      const { messages, target, userAgent, sessionId } = structuredClone({
+        messages: request.messages, target: request.target, userAgent: request.userAgent, sessionId: request.object.sessionId,
       });
       let content: ModelContent | undefined;
       let captured: Promise<void>;
@@ -146,9 +142,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
       const environment = Promise.all([resolve(target), request.context, captured]).then(async ([resolved, context]) => ({
         ...resolved, userAgent, sessionId, capabilities: request.capabilities, topLevelTools: request.topLevelTools,
         messages: await resolveInput(messages, content, request.signal),
-        system: { blocks: [...system.blocks, ...context.map((file, index) => ({
-          id: coreId(`context.${index}`), kind: "context" as const, ...file,
-        }))] },
+        system: typeof system === "function" ? structuredClone(system(context)) : system,
       })).catch(error => {
         if (error instanceof ModelTargetFailure) throw new ModelFailure(error.reason, error.message);
         throw error;

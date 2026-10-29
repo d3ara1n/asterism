@@ -1,4 +1,4 @@
-import type { ProviderUsageState } from "./contract.ts";
+import type { ProviderUsageState } from "@asterism-app/sdk/contracts";
 
 export interface UsageBridge {
   query(providerId: string, refresh: boolean): Promise<ProviderUsageState>;

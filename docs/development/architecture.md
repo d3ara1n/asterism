@@ -23,13 +23,33 @@ The main process resolves the login-shell environment before starting the runtim
 
 ## Composition boundaries
 
-Application composition can depend on host interfaces, SDK contracts, and the built-in plugin’s public domain API. Generic host mechanisms depend on the SDK and do not interpret Agent turns, messages, or naming rules.
+The host and SDK must remain independent of Agent paradigms and import no builtin packages. Agent turns, role resolution, request composition, and conversation behavior belong to paradigm plugins. A paradigm can represent its Agent as a workbench resource or choose another representation.
 
 The built-in implementation uses the SDK and `@asterism-app/builtin-api`. External plugins use the SDK and their declared public dependencies. Public API packages do not import implementations, and the SDK imports no host implementation.
 
-Bundling a plugin with the application grants no bypass of identity, validation, or lifecycle rules. Built-in entries compile statically; external entries use the host’s package graph. Both contribute through the same mechanisms.
+Builtin supplies the official paradigm, Agent forms, and capability compositions as an ordinary bundled plugin. Users can disable it and develop or install another paradigm. Distribution alongside the application grants no special domain recognition, identity, validation, or lifecycle. Contributions use the same plugin mechanisms.
 
-Shell, terminal, filesystem, MCP, and web behavior belong to their plugin domains. The host supplies lifecycle, routing, storage, and validation.
+A capability belongs in the host when its meaning is independent of Agent paradigms and it has application-wide configuration or shared state. The host owns that configuration and state; the SDK defines domain types and capabilities; plugins own resources, tools, views, model-facing text, and capability composition. Stateless helpers remain library or plugin code. Interfaces follow current consumers rather than hypothetical feature sets.
+
+Model calls, terminal sessions, and MCP calls are composable capabilities. Builtin can build a conversation card from model calls; another plugin can combine model calls with a terminal in one resource. Shared services do not prescribe card types or a one-to-one relationship between services and resources. Skill and instruction catalogs retain raw contributions with plugin provenance; consuming paradigms determine effective request contents.
+
+## Sessions and entry ownership
+
+A session is the time and space of the user's work: its history and workbench. The host owns session identity, titles, history, resources, and static resource templates independently of conversations.
+
+Home hosts plugin-declared entry interfaces. The plugin owns its controls, business validation, preparation, and session assembly, including the initial title. Backend plugin operations perform that assembly through generic host capabilities. The host retains contract validation, authorization, persistence, and lifetime enforcement.
+
+Session preparation finishes before persistent initialization. A synchronous transaction creates the session, prepared resources, initial records, and retry receipt together. Retry identities belong to the contributing plugin. Attachments retain explicit content authority through preparation and become persistent only through their saved references.
+
+Home displays the sole available entry directly. With several entries, the user chooses one in General settings. An unavailable selection requires a new choice rather than silent replacement. Without an entry, Home explains that a paradigm plugin is required and retains access to templates. Template instantiation uses resource declarations independently of the selected entry.
+
+Automatic naming belongs to the paradigm that defines its triggers and material. Builtin uses Agent-turn triggers and its utility role, then updates the host-owned title through generic capabilities. The host needs no automatic-naming strategy registry.
+
+## Settings ownership
+
+Settings home contains host pages and plugin-declared configuration pages. Each plugin page identifies its contributor; Roles, for example, belongs to builtin. Plugins may contribute several pages or none.
+
+A Plugins card opens a plain management list with plugin information and enablement controls. Settings home has no separate plugin list beneath its page entries, and plugin management items do not act as configuration-page cards.
 
 ## Startup and loading
 
@@ -55,9 +75,13 @@ Main aggregates logs from itself and child processes in `logs/runtime.log`. Reco
 
 The plugin cache stores successful build outputs and dependency graphs, not running instances or service state. Its fingerprint includes build inputs, host bindings, package order, enabled packages, platform, and relevant dependencies and configuration.
 
+Bundled packages use the ordinary package list, validation, compilation, and enablement mechanisms. A plugin can provide its own public export or declare separate public API libraries. Package-name ownership is unique across both mechanisms, and the enabled provider supplies the shared module instance in each environment.
+
 A cache hit requires the complete output set. Inputs whose resolution cannot be fully tracked use an ordinary uncached build. The cache does not implement an alternative module resolver.
 
 Native helpers such as ripgrep and PTY binaries ship for the target platform outside asar. Runtime execution uses packaged binaries rather than downloading or finding an arbitrary system replacement. Packaging must retain target-specific optional dependencies.
+
+Runtime dependencies with native binaries or package-relative assets can remain external to a plugin bundle. Their resolved installed paths remain intact. Bundled source packages and their compilation dependencies are available at physical installed paths, independently of the writable plugin cache.
 
 ## Storage ownership
 
@@ -65,7 +89,8 @@ Application identity and data layout are centralized. Development and installed 
 
 | Data | Owner |
 | --- | --- |
-| Global model, provider, role, and agent configuration | Runtime configuration service |
+| Global model, provider, and other paradigm-neutral shared configuration | Host configuration services |
+| Roles, Agent configurations, and other paradigm-specific configuration | Owning plugin through generic plugin storage facilities |
 | Appearance, language, update preferences, window cache | Main process |
 | Encrypted credential files | Runtime storage with main-process `safeStorage` operations |
 | Session tree, current data, templates, view state, content roots | Runtime SQLite database |

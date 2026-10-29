@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useRendererCatalogs, useRendererObject } from "@asterism-app/sdk/renderer";
 import { totalEstimatedCost } from "@asterism-app/sdk/contracts";
-import { ModelConfiguration } from "@asterism-app/builtin-api/contracts";
+import { ModelCatalog } from "@asterism-app/sdk/contracts";
 import { diagnosticHistory, type DiagnosticScope } from "./history.ts";
 import { diagnosticModel, estimateUsageCost } from "./cost.ts";
 import { diagnosticOverview } from "./overview.ts";
@@ -11,7 +11,7 @@ export function useDiagnostics(scope: DiagnosticScope) {
   const object = useRendererObject();
   const catalogs = useRendererCatalogs();
   const snapshot = object.session.snapshot();
-  const configuration = useMemo(() => catalogs.get(ModelConfiguration), [catalogs]);
+  const configuration = useMemo(() => catalogs.get(ModelCatalog), [catalogs]);
   const history = useMemo(() => snapshot ? diagnosticHistory(snapshot, object.ref.id, scope)
     : { requests: [], unreadable: 0 }, [snapshot, object.ref.id, scope]);
   const requests = useMemo(() => history.requests.map(request => {

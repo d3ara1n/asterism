@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { defineCall } from "@asterism-app/sdk/contracts";
 import { builtin, textReadSchema } from "@asterism-app/builtin-api/contracts";
 
 export const skillMetadataSchema = z.object({
@@ -23,32 +22,7 @@ export const SkillRead = builtin.data("skill.read", textReadSchema.extend({
 const skillIssueSchema = z.strictObject({ file: z.string(), message: z.string() });
 export type SkillIssue = z.infer<typeof skillIssueSchema>;
 
-/** Source is only an identifier for grouping and auditing: an absolute path for directory sources, a plugin ID for plugin sources, and builtin for software-bundled sources. */
-export const skillSourceOverviewSchema = z.strictObject({
-  source: z.string(),
-  skills: z.array(z.strictObject({
-    name: z.string(),
-    description: z.string(),
-    /** Records the effective source when a higher-priority source provides a skill with the same name. */
-    overriddenBy: z.string().optional(),
-  })),
-  issues: z.array(skillIssueSchema),
-});
-export type SkillSourceOverview = z.infer<typeof skillSourceOverviewSchema>;
-/** Sources ordered from lower to higher override priority: built-in, plugins, user directories. */
-export const skillOverviewSchema = z.strictObject({ sources: z.array(skillSourceOverviewSchema) });
-export type SkillOverview = z.infer<typeof skillOverviewSchema>;
-
-export const ReadSkills = defineCall(builtin.name("skills.list"), {
-  scope: "plugin", input: z.strictObject({}), output: skillOverviewSchema,
-});
-export const RefreshSkills = defineCall(builtin.name("skills.refresh"), {
-  scope: "plugin", input: z.strictObject({}), output: skillOverviewSchema,
-});
 export const SkillRefresh = builtin.data("skill.refresh", z.strictObject({
   count: z.number().int().nonnegative(),
   issues: z.array(skillIssueSchema),
 }).describe("Number of skills in the rebuilt catalog and discovery issues by file."));
-export const SkillsChanged = builtin.event("skills.changed", {
-  schema: skillOverviewSchema, source: "plugin", semantics: { kind: "snapshot", key: [] },
-});

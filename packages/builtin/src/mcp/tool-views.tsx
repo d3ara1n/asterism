@@ -5,8 +5,9 @@ import { toolRenderer, useI18n, useRendererObject, type ToolRenderProps } from "
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { formatCount } from "@asterism-app/ui/format-count";
-import { McpList, McpSearch, McpInspect, McpConnect, McpCall, connectionPhases, type McpCallData } from "./contract";
-import { mcpMessages as messages } from "../messages/mcp";
+import { McpList, McpSearch, McpInspect, McpConnect, McpCall, type McpCallData } from "./contract";
+import { connectionPhases } from "@asterism-app/sdk/contracts";
+import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
 import { textMessages } from "../messages/text";
 import { inputField, inputText, characterCount } from "../shared/tool-preview";
 import { settledBodyViews } from "../shared/tool-views";

@@ -1,6 +1,6 @@
 {
   "name": "@asterism-app/builtin-api",
-  "version": "0.19.2",
+  "version": "0.20.0",
   "description": "Public domain contracts and extensions for Asterism built-in features",
   "license": "MIT",
   "author": "Chien Zhang",
@@ -15,6 +15,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "type": "module",
+  "asterism": { "manual": ["docs", "examples"] },
   "exports": {
     "./contracts": "./src/contracts.ts",
     "./renderer": "./src/renderer.ts",

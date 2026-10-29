@@ -1,23 +1,13 @@
-import { defineModule, defineTopLevelTool, implementCall } from "@asterism-app/sdk/runtime";
+import { defineModule, defineTopLevelTool, PluginApiError } from "@asterism-app/sdk/runtime";
 import { z } from "zod";
 import { TextError, readToModel } from "../shared/text.ts";
 import { filesystemFailure } from "../filesystem/errors.ts";
-import { SkillError, type SkillCatalog } from "./catalog.ts";
-import { ReadSkills, RefreshSkills, SkillsChanged, SkillRead, SkillRefresh, skillReadArgsSchema } from "./contract.ts";
+import type { SkillCatalog } from "./catalog.ts";
+import { SkillRead, SkillRefresh, skillReadArgsSchema } from "./contract.ts";
 
 export function createSkillsModule(catalog: SkillCatalog) {
-  return defineModule(plugin => {
-    const refresh = (signal: AbortSignal) => {
-      const data = catalog.refresh(signal);
-      plugin.ipc.events.publish(SkillsChanged, data);
-      return data;
-    };
+  return defineModule(() => {
     return {
-      events: [SkillsChanged],
-      calls: [
-        implementCall(ReadSkills, async () => catalog.overview()),
-        implementCall(RefreshSkills, async (_input, { signal }) => refresh(signal)),
-      ],
       topLevelTools: [defineTopLevelTool({
         id: SkillRead.id,
         name: "skill_read",
@@ -29,11 +19,11 @@ export function createSkillsModule(catalog: SkillCatalog) {
         ],
         argsSchema: skillReadArgsSchema, resultSchema: SkillRead.schema,
         effect: "read", execution: "parallel",
-        async execute(args, { signal }) {
-          try { return { kind: "succeeded", data: await catalog.read(args, signal) }; }
+        async execute(args, { signal, object }) {
+          try { return { kind: "succeeded", data: await catalog.read(object.ref.id, args, signal) }; }
           catch (error) {
             if (signal.aborted) return { kind: "cancelled", message: "Skill reading was cancelled." };
-            if (error instanceof SkillError) return { kind: "rejected", error: { code: error.code, message: error.message } };
+            if (error instanceof PluginApiError) return { kind: "rejected", error: { code: error.reason ?? error.code, message: error.message } };
             if (error instanceof TextError) return error.outcome();
             return filesystemFailure(error, "Read skill file");
           }
@@ -47,7 +37,7 @@ export function createSkillsModule(catalog: SkillCatalog) {
         resultSchema: SkillRefresh.schema, effect: "write", execution: "sequential",
         async execute(_args, { signal }) {
           signal.throwIfAborted();
-          refresh(signal);
+          catalog.refresh(signal);
           return { kind: "succeeded", data: catalog.summary() };
         },
       })],

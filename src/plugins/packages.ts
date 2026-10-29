@@ -1,19 +1,22 @@
+import { pathWithin } from "../storage/paths.ts";
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, relative, resolve, isAbsolute, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 import { z } from "zod";
 import * as zod from "zod";
 import * as sdkContracts from "@asterism-app/sdk/contracts";
 import * as sdkRuntime from "@asterism-app/sdk/runtime";
 import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
-import type { PluginDefinition, PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
+import type { PluginDefinition, PluginStorageDeclaration, ManualSource } from "@asterism-app/sdk/runtime";
 import type { Plugin } from "esbuild";
-import { compileModules, packageModule, type PackageModule } from "./package-modules.ts";
+import { applicationDirectory, compileModules, packageModule, type PackageModule } from "./package-modules.ts";
 import { loadCatalogs } from "./catalogs.ts";
 import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@asterism-app/sdk/contracts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { PublicProvider } from "../shared/public-modules.ts";
 import { jsonStorage } from "../storage/migrations.ts";
+import { isRendererShared, rendererSharedModules, sharedUiPackage } from "../shared/renderer-modules.ts";
 
 /** Plugin package manifest: the asterism field in package.json, shared by source and release artifacts. */
 export const manifestSchema = z.strictObject({
@@ -22,9 +25,14 @@ export const manifestSchema = z.strictObject({
   renderer: z.string().min(1).optional(),
   /** Storage declaration entry: default export `defineStorage([...])`, imported separately by the host before plugin runtime. */
   storage: z.string().min(1).optional(),
+  /** Public dependency packages whose exports form this plugin's API. */
+  publicPackages: z.array(z.string().min(1)).optional(),
+  /** Runtime packages kept intact so native binaries and package-relative assets retain their locations. */
+  runtimeExternals: z.array(z.string().min(1)).optional(),
   /** Package-relative directories exposed by the manual without executing plugin code. */
   manual: z.array(z.string().min(1)).optional(),
-  displayName: uiTextSchema.optional(),
+  /** The plugin name shown wherever the application names this plugin. */
+  displayName: uiTextSchema,
   description: uiTextSchema.optional(),
   icon: z.string().min(1).optional(),
   i18n: z.strictObject({ catalogs: z.record(z.string().refine(value => localeSchema.safeParse(value).success, "Invalid language tag."), z.string().min(1)) }).superRefine((value, context) => {
@@ -46,8 +54,7 @@ export function readPackageMetadata(root: string): PluginMetadata {
   let icon: string | undefined;
   if (pkg.asterism?.icon) {
     const file = realpathSync(resolve(root, pkg.asterism.icon));
-    const inside = relative(realpathSync(root), file);
-    if (!inside || inside.startsWith("..") || isAbsolute(inside)) throw new Error("Plugin icon must be inside the package.");
+    if (!pathWithin(realpathSync(root), file)) throw new Error("Plugin icon must be inside the package.");
     const mime = ({ ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml" } as Record<string, string>)[extname(file).toLowerCase()];
     if (!mime) throw new Error("Plugin icon must be a PNG, JPEG, WebP or SVG image.");
     icon = `data:${mime};base64,${readFileSync(file).toString("base64")}`;
@@ -59,6 +66,7 @@ export function readPackageMetadata(root: string): PluginMetadata {
 /** One management-list entry: source determines only the package root location; enabled state is independent of source. */
 export const packageEntrySchema = z.strictObject({
   source: z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("bundled"), name: z.string().regex(/^[a-z0-9-]+$/u) }),
     z.strictObject({ kind: z.literal("path"), path: z.string().min(1) }),
     z.strictObject({ kind: z.literal("npm"), name: z.string().min(1), version: z.string().min(1) }),
   ]),
@@ -66,7 +74,7 @@ export const packageEntrySchema = z.strictObject({
 });
 export type PackageEntry = z.infer<typeof packageEntrySchema>;
 /** Plugin list format; increment on changes and append migrations to `packageListStorage`. */
-const packageListVersion = 1;
+const packageListVersion = 2;
 const listSchema = z.strictObject({ version: z.literal(packageListVersion), packages: z.array(packageEntrySchema) });
 export function packageListStorage(root: string) {
   return jsonStorage({ id: "plugins", file: join(root, "plugins.json"), version: packageListVersion, migrations: {} });
@@ -78,6 +86,7 @@ export class PluginPackageError extends Error {
 
 /** Source adapter: yields only a package root; later stages no longer distinguish sources. */
 export function packageRoot(entry: PackageEntry, npmRoot: string): string {
+  if (entry.source.kind === "bundled") return applicationDirectory(`packages/${entry.source.name}`);
   return entry.source.kind === "path" ? resolve(entry.source.path) : join(npmRoot, "node_modules", entry.source.name);
 }
 
@@ -95,10 +104,16 @@ export function readManifest(root: string): PluginPackageManifest {
   }
   const manifest = parsed.data;
   for (const entry of [manifest.runtime, manifest.renderer, manifest.storage]) {
-    if (entry && relative(root, resolve(root, entry)).startsWith("..")) throw new PluginPackageError("invalid_entry", `Entry ${entry} is outside the package.`);
+    if (entry && !pathWithin(root, resolve(root, entry))) throw new PluginPackageError("invalid_entry", `Entry ${entry} is outside the package.`);
   }
-  const paths: string[] = [];
-  for (const path of manifest.manual ?? []) {
+  manualDirectories(root, manifest.manual ?? []);
+  return manifest;
+}
+
+/** Both plugin packages and their declared public libraries retain their own manual boundaries. */
+function manualDirectories(root: string, declared: readonly string[]): ManualSource[] {
+  const paths: string[] = [], sources: ManualSource[] = [];
+  for (const path of declared) {
     if (path.includes("\\") || path.includes("\0") || posix.isAbsolute(path) || win32.isAbsolute(path)
       || path !== posix.normalize(path) || path.split("/").some(part => !part || part === "." || part === ".."))
       throw new PluginPackageError("invalid_entry", `Manual directory ${path} must be a normalized package-relative subdirectory.`);
@@ -106,22 +121,37 @@ export function readManifest(root: string): PluginPackageManifest {
       throw new PluginPackageError("invalid_entry", `Manual directory ${path} overlaps another declared directory.`);
     try {
       const directory = realpathSync(resolve(root, path));
-      const inside = relative(realpathSync(root), directory);
-      if (!inside || inside.split(/[\\/]/u).includes("..") || isAbsolute(inside) || !statSync(directory).isDirectory())
+      if (!pathWithin(realpathSync(root), directory) || !statSync(directory).isDirectory())
         throw new Error("Not a package subdirectory.");
+      sources.push({ path, directory });
     } catch {
       throw new PluginPackageError("invalid_entry", `Manual directory ${path} must resolve to an existing directory inside the package.`);
     }
     paths.push(path);
   }
-  return manifest;
+  return sources;
+}
+
+function packageManuals(root: string, manifest: PluginPackageManifest): ManualSource[] {
+  const sources = manualDirectories(root, manifest.manual ?? []);
+  const require = createRequire(join(root, "package.json"));
+  for (const name of manifest.publicPackages ?? []) {
+    const directory = require.resolve.paths(name)?.map(path => join(path, name)).find(path => existsSync(join(path, "package.json")));
+    if (!directory) throw new PluginPackageError("invalid_entry", `Public package ${name} is not installed for ${manifest.id}.`);
+    const metadata = z.object({ asterism: z.object({ manual: z.array(z.string()).optional() }).optional() })
+      .parse(JSON.parse(readFileSync(join(directory, "package.json"), "utf8")));
+    sources.push(...manualDirectories(directory, metadata.asterism?.manual ?? []).map(source => ({
+      ...source, path: `public/${name}/${source.path}`,
+    })));
+  }
+  return sources.map(source => ({ ...source, path: `plugins/${manifest.id}/${source.path}` }));
 }
 
 /** Package list persistence: `<data>/plugins.json`; changes take effect after restart. */
 export class PackageList {
-  constructor(private readonly file: string) {}
+  constructor(private readonly file: string, private readonly defaults: readonly PackageEntry[] = []) {}
   read(): PackageEntry[] {
-    if (!existsSync(this.file)) return [];
+    if (!existsSync(this.file)) return structuredClone([...this.defaults]);
     return listSchema.parse(JSON.parse(readFileSync(this.file, "utf8"))).packages;
   }
   private write(packages: PackageEntry[]): void {
@@ -169,16 +199,16 @@ function sharedModuleSource(id: string): string {
 }
 
 /** Renderer shared modules: the host page supplies the same instances through window.__asterismRendererModules. */
-export const rendererShared: readonly string[] = ["react", "react/jsx-runtime", "react-dom", "react-dom/client", "react-intl", "zod", "@asterism-app/sdk/contracts", "@asterism-app/sdk/renderer"];
 function rendererModuleSource(id: string): string {
   // CJS forwarding: esbuild interop reads named imports as properties of the same instance.
-  return `const m = globalThis.__asterismRendererModules[${JSON.stringify(id)}]; module.exports = m;`;
+  return `const m = globalThis.__asterismRendererModules[${JSON.stringify(id)}];`
+    + ` if (!m) throw new Error(${JSON.stringify(`The host does not provide renderer module ${id}.`)}); module.exports = m;`;
 }
 
 /** Host libraries retain existing instances; plugin public modules share the same ESM graph. */
 function hostModules(realm: "runtime" | "renderer"): Plugin {
   return { name: "asterism-host-modules", setup(build) {
-    build.onResolve({ filter: /.*/ }, args => (realm === "runtime" ? args.path in shared : rendererShared.includes(args.path))
+    build.onResolve({ filter: /.*/ }, args => (realm === "runtime" ? args.path in shared : isRendererShared(args.path))
       ? { path: args.path, namespace: "asterism-host" } : undefined);
     build.onLoad({ filter: /.*/, namespace: "asterism-host" }, args => ({
       contents: realm === "runtime" ? sharedModuleSource(args.path) : rendererModuleSource(args.path), loader: "js",
@@ -187,6 +217,7 @@ function hostModules(realm: "runtime" | "renderer"): Plugin {
 }
 
 export interface ResolvedPackage {
+  manualSources?: readonly ManualSource[];
   dependencies?: string[];
   /** Runtime providers requiring setup, including providers reached through public-only packages. */
   runtimeDependencies?: string[];
@@ -251,7 +282,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
     }
   }
   const hostIdentity = JSON.stringify({ sdkVersion: sdkMetadata.version, runtime: Object.keys(shared).sort().map(id => sharedModuleSource(id)),
-    renderer: rendererShared.map(id => rendererModuleSource(id)) });
+    renderer: { modules: rendererSharedModules, prefix: sharedUiPackage, source: rendererModuleSource("") } });
   const compiled = await compileModules(modules, new Set(result.filter(item => item.status === "loaded").map(item => item.manifest!.id)),
     cacheRoot, hostModules, publicProviders, hostIdentity, progress);
   for (const item of result) {
@@ -261,6 +292,7 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
     item.rendererDependencies = [...compiled.rendererDependencies.get(id) ?? []];
     try {
       if (compiled.failures.has(id)) throw new PluginPackageError("build_failed", compiled.failures.get(id)!);
+      item.manualSources = packageManuals(item.root, item.manifest!);
       const renderer = compiled.renderer.get(id);
       if (renderer) item.renderer = relative(cacheRoot, renderer).split("\\").join("/");
       const stylesheet = compiled.stylesheets.get(id);
@@ -304,4 +336,10 @@ export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot
   for (const item of result) if (item.status === "loaded" && item.manifest?.i18n)
     item.catalogs = loadCatalogs(item.root, item.manifest.id, item.manifest.i18n.catalogs);
   return result;
+}
+
+/** Stable source identity is independent of the installed application directory. */
+export function packageSource(entry: PackageEntry): string {
+  return entry.source.kind === "path" ? entry.source.path
+    : entry.source.kind === "bundled" ? `bundled:${entry.source.name}` : `${entry.source.name}@${entry.source.version}`;
 }

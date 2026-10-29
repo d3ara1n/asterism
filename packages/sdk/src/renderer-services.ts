@@ -68,8 +68,22 @@ export function useRendererConfiguration<T extends Json>(contract: ConfigContrac
   return { ...configs.get(contract), save: (value: T) => configs.save(contract, value), reset: () => configs.reset(contract), refresh: configs.refresh };
 }
 
-export interface RendererSettingsNavigation { open(pluginId: string, location?: string): void }
+export interface RendererSettingsNavigation {
+  open(pluginId: string, pageId: string, location?: string): void;
+  openHost(pageId: string): void;
+}
 const SettingsNavigation = createContext<RendererSettingsNavigation | null>(null);
 export const RendererSettingsNavigationProvider = SettingsNavigation.Provider;
 /** Open plugin settings without binding the current resource or session. */
 export function useRendererSettings(): RendererSettingsNavigation { return required(useContext(SettingsNavigation), "settings navigation"); }
+
+/** Application-wide frontend capabilities shared by plugin interfaces. */
+export interface RendererApplicationServices {
+  readonly platform: "darwin" | "win32" | "linux";
+  preferences(pluginId: string): import("./renderer-creation.ts").RendererPreferences;
+  pickDirectory(initialPath?: string): Promise<string | null>;
+  openLocalFile(path: string): Promise<void>;
+}
+const Application = createContext<RendererApplicationServices | null>(null);
+export const RendererApplicationProvider = Application.Provider;
+export function useRendererApplication(): RendererApplicationServices { return required(useContext(Application), "application"); }

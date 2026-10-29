@@ -77,7 +77,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     setRunning({ label: entry.label, requestId, sessionId: active.sessionId });
     submitting.current.add(content);
     try {
-      const scopeId = await contentScopeId(content, { sessionId: active.sessionId, resourceKind: kind, contractId: entry.contract.id });
+      const scopeId = await contentScopeId(content, { kind: "resource", sessionId: active.sessionId, resourceKind: kind, contractId: entry.contract.id });
       const result = await active.execute({ type: "resource.create", sessionId: active.sessionId, kind,
         creation: reference(entry.contract), input: value, position: placement, requestId, contentScopeId: scopeId });
       if (!result.ok) setError(errorDisplay(result.error));
@@ -106,13 +106,13 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     const active = latest.current.controller;
     if (!active) return false;
     const requestId = crypto.randomUUID();
-    const content = contentInput({ sessionId: active.sessionId, resourceKind: entry.contract.resource.kind, contractId: entry.contract.id });
+    const content = contentInput({ kind: "resource", sessionId: active.sessionId, resourceKind: entry.contract.resource.kind, contractId: entry.contract.id });
     drafts.current.add(content);
     try {
       setError(null); setBusy(true);
       setRunning({ label: entry.label, sessionId: active.sessionId, requestId, content });
       const value = source.kind === "menu" ? entry.triggers.menu?.initialInput : await entry.triggers.drop?.toInput(source.item, content);
-      await contentScopeId(content, { sessionId: active.sessionId, resourceKind: entry.contract.resource.kind, contractId: entry.contract.id });
+      await contentScopeId(content, { kind: "resource", sessionId: active.sessionId, resourceKind: entry.contract.resource.kind, contractId: entry.contract.id });
       setRunning(null);
       setBusy(false);
       if (entry.InputView) return await collect(entry, source, position, content, value ?? undefined);

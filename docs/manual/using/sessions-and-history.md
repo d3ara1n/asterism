@@ -2,11 +2,17 @@
 
 A session keeps the history and resources for a piece of work. Continue the current approach, branch from an earlier point, or reuse the setup through a template.
 
+## Start work
+
+Home displays the selected plugin's starting interface. The builtin entry starts an Agent conversation; another plugin can start with a form, a terminal, or other resources. A session does not require a message or an Agent.
+
+With several entries available, choose one in General settings. If that plugin becomes unavailable, choose another entry. Templates on Home work independently of this selection.
+
 ## Continue work
 
 Select a saved session from the sidebar. Its agent cards display conversations for the current timeline. Stop and continue operate on an agent’s execution; switching sessions does not stop it.
 
-Automatic naming uses the utility model when available. Rename the session explicitly when a specific title matters. An explicit user or agent title prevents subsequent automatic naming on that history path.
+Builtin's automatic naming uses its utility model when available. Rename the session explicitly when a specific title matters. An explicit user or agent title prevents builtin's subsequent automatic naming on that history path. Manual naming remains available with other paradigms or with builtin disabled.
 
 ## Explore another approach
 
@@ -14,7 +20,7 @@ Open the history panel and select a position. Selection lets you inspect history
 
 Use the explicit continue action to move execution to that position. Work that depends on the current timeline must finish before the jump. Adding records after the jump creates another continuation, preserving existing descendants.
 
-The jump reconstructs resource presence and links. Current file contents, note text, and external services keep their current state. Inspect relevant resources before continuing from older context.
+The jump reconstructs resource presence, links, and the session title recorded on that path. A path without a later title assignment uses the entry's initial title. Current file contents, note text, and external services keep their current state. Inspect relevant resources before continuing from older context.
 
 ## Understand context compaction
 

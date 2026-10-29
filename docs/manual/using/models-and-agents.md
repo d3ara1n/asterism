@@ -2,6 +2,8 @@
 
 Model connections, model roles, and agent configurations serve different purposes. Select the connection and model first, then reuse that selection through roles or agent defaults.
 
+Provider connections and models belong to the application. Roles and Agent configurations belong to the builtin paradigm and have their own contributor-labeled settings pages. Another paradigm can organize its model choices differently while using the same configured providers.
+
 | Item | Purpose |
 | --- | --- |
 | Provider connection | Service endpoint, protocol, credentials, and its model list |

@@ -16,6 +16,8 @@ Creation establishes the object. Incrementing reads the configured step, saves t
 
 The card reads projected data and invokes the public increment action. Each button owns its pending state and displays failures. Actions return receipts that the view checks; typed calls and settings saves reject on failure. A settings page edits the step and reads it back through the backend call.
 
+The example also contributes a Home entry. It prepares a counter, then initializes a session containing it in one transaction. This entry works with the builtin paradigm disabled and requires no conversation input.
+
 The model tool reads the same counter value through its resource implementation. Registering the tool does not grant access: an agent needs a link to the counter and a tool policy that allows the operation.
 
 ## Adapt the package

@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { useI18n, useRendererCatalogs, useRendererObject } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererObject } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { cn } from "@asterism-app/ui/utils";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { modelReference } from "@asterism-app/sdk/contracts";
-import { resolveAgentModel, ModelConfiguration } from "@asterism-app/builtin-api/contracts";
+import { resolveAgentModel } from "@asterism-app/builtin-api/contracts";
+import { useSettingsConfiguration } from "../../configuration/renderer-state";
 import { contextMessages as messages } from "../../messages/context";
 import { COMPRESSION_RESERVE } from "../context-budget";
 import { ContextProjectionError } from "../context-projection";
@@ -24,7 +25,7 @@ const fill: Record<ConversationCategory, string> = {
 /** Window usage: used capacity comes from reported input, while the window and reserve come from the measured request's model configuration; unmeasured content is not plotted. */
 function WindowUsage({ insight, selection }: { insight: ContextInsight; selection: z.infer<typeof AgentView.schema>["selection"] }) {
   const i18n = useI18n();
-  const configuration = useRendererCatalogs().get(ModelConfiguration);
+  const { snapshot: configuration } = useSettingsConfiguration();
   const usage = insight.usage;
   if (!usage) return <Section title={i18n.text(messages.window)}><p className="type-caption">{i18n.text(messages.noUsage)}</p></Section>;
   const measured = diagnosticModel({ model: usage.model, modelScope: usage.scope }, configuration?.models ?? []);

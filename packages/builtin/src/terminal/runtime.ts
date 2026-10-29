@@ -1,27 +1,28 @@
 import { terminalCard } from "../shared/card-appearance.ts";
 import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { isAbsolute } from "node:path";
 import { randomUUID } from "node:crypto";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, implementChannel, PluginApiError,
   type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { ResourceStatusChanged, type Json } from "@asterism-app/sdk/contracts";
-import type { ShellSettings } from "../shell/contract.ts";
 import { terminalMessages } from "../messages/terminal.ts";
-import { SharedTerminal, TerminalError, keySequence, type TerminalViewer } from "./service.ts";
+import { TerminalError, type InteractiveTerminal, type TerminalViewer } from "@asterism-app/sdk/runtime";
+import { keySequence } from "./keys.ts";
+import { inactiveStatus, type TerminalConfig, type TerminalDown, type TerminalImage } from "@asterism-app/sdk/contracts";
 import { TerminalResource, CreateTerminal, TerminalView, TerminalInput, TerminalRead, TerminalWait, TerminalSee, TerminalChannel,
-  StartTerminal, CloseTerminal, TerminalImageRequested, CompleteTerminalImage, inactiveStatus, type TerminalConfig, type TerminalDown, type TerminalImage } from "./contract.ts";
+  StartTerminal, CloseTerminal, TerminalImageRequested, CompleteTerminalImage } from "./contract.ts";
 
 /**
  * A terminal resource is a static entry point, with its external shell instance attached to the object lifecycle: it starts automatically only when the resource is newly created;
  * it remains unopened after application restart, rewind, or session restoration. The instance ends with the object lifecycle (removal, leaving the current set, archival, exit).
  */
-export function createTerminalModule(settings: () => ShellSettings) { return defineModule(plugin => {
-  const terminals = new Map<string, SharedTerminal>();
+export function createTerminalModule() { return defineModule(plugin => {
+  const terminals = new Map<string, InteractiveTerminal>();
   /** Resources newly created in this run and awaiting an appearance notification; start automatically when they appear. */
   const pendingStart = new Set<string>();
   const images = new Map<string, { resolve(png: Uint8Array): void; reject(error: Error): void }>();
-  const root = join(plugin.dir, "shell-integration");
+  const settings = () => plugin.terminalProfiles.get();
   const release = (id: string): Promise<void> => {
     pendingStart.delete(id);
     const terminal = terminals.get(id);
@@ -29,10 +30,10 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
     terminals.delete(id);
     return terminal.dispose();
   };
-  function terminal(config: TerminalConfig, ref: ObjectReader["ref"]): SharedTerminal {
+  function terminal(config: TerminalConfig, ref: ObjectReader["ref"]): InteractiveTerminal {
     const existing = terminals.get(ref.id);
     if (existing) return existing;
-    const created = new SharedTerminal(config, settings, root, {
+    const created = plugin.terminals.create(config, {
       // The session list marks only startup failures; individual interactive shell commands do not create completion or persistent-running markers.
       failed(error) {
         if (plugin.lifetime.signal.aborted || terminals.get(ref.id) !== created) return;
@@ -45,7 +46,7 @@ export function createTerminalModule(settings: () => ShellSettings) { return def
     terminals.set(ref.id, created);
     return created;
   }
-  function get(object: ObjectReader): SharedTerminal {
+  function get(object: ObjectReader): InteractiveTerminal {
     const data = object.snapshot()?.data;
     if (!data) throw new TerminalError("terminal_removed", "The terminal is no longer available.");
     return terminal(TerminalResource.stateSchema.parse(data), object.ref);

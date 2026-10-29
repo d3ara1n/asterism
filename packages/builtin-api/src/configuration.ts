@@ -3,6 +3,13 @@ import { modelExpressionSchema, thinkingSchema } from "@asterism-app/sdk/contrac
 const id = z.string().min(1).max(160);
 /** Configurations use readable slugs for identification by both users and models. */
 export const configurationIdSchema = z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/u, "Use lowercase letters, digits, hyphens or underscores.");
+export const modelRoleInputSchema = z.strictObject({
+  model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
+});
+export const modelRoleSchema = modelRoleInputSchema.extend({ id: configurationIdSchema, builtin: z.boolean() });
+export const modelRoleOverridesSchema = modelRoleInputSchema.partial();
+export type ModelRole = z.infer<typeof modelRoleSchema>;
+export type ModelRoleOverrides = z.infer<typeof modelRoleOverridesSchema>;
 const names = z.array(id).max(200);
 const agentFieldsSchema = z.strictObject({
   enabled: z.boolean(), description: z.string().max(20_000), systemPrompt: z.string().max(100_000),

@@ -1,12 +1,12 @@
-import { type AgentConfiguration, builtin } from "@asterism-app/builtin-api/contracts";
-import type { PromptBlock, SystemPrompt } from "@asterism-app/sdk/contracts";
+import { type AgentPromptBlock, builtin } from "@asterism-app/builtin-api/contracts";
+import type { SystemPrompt } from "@asterism-app/sdk/contracts";
 
-export type { PromptBlock, SystemPrompt } from "@asterism-app/sdk/contracts";
 
-const environment = (applicationName: string): PromptBlock => ({
+export const environment = (applicationName: string): AgentPromptBlock => ({
   id: builtin.name("environment"),
   kind: "system",
   from: builtin.id,
+  source: { id: builtin.name("environment"), plugin: builtin.id },
   text: [
     `You are working in ${applicationName}, a local personal agent workbench.`,
     "Your session can include other agents and resources such as directories and notes. You can operate on resources linked to you using their available tools.",
@@ -18,11 +18,18 @@ const environment = (applicationName: string): PromptBlock => ({
   ].join("\n"),
 });
 
-/** Builds an independent block collection each time; extensions can append or replace by identity before projection without modifying built-in source objects. */
-export function composeSystemPrompt(agent: Pick<AgentConfiguration, "id" | "systemPrompt">, applicationName: string, context: readonly { file: string; text: string }[] = []): SystemPrompt {
-  return { blocks: [
-    environment(applicationName),
-    { id: builtin.name("agent"), kind: "agent", role: agent.id, text: agent.systemPrompt },
-    ...context.map((c, i) => ({ id: builtin.name(`context.${i}`), kind: "context" as const, file: c.file, text: c.text })),
-  ] };
+/** The body is Markdown; neutralize only tag syntax `<name` and `</name`, preserving all other characters. */
+function escapeTags(value: string): string {
+  return value.replace(/<(?=\/?[A-Za-z])/g, "&lt;");
+}
+function escapeAttribute(value: string): string {
+  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+}
+
+/** XML-like markup is the model view; block identity stays outside the body, and attribute order and delimiters are determined here alone. */
+export function projectAgentPrompt(blocks: readonly AgentPromptBlock[]): SystemPrompt {
+  return { blocks: blocks.map(block => {
+    const attribute = block.kind === "system" ? `from="${escapeAttribute(block.from)}"` : block.kind === "agent" ? `role="${escapeAttribute(block.role)}"` : `file="${escapeAttribute(block.file)}"`;
+    return { id: block.id, source: block.source, text: `<${block.kind} ${attribute}>\n${escapeTags(block.text)}\n</${block.kind}>` };
+  }) };
 }

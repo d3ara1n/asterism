@@ -12,3 +12,5 @@ export * from "./request-context.ts";
 export * from "./naming.ts";
 export * from "./catalogs.ts";
 export * from "./creations.ts";
+
+export type * from "./prompt.ts";

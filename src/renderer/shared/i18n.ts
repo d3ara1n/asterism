@@ -2,7 +2,6 @@ import { I18nProvider, useI18n, type I18n } from "@asterism-app/sdk/renderer";
 import { createElement, useSyncExternalStore, type ReactNode } from "react";
 import { createIntl, createIntlCache, RawIntlProvider } from "react-intl";
 
-import builtinChinese from "@asterism-app/builtin/locales/zh-Hans.json";
 import { hostCatalog } from "../../shared/host-catalog";
 import { MessageFormatter, type TranslationCatalog } from "../../shared/i18n";
 import type { LanguageState, LanguageBridge } from "../../shared/language";
@@ -17,7 +16,6 @@ const listeners = new Set<() => void>();
 function environment(): I18n {
   const formatter = new MessageFormatter(language.locale, [
     hostCatalog,
-    { owner: "asterism.builtin", locale: "zh-Hans", revision: "builtin", messages: builtinChinese },
     ...catalogs,
   ]);
   return {

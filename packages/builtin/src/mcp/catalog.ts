@@ -1,34 +1,5 @@
-import { z } from "zod";
-import { jsonSchema, type Json } from "@asterism-app/sdk/contracts";
-import { SERVER_ID_PATTERN, type McpServerConfig, type McpServerState } from "./contract.ts";
-import { McpError } from "./errors.ts";
-
-export const cachedToolSchema = z.object({
-  name: z.string(), title: z.string().optional(), description: z.string().optional(),
-  inputSchema: z.record(z.string(), jsonSchema), outputSchema: z.record(z.string(), jsonSchema).optional(),
-  annotations: z.record(z.string(), jsonSchema).optional(),
-});
-export type CachedTool = z.infer<typeof cachedToolSchema>;
-export const directorySchema = z.object({ tools: z.array(cachedToolSchema), instructions: z.string().optional() });
-export type Directory = z.infer<typeof directorySchema>;
-export interface CatalogServer { config: McpServerConfig; state: McpServerState; directory?: Directory }
-
-/** Server IDs contain no `/`; split handles at the first `/`. Remote tool names may themselves contain `/`. */
-export function toolIdentity(serverId: string, name: string): string { return `${serverId}/${name}`; }
-export function parseToolIdentity(value: string): [string, string] {
-  const split = value.indexOf("/");
-  const serverId = value.slice(0, split), name = value.slice(split + 1);
-  if (split < 1 || !name || !SERVER_ID_PATTERN.test(serverId)) throw new McpError("invalid_tool_id", "tool_id uses the form server_id/tool_name.");
-  return [serverId, name];
-}
-
-/** Default ID generated from the name; names that cannot be transliterated fall back to server, with numeric suffixes to avoid existing IDs. */
-export function slugifyServerId(name: string, taken: Iterable<string>): string {
-  const base = name.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, 48) || "server";
-  const used = new Set(taken);
-  if (!used.has(base)) return base;
-  for (let index = 2; ; index++) if (!used.has(`${base}-${index}`)) return `${base}-${index}`;
-}
+import { McpError, mcpToolIdentity as toolIdentity, type Json, type McpServerState,
+  type CachedMcpTool as CachedTool, type McpCatalogServer as CatalogServer } from "@asterism-app/sdk/contracts";
 
 export function pageOf<T extends Json>(items: T[], offset: number, limit: number) {
   return { items: items.slice(offset, offset + limit), total: items.length, next_offset: offset + limit < items.length ? offset + limit : null };
@@ -73,19 +44,4 @@ export function searchCatalog(all: CatalogServer[], args: { query: string; serve
   return { matches: pageOf(ranked.map(item => item.entry), args.offset, args.limit),
     unindexed_servers: (args.offset === 0 ? unindexed.slice(0, args.limit) : []).map(({ server }) => ({ server_id: server.config.id, name: server.config.name, connection: server.state.connection })),
     coverage: { indexed_servers: servers.length - unindexed.length, unindexed_servers: unindexed.length } };
-}
-
-/** The form accepts KEY=VALUE one line at a time; equals signs and whitespace in values are preserved. */
-export function parseCredentialLines(text: string): Record<string, string> {
-  return Object.fromEntries(text.split(/\r?\n/u).filter(line => line.trim()).map(line => {
-    const split = line.indexOf("=");
-    if (split < 1 || !line.slice(0, split).trim()) throw new Error("Each entry uses KEY=VALUE.");
-    return [line.slice(0, split).trim(), line.slice(split + 1)];
-  }));
-}
-/** One argv per line; trailing blank lines come from newline characters and do not constitute arguments. Blank lines in between are explicit empty arguments. */
-export function parseArgumentLines(text: string): string[] {
-  const lines = text.split(/\r?\n/u);
-  while (lines.length && !lines.at(-1)) lines.pop();
-  return lines;
 }

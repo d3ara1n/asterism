@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { belongsTo, pluginNamespace, defineCall, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type ToolContract } from "@asterism-app/sdk/contracts";
-import { defineTopLevelTool, definePlugin, defineModule, implementCall, implementTool, implementResource, type PluginDefinition, type PluginContext } from "@asterism-app/sdk/runtime";
-import { loadPlugins, type PluginHostServices } from "./loader.ts";
+import { defineTopLevelTool, definePlugin, defineModule, defineAgentInstructions, implementCall, implementTool, implementResource, type PluginDefinition, type PluginContext } from "@asterism-app/sdk/runtime";
+import { AgentCatalogService } from "./agent-catalog.ts";
+import { loadPlugins } from "./loader.ts";
+import { testHostServices } from "./testing.ts";
 import { CallClient } from "../shared/call-client.ts";
 import type { CallFrame } from "../shared/plugin-calls.ts";
 
-const services = { extensionsDirectory: "/unused", data: null as never, refOf: () => null, sessions: { progressChanged() {} } as never,
-  models: { list: () => [] } as never, log: () => {} } satisfies PluginHostServices;
+const services = testHostServices();
 const instances: ReturnType<typeof loadPlugins>[] = [];
 afterEach(async () => {
   for (const instance of instances.splice(0).reverse()) await instance.close();
@@ -34,6 +35,20 @@ function plugin(id: string, contract: ToolContract, options: { extra?: ToolContr
 }
 
 describe("Plugin assembly", () => {
+  it("removes instruction contributions from failed setup while retaining actual contributor identity", () => {
+    const catalog = new AgentCatalogService([]);
+    const loaded = loadPlugins([
+      definePlugin({ namespace: pluginNamespace("test.failed-instructions"), modules: [
+        defineAgentInstructions([{ id: "environment", text: "Failed setup" }]),
+        defineModule(() => { throw new Error("Setup failed."); }),
+      ] }),
+      definePlugin({ namespace: pluginNamespace("test.instructions"), modules: [
+        defineAgentInstructions([{ id: "environment", text: "Available instructions" }]),
+      ] }),
+    ], testHostServices({ shared: { agentCatalog: catalog } }));
+    instances.push(loaded);
+    expect(catalog.instructions()).toEqual([{ id: "test.instructions:environment", plugin: "test.instructions", text: "Available instructions" }]);
+  });
   // A resource's template policy cannot select another plugin's data or give one saved ID ambiguous schemas.
   it.each(["foreign", "duplicate"] as const)("rejects %s template data declarations", mode => {
     const ns = pluginNamespace("test.templates");
@@ -313,7 +328,7 @@ describe("Absent plugins", () => {
     const { AgentCapabilities } = await import("../execution/capabilities.ts");
     const resources = new ResourceRegistry([]);
     const object = { id: "x", kind: "acme.gone/thing", title: "Gone", data: { value: 1 } };
-    expect(resources.project(object)).toEqual({ contract: { id: "asterism.builtin/missing-resource" },
+    expect(resources.project(object)).toEqual({ contract: { id: "asterism.host/missing-resource" },
       data: { plugin: "acme.gone", kind: "acme.gone/thing", data: { value: 1 } } });
     expect(await resources.inspect(object)).toMatchObject({ available: false, error: { code: "implementation_missing" } });
     const capabilities = new AgentCapabilities(resources, new ToolRegistry([]), [object], () => true);

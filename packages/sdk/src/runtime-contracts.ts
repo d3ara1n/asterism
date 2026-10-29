@@ -23,6 +23,8 @@ import type { TopLevelTool } from "./runtime-tools.ts";
 import type { ModelProviderServices, UsageProviderServices, UsageProvider, UsageServices } from "./runtime-providers.ts";
 import type { WebServices, WebProviderServices, WebProviderDefinition } from "./runtime-web.ts";
 import type { ModelProviderPresetContribution } from "./provider-usage.ts";
+import type { AgentCatalog, AgentSkillDeclaration, AgentInstructionDeclaration } from "./runtime-agent-catalog.ts";
+import type { SessionCreation } from "./runtime-sessions.ts";
 export type * from "./objects.ts";
 export type { ResourceRef, ResourceCreationResult, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 
@@ -36,11 +38,21 @@ export interface Lifetime {
   defer(cleanup: () => void | Promise<void>): void;
 }
 export interface PluginContext {
+  readonly mcp: import("./runtime-mcp.ts").McpServices;
+  readonly terminalProfiles: import("./runtime-shell.ts").TerminalProfiles;
+  readonly commands: import("./runtime-shell.ts").CommandExecution;
+  readonly terminals: import("./runtime-shell.ts").TerminalSessions;
+  readonly application: import("./runtime-application.ts").ApplicationIdentity;
+  readonly manual: import("./runtime-application.ts").ManualCatalog;
   readonly id: string;
   /** Plugin-level lifecycle: lasts as long as the host runtime instance; shared plugin services such as connection pools, subscriptions, and public registrations belong here. */
   readonly lifetime: Lifetime;
   readonly sessions: SessionDirectory;
+  readonly createSession: SessionCreation;
   readonly dir: string;
+  /** Resolve a package-relative asset, independently of writable plugin data. */
+  readonly assets: { path(relativePath: string): string };
+  readonly agentCatalog: AgentCatalog;
   readonly log: PluginLogger;
   readonly ipc: { readonly events: PluginEvents; readonly calls: PluginCalls };
   config<T extends Json>(contract: ConfigContract<T>): PluginConfig<T>;
@@ -51,9 +63,9 @@ export interface PluginContext {
   readonly modelProviders: ModelProviderServices;
   readonly usageProviders: UsageProviderServices;
   readonly usages: UsageServices;
+  readonly providerUsage: import("./runtime-providers.ts").ProviderUsage;
   readonly webProviders: WebProviderServices;
   readonly web: WebServices;
-  readonly catalogs: { get<T extends Json>(contract: DataContract<T>): T | null };
   session(id: string): SessionExecutor;
   /** Obtain an object handle using a named resource contract; the host validates plugin ownership of the contract, object existence, and matching type, and stamps records accordingly. */
   object<S extends Json>(sessionId: string, contract: ResourceContract<S>, id: string): ObjectExecutor;
@@ -144,6 +156,8 @@ export interface ToolContribution {
   prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json, caller: ToolCaller): ToolInvocation | PreparedResult;
 }
 export interface ModuleContribution {
+  agentSkills?: readonly AgentSkillDeclaration[];
+  agentInstructions?: readonly AgentInstructionDeclaration[];
   webProviders?: readonly WebProviderDefinition[];
   usageProviders?: readonly UsageProvider[];
   modelProviderPresets?: readonly ModelProviderPresetContribution[];

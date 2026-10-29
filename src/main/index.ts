@@ -1,3 +1,4 @@
+import { pathWithin } from "../storage/paths.ts";
 import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, net, protocol, session, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { externalWebUrl } from "@asterism-app/ui/links";
@@ -274,8 +275,8 @@ function servePluginArtifacts(root: string): void {
   protocol.handle("asterism-plugin", request => {
     const url = new URL(request.url);
     const file = resolve(cache, url.hostname, `.${decodeURIComponent(url.pathname)}`);
-    const inside = relative(cache, file);
-    if (!inside || inside.startsWith("..") || inside.includes(":")) return new Response(null, { status: 404 });
+    const inside = pathWithin(cache, file);
+    if (!inside || inside.includes(":")) return new Response(null, { status: 404 });
     return net.fetch(pathToFileURL(file).href);
   });
 }

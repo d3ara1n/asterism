@@ -8,7 +8,7 @@ import { templateSummarySchema } from "./templates.ts";
 import { startupStageSchema, type StartupBridge } from "./startup.ts";
 import type { UpdatesBridge } from "./updates.ts";
 
-export const protocolVersion = 12;
+export const protocolVersion = 13;
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");
@@ -34,7 +34,7 @@ export const snapshotSchema = z.strictObject({
   /** Trash catalog containing sessions themselves only, used for settings counts and restoration. */
   archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string() })),
   /** Plugin packages at startup; renderer is the entry path under asterism-plugin://. */
-  plugins: z.array(z.strictObject({ index: z.number().int().nonnegative().nullable(), id: z.string().nullable(), source: z.string(),
+  plugins: z.array(z.strictObject({ index: z.number().int().nonnegative(), bundled: z.boolean().default(false), id: z.string().nullable(), source: z.string(),
     status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
     stylesheet: z.string().nullable(),
     metadata: pluginMetadataSchema.default({}),

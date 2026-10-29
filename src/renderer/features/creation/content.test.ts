@@ -22,7 +22,7 @@ it.each(["upload.begin", "read.open"] as const)("delivers backend rejection of %
     return { ok: true, reply: { kind: "done" } };
   });
   backend.execute = execute as typeof backend.execute;
-  const content = contentInput({ resourceKind: "example/document", contractId: "example/create" });
+  const content = contentInput({ kind: "resource", resourceKind: "example/document", contractId: "example/create" });
   try {
     const pending = operation === "upload.begin"
       ? content.stage(new Uint8Array([1])) : content.read({ "$asterism.content": "file" });
@@ -40,7 +40,7 @@ it("preserves backend errors while content remains open", async () => {
   backend.execute = async (): Promise<ContentResult> => ({
     ok: false, error: { code: "unavailable", message: "Storage is unavailable." },
   });
-  const content = contentInput({ resourceKind: "example/document", contractId: "example/create" });
+  const content = contentInput({ kind: "resource", resourceKind: "example/document", contractId: "example/create" });
   try {
     await expect(content.stage(new Uint8Array([1]))).rejects.toMatchObject({ name: "Error", message: "Storage is unavailable." });
   } finally { await content.close(); }

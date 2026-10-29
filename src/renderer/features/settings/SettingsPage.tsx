@@ -1,50 +1,62 @@
+import { ShellSettingsPage } from "../shell/Settings";
+import { shellMessages } from "@asterism-app/ui/messages/shell";
+import { McpSettings } from "../mcp/Settings";
+import { mcpMessages } from "@asterism-app/ui/messages/mcp";
 import { LanguageSettings } from "./LanguageSettings";
+import { HomeEntrySettings } from "./HomeEntrySettings";
 import { SessionsSettings } from "./SessionsSettings";
 import { AboutSettings } from "./AboutSettings";
 import { AppearanceSettings } from "../appearance/AppearanceSettings";
 import { ModelProvidersSettings } from "../configuration/ModelProvidersSettings";
 import { WebProvidersSettings } from "../configuration/WebProvidersSettings";
-import { RolesSettings } from "../configuration/RolesSettings";
-import { AgentsSettings } from "../configuration/AgentsSettings";
-import { PluginsOverview, PluginDetails, usePlugins, pluginKey, type PluginManager } from "../plugins/PluginsSettings";
+import { SkillSettings } from "../skills/SkillsSettings";
+import { skillsMessages } from "../../messages/skills";
+import { PluginsSettings, PluginSettingsContent, usePlugins, type PluginManager } from "../plugins/PluginsSettings";
+import { settingsPageKey, usePluginSettingsRegistry } from "../../modules/settings";
 import { pluginsMessages } from "../../messages/plugins";
 import { Item, ItemContent, ItemTitle, ItemDescription } from "@asterism-app/ui/ui/item";
-import { Separator } from "@asterism-app/ui/ui/separator";
 import { AnimatePresence, motion } from "motion/react";
 
 import { Card } from "@asterism-app/ui/ui/card";
 
 import { Button } from "@asterism-app/ui/ui/button";
-import { ArrowLeft, Info, Palette, Cpu, PlugZap, Bot, type LucideProps } from "lucide-react";
+import { ArrowLeft, Info, Palette, PlugZap, Puzzle, BookOpen, Terminal, Network } from "lucide-react";
 import { ConfigurationReadStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";
 import { Screen, useIsland, type IslandSpec } from "../../shared/weave/Screen";
 import { settingsMessages } from "../../messages/settings";
 import { useI18n } from "../../shared/i18n";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import type { UiText } from "@asterism-app/sdk/contracts";
 
 /** The official Card carries the detail animation; component source remains unchanged. */
 const MotionCard = motion.create(Card);
 import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 
 /** Settings category registry: add a category by appending one entry. Include only categories with a clear purpose. */
-export type SettingsCategoryId = "general" | "appearance" | "providers" | "roles" | "agents" | "about";
-interface SettingsCategory { id: SettingsCategoryId; title: import("@asterism-app/sdk/contracts").UiText; summary: import("@asterism-app/sdk/contracts").UiText; icon: ComponentType<LucideProps>; content: () => ReactNode }
+export type SettingsCategoryId = "general" | "appearance" | "providers" | "plugins" | "skills" | "shell" | "mcp" | "about";
+export const isSettingsCategory = (id: string): id is SettingsCategoryId => ["general", "appearance", "providers", "plugins", "skills", "shell", "mcp", "about"].includes(id);
+/** Host and plugin cards share one icon contract; the card decides size and color. */
+type SettingsIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
+interface SettingsCategory { id: SettingsCategoryId; title: UiText; summary: UiText; icon: SettingsIcon; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
-  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><SessionsSettings /></> },
+  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><HomeEntrySettings /><SessionsSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /></> },
-  { id: "roles", title: settingsMessages.rolesTitle, summary: settingsMessages.rolesSummary, icon: Cpu, content: () => <RolesSettings /> },
-  { id: "agents", title: settingsMessages.agents, summary: settingsMessages.agentsSummary, icon: Bot, content: () => <AgentsSettings /> },
+  { id: "skills", title: skillsMessages.title, summary: skillsMessages.summary, icon: BookOpen, content: () => <SkillSettings /> },
+  { id: "shell", title: shellMessages.title, summary: shellMessages.summary, icon: Terminal, content: () => <ShellSettingsPage /> },
+  { id: "mcp", title: mcpMessages.settings, summary: mcpMessages.summary, icon: Network, content: () => <McpSettings /> },
   { id: "about", title: settingsMessages.aboutTitle, summary: settingsMessages.aboutSummary, icon: Info, content: () => <AboutSettings /> },
 ];
+/** Categories editing the shared host configuration; their bodies render once its snapshot is available. */
+const configurationPages = new Set<string>(["providers", "shell", "mcp"]);
 
 /**
  * Settings screen: the root island initially shows category cards tiled over the material; opening a category fades out the overview and scales and fades in category content from the clicked card's transform origin,
  * reversing toward the same origin when closing. Animate only opacity/transform, without layout interpolation. Category content can open deeper islands on the right (such as provider details).
  */
-export type SettingsTarget = ({ category: SettingsCategoryId } | { pluginId: string; location?: string }) & { sequence: number };
+export type SettingsTarget = ({ category: SettingsCategoryId } | { pluginId: string; pageId: string; location?: string }) & { sequence: number };
 function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId: string | null; onOpen: (id: string) => void; onClosed: () => void; manager: PluginManager; location?: string }) {
   const i18n = useI18n();
   const island = useIsland();
@@ -55,13 +67,14 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
   const overviewScroll = useRef(0);
   // Transform origin shared by details and overview (relative to the stage): use the center of the last clicked card; when opened directly from outside, reuse the previous origin or top center.
   const [origin, setOrigin] = useState("50% 0px");
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState("all");
-  const plugin = manager.list.find(plugin => pluginKey(plugin) === openId);
-  const open = categories.find(category => category.id === openId) ?? (plugin ? {
-    id: pluginKey(plugin), title: plugin.metadata.name ?? plugin.id ?? pluginsMessages.unknownPlugin,
-    content: () => <PluginDetails plugin={plugin} manager={manager} location={location} />,
-  } : undefined);
+  const registry = usePluginSettingsRegistry();
+  const entries: { id: string; title: UiText; summary: UiText; icon: SettingsIcon; source?: UiText; content: () => ReactNode }[] = [
+    ...categories,
+    { id: "plugins", title: pluginsMessages.plugins, summary: pluginsMessages.pluginsSummary, icon: Puzzle, content: () => <PluginsSettings manager={manager} /> },
+    ...Array.from(registry.pages, ([id, page]) => ({ id, title: page.title, summary: page.summary, icon: page.icon ?? Puzzle, source: page.pluginName,
+      content: () => <PluginSettingsContent key={id} pluginId={page.pluginId} page={page} location={location} /> })),
+  ];
+  const open = entries.find(entry => entry.id === openId);
 
   useEffect(() => { if (openId) heading.current?.focus({ preventScroll: true }); }, [openId]);
   const openCard = (id: string) => {
@@ -88,24 +101,22 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
         style={{ transformOrigin: origin }}
         initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={fadeTransition}>
         <section className="shrink-0" aria-labelledby="application-settings-title">
-          <header className="mb-4 space-y-2">
+          <header className="mb-4 flex flex-col gap-2">
             <h2 id="application-settings-title" className="type-section">{i18n.text(pluginsMessages.application)}</h2>
             <p className="type-caption">{i18n.text(pluginsMessages.applicationSummary)}</p>
           </header>
           <div className="settings-grid">
-        {categories.map(({ id, title, summary, icon: Icon }) => <Item key={id} variant="outline" asChild className="surface h-full hover:bg-accent"><button type="button" className="settings-card group"
+        {entries.map(({ id, title, summary, icon: Icon, source }) => <Item key={id} variant="outline" asChild className="surface h-full hover:bg-accent"><button type="button" className="settings-card group"
           ref={node => { if (node) cards.current.set(id, node); else cards.current.delete(id); }}
           onClick={() => openCard(id)}>
           <ItemContent>
             <Icon className="mb-2 size-4 text-muted-foreground" aria-hidden="true" />
             <ItemTitle>{i18n.text(title)}</ItemTitle><ItemDescription>{i18n.text(summary)}</ItemDescription>
+            {source && <p className="type-caption">{i18n.formatMessage(pluginsMessages.contributedBy, { plugin_name: i18n.text(source) })}</p>}
           </ItemContent>
         </button></Item>)}
           </div>
         </section>
-        <Separator />
-        <PluginsOverview manager={manager} query={query} filter={filter} onQuery={setQuery} onFilter={setFilter}
-          onOpen={openCard} cardRef={(id, node) => { if (node) cards.current.set(id, node); else cards.current.delete(id); }} />
       </motion.div> : <MotionCard layoutScroll key={`detail-${open.id}`} className="settings-detail gap-0 py-0" style={{ transformOrigin: origin }}
         initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96, transition: fadeTransition }}
         transition={islandTransition}>
@@ -113,7 +124,8 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
           <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={() => void close()}><ArrowLeft />{i18n.formatMessage(settingsMessages.allSettings)}</Button>
           {/* The About page uses the application identity card as its visible heading; retain the category title only for assistive technology and as a focus target. */}
           <h2 ref={heading} tabIndex={-1} className={open.id === "about" ? "sr-only" : "type-page mb-2 outline-none"}>{i18n.text(open.title)}</h2>
-          {["providers", "roles", "agents"].includes(open.id) && <ConfigurationReadStatus />}
+          {open.source && <p className="type-caption mb-4">{i18n.formatMessage(pluginsMessages.contributedBy, { plugin_name: i18n.text(open.source) })}</p>}
+          {configurationPages.has(open.id) && <ConfigurationReadStatus />}
           {open.content()}
         </div>
       </MotionCard>}
@@ -131,6 +143,7 @@ export function SettingsPage({ active, target }: { active: boolean; target: Sett
   const [location, setLocation] = useState<string | undefined>();
   const [generation, setGeneration] = useState(0);
   const manager = usePlugins(active);
+  const registry = usePluginSettingsRegistry();
   const appliedTarget = useRef<SettingsTarget | null>(null);
   useEffect(() => {
     if (!active || !target || appliedTarget.current === target) return;
@@ -138,12 +151,12 @@ export function SettingsPage({ active, target }: { active: boolean; target: Sett
       appliedTarget.current = target; setLocation(undefined); setOpenId(target.category);
       return;
     }
-    const plugin = manager.list.find(plugin => plugin.id === target.pluginId);
-    if (plugin) { appliedTarget.current = target; setLocation(target.location); setOpenId(pluginKey(plugin)); }
-  }, [active, target, manager.list]);
+    const key = settingsPageKey(target.pluginId, target.pageId);
+    if (registry.pages.has(key)) { appliedTarget.current = target; setLocation(target.location); setOpenId(key); }
+  }, [active, target, registry.pages]);
   useEffect(() => {
-    if (openId?.startsWith("plugin:") && !manager.list.some(plugin => pluginKey(plugin) === openId)) setOpenId(null);
-  }, [openId, manager.list]);
+    if (openId?.startsWith("plugin:") && !registry.pages.has(openId)) setOpenId(null);
+  }, [openId, registry.pages]);
   // Return to the category overview when leaving settings (recreate the screen and clear deeper islands).
   // Reset after the page strip finishes sliding and settings leave the viewport, avoiding visible reconstruction during exit.
   useEffect(() => {

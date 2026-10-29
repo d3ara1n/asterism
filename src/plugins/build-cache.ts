@@ -1,118 +1,77 @@
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, renameSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { z } from "zod";
 import type { CompiledModules } from "./package-modules.ts";
 
 const entries = z.array(z.tuple([z.string(), z.string()]));
 const dependencies = z.array(z.tuple([z.string(), z.array(z.string())]));
 const cacheSchema = z.object({
-  key: z.string(), files: z.array(z.string()),
+  key: z.string(), files: z.array(z.string()), observed: entries,
   runtime: entries, storage: entries, renderer: entries, stylesheets: entries, dependencies, runtimeDependencies: dependencies, rendererDependencies: dependencies,
 });
-function inside(root: string, path: string): boolean {
-  const part = relative(root, path);
-  return part !== ".." && !part.startsWith(`..${sep}`) && !isAbsolute(part);
+const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
+
+/** What resolution and bundling observe at a path: file contents, directory entry names, or absence. */
+function fingerprint(path: string): string {
+  const stat = statSync(path, { throwIfNoEntry: false });
+  if (!stat) return "missing";
+  return stat.isDirectory() ? `directory:${digest(readdirSync(path).sort().join("\0"))}` : `file:${digest(readFileSync(path))}`;
 }
 
 /**
- * Content fingerprints of the complete source tree and candidate node_modules cover new resolution candidates.
- * Out-of-scope helpers, configuration inheritance, and path mapping still build normally without cache reuse in this batch.
+ * The index is valid while every path the last build observed still looks the same.
+ * Inputs record their contents and directory listings; each ancestor records package.json, tsconfig.json and node_modules,
+ * so new higher-priority candidates, nearer dependencies, package exports and new configuration invalidate it.
+ * Inherited TypeScript configuration of plugin sources reads files outside this set, so such builds are not cached.
  */
 export class PluginBuildCache {
-  private readonly roots: string[];
+  private readonly observed = new Set<string>();
   private readonly ancestors = new Set<string>();
-  private readonly checkedConfigurations = new Set<string>();
+  private readonly configurations = new Set<string>();
   private reusable = true;
   private readonly index: string;
-  readonly key: string | null;
-  constructor(private readonly directory: string, sourceRoots: readonly string[], recipe: unknown) {
-    directory = this.directory = resolve(directory);
-    this.index = join(directory, "build-index.json");
-    const roots = new Set(sourceRoots.map(root => realpathSync(root)));
-    for (const root of sourceRoots) {
-      let parent = resolve(root);
-      while (true) {
-        this.ancestors.add(parent);
-        roots.add(join(parent, "node_modules"));
-        const next = dirname(parent);
-        if (next === parent) break;
-        parent = next;
-      }
-    }
-    this.roots = [...roots].sort().filter(root => ![...roots].some(other => other !== root && inside(other, root)));
-    const hash = createHash("sha256").update(JSON.stringify(recipe));
-    const record = (path: string, kind: string, value: string | Buffer = "") => {
-      hash.update(JSON.stringify([path, kind, value.length])).update(value);
-    };
-    const scan = (path: string) => {
-      if (inside(directory, path) || basename(path) === ".git") return;
-      const stat = lstatSync(path, { throwIfNoEntry: false });
-      if (!stat) { record(path, "missing"); return; }
-      if (stat.isSymbolicLink()) {
-        record(path, "link", readlinkSync(path));
-        if (!this.covers(realpathSync(path))) this.reusable = false;
-      } else if (stat.isDirectory()) {
-        record(path, "directory");
-        for (const name of readdirSync(path).sort()) scan(join(path, name));
-      } else if (stat.isFile()) {
-        const contents = readFileSync(path);
-        record(path, "file", contents);
-      } else this.reusable = false;
-    };
-    try {
-      for (const root of this.roots) scan(root);
-      for (const ancestor of [...this.ancestors].sort()) for (const name of ["package.json", "tsconfig.json"]) {
-        const path = join(ancestor, name);
-        if (!this.covers(path)) scan(path);
-      }
-      this.key = this.reusable ? hash.digest("hex") : null;
-    } catch (error) {
-      this.key = null;
-      console.warn("Plugin build cache inputs could not be inspected.", error);
-    }
+  readonly key: string;
+  constructor(directory: string, recipe: unknown) {
+    this.index = join(resolve(directory), "build-index.json");
+    this.key = digest(JSON.stringify(recipe));
   }
 
-  private covers(path: string): boolean {
-    return !inside(this.directory, path) && !path.split(sep).includes(".git") && this.roots.some(root => inside(root, path));
-  }
-  /** Check original candidate parent directories to cover ../pkg resolving to either pkg.js or pkg/index.js. */
-  resolution(path: string, importer: string, resolveDir: string): void {
-    if (!this.reusable || !importer || !resolveDir) return;
-    if (path.startsWith("#")) { this.reusable = false; return; }
-    if (path.startsWith(".") || isAbsolute(path)) {
-      const candidate = resolve(resolveDir, path);
-      if (!this.covers(dirname(candidate))) this.reusable = false;
-    }
-  }
+  /** Paths reported by the esbuild metafile; host and public module namespaces are not files. */
   inputs(paths: readonly string[]): void {
     for (const path of paths) {
-      if (path.startsWith("asterism-host:") || path.startsWith("asterism-public:")) continue;
+      if (/^[a-z][a-z-]+:/u.test(path)) continue;
       const file = resolve(path);
-      if (!this.covers(file)) { this.reusable = false; continue; }
-      let parent = dirname(file);
-      while (!this.checkedConfigurations.has(parent)) {
-        this.checkedConfigurations.add(parent);
-        const config = join(parent, "tsconfig.json");
-        if (existsSync(config)) {
-          try {
-            const value = JSON.parse(readFileSync(config, "utf8"));
-            if (value.extends || value.compilerOptions?.baseUrl || value.compilerOptions?.paths) this.reusable = false;
-          } catch { this.reusable = false; }
-          break;
-        }
-        const next = dirname(parent);
-        if (next === parent) break;
-        parent = next;
+      this.observed.add(file).add(dirname(file));
+      // esbuild reads tsconfig.json only for files outside node_modules.
+      if (!file.split(/[\\/]/u).includes("node_modules")) this.configuration(dirname(file));
+      for (let parent = dirname(file); !this.ancestors.has(parent); parent = dirname(parent)) {
+        this.ancestors.add(parent);
+        for (const name of ["package.json", "tsconfig.json", "node_modules"]) this.observed.add(join(parent, name));
+        if (dirname(parent) === parent) break;
       }
+    }
+  }
+  private configuration(start: string) {
+    for (let parent = start; !this.configurations.has(parent); parent = dirname(parent)) {
+      this.configurations.add(parent);
+      const file = join(parent, "tsconfig.json");
+      if (existsSync(file)) {
+        try {
+          const value = JSON.parse(readFileSync(file, "utf8"));
+          if (value.extends || value.compilerOptions?.baseUrl || value.compilerOptions?.paths) this.reusable = false;
+        } catch { this.reusable = false; }
+        return;
+      }
+      if (dirname(parent) === parent) return;
     }
   }
 
   read(): CompiledModules | null {
-    if (!this.key) return null;
     try {
       const cached = cacheSchema.parse(JSON.parse(readFileSync(this.index, "utf8")));
-      if (cached.key !== this.key || !cached.files.every(path => existsSync(path))) return null;
+      if (cached.key !== this.key || !cached.files.every(path => existsSync(path))
+        || !cached.observed.every(([path, value]) => fingerprint(path) === value)) return null;
       return { runtime: new Map(cached.runtime), storage: new Map(cached.storage), renderer: new Map(cached.renderer), stylesheets: new Map(cached.stylesheets),
         dependencies: new Map(cached.dependencies.map(([id, values]) => [id, new Set(values)])),
         runtimeDependencies: new Map(cached.runtimeDependencies.map(([id, values]) => [id, new Set(values)])),
@@ -121,12 +80,14 @@ export class PluginBuildCache {
     } catch { return null; }
   }
   write(result: CompiledModules, files: readonly string[]): void {
-    if (!this.key || !this.reusable || result.failures.size) return;
+    if (!this.reusable || result.failures.size) return;
     const serialize = (map: Map<string, Set<string>>) => [...map].map(([id, values]) => [id, [...values]]);
     try {
-      mkdirSync(this.directory, { recursive: true });
+      mkdirSync(dirname(this.index), { recursive: true });
+      // Fingerprint after creating the cache directory so its own appearance does not invalidate the index.
+      const observed = [...this.observed].sort().map(path => [path, fingerprint(path)]);
       const temporary = `${this.index}.tmp`;
-      writeFileSync(temporary, JSON.stringify({ key: this.key, files,
+      writeFileSync(temporary, JSON.stringify({ key: this.key, files, observed,
         runtime: [...result.runtime], storage: [...result.storage], renderer: [...result.renderer], stylesheets: [...result.stylesheets], dependencies: serialize(result.dependencies),
         runtimeDependencies: serialize(result.runtimeDependencies), rendererDependencies: serialize(result.rendererDependencies) }));
       renameSync(temporary, this.index);

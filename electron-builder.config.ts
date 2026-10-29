@@ -8,10 +8,10 @@ const config: Configuration = {
   files: [
     "dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md",
     // Explicit directory mappings preserve example declarations that the default application filter excludes.
-    ...["docs/manual", ...["sdk", "builtin-api"].flatMap(name => ["docs", "examples"].map(directory => `packages/${name}/${directory}`))]
+    ...["docs/manual", ...["sdk", "ui", "builtin-api", "builtin"].map(name => `packages/${name}`)]
       .map(path => ({ from: path, to: path, filter: ["**/*", "!**/node_modules{,/**}"] })),
   ],
-  asarUnpack: ["docs/manual/**", "packages/{sdk,builtin-api}/{docs,examples}/**", "**/node_modules/{esbuild,@esbuild,node-pty,@vscode/ripgrep*}/**"],
+  asarUnpack: ["docs/manual/**", "packages/**", "node_modules/**"],
   extraResources: [{ from: "assets/icon/asterism-full.png", to: "asterism-full.png" }],
   artifactName: "Asterism-${version}-${os}-${arch}.${ext}",
   publish: { provider: "github", owner: applicationRepository.owner, repo: applicationRepository.name, channel: "latest" },

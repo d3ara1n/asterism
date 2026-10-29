@@ -8,13 +8,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineCall, defineCreation, defineAction, resourceCall, defineRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@asterism-app/sdk/contracts";
 import { defineTopLevelTool, implementCall, defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@asterism-app/sdk/runtime";
-import { ApplicationService } from "../runtime/service.ts";
+import { BuiltinApplicationService as ApplicationService } from "../../packages/builtin/src/testing.ts";
 import { DatabaseVersionError } from "../runtime/storage.ts";
-import * as runtimeModules from "../runtime/builtin.ts";
+import * as runtimeModules from "./loader.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
-import { SubmitAgentInput } from "@asterism-app/builtin-api/contracts";
+import { SubmitAgentInput, StartAgentSession, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { applicationStorage } from "../shared/application.ts";
 import { flat } from "../session/test-nodes.ts";
 
@@ -61,7 +61,7 @@ async function configureModel(service: ApplicationService) {
     providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
     capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
-  return { role: "default", model: result.savedId! };
+  return { provider: "test", model: "test" };
 }
 function counter(options: { onRead?: (object: ObjectReader) => void; failCreate?: boolean; onCreate?: (object: ObjectExecutor) => void; afterCreate?: (object: ObjectExecutor) => void; afterAction?: (object: ObjectExecutor) => void; observe?: (record: SessionRecord, context: PluginContext) => void;
   prepare?: (signal: AbortSignal) => Promise<void>; execute?: (object: ObjectExecutor, signal: AbortSignal, amount: number) => Promise<void>;
@@ -576,17 +576,44 @@ describe("Host implementation of the workbench SDK", () => {
   });
   it("home input preparation replacements must satisfy submission contracts and failures create no sessions", async () => {
     const namespace = pluginNamespace("test.first-input");
+    const prepare = vi.fn(() => ({ action: "replace" as const, input: {} as never }));
     const plugin = definePlugin({ namespace, modules: [defineModule(() => ({
-      preparers: [{ id: "empty-input", contract: SubmitAgentInput,
-        prepare: () => ({ action: "replace", input: {} }) }],
+      preparers: [implementPreparer(SubmitAgentInput, { id: "empty-input", prepare })],
     }))] });
     const { service } = open([plugin]);
     const target = await configureModel(service);
     const before = service.sessions.tree.list();
-    await expect(service.sessions.execute({ type: "start", submissionId: nanoid(16),
-      agent: "worker", model: target.model, thinking: null, parts: [{ kind: "text", text: "First" }] })).rejects.toMatchObject({ code: "invalid_request" });
+    await expect(service.sessions.calls.invoke(StartAgentSession.id, { submissionId: nanoid(16),
+      selection: { agent: "worker", model: `${target.provider}/${target.model}`, thinking: null },
+      parts: [{ kind: "text", text: "First" }] }, {}, null)).rejects.toMatchObject({ code: "invalid_argument" });
+    expect(prepare).toHaveBeenCalledOnce();
     expect(service.sessions.tree.list()).toEqual(before);
     expect(service.sessions.running).toBe(false);
+  });
+  it("validates and saves the prepared Home input with the same resource identity", async () => {
+    const namespace = pluginNamespace("test.first-replacement");
+    let preparedRef: ObjectReader["ref"] | undefined;
+    const plugin = definePlugin({ namespace, modules: [defineModule(() => ({
+      preparers: [implementPreparer(SubmitAgentInput, { id: "replace-input", prepare(input, context) {
+        preparedRef = context.object.ref;
+        return { action: "replace", input: { ...input, parts: [{ kind: "text" as const, text: "Prepared" }] } };
+      } })],
+    }))] });
+    const validated: string[] = [];
+    const { service } = open([plugin], () => ({
+      version: "test", validate(input) { validated.push(JSON.stringify(input.messages)); },
+      prepare() { return { async *stream() { yield { type: "finish", reason: "stop", usage: null } as const; } }; },
+    }));
+    const target = await configureModel(service);
+    const result = await service.sessions.calls.invoke(StartAgentSession.id, { submissionId: nanoid(16),
+      selection: { agent: "worker", model: `${target.provider}/${target.model}`, thinking: null },
+      parts: [{ kind: "text", text: "Original" }] }, {}, null) as { sessionId: string };
+    const view = service.sessions.current(result.sessionId);
+    expect(view.nodes.find(node => node.contract === AgentInputMessage.id)?.data).toMatchObject({ parts: [{ kind: "text", text: "Prepared" }] });
+    expect(view.title).toBe("Prepared");
+    expect(preparedRef).toEqual({ sessionId: result.sessionId, id: view.workbench.objects[0]!.id, kind: "asterism.builtin/agent" });
+    expect(validated[0]).toContain("Prepared");
+    expect(validated[0]).not.toContain("Original");
   });
   it("current data is isolated by session and object and other plugin contracts cannot write into this scope", async () => {
     const c = counter(), { service, sessionId } = open([c.plugin]);
@@ -702,8 +729,8 @@ describe("Host implementation of the workbench SDK", () => {
       }, toModel: value => String(value + 1) })],
     }))] });
     let tools!: ToolRegistry;
-    const original = runtimeModules.createModules;
-    vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {
+    const original = runtimeModules.loadPlugins;
+    vi.spyOn(runtimeModules, "loadPlugins").mockImplementation((...args) => {
       const modules = original(...args); tools = modules.tools; return modules;
     });
     const { service, sessionId } = open([plugin]);
@@ -795,7 +822,7 @@ describe("Host implementation of the workbench SDK", () => {
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(2);
   });
 
-  // Cursor observation contract: appends and explicit cursor selection notify the final timeline uniformly; data/title-only writes and read-only queries do not notify.
+  // Appends and explicit cursor selection notify the final timeline; current-data writes and read-only queries do not.
   it("cursor observation is independent of record commits; batch and nested commits notify only final positions and rollbacks never notify", async () => {
     const eventNs = pluginNamespace("test.cursor");
     const Entry = defineRecord(eventNs.name("entry"), { schema: z.string() });
@@ -811,13 +838,12 @@ describe("Host implementation of the workbench SDK", () => {
           expect(event).not.toHaveProperty("records");
           const path = event.snapshot.records.all({ scope: "timeline" }).map(record => record.id);
           paths.push(path);
-          event.session.title.set(`Position ${path.length}`);
         },
       }] };
     })] });
     let current!: ApplicationService;
     const { service, sessionId } = open([plugin], undefined, event => {
-      if (event.kind === "session.changed") published.push(current.sessions.tree.title(event.sessionId));
+      if (event.kind === "session.changed") published.push(current.sessions.tree.cursor(event.sessionId) ?? "empty");
     });
     current = service;
     await service.sessions.execute({ type: "watch", sessionId });
@@ -830,11 +856,10 @@ describe("Host implementation of the workbench SDK", () => {
     });
     expect(commits).toEqual([ids]);
     expect(paths).toEqual([ids]);
-    expect(published).toEqual(["Position 3"]);
+    expect(published).toEqual([ids[2]]);
     const first = ids[0]!;
     service.sessions.current(sessionId);
     session.commit(writer => { writer.set(Current, 1); });
-    session.title.set("Current title");
     expect(paths).toHaveLength(1);
     expect(commits).toHaveLength(1);
     expect(() => session.commit(writer => {
@@ -846,7 +871,7 @@ describe("Host implementation of the workbench SDK", () => {
     await service.sessions.execute({ type: "select", sessionId, nodeId: first });
     expect(paths).toEqual([ids, [first]]);
     expect(commits).toHaveLength(1);
-    expect(published.at(-1)).toBe("Position 1");
+    expect(published.at(-1)).toBe(first);
     await service.sessions.execute({ type: "select", sessionId, nodeId: first });
     expect(paths).toHaveLength(2);
     let branch!: string;

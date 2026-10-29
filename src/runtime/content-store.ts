@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type Json } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ContentReader, type ContentScope } from "@asterism-app/sdk/runtime";
-import { contentChunkSize, contentReadLimit } from "../shared/content.ts";
+import { contentChunkSize, contentReadLimit, sameContentTarget, type ContentTarget } from "../shared/content.ts";
 
 /** Host implementation parameters: 1 MiB per chunk, 256 MiB per content item, 1 GiB temporary total, 16 MiB per read. */
 export const contentLimits = { chunk: contentChunkSize, read: contentReadLimit, file: 256 * 1024 * 1024, temporary: 1024 * 1024 * 1024, scopes: 128, uploads: 16 } as const;
@@ -26,7 +26,7 @@ export const contentSchemaSql = `
   CREATE INDEX template_content_roots_content ON template_content_roots(content_id);
 `;
 export interface ContentAccess { owner?: string; sessionId?: string; objectId?: string; templateId?: string; scope?: ContentLease; recordIds?: ReadonlySet<string>; allowHandover?: boolean; check?(): void }
-export interface ContentTarget { contractId: string; resourceKind: string; sessionId?: string; objectId?: string }
+export type { ContentTarget } from "../shared/content.ts";
 export interface CapturedContent {
   reader: ContentReader;
   sizes: ReadonlyMap<string, number>;
@@ -144,9 +144,7 @@ export class ContentStore {
     const source = id ? this.getScope(id) : undefined;
     if (source) {
       const bound = source.target;
-      if (!bound || bound.contractId !== target.contractId || bound.resourceKind !== target.resourceKind
-        || bound.sessionId !== undefined && bound.sessionId !== target.sessionId
-        || bound.objectId !== target.objectId) invalid("The content input belongs to another command.");
+      if (!bound || !sameContentTarget(bound, target, true)) invalid("The content input belongs to another command.");
     }
     const scope = this.scope(target);
     for (const ref of source?.refs ?? []) scope.add(ref);
@@ -225,11 +223,21 @@ export class ContentStore {
       return { reader: this.reader({ scope }), sizes, close: () => scope.close() };
     } catch (error) { void scope.close(); throw error; }
   }
-  captureReader(refs: readonly ContentRef[], reader: ContentReader | undefined, owner: string): CapturedContent {
+  private readerAccess(reader: ContentReader | undefined, owner: string): ContentAccess {
     const access = reader && this.readers.get(reader.read);
     if (!access || access.owner !== owner)
       throw new PluginApiError("foreign_resource", "Use a content reader from the current plugin context.");
-    return this.capture(refs, access);
+    return access;
+  }
+  captureReader(refs: readonly ContentRef[], reader: ContentReader | undefined, owner: string): CapturedContent {
+    return this.capture(refs, this.readerAccess(reader, owner));
+  }
+  /** Pin the references a value carries into a destination lease, authorized by the caller's reader; all references are checked before any is retained. */
+  retain(destination: ContentLease, value: Json, reader: ContentReader | undefined, owner: string): void {
+    const refs = contentReferences(value);
+    if (!refs.length) return;
+    const access = this.readerAccess(reader, owner);
+    for (const row of refs.map(ref => this.assert(ref, access))) destination.add(row.id);
   }
   /** Register roots within the owning transaction; access scopes supply session and object identities without passing them twice. */
   bind(access: ContentAccess & { sessionId: string }, root: { kind: "data" | "record"; id: string }, value: Json): void {

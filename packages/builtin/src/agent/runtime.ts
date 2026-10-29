@@ -1,11 +1,11 @@
 import { agentCard } from "../shared/card-appearance.ts";
-import { composeSystemPrompt } from "./system-prompt.ts";
-import type { BuiltinApplication } from "../application.ts";
+import { createRequestAssembly } from "./preparation.ts";
+import type { ApplicationIdentity } from "@asterism-app/sdk/runtime";
 import { AgentView, AgentSelection, AgentDrafts } from "./data.ts";
-import { defineModule, implementResource, implementCreation, implementAction, PluginApiError, type ResourceRef } from "@asterism-app/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementAction, implementCall, PluginApiError, type ResourceRef } from "@asterism-app/sdk/runtime";
 import { registerAgentServices } from "@asterism-app/builtin-api/runtime";
 import {
-  Agent, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent, AgentConfigurations,
+  Agent, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent, StartAgentSession, inputSummary,
   AgentInputMessage, Execution, ContextSummary,
 } from "@asterism-app/builtin-api/contracts";
 import { createSelection, selectionOf } from "./selection.ts";
@@ -15,7 +15,7 @@ import { createAdmission } from "./admission.ts";
 import { projectAgentTurnState } from "./state-projection.ts";
 import { agentExecutionState } from "./state.ts";
 import type { AgentTurnState } from "./state.ts";
-import type { UsageConsumer } from "../usage/service.ts";
+import type { ProviderUsage } from "@asterism-app/sdk/runtime";
 import { createPeekTool, investigateAgent } from "./peek/runtime.ts";
 import { AgentSoftwareFeedback } from "./feedback.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
@@ -24,18 +24,19 @@ import { saveDraft, setDraftMode, exchangeDraft, discardDraft, moveDraft } from 
 import { createSendTool } from "./send/runtime.ts";
 import { createWaitTool } from "./wait/runtime.ts";
 import type { SkillCatalog } from "../skills/catalog.ts";
+import { builtinConfiguration, resolveRoleTarget } from "../configuration/runtime.ts";
 
 /** The resource entry point only assembles domain modules and contributions; business modules do not depend on the full plugin context. */
-export function createAgentModule(application: BuiltinApplication, usage: UsageConsumer, skills: SkillCatalog) {
+export function createAgentModule(application: ApplicationIdentity, usage: ProviderUsage, skills: SkillCatalog) {
   return defineModule(plugin => {
-    const systemPrompt = (agent: Parameters<typeof composeSystemPrompt>[0]) => {
-      const system = composeSystemPrompt(agent, application.name);
-      return { blocks: [...system.blocks, skills.prompt()] };
-    };
-    const selection = createSelection({ agents: () => plugin.catalogs.get(AgentConfigurations) ?? [] });
+    const prepareRequest = createRequestAssembly(plugin, skills);
+    const systemPrompt = (agent: Parameters<typeof prepareRequest>[0]) => prepareRequest(agent)().system;
+    const selection = createSelection({ agents: () => builtinConfiguration(plugin).agents, roles: () => builtinConfiguration(plugin).roles });
+    const peek = { models: plugin.models, userAgent: application.userAgent, usage,
+      utility: () => resolveRoleTarget(builtinConfiguration(plugin).roles, "utility") };
     const feedback = createAgentFeedback();
     plugin.lifetime.defer(feedback.clear);
-    const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, systemPrompt, userAgent: application.userAgent,
+    const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, prepareRequest, skills, userAgent: application.userAgent,
       usage, feedback });
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
     const agentObject = (ref: ResourceRef) => {
@@ -46,14 +47,29 @@ export function createAgentModule(application: BuiltinApplication, usage: UsageC
     };
     registerAgentServices(plugin, {
       describe: ref => ({ type: selectionOf(agentObject(ref)).selection.agent }),
-      peek: (ref, args, signal, publish) => investigateAgent(
-        { models: plugin.models, userAgent: application.userAgent, usage }, agentObject(ref), args, signal, publish),
+      peek: (ref, args, signal, publish) => investigateAgent(peek, agentObject(ref), args, signal, publish),
     });
     // Draft and configuration updates reuse the current path's turn state; rederive it only when the history position changes.
     const turns = new Map<string, { nodeId: string | null; interruptions: readonly (string | null)[]; state: AgentTurnState }>();
     return {
+      calls: [implementCall(StartAgentSession, async (input, context) => {
+        let accepted: ResourceRef | undefined;
+        const submission = { submissionId: input.submissionId, parts: input.parts, mode: "follow" as const, sender: { kind: "user" as const } };
+        const sessionId = await plugin.createSession(`home:${input.submissionId}`, async preparation => {
+          const prepared = await preparation.prepare(CreateAgent, { selection: input.selection });
+          const acceptedInput = await preparation.prepareAction(prepared, SubmitAgentInput, submission);
+          await admission.prepareInitial(acceptedInput, input.selection, preparation.signal, context.content);
+          return { title: inputSummary(acceptedInput.parts).slice(0, 72), initialize(session) {
+            const resource = session.create(prepared);
+            admission.acceptInitial(acceptedInput, session.object(Agent, resource.id));
+            accepted = resource;
+          } };
+        }, { signal: context.signal, content: context.content });
+        if (accepted) loop.start(plugin.object(sessionId, Agent, accepted.id));
+        return { sessionId };
+      })],
       events: [AgentSoftwareFeedback],
-      tools: [createPeekTool(plugin.models, application.userAgent, usage), createSendTool(), createWaitTool(loop)],
+      tools: [createPeekTool(peek), createSendTool(), createWaitTool(loop)],
       resources: [implementResource(Agent, AgentView, {
         card: agentCard,
         template: { current: [AgentSelection], createTitle: generateAgentName },

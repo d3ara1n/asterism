@@ -26,13 +26,15 @@ The host attributes contribution identities to the plugin namespace and rejects 
 
 Public imports establish runtime dependencies. The host resolves environment-specific exports and binds consumers to the provider's actual exports. The import graph determines initialization order and propagates provider failures. This graph belongs to host loading metadata, separate from author-provided runtime definitions. Package-manager dependency declarations describe how to acquire those packages, without becoming a second runtime admission policy.
 
+A plugin can provide its own public export or declare separate public libraries. Both mechanisms share package-name ownership, so competing enabled providers fail explicitly. A disabled library declaration does not displace an enabled public provider.
+
 Each backend or frontend environment has one module instance for a shared declaration. Identical textual IDs in copied declarations do not establish identity. Stable IDs serve routing, persistence, and cross-process association.
 
 The built-in public API is a separate package associated with the built-in implementation plugin. Its release version is independent of the SDK package version.
 
 Public packages own their development guides and source examples according to domain responsibility. Generic authoring material belongs to the SDK; built-in domain material belongs to the built-in public API. Package contents include that material for development outside the application. The manual exposes source directories directly without copying or merging their contents. Compile-time counterexamples remain internal verification material.
 
-Plugins declare manual directories in package metadata. Admission validates existing, non-overlapping subdirectories within the package. The application exposes directories from successfully loaded packages under plugin-qualified paths; disabled plugins and plugins with loading or storage failures contribute none. Declarations follow the startup package snapshot, while file contents are read at operation time. Articles carry their own context and remain independently readable.
+Plugins and their declared public API libraries can declare manual directories in package metadata. Admission validates existing, non-overlapping subdirectories within each declaring package. The application exposes directories from successfully loaded providers under plugin-qualified paths; disabled plugins and plugins with loading or storage failures contribute none. Declarations follow the startup package snapshot, while file contents are read at operation time. Articles carry their own context and remain independently readable.
 
 Provider initialization precedes consumers. Shutdown waits for managed work, then cleans up in reverse dependency order. Public exports do not grant resource access or another plugin’s private state.
 
@@ -48,9 +50,11 @@ First/last queries decode their selected record and preserve unknown status rath
 
 Commits are synchronous. Nested same-session commits join the outer transaction; asynchronous commit callbacks fail. Append uses the current cursor at commit time.
 
-Record-commit and cursor-change observers are distinct. Post-commit observer failure is logged and does not roll back the original transaction. Derived title updates belong to their domain observer.
+Record-commit and cursor-change observers are distinct. Post-commit observer failure is logged and does not roll back the original transaction. Title assignments append host records; continuing from another position restores the path's title without appending an assignment. Domain observers can request new assignments according to their own policy.
 
 ## Creation and actions
+
+A plugin can prepare a complete session before committing it. Preparation produces resource tokens and can run action preparers against their reserved identities. The initializer synchronously commits session identity, resources, initial records, and the plugin-scoped retry receipt. It receives no implicit Agent or first-message requirement. A failed attempt leaves no persistent partial session; an accepted retry returns the existing identity.
 
 Shared contracts declare resource creation and object actions. Implementations bind the original declarations.
 
@@ -84,6 +88,8 @@ Calls declare plugin or object scope. Object calls validate a full resource refe
 
 Call declarations retain both sides of their schemas. Invocation accepts raw JSON input and implementations receive parsed input. Implementations return raw JSON accepted by the response schema; each caller decodes that response into its result type. Schema inference preserves these distinctions for backend and frontend clients.
 
+Input content is a separate call capability. The host binds its authority to the declared entry and retains referenced bytes for the call. Passing content IDs in business JSON does not grant access. Initial session records and current data acquire persistent ownership within their initialization transaction.
+
 Calls remain independent of the object action queue, allowing answers to reach a waiting tool. Communication cancellation and business cancellation are separate. There is no default timeout or automatic replay.
 
 Events carry contract, timestamp, host-stamped origin, and typed data. They are transient, nontransactional, and absent from history and model context.
@@ -98,11 +104,13 @@ The host trusts installed plugins. It protects identity, history, and its declar
 
 ## Provider services
 
-Plugins contribute model connection presets, account usage providers, and web providers. The host owns catalog validation and lifecycle; domain consumers choose when to query and how to cache results.
+Plugins contribute model connection presets, account usage providers, and web providers. The host owns catalog validation, shared service state, and lifecycle. Plugins choose how to compose these capabilities and present their results.
 
 Preset additions and patches follow dependency and declaration order. Patches merge declared top-level fields and connection fields, with arrays replaced as wholes. Failed assembly removes the plugin’s contributions.
 
 Usage providers distinguish active queries from response-header interpretation. Consumers supply the selected connection and credentials or response; the generic model service does not implicitly trigger account queries.
+
+The host's shared usage service reads configured credentials, caches query results, and retains explicitly supplied header observations. Model requests use concrete provider/model targets. Role resolution and prompt composition belong to the requesting paradigm; the host transports ordered prompt bodies and supplies captured linked context for plugin assembly.
 
 Backend credentials remain explicit trusted-plugin capabilities. Frontend consumption uses typed domain calls rather than the credential vault.
 
@@ -132,7 +140,7 @@ Content roots follow the actual encoded persistent JSON within the owning transa
 
 ## Renderer contributions
 
-The renderer can contribute cards, tool phases, history records, creation entries, and settings. Frontend preparation can establish services independently of card mounting and binds them to a cancellation scope.
+The renderer can contribute cards, tool phases, history records, creation entries, Home session entries, and independent settings pages. Frontend preparation can establish services independently of card mounting and binds them to a cancellation scope.
 
 Imported styles are frontend build dependencies. The host preserves each entry's CSS association through compilation, caching, and startup projection, and loads styles in dependency and registration order before preparing the frontend. Initialization failures and frontend shutdown release the associated styles; individual view mounting does not own them.
 

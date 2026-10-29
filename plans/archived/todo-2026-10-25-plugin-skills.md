@@ -2,7 +2,7 @@
 
 Filed on 2026-10-25.
 
-Archived on 2026-10-28. Superseded by `plans/todo-2026-10-28-agent-skills-instructions.md` under the layering in `plans/ref-2026-10-28-plugin-paradigm-layering.md`. Implementation remains deferred; the original scope below is preserved.
+Archived on 2026-10-28. Superseded by `plans/archived/todo-2026-10-28-agent-skills-instructions.md` under the layering in `plans/archived/ref-2026-10-28-plugin-paradigm-layering.md`. Implementation was deferred at archival and subsequently completed under that scope; the original scope below is preserved.
 
 A shared runtime catalog already supplies skill summaries at request boundaries and reads package text on demand. Plugin registration remains unimplemented.
 

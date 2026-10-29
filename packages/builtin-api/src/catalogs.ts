@@ -1,23 +1,12 @@
-import { z } from "zod";
-import { modelCostSchema, modelReference, resolveModelSelection, thinkingSchema } from "@asterism-app/sdk/contracts";
-import { agentSchema, type AgentSelection } from "./configuration.ts";
-import { builtin } from "./identity.ts";
+import { modelReference, resolveModelSelection, type CatalogModel, type ModelCatalogSnapshot } from "@asterism-app/sdk/contracts";
+import type { AgentConfiguration, AgentSelection, ModelRole } from "./configuration.ts";
 
-/** Catalogs projected by the application for built-in plugins; excludes configuration file formats, credentials, connection tests, and override editing state. */
-export const AgentConfigurations = builtin.data("agent.configurations", z.array(agentSchema));
-const modelProviderSchema = z.object({ id: z.string(), name: z.string(), enabled: z.boolean() });
-const modelSchema = z.object({
-  providerId: z.string(), modelId: z.string(), name: z.string(), enabled: z.boolean(),
-  contextWindow: z.number().nullable(), cost: modelCostSchema.nullable(),
-  generation: z.object({ maxOutputTokens: z.number().nullable() }),
-  capabilities: z.object({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema) }),
-});
-const roleSchema = z.object({ id: z.string(), enabled: z.boolean(), model: z.string().nullable(), thinking: thinkingSchema.nullable() });
-export const ModelConfiguration = builtin.data("model.configuration", z.object({
-  modelProviders: z.array(modelProviderSchema), models: z.array(modelSchema), roles: z.array(roleSchema), agents: z.array(agentSchema),
-}));
-export type ModelConfigurationSnapshot = z.infer<typeof ModelConfiguration.schema>;
-export type CatalogModel = z.infer<typeof modelSchema>;
+/** Builtin combines host model metadata with its own effective configuration. */
+export interface ModelConfigurationSnapshot extends ModelCatalogSnapshot {
+  roles: Pick<ModelRole, "id" | "enabled" | "model" | "thinking">[];
+  agents: AgentConfiguration[];
+}
+export type { CatalogModel } from "@asterism-app/sdk/contracts";
 
 export function resolveCatalogModel<M extends CatalogModel>(snapshot: Omit<ModelConfigurationSnapshot, "models"> & { models: M[] }, reference: string | null): M | null {
   return snapshot.models.find(model => model.enabled && modelReference(model) === reference

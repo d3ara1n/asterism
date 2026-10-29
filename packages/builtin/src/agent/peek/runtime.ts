@@ -1,12 +1,12 @@
-import type { ModelItem, ModelTarget } from "@asterism-app/sdk/contracts";
-import { implementTool, type CallResult, type ModelServices, type ObjectReader } from "@asterism-app/sdk/runtime";
+import { formatModelExpression, type ModelItem, type ModelTarget } from "@asterism-app/sdk/contracts";
+import { implementTool, PluginApiError, type CallResult, type ModelServices, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { builtin, peekToModel } from "@asterism-app/builtin-api/contracts";
 import type { z } from "zod";
 import { AgentPeek, Peek, type PeekResult } from "./contract.ts";
 import { peekOverview, projectPeekRecords } from "./snapshot.ts";
 import { retrievalTools, retrieve } from "./retrieval.ts";
 import { collectPeekResponse } from "./stream.ts";
-import type { UsageConsumer } from "../../usage/service.ts";
+import type { ProviderUsage } from "@asterism-app/sdk/runtime";
 
 const requestLimit = 6, maxOutputTokens = 8192;
 const system = { blocks: [{
@@ -29,11 +29,13 @@ function estimate(value: unknown): number {
   return Math.ceil(tokens);
 }
 
-export async function investigateAgent(deps: {
-  models: Pick<ModelServices, "stream" | "roles" | "list">;
+interface PeekDependencies {
+  models: Pick<ModelServices, "stream" | "list">;
+  utility(): ModelTarget;
   userAgent: string;
-  usage?: Pick<UsageConsumer, "consume">;
-}, object: Pick<ObjectReader, "ref"> & { session: Pick<ObjectReader["session"], "snapshot"> },
+  usage?: Pick<ProviderUsage, "consume">;
+}
+export async function investigateAgent(deps: PeekDependencies, object: Pick<ObjectReader, "ref"> & { session: Pick<ObjectReader["session"], "snapshot"> },
 args: z.infer<typeof Peek.argsSchema>, signal: AbortSignal,
 publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>> {
   signal.throwIfAborted();
@@ -43,11 +45,15 @@ publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>> {
     snapshot: { nodeId: snapshot.position.nodeId, capturedAt: new Date().toISOString(), records: records.length },
     phase: "investigating", report: "", round: 0, requests: [], queries: [],
   };
-  const role = deps.models.roles().find(role => role.id === "utility");
-  const model = deps.models.list().find(model => model.model === role?.model);
-  if (!role?.model || !model || !model.capabilities.tools)
+  let target: ModelTarget;
+  try { target = deps.utility(); }
+  catch (error) {
+    if (!(error instanceof PluginApiError)) throw error;
+    return { kind: "failed", data, error: { code: "peek_model_unavailable", message: error.message } };
+  }
+  const model = deps.models.list().find(model => model.model === formatModelExpression(target));
+  if (!model || !model.capabilities.tools)
     return { kind: "failed", data, error: { code: "peek_model_unavailable", message: "Peek requires an available utility model with tool-calling support." } };
-  const target: ModelTarget = { role: "utility", model: role.model, ...(role.thinking ? { thinking: role.thinking } : {}) };
   const outputLimit = Math.min(maxOutputTokens, Math.max(1, Math.floor((model.contextWindow ?? 65536) / 8)));
   const inputBudget = model.contextWindow === null ? null : Math.floor((model.contextWindow - outputLimit) * 0.8);
   // The overview reserves space for the question, tool declarations, and subsequent retrieval; its budget does not affect original text.
@@ -117,10 +123,10 @@ publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>> {
   }
 }
 
-export function createPeekTool(models: ModelServices, userAgent: string, usage: Pick<UsageConsumer, "consume">) {
+export function createPeekTool(deps: PeekDependencies) {
   return implementTool(AgentPeek, {
     call(_resource, _target, args, { object, signal, publish }) {
-      return investigateAgent({ models, userAgent, usage }, object, args, signal, publish);
+      return investigateAgent(deps, object, args, signal, publish);
     },
     toModel: peekToModel,
   });

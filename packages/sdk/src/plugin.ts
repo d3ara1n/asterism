@@ -55,4 +55,4 @@ export function pluginOf(qualified: string): string | null {
   return index > 0 ? qualified.slice(0, index) : null;
 }
 /** Resource projection for a missing implementation: preserves raw data and the source plugin for fallback UI display. */
-export const missingResourceContract = { id: "asterism.builtin/missing-resource" } as const;
+export const missingResourceContract = { id: "asterism.host/missing-resource" } as const;

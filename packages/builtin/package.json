@@ -14,13 +14,10 @@
     "@asterism-app/sdk": "*",
     "@asterism-app/ui": "*",
     "@lobehub/streamdown": "1.4.1",
-    "@modelcontextprotocol/client": "2.3.1",
     "@pierre/diffs": "1.5.2",
     "@vscode/ripgrep": "1.18.0",
     "@xterm/addon-fit": "0.11.0",
-    "@xterm/addon-serialize": "0.14.0",
     "@xterm/addon-webgl": "0.19.0",
-    "@xterm/headless": "6.0.0",
     "@xterm/xterm": "6.0.0",
     "diff": "9.0.0",
     "exa-js": "2.26.0",
@@ -29,18 +26,48 @@
     "mermaid": "12.2.0",
     "motion": "14.1.0",
     "nanoid": "6.0.2",
-    "node-pty": "1.1.0",
     "parallel-web": "1.3.6",
     "rehype-katex": "7.0.1",
     "remark-gfm": "4.0.1",
     "remark-math": "6.0.0",
     "sonner": "2.0.8",
-    "virtua": "0.53.6",
-    "yaml": "2.9.1"
+    "virtua": "0.53.6"
   },
   "peerDependencies": {
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "zod": "^4.6.5"
+  },
+  "author": "Asterism",
+  "asterism": {
+    "id": "asterism.builtin",
+    "runtime": "src/runtime.ts",
+    "renderer": "src/renderer.ts",
+    "storage": "src/storage.ts",
+    "displayName": {
+      "owner": "asterism.builtin",
+      "id": "plugin.name",
+      "defaultMessage": "Asterism Essentials",
+      "kind": "message",
+      "sourceLocale": "en"
+    },
+    "description": {
+      "owner": "asterism.builtin",
+      "id": "plugin.description",
+      "defaultMessage": "Agents, conversations, notes, files and interactive tools.",
+      "kind": "message",
+      "sourceLocale": "en"
+    },
+    "i18n": {
+      "catalogs": {
+        "zh-Hans": "src/locales/zh-Hans.json"
+      }
+    },
+    "publicPackages": [
+      "@asterism-app/builtin-api"
+    ],
+    "runtimeExternals": [
+      "@vscode/ripgrep"
+    ]
   }
 }

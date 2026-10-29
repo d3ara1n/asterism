@@ -18,6 +18,9 @@ export const Settings = ns.config(
 export const ReadStep = defineCall(ns.name("read-step"), {
   scope: "plugin", input: z.null(), output: z.number(),
 });
+export const StartSession = defineCall(ns.name("start-session"), {
+  scope: "plugin", input: z.strictObject({ key: z.string().min(1) }), output: z.string(),
+});
 const Read = defineTool({
   id: ns.name("read-counter"), name: "read_counter",
   description: "Read the current value of a counter.", guidelines: [],

@@ -11,9 +11,10 @@ import type { PluginDefinition } from "@asterism-app/sdk/runtime";
 const roots: string[] = [];
 afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
 function temp() { const r = mkdtempSync(join(tmpdir(), "plugin-pkg-")); roots.push(r); return r; }
-function pkg(root: string, asterism: unknown, source?: string) {
+function pkg(root: string, asterism: object | undefined, source?: string) {
   mkdirSync(join(root, "src"), { recursive: true });
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", version: "1.0.0", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism }));
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", version: "1.0.0", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` },
+    ...(asterism && { asterism: { displayName: "Test plugin", ...asterism } }) }));
   if (source) writeFileSync(join(root, "src", "runtime.ts"), source);
 }
 const runtime = (id: string) => `import { pluginNamespace } from "@asterism-app/sdk/contracts";
@@ -383,7 +384,7 @@ describe("Public modules", () => {
     writeFileSync(join(fixture.provider, "package.json"), JSON.stringify(provider));
     const source = join(fixture.provider, "src/runtime.ts");
     writeFileSync(source, readFileSync(source, "utf8").replace('"./state.ts"', '"@fixture/provider/internal"'));
-    writeFileSync(join(disabled, "package.json"), JSON.stringify({ ...provider, asterism: { id: "acme.disabled" } }));
+    writeFileSync(join(disabled, "package.json"), JSON.stringify({ ...provider, asterism: { displayName: "Test plugin", id: "acme.disabled" } }));
     const list = new PackageList(join(fixture.data, "other-plugins.json"));
     list.add({ source: { kind: "path", path: disabled } }, fixture.data); list.setEnabled(0, false);
     list.add({ source: { kind: "path", path: fixture.consumer } }, fixture.data);

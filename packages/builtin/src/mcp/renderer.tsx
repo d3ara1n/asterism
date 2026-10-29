@@ -6,9 +6,10 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
 import { cn } from "@asterism-app/ui/utils";
-import { McpHost, CreateMcpHost, McpHostView, type McpServerState } from "./contract";
-import { mcpMessages as messages } from "../messages/mcp";
-import { useMcpTools } from "./status";
+import { McpHost, CreateMcpHost, McpHostView } from "./contract";
+import type { McpServerState } from "@asterism-app/sdk/contracts";
+import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
+import { useMcpTools } from "@asterism-app/ui/mcp-status";
 import { Instructions, ServerError, ServerSummary, VirtualToolList } from "./views";
 import { mcpToolRenderers } from "./tool-views";
 
@@ -19,7 +20,7 @@ const detail = "col-[3/-1] min-w-0";
 
 function useOpenSettings() {
   const settings = useRendererSettings();
-  return () => settings.open("asterism.builtin", "mcp");
+  return () => settings.openHost("mcp");
 }
 
 /** Titlebar entry point: server management is in the MCP section of the built-in plugin settings. */
@@ -34,7 +35,7 @@ function ServerTools({ server }: { server: McpServerState }) {
   const { directory, error } = useMcpTools(server.id, true);
   return <div className="flex min-w-0 flex-col gap-2 pb-2">
     {server.error && <pre className="type-caption max-h-32 overflow-auto whitespace-pre-wrap break-words text-destructive select-text">{server.error}</pre>}
-    {error && <p className="type-caption text-destructive">{error}</p>}
+    {error && <p className="type-caption text-destructive">{i18n.text(error)}</p>}
     {directory === undefined && !error ? <Spinner className="size-3.5 text-muted-foreground motion-reduce:animate-none" />
       : directory === null ? <p className="type-caption text-muted-foreground">{i18n.text(messages.unindexedHint)}</p>
         : directory && <>

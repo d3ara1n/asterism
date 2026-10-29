@@ -67,7 +67,7 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
   const service = new ApplicationService(root, { plugins: [plugin, ...options.extra ?? []], adapterFactory: options.adapter ? () => options.adapter! : undefined }); services.push(service);
   const sessionId = service.sessions.tree.create("Content");
   const store = service.sessions.content;
-  const input = () => service.sessions.openContentInput({ contractId: Create.id, resourceKind: Document.kind, sessionId });
+  const input = () => service.sessions.openContentInput({ kind: "resource", contractId: Create.id, resourceKind: Document.kind, sessionId });
   const create = async (file: ContentRef, scopeId?: string, rest: { history?: boolean; fail?: boolean } = {}) => {
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Document.kind, creation: { id: Create.id }, input: { file, ...rest }, contentScopeId: scopeId, position: { x: 0, y: 0 } });
     return service.sessions.current(sessionId).workbench.objects.at(-1)!.id;
@@ -108,7 +108,7 @@ describe("Host immutable content", () => {
     const initialFile = await f.store.writer({ scope: initial }).stage(bytes("target"));
     const targetId = await f.create(initialFile, initial.id);
     await initial.close();
-    const input = f.service.sessions.openContentInput({ sessionId: f.sessionId, resourceKind: Source.kind, contractId: CreateSource.id });
+    const input = f.service.sessions.openContentInput({ kind: "resource", sessionId: f.sessionId, resourceKind: Source.kind, contractId: CreateSource.id });
     const file = await f.store.writer({ scope: input }).stage(bytes("shared input"));
     await f.service.sessions.execute({ type: "resource.create", sessionId: f.sessionId, kind: Source.kind,
       creation: { id: CreateSource.id }, input: file, contentScopeId: input.id, position: { x: 0, y: 0 } });
@@ -250,7 +250,7 @@ describe("Host immutable content", () => {
     const f = fixture(), draft = f.input();
     const old = await f.store.writer({ scope: draft }).stage(bytes("old"));
     const id = await f.create(old, draft.id); await draft.close();
-    const action = f.service.sessions.openContentInput({ sessionId: f.sessionId, objectId: id, resourceKind: Document.kind, contractId: Replace.id });
+    const action = f.service.sessions.openContentInput({ kind: "resource", sessionId: f.sessionId, objectId: id, resourceKind: Document.kind, contractId: Replace.id });
     const file = await f.store.writer({ scope: action }).stage(bytes("new"));
     await expect(f.create(file, action.id)).rejects.toThrow();
     await f.replace(id, { file }, action.id); await action.close(); f.store.collect();
@@ -362,7 +362,7 @@ describe("Host immutable content", () => {
   });
   it("content services reject oversized chunks, cannot seal out-of-order input, and import empty files normally", async () => {
     const f = fixture();
-    const opened = await f.service.content.execute({ type: "input.open", target: { sessionId: f.sessionId, resourceKind: Document.kind, contractId: Create.id } });
+    const opened = await f.service.content.execute({ type: "input.open", target: { kind: "resource", sessionId: f.sessionId, resourceKind: Document.kind, contractId: Create.id } });
     if (opened.kind !== "input") throw new Error("Expected input.");
     const oversized = { type: "upload.write", scopeId: opened.scopeId, uploadId: randomUUID(), offset: 0, data: new Uint8Array(contentLimits.chunk + 1) };
     expect(await serveContent(f.service, oversized)).toMatchObject({ ok: false, error: { code: "invalid_argument" } });
@@ -393,7 +393,7 @@ describe("Host immutable content", () => {
 /** Expectations follow content authorization and request boundaries: files must be readable, and temporary input and requests retain separate holds. */
 describe("Models consuming immutable content", () => {
   const request = (file: ContentRef, mediaType = "image/png") => ({
-    target: { role: "default", model: "media/model" }, system: { blocks: [] },
+    target: { provider: "media", model: "model" }, system: { blocks: [] },
     messages: [{ kind: "input", parts: [{ kind: "file", file, mediaType, filename: "input.png" }] }],
     signal: new AbortController().signal,
   } satisfies StreamRequest);
@@ -472,7 +472,7 @@ describe("Models consuming immutable content", () => {
     await f.context.models.validate(request(file), { content });
     await expect((async () => { for await (const _ of f.context.models.stream(request(file), { content })) {} })()).rejects.toMatchObject({ code: "content_unavailable" });
     // Establish valid ownership using the same object's action draft so authorization failure is not mistaken for size validation.
-    const actionDraft = f.service.sessions.openContentInput({ sessionId: f.sessionId, objectId: id, resourceKind: Document.kind, contractId: Replace.id });
+    const actionDraft = f.service.sessions.openContentInput({ kind: "resource", sessionId: f.sessionId, objectId: id, resourceKind: Document.kind, contractId: Replace.id });
     const large = await f.store.writer({ scope: actionDraft }).stage(new Uint8Array(modelInputLimits.file + 1));
     await f.replace(id, { file: large }, actionDraft.id);
     await expect(f.context.models.validate(request(large), { content: f.object(id).content })).rejects.toMatchObject({ reason: "content_limit" });

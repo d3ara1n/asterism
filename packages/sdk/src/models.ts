@@ -11,11 +11,9 @@ import type { ErrorDetails } from "./error-details.ts";
 /** Standard levels shared across the application; protocol encoding does not change public values. */
 export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 export type ThinkingLevel = typeof thinkingLevels[number];
-export interface ModelTarget { role: string; model?: string; thinking?: ThinkingLevel }
-export type PromptBlock =
-  | { id: string; kind: "system"; from: string; text: string }
-  | { id: string; kind: "agent"; role: string; text: string }
-  | { id: string; kind: "context"; file: string; text: string };
+export interface ModelTarget { provider: string; model: string; thinking?: ThinkingLevel }
+export interface PromptBlock { id: string; text: string; source?: { id: string; plugin: string | null } }
+export interface PromptFile { readonly file: string; readonly text: string }
 export interface SystemPrompt { blocks: readonly PromptBlock[] }
 /** Reasoning text is the plaintext delivered by the protocol, and summary is an independent summary; both can coexist or be empty, and neither fills the other.
  * continuation carries only native data such as signatures/ciphertext; target projection determines whether it can be reused.
@@ -94,7 +92,7 @@ export interface ModelRunRequest {
   userAgent?: string;
   requestParentId: string | null;
   target: ModelTarget;
-  system: SystemPrompt;
+  system: SystemPrompt | ((files: readonly PromptFile[]) => SystemPrompt);
   messages: ModelItem[];
   /** Filters plugin top-level tools and resource tools selected through actual links by name; does not affect fixed host entry points. */
   tools?: { allow?: readonly string[]; exclude?: readonly string[] };
@@ -132,6 +130,5 @@ export interface ModelServices {
   stream(request: StreamRequest, options?: ModelInputOptions): AsyncIterable<ModelEvent>;
   /** One request and its tool batch; neither saves history nor drives the next request. */
   run(request: ModelRunRequest): Promise<ModelRunResult>;
-  roles(): readonly { id: string; description: string; hidden: boolean; model: string | null; thinking: ThinkingLevel | null }[];
   list(): readonly { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean; thinkingLevels: readonly ThinkingLevel[] } }[];
 }

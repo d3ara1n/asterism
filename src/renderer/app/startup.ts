@@ -1,9 +1,9 @@
-import type { RendererModule, RendererPlugin } from "@asterism-app/sdk/renderer";
-import type { EventSubscriber, PluginCalls } from "@asterism-app/sdk/contracts";
+import type { RendererModule, RendererPlugin, RendererCalls } from "@asterism-app/sdk/renderer";
+import type { EventSubscriber } from "@asterism-app/sdk/contracts";
 
-const unavailableCalls: PluginCalls = { invoke: async () => { throw new Error("Renderer calls are unavailable."); } };
-function scopedCalls(calls: PluginCalls, signal: AbortSignal): PluginCalls {
-  return { invoke: (contract, input, options) => calls.invoke(contract, input,
+const unavailableCalls: RendererCalls = { input: () => { throw new Error("Renderer content inputs are unavailable."); }, invoke: async () => { throw new Error("Renderer calls are unavailable."); } };
+function scopedCalls(calls: RendererCalls, signal: AbortSignal): RendererCalls {
+  return { input: contract => calls.input(contract), invoke: (contract, input, options) => calls.invoke(contract, input,
     { ...options, signal: options?.signal ? AbortSignal.any([signal, options.signal]) : signal }) };
 }
 
@@ -13,7 +13,7 @@ export const MODULE_PREPARE_TIMEOUT_MS = 10_000;
 /** Prepare feature modules after shared plugin services are ready; the caller shuts down in reverse dependency order. */
 export async function preparePlugin(plugin: RendererPlugin, events: EventSubscriber, signal: AbortSignal,
   timeout = MODULE_PREPARE_TIMEOUT_MS, registerCleanup?: (close: () => Promise<void>) => void,
-  calls: PluginCalls = unavailableCalls): Promise<() => Promise<void>> {
+  calls: RendererCalls = unavailableCalls): Promise<() => Promise<void>> {
   const controller = new AbortController();
   const lifetime = AbortSignal.any([signal, controller.signal]);
   const work = new Set<Promise<void>>();
@@ -57,7 +57,7 @@ export async function preparePlugin(plugin: RendererPlugin, events: EventSubscri
 /** Run module preparation in parallel; log failures and timeouts and continue, retaining views. */
 export async function prepareModules(modules: readonly RendererModule[], events: EventSubscriber, timeout = MODULE_PREPARE_TIMEOUT_MS,
   signal?: AbortSignal, track: (work: Promise<void>) => Promise<void> = work => work,
-  calls: PluginCalls = unavailableCalls): Promise<void> {
+  calls: RendererCalls = unavailableCalls): Promise<void> {
   await Promise.all(modules.map(async (module, index) => {
     if (!module.prepare) return;
     const controller = new AbortController();

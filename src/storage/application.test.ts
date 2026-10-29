@@ -8,6 +8,7 @@ import { readJson, writeJson } from "./files.ts";
 import { PluginStorage } from "../plugins/storage.ts";
 import builtinStorage from "@asterism-app/builtin/storage";
 import { BuiltinSettings } from "../../packages/builtin/src/settings/contract.ts";
+import { applicationPackages } from "../plugins/distribution.ts";
 
 const roots: string[] = [];
 function root() { const directory = mkdtempSync(join(tmpdir(), "asterism-prepare-")); roots.push(directory); return directory; }
@@ -16,6 +17,7 @@ afterEach(() => { for (const directory of roots.splice(0)) rmSync(directory, { r
 // Business logic creates new installations in the current format; preparation must not write files early or falsely report migration.
 it("unified preparation of new data directories creates no files or recovery points", async () => {
   const directory = root();
+  applicationPackages(directory).setEnabled(0, false);
   expect(await prepareApplicationData(directory, "0.1.0")).toEqual({ ok: true, plugins: [] });
   expect(existsSync(join(directory, "configuration.json"))).toBe(false);
   expect(existsSync(join(directory, "recovery"))).toBe(false);

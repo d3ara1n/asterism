@@ -53,4 +53,4 @@ The user has accepted installed task execution and persistence, PTY/search execu
 - [x] Integrate the English internal manual through resources/tools and verify direct discovery and reading. Application guides and public-package guides/examples are included in application packaging.
 - [x] Accept manual creation, linking, discovery, and reading through the GUI and an installed application.
 
-Plugin prompt/skill contributions and the paradigm layering are planned in `plans/ref-2026-10-28-plugin-paradigm-layering.md` and its todos. Captured-resource restore, provider OAuth, additional protocols, skill picking, manual compaction, media/export/sync, and a search-library replacement remain separate scope decisions.
+Plugin prompt/skill contributions and the paradigm layering are implemented; `plans/archived/ref-2026-10-28-plugin-paradigm-layering.md` and its archived implementation records retain the decisions, verification, and manual acceptance caveats. Captured-resource restore, provider OAuth, additional protocols, skill picking, manual compaction, media/export/sync, and a search-library replacement remain separate scope decisions.

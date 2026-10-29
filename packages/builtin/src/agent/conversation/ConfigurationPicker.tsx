@@ -2,8 +2,9 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, Bot, Brain, ChevronDown, ChevronRight, Cpu, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { availableThinkingLevels, type ThinkingLevel } from "@asterism-app/sdk/contracts";
-import { useI18n, useRendererCatalogs } from "@asterism-app/sdk/renderer";
-import { type AgentSelection, ModelConfiguration, resolveAgentModelSelection } from "@asterism-app/builtin-api/contracts";
+import { useI18n } from "@asterism-app/sdk/renderer";
+import { type AgentSelection, resolveAgentModelSelection } from "@asterism-app/builtin-api/contracts";
+import { useSettingsConfiguration } from "../../configuration/renderer-state";
 import { useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { modelSelectionMessages, thinkingLabels } from "@asterism-app/ui/messages/model-selection";
@@ -48,8 +49,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   onChange(selection: AgentSelection): Promise<boolean>;
 }) {
   const i18n = useI18n();
-  const catalogs = useRendererCatalogs();
-  const configuration = catalogs.get(ModelConfiguration);
+  const { snapshot: configuration, readError } = useSettingsConfiguration();
   const resolved = useAgentModelSelection();
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState<Page | null>(null);
@@ -129,7 +129,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
     }
   }
 
-  if (catalogs.error) return <StatusText tone="error">{i18n.text(catalogs.error)}</StatusText>;
+  if (readError) return <StatusText tone="error">{i18n.text(readError)}</StatusText>;
   return <Popover open={open} onOpenChange={value => {
     setOpen(value);
     if (value) { setPage(null); returnTo.current = "agent"; }

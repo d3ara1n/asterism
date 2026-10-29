@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { modelReference } from "@asterism-app/sdk/contracts";
 import { useI18n, useRendererCatalogs, useRendererObject } from "@asterism-app/sdk/renderer";
-import { ModelConfiguration } from "@asterism-app/builtin-api/contracts";
+import { ModelCatalog } from "@asterism-app/sdk/contracts";
 import { useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { contextMessages as messages } from "../../messages/context";
@@ -16,7 +16,7 @@ export function ContextUsage() {
   const i18n = useI18n();
   const object = useRendererObject();
   const snapshot = object.session.snapshot();
-  const configuration = useRendererCatalogs().get(ModelConfiguration);
+  const configuration = useRendererCatalogs().get(ModelCatalog);
   const { model: current } = useAgentModelSelection();
   const result = useMemo(() => {
     if (!snapshot) return null;

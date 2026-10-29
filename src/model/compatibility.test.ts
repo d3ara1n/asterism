@@ -21,7 +21,7 @@ function input(protocol: ModelInput["settings"]["provider"]["protocol"] = "opena
         capabilities: { reasoning: true, thinkingLevels: [...thinkingLevels], tools: true },
         generation: { temperature: null, topP: null, maxOutputTokens: 4096 }, compatibility: [] }, thinking: "low",
     },
-    system: { blocks: [{ id: "system", kind: "system", from: "test", text: "System instruction" }] },
+    system: { blocks: [{ id: "system", text: "System instruction" }] },
     messages: [{ kind: "input", parts: [{ kind: "text", text: "Question" }] }], tools: [],
   };
 }

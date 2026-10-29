@@ -1,7 +1,5 @@
-import { agentInputSchema, agentSchema, agentOverridesSchema, configurationIdSchema } from "@asterism-app/builtin-api/contracts";
-export { agentInputSchema, agentSchema, agentOverridesSchema, type AgentConfiguration, type AgentOverrides } from "@asterism-app/builtin-api/contracts";
 import {
-  modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
+  mcpSettingsSchema, shellSettingsSchema, modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema,
   modelProviderFixedFields, providerUsageIdSchema, usageProviderInfoSchema, modelProviderPresetSchema,
 } from "@asterism-app/sdk/contracts";
@@ -49,11 +47,6 @@ export const modelInputSchema = z.strictObject({
   compatibility: modelCompatibilitySchema,
 });
 export const modelSchema = modelInputSchema;
-export const modelRoleInputSchema = z.strictObject({
-  model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
-});
-export const modelRoleSchema = modelRoleInputSchema.extend({ id: configurationIdSchema, builtin: z.boolean() });
-export const modelRoleOverridesSchema = modelRoleInputSchema.partial();
 export const testErrorSchema = z.enum(["configuration", "credential", "authentication", "model_unavailable", "rate_limit", "network", "timeout", "protocol", "server", "cancelled"]);
 export const connectionTestSchema = z.strictObject({
   id, providerId: modelProviderIdSchema, model: modelExpressionSchema,
@@ -84,35 +77,32 @@ export function createModelInput(providerId: string, model: DiscoveredModel): z.
     generation: { temperature: null, topP: null, maxOutputTokens: null },
   };
 }
+export const sessionEntrySelectionSchema = z.strictObject({ pluginId: z.string().min(1), entryId: z.string().min(1) });
 export const configurationSnapshotSchema = z.strictObject({
+  mcp: mcpSettingsSchema,
+  shell: shellSettingsSchema,
+  sessionEntry: sessionEntrySelectionSchema.nullable(),
   webProviders: z.array(webProviderSchema),
   webProviderTypes: z.array(webProviderTypeSchema),
-  modelProviders: z.array(modelProviderSchema), models: z.array(modelSchema), roles: z.array(modelRoleSchema), agents: z.array(agentSchema),
+  modelProviders: z.array(modelProviderSchema), models: z.array(modelSchema),
   tests: z.array(connectionTestSchema), discoveries: z.array(modelDiscoverySchema), credentialStorageAvailable: z.boolean(),
   modelProviderPresets: z.array(modelProviderPresetSchema).optional(),
   usageProviders: z.array(usageProviderInfoSchema).optional(),
-  defaults: z.strictObject({
-    roles: z.record(id, modelRoleInputSchema), agents: z.record(id, agentInputSchema),
-  }),
-  overrides: z.strictObject({
-    roles: z.record(id, modelRoleOverridesSchema), agents: z.record(id, agentOverridesSchema),
-  }),
 });
-const target = { id: id.nullable() };
 const credentialUpdateSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("keep") }), z.strictObject({ action: z.literal("clear") }),
   z.strictObject({ action: z.literal("replace"), value: z.string().trim().min(1).max(16_384) }),
 ]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("shell.set"), value: shellSettingsSchema }),
   z.strictObject({ type: z.literal("webProvider.save"), id: z.string().trim().min(1), enabled: z.boolean(), credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("webProvider.reorder"), ids: z.array(z.string().min(1)) }),
   z.strictObject({ type: z.literal("read") }),
+  z.strictObject({ type: z.literal("sessionEntry.set"), value: sessionEntrySelectionSchema }),
   // Save targets the current ID; a different ID in value means rename.
   z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderInputSchema, credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
-  z.strictObject({ type: z.literal("role.save"), ...target, value: modelRoleOverridesSchema.extend({ id: configurationIdSchema }) }),
-  z.strictObject({ type: z.literal("agent.save"), ...target, value: agentOverridesSchema.safeExtend({ id: configurationIdSchema }) }),
-  z.strictObject({ type: z.literal("remove"), kind: z.enum(["modelProvider", "webProvider", "model", "role", "agent"]), id: z.string().min(1).max(321) }),
+  z.strictObject({ type: z.literal("remove"), kind: z.enum(["modelProvider", "webProvider", "model"]), id: z.string().min(1).max(321) }),
   z.strictObject({ type: z.literal("test.start"), model: modelExpressionSchema }),
   z.strictObject({ type: z.literal("test.cancel"), id }),
   z.strictObject({ type: z.literal("discovery.start"), providerId: modelProviderIdSchema }),
@@ -155,8 +145,6 @@ export function canEditModelProviderField(provider: Pick<ModelProviderInput, "fi
   return !provider.fixedFields?.includes(field);
 }
 export type ProviderModel = z.infer<typeof modelSchema>;
-export type ModelRole = z.infer<typeof modelRoleSchema>;
-export type ModelRoleOverrides = z.infer<typeof modelRoleOverridesSchema>;
 export type ConfigurationSnapshot = z.infer<typeof configurationSnapshotSchema>;
 export type ConfigurationCommand = z.infer<typeof configurationCommandSchema>;
 export type ConfigurationResult = z.infer<typeof configurationResultSchema>;
@@ -168,7 +156,7 @@ export interface ConfigurationBridge {
 }
 
 /** Selectors and execution share this existence/enabled check without maintaining configuration references or cascaded state. */
-export function resolveProviderModel(snapshot: ConfigurationSnapshot, reference: string | null): { model: ProviderModel; provider: ModelProvider } | null {
+export function resolveProviderModel(snapshot: Pick<ConfigurationSnapshot, "modelProviders" | "models">, reference: string | null): { model: ProviderModel; provider: ModelProvider } | null {
   const expression = reference === null ? null : parseModelExpression(reference);
   if (!expression) return null;
   const model = snapshot.models.find(item => item.providerId === expression.provider && item.modelId === expression.model);
@@ -177,20 +165,4 @@ export function resolveProviderModel(snapshot: ConfigurationSnapshot, reference:
   return provider?.enabled ? { model, provider } : null;
 }
 
-export { resolveAgentModel } from "@asterism-app/builtin-api/contracts";
 export { availableThinkingLevels } from "@asterism-app/sdk/contracts";
-
-/**
- * Only empty values inherit; consumers explicitly handle missing or disabled configuration without silently substituting models.
- * Hidden roles are unavailable only to agents: agent paths use defaults while internal features explicitly pass allowHidden.
- */
-export function resolveModelRole(snapshot: ConfigurationSnapshot, roleId: string, current?: { model: string | null; thinking: ThinkingLevel | null }, options: { allowHidden?: boolean } = {}): {
-  model: string | null; thinking: ThinkingLevel | null; error: "role_unavailable" | "model_unavailable" | null;
-} {
-  const role = snapshot.roles.find(item => item.id === roleId);
-  if (!role?.enabled || (role.hidden && !options.allowHidden)) return { model: null, thinking: null, error: "role_unavailable" };
-  const model = role.model ?? current?.model ?? null;
-  const thinking = role.thinking ?? current?.thinking ?? null;
-  if (model === null) return { model, thinking, error: null };
-  return { model, thinking, error: resolveProviderModel(snapshot, model) ? null : "model_unavailable" };
-}

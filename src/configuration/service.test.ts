@@ -4,12 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createModelInput, resolveModelRole, type ConfigurationSnapshot, type ModelProviderInput } from "../shared/configuration.ts";
+import { createModelInput, type ModelProviderInput } from "../shared/configuration.ts";
 import { modelProviderPresetDraft } from "../shared/provider-presets.ts";
 import { modelProviderPresets } from "../../packages/builtin/src/providers/presets.ts";
 import { ConfigurationService } from "./service.ts";
 import type { ConnectionProbe } from "./probe.ts";
-import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 import type { ModelCompatibility } from "../shared/model-compatibility.ts";
 import type { DiscoverModels } from "./discovery.ts";
 import type { LoadModelCatalog } from "./model-catalog.ts";
@@ -42,10 +41,6 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
   } });
   return { providerId: provider.savedId!, modelId: model.savedId!, snapshot: model.snapshot };
 }
-function roleValue(snapshot: ConfigurationSnapshot, id: string) {
-  const { builtin: _builtin, ...value } = snapshot.roles.find(role => role.id === id)!;
-  return value;
-}
 
 describe("Real configuration and consumption boundaries", () => {
   it("persists web provider order without changing credentials or enablement", async () => {
@@ -76,26 +71,6 @@ describe("Real configuration and consumption boundaries", () => {
     await reopened.execute({ type: "webProvider.save", id: definition.id, enabled: false,
       credential: { action: "replace", value: "new-key" } });
     expect(reopened.current().webProviders[1]).toMatchObject({ id: definition.id, enabled: false, credentialState: "available" });
-  });
-  // Configuration IDs directly select models; duplicate additions cannot overwrite existing entries, and renaming replaces the original while retaining behavior overrides.
-  it.each(["agent", "role"] as const)("%s creates with an explicit slug, rejects duplicate names, and persists renames", async kind => {
-    const { service, root, protector } = setup();
-    const created = await service.execute({ type: `${kind}.save`, id: null, value: { id: "code-review", description: "Review code" } });
-    expect(created.savedId).toBe("code-review");
-    await expect(service.execute({ type: `${kind}.save`, id: null, value: { id: "code-review", description: "Overwrite" } }))
-      .rejects.toMatchObject({ code: "conflict" });
-    const renamed = await service.execute({ type: `${kind}.save`, id: "code-review", value: { id: "review-code", description: "Review code" } });
-    const entries = kind === "agent" ? renamed.snapshot.agents : renamed.snapshot.roles;
-    expect(entries.some(item => item.id === "code-review")).toBe(false);
-    expect(entries.find(item => item.id === "review-code")).toMatchObject({ description: "Review code", builtin: false });
-    const builtinId = kind === "agent" ? "worker" : "default";
-    await expect(service.execute({ type: `${kind}.save`, id: builtinId, value: { id: "renamed-builtin" } }))
-      .rejects.toMatchObject({ code: "invalid_request" });
-    service.close();
-    const reopened = new ConfigurationService(root, protector);
-    cleanups.push(() => reopened.close());
-    const saved = kind === "agent" ? reopened.current().agents : reopened.current().roles;
-    expect(saved.find(item => item.id === "review-code")).toEqual(entries.find(item => item.id === "review-code"));
   });
   // Editing rules must persist independently per connection; fixed auth methods cannot prevent renaming, toggling, or credential management.
   it("preset fixed fields survive reopen while connection identity and keys remain editable", async () => {
@@ -257,78 +232,9 @@ describe("Real configuration and consumption boundaries", () => {
     expect(again.current()[kind === "modelProvider" ? "modelProviders" : "models"][0]?.compatibility).toEqual([]);
   });
 
-  it("saves only user overrides, restores built-ins for empty prompts, and preserves explicit false and empty lists", async () => {
-    const { service } = setup();
-    const initial = await service.execute({ type: "read" });
-    expect(initial.snapshot.overrides.agents.worker).toEqual({});
-    const saved = await service.execute({ type: "agent.save", id: "worker", value: { id: "worker",
-      systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [],
-    } });
-    expect(saved.snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({
-      systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [],
-    });
-    const cleared = await service.execute({ type: "agent.save", id: "worker", value: { id: "worker", systemPrompt: " \n " } });
-    expect(cleared.snapshot.overrides.agents.worker).toEqual({});
-    expect(cleared.snapshot.agents.find(agent => agent.id === "worker")?.systemPrompt).toBe(initial.snapshot.defaults.agents.worker!.systemPrompt);
-    expect(saved.snapshot.agents.find(agent => agent.id === "worker")?.systemPrompt).toBe("Custom instructions");
-  });
-  it("custom configuration always inherits the original baseline; modifying or deleting worker does not affect new agents", async () => {
-    const { service } = setup();
-    await service.execute({ type: "agent.save", id: "worker", value: { id: "worker", systemPrompt: "Changed worker", maxTurns: 1, enabled: false } });
-    await service.execute({ type: "role.save", id: "default", value: { id: "default", thinking: "off", enabled: false } });
-    const agent = await service.execute({ type: "agent.save", id: null, value: { id: "supervisor", tools: [] } });
-    expect(agent.snapshot.agents.find(item => item.id === agent.savedId)).toMatchObject({
-      id: "supervisor", tools: [], systemPrompt: configurationDefaults.agents.worker!.systemPrompt, maxTurns: configurationDefaults.agents.worker!.maxTurns, enabled: true,
-    });
-    const role = await service.execute({ type: "role.save", id: null, value: { id: "custom" } });
-    expect(role.snapshot.roles.find(item => item.id === role.savedId)).toMatchObject({ id: "custom", thinking: configurationDefaults.roles.default!.thinking, enabled: true });
-    await service.execute({ type: "remove", kind: "agent", id: "worker" });
-    const after = await service.execute({ type: "agent.save", id: null, value: { id: "independent" } });
-    expect(after.snapshot.agents.find(item => item.id === after.savedId)?.systemPrompt).toBe(configurationDefaults.agents.worker!.systemPrompt);
-    await expect(service.execute({ type: "role.save", id: null, value: {} })).rejects.toMatchObject({ code: "invalid_request" });
-  });
-  it("tool policy overrides replace built-ins; explicit null means caller inheritance and omission means the built-in value", async () => {
-    const { service } = setup();
-    const saved = await service.execute({ type: "agent.save", id: "explorer", value: { id: "explorer", excludeTools: ["bash"] } });
-    expect(saved.snapshot.agents.find(item => item.id === "explorer")).toMatchObject({ tools: null, excludeTools: ["bash"] });
-    const empty = await service.execute({ type: "agent.save", id: "explorer", value: { id: "explorer", tools: [] } });
-    expect(empty.snapshot.agents.find(item => item.id === "explorer")).toMatchObject({ tools: [], excludeTools: null });
-    await expect(service.execute({ type: "agent.save", id: "explorer", value: { id: "explorer", tools: [], excludeTools: [] } })).rejects.toMatchObject({ code: "invalid_request" });
-    const inherited = await service.execute({ type: "role.save", id: "heavy", value: { id: "heavy", thinking: null, hidden: false } });
-    expect(resolveModelRole(inherited.snapshot, "heavy", { model: null, thinking: "low" }).thinking).toBe("low");
-    const reset = await service.execute({ type: "role.save", id: "heavy", value: { id: "heavy",} });
-    expect(resolveModelRole(reset.snapshot, "heavy", { model: null, thinking: "low" }).thinking).toBe("high");
-  });
-  it("built-in upgrades affect only fields without overrides and leave acquired effective configuration stable", () => {
-    const oldDefaults = structuredClone(configurationDefaults);
-    const nextDefaults = structuredClone(configurationDefaults);
-    oldDefaults.agents.worker!.maxTurns = 1200;
-    nextDefaults.agents.worker!.maxTurns = 3000;
-    nextDefaults.agents.worker!.systemPrompt = "New built-in prompt";
-    nextDefaults.roles.default!.thinking = "high";
-    const agent = { id: "custom-agent", builtin: false, overrides: { systemPrompt: "Pinned prompt" } };
-    const before = resolveAgentConfiguration(agent, oldDefaults);
-    const after = resolveAgentConfiguration(agent, nextDefaults);
-    expect(before.maxTurns).toBe(1200);
-    expect(after).toMatchObject({ maxTurns: 3000, systemPrompt: "Pinned prompt" });
-    const role = { id: "custom-role", builtin: false, overrides: { hidden: false } };
-    expect(resolveRoleConfiguration(role, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
-  });
-  it("initializes five model roles and five agents; worker is available by default and utility is manageable but hidden", async () => {
-    const { service } = setup();
-    const { snapshot } = await service.execute({ type: "read" });
-    expect(snapshot.modelProviders).toEqual([]);
-    expect(new Set(snapshot.roles.map(role => role.id))).toEqual(new Set(["default", "heavy", "fast", "utility", "smart"]));
-    expect(snapshot.roles.find(role => role.id === "utility")).toMatchObject({ hidden: true, builtin: true, model: null });
-    expect(snapshot.agents.map(agent => agent.id)).toEqual(["worker", "explorer", "reviewer", "researcher", "advisor"]);
-    expect(snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ enabled: true, modelRole: "default" });
-    expect(snapshot.agents.find(agent => agent.id === "advisor")).toMatchObject({ modelRole: "smart" });
-  });
   it("configuration reopens independently of the database; keys enter only the encrypted file, never configuration or UI responses", async () => {
     const { service, root, protector } = setup();
     const { providerId } = await addModel(service, "api_key");
-    await service.execute({ type: "agent.save", id: "worker", value: { id: "worker", systemPrompt: "Pinned", enabled: false, tools: [] } });
-    await service.execute({ type: "role.save", id: "heavy", value: { id: "heavy", thinking: null, hidden: false } });
     // An empty level set is valid; saving and reopening do not rewrite configuration when the current role's level is unavailable.
     const model = service.current().models[0]!;
     const modelValue = model;
@@ -345,45 +251,16 @@ describe("Real configuration and consumption boundaries", () => {
       expect(result.snapshot.modelProviders[0]).toMatchObject({ id: providerId, credentialState: "available" });
       expect(result.snapshot.models).toHaveLength(1);
       expect(result.snapshot.models[0]!.capabilities).toMatchObject({ reasoning: true, thinkingLevels: [] });
-      expect(result.snapshot.overrides.agents.worker).toEqual({ systemPrompt: "Pinned", enabled: false, tools: [] });
-      expect(result.snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ enabled: false, tools: [] });
-      expect(result.snapshot.overrides.roles.heavy).toEqual({ thinking: null, hidden: false });
       expect(JSON.stringify(result)).not.toMatch(/test-key-not-for-network|credentialRef|ciphertext/);
     } finally { reopened.close(); }
   });
-  it("deleting a provider and its models does not refresh roles or old snapshots, and consuming invalid IDs fails explicitly", async () => {
+  it("deleting a provider and its models preserves old snapshots and makes invalid IDs fail explicitly", async () => {
     const { service } = setup();
     const { providerId, modelId, snapshot } = await addModel(service);
-    const assigned = await service.execute({ type: "role.save", id: "heavy", value: { ...roleValue(snapshot, "heavy"), model: modelId } });
     const removed = await service.execute({ type: "remove", kind: "modelProvider", id: providerId});
     expect(removed.snapshot.models).toEqual([]);
-    expect(removed.snapshot.roles.find(role => role.id === "heavy")?.model).toBe(modelId);
-    expect(assigned.snapshot.models).toHaveLength(1);
-    expect(resolveModelRole(removed.snapshot, "heavy", { model: "another", thinking: "low" }).error).toBe("model_unavailable");
+    expect(snapshot.models).toHaveLength(1);
     await expect(service.execute({ type: "test.start", model: modelId })).rejects.toMatchObject({ code: "not_found" });
-  });
-  it("only empty values inherit; explicit off does not inherit and disabled does not mean hidden", async () => {
-    const { service } = setup();
-    const { snapshot, modelId } = await addModel(service);
-    const value = { ...roleValue(snapshot, "utility"), thinking: null };
-    const saved = await service.execute({ type: "role.save", id: "utility", value });
-    expect(resolveModelRole(saved.snapshot, "utility", { model: modelId, thinking: "high" }, { allowHidden: true })).toEqual({ model: modelId, thinking: "high", error: null });
-    const off = await service.execute({ type: "role.save", id: "utility", value: { ...value, thinking: "off" } });
-    expect(resolveModelRole(off.snapshot, "utility", { model: modelId, thinking: "high" }, { allowHidden: true }).thinking).toBe("off");
-    const disabled = await service.execute({ type: "role.save", id: "utility", value: { ...value, enabled: false } });
-    expect(resolveModelRole(disabled.snapshot, "utility", undefined, { allowHidden: true }).error).toBe("role_unavailable");
-  });
-  it("built-in model roles cannot be deleted; custom roles and agents can, and reopening does not reseed them", async () => {
-    const { service, root, protector } = setup();
-    await expect(service.execute({ type: "remove", kind: "role", id: "smart"})).rejects.toMatchObject({ code: "invalid_request" });
-    const { snapshot } = await service.execute({ type: "read" });
-    const custom = await service.execute({ type: "role.save", id: null, value: { ...roleValue(snapshot, "default"), id: "custom" } });
-    await service.execute({ type: "remove", kind: "role", id: custom.savedId!});
-    await service.execute({ type: "remove", kind: "agent", id: "advisor"});
-    service.close();
-    const reopened = new ConfigurationService(root, protector);
-    try { expect((await reopened.execute({ type: "read" })).snapshot.agents.some(agent => agent.id === "advisor")).toBe(false); }
-    finally { reopened.close(); }
   });
   it("rejects saving keys without credential protection rather than persisting plaintext", async () => {
     const { service, root } = setup(undefined, false);
@@ -457,12 +334,12 @@ describe("Real configuration and consumption boundaries", () => {
       expect((await reopened.execute({ type: "read" })).snapshot.modelProviders[0]).toMatchObject({ id: providerId, name: "Local" });
     } finally { reopened.close(); }
   });
-  it.each(["invalid JSON", "unsupported version", "missing configuration category", "duplicate identity"])("%s does not reset or overwrite original configuration", scenario => {
-    const { root, service, protector } = setup(); service.close();
+  it.each(["invalid JSON", "unsupported version", "missing configuration category", "duplicate identity"])("%s does not reset or overwrite original configuration", async scenario => {
+    const { root, service, protector } = setup(); await addModel(service); service.close();
     const file = join(root, "configuration.json"), document = JSON.parse(readFileSync(file, "utf8"));
     if (scenario === "unsupported version") document.version = 999;
-    else if (scenario === "missing configuration category") delete document.agents;
-    else if (scenario === "duplicate identity") document.roles.push(structuredClone(document.roles[0]));
+    else if (scenario === "missing configuration category") delete document.models;
+    else if (scenario === "duplicate identity") document.models.push(structuredClone(document.models[0]));
     const content = scenario === "invalid JSON" ? "{broken" : JSON.stringify(document);
     writeFileSync(file, content);
     expect(() => new ConfigurationService(root, protector)).toThrow();

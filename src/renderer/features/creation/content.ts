@@ -1,7 +1,7 @@
 import { runtime } from "../../runtime";
 import type { ContentRange, ContentRef } from "@asterism-app/sdk/contracts";
 import type { ContentReader, RendererContentInput, RendererReceipt } from "@asterism-app/sdk/renderer";
-import { contentChunkSize, contentReadLimit, type ContentCommand, type ContentReply } from "../../../shared/content";
+import { contentChunkSize, contentReadLimit, sameContentTarget, type ContentCommand, type ContentReply } from "../../../shared/content";
 
 type Target = Extract<ContentCommand, { type: "input.open" }>["target"];
 type Source = Extract<ContentCommand, { type: "read.open" }>["source"];
@@ -84,8 +84,7 @@ export function contentInput(target: Target): RendererContentInput {
 export async function contentScopeId(content: RendererContentInput | undefined, target: Target): Promise<string | undefined> {
   if (!content) return undefined;
   const input = inputs.get(content);
-  if (!input || input.target.contractId !== target.contractId || input.target.resourceKind !== target.resourceKind
-    || input.target.sessionId !== target.sessionId || input.target.objectId !== target.objectId)
+  if (!input || !sameContentTarget(input.target, target))
     throw new Error("The content input belongs to another command.");
   return input.scope();
 }

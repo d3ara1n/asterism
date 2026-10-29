@@ -1,11 +1,12 @@
 import { createContext, useContext, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { pluginOf } from "@asterism-app/sdk/contracts";
-import { RendererPreferencesProvider, useI18n, useRendererCatalogs } from "@asterism-app/sdk/renderer";
-import { ModelConfiguration, resolveAgentModelSelection, type AgentSelection } from "@asterism-app/builtin-api/contracts";
+import { RendererPreferencesProvider, useI18n } from "@asterism-app/sdk/renderer";
+import { resolveAgentModelSelection, type AgentSelection } from "@asterism-app/builtin-api/contracts";
+import { useSettingsConfiguration } from "../../configuration/renderer-state";
 import { agentUI, AgentUIRendererProvider, AgentModelSelectionProvider, type AgentModelSelection, type AgentToolbarItemProps, type AgentUIContribution, type AgentOverlayPosition, type AgentOverlayProps, type AgentModalProps } from "@asterism-app/builtin-api/renderer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";
-import { useBuiltinRendererServices } from "../../renderer-context";
+import { useRendererApplication } from "@asterism-app/sdk/renderer";
 import { createComposerVisibility } from "./composer-visibility";
 import { ScrollArea } from "./ScrollArea";
 
@@ -31,7 +32,7 @@ export function AgentUI({ selection, children }: { selection: AgentSelection | n
   const [bottom, setBottom] = useState<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
   const [composer] = useState(createComposerVisibility);
-  const configuration = useRendererCatalogs().get(ModelConfiguration);
+  const { snapshot: configuration } = useSettingsConfiguration();
   const modelSelection = useMemo<AgentModelSelection>(() => ({
     selection,
     ...(selection && configuration ? resolveAgentModelSelection(configuration, selection)
@@ -68,7 +69,7 @@ function Contributions() {
   return entries.map((entry, order) => <Contribution key={entry.id} entry={entry} order={order} />);
 }
 function Contribution({ entry, order }: { entry: AgentUIContribution; order: number }) {
-  const services = useBuiltinRendererServices();
+  const services = useRendererApplication();
   const preferences = useMemo(() => services.preferences(pluginOf(entry.id)!), [services, entry.id]);
   return <ContributionOrder.Provider value={order}>
     <RendererPreferencesProvider value={preferences}><entry.Component /></RendererPreferencesProvider>

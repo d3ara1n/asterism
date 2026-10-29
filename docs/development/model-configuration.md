@@ -1,6 +1,6 @@
 # Model configuration
 
-Connections describe services; model records describe callable models; roles reuse model selections; agent configurations describe execution behavior. Exact schemas and defaults belong to configuration source.
+The host owns provider connections and callable model records. Paradigm plugins own reusable selections and execution configuration. Builtin implements model roles and Agent configurations in its own settings. Exact schemas and defaults belong to their owning source.
 
 ## Connections and presets
 
@@ -32,7 +32,9 @@ Input files are sent with their media types; the service determines accepted mod
 
 A model expression identifies a provider and service model, split at the first slash. Thinking is an independent selection, though historical display expressions may append a standard level.
 
-A model target resolves a role with optional explicit model and thinking overrides. A missing override inherits the role. A nonempty invalid reference fails instead of falling back.
+The SDK model target names a concrete provider, service model, and optional thinking level. The host resolves that exact pair and does not interpret roles. Missing or disabled models and unavailable credentials fail explicitly.
+
+Builtin resolves its roles and optional Agent overrides before calling the host. A missing override inherits the role. A nonempty invalid reference fails instead of falling back.
 
 Roles are reusable selections, not workbench objects. Hidden roles remain usable by internal consumers; disabled roles do not resolve. The utility role does not fall back to the current conversation.
 
@@ -68,13 +70,13 @@ Packs can adapt protocol placement, supported file transport, reasoning encoding
 
 Account balance and quota are separate from response token usage and reference cost. A connection explicitly selects a usage provider.
 
-Active providers query using supplied connection credentials. Header providers interpret response metadata supplied by the consumer. The host catalog does not fetch credentials, cache results, or choose a connection on their behalf.
+Active providers query using supplied connection credentials. Header providers interpret response metadata supplied by the consumer. The provider catalog exposes those implementations. A separate host usage service obtains the selected connection's credentials, shares active queries, and caches results for consumers.
 
 Usage items distinguish amount balance from quota windows and rate-limit headroom. Unknown limits and reset times remain unknown. An empty successful list is different from failure.
 
-The built-in consumer shares state by connection. Query results and failures follow completion order; configuration changes invalidate the relevant state. Header refresh reads cached observations without making an artificial model request.
+The host usage service shares state by connection. Query results and failures follow completion order; configuration changes invalidate the relevant state. Builtin explicitly supplies its received response headers and presents the shared state in its toolbar. Header refresh reads cached observations without making an artificial model request.
 
-The consumer preserves a previous successful result when refresh fails and labels it accordingly. A predicted reset time does not manufacture new quota. Precise refresh intervals and query paths belong to the provider and consumer implementations.
+The usage service preserves a previous successful result when refresh fails and labels it accordingly. A predicted reset time does not manufacture new quota. Precise refresh intervals and query paths belong to the service and provider implementations.
 
 ## Reference pricing
 

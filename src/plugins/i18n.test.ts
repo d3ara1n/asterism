@@ -34,12 +34,12 @@ describe("Plugin catalogs and presentation IPC", () => {
   it("public messages retain provider ownership and renderer React Intl comes from the host instance", async () => {
     const provider = temp(), consumer = temp(), data = temp(), cache = join(data, "cache");
     writeFileSync(join(provider, "package.json"), JSON.stringify({ name: "@example/messages", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, exports: { "./public": "./public.ts" },
-      asterism: { id: "example.messages", i18n: { catalogs: { "zh-Hans": "zh.json" } } } }));
+      asterism: { displayName: "Test plugin", id: "example.messages", i18n: { catalogs: { "zh-Hans": "zh.json" } } } }));
     writeFileSync(join(provider, "public.ts"), `import {pluginNamespace,defineMessages} from '@asterism-app/sdk/contracts';
       export const messages=pluginNamespace('example.messages').messages('en',defineMessages({title:{id:'title',defaultMessage:'Shared title'}}));`);
     writeFileSync(join(provider, "zh.json"), JSON.stringify({ title: "共享标题" }));
     writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "@example/consumer", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, dependencies: { "@example/messages": "*" },
-      asterism: { id: "example.consumer", renderer: "renderer.ts" } }));
+      asterism: { displayName: "Test plugin", id: "example.consumer", renderer: "renderer.ts" } }));
     writeFileSync(join(consumer, "renderer.ts"), `export {messages} from '@example/messages/public';
       export {IntlProvider, useIntl} from 'react-intl'; export default {modules:[{resources:[],cards:[],tools:[]}]};`);
     const list = new PackageList(join(data, "plugins.json"));
@@ -57,7 +57,7 @@ describe("Plugin catalogs and presentation IPC", () => {
   });
   it("source plugins without renderers declare messages and configuration through the public SDK with independently updated catalog content", async () => {
     const root = temp(), data = temp(); mkdirSync(join(root, "locales"));
-    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@example/backend", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { id: "example.backend",
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@example/backend", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { displayName: "Test plugin", id: "example.backend",
       runtime: "runtime.ts", i18n: { catalogs: { "zh-Hans": "locales/zh.json" } } } }));
     writeFileSync(join(root, "runtime.ts"), `import { z } from 'zod';
       import {pluginNamespace,defineMessages} from '@asterism-app/sdk/contracts';
@@ -93,7 +93,7 @@ describe("Plugin catalogs and presentation IPC", () => {
     writeFileSync(join(outside, "catalog.json"), "{}"); symlinkSync(join(outside, "catalog.json"), join(root, "linked.json"));
     expect(loadCatalogs(root, "example.test", { en: "linked.json", fr: "missing.json" }, message => diagnostics.push(message))).toEqual([]);
     expect(diagnostics.length).toBeGreaterThan(0);
-    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { id: "example.test", i18n: { catalogs: { en: "a.json", EN: "b.json" } } } }));
+    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { displayName: "Test plugin", id: "example.test", i18n: { catalogs: { en: "a.json", EN: "b.json" } } } }));
     expect(() => readManifest(root)).toThrow();
   });
   it("preparation reason codes and display pass through command IPC; custom reasons without display retain English fallbacks", async () => {

@@ -1,8 +1,7 @@
 import { z } from "zod";
-import { definePlugin, implementCall, PluginApiError } from "@asterism-app/sdk/runtime";
-import { builtin, CreateAgent, agentCreateSchema, type NamingApi } from "@asterism-app/builtin-api/contracts";
-import { defineAgentCreation, type ManualSource } from "@asterism-app/builtin-api/runtime";
-import type { BuiltinApplication } from "./application.ts";
+import { definePlugin, defineAgentInstructions, implementCall } from "@asterism-app/sdk/runtime";
+import { builtin, CreateAgent, agentCreateSchema } from "@asterism-app/builtin-api/contracts";
+import { defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { createAgentModule } from "./agent/runtime.ts";
 import { createFilesystemModule } from "./filesystem/runtime.ts";
 import { createManualModule } from "./manual/runtime.ts";
@@ -14,9 +13,6 @@ import questions from "./questions/runtime.ts";
 import resourceOperations from "./resources/runtime.ts";
 import { CreateNote } from "./notes/contract.ts";
 import providers from "./providers/runtime.ts";
-import { UsageConsumer } from "./usage/service.ts";
-import { ReadUsage, UsageChanged } from "./usage/contract.ts";
-import { ShellService } from "./shell/service.ts";
 import { createShellModule } from "./shell/runtime.ts";
 import { createTerminalModule } from "./terminal/runtime.ts";
 import { CreateTerminal } from "./terminal/contract.ts";
@@ -26,26 +22,27 @@ import { SkillCatalog } from "./skills/catalog.ts";
 import { createSkillsModule } from "./skills/runtime.ts";
 import mesh from "./mesh/runtime.ts";
 import { CreateMesh } from "./mesh/contract.ts";
+import { environment } from "./agent/system-prompt.ts";
+import { UpdateParadigmConfiguration } from "./configuration/contract.ts";
+import { resolveParadigmConfiguration } from "./configuration/state.ts";
+import { updateParadigmConfiguration } from "./configuration/runtime.ts";
 
 /** Composes only plugin business logic; the application owns loading, host services, and external plugin dependencies. */
-export function createBuiltin(options: { application: BuiltinApplication; manualSources(): readonly ManualSource[]; connectNaming(api: NamingApi): () => void }) {
-  return definePlugin({ namespace: builtin,
+export default definePlugin({ namespace: builtin,
     setup(plugin) {
+      const application = plugin.application;
       const settings = plugin.config(BuiltinSettings);
-      const skills = new SkillCatalog();
-      // Backend assembly precedes task-process ready; the initial skill catalog is built during startup loading.
-      skills.refresh(plugin.lifetime.signal);
-      const shell = new ShellService(() => settings.get().shell, plugin.lifetime.signal);
-      const usage = new UsageConsumer(plugin.modelProviders, plugin.usageProviders, providerId => {
-        try { plugin.ipc.events.publish(UsageChanged, { providerId }); }
-        catch (error) { if (!(error instanceof PluginApiError && error.code === "unavailable")) throw error; }
-      });
-      // The root entry registers before feature modules, and cleanup runs in reverse order: shared services are released after modules.
-      plugin.lifetime.defer(() => usage.close());
-      return { events: [UsageChanged],
-        calls: [implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal }))],
-        modules: [providers, createAgentModule(options.application, usage, skills), createSkillsModule(skills), createFilesystemModule(shell), createNamingModule(options.connectNaming, options.application.userAgent), notes, questions,
-        resourceOperations, mcp, web, mesh, createManualModule(options.manualSources, options.application.name), createShellModule(() => settings.get().shell), createTerminalModule(() => settings.get().shell),
+      const skills = new SkillCatalog(plugin.agentCatalog);
+      const usage = plugin.providerUsage;
+      return {
+        calls: [
+          implementCall(UpdateParadigmConfiguration, async input => {
+            settings.update(current => ({ ...current, paradigm: updateParadigmConfiguration(current.paradigm, input) }));
+            return { snapshot: resolveParadigmConfiguration(settings.get().paradigm), savedId: input.type === "remove" ? null : input.value.id };
+          })],
+        modules: [defineAgentInstructions([{ id: "environment", text: environment(application.name).text }]),
+        providers, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.commands), createNamingModule(application.userAgent), notes, questions,
+        resourceOperations, mcp, web, mesh, createManualModule(() => plugin.manual.sources(), application.name), createShellModule(), createTerminalModule(),
         defineAgentCreation({ id: CreateMesh.id, creation: CreateMesh,
           description: "Create a Mesh resource in the default channel. Mesh provides list, send, peek, get_profile, and set_profile for Agents exposed to its channel across sessions.",
           guidelines: ["The Mesh card selects its channel. Link direction independently controls use of the Mesh and exposure of Agents to its channel."] }),
@@ -76,8 +73,3 @@ export function createBuiltin(options: { application: BuiltinApplication; manual
           guidelines: ["Notes store their current text."] }),
       ] };
     } });
-}
-export { createSelection } from "./agent/selection.ts";
-export { composeSystemPrompt } from "./agent/system-prompt.ts";
-export type { BuiltinApplication } from "./application.ts";
-export { builtinMetadata } from "./metadata.ts";

@@ -4,7 +4,8 @@ import { z } from "zod";
 import { pluginNamespace, type EventSubscription } from "@asterism-app/sdk/contracts";
 import { defineModule, definePlugin } from "@asterism-app/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
-import { loadPlugins, type PluginHostServices } from "./loader.ts";
+import { loadPlugins } from "./loader.ts";
+import { testHostServices } from "./testing.ts";
 
 const ns = pluginNamespace("test.publisher");
 const Update = ns.event("update", { schema: z.object({ value: z.number(), associated: z.string().optional() }), source: "any", semantics: { kind: "occurrence" } });
@@ -20,9 +21,7 @@ describe("Event SDK and host boundaries", () => {
       defineModule(plugin => { subscription = plugin.ipc.events.subscribe(Update, {}, () => {}); return { events: [Update] }; }),
       defineModule(() => { throw new Error("Setup failed."); }),
     ] });
-    const host = { extensionsDirectory: "/unused", data: null as never, refOf: () => null, sessions: { progressChanged() {} } as never,
-      models: { list: () => [] } as never, log: () => {} } satisfies PluginHostServices;
-    const loaded = loadPlugins([broken], host);
+    const loaded = loadPlugins([broken], testHostServices());
     try {
       expect(loaded.manifest[0]!.status).toBe("failed");
       expect(await subscription.closed).toMatchObject({ reason: "unavailable" });

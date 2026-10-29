@@ -7,8 +7,9 @@ import { applicationStorage, sessionRetentionMs } from "../shared/application.ts
 import { contentSchemaSql } from "./content-store.ts";
 import { templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
+import { mcpSchemaSql } from "../mcp/storage.ts";
 
-export const workspaceDatabaseVersion = 28;
+export const workspaceDatabaseVersion = 29;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
@@ -41,6 +42,7 @@ function initializeWorkspace(db: DatabaseSync): void {
   db.exec(`
       CREATE TABLE workspace (id TEXT PRIMARY KEY, title TEXT NOT NULL);
       ${sessionSchemaSql}
+      ${mcpSchemaSql}
       CREATE TABLE object_views (
         session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, object_id TEXT NOT NULL,
         x REAL NOT NULL, y REAL NOT NULL, hidden INTEGER NOT NULL DEFAULT 0,
@@ -76,18 +78,10 @@ const focusTableSql = `
         width REAL CHECK (width IS NULL OR width > 0)
       ) STRICT;`;
 
-/** Retain every released migration step permanently; key 25 means 25 → 26. Only `openDatabase` creates new databases. */
+/** Development formats have no compatibility chain. Only openDatabase creates new databases. */
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
-    version: workspaceDatabaseVersion, migrations: {
-      // Released steps keep their own SQL instead of referencing current schema constants.
-      27: db => db.exec(`
-        CREATE TABLE workbench_focus (
-          session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
-          object_id TEXT,
-          width REAL CHECK (width IS NULL OR width > 0)
-        ) STRICT;`),
-    } });
+    version: workspaceDatabaseVersion, migrations: {} });
 }
 /** Startup cleanup hard-deletes archived sessions past retention, cascades associated rows through foreign keys, and leaves orphan content for the subsequently constructed store. */
 export function collectExpiredSessions(db: DatabaseSync, now = Date.now()): number {

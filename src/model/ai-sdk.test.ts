@@ -7,13 +7,12 @@ import { modelScope } from "../shared/model.ts";
 import { ModelFailure, type ModelInput, type ModelEvent } from "./contract.ts";
 import { createProviderModel } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
-import { composeSystemPrompt } from "@asterism-app/builtin/runtime";
 
 const input: ModelInput = {
   settings: { provider: { id: "p", name: "Provider", enabled: true, baseUrl: "https://example.invalid", protocol: "anthropic", auth: "api_key", compatibility: [] },
     model: { name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
-  system: composeSystemPrompt({ id: "worker", systemPrompt: "System" }, "Asterism"), messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
+  system: { blocks: [{ id: "test", text: "System" }] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
   tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
 };
 async function consume(events: AsyncIterable<ModelEvent>) { for await (const _event of events) { /* Consume through terminal state or error. */ } }

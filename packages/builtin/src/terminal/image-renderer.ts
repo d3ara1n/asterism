@@ -1,5 +1,6 @@
 import type { RendererPrepareContext } from "@asterism-app/sdk/renderer";
-import { CompleteTerminalImage, TerminalImageRequested, type TerminalImage } from "./contract.ts";
+import { CompleteTerminalImage, TerminalImageRequested } from "./contract.ts";
+import type { TerminalImage } from "@asterism-app/sdk/contracts";
 import { terminalTypography } from "./typography.ts";
 
 /** The canvas renders only the parsed character grid; the screenshot service is independent of card mounting. */

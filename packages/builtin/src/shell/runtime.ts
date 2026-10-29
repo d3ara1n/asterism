@@ -1,11 +1,9 @@
 import { z } from "zod";
-import { defineModule, defineTopLevelTool, implementCall } from "@asterism-app/sdk/runtime";
-import { ReadShellProfiles, ShellProfileListResult, type ShellSettings } from "./contract.ts";
-import { listShellProfiles } from "./profiles.ts";
+import { defineModule, defineTopLevelTool } from "@asterism-app/sdk/runtime";
+import { ShellProfileListResult } from "./contract.ts";
 
-export function createShellModule(settings: () => ShellSettings) {
-  return defineModule(() => ({
-    calls: [implementCall(ReadShellProfiles, () => listShellProfiles(settings()))],
+export function createShellModule() {
+  return defineModule(plugin => ({
     topLevelTools: [defineTopLevelTool({
       id: ShellProfileListResult.id,
       name: "shell_profile_list",
@@ -19,7 +17,7 @@ export function createShellModule(settings: () => ShellSettings) {
       effect: "read", execution: "parallel",
       async execute(_args, { signal }) {
         if (signal.aborted) return { kind: "cancelled", message: "Shell profile listing was cancelled." };
-        const data = await listShellProfiles(settings());
+        const data = await plugin.terminalProfiles.list();
         if (signal.aborted) return { kind: "cancelled", message: "Shell profile listing was cancelled." };
         return { kind: "succeeded", data };
       },

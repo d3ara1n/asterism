@@ -9,13 +9,3 @@ export const mcpErrorCodes = {
   service_unavailable: "failed", connection_failed: "failed", authorization_expired: "failed",
   request_failed: "failed", tool_error: "failed",
 } as const;
-export type McpErrorCode = keyof typeof mcpErrorCodes;
-
-/** MCP error with a stable error code; the code determines the outcome. */
-export class McpError extends Error {
-  constructor(readonly code: McpErrorCode, message: string) { super(message); }
-}
-/** Aborted outcomes and outcomes with unknown effects carry no error code. */
-export class McpInterrupted extends Error {
-  constructor(readonly outcome: "cancelled" | "unknown", message: string) { super(message); }
-}

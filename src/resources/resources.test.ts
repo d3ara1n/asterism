@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import * as runtimeModules from "../runtime/builtin.ts";
-import { ApplicationService } from "../runtime/service.ts";
+import * as runtimeModules from "../plugins/loader.ts";
+import { BuiltinApplicationService as ApplicationService } from "../../packages/builtin/src/testing.ts";
 import { Directory } from "../../packages/builtin/src/filesystem/contract.ts";
 import { defineData, defineImplementation, defineTool } from "@asterism-app/sdk/contracts";
 import { implement, toolCaller } from "../tools/testing.ts";
@@ -31,9 +31,9 @@ function setup() {
   writeFileSync(join(root, "a.txt"), "hello"); writeFileSync(join(outside, "secret.txt"), "secret");
   const resource = { id: "d1", kind: "asterism.builtin/directory", title: "root", data: { path: root } } satisfies FoldedObject;
   const note: FoldedObject = { id: "n1", kind: "asterism.builtin/note", title: "Note", data: {} };
-  let modules!: ReturnType<typeof runtimeModules.createModules>;
-  const createModules = runtimeModules.createModules;
-  const capture = vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {
+  let modules!: ReturnType<typeof runtimeModules.loadPlugins>;
+  const createModules = runtimeModules.loadPlugins;
+  const capture = vi.spyOn(runtimeModules, "loadPlugins").mockImplementation((...args) => {
     modules = createModules(...args); return modules;
   });
   const service = new ApplicationService(join(base, "host")); services.push(service);

@@ -7,8 +7,8 @@ import { definePlugin, type PluginContext, type SessionExecutor } from "@asteris
 import { AgentInputMessage, CreateAgent } from "@asterism-app/builtin-api/contracts";
 import { agentServices } from "@asterism-app/builtin-api/runtime";
 import { CreateMesh, CreateMeshChannel, MeshList, MeshGetProfile, MeshView, RenameMeshChannel, SelectMeshChannel } from "../../packages/builtin/src/mesh/contract.ts";
-import { ApplicationService } from "../runtime/service.ts";
-import * as runtimeModules from "../runtime/builtin.ts";
+import { BuiltinApplicationService as ApplicationService, configureBuiltin } from "../../packages/builtin/src/testing.ts";
+import * as runtimeModules from "./loader.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 
@@ -21,9 +21,9 @@ afterEach(async () => {
 
 function open(root = mkdtempSync(join(tmpdir(), "asterism-mesh-"))) {
   if (!roots.includes(root)) roots.push(root);
-  let plugin!: PluginContext, modules!: ReturnType<typeof runtimeModules.createModules>;
-  const original = runtimeModules.createModules;
-  const capture = vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {
+  let plugin!: PluginContext, modules!: ReturnType<typeof runtimeModules.loadPlugins>;
+  const original = runtimeModules.loadPlugins;
+  const capture = vi.spyOn(runtimeModules, "loadPlugins").mockImplementation((...args) => {
     modules = original(...args); return modules;
   });
   const adapter: ModelAdapter = { version: "test/1", validate() {}, prepare: () => ({
@@ -131,7 +131,7 @@ describe("Mesh resource routing", () => {
       providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { tools: true, reasoning: false, thinkingLevels: [] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
     } });
-    await f.app.configuration.execute({ type: "role.save", id: "default", value: { id: "default", model: "test/test" } });
+    await configureBuiltin(f.app, { type: "role.save", id: "default", value: { id: "default", model: "test/test" } });
     const captured = f.capabilities(a);
     expect(await call(captured, ma, "send", { title: "Atlas" }, { message: "Review login" })).toMatchObject({ kind: "succeeded" });
     expect(other.snapshot().records.query(AgentInputMessage, { scope: "timeline" }).map(record => record.status === "known" ? record.data : null)).toContainEqual(

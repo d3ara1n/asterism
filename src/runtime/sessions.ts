@@ -1,5 +1,6 @@
-import { resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@asterism-app/sdk/contracts";
-import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, PluginApiError } from "@asterism-app/sdk/runtime";
+import { createSharedServices } from "./shared-services.ts";
+import { SessionTitleAssigned, type Presentation, type Source, resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@asterism-app/sdk/contracts";
+import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, type ManualSource, type PreparedCreation, PluginApiError } from "@asterism-app/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
@@ -7,14 +8,9 @@ import type { DatabaseSync } from "node:sqlite";
 import type { ConfigurationService } from "../configuration/service.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import type { ModelAdapter } from "../model/contract.ts";
-import {
-  Agent, CreateAgent, SubmitAgentInput, startAgentContentTarget, type SubmitAgentInputData, type NamingApi, inputSummary,
-} from "@asterism-app/builtin-api/contracts";
-import { createSelection, composeSystemPrompt } from "@asterism-app/builtin/runtime";
 import { inputReferences } from "../model/input.ts";
-import { createModules } from "./builtin.ts";
+import { loadPlugins } from "../plugins/loader.ts";
 import type { ParsedCall } from "../plugins/commands.ts";
-import { createBuiltinCatalogs } from "./builtin-catalogs.ts";
 import type { SessionHost, SessionHostWriter as SessionWriter } from "../plugins/host.ts";
 import type { PluginManifest, LoadedPlugins, PreparedPluginStorage } from "../plugins/loader.ts";
 import { createModelServices } from "../plugins/models.ts";
@@ -23,20 +19,31 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import { SessionDataStore } from "../session/data.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, SessionTree } from "../session/tree.ts";
-import type { ModelSettings, AgentSelection } from "../shared/model.ts";
+import type { ModelSettings } from "../shared/model.ts";
 import { sessionCommandSchema, type SessionChanged, type SessionCommand, type SessionData, type SessionProgress, type SessionReply, type SessionNode } from "../shared/session.ts";
 import { diffLive } from "../shared/live-patch.ts";
 import { wireLive } from "../shared/partial-arguments.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { SessionWorkbench } from "./workbench.ts";
-import { ContentStore, contentReferences, type ContentLease, type ContentTarget } from "./content-store.ts";
-import { applicationStorage, applicationBrand } from "../shared/application.ts";
+import { ContentStore, type ContentLease, type ContentTarget } from "./content-store.ts";
+import { applicationStorage } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
 import { TemplateStore } from "./templates.ts";
-import type { ManualSource } from "@asterism-app/builtin-api/runtime";
 
-const agentKind = Agent.kind;
+export interface SessionServiceOptions {
+  onChanged?: (event: SessionChanged) => void;
+  adapterFactory?: (settings: ModelSettings) => ModelAdapter;
+  plugins?: readonly PluginDefinition[];
+  configurationChanged?: (pluginId: string) => void;
+  preparedStorage?: PreparedPluginStorage;
+  manualSources?: () => readonly ManualSource[];
+  pluginDependencies?: ReadonlyMap<string, readonly string[]>;
+  packageRoots?: ReadonlyMap<string, string>;
+  /** User skill directories; tests leave this empty to stay isolated from the real user profile. */
+  skillDirectories?: readonly string[];
+}
+
 
 /**
  * Session application entry: compose built-in domain interfaces and provide session trees, workbench events, layout, and notifications.
@@ -49,6 +56,8 @@ export class SessionService {
   private readonly watching = new Map<string, SessionProgress>();
   private readonly updates = new Map<string, { nodes: SessionNode[]; objects: Set<string>; workbench: boolean; layout: boolean }>();
   private closed = false;
+  private readonly shared: ReturnType<typeof createSharedServices>;
+  private readonly changed: (event: SessionChanged) => void;
   readonly tree: SessionTree;
   readonly content: ContentStore;
   readonly templates: TemplateStore;
@@ -62,21 +71,20 @@ export class SessionService {
   private readonly restorePlugins: LoadedPlugins["restore"];
   /** Entry pending: do not reenter archive cleanup for the same session while it is in progress. */
   private readonly archiving = new Set<string>();
-  private readonly naming: NamingApi;
   private readonly prepare: LoadedPlugins["prepare"];
   private readonly afterCommit: LoadedPlugins["afterCommit"];
   private readonly pluginActivity: LoadedPlugins["activity"];
-  private readonly validateInitialInput: (selection: AgentSelection, parts: ModelInputPart[], content: ContentLease) => Promise<void>;
-  constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService,
-    private readonly changed: (event: SessionChanged) => void = () => {}, adapterFactory?: (settings: ModelSettings) => ModelAdapter, external: readonly PluginDefinition[] = [],
-    configurationChanged?: (pluginId: string) => void, preparedStorage?: PreparedPluginStorage, manualSources: () => readonly ManualSource[] = () => [],
-    pluginDependencies?: ReadonlyMap<string, readonly string[]>) {
+  constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService, options: SessionServiceOptions = {}) {
+    this.changed = options.onChanged ?? (() => {});
     this.tree = new SessionTree(db);
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(ResourceStatusChanged);
+    this.shared = createSharedServices({ db, dataRoot, configuration, events: this.events,
+      manualSources: options.manualSources ?? (() => []), packageRoots: options.packageRoots ?? new Map(), skillDirectories: options.skillDirectories ?? [] });
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     this.content.collectStartup();
     const host: SessionHost = {
+      initialize: (owner, key, prepare, options) => this.initializeSession(owner, key, prepare, options),
       list: () => {
         if (this.writesClosed) throw new PluginApiError("unavailable", "The session service is closed.");
         return this.tree.list();
@@ -95,12 +103,7 @@ export class SessionService {
       timeline: sessionId => this.tree.timeline(sessionId),
       workbench: sessionId => this.tree.workbench(sessionId),
       title: sessionId => this.tree.title(sessionId),
-      setTitle: (sessionId, text) => {
-        const title = text.replace(/\s+/gu, " ").trim().slice(0, 160);
-        // Ignore meaningless empty titles; apply within the outer transaction during commits, otherwise use an independent commit.
-        if (!title || this.closed || title === this.tree.title(sessionId)) return;
-        this.commit(sessionId, () => this.tree.setTitle(sessionId, title));
-      },
+      setTitle: (sessionId, text, source, detail) => this.assignTitle(sessionId, text, source, detail),
       commit: (sessionId, work, objectId) => this.commit(sessionId, work, { objectId }),
       idle: (sessionId, objectId) => !this.pluginActivity(sessionId).busy.some(id => id !== objectId)
         && !this.resources.controllers().some(controller => controller.activity?.(sessionId).busy.some(id => id !== objectId)),
@@ -120,44 +123,10 @@ export class SessionService {
       context: linked => this.resources.context(linked),
     };
     const refOf = (objectId: string): ResourceRef | null => this.tree.resourceRef(objectId);
-    const models = createModelServices(configuration, adapterFactory);
-    const selection = createSelection({ agents: () => configuration.current().agents });
-    // The object does not exist during first-submit preparation; composition entries use prepared selections for the same model preflight.
-    this.validateInitialInput = async (value, parts, content) => {
-      try {
-        await models.validate({ target: selection.target(value), system: composeSystemPrompt(selection.agent(value), applicationBrand.en),
-          messages: [{ kind: "input", parts }], signal: AbortSignal.timeout(10_000) },
-        { content: messages => this.content.capture(inputReferences(messages), { scope: content }) });
-      } catch (error) {
-        if (error instanceof PluginApiError) throw sessionPluginError(error);
-        throw error;
-      }
-    };
-    const modules = createModules({ events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf, vault: configuration.vault, configurationChanged, preparedStorage, pluginDependencies,
-      sessions: host, models, catalogs: createBuiltinCatalogs(configuration),
-      webProviders: configuration.web,
-      modelProviderExtensions: configuration.extensions, modelProviders: {
-        presets: () => configuration.extensions.presets(),
-        list: () => configuration.current().modelProviders.map(({ credentialState: _state, ...connection }) => connection),
-        get: id => {
-          const provider = configuration.current().modelProviders.find(item => item.id === id);
-          if (!provider) return null;
-          const { credentialState: _state, ...connection } = provider;
-          return connection;
-        },
-        credential: async (id, options) => {
-          options?.signal?.throwIfAborted();
-          const provider = configuration.current().modelProviders.find(item => item.id === id);
-          const value = await configuration.executionCredential(id);
-          options?.signal?.throwIfAborted();
-          return provider?.auth === "none" ? null : value;
-        },
-        subscribe: listener => configuration.subscribeProviders(listener),
-      }, usageProviders: {
-        list: () => configuration.extensions.usageProviders(),
-        get: id => configuration.extensions.get(id),
-        subscribe: listener => configuration.extensions.subscribe(listener),
-      } }, external, manualSources);
+    const models = createModelServices(configuration, options.adapterFactory);
+    const modules = loadPlugins(options.plugins ?? [], { events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf,
+      vault: configuration.vault, configurationChanged: options.configurationChanged, preparedStorage: options.preparedStorage,
+      pluginDependencies: options.pluginDependencies, sessions: host, models, shared: this.shared });
     this.resources = modules.resources;
     this.calls = modules.calls;
     this.channels = modules.channels;
@@ -167,7 +136,6 @@ export class SessionService {
     this.closePlugins = modules.close;
     this.releasePlugins = modules.release;
     this.restorePlugins = modules.restore;
-    this.naming = modules.naming;
     this.afterCommit = modules.afterCommit;
     this.prepare = modules.prepare;
     this.pluginActivity = modules.activity;
@@ -308,7 +276,7 @@ export class SessionService {
     const resource = this.object(sessionId, objectId);
     const controller = this.resources.controller(resource.kind);
     if (!controller?.execute) throw new SessionError("invalid_request", "This resource has no actions.");
-    const content = this.content.fork(inputScopeId, { sessionId, objectId, resourceKind: resource.kind, contractId: raw.id });
+    const content = this.content.fork(inputScopeId, { kind: "resource", sessionId, objectId, resourceKind: resource.kind, contractId: raw.id });
     await this.invokeResource({ sessionId, id: objectId, kind: resource.kind }, raw, content);
   }
   /** Frontend and backend actions share preparation and object queues; this content hold covers preparation, queuing, and actual execution. */
@@ -346,16 +314,11 @@ export class SessionService {
     if (!this.resources.controller(target.kind)?.actionContracts?.includes(contract))
       throw new PluginApiError("invalid_argument", "Use the registered action contract instance for this resource.");
     const value = jsonSchema.parse(input);
-    const lease = this.content.scope({ sessionId, objectId: target.id, resourceKind: target.kind, contractId: contract.id });
-    let captured: ReturnType<ContentStore["captureReader"]> | undefined;
+    const lease = this.content.scope({ kind: "resource", sessionId, objectId: target.id, resourceKind: target.kind, contractId: contract.id });
     try {
-      const refs = contentReferences(value);
-      if (refs.length) {
-        captured = this.content.captureReader(refs, options.content, options.owner);
-        for (const id of captured.sizes.keys()) lease.add(id);
-      }
+      this.content.retain(lease, value, options.content, options.owner);
       await this.invokeResource(target, { id: contract.id, input: value }, lease, options);
-    } finally { await lease.close(); await captured?.close(); }
+    } finally { await lease.close(); }
   }
   private async prepareCommand(kind: string, raw: ResourceCall, context: { sessionId: string; objectId: string; content?: ContentLease }, request?: AbortSignal): Promise<ParsedCall> {
     const deadline = new AbortController();
@@ -397,6 +360,14 @@ export class SessionService {
       this.workbench.mutate({ type: "object.remove", sessionId, objectId: ref.id });
     });
   }
+  private assignTitle(sessionId: string, text: string, source: Source, detail?: Presentation): void {
+    const data = SessionTitleAssigned.schema.parse({ title: text.replace(/\s+/gu, " ").trim(), ...(detail ? { detail } : {}) });
+    this.commit(sessionId, writer => {
+      writer.append({ contract: SessionTitleAssigned.id, data, source, model: null, recipient: null });
+      this.tree.setTitle(sessionId, data.title);
+    });
+  }
+
   private renameResource(sessionId: string, ref: ResourceRef, text: string): string {
     const parsed = resourceTitleSchema.safeParse(text);
     if (!parsed.success) throw new SessionError("invalid_request", "The resource title must contain non-whitespace text and be at most 160 characters.");
@@ -456,16 +427,11 @@ export class SessionService {
     if (this.resources.controller(contract.resource.kind)?.creationContract !== contract)
       throw new PluginApiError("invalid_argument", "Use the registered creation contract instance.");
     const value = jsonSchema.parse(input);
-    const lease = this.content.scope({ sessionId, resourceKind: contract.resource.kind, contractId: contract.id });
-    let captured: ReturnType<ContentStore["captureReader"]> | undefined;
+    const lease = this.content.scope({ kind: "resource", sessionId, resourceKind: contract.resource.kind, contractId: contract.id });
     try {
-      const refs = contentReferences(value);
-      if (refs.length) {
-        captured = this.content.captureReader(refs, options.content, options.owner);
-        for (const id of captured.sizes.keys()) lease.add(id);
-      }
+      this.content.retain(lease, value, options.content, options.owner);
       return await this.createResource(sessionId, contract.resource.kind, { id: contract.id, input: value }, lease, options);
-    } finally { await lease.close(); await captured?.close(); }
+    } finally { await lease.close(); }
   }
   async execute(raw: unknown): Promise<SessionReply> {
     if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
@@ -498,7 +464,6 @@ export class SessionService {
         if (!this.settled(command.sessionId)) throw new SessionError("conflict", "Wait for all captured resources to settle before moving through history.");
         this.commit(command.sessionId, () => this.tree.select(command.sessionId, command.nodeId), { workbench: true });
         return { kind: "accepted", sessionId: command.sessionId };
-      case "start": return this.start(command);
       case "disposal.warnings": {
         const ids = command.objectIds ? new Set(command.objectIds) : null;
         return { kind: "warnings", warnings: this.tree.workbench(command.sessionId).objects.flatMap(object => {
@@ -514,7 +479,7 @@ export class SessionService {
         this.restorePlugins(command.sessionId);
         return { kind: "accepted", sessionId: command.sessionId };
       case "rename":
-        try { this.naming.nameByUser(command.sessionId, command.title); }
+        try { this.assignTitle(command.sessionId, command.title, null); }
         catch (error) {
           if (error instanceof PluginApiError) throw sessionPluginError(error);
           throw error;
@@ -532,7 +497,7 @@ export class SessionService {
         const abort = new AbortController();
         const requestKey = command.requestId ? `${command.sessionId}/${command.requestId}` : undefined;
         if (requestKey && this.creating.has(requestKey)) throw new SessionError("conflict", "This creation request is already running.");
-        const content = this.content.fork(command.contentScopeId, { sessionId: command.sessionId, resourceKind: command.kind, contractId: command.creation.id });
+        const content = this.content.fork(command.contentScopeId, { kind: "resource", sessionId: command.sessionId, resourceKind: command.kind, contractId: command.creation.id });
         if (requestKey) this.creating.set(requestKey, abort);
         try {
           await this.createResource(command.sessionId, command.kind, { ...command.creation, input: command.input }, content,
@@ -565,18 +530,14 @@ export class SessionService {
       }
     }
   }
-  /** Home composition entry: establish a session, create its first agent resource, and submit initial input through the agent's own submit in one atomic commit. */
-  private starting = new Map<string, Promise<SessionReply>>();
+  /** In-flight session assembly is deduplicated by the contributing plugin and retry key. */
+  private starting = new Map<string, Promise<string>>();
   /** Creation request under preparation; cancellation aborts preparation only, without rolling back committed transactions. */
   private creating = new Map<string, AbortController>();
   /** Input binds only assembled contracts without creating objects early or granting access to other resources. */
   openContentInput(target: ContentTarget): ContentLease {
     if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
-    if (target.contractId === startAgentContentTarget.contractId) {
-      if (target.resourceKind !== agentKind || target.sessionId !== undefined || target.objectId !== undefined)
-        throw new SessionError("invalid_request", "The content input does not match a new conversation.");
-      return this.content.scope(target);
-    }
+    if (target.kind === "call") return this.content.scope(this.calls.contentTarget(target.contractId));
     const controller = this.resources.controller(target.resourceKind);
     if (target.objectId) {
       if (!target.sessionId || this.object(target.sessionId, target.objectId).kind !== target.resourceKind
@@ -588,38 +549,75 @@ export class SessionService {
     }
     return this.content.scope(target);
   }
-  /** Concurrent home submissions with the same submission identity share one execution. */
-  private start(command: Extract<SessionCommand, { type: "start" }>): Promise<SessionReply> {
-    const pending = this.starting.get(command.submissionId);
+  /** Plugin-scoped retry keys recover committed sessions without repeating preparation or initialization. */
+  private initializeSession(owner: string, key: string, prepare: Parameters<SessionHost["initialize"]>[2], options: Parameters<SessionHost["initialize"]>[3]): Promise<string> {
+    if (!key.trim()) throw new PluginApiError("invalid_argument", "A session creation key is required.");
+    const receipt = JSON.stringify([owner, key]);
+    const pending = this.starting.get(receipt);
     if (pending) return pending;
-    const run = this.startOnce(command).finally(() => this.starting.delete(command.submissionId));
-    this.starting.set(command.submissionId, run);
+    const run = this.initializeSessionOnce(owner, receipt, prepare, options).finally(() => this.starting.delete(receipt));
+    this.starting.set(receipt, run);
     return run;
   }
-  /** Sole domain exception: home names a built-in agent, creates it through standard creation/action interfaces, and submits initial input. */
-  private async startOnce(command: Extract<SessionCommand, { type: "start" }>): Promise<SessionReply> {
-    const prior = this.db.prepare("SELECT session_id FROM session_submissions WHERE id = ?").get(command.submissionId) as { session_id: string } | undefined;
-    if (prior) return { kind: "accepted", sessionId: prior.session_id };
-    const content = this.content.fork(command.contentScopeId, startAgentContentTarget);
+  private async initializeSessionOnce(owner: string, key: string, prepare: Parameters<SessionHost["initialize"]>[2], options: Parameters<SessionHost["initialize"]>[3]): Promise<string> {
+    const prior = this.db.prepare("SELECT session_id FROM session_submissions WHERE id = ?").get(key) as { session_id: string } | undefined;
+    if (prior) return prior.session_id;
+    const { signal } = options;
+    signal.throwIfAborted();
+    const sessionId = randomUUID();
+    const prepared = new Map<PreparedCreation, { id: string; kind: string; input: Json; content: ContentLease }>();
+    const holds: { close(): Promise<void> }[] = [];
+    const initialContent = this.content.scope();
+    let active = true;
+    /** Each prepared input owns a content scope holding the references it carries from the caller's reader. */
+    const stage = (resourceKind: string, contractId: string, value: Json) => {
+      if (!active) throw new PluginApiError("unavailable", "Session preparation has ended.");
+      signal.throwIfAborted();
+      const input = jsonSchema.parse(value);
+      const content = this.content.scope({ kind: "resource", resourceKind, contractId });
+      holds.push(content);
+      this.content.retain(content, input, options.content, owner);
+      return { input, content };
+    };
     try {
-      const agents = this.resources.controller(agentKind)!;
-      const selection = { agent: command.agent, model: command.model, thinking: command.thinking };
-      const input = await agents.prepareCreate!(resourceCall(CreateAgent, { selection }));
-      const sessionId = randomUUID();
-      const agentId = createResourceId();
-      const before = () => {
-        this.tree.create(inputSummary(command.parts).slice(0, 72), sessionId);
-        this.workbench.createWith(sessionId, agentKind, agentId, input, { x: 48, y: 48 });
-        this.db.prepare("INSERT INTO session_submissions (id, session_id) VALUES (?, ?)").run(command.submissionId, sessionId);
-      };
-      const resource: FoldedObject = { id: agentId, kind: agentKind, title: "", data: {} };
-      // Initial home input also uses the preparation pipeline; the agent is not created yet and objectId is its future identity.
-      const submit = await this.prepareCommand(agentKind, resourceCall(SubmitAgentInput, { mode: "follow", submissionId: command.submissionId, parts: command.parts }), { sessionId, objectId: agentId, content });
-      await this.validateInitialInput((input as { selection: AgentSelection }).selection,
-        (submit.value as SubmitAgentInputData).parts, content);
-      await agents.execute!({ sessionId, resource }, submit, before);
-      return { kind: "accepted", sessionId };
-    } finally { await content.close(); }
+      const initialization = await prepare({ signal, prepare: async (contract, value) => {
+        const controller = this.resources.controller(contract.resource.kind);
+        if (controller?.creationContract !== contract || !controller.prepareCreate)
+          throw new PluginApiError("invalid_argument", "Use the registered resource creation contract.");
+        const { input, content } = stage(contract.resource.kind, contract.id, value);
+        const parsed = await controller.prepareCreate({ id: contract.id, input }, signal, content);
+        const token = {} as PreparedCreation;
+        prepared.set(token, { id: createResourceId(), kind: contract.resource.kind, input: parsed, content });
+        return token;
+      }, prepareAction: async <I, O extends Json>(token: PreparedCreation, contract: ActionContract<I, O>, value: NoInfer<I> & Json): Promise<O> => {
+        const resource = prepared.get(token);
+        if (!resource || resource.kind !== contract.resource.kind
+          || !this.resources.controller(resource.kind)?.actionContracts?.includes(contract))
+          throw new PluginApiError("invalid_argument", "Use a registered action for this prepared resource.");
+        const { input, content } = stage(resource.kind, contract.id, value);
+        const parsed = await this.prepare(resource.kind, { id: contract.id, input }, { sessionId, objectId: resource.id, signal, content });
+        return parsed.value as O;
+      } });
+      active = false;
+      signal.throwIfAborted();
+      if (this.closed) throw new PluginApiError("unavailable", "The session service is closed.");
+      const title = resourceTitleSchema.parse(initialization.title).trim();
+      this.commit(sessionId, () => {
+        this.tree.create(title, sessionId);
+        initialization.initialize(sessionId, token => {
+          const value = prepared.get(token);
+          if (!value) throw new PluginApiError("invalid_argument", "The resource was not prepared in this session creation attempt.");
+          prepared.delete(token);
+          const id = this.workbench.createWith(sessionId, value.kind, value.id, value.input, this.workbench.placement(sessionId, value.kind), value.content);
+          return { sessionId, id, kind: value.kind, title: this.object(sessionId, id).title };
+        }, initialContent);
+        this.db.prepare("INSERT INTO session_submissions (id, session_id) VALUES (?, ?)").run(key, sessionId);
+      }, { workbench: true });
+      return sessionId;
+    } finally {
+      active = false;
+      await Promise.all([...holds, initialContent].map(hold => hold.close()));
+    }
   }
   /** Shared archival/exit cleanup: abort in-flight creations, end all session object scopes, then mark archive time. */
   private async archive(sessionId: string): Promise<void> {
@@ -641,6 +639,7 @@ export class SessionService {
     this.closed = true;
     for (const pending of this.pendingCreations.values()) pending.controller.abort();
     await this.closePlugins();
+    await this.shared.close();
     await Promise.allSettled([...this.pendingCreations.values()].map(pending => pending.done));
     await Promise.allSettled([...this.starting.values()]);
     await this.content.close();

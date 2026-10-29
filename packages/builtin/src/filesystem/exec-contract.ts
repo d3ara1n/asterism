@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineImplementation, defineTool } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 import { Directory } from "./contract.ts";
-import { execResultSchema, OUTPUT_CHAR_LIMIT, MAX_TIMEOUT_SECONDS } from "../shell/contract.ts";
+import { execResultSchema, OUTPUT_CHAR_LIMIT, MAX_TIMEOUT_SECONDS } from "@asterism-app/sdk/contracts";
 
 export const Exec = defineTool({
   id: builtin.name("tool.exec"), name: "exec",
@@ -19,7 +19,7 @@ export const Exec = defineTool({
   }).describe("A non-interactive shell command and its optional execution timeout."),
 });
 export const DirectoryExec = defineImplementation({
-  ...builtin.data("directory.exec", execResultSchema),
+  ...builtin.data("directory.exec", execResultSchema.describe("Processed shell output, optional temporary log location and execution status.")),
   resource: Directory, tool: Exec,
   targetSchema: z.null().describe("The directory resource supplies the initial working directory; target is omitted or null."),
   effect: "write", execution: "sequential",

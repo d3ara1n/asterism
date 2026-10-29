@@ -5,9 +5,8 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { ConfigurationService } from "../configuration/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
-import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot } from "../plugins/packages.ts";
-import { builtinMetadata } from "@asterism-app/builtin/runtime";
-import { builtin } from "@asterism-app/builtin-api/contracts";
+import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot, packageSource } from "../plugins/packages.ts";
+import { applicationPackages, applicationManuals } from "../plugins/distribution.ts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { ModelSettings } from "../shared/model.ts";
@@ -19,7 +18,7 @@ import type { PreparedPluginStorage } from "../plugins/loader.ts";
 import { SessionService } from "./sessions.ts";
 import { collectExpiredSessions, openDatabase } from "./storage.ts";
 import { ContentTransferService } from "./content-transfer.ts";
-import type { ManualSource } from "@asterism-app/builtin-api/runtime";
+import type { ManualSource } from "@asterism-app/sdk/runtime";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string, readonly display?: UiText) { super(message); }
@@ -36,10 +35,10 @@ export class ApplicationService {
   private readonly packages: StartupPackage[];
   private readonly list: PackageList;
   private readonly started: string;
-  constructor(root: string, private readonly options: { catalogs?: TranslationCatalog[]; packages?: StartupPackage[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
+  constructor(root: string, private readonly options: { packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: StartupPackage[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
     this.db = openDatabase(root);
     this.packages = options.packages ?? [];
-    this.list = new PackageList(join(root, "plugins.json"));
+    this.list = applicationPackages(root);
     this.started = JSON.stringify(this.list.read());
     this.npmRoot = join(root, "plugins");
     try {
@@ -47,9 +46,13 @@ export class ApplicationService {
       this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
       // Archive cleanup releases references first; session services then explicitly reclaim content.
       collectExpiredSessions(this.db);
-      this.sessions = new SessionService(this.db, root, this.configuration, options.onSessionChanged, options.adapterFactory, options.plugins, options.onPluginConfigurationChanged, options.preparedStorage,
-        () => (options.manualSources ?? []).filter(source => this.packages.some(item => item.id === source.pluginId && item.status === "loaded")
-          && !options.preparedStorage?.failures.has(source.pluginId)), options.pluginDependencies);
+      this.sessions = new SessionService(this.db, root, this.configuration, {
+        onChanged: options.onSessionChanged, adapterFactory: options.adapterFactory, plugins: options.plugins,
+        configurationChanged: options.onPluginConfigurationChanged, preparedStorage: options.preparedStorage,
+        pluginDependencies: options.pluginDependencies, packageRoots: options.packageRoots, skillDirectories: options.skillDirectories,
+        manualSources: () => [...applicationManuals, ...(options.manualSources ?? []).filter(source => this.packages.some(item => item.id === source.pluginId && item.status === "loaded")
+          && !options.preparedStorage?.failures.has(source.pluginId))],
+      });
       // setup and contribution registration may also fail; frontend-only consumers cannot use failed providers either.
       let changed = true;
       while (changed) {
@@ -101,7 +104,7 @@ export class ApplicationService {
     const current = this.list.read();
     // Match list entries to startup results by source; new or modified entries show as pending restart.
     const plugins: AppSnapshot["plugins"] = current.map((entry, index) => {
-      const source = entry.source.kind === "path" ? entry.source.path : `${entry.source.name}@${entry.source.version}`;
+      const source = packageSource(entry);
       const startup = this.packages.find(item => item.source === source);
       const pending = !startup || startup.enabled !== entry.enabled;
       let metadata = {}, id = startup?.id ?? null, metadataError: string | null = null;
@@ -109,14 +112,11 @@ export class ApplicationService {
       try { metadata = readPackageMetadata(root); }
       catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
       if (!id) { try { id = readManifest(root).id; } catch { /* Loading state retains package validation failure reasons. */ } }
-      return { index, source, metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
+      return { index, source, bundled: entry.source.kind === "bundled", metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
         error: (pending ? null : startup.error) ?? metadataError, renderer: pending ? null : startup.renderer,
         stylesheet: pending ? null : startup.stylesheet,
         dependencies: startup?.rendererDependencies ?? [] };
     });
-    const builtIn = this.sessions.plugins.find(plugin => plugin.id === builtin.id);
-    plugins.push({ index: null, source: "@asterism-app/builtin", id: builtin.id, metadata: builtinMetadata,
-      status: builtIn?.status ?? "failed", enabled: true, error: builtIn?.error ?? null, renderer: null, stylesheet: null, dependencies: [] });
     return snapshotSchema.parse({ workspace, sessions, templates: this.sessions.templates.list(), archivedSessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started,
       ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings() } : {}) });
   }

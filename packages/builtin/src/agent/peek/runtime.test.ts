@@ -21,11 +21,10 @@ function* query(): Generator<ModelEvent> {
   yield { type: "part.delta", partId: "call", delta: '{"id":' };
   yield { type: "part.end", partId: "call", arguments: { id: "saved" } };
 }
-const role = { id: "utility", name: "utility", description: "", hidden: true, model: "p/m", thinking: null };
 const model = { model: "p/m", provider: "p", name: "Model", contextWindow: 65536,
   capabilities: { reasoning: false, tools: true, thinkingLevels: [] } };
 const deps = (stream: ModelServices["stream"]) => ({
-  models: { stream, roles: () => [role], list: () => [model] }, userAgent: "Asterism/test",
+  models: { stream, list: () => [model] }, utility: () => ({ provider: "p", model: "m" }), userAgent: "Asterism/test",
 });
 function target() {
   const nodes = [node("saved", null, message("a", "Original evidence"))];
@@ -73,7 +72,7 @@ describe("peek investigation stream", () => {
     expect(result.data?.queries).toEqual([{ tool: "read_records", arguments: { id: "saved" }, records: ["saved"] }]);
     expect(updates.some(data => data.report === "" && data.phase === "reading")).toBe(true);
     expect(object.session.snapshot).toHaveBeenCalledTimes(1);
-    expect(targets[0]).toEqual({ role: "utility", model: "p/m" });
+    expect(targets[0]).toEqual({ provider: "p", model: "m" });
   });
 
   it("Does not execute tool calls truncated by the output limit, and saves truncated reports as partial results", async () => {

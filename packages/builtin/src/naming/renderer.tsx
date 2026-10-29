@@ -1,10 +1,7 @@
-import { recordRenderer, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
-import { withValues } from "@asterism-app/sdk/contracts";
+import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { PenLine, TextCursorInput } from "lucide-react";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 
-import { recordMessages } from "../messages/records";
-import { SessionNamed } from "@asterism-app/builtin-api/contracts";
 import { namingMessages } from "../messages/naming";
 import { inputText } from "../shared/tool-preview";
 import { SessionNameResult, SessionRenameResult } from "./contract";
@@ -34,6 +31,5 @@ export default {
       input: renameView, execution: renameView, result: renameView,
     }),
   ],
-  records: [recordRenderer(SessionNamed, { icon: <PenLine className="size-4" />,
-    label: data => withValues(recordMessages.recordSessionNamed, { title: data.title }) })],
+  records: [],
 } satisfies RendererModule;

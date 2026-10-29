@@ -19,9 +19,13 @@ Each entry names an existing package-relative subdirectory using `/` separators.
 
 Declare only directories intended for readers. Source examples can be exposed alongside prose; internal test fixtures and credentials belong outside the declared directories.
 
+A public API library named in the plugin's `asterism.publicPackages` can declare its own `asterism.manual` directories. The library needs no plugin identity or executable entry for this declaration. Its documentation remains inside its own package and is available while its implementation provider is loaded.
+
 ## Read through the manual
 
 When the plugin loads successfully, its directories appear under `plugins/<plugin-id>/`. For this example, an article at `docs/usage.md` appears as `plugins/example.bridge/docs/usage.md`. The manual supports directory listing, file discovery, content search, and reading selected lines.
+
+Public-library directories appear under `plugins/<plugin-id>/public/<package-name>/`. The host exposes the same source catalog through the SDK for plugins that provide another documentation interface.
 
 The manual reads current files at their original locations. It creates no copied document tree or index. Source declarations follow the loaded package set: changes to declarations, enabling, disabling, or removing a plugin take effect after restart. Plugins with package, startup, or storage failures do not contribute documents.
 

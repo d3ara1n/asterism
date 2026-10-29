@@ -1,107 +1,46 @@
-import { ArrowUp, Bot, Settings } from "lucide-react";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { type MessageDraft, AttachFiles, DraftFiles, DraftFileError, fileInputEvents, ModelChoices } from "@asterism-app/builtin/renderer";
-import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
+import { useState } from "react";
 import type { UiText } from "@asterism-app/sdk/contracts";
-
-import type { ThinkingLevel } from "../../../shared/configuration";
-import type { SessionCommand } from "../../../shared/session";
 import { appMessages } from "../../messages/app";
-import { commonMessages } from "@asterism-app/ui/messages/common";
 import { homeMessages } from "../../messages/home";
-import { ConfigurationChoice as Choice } from "@asterism-app/ui/ConfigurationChoice";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { useI18n } from "../../shared/i18n";
 import { BrandMark } from "@asterism-app/ui/ui/brand-mark";
-import { StatusText } from "@asterism-app/ui/ui/status";
 import { Button } from "@asterism-app/ui/ui/button";
-import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { InputGroup, InputGroupTextarea, InputGroupAddon } from "@asterism-app/ui/ui/input-group";
+import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { useConfiguration } from "../configuration/state";
-import { Showcase, showcaseSpell } from "../showcase/Showcase";
+import { usePluginSettingsRegistry } from "../../modules/settings";
+import { PluginRegion } from "../plugins/scope";
+import { resolveSessionEntry, sessionEntryKey } from "./entries";
 import type { TemplateSummary } from "../../../shared/templates";
 import { TemplateCards } from "../templates/TemplateCards";
-import type { SettingsCategoryId } from "../settings/SettingsPage";
 
-export type StartInput = Omit<Extract<SessionCommand, { type: "start" }>, "type" | "submissionId" | "contentScopeId">;
-
-/** Application-level drafts store only explicit overrides; default model and level are resolved at request time. */
-export function HomePage({ active, draft, onSettings, ready, busy, submitError, onStart, templates, onTemplateStart, onTemplatesChanged }: {
-  active: boolean; draft: MessageDraft; onSettings: (category: SettingsCategoryId) => void;
-  ready: boolean; busy: boolean; submitError: UiText | null; onStart: (input: StartInput) => Promise<void>;
-  templates: readonly TemplateSummary[]; onTemplateStart: (id: string) => Promise<UiText | null>; onTemplatesChanged: () => void;
+/** Home owns entry selection and templates; the selected plugin supplies its entire starting interaction. */
+export function HomePage({ active, onSettings, ready, onCreated, templates, onTemplateStart, onTemplatesChanged }: {
+  active: boolean; onSettings(): void; ready: boolean; onCreated(sessionId: string): void;
+  templates: readonly TemplateSummary[]; onTemplateStart(id: string): Promise<UiText | null>; onTemplatesChanged(): void;
 }) {
   const i18n = useI18n();
-  const inputState = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const { snapshot, readError } = useConfiguration(active);
-  const initialized = useRef(false);
-  const [agentId, setAgentId] = useState<string | null>(null);
-  const [modelId, setModelId] = useState<string | null>(null);
-  const [thinking, setThinking] = useState<ThinkingLevel | null>(null);
-  const [showcase, setShowcase] = useState(false);
-  useEffect(() => {
-    if (!snapshot) return;
-    if (!initialized.current) {
-      initialized.current = true;
-      // The sole domain exception for home initiation: select the built-in agent preset by default.
-      setAgentId(defaultAgentPreset);
-      return;
-    }
-  }, [snapshot]);
-  const agent = snapshot?.agents.find(item => item.id === agentId && item.enabled);
-  const canSend = ready && !busy && !inputState.uploading && !!agent && (!!inputState.text.trim() || !!inputState.files.length);
-  // Existing configuration means the user has encountered the corresponding concept; onboarding progress is independent of request availability.
-  const guidance = !snapshot ? null
-    : !snapshot.modelProviders.length ? { message: homeMessages.setupProvider, action: homeMessages.openProviders, category: "providers" as const }
-    : !snapshot.models.length ? { message: homeMessages.setupModel, action: homeMessages.openModels, category: "providers" as const }
-    : !snapshot.roles.some(role => role.model !== null) ? { message: homeMessages.setupRole, action: homeMessages.openRoles, category: "roles" as const }
-    : null;
+  const { sessionEntries } = usePluginSettingsRegistry();
+  const [attempt, setAttempt] = useState(0);
+  const entry = snapshot ? resolveSessionEntry(sessionEntries, snapshot.sessionEntry) : null;
+  const Body = entry?.Body;
   return <div className="home-page"><div className="home-content">
     <div className="mx-auto w-full max-w-2xl">
       <header className="mb-8 flex flex-col items-center text-center">
-        <BrandMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{i18n.formatMessage(appMessages.appName)}</h1>
-        <p className="type-body mt-2 text-muted-foreground">{i18n.formatMessage(homeMessages.homePrompt)}</p>
+        <BrandMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{i18n.text(appMessages.appName)}</h1>
+        <p className="type-body mt-2 text-muted-foreground">{i18n.text(homeMessages.homePrompt)}</p>
       </header>
-      {/* Two-layer input area: a light input surface above a gray options tray; options use compact ghost buttons + menus, not form dropdowns. */}
-      <form {...fileInputEvents(draft, busy || !ready)} onSubmit={event => {
-        event.preventDefault();
-        if (canSend) void onStart({ agent: agent!.id, model: modelId, thinking, parts: draft.parts() });
-      }} aria-label={i18n.formatMessage(commonMessages.newConversation)} className="rounded-xl border bg-muted">
-        <InputGroup className="rounded-xl border-0 border-b bg-card shadow-none">
-          <label htmlFor="home-message" className="sr-only">{i18n.formatMessage(homeMessages.firstMessage)}</label>
-          <InputGroupTextarea id="home-message" className="min-h-32 px-4 py-4" rows={4} maxLength={100_000}
-            placeholder={i18n.formatMessage(homeMessages.homePlaceholder)} value={inputState.text} disabled={busy} onChange={event => draft.setText(event.target.value)} aria-describedby="home-availability"
-            onKeyDown={event => {
-              // Easter egg: entering the complete passphrase and pressing Enter opens the component showcase without entering the command system.
-              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-              event.preventDefault();
-              if (inputState.text.trim() === showcaseSpell) { draft.setText(""); setShowcase(true); }
-              else event.currentTarget.form?.requestSubmit();
-            }} />
-          <InputGroupAddon align="block-end" className="min-w-0 gap-1">
-            <AttachFiles draft={draft} disabled={busy || !ready} />
-            <DraftFiles draft={draft} disabled={busy} />
-            <IconButton variant="default" className="rounded-full" label={i18n.formatMessage(commonMessages.sendMessage)} type="submit" disabled={!canSend} aria-describedby="home-availability"><ArrowUp /></IconButton>
-          </InputGroupAddon>
-        </InputGroup>
-        <div className="flex min-w-0 flex-wrap items-center gap-0.5 px-1.5 py-1">
-          <Choice icon={<Bot />} label={i18n.formatMessage(commonMessages.agent)} value={agent?.id ?? i18n.formatMessage(commonMessages.agent)} disabled={!snapshot || busy}
-            selected={agent?.id ?? ""} onSelect={setAgentId}
-            options={snapshot?.agents.filter(item => item.enabled).map(item => ({ value: item.id, label: item.id })) ?? []} />
-          <ModelChoices configuration={snapshot} agent={agentId} model={modelId} thinking={thinking} disabled={busy}
-            onModelChange={setModelId} onThinkingChange={setThinking} />
-        </div>
-      </form>
-      <DraftFileError draft={draft} className="mt-2" />
-      {(submitError || readError) && <p role="alert" className="mt-3 text-center"><StatusText tone="error">{i18n.text(submitError ?? readError ?? "")}</StatusText></p>}
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center">
-        <p id="home-availability" role="status" className="type-caption">{i18n.text(busy ? homeMessages.startingConversation
-          : !ready ? commonMessages.statusUnavailable : !snapshot ? (readError ? commonMessages.statusUnavailable : commonMessages.loading)
-          : guidance?.message ?? homeMessages.workbenchHint)}</p>
-        {ready && !busy && guidance && <Button variant="ghost" size="sm" onClick={() => onSettings(guidance.category)}>
-          <Settings />{i18n.text(guidance.action)}</Button>}
-      </div>
+      {entry && Body ? <PluginRegion key={`${sessionEntryKey(entry)}:${attempt}`} pluginId={entry.pluginId} page fallback={<Alert variant="destructive"><AlertDescription>
+        {i18n.formatMessage(homeMessages.entryFailed, { plugin_name: i18n.text(entry.pluginName) })}<Button variant="outline" size="sm" onClick={() => setAttempt(value => value + 1)}>{i18n.text(homeMessages.retry)}</Button>
+      </AlertDescription></Alert>}>
+        <Body active={active} ready={ready} open={onCreated} />
+      </PluginRegion> : <div className="flex flex-col items-center gap-3 text-center">
+        <p role="status" className="type-body text-muted-foreground">{i18n.text(readError ?? (!snapshot ? commonMessages.loading
+          : !sessionEntries.length ? homeMessages.noEntry : snapshot.sessionEntry ? homeMessages.entryUnavailable : homeMessages.chooseEntry))}</p>
+        {snapshot && <Button variant="outline" onClick={onSettings}>{i18n.text(homeMessages.entrySettings)}</Button>}
+      </div>}
     </div>
     <TemplateCards templates={templates} ready={ready} onStart={onTemplateStart} onChanged={onTemplatesChanged} />
-    <Showcase open={showcase} onOpenChange={setShowcase} />
   </div></div>;
 }

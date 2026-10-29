@@ -7,7 +7,7 @@ import { contentRefSchema, defineAction, defineCreation, defineRecord, jsonSchem
 import { definePlugin, implementAction, implementCreation, implementResource, type PluginContext, type ResourceContribution } from "@asterism-app/sdk/runtime";
 import { CreateAgent, defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
-import { ApplicationService } from "./service.ts";
+import { BuiltinApplicationService as ApplicationService } from "../../packages/builtin/src/testing.ts";
 import { openDatabase } from "./storage.ts";
 
 const ns = pluginNamespace("test.templates");

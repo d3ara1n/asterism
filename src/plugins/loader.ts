@@ -12,7 +12,7 @@ import { RunLifecycle, type RunGroup, type RunningWork } from "./lifecycle.ts";
 import { LifetimeScope } from "./lifetime.ts";
 import { PluginStorage } from "./storage.ts";
 import type { HostModels } from "./models.ts";
-import type { CatalogHost, SessionHost } from "./host.ts";
+import type { SessionHost, SharedServices } from "./host.ts";
 import { toRecord, sessionSnapshot } from "./records.ts";
 import { createSdkContext, type SdkContext } from "./sdk-context.ts";
 import { synchronous } from "./synchronous.ts";
@@ -27,15 +27,14 @@ import { PluginEventScope } from "./event-scope.ts";
 import { CallRegistry } from "./calls.ts";
 import { bindTopLevelTools, type RegisteredTopLevelTool } from "./top-level-tools.ts";
 import { resolveToolContributions, validateToolContributions, type ToolImplementationStatus } from "./tool-contributions.ts";
-import type { ModelProviderExtensions } from "../configuration/provider-extensions.ts";
-import type { ModelProviderServices, PluginStorageDeclaration, UsageProviderServices } from "@asterism-app/sdk/runtime";
-import type { WebProviderRegistry } from "../configuration/web-providers.ts";
+import type { PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
 
 export interface PreparedPluginStorage {
   declarations: ReadonlyMap<string, readonly PluginStorageDeclaration[]>;
   failures: ReadonlyMap<string, string>;
 }
 export interface PluginHostServices {
+  shared: SharedServices;
   /** Backend provider dependencies derived from public imports, separate from author definitions. */
   pluginDependencies?: ReadonlyMap<string, readonly string[]>;
   events?: EventBus;
@@ -44,12 +43,7 @@ export interface PluginHostServices {
   content?: ContentStore;
   refOf(objectId: string): ResourceRef | null;
   sessions: SessionHost;
-  catalogs?: CatalogHost;
   models: HostModels;
-  modelProviders?: ModelProviderServices;
-  usageProviders?: UsageProviderServices;
-  webProviders?: WebProviderRegistry;
-  modelProviderExtensions?: ModelProviderExtensions;
   vault?: CredentialVault | null;
   /** Plugin configuration changes: settings saves, default restoration, and backend updates all notify here. */
   configurationChanged?: (pluginId: string) => void;
@@ -135,6 +129,7 @@ function initializationOrder(plugins: readonly PluginDefinition[], dependencies:
 
 /** Collect SDK contributions at startup, resolve overrides in plugin order, and freeze the catalog. */
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
+  const { agentCatalog, webProviders, extensions } = services.shared;
   const dependencies = services.pluginDependencies ?? new Map<string, readonly string[]>();
   const directory = Object.freeze({ list: () => services.sessions.list(), archived: () => services.sessions.archived() });
   const events = services.events ?? new EventBus();
@@ -143,7 +138,9 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const channels = new ChannelRegistry(services);
   let topLevelTools: readonly RegisteredTopLevelTool[] = [];
   const manifest: PluginManifest[] = [], collected: Collected[] = [];
-  const lifecycles: RunLifecycle[] = [];
+  const hostLifecycle = new RunLifecycle(() => {});
+  const lifecycles: RunLifecycle[] = [hostLifecycle];
+  for (const call of services.shared.calls) calls.declareHost(call, hostLifecycle.group("call"));
   const initialized: Collected[] = [], invalidEntries = new Set<Collected>();
   const kinds = new Set<string>(), identities = new Set<string>();
   const toolContracts = new Map<string, ToolContract>();
@@ -164,6 +161,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn, services.preparedStorage?.declarations.get(id) ?? []);
       storage.onChanged = () => services.configurationChanged?.(id);
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
+      lifecycle.signal.addEventListener("abort", () => agentCatalog.remove(id), { once: true });
       // Plugin lifetime signals abort alongside run registration; cleanup runs in reverse registration order on plugin release.
       const lifetime = new LifetimeScope((message, error) => log.error(message, error), lifecycle.signal);
       const taskHost = new TaskHost(log, lifecycle.group("task"));
@@ -179,15 +177,10 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const pluginTools = entry.topLevelTools;
       // Root entries and feature modules share registration; each module registers cleanup responsibility with plugin.lifetime during setup.
       const register = (contribution: ModuleContribution) => {
-        if (contribution.webProviders?.length) {
-          if (!services.webProviders) throw new Error("Web provider contributions are unavailable.");
-          services.webProviders.declare(id, contribution.webProviders, lifecycle.group("call"));
-        }
-        if (contribution.usageProviders?.length || contribution.modelProviderPresets?.length) {
-          if (!services.modelProviderExtensions) throw new Error("Provider contributions are unavailable.");
-          services.modelProviderExtensions.declare(id, contribution.usageProviders ?? [], contribution.modelProviderPresets ?? [],
-            lifecycle.group("call"), dependencies.get(id));
-        }
+        agentCatalog.register(id, sdk.context.assets, contribution.agentSkills ?? [], contribution.agentInstructions ?? []);
+        if (contribution.webProviders?.length) webProviders.declare(id, contribution.webProviders, lifecycle.group("call"));
+        if (contribution.usageProviders?.length || contribution.modelProviderPresets?.length)
+          extensions.declare(id, contribution.usageProviders ?? [], contribution.modelProviderPresets ?? [], lifecycle.group("call"), dependencies.get(id));
         for (const call of contribution.calls ?? []) calls.declare(id, call, sdk, lifecycle.group("call"));
         for (const channel of contribution.channels ?? []) channels.declare(id, channel, sdk);
         for (const tool of contribution.topLevelTools ?? []) {
@@ -241,8 +234,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       collected.push(entry); manifest.push({ id, status: "loaded", resources: ownKinds, implementations: [] });
     } catch (error) {
       if (entry) {
-        services.modelProviderExtensions?.removeOwners([id]);
-        services.webProviders?.removeOwners([id]);
+        extensions.removeOwners([id]);
+        webProviders.removeOwners([id]);
         calls.removeOwner(id); channels.removeOwner(id);
         entry.events.stop(); events.removeOwner(id);
         entry.lifecycle.stop();
@@ -279,8 +272,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       collected.splice(i, 1); invalidated = true;
     }
   }
-  services.modelProviderExtensions?.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
-  services.webProviders?.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
+  extensions.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
+  webProviders.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
   // setup and post-validation failures share one reverse cleanup pass so providers cannot bypass failed consumers still cleaning up.
   const failedCleanup = (async () => {
     await Promise.allSettled([...invalidEntries].map(entry => entry.lifecycle.close()));
@@ -292,6 +285,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const disposalOrder = [...collected].reverse();
   const index = (id: string) => plugins.findIndex(plugin => plugin.namespace.id === id);
   collected.sort((a, b) => index(a.plugin.namespace.id) - index(b.plugin.namespace.id));
+  agentCatalog.refresh(new AbortController().signal);
   manifest.sort((a, b) => index(a.id) - index(b.id));
   const resolvedTools = resolveToolContributions(collected.map(entry => ({
     id: entry.plugin.namespace.id, tools: entry.tools, topLevelTools: entry.topLevelTools,
@@ -441,14 +435,14 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     close() {
       if (closing) return closing;
       closed = true;
-      services.modelProviderExtensions?.removeOwners(collected.map(entry => entry.plugin.namespace.id));
-      services.webProviders?.removeOwners(collected.map(entry => entry.plugin.namespace.id));
+      extensions.removeOwners(collected.map(entry => entry.plugin.namespace.id));
+      webProviders.removeOwners(collected.map(entry => entry.plugin.namespace.id));
       for (const entry of collected) entry.events.stop();
       events.close();
       for (const lifecycle of lifecycles) lifecycle.stop();
       channels.close();
       closing = (async () => {
-        await Promise.allSettled(collected.map(entry => entry.lifecycle.close()));
+        await Promise.allSettled(lifecycles.map(lifecycle => lifecycle.close()));
         await failedCleanup;
         // Exit and archival share object lifetime cleanup; objects end before their owning plugin lifetimes.
         const scopes = [...objectScopes.values()];

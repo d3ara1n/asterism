@@ -6,17 +6,17 @@ import { Button } from "@asterism-app/ui/ui/button";
 
 import { commonMessages } from "../messages/common";
 import { filesystemMessages } from "../messages/filesystem";
-import { useI18n, useRendererCalls, type CreationInputProps } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererCalls, useRendererApplication, type CreationInputProps } from "@asterism-app/sdk/renderer";
 import { useEffect, useState } from "react";
 import { ReadDirectoryDefaults } from "./contract";
 
 /** Path examples are platform-specific hints only and do not participate in validation. */
-const pathPlaceholder = () => window.host.platform === "win32" ? "C:\\Users\\me\\project"
-  : window.host.platform === "darwin" ? "/Users/me/project" : "/home/me/project";
+const pathPlaceholder = (platform: string) => platform === "win32" ? "C:\\Users\\me\\project"
+  : platform === "darwin" ? "/Users/me/project" : "/home/me/project";
 
 /** Directory creation: enter a path manually or choose it through the system dialog; the runtime handles name fallback and path validation. */
 export function DirectoryInput({ initialInput, busy, resolve, cancel }: CreationInputProps<{ path: string; title?: string }>) {
-  const i18n = useI18n();
+  const i18n = useI18n(), application = useRendererApplication();
   const calls = useRendererCalls();
   const [path, setPath] = useState(initialInput?.path ?? "");
   const [title, setTitle] = useState(initialInput?.title ?? "");
@@ -39,7 +39,7 @@ export function DirectoryInput({ initialInput, busy, resolve, cancel }: Creation
     setBrowsing(true);
     setPathError(null);
     try {
-      const picked = await window.host.pickDirectory(path);
+      const picked = await application.pickDirectory(path);
       if (picked) setPath(picked);
     } catch {
       setPathError(filesystemMessages.directoryBrowseFailed);
@@ -56,7 +56,7 @@ export function DirectoryInput({ initialInput, busy, resolve, cancel }: Creation
       <div className="flex gap-2">
         <Input id="directory-path" maxLength={4096} spellCheck={false} autoComplete="off" disabled={loading}
           aria-invalid={!!pathError} aria-describedby={pathError ? "directory-path-error" : undefined}
-          value={path} onChange={e => { setPath(e.target.value); setPathError(null); }} placeholder={pathPlaceholder()} />
+          value={path} onChange={e => { setPath(e.target.value); setPathError(null); }} placeholder={pathPlaceholder(application.platform)} />
         <Button type="button" variant="secondary" disabled={loading || browsing} onClick={() => { void browse(); }}>{i18n.formatMessage(filesystemMessages.browse)}</Button>
       </div>
       {pathError && <FieldError id="directory-path-error">{i18n.text(pathError)}</FieldError>}

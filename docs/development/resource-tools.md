@@ -22,7 +22,7 @@ Notes store current text in object data. Saving does not append a note-content h
 
 Find and grep are read-only resource implementations backed by packaged ripgrep. Every call searches current files; it creates no separate index.
 
-The manual is a separate resource with empty state and parameterless creation. It exposes list, find, grep, and read over a virtual directory of application guides, public-package material, and directories declared by loaded plugins. Application composition supplies source paths; resource state contains neither installation paths nor captured documents. Files remain at their original locations, with installed application sources unpacked for native search. Linking and agent policy determine tool availability as for other resources.
+The manual is a separate resource with empty state and parameterless creation. It exposes list, find, grep, and read over a virtual directory of application guides, public-package material, and directories declared by loaded plugins. The host collects those sources and exposes their current catalog through the SDK. Resource state contains neither installation paths nor captured documents. Files remain at their original locations, with installed application sources unpacked for native search. Linking and agent policy determine tool availability as for other resources.
 
 Virtual ancestors list source directories. A source-local target resolves inside that source's real directory. Searches over virtual ancestors visit their descendant sources and share one result limit and byte budget. Globs apply within each selected physical search directory; result paths include the source prefix and can be passed directly to read. A source failure fails the search rather than presenting an incomplete search as complete. File reads use current contents; saved tool results retain their original content.
 
@@ -40,7 +40,7 @@ An incomplete empty search means no results were returned before stopping. Only 
 
 ## Shell profiles and command execution
 
-The shell service owns configured profiles and executable resolution. A profile contains the executable, startup arguments, command arguments, and environment overrides. Pass the command as one argument after those configured arguments.
+The host owns shell profile configuration, its settings page, executable resolution, and process execution. The SDK exposes profiles and one-shot commands to any plugin. Builtin's directory exec adapts that capability to its resource and model-facing result. A profile contains the executable, startup arguments, command arguments, and environment overrides. The command is one argument after those configured arguments.
 
 Explicit unavailable profiles fail. Automatic selection searches configured profiles in platform preference order. Listing profiles resolves availability without starting shells or exposing environment secrets.
 
@@ -58,7 +58,7 @@ Zero exit is success; an ordinary nonzero or signal exit is failure. Cancellatio
 
 ## Interactive terminals
 
-A terminal resource persists its title, initial directory, and profile selection. Its PTY, screen, variables, and jobs belong to the current application run.
+The SDK exposes interactive terminal sessions backed by the host's PTY, screen, process supervision, and readiness integration. Plugins decide how to represent and use them. Builtin's terminal resource persists its title, initial directory, and profile selection. Its PTY, screen, variables, and jobs belong to the current application run.
 
 A newly created terminal starts automatically. Reconstructed terminals after restart or cursor movement remain inactive until explicitly opened or first used for input. Card hiding and session navigation preserve a running instance; closing the terminal ends the instance but retains the resource.
 

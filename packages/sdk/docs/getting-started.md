@@ -1,6 +1,6 @@
 # Prepare for plugin development
 
-A plugin adds resources, tools, views, settings, or services through Asterism's public software development kit (SDK). Development includes preparing a compatible package, verifying its capabilities and lifecycle in the application, and checking the packaged result before sharing it.
+A plugin adds resources, tools, views, settings pages, Home entries, or services through Asterism's public software development kit (SDK). Development includes preparing a compatible package, verifying its capabilities and lifecycle in the application, and checking the packaged result before sharing it.
 
 ## Prepare a project
 
@@ -14,7 +14,7 @@ npm distribution tags follow the application's release channels: `latest` matche
 
 Asterism binds shared public imports to the active host or plugin provider. Dependency ranges do not reject loading; missing modules, missing exports, invalid contributions, and initialization errors produce loading failures. Check the APIs your plugin actually uses with TypeScript and exercise them in the target application.
 
-The `asterism` field declares a namespaced `id` and the needed `runtime`, `renderer`, and `storage` entry paths, relative to the package root. Runtime and renderer entries default-export their SDK plugin definitions. The runtime namespace must match the manifest ID.
+The `asterism` field declares a namespaced `id` and the needed `runtime`, `renderer`, and `storage` entry paths, relative to the package root. Runtime and renderer entries default-export their SDK plugin definitions. The runtime namespace must match the manifest ID. The required `displayName` is the plugin's name wherever the application shows it, including plugin management, settings attribution, and session entries; use a message reference owned by the plugin to localize it. The host reads it from the package without running plugin code, so disabled and failed plugins keep their names.
 
 Keep shared declarations separate from executable backend and frontend code. Backend work can use local system capabilities; frontend code works through the host's view and communication facilities.
 

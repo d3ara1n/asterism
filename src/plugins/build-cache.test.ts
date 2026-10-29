@@ -14,8 +14,10 @@ function fixture() {
   const plugin = join(root, "plugin"), cache = join(root, "cache");
   const entry = join(cache, "modules-one", "runtime.mjs"), chunk = join(cache, "modules-one", "shared.mjs");
   put(join(plugin, "package.json"), '{"name":"fixture"}');
-  put(join(plugin, "src/index.ts"), 'export { value } from "./value";');
+  put(join(plugin, "src/index.ts"), 'export { value } from "./value"; export { shared } from "../../shared/helper";');
   put(join(plugin, "src/value.js"), "export const value = 1;");
+  // A workspace helper outside the plugin package, as reached through linked packages.
+  put(join(root, "shared/helper.ts"), "export const shared = 1;");
   put(join(root, "node_modules/dependency/package.json"), '{"name":"dependency","version":"1.0.0"}');
   put(join(root, "node_modules/dependency/index.js"), "export const value = 1;");
   put(entry, 'export { value } from "./shared.mjs";'); put(chunk, "export const value = 1;");
@@ -25,17 +27,18 @@ function fixture() {
     runtimeDependencies: new Map([["fixture", new Set(["provider"])]]),
     rendererDependencies: new Map(), failures: new Map(),
   };
-  const create = (recipe = "recipe-one") => new PluginBuildCache(cache, [plugin], recipe);
+  const inputs = [join(plugin, "src/index.ts"), join(plugin, "src/value.js"), join(root, "shared/helper.ts"), join(root, "node_modules/dependency/index.js")];
+  const create = (recipe = "recipe-one") => new PluginBuildCache(cache, recipe);
   const save = () => {
     const initial = create();
-    initial.inputs([join(plugin, "src/index.ts")]);
+    initial.inputs(inputs);
     initial.write(result, [entry, chunk]);
   };
   return { root, plugin, cache, entry, chunk, result, create, save };
 }
 
 // Caches must return the complete shared module graph; checking only entries misses deleted shared chunks.
-it("reuses unchanged complete dependency graphs and rebuilds when recipes change or shared artifacts are missing", () => {
+it("reuses unchanged builds, including inputs outside the plugin package, and rebuilds when recipes change or shared artifacts are missing", () => {
   const f = fixture();
   f.save();
   expect(f.create().read()).toEqual(f.result);
@@ -44,10 +47,11 @@ it("reuses unchanged complete dependency graphs and rebuilds when recipes change
   expect(f.create().read()).toBeNull();
 });
 
-// Local source does not change with package versions; new higher-priority candidates, dependency shadowing, and resolution configuration can change actual builds.
+// Only paths the build observed are checked; each change below alters what resolution or bundling would see.
 it.each([
   ["source contents", (f: ReturnType<typeof fixture>) => put(join(f.plugin, "src/value.js"), "export const value = 2;")],
   ["higher-priority same-name extension", (f: ReturnType<typeof fixture>) => put(join(f.plugin, "src/value.ts"), "export const value = 3;")],
+  ["helper outside the plugin package", (f: ReturnType<typeof fixture>) => put(join(f.root, "shared/helper.ts"), "export const shared = 2;")],
   ["npm dependency with unchanged version", (f: ReturnType<typeof fixture>) => put(join(f.root, "node_modules/dependency/index.js"), "export const value = 4;")],
   ["nearer same-name dependency", (f: ReturnType<typeof fixture>) => put(join(f.plugin, "node_modules/dependency/index.js"), "export const value = 5;")],
   ["package exports", (f: ReturnType<typeof fixture>) => put(join(f.root, "node_modules/dependency/package.json"), '{"name":"dependency","exports":"./other.js"}')],
@@ -59,13 +63,9 @@ it.each([
   expect(f.create().read()).toBeNull();
 });
 
-// These inputs exceed fingerprint coverage; use ordinary builds without leaving reusable indexes.
-it("out-of-scope helpers and inherited configuration bypass caching while ordinary configuration remains cacheable", () => {
+// Inherited configuration reads files outside the observed set; such builds run normally without leaving reusable indexes.
+it("inherited configuration bypasses caching while ordinary configuration remains cacheable", () => {
   const f = fixture();
-  const outside = f.create();
-  outside.resolution("../helper", join(f.plugin, "index.ts"), f.plugin);
-  outside.write(f.result, [f.entry, f.chunk]);
-  expect(f.create().read()).toBeNull();
   put(join(f.plugin, "tsconfig.json"), '{"extends":"../base.json"}');
   f.save();
   expect(f.create().read()).toBeNull();
@@ -78,8 +78,11 @@ it("out-of-scope helpers and inherited configuration bypass caching while ordina
 it("cache artifacts do not enter source fingerprints and failed batches do not overwrite successful indexes", () => {
   const f = fixture();
   const cache = join(f.plugin, ".cache");
-  const create = () => new PluginBuildCache(cache, [f.plugin], "recipe");
-  create().write(f.result, [f.entry, f.chunk]);
+  put(join(f.plugin, "index.ts"), "export const value = 1;");
+  const create = () => new PluginBuildCache(cache, "recipe");
+  const saved = create();
+  saved.inputs([join(f.plugin, "index.ts")]);
+  saved.write(f.result, [f.entry, f.chunk]);
   const index = readFileSync(join(cache, "build-index.json"), "utf8");
   expect(create().read()).toEqual(f.result);
   create().write({ ...f.result, failures: new Map([["fixture", "Invalid source."]]) }, []);

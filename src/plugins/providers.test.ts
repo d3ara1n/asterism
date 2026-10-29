@@ -4,12 +4,12 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pluginNamespace, type UsageItem, type ModelEvent } from "@asterism-app/sdk/contracts";
 import { definePlugin, defineModule, type PluginContext, type PluginDefinition, type UsageQueryContext } from "@asterism-app/sdk/runtime";
-import { ApplicationService } from "../runtime/service.ts";
+import { BuiltinApplicationService as ApplicationService } from "../../packages/builtin/src/testing.ts";
 import { modelProviderPresetDraft } from "../shared/provider-presets.ts";
 import { createModelInput } from "../shared/configuration.ts";
 import { createModelServices } from "./models.ts";
-import { ReadUsage } from "../../packages/builtin/src/usage/contract.ts";
-import { UsageConsumer } from "../../packages/builtin/src/usage/service.ts";
+import { ReadUsage } from "@asterism-app/sdk/contracts";
+import { ProviderUsageService } from "../configuration/usage.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0).reverse()) await cleanup(); vi.unstubAllGlobals(); });
@@ -54,11 +54,11 @@ describe("Plugin presets and account usage", () => {
       headers: { "content-type": "text/event-stream", "x-ratelimit-limit-tokens": "100", "x-ratelimit-remaining-tokens": "40" },
     }));
     vi.stubGlobal("fetch", transport);
-    const usage = new UsageConsumer(observer.modelProviders, observer.usageProviders);
+    const usage = new ProviderUsageService(observer.modelProviders, observer.usageProviders);
     cleanups.push(async () => usage.close());
     const events: ModelEvent[] = [];
     for await (const event of createModelServices(service.configuration).stream({
-      target: { role: "default", model: `${value.id}/test` }, system: { blocks: [] },
+      target: { provider: value.id, model: "test" }, system: { blocks: [] },
       messages: [{ kind: "input", parts: [{ kind: "text", text: "Hello" }] }], signal: new AbortController().signal,
     })) {
       events.push(event);

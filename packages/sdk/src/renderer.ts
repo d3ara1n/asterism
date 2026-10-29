@@ -26,6 +26,7 @@ import type { CreationEntry } from "./renderer-creation.ts";
 import type { ToolRenderer } from "./renderer-tools.ts";
 import type { EventSubscriber } from "./events.ts";
 import type { PluginCalls } from "./calls.ts";
+import type { RendererCalls } from "./renderer-calls.ts";
 import type { ChannelContract, ChannelEnd, ChannelValue } from "./channels.ts";
 
 /** The frontend end of a channel: messages are delivered in order and buffered until a listener registers; closed resolves when either end terminates. */
@@ -106,21 +107,38 @@ export interface RendererModule {
   prepare?(context: RendererPrepareContext): Promise<void>;
 }
 export interface PluginSettingsPage {
+  /** Stable page identity within the contributing plugin. */
+  id: string;
+  title: UiText;
+  summary: UiText;
+  /** Icon component drawn by the host at its own size and color; the host uses a plugin icon when omitted. */
+  icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
   /** A directly addressable location within a page; an empty location means the root page. */
   locations?: readonly string[];
   Body: ComponentType<{ location?: string }>;
 }
+export interface SessionEntryProps {
+  active: boolean;
+  ready: boolean;
+  open(sessionId: string): void;
+}
+export interface PluginSessionEntry {
+  id: string;
+  title: UiText;
+  Body: ComponentType<SessionEntryProps>;
+}
 /** Frontend plugins own settings pages and shared service lifecycles; feature views are composed from modules. */
 export interface RendererPlugin {
   modules?: readonly RendererModule[];
-  settings?: PluginSettingsPage;
+  settings?: readonly PluginSettingsPage[];
+  sessionEntries?: readonly PluginSessionEntry[];
   prepare?(context: RendererPrepareContext): Promise<void>;
   closing?(): void | Promise<void>;
 }
 export function defineRendererPlugin(plugin: RendererPlugin): RendererPlugin { return plugin; }
 export interface RendererPrepareContext {
   /** Typed calls for frontend module-level services; cancellation propagates with the preparation scope. */
-  readonly calls: PluginCalls;
+  readonly calls: RendererCalls;
   /** Global subscriptions bound to the module lifecycle, cleaned up on failure, timeout, or application shutdown. */
   readonly events: EventSubscriber;
   /** Triggered when the host stops waiting due to timeout or shutdown; the module should stop promptly. */

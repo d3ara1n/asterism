@@ -23,7 +23,7 @@ function SettingsPage() {
     createElement("p", null, label),
     error ? createElement("p", { role: "alert" }, error) : null);
 }
-export default defineRendererPlugin({ settings: { Body: SettingsPage, locations: ["general"] } });
+export default defineRendererPlugin({ settings: [{ id: "general", title: "Labels", summary: "Configure shared labels.", Body: SettingsPage }] });
 export function OpenSettings() {
   const settings = useRendererSettings();
   return createElement("button", { onClick: () => settings.open(settingsPlugin.id, "general") }, "Open settings");

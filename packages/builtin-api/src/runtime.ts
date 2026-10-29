@@ -2,8 +2,8 @@ import { z } from "zod";
 import { belongsTo, jsonSchema, type CreationContract, type Json, type SessionDirectory } from "@asterism-app/sdk/contracts";
 import { defineModule, PluginApiError, type PluginContext, type PluginModule, type ObjectReader, type TopLevelToolContext } from "@asterism-app/sdk/runtime";
 
-export type { ManualSource } from "./manual.ts";
 export { agentServices, registerAgentServices, type AgentServices } from "./agent-services.ts";
+export { defineAgentPreparer, captureAgentPreparers, type AgentPreparation, type AgentPromptBlock } from "./preparation.ts";
 
 export interface AgentCreationDescription {
   readonly id: string;

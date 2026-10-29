@@ -1,7 +1,7 @@
 import { terminalCard as appearance } from "../shared/card-appearance.ts";
 import { useState, useEffect, type ReactNode } from "react";
 import { TerminalSquare, Eye, Keyboard, Clock, BookOpen } from "lucide-react";
-import { cardRenderer, creationEntry, toolRenderer, useI18n, useRendererConfig, type CreationInputProps, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { cardRenderer, creationEntry, toolRenderer, useI18n, useRendererCatalogs, type CreationInputProps, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { Input } from "@asterism-app/ui/ui/input";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Field, FieldLabel } from "@asterism-app/ui/ui/field";
@@ -11,13 +11,13 @@ import { CreationForm } from "../shared/creation-form";
 import { commonMessages } from "../messages/common";
 import { filesystemMessages } from "../messages/filesystem";
 import { terminalMessages } from "../messages/terminal";
-import { BuiltinSettings } from "../settings/contract";
 import { TerminalActions, TerminalCard } from "./TerminalCard";
 import { prepareTerminalImages } from "./image-renderer";
-import { CreateTerminal, TerminalResource, TerminalView, TerminalInput, TerminalRead, TerminalWait, TerminalSee, type TerminalStatus } from "./contract";
+import { CreateTerminal, TerminalResource, TerminalView, TerminalInput, TerminalRead, TerminalWait, TerminalSee } from "./contract";
+import { TerminalProfilesCatalog, type TerminalStatus } from "@asterism-app/sdk/contracts";
 import type { z } from "zod";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
-import { useRendererObject } from "@asterism-app/sdk/renderer";
+import { useRendererObject, useRendererApplication } from "@asterism-app/sdk/renderer";
 import { mediaMessages } from "../messages/media";
 import { inputField, inputText } from "../shared/tool-preview";
 
@@ -26,11 +26,12 @@ const DEFAULT_PROFILE = "default";
 const profileValue = (id: string) => `profile:${id}`;
 
 function TerminalCreation({ initialInput, busy, resolve, cancel }: CreationInputProps<{ title?: string; cwd?: string; profile?: string }>) {
-  const i18n = useI18n(), settings = useRendererConfig(BuiltinSettings);
+  const i18n = useI18n(), catalogs = useRendererCatalogs(), settings = catalogs.get(TerminalProfilesCatalog);
+  const application = useRendererApplication();
   const [title, setTitle] = useState(initialInput?.title ?? ""), [cwd, setCwd] = useState(initialInput?.cwd ?? "");
   const [profile, setProfile] = useState<string | undefined>(initialInput?.profile), [browsing, setBrowsing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  return <CreationForm busy={busy} disabled={browsing} onCancel={cancel} onSubmit={() => resolve({
+  return <CreationForm busy={busy} disabled={browsing || !settings} onCancel={cancel} onSubmit={() => resolve({
     ...(title.trim() ? { title: title.trim() } : {}), ...(cwd.trim() ? { cwd: cwd.trim() } : {}), ...(profile !== undefined ? { profile } : {}),
   })}>
     <Field><FieldLabel htmlFor="terminal-title">{i18n.formatMessage(commonMessages.name)}</FieldLabel>
@@ -39,14 +40,15 @@ function TerminalCreation({ initialInput, busy, resolve, cancel }: CreationInput
       <Input id="terminal-cwd" value={cwd} spellCheck={false} placeholder={i18n.formatMessage(terminalMessages.cwdHint)} onChange={event => setCwd(event.target.value)} />
       <Button variant="secondary" type="button" disabled={browsing} onClick={() => {
         setBrowsing(true); setError(null);
-        void window.host.pickDirectory().then(path => { if (path) setCwd(path); }).catch(failure => setError(String(failure))).finally(() => setBrowsing(false));
+        void application.pickDirectory().then(path => { if (path) setCwd(path); }).catch(failure => setError(String(failure))).finally(() => setBrowsing(false));
       }}>{i18n.formatMessage(filesystemMessages.browse)}</Button></div></Field>
     <Field><FieldLabel>{i18n.formatMessage(terminalMessages.profile)}</FieldLabel>
       <Select value={profile === undefined ? DEFAULT_PROFILE : profileValue(profile)} onValueChange={value => setProfile(value === DEFAULT_PROFILE ? undefined : value.slice("profile:".length))}><SelectTrigger className="w-full"><SelectValue /></SelectTrigger><SelectContent>
         <SelectItem value={DEFAULT_PROFILE}>{i18n.formatMessage(terminalMessages.defaultProfile)}</SelectItem>
-        {settings.shell.profiles.map(item => <SelectItem key={item.id} value={profileValue(item.id)}>{item.id}</SelectItem>)}
+        {settings?.profiles.map(item => <SelectItem key={item.id} value={profileValue(item.id)}>{item.id}</SelectItem>)}
       </SelectContent></Select></Field>
     {error && <p className="type-caption text-destructive">{error}</p>}
+    {catalogs.error && <p className="type-caption text-destructive">{i18n.text(catalogs.error)}</p>}
   </CreationForm>;
 }
 function ReadBody({ result }: ToolRenderProps<z.infer<typeof TerminalRead.schema>>) {

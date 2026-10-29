@@ -3,14 +3,12 @@ import { dispatch } from "./dispatch.ts";
 import { protocolVersion } from "../shared/contracts.ts";
 import { SecretClient } from "./secret-client.ts";
 import { join } from "node:path";
-import { PackageList, loadPackages } from "../plugins/packages.ts";
-import { builtin } from "@asterism-app/builtin-api/contracts";
+import { loadPackages, packageSource } from "../plugins/packages.ts";
+import { applicationPackages } from "../plugins/distribution.ts";
+import { userSkillDirectory } from "../plugins/agent-catalog.ts";
 import { DatabaseVersionError } from "./storage.ts";
 import { RendererConnection } from "./connection.ts";
 import type { RendererFrame, RuntimeFrame } from "../shared/connection.ts";
-import { bindPublicProvider } from "../shared/public-modules.ts";
-import { builtinPublicProvider } from "../builtin-public.ts";
-import { builtinRuntimePublicModules } from "../builtin-runtime-public.ts";
 import { z } from "zod";
 import { pluginStorageFailureSchema } from "../shared/recovery.ts";
 
@@ -19,7 +17,6 @@ const port = process.parentPort;
 if (!port) throw new Error("The task runtime must be started as an Electron utility process.");
 let service: ApplicationService;
 const secrets = new SecretClient(message => port.postMessage(message));
-const releasePublic = bindPublicProvider("runtime", builtinPublicProvider, builtinRuntimePublicModules);
 /** Direct renderer connections handed off by the main process; main-process-assigned numbers support explicit disconnection. */
 const connections = new Map<string, RendererConnection>();
 const broadcast = (frame: RuntimeFrame) => { for (const connection of connections.values()) connection.send(frame); };
@@ -31,21 +28,21 @@ try {
   const started = performance.now();
   // Resolve, bundle, and import plugin packages only at startup; list changes take effect after restart.
   port.postMessage({ kind: "startup", stage: "plugins" });
-  const packages = await loadPackages(new PackageList(join(root, "plugins.json")), join(root, "plugins"), join(root, "plugins", ".cache"),
-    [builtin.id], [builtinPublicProvider], detail => port.postMessage({ kind: "startup", stage: "plugins", detail }));
+  const packages = await loadPackages(applicationPackages(root), join(root, "plugins"), join(root, "plugins", ".cache"),
+    [], [], detail => port.postMessage({ kind: "startup", stage: "plugins", detail }));
   console.info(`Plugin package preparation completed in ${Math.round(performance.now() - started)} ms.`);
   for (const item of packages) if (item.error) console.error(`Plugin package ${item.root} is ${item.status}: ${item.error}`);
   const listed = packages.map(item => ({ enabled: item.entry.enabled, id: item.manifest?.id ?? null,
-    source: item.entry.source.kind === "path" ? item.entry.source.path : `${item.entry.source.name}@${item.entry.source.version}`,
+    source: packageSource(item.entry),
     status: item.status, error: item.error ?? null, renderer: item.status === "loaded" ? item.renderer ?? null : null,
     stylesheet: item.status === "loaded" ? item.stylesheet ?? null : null,
     dependencies: item.dependencies ?? [], rendererDependencies: item.rendererDependencies ?? [] }));
   port.postMessage({ kind: "startup", stage: "workspace" });
   service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []), packages: listed,
+    skillDirectories: [userSkillDirectory()],
+    packageRoots: new Map(packages.flatMap(item => item.manifest ? [[item.manifest.id, item.root] as const] : [])),
     manualSources: packages.flatMap(item => item.status === "loaded" && item.manifest
-      ? (item.manifest.manual ?? []).map(path => ({
-        pluginId: item.manifest!.id, path: `plugins/${item.manifest!.id}/${path}`, directory: join(item.root, path),
-      })) : []),
+      ? (item.manualSources ?? []).map(source => ({ ...source, pluginId: item.manifest!.id })) : []),
     plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets,
     pluginDependencies: new Map(packages.flatMap(item => item.definition
       ? [[item.definition.namespace.id, item.runtimeDependencies ?? []] as const] : [])),
@@ -59,7 +56,7 @@ try {
     if (data?.kind === "shutdown") {
       for (const id of [...connections.keys()]) disconnect(id);
       secrets.close();
-      void service.close().finally(() => { releasePublic(); process.exit(0); });
+      void service.close().finally(() => { process.exit(0); });
       return;
     }
     if (data?.kind === "ping") { port.postMessage({ kind: "pong" }); return; }
@@ -85,7 +82,6 @@ try {
   console.info(`Task runtime initialization completed in ${Math.round(performance.now() - started)} ms.`);
   port.postMessage({ kind: "ready", version: protocolVersion });
 } catch (error) {
-  releasePublic();
   console.error("Task runtime initialization failed.", error);
   port.postMessage(error instanceof DatabaseVersionError
     ? { kind: "fatal", reason: "database_version", message: error.message, directory: error.directory }

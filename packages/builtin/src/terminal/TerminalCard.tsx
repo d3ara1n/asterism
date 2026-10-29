@@ -11,7 +11,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Play, Power, RotateCcw } from "lucide-react";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { terminalMessages } from "../messages/terminal";
-import { CloseTerminal, StartTerminal, type TerminalConfig, type TerminalState } from "./contract";
+import { CloseTerminal, StartTerminal } from "./contract";
+import type { TerminalConfig, TerminalState } from "@asterism-app/sdk/contracts";
 import { useTerminalLink } from "./link";
 import { ScreenWriter } from "./screen-writer";
 import { terminalTypography } from "./typography";

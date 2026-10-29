@@ -4,7 +4,7 @@ The built-in public API lets plugins interact with Asterism's existing agents th
 
 ## Declare the dependency
 
-Declare `@asterism-app/builtin-api` and `@asterism-app/sdk` in `peerDependencies` with `"*"`; the running application provides the public package instances, and the host does not gate loading on these ranges. For local development, source-package dependencies supply editor types. Import public contracts from the domain package so every participant uses the same declarations.
+Declare `@asterism-app/builtin-api` and `@asterism-app/sdk` in `peerDependencies` with `"*"`. The SDK is supplied by the host; the enabled builtin plugin provides its public API package. The host does not gate loading on dependency ranges. For local development, source-package dependencies supply editor types. Import public contracts from the domain package so every participant uses the same declarations. Disabling builtin also makes its dependent plugins unavailable.
 
 Examples are TypeScript and TSX fragments for a plugin's backend or renderer. They use public packages; install additional libraries imported by the chosen example, such as Nano ID for submission identities, in the plugin project. A plugin still supplies its manifest and composition entry points.
 
@@ -33,6 +33,12 @@ Communication resources own their member directory and task descriptions. Resolv
 An external preparer can inspect, replace, or reject input using the original built-in action contract. Its replacement supplies raw action input that will be parsed again. Preparation has read capabilities and does not commit session mutations.
 
 Keep a preparer's scope tied to its business purpose. It does not replace the agent implementation or acquire a private agent executor.
+
+## Prepare model requests
+
+The host collects skill packages and instruction blocks with their registering plugin's provenance. Builtin selects its effective skills and builds structured instruction blocks for each request. User skills override plugin skills, which override builtin skills.
+
+Declare an Agent preparer to filter skills or remove, change, and append instruction blocks. Preparers run synchronously in plugin initialization order. Each request captures the catalog and preparer set before awaiting linked context, then uses the prepared result for its prompt and tool batch. Removing a skill from that result also makes it unavailable to `skill_read` for that request. A catalog refresh affects later requests.
 
 ## Extend presentation
 

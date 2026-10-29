@@ -1,12 +1,10 @@
 import { z } from "zod";
 import type { LivePatch } from "./live-patch.ts";
-import { userInputPartsSchema, submissionIdSchema } from "@asterism-app/builtin-api/contracts";
 import {
   resourceCallSchema, contractReferenceSchema, toolInvocationSchema,
   toolRunningResultSchema, uiTextSchema,
 } from "@asterism-app/sdk/contracts";
 import { jsonSchema } from "./model.ts";
-import { modelExpressionSchema, thinkingSchema } from "./configuration.ts";
 import { pointSchema, workbenchCommands, workbenchSnapshotSchema, type WorkbenchLayout, type WorkbenchSnapshot } from "./workbench.ts";
 import { templateCommands, templateObjectSummarySchema } from "./templates.ts";
 
@@ -27,15 +25,13 @@ export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "creat
 // ---- Session capability interfaces ----
 const uuid = z.string().uuid();
 export const sessionCommandSchema = z.discriminatedUnion("type", [
-  // Home composition entry: establish a session, create the first agent resource, and submit initial input to it.
-  z.strictObject({ type: z.literal("start"), submissionId: submissionIdSchema, agent: id, model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), parts: userInputPartsSchema, contentScopeId: uuid.optional() }),
   z.strictObject({ type: z.literal("read"), sessionId: id }),
   z.strictObject({ type: z.literal("watch"), sessionId: id }),
   z.strictObject({ type: z.literal("unwatch"), sessionId: id }),
   // Exit prompts read current instance state at confirmation time without entering projections or triggering reprojection on changes. Omitted objectIds selects all current-path objects.
   z.strictObject({ type: z.literal("disposal.warnings"), sessionId: id, objectIds: z.array(id).max(1000).optional() }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
-  // Application composition entry: delegate manual naming to the built-in naming module to append domain records.
+  // Session titles belong to the host independently of plugin naming policies.
   z.strictObject({ type: z.literal("rename"), sessionId: id, title: z.string().max(160).refine(value => value.trim().length > 0) }),
   // Archival: clean all session objects before marking archive time; subsequent business reads treat the session as absent.
   z.strictObject({ type: z.literal("archive"), sessionId: id }),

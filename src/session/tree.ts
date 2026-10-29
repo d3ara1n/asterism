@@ -6,7 +6,7 @@ import { SessionError } from "../shared/session-timeline.ts";
 import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
 import { foldWorkbench, type FoldedState } from "./fold.ts";
 import { deepFreeze } from "../shared/immutable.ts";
-import type { ResourceRef } from "@asterism-app/sdk/contracts";
+import { SessionTitleAssigned, type ResourceRef } from "@asterism-app/sdk/contracts";
 export { SessionError } from "../shared/session-timeline.ts";
 
 export type CursorSelection = {
@@ -53,7 +53,7 @@ export class SessionTree {
   }
 
   create(title: string, id: string = randomUUID()): string {
-    this.db.prepare("INSERT INTO sessions (id, title, created_at, cursor) VALUES (?, ?, ?, NULL)").run(id, title, new Date().toISOString());
+    this.db.prepare("INSERT INTO sessions (id, title, initial_title, created_at, cursor) VALUES (?, ?, ?, ?, NULL)").run(id, title, title, new Date().toISOString());
     return id;
   }
   /** Active session catalog; archived sessions are read only through archived. */
@@ -194,6 +194,10 @@ export class SessionTree {
       this.db.prepare(`INSERT INTO cursor_selections (session_id, from_id, requested_id, selected_id, reason, recorded_at)
         VALUES (?, ?, ?, ?, ?, ?)`).run(sessionId, from, nodeId, nodeId, "user", new Date().toISOString());
       this.db.prepare("UPDATE sessions SET cursor = ? WHERE id = ?").run(nodeId, sessionId);
+      const assignment = this.view(sessionId).read({ scope: "timeline", contracts: [SessionTitleAssigned.id], edge: "last" })[0];
+      const title = assignment ? SessionTitleAssigned.schema.parse(assignment.node.data).title
+        : (this.db.prepare("SELECT initial_title AS title FROM sessions WHERE id = ?").get(sessionId) as { title: string }).title;
+      this.setTitle(sessionId, title);
       this.db.exec("RELEASE select_session_cursor");
     } catch (error) {
       this.db.exec("ROLLBACK TO select_session_cursor; RELEASE select_session_cursor");

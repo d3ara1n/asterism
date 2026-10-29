@@ -1,7 +1,7 @@
 import { Component, useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   RendererCallsProvider, RendererIslandPanelProvider, RendererIslandProvider, RendererPreferencesProvider, useRendererCalls,
-  type RendererIsland, type RendererIslandSpec,
+  type RendererIsland, type RendererIslandSpec, type RendererCalls,
 } from "@asterism-app/sdk/renderer";
 import type { PluginCalls } from "@asterism-app/sdk/contracts";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
@@ -23,11 +23,11 @@ export class SettingsBoundary extends Component<{ children: ReactNode; fallback:
 export function PluginCallScope({ children }: { children: ReactNode }) {
   const parent = useRendererCalls();
   const pending = useRef(new Set<AbortController>());
-  const calls = useMemo<PluginCalls>(() => ({ invoke: (contract, input, options) => {
+  const calls = useMemo<RendererCalls>(() => ({ input: contract => parent.input(contract), invoke: (contract, input, options) => {
     const controller = new AbortController();
     const active = pending.current;
     active.add(controller);
-    return parent.invoke(contract, input, { ...options,
+    return parent.invoke(contract, input, { ...options, content: options.content,
       signal: options.signal ? AbortSignal.any([options.signal, controller.signal]) : controller.signal,
     }).finally(() => active.delete(controller));
   } }), [parent]);
@@ -65,18 +65,22 @@ export function PluginIslandProvider({ pluginId, page = false, children }: { plu
 /** Call the plugin's render during rendering so its errors reach the boundary. */
 function Render({ render }: { render: () => ReactNode }) { return render(); }
 
-/** Plugin island content renders within the host screen, outside the settings page context, so provide plugin preferences, communication scope, and an error boundary again. */
+/**
+ * One composition for every mounted plugin region (Home entry, settings page, island).
+ * The boundary encloses the call scope, so a failed region also cancels the calls it started.
+ */
+export function PluginRegion({ pluginId, page = false, fallback, children }: { pluginId: string; page?: boolean; fallback: ReactNode; children: ReactNode }) {
+  return <SettingsBoundary fallback={fallback}>
+    <RendererPreferencesProvider value={pluginPreferences(pluginId)}>
+      <PluginCallScope><PluginIslandProvider pluginId={pluginId} page={page}>{children}</PluginIslandProvider></PluginCallScope>
+    </RendererPreferencesProvider>
+  </SettingsBoundary>;
+}
+
+/** Plugin island content renders within the host screen, outside the page that opened it, so it forms its own region. */
 function PluginIslandContent({ pluginId, spec }: { pluginId: string; spec: RendererIslandSpec }) {
   const i18n = useI18n();
-  return <RendererPreferencesProvider value={pluginPreferences(pluginId)}>
-    <PluginCallScope>
-      <PluginIslandProvider pluginId={pluginId}>
-        <SettingsBoundary fallback={<IslandPanel title={i18n.text(spec.label)}>
-          <Alert variant="destructive"><AlertDescription>{i18n.text(messages.pageFailed)}</AlertDescription></Alert>
-        </IslandPanel>}>
-          <Render render={spec.render} />
-        </SettingsBoundary>
-      </PluginIslandProvider>
-    </PluginCallScope>
-  </RendererPreferencesProvider>;
+  return <PluginRegion pluginId={pluginId} fallback={<IslandPanel title={i18n.text(spec.label)}>
+    <Alert variant="destructive"><AlertDescription>{i18n.text(messages.pageFailed)}</AlertDescription></Alert>
+  </IslandPanel>}><Render render={spec.render} /></PluginRegion>;
 }

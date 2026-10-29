@@ -3,8 +3,8 @@ import * as fs from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import * as runtimeModules from "../../../../src/runtime/builtin.ts";
-import { ApplicationService } from "../../../../src/runtime/service.ts";
+import * as runtimeModules from "../../../../src/plugins/loader.ts";
+import { BuiltinApplicationService as ApplicationService } from "../testing.ts";
 import { AgentCapabilities } from "../../../../src/execution/capabilities.ts";
 import { executeCoreBatch } from "../../../../src/execution/core.ts";
 import type { Json, ToolOutcome } from "../../../../src/shared/model.ts";
@@ -28,9 +28,9 @@ function setup() {
   const directory = join(root, "directory"), outside = join(root, "outside");
   mkdirSync(directory); mkdirSync(outside);
   const resource = { id: "directory", kind: "asterism.builtin/directory", title: "Directory", data: { path: directory } };
-  let modules!: ReturnType<typeof runtimeModules.createModules>;
-  const createModules = runtimeModules.createModules;
-  const capture = vi.spyOn(runtimeModules, "createModules").mockImplementation((...args) => {
+  let modules!: ReturnType<typeof runtimeModules.loadPlugins>;
+  const createModules = runtimeModules.loadPlugins;
+  const capture = vi.spyOn(runtimeModules, "loadPlugins").mockImplementation((...args) => {
     modules = createModules(...args); return modules;
   });
   const service = new ApplicationService(join(root, "host")); services.push(service);

@@ -22,11 +22,19 @@ Styles remain loaded while the plugin frontend is active, including when individ
 
 ## Add settings
 
-A plugin can have a settings page independently of sessions and resources. The page owns its edit drafts and pending interactions; the plugin service owns shared configuration.
+A plugin can declare several settings pages independently of sessions and resources. Each has its own identity, title, summary, optional icon, and body. The icon is a component the host draws at its own size and color; the host draws the card, page heading, and attribution, and the plugin supplies only the body. Entries appear on settings home with the contributing plugin's display name. Plugin management is a separate list for installation and enablement.
+
+The page owns its edit drafts and pending interactions; the plugin service owns shared configuration. Navigation targets a plugin and page, with an optional declared location inside the page. A page failure is isolated and can be retried without disabling other settings pages.
 
 Managed configuration suits schema-validated settings. Other plugin data can use a storage model appropriate to its purpose.
 
 Closing a page releases its view subscriptions. It does not end every service the plugin uses.
+
+## Start work from Home
+
+A session entry supplies the complete starting interface for a plugin's workflow. It owns drafts, validation feedback, submission, and the initial title. Submit through a typed plugin call, prepare resources in the backend, and initialize the session atomically. Open the resulting session using the entry's host-provided callback.
+
+Keep a retry identity until submission succeeds. Attachments travel through the call's content capability independently of its JSON input. The host handles entry selection and retains access to templates when no entry is available.
 
 ## Write interface text
 

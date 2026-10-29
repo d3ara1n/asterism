@@ -1,48 +1,13 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const homeMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
-  homePrompt: {
-    id: "homePrompt",
-    defaultMessage: "What would you like to work on?",
-  },
-  homePlaceholder: {
-    id: "homePlaceholder",
-    defaultMessage: "Describe what you have in mind…",
-  },
-  firstMessage: {
-    id: "firstMessage",
-    defaultMessage: "Your first message",
-  },
-  startingConversation: {
-    id: "features_home_HomePage_8",
-    defaultMessage: "Starting conversation…",
-  },
-  setupProvider: {
-    id: "home.setup.provider",
-    defaultMessage: "Add a model provider to connect Asterism to your AI service.",
-  },
-  openProviders: {
-    id: "home.setup.openProviders",
-    defaultMessage: "Configure providers",
-  },
-  setupModel: {
-    id: "home.setup.model",
-    defaultMessage: "Add at least one model under your provider so it appears in model choices.",
-  },
-  openModels: {
-    id: "home.setup.openModels",
-    defaultMessage: "Add a model",
-  },
-  setupRole: {
-    id: "home.setup.role",
-    defaultMessage: "Choose a preferred model for a model role. You can start with default.",
-  },
-  openRoles: {
-    id: "home.setup.openRoles",
-    defaultMessage: "Configure model roles",
-  },
-  workbenchHint: {
-    id: "home.workbenchHint",
-    defaultMessage: "Start with a task. Organize materials, explore results, and follow the process with your agent.",
-  },
+  homePrompt: { id: "homePrompt", defaultMessage: "What would you like to work on?" },
+  noEntry: { id: "home.noEntry", defaultMessage: "Enable an Agent paradigm plugin to start new work." },
+  chooseEntry: { id: "home.chooseEntry", defaultMessage: "Choose how to start new work." },
+  entryUnavailable: { id: "home.entryUnavailable", defaultMessage: "Your selected entry is unavailable. Choose another entry in General settings." },
+  entrySettings: { id: "home.entrySettings", defaultMessage: "Open General settings" },
+  entryTitle: { id: "home.entryTitle", defaultMessage: "Session entry" },
+  entrySummary: { id: "home.entrySummary", defaultMessage: "The plugin interface used to start work from Home." },
+  entryFailed: { id: "home.entryFailed", defaultMessage: "{plugin_name} could not display its session entry." },
+  retry: { id: "home.retry", defaultMessage: "Try again" },
 }));

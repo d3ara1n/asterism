@@ -5,20 +5,21 @@ import { agentRequestExtensions } from "./request-context.ts";
 import { feedbackOrigin } from "./feedback.ts";
 import type { createAgentFeedback } from "./feedback-state.ts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
-import type { composeSystemPrompt } from "./system-prompt.ts";
+import type { createRequestAssembly } from "./preparation.ts";
+import type { SkillCatalog } from "../skills/catalog.ts";
 import { projectForAgent } from "./projection.ts";
 import { compressContext } from "./compression.ts";
 import { deliverDrafts } from "./drafts.ts";
-import type { UsageConsumer } from "../usage/service.ts";
+import type { ProviderUsage } from "@asterism-app/sdk/runtime";
 
-type AgentDefinition = Parameters<typeof composeSystemPrompt>[0];
 interface AgentLoopDependencies {
   selection: AgentSelectionService;
   tasks: PluginTasks;
   models: ModelServices;
-  systemPrompt: (agent: AgentDefinition) => ReturnType<typeof composeSystemPrompt>;
+  prepareRequest: ReturnType<typeof createRequestAssembly>;
+  skills: SkillCatalog;
   userAgent: string;
-  usage?: Pick<UsageConsumer, "consume">;
+  usage?: Pick<ProviderUsage, "consume">;
   feedback: ReturnType<typeof createAgentFeedback>;
 }
 
@@ -70,7 +71,7 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
       const run = { key: `agent:${object.ref.id}:${++execution}`, entered: false };
       const compress = (signal: AbortSignal) => {
         const selection = selectionOf(object).selection;
-        const system = deps.systemPrompt(deps.selection.agent(selection));
+        const { system } = deps.prepareRequest(deps.selection.agent(selection))();
         const tokens = Math.ceil(system.blocks.reduce((size, block) => size + block.text.length, 0) / 4);
         return compressContext(object, deps.selection.target(selection), tokens, deps.models, signal,
           value => deps.feedback.report(object, value), deps.userAgent, () => deps.feedback.beginCompression(object));
@@ -125,11 +126,13 @@ export function createAgentLoop(deps: AgentLoopDependencies) {
               };
               let result: Awaited<ReturnType<ModelServices["run"]>> | undefined;
               try {
-                result = await deps.models.run({ object: object.ref, requestParentId: snapshot.position.nodeId,
-                  userAgent: deps.userAgent, completionExtensions: agentRequestExtensions,
-                  target: deps.selection.target(selection), system: deps.systemPrompt(agent), messages: projectForAgent(snapshot, object.ref.id), signal,
+                const prepare = deps.prepareRequest(agent);
+                let prepared: ReturnType<typeof prepare>;
+                result = await deps.skills.during(object.ref.id, bind => deps.models.run({ object: object.ref, requestParentId: snapshot.position.nodeId,
+                  userAgent: deps.userAgent, completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
+                  target: deps.selection.target(selection), system: files => { prepared = prepare(files); bind(prepared.skills); return prepared.system; }, messages: projectForAgent(snapshot, object.ref.id), signal,
                   tools: deps.selection.tools(agent), cache: { expectHit: request > 0 && !compressed }, observer,
-                });
+                }));
               } catch (error) {
                 cancelled = signal.aborted;
                 status = cancelled ? "awaiting" : "failed";

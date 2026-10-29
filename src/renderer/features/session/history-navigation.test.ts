@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { node, created as make, text, thinking, call, message, event, attached, removed } from "../../../session/test-nodes";
 import { ViewRegistry } from "../../modules/registry";
-import { builtinViews } from "../../../../packages/builtin/src/renderer";
+import builtinRenderer from "../../../../packages/builtin/src/renderer";
 import { workbenchRecordViews } from "../workbench/records";
 import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView } from "./history-navigation";
 
 const created = (id: string, title: string, kind = "agent") => make(id, title, kind);
-const label = new ViewRegistry([...builtinViews, workbenchRecordViews]);
+const label = new ViewRegistry([...builtinRenderer.modules ?? [], workbenchRecordViews]);
 
 describe("History navigation contract", () => {
   // Renaming affects only descendants of that event; displaying the whole tree in append order must not carry names from one branch into another.

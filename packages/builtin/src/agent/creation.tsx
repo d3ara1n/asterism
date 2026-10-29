@@ -10,11 +10,12 @@ import { Bot } from "lucide-react";
 
 import { commonMessages } from "../messages/common";
 import { creationMessages } from "../messages/creation";
-import { useI18n, useRendererCatalogs, type CreationInputProps } from "@asterism-app/sdk/renderer";
+import { useI18n, type CreationInputProps } from "@asterism-app/sdk/renderer";
 import { useState } from "react";
 
 import type { ThinkingLevel } from "@asterism-app/sdk/contracts";
-import { type AgentSelection, ModelConfiguration } from "@asterism-app/builtin-api/contracts";
+import { type AgentSelection } from "@asterism-app/builtin-api/contracts";
+import { useSettingsConfiguration } from "../configuration/renderer-state";
 import { ModelChoices } from "./conversation/ModelChoices";
 
 
@@ -23,15 +24,13 @@ import { ModelChoices } from "./conversation/ModelChoices";
  */
 export function AgentInput({ busy, resolve, cancel }: CreationInputProps<{ selection: AgentSelection; title?: string }>) {
   const i18n = useI18n();
-  const catalogs = useRendererCatalogs();
-  const configuration = catalogs.get(ModelConfiguration);
+  const { snapshot: configuration, readError: error } = useSettingsConfiguration();
   const [agentId, setAgentId] = useState<string | null>(null);
   const [modelId, setModelId] = useState<string | null>(null);
   const [thinking, setThinking] = useState<ThinkingLevel | null>(null);
   const [title, setTitle] = useState("");
   const agents = configuration?.agents.filter(item => item.enabled) ?? [];
   const agent = agents.find(item => item.id === agentId);
-  const error = catalogs.error;
   return <CreationForm busy={busy} onCancel={cancel} disabled={!agent}
     onSubmit={() => resolve({
       selection: { agent: agent!.id, model: modelId, thinking },

@@ -2,7 +2,8 @@ import { z } from "zod";
 import { jsonSchema, resourceTitleSchema, type Json } from "@asterism-app/sdk/contracts";
 import { defineModule, defineTopLevelTool, implementCall, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
 import { agentCreations } from "@asterism-app/builtin-api/runtime";
-import { AgentConfigurations, ReadAgentCreations } from "@asterism-app/builtin-api/contracts";
+import { ReadAgentCreations } from "@asterism-app/builtin-api/contracts";
+import { builtinConfiguration } from "../configuration/runtime.ts";
 import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult } from "./contract.ts";
 
 /** Known rejection is not represented as an unknown write; resource initialization exceptions still use the tool executor's unknown outcome. */
@@ -28,7 +29,7 @@ export default defineModule(plugin => ({
       resultSchema: AgentListResult.schema,
       effect: "read", execution: "parallel",
       execute(_args, { signal }) {
-        return attempt(signal, () => (plugin.catalogs.get(AgentConfigurations) ?? [])
+        return attempt(signal, () => builtinConfiguration(plugin).agents
           .filter(agent => agent.enabled)
           .map(({ id, description, examples }) => ({ id, description, examples })));
       },

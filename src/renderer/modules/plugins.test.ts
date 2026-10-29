@@ -6,7 +6,7 @@ describe("Plugin frontend entry", () => {
   // ComponentType allows React-wrapped components; a runtime typeof function check must not reject the entire plugin.
   it.each([memo(() => null), forwardRef<unknown, { location?: string }>(() => null)])("accepts React-wrapped settings pages", async Body => {
     const loaded = await loadPluginRenderers([{ id: "wrapped", renderer: "wrapped", dependencies: [] }], {
-      load: async () => ({ default: { settings: { Body } } }),
+      load: async () => ({ default: { settings: [{ id: "general", title: "General", summary: "Preferences", Body }] } }),
     });
     expect(loaded.failures).toEqual([]);
   });
@@ -15,8 +15,8 @@ describe("Plugin frontend entry", () => {
     const seen: string[] = [];
     const Body = () => null;
     const loaded = await loadPluginRenderers([{ id: "settings", renderer: "settings", dependencies: [] }], {
-      load: async () => ({ default: { settings: { Body, locations: ["account"] } } }),
-      accept(plugin, id) { expect(plugin.settings?.Body).toBe(Body); seen.push(id); },
+      load: async () => ({ default: { settings: [{ id: "general", title: "General", summary: "Preferences", Body, locations: ["account"] }] } }),
+      accept(plugin, id) { expect(plugin.settings?.[0]?.Body).toBe(Body); seen.push(id); },
     });
     expect(seen).toEqual(["settings"]);
     expect(loaded).toEqual({ modules: [], failures: [] });

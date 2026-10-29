@@ -7,7 +7,6 @@ import { ConfigurationError } from "./errors.ts";
 import { ConfigurationStore, type ConfigurationKind, type StoredModelProvider } from "./store.ts";
 import { CredentialVault } from "./credentials.ts";
 import { classifyProbeError, runConnectionProbe, type ConnectionProbe } from "./probe.ts";
-import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
 import { discoverModels, ModelDiscoveries, type DiscoverModels } from "./discovery.ts";
 import { loadModelCatalog, modelParameters, type LoadModelCatalog } from "./model-catalog.ts";
 import { modelCatalogMessages } from "../shared/model-catalog-messages.ts";
@@ -15,7 +14,7 @@ import { ModelProviderExtensions } from "./provider-extensions.ts";
 import { WebProviderRegistry } from "./web-providers.ts";
 import { WebError } from "@asterism-app/sdk/runtime";
 
-const saveKinds = { "modelProvider.save": "modelProvider", "model.save": "model", "role.save": "role", "agent.save": "agent" } as const;
+const saveKinds = { "modelProvider.save": "modelProvider", "model.save": "model" } as const;
 
 export class ConfigurationService {
   readonly extensions = new ModelProviderExtensions();
@@ -91,6 +90,24 @@ export class ConfigurationService {
   }
   private assertOpen(): void { if (this.closed) throw new ConfigurationError("unavailable", "Configuration service is unavailable."); }
   /** Synchronously obtain current effective configuration; credential status retains the latest check result. */
+  private readonly mcpListeners = new Set<() => void>();
+  mcpSettings() { this.assertOpen(); return this.store.mcp(); }
+  mcpCredentialReference(key: string) { this.assertOpen(); return this.store.mcpCredentialReference(key); }
+  setMcpCredentialReference(key: string, reference: string | null) {
+    this.assertOpen();
+    this.store.setMcpCredentialReference(key, reference);
+  }
+  updateMcp(update: (current: ConfigurationSnapshot["mcp"]) => ConfigurationSnapshot["mcp"]): void {
+    this.assertOpen();
+    this.store.setMcp(update(this.store.mcp()));
+    for (const listener of this.mcpListeners) listener();
+    this.onChanged();
+  }
+  subscribeMcp(listener: () => void): () => void {
+    this.mcpListeners.add(listener);
+    return () => { this.mcpListeners.delete(listener); };
+  }
+  shellSettings() { this.assertOpen(); return this.store.shell(); }
   current(): ConfigurationSnapshot { this.assertOpen(); return this.snapshot(); }
   async executionCredential(providerId: string): Promise<string | null> {
     this.assertOpen();
@@ -106,9 +123,10 @@ export class ConfigurationService {
     return modelProviderSchema.parse({ ...value, credentialState });
   }
   private snapshot(): ConfigurationSnapshot {
-    const roles = this.store.list("role");
-    const agents = this.store.list("agent");
     return {
+      mcp: this.store.mcp(),
+      shell: this.store.shell(),
+      sessionEntry: this.store.sessionEntry(),
       webProviders: this.store.list("webProvider").map(({ credentialRef, ...state }) => {
         const type = this.web.types().find(t => t.id === state.id);
         const needsCredential = type ? type.credential !== null : credentialRef !== null;
@@ -118,18 +136,13 @@ export class ConfigurationService {
       modelProviders: this.store.list("modelProvider").map(provider => this.provider(provider)),
       modelProviderPresets: this.extensions.presets(), usageProviders: this.extensions.usageProviders(),
       models: this.store.list("model"),
-      roles: roles.map(role => resolveRoleConfiguration(role)),
-      agents: agents.map(agent => resolveAgentConfiguration(agent)),
-      defaults: structuredClone(configurationDefaults),
-      overrides: {
-        roles: Object.fromEntries(roles.map(role => [role.id, role.overrides])),
-        agents: Object.fromEntries(agents.map(agent => [agent.id, agent.overrides])),
-      },
       tests: [...this.tests.values()].map(test => ({ ...test.value })), discoveries: this.discoveries.snapshot(), credentialStorageAvailable: this.storageAvailable,
     };
   }
   private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" }>): Promise<string | null> {
     if (command.type === "read") return null;
+    if (command.type === "shell.set") { this.store.setShell(command.value); return null; }
+    if (command.type === "sessionEntry.set") { this.store.selectSessionEntry(command.value); return null; }
     if (command.type === "webProvider.reorder") {
       this.store.reorderWebProviders(command.ids);
       return null;
@@ -191,10 +204,6 @@ export class ConfigurationService {
     }
     if (command.id && !this.store.get(saveKinds[command.type as keyof typeof saveKinds], command.id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
     switch (command.type) {
-      case "role.save": case "agent.save": {
-        this.store.save({ kind: command.type === "role.save" ? "role" : "agent", id: command.id, value: command.value } as never);
-        return command.value.id;
-      }
       case "model.save":
         if (!this.store.get("modelProvider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
         this.store.save({ kind: "model", id: command.id, value: command.value });

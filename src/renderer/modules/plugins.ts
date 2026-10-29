@@ -1,21 +1,9 @@
-import * as React from "react";
-import * as ReactJsx from "react/jsx-runtime";
-import * as ReactDom from "react-dom";
-import * as ReactDomClient from "react-dom/client";
-import * as ReactIntl from "react-intl";
-import * as zod from "zod";
-import * as sdkContracts from "@asterism-app/sdk/contracts";
-import * as sdkRenderer from "@asterism-app/sdk/renderer";
 import type { RendererModule, RendererPlugin } from "@asterism-app/sdk/renderer";
 import { awaitStartup } from "../app/boot.ts";
 import { loadPluginStylesheet } from "./plugin-styles.ts";
+import { hostRendererModules } from "./shared-modules.ts";
 
-/** Shared module allowlist: these imports in plugin bundles resolve to the same host instances, ensuring a single React instance. */
-(globalThis as Record<string, unknown>).__asterismRendererModules = {
-  react: React, "react/jsx-runtime": ReactJsx, "react-dom": ReactDom, "react-dom/client": ReactDomClient,
-  zod, "@asterism-app/sdk/contracts": sdkContracts, "@asterism-app/sdk/renderer": sdkRenderer,
-  "react-intl": ReactIntl,
-};
+(globalThis as Record<string, unknown>).__asterismRendererModules = hostRendererModules;
 
 export interface PluginRendererFailure { id: string; error: string }
 export interface RendererEntry { id: string; renderer: string | null; stylesheet?: string | null; dependencies: readonly string[] }
@@ -27,13 +15,29 @@ export function validateRendererPlugin(plugin: RendererPlugin | undefined): asse
     throw new Error("The renderer entry must default-export defineRendererPlugin(...).");
   const settings = plugin.settings;
   if (settings !== undefined) {
-    if (!settings || typeof settings !== "object" || settings.Body === undefined)
-      throw new Error("Plugin settings must declare a Body component.");
-    const locations = settings.locations;
-    if (locations !== undefined && (!Array.isArray(locations)
-      || locations.some(location => typeof location !== "string" || !location.trim())
-      || new Set(locations).size !== locations.length))
-      throw new Error("Plugin settings locations must be unique non-empty strings.");
+    if (!Array.isArray(settings)) throw new Error("Plugin settings must be an array of pages.");
+    const ids = new Set<string>();
+    for (const page of settings) {
+      if (!page || typeof page.id !== "string" || !page.id.trim() || page.id !== page.id.trim() || ids.has(page.id))
+        throw new Error("Plugin settings page IDs must be unique non-empty trimmed strings.");
+      ids.add(page.id);
+      if (page.title === undefined || page.summary === undefined || page.Body === undefined)
+        throw new Error("Plugin settings pages must declare a title, summary, and Body component.");
+      const locations = page.locations;
+      if (locations !== undefined && (!Array.isArray(locations)
+        || locations.some(location => typeof location !== "string" || !location.trim())
+        || new Set(locations).size !== locations.length))
+        throw new Error("Plugin settings locations must be unique non-empty strings.");
+    }
+  }
+  if (plugin.sessionEntries !== undefined) {
+    if (!Array.isArray(plugin.sessionEntries)) throw new Error("Session entries must be an array.");
+    const ids = new Set<string>();
+    for (const entry of plugin.sessionEntries) {
+      if (!entry || typeof entry.id !== "string" || !entry.id.trim() || entry.id !== entry.id.trim() || ids.has(entry.id)
+        || entry.title === undefined || entry.Body === undefined) throw new Error("Session entries need unique IDs, titles, and Body components.");
+      ids.add(entry.id);
+    }
   }
   for (const module of plugin.modules ?? []) {
     if (!module || !Array.isArray(module.resources) || !Array.isArray(module.cards) || !Array.isArray(module.tools)

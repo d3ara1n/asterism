@@ -1,5 +1,5 @@
 import type { Json } from "./json.ts";
-import type { DataContract } from "./presentation.ts";
+import type { DataContract, Presentation } from "./presentation.ts";
 import type { RecordContract } from "./records.ts";
 import type { ResourceRef, ResourceCreationResult, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 import type { ContentReader, ContentScope } from "./content-runtime.ts";
@@ -49,8 +49,8 @@ export interface SessionExecutor extends SessionReader {
   /** Append a resource rename event when the title changes; return the title with leading and trailing whitespace removed. */
   rename(resource: ResourceRef, title: string): string;
   commit(work: (writer: SessionWriter) => undefined): void;
-  /** set directly overwrites the session title; it can be called within a synchronous commit and commits or rolls back with it. */
-  readonly title: SessionReader["title"] & { set(text: string): void };
+  /** Append a host title assignment atomically, with optional plugin-owned detail. */
+  readonly title: SessionReader["title"] & { set(text: string, detail?: Presentation): void };
 }
 /**
  * An operation facade for the same session from the perspective of the tool caller and this request.

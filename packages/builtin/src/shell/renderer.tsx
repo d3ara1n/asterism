@@ -3,10 +3,11 @@ import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@asterism-app/ui/ui/item";
-import { shellMessages as messages } from "../messages/shell";
+import { shellMessages as messages } from "@asterism-app/ui/messages/shell";
 import { resourceMessages } from "../messages/resources";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
-import { ShellProfileListResult, type ShellProfileList } from "./contract";
+import { ShellProfileListResult } from "./contract";
+import type { ShellProfileList } from "@asterism-app/sdk/contracts";
 
 type Props = ToolRenderProps<ShellProfileList>;
 

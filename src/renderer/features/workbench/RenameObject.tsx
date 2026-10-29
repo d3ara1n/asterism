@@ -8,7 +8,7 @@ import { Input } from "@asterism-app/ui/ui/input";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { errorDisplay } from "../../../shared/error-display";
 import type { WorkbenchObject } from "../../../shared/workbench";
-import { formsMessages } from "../../messages/forms";
+import { formsMessages } from "@asterism-app/ui/messages/forms";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { useWorkbench } from "./context";

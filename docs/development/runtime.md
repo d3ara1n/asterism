@@ -10,6 +10,8 @@ The first input in a turn carries `startsTurn`; subsequent inputs in the batch a
 
 Input submission is an Agent action. Exact retries use the same submission identity and complete input; reusing that identity for a different action or input fails.
 
+Builtin's Home entry prepares the first Agent and runs the same registered input preparers before initial admission. It validates the prepared input and commits it with the new session and resource. The initial title is derived from that accepted input.
+
 Idle input commits before execution. While running, accepted inputs enter the persistent Agent drafts collection. Drafts retain full parts, sender, and mode, but are not model context until delivered.
 
 Boundary consumption follows these rules:
@@ -39,15 +41,15 @@ The Agent stores selection and activity state, not a second message history. Sys
 
 Host-authored harness text uses declarative descriptions of primitives. Workflows come from user prompts and skills. User instructions retain their meaning, including negative requirements.
 
-Structured prompt blocks provide identity and origin for rendering and diagnostics. Their text delimiters do not establish an additional instruction hierarchy.
+Builtin owns structured prompt blocks and their projection. The host model service accepts neutral source/text blocks and captures linked context for the requesting plugin to assemble. Builtin's ordered request preparers can filter skills and edit blocks before projection. Captured blocks provide identity and origin for diagnostics; their text delimiters do not establish an additional instruction hierarchy.
 
 ## Skills
 
-The built-in skill service discovers direct child packages under the configured sources. Current assembly uses the system user’s `~/.agents/skills`. Each package declares a name and description in `SKILL.md` YAML frontmatter.
+The host skill catalog discovers direct child packages under the user's `~/.agents/skills` directory and plugin-declared package directories. Each package declares a name and description in `SKILL.md` YAML frontmatter. Instruction contributions are fixed text registered during plugin setup. The host stamps actual plugin provenance and removes contributions with their owner's lifetime.
 
-Discovery occurs at startup or explicit refresh, not on every request. The shared catalog sorts effective skills by name. Duplicate names in one source are ambiguous; when multiple sources are supplied, later sources override earlier ones.
+Discovery occurs at startup or explicit refresh. The host exposes raw sources and same-source duplicate diagnostics. Builtin selects effective skills with user sources above plugin sources above builtin, resolves plugin conflicts deterministically, and sorts its result by name.
 
-`skill_read` resolves a name from the loaded catalog and reads current text within that package. Lexical and resolved paths remain inside its real package root. Reading returns ordinary tool output; it neither executes scripts nor establishes resource links.
+Each request captures its effective list after synchronous preparers. `skill_read` resolves names only from that list and reads current text within the captured package. A skill removed by preparation is unavailable to that request. Lexical and resolved paths remain inside its real package root. Reading returns ordinary tool output; it neither executes scripts nor establishes resource links.
 
 `skill_refresh` rebuilds discovery and reports counts and issues. Subsequent requests use the new catalog.
 
@@ -74,7 +76,7 @@ The host reserves `resource_list`, `resource_inspect`, and `resource_call`. Insp
 
 Plugin tool policy filters plugin top-level and resource-tool names. It does not turn the reserved host discovery entries into grants of access.
 
-Overrides follow user plugin order, with the built-in plugin first. Top-level names and resource-tool names resolve independently. A later tool declaration replaces its whole definition; a later implementation replaces the same resource-type/tool pair. Referencing a replaced contract does not reactivate it.
+Overrides follow configured plugin order. The distribution initially places builtin first in the ordinary package list. Top-level names and resource-tool names resolve independently. A later tool declaration replaces its whole definition; a later implementation replaces the same resource-type/tool pair. Referencing a replaced contract does not reactivate it.
 
 Invalid duplicate identities within a plugin fail assembly. Historical results retain the actual implementation identity selected for that call.
 

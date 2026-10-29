@@ -3,11 +3,13 @@ import type { z } from "zod";
 import type { Json } from "./json.ts";
 import type { ObjectReader } from "./objects.ts";
 import type { Source } from "./workspace.ts";
+import type { ContentReader } from "./content-runtime.ts";
 
 export type CallContext<S extends CallScope = CallScope> = {
   /** The host binds the source for backend plugin calls; null for desktop user calls. */
   readonly source: Source;
   readonly signal: AbortSignal;
+  readonly content: ContentReader;
 } & (S extends "object" ? { readonly object: ObjectReader } : { readonly object?: never });
 export interface CallContribution {
   readonly contract: CallContract;

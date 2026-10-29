@@ -12,7 +12,7 @@ import { resourceMessages as messages } from "../messages/resources";
 import { inputText } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult } from "./contract";
-import { useCreationDirectory } from "./directory";
+import { useCreationDirectory, prepareCreationDirectory } from "./directory";
 
 function ResourceType({ kind }: { kind: string }) {
   const resource = useRendererResources().get(kind);
@@ -175,6 +175,7 @@ const createView = { headerRenderer: CreateHeader, bodyRenderer: CreateBody };
 const removeView = { headerRenderer: RemoveHeader, bodyRenderer: RemoveBody };
 
 export default {
+  prepare: prepareCreationDirectory,
   resources: [], cards: [],
   tools: [
     toolRenderer(AgentListResult, {

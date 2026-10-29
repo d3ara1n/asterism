@@ -1,4 +1,4 @@
-import { defineCreation, defineAction } from "@asterism-app/sdk/contracts";
+import { defineCreation, defineAction, defineCall } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
 import { builtin } from "./identity.ts";
 import { userInputPartsSchema } from "./input.ts";
@@ -9,12 +9,14 @@ import { agentMessageSenderSchema } from "./messaging.ts";
 export const Agent = builtin.resource("agent", z.object({}));
 /** The built-in agent preset selected by default when starting from the home page. */
 export const defaultAgentPreset = "worker";
-/** The host draft target for the first submission from the home page; this is not an action routable to an existing object. */
-export const startAgentContentTarget = { contractId: builtin.name("session.start"), resourceKind: Agent.kind } as const;
 /** Pending input is delivered at request or turn boundaries; execution starts immediately when idle. */
 export const agentInputModeSchema = z.enum(["steer", "follow"]);
 /** Submissions and drafts share a 16-character Nano ID identity. */
 export const submissionIdSchema = z.string().regex(/^[A-Za-z0-9_-]{16}$/u);
+export const StartAgentSession = defineCall(builtin.name("session.start"), {
+  scope: "plugin", input: z.strictObject({ submissionId: submissionIdSchema, selection: agentSelectionSchema, parts: userInputPartsSchema }),
+  output: z.strictObject({ sessionId: z.string().min(1) }),
+});
 /** title is optional; when omitted, the creation entry point generates a random display name. */
 export const agentCreateSchema = z.strictObject({
   selection: agentSelectionSchema,

@@ -1,3 +1,4 @@
+import { applicationBrand, applicationUserAgent } from "../shared/application.ts";
 import { belongsTo, jsonSchema, type DataContract, type Json, type RecordContract, type SessionDirectory } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ContentReader, type ContentScope, type ObjectReader, type ObjectExecutor, type PluginContext, type ResourceRef, type ResourceSnapshot, type SessionExecutor, type ObjectWriter, type ToolSession } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "./lifecycle.ts";
@@ -12,8 +13,9 @@ import type { PluginEventScope } from "./event-scope.ts";
 import type { PluginCalls } from "@asterism-app/sdk/contracts";
 import type { BoundTopLevelTool } from "./top-level-tools.ts";
 import { SessionError } from "../session/tree.ts";
-import { UsageQueryError, WebError, type WebProviderInstance } from "@asterism-app/sdk/runtime";
+import { UsageQueryError, type McpToolHandle, type WebProviderInstance } from "@asterism-app/sdk/runtime";
 import { encodePluginData } from "./data-encoding.ts";
+import { packageAsset } from "./agent-catalog.ts";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,
@@ -143,7 +145,11 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     },
     title: {
       get: () => { checkAvailable(); return host.sessions.title(id); },
-      set: text => { checkMutation(); host.sessions.setTitle(id, text); },
+      set: (text, detail) => {
+        checkMutation();
+        if (detail) own(detail.contract.id);
+        host.sessions.setTitle(id, text, { plugin: internal.id, resource: objectId ? host.refOf(objectId) : null }, detail);
+      },
     },
     commit: work => { checkMutation(); commit(id, work, undefined, scope); },
   });
@@ -161,6 +167,9 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       const check = () => {
         if (!active) throw new PluginApiError("unavailable", "The writer is outside its commit callback.");
       };
+      const captureInput = (value: Json) => {
+        if (scope?.input && scope.content) host.content?.retain(scope.content, value, scope.input, internal.id);
+      };
       try {
         synchronous(() => work({
           append(contract, data) {
@@ -171,6 +180,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             if (contract !== declared)
               throw new PluginApiError("invalid_argument", "Use the declared record contract instance.");
             const value = encodePluginData(declared, data);
+            captureInput(value);
             // Write channels stamp origins: operation handles supply plugin identity and validated object references supply resources.
             const recordId = writer.append({ contract: declared.id, data: value, model: null, recipient: null,
               source: { plugin: internal.id, resource: ref ?? null } });
@@ -181,6 +191,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
             check();
             checkData(contract);
             const value = encodePluginData(contract, data);
+            captureInput(value);
             host.content?.bind(access(id, ref?.id, scope), { kind: "data", id: contract.id }, value);
             host.data.set(id, ref?.id ?? null, contract.id, value);
           },
@@ -242,33 +253,71 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         title: Object.freeze({ get: session.title.get }) }),
     });
   };
-  const subscribeRegistry = (registry: { subscribe(listener: () => void): () => void } | undefined, listener: () => void) => {
+  const subscribeRegistry = (registry: { subscribe(listener: () => void): () => void }, listener: () => void) => {
     checkAvailable();
-    const unsubscribe = registry?.subscribe(() => { checkAvailable(); synchronous(listener); }) ?? (() => {});
+    const unsubscribe = registry.subscribe(() => { checkAvailable(); synchronous(listener); });
     const release = () => { unsubscribe(); internal.lifetime.signal.removeEventListener("abort", release); };
     internal.lifetime.signal.addEventListener("abort", release, { once: true });
     return release;
   };
+  /** Host-wide services; data crossing into the plugin is copied once here. */
+  const shared = host.shared;
+  const outside = { affectsHistory: false } as const;
   const context: PluginContext = {
+    mcp: {
+      states() { checkAvailable(); return structuredClone(shared.mcp.service.states()); },
+      catalog() { checkAvailable(); return structuredClone(shared.mcp.service.catalog()); },
+      connect(id, signal) {
+        checkAvailable();
+        return sessionRuns.start(scope => shared.mcp.service.connectEnabled(id, scope), { ...outside, signal }).done;
+      },
+      resolve(id) {
+        checkAvailable();
+        const service = shared.mcp.service, target = service.resolve(id);
+        return Object.freeze<McpToolHandle>({
+          serverId: target.serverId, serverName: target.serverName, toolName: target.toolName,
+          call(args, options) {
+            checkAvailable();
+            const input = structuredClone(args);
+            return sessionRuns.start(signal => service.call(target, input, signal, options.progress), { ...outside, signal: options.signal }).done;
+          },
+        });
+      },
+      subscribe: listener => subscribeRegistry(shared.mcp, listener),
+    },
+    terminalProfiles: {
+      get: () => { checkAvailable(); return structuredClone(shared.shell.profiles.get()); },
+      list: () => { checkAvailable(); return sessionRuns.start(() => shared.shell.profiles.list(), outside).done; },
+    },
+    commands: {
+      inspect: () => { checkAvailable(); return sessionRuns.start(() => shared.shell.commands.inspect(), outside).done; },
+      execute(cwd, args, options) {
+        checkAvailable();
+        return sessionRuns.start(signal => shared.shell.commands.execute(cwd, args, { ...options, signal }), { ...outside, signal: options.signal }).done;
+      },
+    },
+    // The plugin releases terminals with its resources; the host reaps any left at shutdown.
+    terminals: { create: (config, events) => { checkAvailable(); return shared.shell.terminals.create(structuredClone(config), events); } },
+    application: Object.freeze({ name: applicationBrand.en, userAgent: applicationUserAgent }),
+    manual: { sources() { checkAvailable(); return structuredClone(shared.manualSources()); } },
     webProviders: {
-      types: () => { checkAvailable(); return host.webProviders?.types() ?? []; },
-      list: () => { checkAvailable(); return host.webProviders?.list() ?? []; },
-      get: id => { checkAvailable(); return host.webProviders?.get(id) ?? null; },
-      subscribe: listener => subscribeRegistry(host.webProviders, listener),
+      types: () => { checkAvailable(); return shared.webProviders.types(); },
+      list: () => { checkAvailable(); return shared.webProviders.list(); },
+      get: id => { checkAvailable(); return shared.webProviders.get(id); },
+      subscribe: listener => subscribeRegistry(shared.webProviders, listener),
       async resolve(id, options) {
         checkAvailable();
-        if (!host.webProviders) throw new WebError("provider_unavailable", "Web providers are unavailable.");
-        const instance = await host.webProviders.resolve(id, options);
+        const instance = await shared.webProviders.resolve(id, options);
         const bound: WebProviderInstance = {};
         if (instance.search) bound.search = (request, opts) => {
           checkAvailable();
           const input = structuredClone(request);
-          return sessionRuns.start(scope => instance.search!(input, { signal: scope }), { signal: opts.signal, affectsHistory: false }).done;
+          return sessionRuns.start(scope => instance.search!(input, { signal: scope }), { ...outside, signal: opts.signal }).done;
         };
         if (instance.fetch) bound.fetch = (request, opts) => {
           checkAvailable();
           const input = structuredClone(request);
-          return sessionRuns.start(scope => instance.fetch!(input, { signal: scope }), { signal: opts.signal, affectsHistory: false }).done;
+          return sessionRuns.start(scope => instance.fetch!(input, { signal: scope }), { ...outside, signal: opts.signal }).done;
         };
         return bound;
       },
@@ -276,16 +325,22 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     web: {
       search(request, options) {
         checkAvailable();
-        if (!host.webProviders) throw new WebError("provider_unavailable", "Web providers are unavailable.");
         const input = structuredClone(request);
-        return sessionRuns.start(scope => host.webProviders!.search(input, { signal: scope }), { signal: options.signal, affectsHistory: false }).done;
+        return sessionRuns.start(scope => shared.webProviders.search(input, { signal: scope }), { ...outside, signal: options.signal }).done;
       },
       fetch(request, options) {
         checkAvailable();
-        if (!host.webProviders) throw new WebError("provider_unavailable", "Web providers are unavailable.");
         const input = structuredClone(request);
-        return sessionRuns.start(signal => host.webProviders!.fetch(input, { signal }), { signal: options.signal, affectsHistory: false }).done;
+        return sessionRuns.start(signal => shared.webProviders.fetch(input, { signal }), { ...outside, signal: options.signal }).done;
       },
+    },
+    providerUsage: {
+      query(id, options = {}) {
+        checkAvailable();
+        return sessionRuns.start(async signal => structuredClone(await shared.usage.query(id, { ...options, signal })),
+          { ...outside, signal: options.signal }).done;
+      },
+      consume(response) { checkAvailable(); shared.usage.consume(structuredClone(response)); },
     },
     usages: {
       query(id, input) {
@@ -303,6 +358,43 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     },
     ipc: { events: eventScope.api, calls },
     id: internal.id, lifetime: internal.lifetime, sessions: directory, dir: internal.dir, log: internal.log,
+    createSession(key, prepare, options = {}) {
+      checkAvailable();
+      return sessionRuns.start(signal => host.sessions.initialize(internal.id, key, async preparation => {
+        const initialization = await prepare(preparation);
+        return { title: initialization.title, initialize(id, create, content) {
+          const scope: ObjectScope = { active: true, execution: true, content, input: options.content };
+          const bound = session(id, undefined, checkAvailable, scope);
+          try {
+            synchronous(() => initialization.initialize({
+              id, content: bound.content, snapshot: bound.snapshot, get: bound.get, title: { get: bound.title.get }, create,
+              object(contract, objectId) {
+                own(contract.kind);
+                const ref = { sessionId: id, kind: contract.kind, id: objectId };
+                checkRef(ref);
+                const executor = object(ref, scope);
+                return { ...reader(ref, scope), commit: executor.commit };
+              },
+            }));
+          } finally { scope.active = false; }
+        } };
+      }, { signal, content: options.content }), { ...outside, signal: options.signal }).done;
+    },
+    assets: { path(relativePath) {
+      checkAvailable();
+      const root = shared.packageRoots.get(internal.id);
+      if (!root) throw new PluginApiError("unavailable", "The plugin was not loaded from a package.");
+      return packageAsset(root, relativePath);
+    } },
+    agentCatalog: {
+      skills() { checkAvailable(); return structuredClone(shared.agentCatalog.skills()); },
+      instructions() { checkAvailable(); return structuredClone(shared.agentCatalog.instructions()); },
+      refresh(signal) { checkAvailable(); return structuredClone(shared.agentCatalog.refresh(signal)); },
+      read(skill, path, signal) {
+        checkAvailable();
+        return sessionRuns.start(scope => shared.agentCatalog.read(skill, path, scope), { ...outside, signal }).done;
+      },
+    },
     config: contract => {
       checkAvailable();
       if (contract.plugin !== internal.id) throw new PluginApiError("foreign_resource", "The configuration belongs to another plugin.");
@@ -318,24 +410,21 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       cancel: key => internal.tasks.cancel(key),
       has: key => internal.tasks.has(key),
     },
-    catalogs: { get: contract => { checkAvailable(); return host.catalogs?.get(contract) ?? null; } },
     modelProviders: {
-      presets: () => { checkAvailable(); return host.modelProviders?.presets() ?? []; },
-      list: () => { checkAvailable(); return structuredClone(host.modelProviders?.list() ?? []); },
-      get: id => { checkAvailable(); return structuredClone(host.modelProviders?.get(id) ?? null); },
+      presets: () => { checkAvailable(); return shared.modelProviders.presets(); },
+      list: () => { checkAvailable(); return structuredClone(shared.modelProviders.list()); },
+      get: id => { checkAvailable(); return structuredClone(shared.modelProviders.get(id)); },
       credential: (id, options = {}) => {
         checkAvailable();
-        if (!host.modelProviders) throw new PluginApiError("unavailable", "Provider connections are unavailable.");
-        return sessionRuns.start(signal => host.modelProviders!.credential(id, { signal }),
-          { signal: options.signal, affectsHistory: false }).done;
+        return sessionRuns.start(signal => shared.modelProviders.credential(id, { signal }), { ...outside, signal: options.signal }).done;
       },
-      subscribe: listener => subscribeRegistry(host.modelProviders, listener),
+      subscribe: listener => subscribeRegistry(shared.modelProviders, listener),
     },
     usageProviders: {
-      list: () => { checkAvailable(); return host.usageProviders?.list() ?? []; },
+      list: () => { checkAvailable(); return shared.usageProviders.list(); },
       get: id => {
         checkAvailable();
-        const provider = host.usageProviders?.get(id);
+        const provider = shared.usageProviders.get(id);
         if (!provider) return null;
         if (provider.source === "headers") return { ...provider, parseHeaders(value) {
           checkAvailable(); return provider.parseHeaders(value);
@@ -343,11 +432,10 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         return { ...provider, query(value) {
           checkAvailable();
           const captured = { connection: structuredClone(value.connection), credential: value.credential };
-          return sessionRuns.start(signal => provider.query({ ...captured, signal }),
-            { signal: value.signal, affectsHistory: false }).done;
+          return sessionRuns.start(signal => provider.query({ ...captured, signal }), { ...outside, signal: value.signal }).done;
         } };
       },
-      subscribe: listener => subscribeRegistry(host.usageProviders, listener),
+      subscribe: listener => subscribeRegistry(shared.usageProviders, listener),
     },
     models: {
       validate: (request, options) => {
@@ -373,8 +461,9 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
           throw new PluginApiError("unavailable", "The resource is not on the current session path.");
         if ((path.at(-1)?.id ?? null) !== request.requestParentId)
           throw new PluginApiError("invalid_argument", "Rebuild model input from the current session position.");
-        const { target, system, messages, tools, cache, userAgent } = structuredClone({
-          target: request.target, system: request.system, messages: request.messages, tools: request.tools, cache: request.cache,
+        const system = typeof request.system === "function" ? request.system : structuredClone(request.system);
+        const { target, messages, tools, cache, userAgent } = structuredClone({
+          target: request.target, messages: request.messages, tools: request.tools, cache: request.cache,
           userAgent: request.userAgent,
         });
         const allowed = tools?.allow ? new Set(tools.allow) : null;
@@ -405,7 +494,6 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
         host.sessions.progressChanged(ref.sessionId);
         return done;
       },
-      roles: () => { checkAvailable(); return host.models.roles(); },
       list: () => { checkAvailable(); return host.models.list(); },
     },
     session,

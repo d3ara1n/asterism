@@ -5,8 +5,9 @@ export const applicationId = "dev.dearain.asterism";
 export const applicationBrand = { en: "Asterism", zh: "星图" } as const;
 export const applicationSlug = "asterism";
 export const applicationRepository = { owner: "d3ara1n", name: "asterism" } as const;
+export const applicationVersion = packageMetadata.version;
 /** Built-in model calls declare the actual app identity; third-party callers may supply their own UA. */
-export const applicationUserAgent = `${applicationBrand.en}/${packageMetadata.version}`;
+export const applicationUserAgent = `${applicationBrand.en}/${applicationVersion}`;
 
 /** Data roots use fixed identity with explicit development/release isolation; callers resolve under Electron appData. */
 export function applicationDataDirectory(isPackaged: boolean): string {
@@ -15,6 +16,7 @@ export function applicationDataDirectory(isPackaged: boolean): string {
 
 /** Fixed layout within one application data root; filenames do not follow brand display names. */
 export const applicationStorage = {
+  shellIntegrationDirectory: "shell-integration",
   databaseDirectory: "db",
   databaseFile: "workspace.sqlite",
   contentDirectory: "content",

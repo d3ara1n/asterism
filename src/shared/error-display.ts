@@ -1,16 +1,5 @@
-import { defineMessages, pluginNamespace, type UiText } from "@asterism-app/sdk/contracts";
-/** UI explanations for stable public error codes; English diagnostics and plugin business prompts remain unchanged. */
-export const errorMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
-  invalid_request: { id: "error.invalidRequest", defaultMessage: "The request is invalid. Check your input and try again." },
-  not_found: { id: "error.notFound", defaultMessage: "The requested item is no longer available." },
-  conflict: { id: "error.conflict", defaultMessage: "The operation cannot run in the current state." },
-  unavailable: { id: "error.unavailable", defaultMessage: "The operation is currently unavailable. Reload before retrying." },
-  tool_files_unsupported: { id: "error.toolFilesUnsupported", defaultMessage: "Chat Completions cannot carry files in tool results. Add the 'Tool files in a user message' compatibility setting or choose another protocol." },
-  internal: { id: "error.internal", defaultMessage: "The operation could not be completed. Check the application logs." },
-}));
-export function errorDisplay(error: { code: string; message: string; display?: UiText }): UiText {
-  return error.display ?? (Object.hasOwn(errorMessages, error.code) ? errorMessages[error.code as keyof typeof errorMessages] : error.message);
-}
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
+export { errorMessages, errorDisplay, failureDisplay } from "@asterism-app/ui/error-display";
 export const startupMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   quitTitle: { id: "shutdown.title", defaultMessage: "Close running resources?" },
   quitDescription: { id: "shutdown.description", defaultMessage: "These resources may still have running programs. Quitting will end their live instances:\n\n{resources}" },

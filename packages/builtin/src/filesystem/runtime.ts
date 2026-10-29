@@ -11,7 +11,7 @@ import { failed, filesystemFailure } from "./errors.ts";
 import { readTextFile, commitTextFile, validateTextSize } from "./text-io.ts";
 import { DirectoryExec } from "./exec-contract.ts";
 import { execToModel } from "../shell/contract.ts";
-import type { ShellService } from "../shell/service.ts";
+import type { CommandExecution } from "@asterism-app/sdk/runtime";
 import { simpleGit } from "simple-git";
 import { searchTools } from "./search.ts";
 import { listFiles, readFileContent } from "./read.ts";
@@ -61,7 +61,7 @@ async function readGitStatus(rootPath: string): Promise<{ entries: Array<{ path:
   return { entries, hasGit: true };
 }
 
-export function createFilesystemModule(shell: ShellService) { return defineModule(() => ({
+export function createFilesystemModule(shell: CommandExecution) { return defineModule(() => ({
   resources: [implementResource(Directory, DirectoryView, {
     card: directoryCard,
     template: { current: [] },

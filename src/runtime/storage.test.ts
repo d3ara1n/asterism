@@ -7,7 +7,7 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import { SessionTree } from "../session/tree.ts";
 import { created, event, removed } from "../session/test-nodes.ts";
 import { sessionRetentionMs } from "../shared/application.ts";
-import { collectExpiredSessions, openDatabase, workspaceStorage } from "./storage.ts";
+import { collectExpiredSessions, openDatabase } from "./storage.ts";
 import { SessionWorkbench } from "./workbench.ts";
 
 const roots: string[] = [], databases: DatabaseSync[] = [];
@@ -97,30 +97,5 @@ describe("Session focus layout", () => {
     // A null width restores the shared default; an omitted width keeps it.
     workbench.mutate({ type: "focus.set", sessionId: s, width: null });
     expect(workbench.layout(s).focus).toEqual({ objectId: null, width: null });
-  });
-});
-
-// Format 27 had no focus table; the 27 → 28 step must produce a database that the current runtime reads and writes.
-describe("Workspace migration 27 → 28", () => {
-  it("adds session focus storage while keeping existing sessions", () => {
-    const root = mkdtempSync(join(tmpdir(), "asterism-storage-")); roots.push(root);
-    const seed = openDatabase(root);
-    const tree = new SessionTree(seed);
-    const s = tree.create("Kept");
-    tree.appendToTimeline(s, created("a1", "Agent"));
-    seed.exec("DROP TABLE workbench_focus; PRAGMA user_version = 27;");
-    seed.close();
-
-    const plan = workspaceStorage(root).inspect();
-    expect(plan?.change).toEqual({ id: "workspace", from: 27, to: 28 });
-    plan!.apply();
-
-    const db = openDatabase(root); databases.push(db);
-    const migrated = new SessionTree(db);
-    expect(migrated.list().map(item => item.id)).toEqual([s]);
-    const workbench = focusWorkbench(db, migrated);
-    expect(workbench.layout(s).focus).toEqual({ objectId: null, width: null });
-    workbench.mutate({ type: "focus.set", sessionId: s, objectId: "a1", width: 540 });
-    expect(workbench.layout(s).focus).toEqual({ objectId: "a1", width: 540 });
   });
 });

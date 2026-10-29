@@ -4,7 +4,7 @@ import {
 } from "@asterism-app/sdk/runtime";
 import {
   ns, card, Counter, Value, View, Changed, Create, Increment,
-  Settings, ReadStep, ReadCounter,
+  Settings, ReadStep, ReadCounter, StartSession,
 } from "./contracts.ts";
 
 const current = (object: ObjectReader) => object.get(Value) ?? 0;
@@ -14,7 +14,13 @@ export default definePlugin({
   setup(plugin) {
     const settings = plugin.config(Settings);
     return {
-      calls: [implementCall(ReadStep, async () => settings.get().step)],
+      calls: [
+        implementCall(ReadStep, async () => settings.get().step),
+        implementCall(StartSession, async ({ key }, { signal }) => plugin.createSession(key, async preparation => {
+          const counter = await preparation.prepare(Create, null);
+          return { title: "Counter workspace", initialize(session) { session.create(counter); } };
+        }, { signal })),
+      ],
       resources: [implementResource(Counter, View, {
         card, records: [Changed],
         template: { current: [Value] },

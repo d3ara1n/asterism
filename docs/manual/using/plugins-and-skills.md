@@ -4,9 +4,11 @@ Plugins add executable capabilities and views. Skills supply instructions and su
 
 ## Add a plugin
 
-Open **Settings** and use the plugin section to add a local package directory. Select the package root containing its `package.json` and Asterism declaration.
+Open **Settings → Plugins** to add a local package directory. Select the package root containing its `package.json` and Asterism declaration.
 
-Plugin cards show metadata, loading state, and management actions. Open a card for its settings when the plugin supplies a settings page. Installation and enablement changes take effect after restarting Asterism.
+The management list shows metadata, loading state, and enablement controls. A plugin's configuration pages appear separately on settings home and identify their contributor. Installation and enablement changes take effect after restarting Asterism.
+
+The bundled builtin plugin provides the official Agent experience and can be disabled like another plugin. Other plugins can supply their own Home entry. Choose among available entries in General settings. If the selected entry becomes unavailable, choose another; resource templates remain accessible independently.
 
 Plugins run as trusted local code. Install packages whose behavior you accept. Removing a plugin from the list does not erase its historical session records or automatically clean its private data.
 
@@ -25,10 +27,10 @@ Read the relevant notes and identify decisions that need follow-up.
 
 Supporting files belong inside the skill package. References to those files resolve from the package directory.
 
-Refresh the skill catalog in the built-in plugin’s settings after adding or changing packages. That view shows discovered skills and discovery problems.
+Refresh **Settings → Skills** after adding or changing packages. The page shows raw user and plugin sources, their provenance, discovered skills, and discovery problems. Each Agent paradigm decides which of those contributions enter its requests.
 
 ## Read skills during work
 
-The model receives names and descriptions in its skill catalog. `skill_read` reads a selected skill or one of its supporting text files; `skill_refresh` refreshes discovery.
+Builtin gives the model the names and descriptions selected for its request. User packages override plugin packages with the same name, and plugin packages override builtin packages. `skill_read` reads a selected skill or one of its supporting text files; `skill_refresh` refreshes discovery for later requests. A skill removed by request preparation is unavailable to that request.
 
 A skill describes a method. The resources and tools available to the agent determine which operations it can actually perform.

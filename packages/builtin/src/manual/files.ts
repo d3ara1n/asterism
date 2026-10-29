@@ -1,6 +1,6 @@
 import { posix } from "node:path";
 import type { z } from "zod";
-import type { ManualSource } from "@asterism-app/builtin-api/runtime";
+import type { ManualSource } from "@asterism-app/sdk/runtime";
 import type { CallResult } from "@asterism-app/sdk/runtime";
 import { DirectoryList, DirectoryRead } from "../filesystem/contract.ts";
 import { DirectoryFind, DirectoryGrep } from "../filesystem/search-contract.ts";
