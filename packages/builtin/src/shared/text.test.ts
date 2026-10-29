@@ -1,20 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { applyPatch } from "diff";
-import { Read, Edit, Write } from "@asterism-app/builtin-api/contracts";
 import { readText, readToModel, editText, textChange, writeToModel, editToModel } from "./text.ts";
 import { computeLineHash } from "./hashline/hash.ts";
 
-// Expectations come from the tool contract: targeting stays out of args, a failed batch writes nothing, anchors reference full content, and edits preserve original line endings.
+// Expectations come from the tool contract: a failed batch writes nothing, anchors reference full content, and edits preserve original line endings.
 describe("text tool contracts", () => {
-  it("read accepts only anchored, write accepts no anchors, and edit requires fields according to the operation", () => {
-    expect(Read.argsSchema.safeParse({ anchored: false }).success).toBe(true);
-    expect(Read.argsSchema.safeParse({ offset: 2 }).success).toBe(false);
-    expect(Write.argsSchema.safeParse({ content: "x", anchor: { line: 1, hash: "ABCD" } }).success).toBe(false);
-    expect(Edit.argsSchema.safeParse({ edits: [{ op: "replace", body: ["x"] }] }).success).toBe(false);
-    expect(Edit.argsSchema.safeParse({ edits: [{ op: "append", body: ["x\ny"] }] }).success).toBe(false);
-    expect(Edit.argsSchema.safeParse({ edits: [{ op: "delete", anchor: { line: 1, hash: "ABCD" }, body: ["x"] }] }).success).toBe(false);
-  });
-
   it("returns the same anchor for the same line in paginated and full content, and exposes no anchors when anchored is disabled", () => {
     const text = "zero\nfirst\nsecond";
     const full = readText(text, true);

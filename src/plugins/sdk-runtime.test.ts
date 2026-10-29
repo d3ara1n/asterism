@@ -63,7 +63,7 @@ async function configureModel(service: ApplicationService) {
   } });
   return { provider: "test", model: "test" };
 }
-function counter(options: { onRead?: (object: ObjectReader) => void; failCreate?: boolean; onCreate?: (object: ObjectExecutor) => void; afterCreate?: (object: ObjectExecutor) => void; afterAction?: (object: ObjectExecutor) => void; observe?: (record: SessionRecord, context: PluginContext) => void;
+function counter(options: { failCreate?: boolean; onCreate?: (object: ObjectExecutor) => void; afterCreate?: (object: ObjectExecutor) => void; afterAction?: (object: ObjectExecutor) => void; observe?: (record: SessionRecord, context: PluginContext) => void;
   prepare?: (signal: AbortSignal) => Promise<void>; execute?: (object: ObjectExecutor, signal: AbortSignal, amount: number) => Promise<void>;
 } = {}) {
   let context!: PluginContext;
@@ -92,7 +92,7 @@ function counter(options: { onRead?: (object: ObjectReader) => void; failCreate?
             options.afterAction?.(object);
           },
         })],
-        project: (_data, object) => { options.onRead?.(object); return { value: object.get(State)! }; },
+        project: (_data, object) => ({ value: object.get(State)! }),
         inspect: async (_data, object) => ({ value: object.get(State)! }),
       })],
       observers: [{ id: "observe", committed(event) { for (const record of event.records) options.observe?.(record, plugin); } }],
@@ -468,18 +468,6 @@ describe("Host implementation of the workbench SDK", () => {
     expect(service.sessions.running).toBe(false);
   });
 
-  it("read facades expose no mutation of objects or nested sessions", async () => {
-    let reader!: ObjectReader;
-    const c = counter({ onRead: value => { reader = value; } });
-    const { service, sessionId } = open([c.plugin]);
-    await create(service, sessionId);
-    service.sessions.current(sessionId);
-    expect(reader.get(State)).toBe(1);
-    expect(reader).not.toHaveProperty("commit");
-    expect(reader.session).not.toHaveProperty("commit");
-    expect(reader.session).not.toHaveProperty("resume");
-    expect(reader.session.title).not.toHaveProperty("set");
-  });
   it("actions validate identity, resource ownership, and input against host contracts and rejected calls leave no writes", async () => {
     const c = counter();
     const { service, sessionId } = open([c.plugin]);

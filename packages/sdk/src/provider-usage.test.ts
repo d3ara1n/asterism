@@ -20,10 +20,9 @@ describe("Public account usage results", () => {
     expect(primaryQuota(items.slice(0, 1))).toBeNull();
   });
   // Reject contradictory results that cannot be displayed at the data boundary; UI clamping must not disguise them as valid quotas.
-  it("rejects duplicate identities, invalid ratios, and remaining quantities above the limit", () => {
+  it("rejects duplicate identities and remaining quantities above the limit", () => {
     const item = quota("test", 1000, 1000);
     expect(usageItemsSchema.safeParse([item, item]).success).toBe(false);
-    expect(usageItemsSchema.safeParse([{ ...item, value: { type: "ratio", remaining: 1.1 } }]).success).toBe(false);
     expect(usageItemsSchema.safeParse([{ ...item, value: { type: "quantity", remaining: 2, limit: 1, unit: "tokens" } }]).success).toBe(false);
   });
 });

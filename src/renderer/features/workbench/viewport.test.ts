@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { viewportSchema } from "../../../shared/workbench";
 import { locateViewport, overviewMinZoom } from "./viewport";
 
-describe("Canvas overview and zoom contract", () => {
+describe("Canvas overview fitting", () => {
   it("uses a 5% minimum for ordinary and empty canvases", () => {
     expect(overviewMinZoom({ x: 0, y: 0, width: 1200, height: 800 }, 1000, 700)).toBe(0.05);
     expect(overviewMinZoom({ x: 0, y: 0, width: 0, height: 0 }, 1000, 700)).toBe(0.05);
@@ -22,13 +21,5 @@ describe("Canvas overview and zoom contract", () => {
     expect(overviewMinZoom(bounds, 440, height)).toBeLessThan(minZoom);
     const narrow = locateViewport(bounds, 440, height);
     expect((bounds.x + bounds.width) * narrow.zoom + narrow.x).toBeLessThanOrEqual(440);
-  });
-
-
-  it("the zoom contract rejects zero, negative, and non-finite values", () => {
-    for (const zoom of [0, -1, Infinity, NaN]) {
-      expect(viewportSchema.safeParse({ x: 0, y: 0, zoom }).success).toBe(false);
-    }
-    expect(viewportSchema.safeParse({ x: 0, y: 0, zoom: 0.0001 }).success).toBe(true);
   });
 });

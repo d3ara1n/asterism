@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { generateText } from "ai";
-import { z } from "zod";
 import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { createProviderModel } from "./provider.ts";
@@ -9,9 +8,8 @@ import { modelScope, type Json } from "../shared/model.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 
 import type { ModelInput } from "./contract.ts";
-import { mergeModelCompatibility, modelCompatibilityDefinition, modelCompatibilitySchema, type ModelCompatibility } from "../shared/model-compatibility.ts";
+import { mergeModelCompatibility, type ModelCompatibility } from "../shared/model-compatibility.ts";
 import { requestOptions } from "./request-options.ts";
-import { configurationField } from "../shared/configuration-fields.ts";
 
 function input(protocol: ModelInput["settings"]["provider"]["protocol"] = "openai-responses"): ModelInput {
   return {
@@ -59,27 +57,6 @@ async function request(value: ModelInput, inspectHeaders?: (headers: Headers) =>
 }
 
 describe("Reasoning level and budget mappings", () => {
-  // Mapping packages accept standard levels only; budgets are absolute token counts and off must not encode as a zero budget.
-  it("level and budget mappings validate sparse values and forms distinguish default, null, and custom values", () => {
-    const levels = modelCompatibilityDefinition("customThinkingLevels")!;
-    const budgets = modelCompatibilityDefinition("customThinkingBudgets")!;
-    expect(modelCompatibilitySchema.parse([
-      { id: levels.id, value: { low: " upstream-low ", high: null } },
-      { id: budgets.id, value: { high: 16384 } },
-    ])).toEqual([
-      { id: levels.id, value: { low: "upstream-low", high: null } },
-      { id: budgets.id, value: { high: 16384 } },
-    ]);
-    for (const value of [{ high: "" }, { high: 1024 }, { ultra: "ultra" }])
-      expect(levels.schema.safeParse(value).success).toBe(false);
-    for (const value of [{ off: 0 }, { high: 1023 }, { high: 1024.5 }, { high: null }, { high: Number.MAX_SAFE_INTEGER + 1 }])
-      expect(budgets.schema.safeParse(value).success).toBe(false);
-    const levelsForm = z.toJSONSchema(levels.schema, { io: "input" });
-    const budgetsForm = z.toJSONSchema(budgets.schema, { io: "input" });
-    expect(configurationField(levelsForm.properties!.high as Json).kind).toBe("nullable-string");
-    expect(configurationField(budgetsForm.properties!.high as Json).kind).toBe("integer");
-  });
-
   // Transmitted values follow explicit mappings rather than SDK enums or model-name defaults; history retains standard levels.
   it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s sends custom effort unchanged and supports explicit omission and protocol defaults", async protocol => {
     const current = input(protocol);

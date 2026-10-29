@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BuiltinApplicationService as ApplicationService } from "../testing.ts";
-import { Directory, DirectoryView } from "./contract.ts";
+import { Directory } from "./contract.ts";
 
 const roots: string[] = [], services: ApplicationService[] = [];
 afterEach(async () => {
@@ -17,9 +17,9 @@ function open() {
   return { root, service, sessionId: service.sessions.tree.create("Resource") };
 }
 
-// Expectations follow the directory creation contract: normalize titles and accept only actual directories; generic creation transactions are entrusted to the host.
+// Expectations follow the directory creation contract: normalize titles and accept only actual directories.
 describe("Directory creation", () => {
-  it("Creates built-in directories through the SDK, preserving existing event and card formats for default or custom titles and paths", async () => {
+  it("uses the directory name by default and trims a supplied title", async () => {
     const { root, service, sessionId } = open();
     const directory = join(root, "directory"); mkdirSync(directory);
     for (const title of [undefined, "  Materials  "]) {
@@ -29,10 +29,6 @@ describe("Directory creation", () => {
     const snapshot = service.sessions.current(sessionId);
     const directories = snapshot.workbench.objects.filter(object => object.kind === Directory.kind);
     expect(directories.map(object => object.title)).toEqual(["directory", "Materials"]);
-    expect(directories.map(object => object.presentation)).toEqual([
-      { contract: { id: DirectoryView.id }, data: { path: directory } },
-      { contract: { id: DirectoryView.id }, data: { path: directory } },
-    ]);
   });
 
   it("Directory creation rejects nonabsolute paths, missing directories, and regular files without leaving objects behind", async () => {

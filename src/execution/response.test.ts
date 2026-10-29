@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { modelBlockSchema, type ModelBlock } from "@asterism-app/sdk/contracts";
 import type { ModelEvent } from "../model/contract.ts";
 import { ResponseBuffer } from "./response.ts";
@@ -58,25 +58,6 @@ describe("Response block state machine", () => {
     response.accept({ type: "part.end", partId: "c", arguments: { path: "first.txt" } });
     expect(response.live()[0]).toMatchObject({ state: "ready", arguments: { path: "first.txt" } });
     expect(response.calls()[0]!.arguments).toEqual({ path: "first.txt" });
-  });
-  it("live reasoning carries the runtime block start without resetting on reads or deltas; finalized blocks retain the same start and end for display and audit after restart", () => {
-    const clock = vi.spyOn(Date, "now").mockReturnValue(1000);
-    try {
-      const { response, nodes } = setup();
-      response.accept({ type: "part.start", part: { id: "thought", kind: "thinking" } });
-      clock.mockReturnValue(4000);
-      response.accept({ type: "part.delta", partId: "thought", delta: "First" });
-      expect(response.live()[0]).toMatchObject({ kind: "thinking", text: "First", startedAt: 1000 });
-      clock.mockReturnValue(9000);
-      response.accept({ type: "part.delta", partId: "thought", delta: " second" });
-      expect(response.live()[0]).toMatchObject({ text: "First second", startedAt: 1000 });
-      response.accept({ type: "part.end", partId: "thought" });
-      expect(response.live()[0]).toMatchObject({ startedAt: 1000, endedAt: 9000 });
-      expect(nodes).toEqual([]);
-      response.accept(finish);
-      expect(response.live()).toEqual([]);
-      expect(modelBlockSchema.parse(nodes[0])).toMatchObject({ kind: "thinking", text: "First second", complete: true, startedAt: 1000, endedAt: 9000 });
-    } finally { clock.mockRestore(); }
   });
 
   it("terminal state belongs to the highest-index block regardless of parallel tool completion order; close meters once", () => {

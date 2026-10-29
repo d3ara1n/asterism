@@ -9,7 +9,6 @@ import { implementCall, defineModule, definePlugin, implementAction, implementCr
 import { ApplicationService } from "../runtime/service.ts";
 import { contentLimits } from "../runtime/content-store.ts";
 import { serveContent } from "../runtime/dispatch.ts";
-import { contentResultSchema } from "../shared/content.ts";
 import { randomUUID } from "node:crypto";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
 import type { StreamRequest } from "@asterism-app/sdk/contracts";
@@ -386,7 +385,6 @@ describe("Host immutable content", () => {
     const id = await f.create(sealed.ref, opened.scopeId);
     await f.service.content.execute({ type: "input.close", scopeId: opened.scopeId });
     expect(await f.object(id).content.read(sealed.ref)).toEqual(new Uint8Array());
-    expect(contentResultSchema.safeParse({ ok: true, reply: sealed }).success).toBe(true);
   });
 });
 

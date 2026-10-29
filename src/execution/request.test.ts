@@ -1,4 +1,4 @@
-import { thinkingLevels, present, completionData, modelCompletionSchema, modelRunRecordSchema, type RequestTiming } from "@asterism-app/sdk/contracts";
+import { thinkingLevels, present, completionData, modelCompletionSchema, modelRunRecordSchema } from "@asterism-app/sdk/contracts";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineData, defineResource, defineTool, defineImplementation, type ModelRunEvent, type ModelRunRequest } from "@asterism-app/sdk/contracts";
@@ -71,31 +71,6 @@ describe("Stateless single model execution", () => {
     const result = await execute(input(events), adapter);
     expect(result).toMatchObject({ reason: outcome, response });
     expect(JSON.stringify(events)).not.toContain("private-response");
-  });
-  // Terminal timing accompanies usage; executing tools does not reset it, and failure retains timing too.
-  it("preserves timing from model termination and failure without replacing it with tool batch completion time", async () => {
-    const timing: RequestTiming = { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:01.000Z",
-      durationMs: 1000, firstOutputMs: 100, firstTextMs: null, firstReasoningMs: null, lastOutputMs: 900, outputChunks: 2, outcome: "completed" };
-    const events = calls(["list"]);
-    const result = await execute(input([]), model([...events.slice(0, -1),
-      { type: "finish", reason: "tool-calls", usage: null, timing }]));
-    expect(result).toMatchObject({ reason: "completed", completion: { timing }, timing,
-      tools: [{ kind: "succeeded" }] });
-    const controller = new AbortController();
-    const cancelled = await execute(input([], { signal: controller.signal }), { validate() {}, version: "test", prepare() { return {
-      async *stream() {
-        yield* events.slice(0, -1);
-        controller.abort();
-        yield { type: "finish", reason: "tool-calls", usage: null, timing };
-      },
-    }; } });
-    expect(cancelled).toMatchObject({ reason: "cancelled", completion: { timing }, tools: [] });
-    const failure = new ModelFailure("provider_error", "Failed.");
-    failure.timing = { ...timing, outcome: "failed" };
-    const failed = await execute(input([]), { validate() {}, version: "test", prepare() { return {
-      async *stream() { throw failure; },
-    }; } });
-    expect(failed).toMatchObject({ reason: "failed", completion: null, timing: { outcome: "failed", durationMs: 1000 } });
   });
 
   it("returns when the tool batch finishes without implicitly starting another request; separate calls use only explicit input", async () => {

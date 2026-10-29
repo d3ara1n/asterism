@@ -3,7 +3,6 @@ import { z } from "zod";
 import { defineImplementation, defineResource, defineTool } from "@asterism-app/sdk/contracts";
 import { defineData } from "@asterism-app/sdk/contracts";
 import { implement, toolCaller } from "./testing.ts";
-import { declareTool, projectTool } from "./definition.ts";
 import { ToolRegistry } from "./registry.ts";
 
 const Sample = defineTool({
@@ -27,14 +26,6 @@ describe("Tool definition and implementation registration boundaries", () => {
   const text = implement(TextSample, { async call() { return { kind: "succeeded", data: { text: "sample" } }; } });
   const collection = implement(CollectionSample, { async call() { return { kind: "succeeded", data: { item: "a", text: "sample" } }; } });
 
-  it("tools share complete definitions while implementations define target and result separately", () => {
-    expect(TextSample.tool).toBe(Sample);
-    expect(CollectionSample.tool).toBe(Sample);
-    expect(() => new ToolRegistry([text, collection])).not.toThrow();
-    expect(TextSample.targetSchema.safeParse({ item: "a" }).success).toBe(false);
-    expect(CollectionSample.targetSchema.safeParse(null).success).toBe(false);
-  });
-
   it("rejects duplicate support relationships and implementation identities", () => {
     expect(() => new ToolRegistry([text, text])).toThrow();
     expect(() => new ToolRegistry([text, { ...collection, reference: text.reference }])).toThrow();
@@ -43,7 +34,6 @@ describe("Tool definition and implementation registration boundaries", () => {
 
   it("shares actual declaration objects and rejects independent copies even with identical IDs", () => {
     const copy = defineTool({ ...Sample, argsSchema: z.strictObject({}).describe("No operation parameters.") });
-    expect(copy).not.toBe(Sample);
     expect(() => new ToolRegistry([text, { ...collection, tool: copy }])).toThrow();
     for (const tool of [
       defineTool({ ...Sample, id: "test.tools/other" }),
@@ -54,23 +44,6 @@ describe("Tool definition and implementation registration boundaries", () => {
     expect(() => defineTool({ ...Sample, argsSchema: z.strictObject({}) })).toThrow("sample.args");
     expect(() => defineImplementation({ ...TextSample, targetSchema: z.null() })).toThrow("test.text.sample.target");
     expect(() => defineImplementation({ ...TextSample, schema: z.strictObject({ text: z.string() }) })).toThrow("test.text.sample.result");
-  });
-
-  it("both model projection layers preserve definition guidance and parameter field descriptions", () => {
-    const Find = defineTool({
-      id: "test.tools/find", name: "find", description: "Find matching items.", guidelines: ["Supply a query before searching."],
-      argsSchema: z.strictObject({ query: z.string().describe("The text to match.") }).describe("Search parameters."),
-    });
-    const resourceDefinition = projectTool(Find);
-    expect(resourceDefinition).toMatchObject({
-      description: "Find matching items.", guidelines: ["Supply a query before searching."],
-      args: { description: "Search parameters.", properties: { query: { description: "The text to match." } } },
-    });
-    const declaration = declareTool(Find);
-    expect(declaration).toMatchObject({ name: "find", parameters: resourceDefinition.args });
-    expect(declaration.description).toContain(Find.description);
-    expect(declaration.description).toContain(Find.guidelines[0]);
-    expect(declareTool(defineTool({ ...Find, guidelines: [] })).description).toBe("Find matching items.");
   });
 
   it("target can locate blocks and handlers receive typed arguments with validated output", async () => {

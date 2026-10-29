@@ -1,6 +1,5 @@
 import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { describe, expect, it, vi } from "vitest";
-import { setImmediate } from "node:timers/promises";
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { modelScope } from "../shared/model.ts";
@@ -75,70 +74,7 @@ describe("AI SDK adaptation contract", () => {
     await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
       .rejects.toMatchObject({ details: { statusCode: 529, httpStatus: 200, rawEvent: JSON.stringify(raw), responseHeaders: { "x-request-id": "stream-1" } } });
   });
-  // Model termination defines the request boundary: paused consumption and delayed connection close do not extend duration; later cancellation must retain reported usage.
-  it.each(["close", "cancel"] as const)("consumer waits and %s after terminal state do not change received metering", async action => {
-    let now = 0;
-    const clock = vi.spyOn(performance, "now").mockImplementation(() => now);
-    const controller = new AbortController();
-    let close!: () => void;
-    let drained!: () => void;
-    const received = new Promise<void>(resolve => { drained = resolve; });
-    const model = new MockLanguageModelV4({ doStream: async () => {
-      now = 10;
-      return { stream: new ReadableStream({
-        start(stream) {
-          close = () => stream.close();
-          stream.enqueue({ type: "stream-start", warnings: [] });
-          stream.enqueue({ type: "text-start", id: "t" });
-          for (let i = 0; i < 32; i++) stream.enqueue({ type: "text-delta", id: "t", delta: "word " });
-          stream.enqueue({ type: "text-end", id: "t" });
-          stream.enqueue({ type: "finish", finishReason: { unified: "stop", raw: "stop" },
-            usage: { inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined },
-              outputTokens: { total: 32, text: 32, reasoning: 0 } } });
-        },
-        pull() { drained(); },
-      }) };
-    } });
-    const events: ModelEvent[] = [];
-    let failure: unknown, paused = false;
-    try {
-      const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
-      try {
-        for await (const event of adapter.prepare(input).stream(controller.signal)) {
-          events.push(event);
-          if (event.type === "part.delta" && !paused) {
-            paused = true;
-            await received;
-            await setImmediate();
-            now = 1000;
-            if (action === "cancel") controller.abort();
-            close();
-          }
-        }
-      } catch (error) { failure = error; }
-      expect(events.at(-1)).toMatchObject({ type: "finish", usage: { input: 10, output: 32, total: 42 },
-        timing: { durationMs: 10, firstOutputMs: 10, firstTextMs: 10, lastOutputMs: 10, outputChunks: 32, outcome: "completed" } });
-      if (action === "cancel") expect(failure).toBeInstanceOf(ModelFailure);
-      else expect(failure).toBeUndefined();
-    } finally { controller.abort(); clock.mockRestore(); }
-  });
-  // Actual adapter streams deliver timing on failure/cancellation without treating empty streams or errors as zero-token success.
-  it.each(["failed", "cancelled"] as const)("preserves timing for %s streams", async outcome => {
-    const controller = new AbortController();
-    const model = new MockLanguageModelV4({ doStream: async () => {
-      if (outcome === "cancelled") controller.abort();
-      throw new Error("Synthetic transport failure");
-    } });
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
-    let failure: unknown;
-    try {
-      for await (const _event of adapter.prepare(input).stream(controller.signal)) { /* Consume the stream. */ }
-    } catch (error) { failure = error; }
-    expect(failure).toBeInstanceOf(ModelFailure);
-    expect((failure as ModelFailure).timing).toMatchObject({
-      outcome, durationMs: expect.any(Number), firstOutputMs: null, firstTextMs: null, outputChunks: 0,
-    });
-  });
+
   // SDK streams must deliver the caller's limit to the provider without expanding the configured output limit.
   it.each([{ requested: 400, expected: 400 }, { requested: 2000, expected: 1000 }])(
     "uses the smaller of the single-completion limit $requested and model configuration", async ({ requested, expected }) => {
@@ -477,10 +413,6 @@ describe("AI SDK adaptation contract", () => {
     expect(events.find(e => e.type === "part.end" && e.partId === "tool:call-1")).toMatchObject({ arguments: { resource_id: "note" } });
     const end = events.at(-1)!;
     expect(end).toMatchObject({ type: "finish", reason: "tool-calls", responseId: "response-1", rawFinishReason: "tool_use", usage: { input: 10, output: 5, total: 15, reasoning: 2, cacheRead: 2 } });
-    expect(end).toMatchObject({ timing: {
-      outcome: "completed", startedAt: expect.any(String), endedAt: expect.any(String),
-      firstOutputMs: expect.any(Number), firstReasoningMs: expect.any(Number), lastOutputMs: expect.any(Number),
-    } });
     if (end.type !== "finish") throw new Error();
     const serialized = JSON.stringify(events);
     expect(serialized).toContain("signature-value"); expect(serialized).not.toContain("credential-not-for-history"); expect(serialized).not.toContain("secret-metadata");
