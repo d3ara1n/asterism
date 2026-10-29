@@ -9,13 +9,13 @@ const config: Configuration = {
   productName: applicationBrand.en,
   directories: { output: "out", buildResources: "assets/icon" },
   files: [
-    "dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md", `!${testFileGlob}`,
+    "dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md", `!${testFileGlob}`, "!**/*.map",
     // Explicit directory mappings preserve example declarations that the default application filter excludes.
     ...["docs/manual", ...["sdk", "ui", "builtin-api", "builtin"].map(name => `packages/${name}`)]
-      .map(path => ({ from: path, to: path, filter: ["**/*", "!**/node_modules{,/**}", `!${testFileGlob}`] })),
+      .map(path => ({ from: path, to: path, filter: ["**/*", "!**/node_modules{,/**}", `!${testFileGlob}`, "!**/*.map"] })),
     // Public libraries resolve through node_modules, whose default dependency filter omits examples.
     ...["sdk", "builtin-api"].flatMap(name => ["docs", "examples"].map(directory => ({
-      from: `packages/${name}/${directory}`, to: `node_modules/@asterism-app/${name}/${directory}`, filter: ["**/*", `!${testFileGlob}`],
+      from: `packages/${name}/${directory}`, to: `node_modules/@asterism-app/${name}/${directory}`, filter: ["**/*", `!${testFileGlob}`, "!**/*.map"],
     }))),
   ],
   asarUnpack: ["docs/manual/**", "packages/**", "node_modules/**"],
