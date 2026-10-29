@@ -183,7 +183,14 @@ jobs:
         with:
           name: notes
           path: release-notes
-      - name: Upload draft release
+      - name: Publish plugin packages
+        env:
+          RELEASE_PACKAGES: ${{ needs.prepare.outputs.packages }}
+          RELEASE_PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+        run: |
+          node scripts/publish-packages.ts version
+          node scripts/publish-packages.ts publish
+      - name: Upload and publish complete release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -194,20 +201,21 @@ jobs:
         run: |
           set -euo pipefail
           tag="v$RELEASE_VERSION"
-          flags=()
-          if [[ "$RELEASE_PRERELEASE" == "true" ]]; then flags+=(--prerelease); fi
-          gh release create "$tag" artifacts/* --draft --target "$RELEASE_SHA" \
-            --title "Asterism $tag" --notes-file release-notes/notes.md "${flags[@]}"
-      - name: Publish plugin packages
-        env:
-          RELEASE_PACKAGES: ${{ needs.prepare.outputs.packages }}
-          RELEASE_PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
-        run: |
-          node scripts/publish-packages.ts version
-          node scripts/publish-packages.ts publish
-      - name: Publish complete release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
-        run: gh release edit "v$RELEASE_VERSION" --draft=false
+          release_id=""
+          cleanup() {
+            release_status=$?
+            if [[ "$release_status" != 0 && -n "$release_id" ]]; then
+              if [[ "$(gh api "repos/$GH_REPO/releases/$release_id" --jq '.draft')" == true ]]; then
+                gh api --method DELETE "repos/$GH_REPO/releases/$release_id" || \
+                  echo "::warning::Failed to remove draft release $release_id."
+              fi
+            fi
+            exit "$release_status"
+          }
+          trap cleanup EXIT
+          release_id=$(gh api --method POST "repos/$GH_REPO/releases" \
+            -f tag_name="$tag" -f target_commitish="$RELEASE_SHA" \
+            -f name="Asterism $tag" -f body="$(<release-notes/notes.md)" \
+            -F draft=true -F prerelease="$RELEASE_PRERELEASE" --jq '.id')
+          gh release upload "$tag" artifacts/*
+          gh api --method PATCH "repos/$GH_REPO/releases/$release_id" -F draft=false > /dev/null

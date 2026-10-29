@@ -11,7 +11,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "postinstall": "install-electron && node scripts/prepare-native.mjs",
+    "postinstall": "install-electron && node scripts/prepare-native.mjs && node scripts/prepare-signing.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.renderer.json",
     "dev": "electron-vite dev",

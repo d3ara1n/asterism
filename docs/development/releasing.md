@@ -28,7 +28,9 @@ Integrate checked changes into main using Conventional Commits. The Release work
 
 Both triggers use the same release computation. With no published baseline, the first target is `0.1.0`. Later runs skip before dependency installation when no release-triggering changes exist.
 
-The workflow builds target installers and metadata, uploads a draft, and publishes only after all assets succeed. macOS uses DMG and update ZIP, Windows uses NSIS, and Linux uses AppImage.
+Each platform build uploads installers and update metadata as Actions artifacts. A single publication job runs after every platform succeeds, downloads the complete artifact set, and publishes the matching npm packages before creating a GitHub Release. macOS uses DMG and update ZIP, Windows uses NSIS, and Linux uses AppImage.
+
+The final publication step creates a draft, uploads all assets, and makes the release public only after upload succeeds. On failure it attempts to remove only the draft created by that step; it preserves published releases. GitHub and npm do not share a transaction, so npm packages can already be published if a later GitHub operation fails.
 
 ## Compute versions and notes
 
@@ -50,7 +52,7 @@ Run Promote Release with a tested prerelease tag. The workflow builds that exact
 
 The resulting stable version must exceed existing stable releases. For one target version, select its latest candidate so a newer prerelease installation does not receive older code as stable.
 
-Promotion does not require a new main commit and does not include later main changes. A failed build remains unpublished. Inspect and remove an incomplete draft before retrying a failed upload, with separate authorization for remote writes.
+Promotion does not require a new main commit and does not include later main changes. A failed build creates no release. If publication cleanup cannot reach GitHub or the runner is terminated before cleanup, inspect any remaining draft before retrying; manual remote cleanup requires explicit authorization.
 
 ## Accept installed updates
 
