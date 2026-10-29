@@ -26,7 +26,7 @@ it("rejects direct port handoff before readiness and transfers it to the task pr
   const host = new RuntimeHost(() => {});
   const port = {} as MessagePortMain;
   try {
-    const ready = host.start("unused-runtime.js", root);
+    const ready = host.start("unused-runtime.js", root, [], join(root, "startup.json"));
     expect(host.connect("a", port)).toBe(false);
     expect(child.postMessage).not.toHaveBeenCalled();
     child.emit("message", { kind: "ready", version: protocolVersion });

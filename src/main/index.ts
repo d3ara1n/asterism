@@ -307,8 +307,8 @@ const startup = new StartupCoordinator({
     try { updates = new ApplicationUpdates(); } catch (error) { console.error("Update settings could not be opened.", error); }
     connectSettings?.();
   },
-  startRuntime: async failures => {
-    await runtime.start(join(here, "runtime.js"), dataRoot, failures);
+  startRuntime: async (failures, pluginBuild) => {
+    await runtime.start(join(here, "runtime.js"), dataRoot, failures, pluginBuild);
     void updates?.check();
   },
 });

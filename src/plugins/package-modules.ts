@@ -6,7 +6,6 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BuildOptions, Plugin } from "esbuild";
 import { publicModuleSource, type PublicProvider, type ModuleRealm } from "../shared/public-modules.ts";
-import { PluginBuildCache } from "./build-cache.ts";
 import { assertRuntimeModules } from "../shared/runtime-modules.ts";
 
 /** Package public entry is standard exports["./public"]; types and runtime share ordinary package imports. */
@@ -78,7 +77,7 @@ async function loadEsbuild(): Promise<typeof import("esbuild")> {
 }
 /** Build the complete module graph for one runtime environment at once; shared ESM chunks preserve object identity and live bindings. */
 export async function compileModules(packages: readonly PackageModule[], enabled: ReadonlySet<string>, cacheRoot: string,
-  hostModule: (realm: ModuleRealm) => Plugin, publicProviders: readonly PublicProvider[] = [], hostIdentity = "",
+  hostModule: (realm: ModuleRealm) => Plugin, publicProviders: readonly PublicProvider[] = [],
   progress: (id: string) => void = () => {}): Promise<CompiledModules> {
   const preloaded = new Map<string, PublicProvider>();
   for (const provider of publicProviders) {
@@ -88,17 +87,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
   }
   const result: CompiledModules = { runtime: new Map(), storage: new Map(), renderer: new Map(), stylesheets: new Map(), dependencies: new Map(), runtimeDependencies: new Map(), rendererDependencies: new Map(), failures: new Map() };
   if (!packages.some(pkg => enabled.has(pkg.id))) return result;
-  const cache = new PluginBuildCache(cacheRoot, {
-    // Increment the recipe version when build options, resolvers, or host bridging rules change.
-    recipe: 8, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
-    cwd: process.cwd(), nodePath: process.env.NODE_PATH,
-    packages, enabled: [...enabled], publicProviders, hostIdentity,
-  });
-  const cached = cache.read();
-  if (cached) { console.info("Plugin build cache hit."); return cached; }
-  console.info("Plugin build cache miss; compiling plugin modules.");
   const esbuild = await loadEsbuild();
-  const outputFiles: string[] = [];
   try {
     const providers = new Map<string, PackageModule>();
     const libraries = new Map<string, PackageModule>();
@@ -198,12 +187,11 @@ export async function compileModules(packages: readonly PackageModule[], enabled
           ".woff": "file", ".woff2": "file", ".ttf": "file", ".otf": "file", ".eot": "file",
           ".wasm": "file", ".mp3": "file", ".ogg": "file",
         } }),
-      plugins: [{ name: "asterism-cache-inputs", setup(build) {
+      plugins: [{ name: "asterism-runtime-inputs", setup(build) {
         build.onEnd(result => {
           if (result.metafile) {
             const inputs = Object.keys(result.metafile.inputs);
             assertRuntimeModules(inputs);
-            cache.inputs(inputs);
           }
         });
       } }, hostModule(realm), resolver(realm, entries.length === 1 ? entries[0] : undefined)],
@@ -238,7 +226,6 @@ export async function compileModules(packages: readonly PackageModule[], enabled
         for (const file of built.outputFiles!) {
           const destination = join(directory, relative(base, file.path));
           mkdirSync(dirname(destination), { recursive: true }); writeFileSync(destination, file.contents);
-          outputFiles.push(destination);
         }
         const outputMetadata = new Map(Object.entries(built.metafile!.outputs).map(([file, output]) => [resolve(file), output]));
         for (const pkg of component) {
@@ -276,7 +263,6 @@ export async function compileModules(packages: readonly PackageModule[], enabled
     }
     // Frontend modules share a document class namespace; unified builds avoid CSS Module collisions even without dependency relationships.
     await compile("renderer", ready.filter(pkg => pkg.renderer && !result.failures.has(pkg.id)));
-    cache.write(result, outputFiles);
     return result;
   } finally {
     // Each build batch owns the esbuild service and terminates its process on exceptions too.

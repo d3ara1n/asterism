@@ -73,15 +73,15 @@ Main aggregates logs from itself and child processes in `logs/runtime.log`. Reco
 
 Fatal interface initialization and rendering errors report their JavaScript and component stacks through the trusted desktop bridge into the same log. Reporting these failures is independent of the business runtime connection.
 
-## Plugin build cache and native tools
+## Plugin build artifacts and native tools
 
-The plugin cache stores successful build outputs and dependency graphs, not running instances or service state. Its fingerprint includes build inputs, host bindings, package order, enabled packages, platform, and relevant dependencies and configuration.
+Each application startup discovers the configured packages and resolves their current sources with the compiler. Content-addressed build artifacts and a serializable package graph capture that startup's entries, dependency relationships, catalogs, and manual declarations. Storage preparation and the task runtime consume this same build; the runtime imports its captured entries without rediscovering or recompiling packages.
 
 Bundled packages use the ordinary package list, validation, compilation, and enablement mechanisms. A plugin can provide its own public export or declare separate public API libraries. Package-name ownership is unique across both mechanisms, and the enabled provider supplies the shared module instance in each environment.
 
 The host's shared UI module table is generated from the package's existing exports, including subpath patterns. Discovery enumerates files without evaluating them and generates imports only for public entries. Test files use the reserved `.test.` filename marker; discovery and distribution exclude them, while compilation rejects explicit runtime imports of tests or the test runner.
 
-A cache hit requires the complete output set. Inputs whose resolution cannot be fully tracked use an ordinary uncached build. The cache does not implement an alternative module resolver.
+Artifact reuse is scoped to the current startup. A later startup resolves sources and dependencies again, including newly installed packages and changed resolution candidates. Before the task runtime starts, preparation removes older artifact directories that the current build no longer references. Build artifacts contain neither running instances nor service state.
 
 Native helpers such as ripgrep and PTY binaries ship for the target platform outside asar. Runtime execution uses packaged binaries rather than downloading or finding an arbitrary system replacement. Packaging must retain target-specific optional dependencies.
 

@@ -1,5 +1,7 @@
 import type { RendererModule, RendererPlugin, RendererCalls } from "@asterism-app/sdk/renderer";
 import type { EventSubscriber } from "@asterism-app/sdk/contracts";
+import type { RendererDiagnostic } from "../modules/plugin-outcome";
+import { pluginErrorMessage } from "../../shared/plugin-startup";
 
 const unavailableCalls: RendererCalls = { input: () => { throw new Error("Renderer content inputs are unavailable."); }, invoke: async () => { throw new Error("Renderer calls are unavailable."); } };
 function scopedCalls(calls: RendererCalls, signal: AbortSignal): RendererCalls {
@@ -13,7 +15,7 @@ export const MODULE_PREPARE_TIMEOUT_MS = 10_000;
 /** Prepare feature modules after shared plugin services are ready; the caller shuts down in reverse dependency order. */
 export async function preparePlugin(plugin: RendererPlugin, events: EventSubscriber, signal: AbortSignal,
   timeout = MODULE_PREPARE_TIMEOUT_MS, registerCleanup?: (close: () => Promise<void>) => void,
-  calls: RendererCalls = unavailableCalls): Promise<() => Promise<void>> {
+  calls: RendererCalls = unavailableCalls): Promise<{ close(): Promise<void>; diagnostics: RendererDiagnostic[] }> {
   const controller = new AbortController();
   const lifetime = AbortSignal.any([signal, controller.signal]);
   const work = new Set<Promise<void>>();
@@ -44,9 +46,9 @@ export async function preparePlugin(plugin: RendererPlugin, events: EventSubscri
       timer = setTimeout(() => reject(new Error("Renderer plugin preparation timed out.")), timeout);
     })]);
     signal.throwIfAborted();
-    await prepareModules(plugin.modules ?? [], scoped, timeout, lifetime, track, calls);
+    const diagnostics = await prepareModules(plugin.modules ?? [], scoped, timeout, lifetime, track, calls);
     signal.throwIfAborted();
-    return close;
+    return { close, diagnostics };
   } catch (error) {
     // Timeout does not imply the work has finished; after cancellation, wait for preparation to actually exit before releasing shared services.
     void close().catch(failure => console.error("Renderer plugin cleanup failed.", failure));
@@ -54,12 +56,12 @@ export async function preparePlugin(plugin: RendererPlugin, events: EventSubscri
   } finally { clearTimeout(timer); }
 }
 
-/** Run module preparation in parallel; log failures and timeouts and continue, retaining views. */
+/** Run module preparation in parallel, retaining views and reporting partial initialization. */
 export async function prepareModules(modules: readonly RendererModule[], events: EventSubscriber, timeout = MODULE_PREPARE_TIMEOUT_MS,
   signal?: AbortSignal, track: (work: Promise<void>) => Promise<void> = work => work,
-  calls: RendererCalls = unavailableCalls): Promise<void> {
-  await Promise.all(modules.map(async (module, index) => {
-    if (!module.prepare) return;
+  calls: RendererCalls = unavailableCalls): Promise<RendererDiagnostic[]> {
+  const outcomes = await Promise.all(modules.map(async (module, index): Promise<RendererDiagnostic | undefined> => {
+    if (!module.prepare) return undefined;
     const controller = new AbortController();
     const lifetime = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
     const scoped: EventSubscriber = { subscribe: (contract, options, handler) => events.subscribe(contract,
@@ -71,12 +73,15 @@ export async function prepareModules(modules: readonly RendererModule[], events:
       if (outcome === "timeout") {
         controller.abort();
         console.error(`Renderer module ${index} preparation timed out.`);
+        return { stage: "module", module: index, message: "Module preparation timed out." };
       }
     } catch (error) {
       controller.abort();
       console.error(`Renderer module ${index} preparation failed.`, error);
+      return { stage: "module", module: index, message: pluginErrorMessage(error) };
     } finally {
       clearTimeout(timer);
     }
   }));
+  return outcomes.filter((item): item is RendererDiagnostic => item !== undefined);
 }

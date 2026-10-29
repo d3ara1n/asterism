@@ -28,6 +28,8 @@ import { CallRegistry } from "./calls.ts";
 import { bindTopLevelTools, type RegisteredTopLevelTool } from "./top-level-tools.ts";
 import { resolveToolContributions, validateToolContributions, type ToolImplementationStatus } from "./tool-contributions.ts";
 import type { PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
+import { PluginAvailability } from "./availability.ts";
+import { pluginErrorMessage, type PluginCandidate, type PluginDiagnostic, type PluginOutcome } from "../shared/plugin-startup.ts";
 
 export interface PreparedPluginStorage {
   declarations: ReadonlyMap<string, readonly PluginStorageDeclaration[]>;
@@ -37,6 +39,8 @@ export interface PluginHostServices {
   shared: SharedServices;
   /** Backend provider dependencies derived from public imports, separate from author definitions. */
   pluginDependencies?: ReadonlyMap<string, readonly string[]>;
+  /** Complete package graph, including frontend and public-only packages; separate from backend setup order. */
+  packages?: readonly PluginCandidate[];
   events?: EventBus;
   extensionsDirectory: string;
   data: SessionDataStore;
@@ -53,6 +57,7 @@ export interface PluginHostServices {
 }
 export interface PluginManifest {
   id: string; status: "loaded" | "failed"; error?: string; resources: string[];
+  diagnostic?: PluginDiagnostic;
   implementations: ToolImplementationStatus[];
 }
 export interface LoadedPlugins {
@@ -64,6 +69,7 @@ export interface LoadedPlugins {
   resources: ResourceRegistry;
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
+  packages: readonly PluginOutcome[];
   initialize(): void;
   /** End all object lifetimes in a session: cancel bound runs, publish disappearance, and wait for cleanup; called before archival. */
   release(sessionId: string): Promise<void>;
@@ -145,13 +151,22 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const kinds = new Set<string>(), identities = new Set<string>();
   const toolContracts = new Map<string, ToolContract>();
   const initialization = initializationOrder(plugins, dependencies);
+  const candidates = services.packages ?? [];
+  const availability = new PluginAvailability([
+    ...candidates.flatMap(item => item.id ? [{ id: item.id, dependencies: item.dependencies,
+      diagnostic: item.diagnostic, unavailable: item.status !== "ready" }] : []),
+    ...plugins.filter(plugin => !candidates.some(item => item.id === plugin.namespace.id)).map(plugin => ({
+      id: plugin.namespace.id, dependencies: dependencies.get(plugin.namespace.id) ?? [],
+    })),
+  ]);
+  for (const [id, message] of services.preparedStorage?.failures ?? []) availability.fail(id, { stage: "storage", message });
+  for (const [id, message] of initialization.failures) availability.fail(id, { stage: "setup", message });
   for (const plugin of initialization.ordered) {
     const id = plugin.namespace.id;
     let entry: Collected | undefined;
     try {
-      if (initialization.failures.has(id)) throw new Error(initialization.failures.get(id)!);
-      const storageFailure = services.preparedStorage?.failures.get(id);
-      if (storageFailure !== undefined) throw new Error(`Plugin storage could not be prepared: ${storageFailure}`);
+      const failure = availability.get(id);
+      if (failure) throw new Error(failure.message);
       const unavailable = dependencies.get(id)?.find(dependency => !collected.some(item => item.plugin.namespace.id === dependency));
       if (unavailable) throw new Error(`Public dependency ${unavailable} failed to initialize.`);
       if (manifest.some(entry => entry.id === id)) throw new Error(`Duplicate plugin ID: ${id}`);
@@ -233,6 +248,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       eventScope.activate();
       collected.push(entry); manifest.push({ id, status: "loaded", resources: ownKinds, implementations: [] });
     } catch (error) {
+      availability.fail(id, { stage: "setup", message: pluginErrorMessage(error) });
       if (entry) {
         extensions.removeOwners([id]);
         webProviders.removeOwners([id]);
@@ -242,7 +258,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         invalidEntries.add(entry);
       }
       (services.log ?? defaultLog)(id, "error", "Plugin failed to load and was disabled.", error);
-      manifest.push({ id, status: "failed", error: error instanceof Error ? error.message : String(error), resources: [], implementations: [] });
+      const diagnostic = availability.get(id)!;
+      manifest.push({ id, status: "failed", error: diagnostic.message, diagnostic, resources: [], implementations: [] });
     }
   }
   async function dispose(entry: Collected) {
@@ -259,12 +276,14 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     for (let i = collected.length - 1; i >= 0; i--) {
       const entry = collected[i]!;
       const invalid = entry.preparers.find(preparer => actionContracts.get(preparer.contract.id) !== preparer.contract);
-      const unavailable = dependencies.get(entry.plugin.namespace.id)?.find(id => !collected.some(provider => provider.plugin.namespace.id === id));
-      if (!invalid && !unavailable) continue;
-      const error = invalid ? `Preparer ${invalid.id} must import the registered action declaration: ${invalid.contract.id}.`
-        : `Public dependency ${unavailable} is unavailable.`;
+      const id = entry.plugin.namespace.id;
+      if (invalid) availability.fail(id, { stage: "validation",
+        message: `Preparer ${invalid.id} must import the registered action declaration: ${invalid.contract.id}.` });
+      const diagnostic = availability.get(id);
+      if (!diagnostic) continue;
       const record = manifest.find(record => record.id === entry.plugin.namespace.id)!;
-      record.status = "failed"; record.error = error; record.resources = [];
+      record.status = "failed"; record.error = diagnostic.message; record.diagnostic = diagnostic; record.resources = [];
+      (services.log ?? defaultLog)(id, "error", "Plugin was excluded from assembly.", diagnostic.message);
       entry.lifecycle.stop();
       calls.removeOwner(entry.plugin.namespace.id); channels.removeOwner(entry.plugin.namespace.id);
       entry.events.stop(); events.removeOwner(entry.plugin.namespace.id);
@@ -293,6 +312,12 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   topLevelTools = resolvedTools.topLevelTools;
   for (const record of manifest) record.implementations = resolvedTools.implementations.get(record.id) ?? [];
   const resources = new ResourceRegistry(collected.flatMap(entry => entry.resources));
+  const packages: PluginOutcome[] = candidates.map(item => {
+    const diagnostic = item.diagnostic ?? (item.status === "ready" && item.id ? availability.get(item.id) : undefined);
+    const status = item.status === "ready" ? diagnostic ? "failed" : "loaded" : item.status;
+    return { ...item, status, diagnostic,
+      renderer: status === "loaded" ? item.renderer : null, stylesheet: status === "loaded" ? item.stylesheet : null };
+  });
   type Notification = { sessionId: string; snapshot: SessionSnapshot; records: SessionRecord[]; cursorChanged: boolean };
   const notifications: Notification[] = [];
   const touched = new Set<string>();
@@ -365,6 +390,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         live: model.flatMap(run => run.live) };
     },
     resources, tools: new ToolRegistry(resolvedTools.tools), manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
+    packages: Object.freeze(packages.map(entry => Object.freeze(entry))),
     initialize() {
       for (const session of services.sessions.list()) notifyPresence(session.id, sessionSnapshot(services.sessions.view(session.id)));
     },

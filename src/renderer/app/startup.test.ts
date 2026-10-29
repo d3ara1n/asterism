@@ -45,7 +45,7 @@ describe("Module startup preparation", () => {
     const order: string[] = [];
     let moduleSignal!: AbortSignal;
     const events: EventSubscriber = { subscribe: () => { throw new Error("Unexpected subscription."); } };
-    const close = await preparePlugin({
+    const { close } = await preparePlugin({
       async prepare() { order.push("plugin"); },
       modules: [{ ...base, async prepare({ signal }) { moduleSignal = signal; order.push("module"); } }],
       async closing() { expect(moduleSignal.aborted).toBe(true); order.push("close"); },
@@ -74,7 +74,7 @@ it("releases module subscriptions and Agent UI registrations on preparation fail
   const lifetime = new AbortController();
   const error = vi.spyOn(console, "error").mockImplementation(() => {});
   try {
-    await prepareModules([
+    const diagnostics = await prepareModules([
       { ...base, async prepare({ events, signal }) {
         events.subscribe(Event, {}, () => {});
         agentUI.register({ id: "test.startup/failed", Component: () => null }, { signal });
@@ -85,6 +85,7 @@ it("releases module subscriptions and Agent UI registrations on preparation fail
         await events.subscribe(Event, {}, () => {}).ready;
       } },
     ], events, 100, lifetime.signal);
+    expect(diagnostics).toEqual([{ stage: "module", module: 0, message: "Setup failed." }]);
     expect(signals.map(signal => signal.aborted)).toEqual([true, false]);
     expect(agentUI.getSnapshot().map(entry => entry.id)).toEqual(["test.startup/ready"]);
     lifetime.abort();

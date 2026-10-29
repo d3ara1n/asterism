@@ -179,6 +179,38 @@ describe("Plugin assembly", () => {
     expect(loaded.resources.controller("acme.ok/thing")?.create).toBeUndefined();
     expect(loaded.manifest[0]!.error).toBe("boom");
   });
+  // A frontend dependency may fail after an independent backend setup has run, including through a public-only intermediary.
+  it("excludes already registered contributions and pending tasks when a frontend dependency fails during backend assembly", async () => {
+    const cleaned: string[] = [], ran: string[] = [];
+    const contract = tool("Read.");
+    const consumer = plugin("acme.consumer", contract);
+    const call = defineCall("acme.consumer/status", { scope: "plugin", input: z.null(), output: z.null() });
+    const loaded = loadPlugins([
+      definePlugin({ ...consumer, setup(context) {
+        context.lifetime.defer(() => { cleaned.push("consumer"); });
+        context.tasks.start("pending", async () => { ran.push("consumer"); });
+        return { calls: [implementCall(call, async () => null)] };
+      } }),
+      definePlugin({ namespace: pluginNamespace("acme.provider"), setup() { throw new Error("Provider setup failed."); } }),
+      plugin("acme.independent", contract),
+    ], { ...services, packages: [
+      { id: "acme.consumer", dependencies: ["acme.public"] },
+      { id: "acme.public", dependencies: ["acme.provider"] },
+      { id: "acme.provider", dependencies: [] },
+      { id: "acme.independent", dependencies: [] },
+    ].map(item => ({ ...item, source: item.id, enabled: true, status: "ready", metadata: {}, renderer: null, stylesheet: null, rendererDependencies: item.dependencies })) });
+    instances.push(loaded);
+    expect(loaded.packages.map(item => [item.id, item.status])).toEqual([
+      ["acme.consumer", "failed"], ["acme.public", "failed"], ["acme.provider", "failed"], ["acme.independent", "loaded"],
+    ]);
+    expect(loaded.manifest.find(item => item.id === "acme.consumer")?.diagnostic).toMatchObject({ stage: "dependency", dependency: "acme.public" });
+    expect(loaded.resources.controller("acme.consumer/thing")).toBeUndefined();
+    expect(loaded.resources.controller("acme.independent/thing")).toBeDefined();
+    await expect(loaded.calls.invoke(call.id, null, { signal: new AbortController().signal }, null)).rejects.toMatchObject({ code: "unavailable" });
+    await loaded.close();
+    expect(cleaned).toEqual(["consumer"]);
+    expect(ran).toEqual([]);
+  });
   it("later module failure cleans initialized modules in reverse order and close does not clean them twice", async () => {
     const calls: string[] = [];
     const broken = definePlugin({ namespace: pluginNamespace("acme.cleanup"), modules: [

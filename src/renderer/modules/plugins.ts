@@ -2,10 +2,11 @@ import type { RendererModule, RendererPlugin } from "@asterism-app/sdk/renderer"
 import { awaitStartup } from "../app/boot.ts";
 import { loadPluginStylesheet } from "./plugin-styles.ts";
 import { hostRendererModules } from "./shared-modules.ts";
+import type { RendererDiagnostic, RendererOutcome } from "./plugin-outcome";
+import { pluginErrorMessage } from "../../shared/plugin-startup";
 
 (globalThis as Record<string, unknown>).__asterismRendererModules = hostRendererModules;
 
-export interface PluginRendererFailure { id: string; error: string }
 export interface RendererEntry { id: string; renderer: string | null; stylesheet?: string | null; dependencies: readonly string[] }
 export function validateRendererPlugin(plugin: RendererPlugin | undefined): asserts plugin is RendererPlugin {
   if (!plugin || typeof plugin !== "object" || "resources" in plugin || "cards" in plugin || "tools" in plugin
@@ -52,13 +53,13 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
   available?: readonly string[];
   signal?: AbortSignal;
   progress?(id: string): void;
-  accept?(plugin: RendererPlugin, id: string): void | Promise<void>;
+  accept?(plugin: RendererPlugin, id: string): void | readonly RendererDiagnostic[] | Promise<void | readonly RendererDiagnostic[]>;
   load?(path: string): Promise<{ default?: RendererPlugin }>;
   loadStylesheet?(path: string, signal: AbortSignal): Promise<() => void>;
 } = {}):
-  Promise<{ modules: RendererModule[]; failures: PluginRendererFailure[] }> {
+  Promise<{ modules: RendererModule[]; outcomes: ReadonlyMap<string, RendererOutcome> }> {
   const modules: RendererModule[] = [];
-  const failures: PluginRendererFailure[] = [];
+  const outcomes = new Map<string, RendererOutcome>();
   const available = new Set(options.available);
   const visiting = new Set<string>();
   const failed = new Set<string>();
@@ -73,28 +74,33 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
     if (!entry) throw new Error(`Public renderer dependency ${id} is unavailable.`);
     visiting.add(id);
     let releaseStylesheet: (() => void) | undefined;
+    let stage: RendererDiagnostic["stage"] = "dependency";
     try {
       for (const dependency of entry.dependencies) await visit(dependency);
-      if (!entry.renderer) { available.add(id); return; }
+      if (!entry.renderer) { available.add(id); outcomes.set(id, { status: "ready", diagnostics: [] }); return; }
       options.progress?.(id);
       const deadline = new AbortController();
       const timer = setTimeout(() => deadline.abort(new Error(`Plugin ${id} renderer loading timed out.`)), 10_000);
       const signal = options.signal ? AbortSignal.any([options.signal, deadline.signal]) : deadline.signal;
       let loaded: { default?: RendererPlugin };
       try {
+        stage = "style";
         if (entry.stylesheet) releaseStylesheet = await loadStylesheet(entry.stylesheet, signal);
+        stage = "import";
         loaded = await awaitStartup(load(entry.renderer), signal);
       } finally { clearTimeout(timer); }
       options.signal?.throwIfAborted();
       const plugin = loaded.default;
       validateRendererPlugin(plugin);
-      await options.accept?.(plugin, id);
+      stage = "prepare";
+      const diagnostics = await options.accept?.(plugin, id) ?? [];
+      outcomes.set(id, { status: diagnostics.length ? "partial" : "ready", diagnostics });
       modules.push(...plugin.modules ?? []); available.add(id);
     } catch (error) {
       releaseStylesheet?.();
       console.error(`Plugin ${entry.id} renderer could not be loaded.`, error);
       failed.add(id);
-      failures.push({ id: entry.id, error: error instanceof Error ? error.message : String(error) });
+      outcomes.set(id, { status: "failed", diagnostics: [{ stage, message: pluginErrorMessage(error) }] });
       throw error;
     } finally { visiting.delete(id); }
   };
@@ -102,5 +108,5 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
     try { await visit(entry.id); }
     catch { options.signal?.throwIfAborted(); /* Failures in this plugin and its dependencies are already logged; continue assembling unrelated plugins. */ }
   }
-  return { modules, failures };
+  return { modules, outcomes };
 }

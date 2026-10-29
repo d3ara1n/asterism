@@ -20,12 +20,20 @@ import { Switch } from "@asterism-app/ui/ui/switch";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism-app/ui/ui/alert-dialog";
 import { usePluginSettingsRegistry } from "../../modules/settings";
+import type { RendererOutcome } from "../../modules/plugin-outcome";
 
 export type PluginInfo = AppSnapshot["plugins"][number];
-const tones: Record<PluginInfo["status"], StatusTone> = { loaded: "success", disabled: "neutral", invalid: "error", failed: "error", pending: "warning" };
-const labels = { loaded: messages.loaded, disabled: messages.disabled, invalid: messages.invalidPackage, failed: messages.failed, pending: messages.restartRequired };
-function pluginStatus(plugin: PluginInfo, failures: ReadonlyMap<string, string>): PluginInfo["status"] {
-  return plugin.status === "loaded" && plugin.id && failures.has(plugin.id) ? "failed" : plugin.status;
+type DisplayStatus = PluginInfo["status"] | "frontendFailed" | "partial";
+const tones: Record<DisplayStatus, StatusTone> = { loaded: "success", disabled: "neutral", invalid: "error", failed: "error", pending: "warning", frontendFailed: "error", partial: "warning" };
+const labels = { loaded: messages.loaded, disabled: messages.disabled, invalid: messages.invalidPackage, failed: messages.failed, pending: messages.restartRequired,
+  frontendFailed: messages.frontendFailed, partial: messages.partial };
+const stages = { discovery: messages.discoveryStage, build: messages.buildStage, storage: messages.storageStage, import: messages.importStage,
+  setup: messages.setupStage, validation: messages.validationStage, dependency: messages.dependencyStage, style: messages.styleStage,
+  prepare: messages.prepareStage, module: messages.moduleStage };
+function pluginStatus(plugin: PluginInfo, renderers: ReadonlyMap<string, RendererOutcome>): DisplayStatus {
+  const renderer = plugin.id ? renderers.get(plugin.id) : undefined;
+  if (plugin.status !== "loaded") return plugin.status;
+  return renderer?.status === "failed" ? "frontendFailed" : renderer?.status === "partial" ? "partial" : "loaded";
 }
 
 /** Package management operations retain the current list and report failures at their entry. */
@@ -55,12 +63,12 @@ export type PluginManager = ReturnType<typeof usePlugins>;
 
 export function PluginsSettings({ manager }: { manager: PluginManager }) {
   const i18n = useI18n();
-  const { failures } = usePluginSettingsRegistry();
+  const { renderers } = usePluginSettingsRegistry();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const search = query.trim().toLocaleLowerCase();
   const list = manager.list.filter(plugin => {
-    const status = pluginStatus(plugin, failures);
+    const status = pluginStatus(plugin, renderers);
     const text = [plugin.id, plugin.metadata.name ? i18n.text(plugin.metadata.name) : "", plugin.metadata.description ? i18n.text(plugin.metadata.description) : "", plugin.metadata.author].join(" ").toLocaleLowerCase();
     return (filter === "all" || status === filter) && text.includes(search);
   });
@@ -80,8 +88,15 @@ export function PluginsSettings({ manager }: { manager: PluginManager }) {
         <PluginListItem
           key={plugin.source}
           plugin={plugin}
-          status={pluginStatus(plugin, failures)}
-          failure={plugin.error ?? (plugin.id ? failures.get(plugin.id) : undefined)}
+          status={pluginStatus(plugin, renderers)}
+          failure={plugin.diagnostic
+            ? i18n.formatMessage(messages.diagnostic, { stage: i18n.text(stages[plugin.diagnostic.stage]), message: plugin.diagnostic.message })
+            : plugin.error ?? (plugin.status === "loaded" && plugin.id ? renderers.get(plugin.id)?.diagnostics.map(diagnostic =>
+              i18n.formatMessage(messages.diagnostic, {
+                stage: diagnostic.module === undefined ? i18n.text(stages[diagnostic.stage])
+                  : i18n.formatMessage(messages.moduleNumber, { number: diagnostic.module + 1 }),
+                message: diagnostic.message,
+              })).join("\n") : undefined)}
           manager={manager}
         />
       ))}
@@ -92,7 +107,7 @@ export function PluginsSettings({ manager }: { manager: PluginManager }) {
 
 function PluginListItem({ plugin, status, failure, manager }: {
   plugin: PluginInfo;
-  status: PluginInfo["status"];
+  status: DisplayStatus;
   failure?: string;
   manager: PluginManager;
 }) {
@@ -150,9 +165,10 @@ function PluginListItem({ plugin, status, failure, manager }: {
           <ItemDescription className="text-wrap wrap-anywhere">{i18n.text(metadata.description)}</ItemDescription>
         )}
         <p className="type-caption select-text wrap-anywhere">{details}</p>
+        {status === "frontendFailed" && <p className="type-caption">{i18n.text(messages.frontendFailedHint)}</p>}
         {failure && (
-          <Alert variant="destructive">
-            <AlertDescription className="select-text wrap-anywhere">{failure}</AlertDescription>
+          <Alert variant={status === "partial" ? "default" : "destructive"}>
+            <AlertDescription className="select-text whitespace-pre-wrap wrap-anywhere">{failure}</AlertDescription>
           </Alert>
         )}
       </ItemContent>

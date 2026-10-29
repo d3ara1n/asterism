@@ -45,7 +45,7 @@ describe("Plugin catalogs and presentation IPC", () => {
     const list = new PackageList(join(data, "plugins.json"));
     for (const root of [provider, consumer]) list.add({ source: { kind: "path", path: root } }, data);
     const packages = await loadPackages(list, data, cache, []);
-    expect(packages.map(item => item.status)).toEqual(["loaded", "loaded"]);
+    expect(packages.map(item => item.status)).toEqual(["ready", "ready"]);
     const globals = globalThis as Record<string, unknown>, previous = globals.__asterismRendererModules;
     globals.__asterismRendererModules = { "@asterism-app/sdk/contracts": sdkContracts, "react-intl": ReactIntl };
     try {
@@ -72,7 +72,7 @@ describe("Plugin catalogs and presentation IPC", () => {
     writeFileSync(join(root, "locales/zh.json"), JSON.stringify({ limit: "上限", broken: "{bad" }));
     const list = new PackageList(join(data, "plugins.json")); list.add({ source: { kind: "path", path: root } }, data);
     const [item] = await loadPackages(list, data, join(data, "cache"), []);
-    expect(item!.status).toBe("loaded"); expect(item!.renderer).toBeUndefined(); expect(item!.catalogs![0]!.messages).toEqual({ limit: "上限" });
+    expect(item!.status).toBe("ready"); expect(item!.renderer).toBeUndefined(); expect(item!.catalogs![0]!.messages).toEqual({ limit: "上限" });
     const service = new ApplicationService(data, { plugins: [item!.definition!], catalogs: item!.catalogs }); services.push(service);
     const reply = servePluginConfiguration(service, { type: "read" });
     if (!reply.ok) throw new Error("Configuration read failed.");

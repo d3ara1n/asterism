@@ -51,7 +51,7 @@ function fixture() {
 describe("Plugin-owned public packages", () => {
   it("shares provider-owned registration state across consumers and keeps frontend and backend instances separate", async () => {
     const fixture_ = fixture(), packages = await fixture_.load();
-    expect(packages.map(item => item.status)).toEqual(["loaded", "loaded", "loaded"]);
+    expect(packages.map(item => item.status)).toEqual(["ready", "ready", "ready"]);
     const registries = packages.map(item => (item.definition as PluginDefinition & { probe: Set<string> }).probe);
     registries[1]!.add("backend");
     expect([...registries[0]!]).toEqual(["backend"]);
@@ -68,7 +68,7 @@ describe("Plugin-owned public packages", () => {
     fixture_.list.setEnabled(0, false);
     const packages = await fixture_.load();
     expect(packages.map(item => item.status)).toEqual(["disabled", "failed", "failed"]);
-    expect(packages[1]!.error).toContain("no available enabled provider");
+    expect(packages[1]!.diagnostic?.message).toContain("no available enabled provider");
   });
   it("rejects conflicting ownership between a public library and a plugin public export", async () => {
     const fixture_ = fixture(), root = directory();
@@ -80,7 +80,7 @@ describe("Plugin-owned public packages", () => {
     for (const id of ["example.provider", "example.other"]) {
       const entry = packages.find(item => item.manifest?.id === id)!;
       expect(entry.status).toBe("failed");
-      expect(entry.error).toContain("Multiple plugins provide public package @example/paradigm");
+      expect(entry.diagnostic?.message).toContain("Multiple plugins provide public package @example/paradigm");
     }
     expect(packages.filter(item => item.manifest?.id.startsWith("example.consumer")).map(item => item.status)).toEqual(["failed", "failed"]);
   });
@@ -98,7 +98,7 @@ describe("Plugin-owned public packages", () => {
     `);
     list.add({ source: { kind: "path", path: root } }, data);
     const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
-    expect(loaded?.error).toBeUndefined();
+    expect(loaded?.diagnostic?.message).toBeUndefined();
     expect((loaded!.definition as PluginDefinition & { probe: string }).probe).toBe("package asset");
   });
 });

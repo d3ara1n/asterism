@@ -30,6 +30,7 @@ import { ContentStore, type ContentLease, type ContentTarget } from "./content-s
 import { applicationStorage } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
 import { TemplateStore } from "./templates.ts";
+import type { PluginCandidate, PluginOutcome } from "../shared/plugin-startup.ts";
 
 export interface SessionServiceOptions {
   onChanged?: (event: SessionChanged) => void;
@@ -37,7 +38,8 @@ export interface SessionServiceOptions {
   plugins?: readonly PluginDefinition[];
   configurationChanged?: (pluginId: string) => void;
   preparedStorage?: PreparedPluginStorage;
-  manualSources?: () => readonly ManualSource[];
+  manualSources?: (packages: readonly PluginOutcome[]) => readonly ManualSource[];
+  packages?: readonly PluginCandidate[];
   pluginDependencies?: ReadonlyMap<string, readonly string[]>;
   packageRoots?: ReadonlyMap<string, string>;
   /** User skill directories; tests leave this empty to stay isolated from the real user profile. */
@@ -65,6 +67,7 @@ export class SessionService {
   private readonly resources: ResourceRegistry;
   private readonly tools: ToolRegistry;
   readonly plugins: readonly PluginManifest[];
+  readonly packages: readonly PluginOutcome[] = [];
   readonly configurePlugins: LoadedPlugins["configure"];
   private readonly closePlugins: () => Promise<void>;
   private readonly releasePlugins: LoadedPlugins["release"];
@@ -80,7 +83,7 @@ export class SessionService {
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(ResourceStatusChanged);
     this.shared = createSharedServices({ db, dataRoot, configuration, events: this.events,
-      manualSources: options.manualSources ?? (() => []), packageRoots: options.packageRoots ?? new Map(), skillDirectories: options.skillDirectories ?? [] });
+      manualSources: () => options.manualSources?.(this.packages) ?? [], packageRoots: options.packageRoots ?? new Map(), skillDirectories: options.skillDirectories ?? [] });
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     this.content.collectStartup();
     const host: SessionHost = {
@@ -126,12 +129,13 @@ export class SessionService {
     const models = createModelServices(configuration, options.adapterFactory);
     const modules = loadPlugins(options.plugins ?? [], { events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf,
       vault: configuration.vault, configurationChanged: options.configurationChanged, preparedStorage: options.preparedStorage,
-      pluginDependencies: options.pluginDependencies, sessions: host, models, shared: this.shared });
+      pluginDependencies: options.pluginDependencies, packages: options.packages, sessions: host, models, shared: this.shared });
     this.resources = modules.resources;
     this.calls = modules.calls;
     this.channels = modules.channels;
     this.tools = modules.tools;
     this.plugins = modules.manifest;
+    this.packages = modules.packages;
     this.configurePlugins = modules.configure;
     this.closePlugins = modules.close;
     this.releasePlugins = modules.release;

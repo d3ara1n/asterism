@@ -8,8 +8,9 @@ import { templateSummarySchema } from "./templates.ts";
 import { startupStageSchema, type StartupBridge } from "./startup.ts";
 import type { UpdatesBridge } from "./updates.ts";
 import type { RendererFailure } from "./renderer-failure.ts";
+import { pluginDiagnosticSchema } from "./plugin-startup.ts";
 
-export const protocolVersion = 13;
+export const protocolVersion = 14;
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");
@@ -37,6 +38,7 @@ export const snapshotSchema = z.strictObject({
   /** Plugin packages at startup; renderer is the entry path under asterism-plugin://. */
   plugins: z.array(z.strictObject({ index: z.number().int().nonnegative(), bundled: z.boolean().default(false), id: z.string().nullable(), source: z.string(),
     status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
+    diagnostic: pluginDiagnosticSchema.nullable().default(null),
     stylesheet: z.string().nullable(),
     metadata: pluginMetadataSchema.default({}),
     dependencies: z.array(z.string()).default([]) })),

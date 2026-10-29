@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, symlinkSyn
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { PackageList, loadPackages, readManifest, readPackageMetadata } from "./packages.ts";
+import { PackageList, loadPackages, readManifest, readPackageMetadata, packageCandidates, runtimeDependencies } from "./packages.ts";
 import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
 import { ApplicationService } from "../runtime/service.ts";
 import { pathToFileURL } from "node:url";
@@ -73,7 +73,7 @@ describe("Plugin packages", () => {
     const list = new PackageList(join(data, "plugins.json"));
     list.add({ source: { kind: "path", path: dir } }, data);
     const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
-    expect(loaded!.status, loaded!.error).toBe("loaded");
+    expect(loaded!.status, loaded!.diagnostic?.message).toBe("ready");
     expect(loaded!.definition!.namespace.id).toBe("acme.x");
   });
   it("esbuild bundles and imports source packages with the host SDK instance; disabled and duplicate IDs do not load", async () => {
@@ -87,17 +87,8 @@ describe("Plugin packages", () => {
     expect(() => list.add({ source: { kind: "path", path: c } }, data)).toThrow();
     list.setEnabled(1, false);
     const loaded = await loadPackages(list, data, join(data, "cache"), ["asterism.builtin"]);
-    expect(loaded.map(item => [item.manifest?.id, item.status])).toEqual([["acme.a", "loaded"], ["acme.b", "disabled"]]);
+    expect(loaded.map(item => [item.manifest?.id, item.status])).toEqual([["acme.a", "ready"], ["acme.b", "disabled"]]);
     expect(loaded[0]!.definition?.namespace.id).toBe("acme.a");
-  });
-  it("build failures mark only the affected package", async () => {
-    const data = temp(); const a = temp();
-    pkg(a, { id: "acme.a", runtime: "src/runtime.ts" }, "export default {{;");
-    const list = new PackageList(join(data, "plugins.json"));
-    list.add({ source: { kind: "path", path: a } }, data);
-    const [item] = await loadPackages(list, data, join(data, "cache"), []);
-    expect(item!.status).toBe("failed");
-    expect(item!.error).toMatch(/Build failed/);
   });
   it("rejects imported test sources before executing them while loading unrelated plugins", async () => {
     const data = temp(), broken = temp(), healthy = temp();
@@ -108,9 +99,9 @@ describe("Plugin packages", () => {
     const list = new PackageList(join(data, "plugins.json"));
     for (const path of [broken, healthy]) list.add({ source: { kind: "path", path } }, data);
     const loaded = await loadPackages(list, data, join(data, "cache"), []);
-    expect(loaded.map(item => item.status)).toEqual(["failed", "loaded"]);
-    expect(loaded[0]!.error).toContain("Runtime entry imports a test module");
-    expect(loaded[0]!.error).toContain("helper.test.ts");
+    expect(loaded.map(item => item.status)).toEqual(["failed", "ready"]);
+    expect(loaded[0]!.diagnostic?.message).toContain("Runtime entry imports a test module");
+    expect(loaded[0]!.diagnostic?.message).toContain("helper.test.ts");
   });
   it("source packages provide real resources using only the public SDK without host-internal factories", async () => {
     const data = temp(); const root = temp();
@@ -133,7 +124,7 @@ describe("Plugin packages", () => {
     const list = new PackageList(join(data, "plugins.json"));
     list.add({ source: { kind: "path", path: root } }, data);
     const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
-    expect(loaded!.status, loaded!.error).toBe("loaded");
+    expect(loaded!.status, loaded!.diagnostic?.message).toBe("ready");
     const service = new ApplicationService(data, { plugins: [loaded!.definition!] });
     try {
       const sessionId = service.sessions.tree.create("SDK");
@@ -150,7 +141,7 @@ describe("Plugin packages", () => {
 });
 
 // Symlink entry source paths resolve; CSS ownership still follows output entries so class names and url() remain valid after relocation.
-it("registers independent styles, preserves CSS Module names and asset paths, and reads styles after cache reuse", async () => {
+it("preserves distinct CSS Module names, relocated assets, and stylesheet changes across builds", async () => {
   const root = temp(), plain = temp(), other = temp(), broken = temp(), data = temp(), cache = join(data, "cache");
   pkg(root, { id: "acme.styled", renderer: "src/renderer.ts" });
   pkg(plain, { id: "acme.plain", renderer: "src/renderer.ts" });
@@ -170,8 +161,8 @@ it("registers independent styles, preserves CSS Module names and asset paths, an
   for (const path of [root, plain, other, broken]) list.add({ source: { kind: "path", path } }, data);
   const load = () => loadPackages(list, data, cache, []);
   const first = await load();
-  expect(first.map(item => item.status)).toEqual(["loaded", "loaded", "loaded", "failed"]);
-  expect(first[3]!.error).toContain("missing.css");
+  expect(first.map(item => item.status)).toEqual(["ready", "ready", "ready", "failed"]);
+  expect(first[3]!.diagnostic?.message).toContain("missing.css");
   expect(first[1]!.stylesheet).toBeUndefined();
   const stylesheet = join(cache, first[0]!.stylesheet!);
   const css = readFileSync(stylesheet, "utf8");
@@ -185,10 +176,6 @@ it("registers independent styles, preserves CSS Module names and asset paths, an
   const assets = [...css.matchAll(/url\(["']?([^"')]+)["']?\)/gu)].map(match =>
     readFileSync(resolve(dirname(stylesheet), match[1]!), "utf8"));
   expect(assets.sort()).toEqual(["font-fixture", "image-fixture"]);
-  list.remove(3);
-  await load();
-  const cached = await load();
-  expect(cached.map(item => [item.renderer, item.stylesheet])).toEqual(first.slice(0, 3).map(item => [item.renderer, item.stylesheet]));
   writeFileSync(join(root, "src/panel.module.css"), ".card { color: #654321; }");
   const updated = await load();
   expect(updated[0]!.stylesheet).not.toBe(first[0]!.stylesheet);
@@ -251,20 +238,20 @@ describe("Public modules", () => {
   it("binds available public APIs across provider upgrades and rejects missing exports", async () => {
     const fixture = publicFixture();
     const load = () => loadPackages(fixture.list, fixture.data, fixture.cache, []);
-    expect((await load()).map(item => item.status)).toEqual(["loaded", "loaded"]);
+    expect((await load()).map(item => item.status)).toEqual(["ready", "ready"]);
     const metadata = JSON.parse(readFileSync(join(fixture.provider, "package.json"), "utf8"));
     metadata.version = "2.0.0";
     writeFileSync(join(fixture.provider, "package.json"), JSON.stringify(metadata));
     const upgraded = await load();
-    expect(upgraded.map(item => item.status)).toEqual(["loaded", "loaded"]);
+    expect(upgraded.map(item => item.status)).toEqual(["ready", "ready"]);
     const probes = upgraded.map(item => (item.definition as PluginDefinition & { probe: Probe }).probe);
     expect(probes[0]!.Read).toBe(probes[1]!.Read);
     writeFileSync(join(fixture.provider, "src/public.ts"), 'export { settings, Marker, events } from "./state.ts";');
     const [consumer, provider] = await load();
     expect(consumer!.status).toBe("failed");
     expect(consumer!.definition).toBeUndefined();
-    expect(consumer!.error).toContain('for import "Read"');
-    expect(provider!.status, provider!.error).toBe("loaded");
+    expect(consumer!.diagnostic?.message).toContain('for import "Read"');
+    expect(provider!.status, provider!.diagnostic?.message).toBe("ready");
   });
   // Helper locations and their peer ranges must not create duplicate public declarations or lose initialization dependencies.
   it.each(["nested", "symlink"] as const)("binds %s helpers to the active provider despite differing peer ranges", async mode => {
@@ -289,7 +276,7 @@ describe("Public modules", () => {
     }
     const load = () => loadPackages(fixture.list, fixture.data, fixture.cache, []);
     const loaded = await load();
-    expect(loaded.map(item => item.status)).toEqual(["loaded", "loaded"]);
+    expect(loaded.map(item => item.status)).toEqual(["ready", "ready"]);
     expect(loaded[0]!.runtimeDependencies).toEqual(["acme.provider"]);
     const probes = loaded.map(item => (item.definition as PluginDefinition & { probe: Probe }).probe);
     expect(probes[0]!.Read).toBe(probes[1]!.Read);
@@ -298,7 +285,7 @@ describe("Public modules", () => {
     helperMetadata.peerDependencies["@fixture/provider"] = "^2.0.0";
     writeFileSync(join(helper, "package.json"), JSON.stringify(helperMetadata));
     const updated = await load();
-    expect(updated.map(item => item.status)).toEqual(["loaded", "loaded"]);
+    expect(updated.map(item => item.status)).toEqual(["ready", "ready"]);
     expect(updated[0]!.runtimeDependencies).toEqual(["acme.provider"]);
   });
   it("provider internal references, two consumers, and re-exports share real declarations, state, and class identity", async () => {
@@ -310,7 +297,7 @@ describe("Public modules", () => {
       asterism: { ...metadata.asterism, id: "acme.second", renderer: undefined } }));
     fixture.list.add({ source: { kind: "path", path: second } }, fixture.data);
     const packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
-    expect(packages.map(pkg => pkg.error)).toEqual([undefined, undefined, undefined]);
+    expect(packages.map(pkg => pkg.diagnostic?.message)).toEqual([undefined, undefined, undefined]);
     const probes = packages.map(pkg => (pkg.definition as PluginDefinition & { probe: Probe }).probe);
     for (const probe of probes) {
       expect(probe.Read).toBe(probes[0]!.Read);
@@ -318,7 +305,7 @@ describe("Public modules", () => {
       expect(new probe.Marker()).toBeInstanceOf(probes[0]!.Marker);
     }
     const service = new ApplicationService(fixture.data, { plugins: packages.map(pkg => pkg.definition!),
-      pluginDependencies: new Map(packages.map(pkg => [pkg.manifest!.id, pkg.runtimeDependencies ?? []])) });
+      packages: packageCandidates(packages), pluginDependencies: runtimeDependencies(packages) });
     try {
       expect(service.sessions.plugins.every(pkg => pkg.status === "loaded")).toBe(true);
       expect(service.sessions.plugins.filter(pkg => pkg.id.startsWith("acme."))
@@ -348,11 +335,11 @@ describe("Public modules", () => {
     pkg(broken, { id: "acme.broken", runtime: "src/runtime.ts" }, "invalid }");
     fixture.list.add({ source: { kind: "path", path: broken } }, fixture.data);
     let packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
-    expect(packages.map(pkg => pkg.status)).toEqual(["loaded", "loaded", "failed"]);
+    expect(packages.map(pkg => pkg.status)).toEqual(["ready", "ready", "failed"]);
     fixture.list.setEnabled(1, false);
     packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
     expect(packages.map(pkg => pkg.status)).toEqual(["failed", "disabled", "failed"]);
-    expect(packages[0]!.error).toEqual(expect.any(String));
+    expect(packages[0]!.diagnostic?.message).toEqual(expect.any(String));
   });
   it("re-exports outside plugin roots register indirect dependencies and broken providers do not disrupt unrelated plugins", async () => {
     const fixture = publicFixture(), outside = temp(), healthy = temp();
@@ -369,7 +356,7 @@ describe("Public modules", () => {
     expect(packages[0]!.runtimeDependencies).toEqual(["acme.provider"]);
     writeFileSync(join(fixture.provider, "src/runtime.ts"), "invalid }");
     packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
-    expect(packages.map(pkg => pkg.status)).toEqual(["failed", "failed", "loaded"]);
+    expect(packages.map(pkg => pkg.status)).toEqual(["failed", "failed", "ready"]);
   });
   it("frontend reverse imports do not create backend initialization cycles", async () => {
     const fixture = publicFixture();
@@ -386,7 +373,7 @@ describe("Public modules", () => {
     expect(packages[0]!.runtimeDependencies).toEqual(["acme.provider"]);
     expect(packages[1]!.runtimeDependencies).toEqual([]);
     const service = new ApplicationService(fixture.data, { plugins: packages.map(pkg => pkg.definition!),
-      pluginDependencies: new Map(packages.map(pkg => [pkg.manifest!.id, pkg.runtimeDependencies ?? []])) });
+      packages: packageCandidates(packages), pluginDependencies: runtimeDependencies(packages) });
     try { expect(service.sessions.plugins.every(pkg => pkg.status === "loaded")).toBe(true); }
     finally { await service.close(); }
   });
@@ -403,6 +390,6 @@ describe("Public modules", () => {
     list.add({ source: { kind: "path", path: fixture.consumer } }, fixture.data);
     list.add({ source: { kind: "path", path: fixture.provider } }, fixture.data);
     const packages = await loadPackages(list, fixture.data, fixture.cache, []);
-    expect(packages.map(pkg => pkg.status)).toEqual(["disabled", "loaded", "loaded"]);
+    expect(packages.map(pkg => pkg.status)).toEqual(["disabled", "ready", "ready"]);
   });
 });

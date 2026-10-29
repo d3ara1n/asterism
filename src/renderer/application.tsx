@@ -74,11 +74,12 @@ export async function startApplication(root: Root, progress: (message: UiText, d
   const rendererPlugins = await loadPluginRenderers(plugins, { signal,
     progress: id => progress(startupMessages.plugins, id), async accept(plugin, id) {
       new ViewRegistry([...accepted, ...plugin.modules ?? []]);
-      await preparePlugin(plugin, events, signal, undefined, close => cleanup.push(close), calls);
+      const prepared = await preparePlugin(plugin, events, signal, undefined, close => cleanup.push(close), calls);
       accepted.push(...plugin.modules ?? []);
       const name = names.get(id) ?? id;
       for (const page of plugin.settings ?? []) pages.set(settingsPageKey(id, page.id), { ...page, pluginId: id, pluginName: name });
       for (const entry of plugin.sessionEntries ?? []) sessionEntries.push({ ...entry, pluginId: id, pluginName: name });
+      return prepared.diagnostics;
     } });
   const moduleViews = new ViewRegistry(accepted);
   const applicationServices = { platform: window.host.platform, preferences: pluginPreferences,
@@ -98,7 +99,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
                   <HostConfigsProvider>
                     <ModuleViewsProvider registry={moduleViews}>
                       <RendererApplicationProvider value={applicationServices}>
-                        <PluginSettingsProvider value={{ pages, sessionEntries, failures: new Map(rendererPlugins.failures.map(failure => [failure.id, failure.error])) }}>
+                        <PluginSettingsProvider value={{ pages, sessionEntries, renderers: rendererPlugins.outcomes }}>
                           <App controller={controller} />
                           <StartupNotification />
                         </PluginSettingsProvider>

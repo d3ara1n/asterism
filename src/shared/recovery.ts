@@ -18,7 +18,7 @@ export const pluginStorageFailureSchema = z.object({ id: z.string(), error: z.st
 export type PluginStorageFailure = z.infer<typeof pluginStorageFailureSchema>;
 
 export const preparationResultSchema = z.discriminatedUnion("ok", [
-  z.object({ ok: z.literal(true), plugins: z.array(pluginStorageFailureSchema) }),
+  z.object({ ok: z.literal(true), plugins: z.array(pluginStorageFailureSchema), pluginBuild: z.string().optional() }),
   /** `paused` means automatic migration is paused after restoration, awaiting user retry. */
   z.object({ ok: z.literal(false), error: z.string(), paused: z.boolean() }),
 ]);

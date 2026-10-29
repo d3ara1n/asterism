@@ -12,7 +12,7 @@ interface StartupOptions {
   publish(state: StartupState): void;
   showWindow(): void;
   settingsReady(): void;
-  startRuntime(failures: readonly PluginStorageFailure[]): Promise<void>;
+  startRuntime(failures: readonly PluginStorageFailure[], pluginBuild: string): Promise<void>;
 }
 
 /** The main process owns background startup order, stages, and cancellation scopes; windows only consume status and settings-availability notifications. */
@@ -95,7 +95,8 @@ export class StartupCoordinator {
       await this.environment();
       this.lifetime.signal.throwIfAborted();
       this.stage("plugins");
-      await this.options.startRuntime(result.plugins);
+      if (!result.pluginBuild) throw new Error("Data preparation did not provide a plugin build.");
+      await this.options.startRuntime(result.plugins, result.pluginBuild);
     } catch (error) {
       if (this.lifetime.signal.aborted) return;
       console.error("Application startup failed.", error);

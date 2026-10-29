@@ -5,7 +5,7 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { ConfigurationService } from "../configuration/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
-import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot, packageSource } from "../plugins/packages.ts";
+import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot, packageSource, type PackageEntry } from "../plugins/packages.ts";
 import { applicationPackages, applicationManuals } from "../plugins/distribution.ts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
@@ -19,27 +19,25 @@ import { SessionService } from "./sessions.ts";
 import { collectExpiredSessions, openDatabase } from "./storage.ts";
 import { ContentTransferService } from "./content-transfer.ts";
 import type { ManualSource } from "@asterism-app/sdk/runtime";
+import type { PluginCandidate } from "../shared/plugin-startup.ts";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string, readonly display?: UiText) { super(message); }
 }
 
 /** Application composition root and session index; SessionService owns session content, operations, and queries. */
-export interface StartupPackage { source: string; enabled: boolean; id: string | null; status: "loaded" | "disabled" | "invalid" | "failed"; error: string | null; renderer: string | null; stylesheet: string | null; dependencies?: string[]; rendererDependencies?: string[] }
 
 export class ApplicationService {
   readonly configuration: ConfigurationService;
   readonly sessions: SessionService;
   readonly content: ContentTransferService;
   private readonly db: DatabaseSync;
-  private readonly packages: StartupPackage[];
   private readonly list: PackageList;
   private readonly started: string;
-  constructor(root: string, private readonly options: { packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: StartupPackage[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
+  constructor(root: string, private readonly options: { packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
     this.db = openDatabase(root);
-    this.packages = options.packages ?? [];
     this.list = applicationPackages(root);
-    this.started = JSON.stringify(this.list.read());
+    this.started = JSON.stringify(options.packageEntries ?? this.list.read());
     this.npmRoot = join(root, "plugins");
     try {
       const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
@@ -49,24 +47,9 @@ export class ApplicationService {
       this.sessions = new SessionService(this.db, root, this.configuration, {
         onChanged: options.onSessionChanged, adapterFactory: options.adapterFactory, plugins: options.plugins,
         configurationChanged: options.onPluginConfigurationChanged, preparedStorage: options.preparedStorage,
-        pluginDependencies: options.pluginDependencies, packageRoots: options.packageRoots, skillDirectories: options.skillDirectories,
-        manualSources: () => [...applicationManuals, ...(options.manualSources ?? []).filter(source => this.packages.some(item => item.id === source.pluginId && item.status === "loaded")
-          && !options.preparedStorage?.failures.has(source.pluginId))],
+        pluginDependencies: options.pluginDependencies, packages: options.packages, packageRoots: options.packageRoots, skillDirectories: options.skillDirectories,
+        manualSources: packages => [...applicationManuals, ...(options.manualSources ?? []).filter(source => packages.some(item => item.id === source.pluginId && item.status === "loaded"))],
       });
-      // setup and contribution registration may also fail; frontend-only consumers cannot use failed providers either.
-      let changed = true;
-      while (changed) {
-        changed = false;
-        for (const item of this.packages) if (item.status === "loaded") {
-          const own = this.sessions.plugins.find(plugin => plugin.id === item.id && plugin.status === "failed");
-          const failed = item.dependencies?.find(id =>
-            this.sessions.plugins.some(plugin => plugin.id === id && plugin.status === "failed")
-            || this.packages.some(provider => provider.id === id && provider.status !== "loaded"));
-          if (!own && !failed) continue;
-          item.status = "failed"; item.error = own?.error ?? `Public dependency ${failed} is unavailable.`;
-          item.renderer = null; changed = true;
-        }
-      }
       this.content = new ContentTransferService(this.sessions);
     } catch (error) { this.db.close(); throw error; }
   }
@@ -105,19 +88,23 @@ export class ApplicationService {
     // Match list entries to startup results by source; new or modified entries show as pending restart.
     const plugins: AppSnapshot["plugins"] = current.map((entry, index) => {
       const source = packageSource(entry);
-      const startup = this.packages.find(item => item.source === source);
+      const startup = this.sessions.packages.find(item => item.source === source);
       const pending = !startup || startup.enabled !== entry.enabled;
-      let metadata = {}, id = startup?.id ?? null, metadataError: string | null = null;
+      let metadata = startup?.metadata ?? {}, id = startup?.id ?? null, metadataError = startup?.metadataError ?? null;
       const root = packageRoot(entry, this.npmRoot);
-      try { metadata = readPackageMetadata(root); }
-      catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
+      if (pending) {
+        try { metadata = readPackageMetadata(root); metadataError = null; }
+        catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
+      }
       if (!id) { try { id = readManifest(root).id; } catch { /* Loading state retains package validation failure reasons. */ } }
       return { index, source, bundled: entry.source.kind === "bundled", metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
-        error: (pending ? null : startup.error) ?? metadataError, renderer: pending ? null : startup.renderer,
+        error: (pending ? null : startup.diagnostic?.message) ?? metadataError, diagnostic: pending ? null : startup.diagnostic ?? null, renderer: pending ? null : startup.renderer,
         stylesheet: pending ? null : startup.stylesheet,
-        dependencies: startup?.rendererDependencies ?? [] };
+        dependencies: [...startup?.rendererDependencies ?? []] };
     });
-    return snapshotSchema.parse({ workspace, sessions, templates: this.sessions.templates.list(), archivedSessions, plugins, catalogs: this.options.catalogs ?? [], restartRequired: JSON.stringify(current) !== this.started,
+    return snapshotSchema.parse({ workspace, sessions, templates: this.sessions.templates.list(), archivedSessions, plugins,
+      catalogs: (this.options.catalogs ?? []).filter(catalog => this.sessions.packages.some(item => item.id === catalog.owner && item.status === "loaded")),
+      restartRequired: JSON.stringify(current) !== this.started,
       ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings() } : {}) });
   }
 }

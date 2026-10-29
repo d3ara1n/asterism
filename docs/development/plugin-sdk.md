@@ -8,7 +8,9 @@ A plugin is the unit of identity, metadata, settings, dependencies, and lifetime
 
 Read package metadata independently of executable entries so disabled or failed plugins remain manageable. Backend setup registers contributions synchronously. Asynchronous work belongs to managed tasks or an appropriate lifetime.
 
-Assembly freezes the registered contributions. Package installation, enablement, and upgrades take effect after restart. Failed providers block their dependents while unrelated plugins continue.
+Assembly freezes the registered contributions. Package installation, enablement, and upgrades take effect after restart. Package discovery, build, storage, import, and backend assembly failures exclude the affected packages and their dependents before the backend catalog is published. Unrelated plugins continue. The published package outcomes and registered contributions come from the same assembly result.
+
+Storage admission covers every package, including packages without backend setup. Backend setup uses provisional registrations so later setup callbacks can consume provider services. Contribution validation and dependency failure propagation remove excluded owners and cancel their managed work before publication. Cleanup runs under the existing lifetime rules. Setup effects such as committed data, file writes, and external operations are not transactional and are not rolled back.
 
 The package manifest owns the plugin's release version. Runtime definitions declare behavior and identity without repeating that version. Standard package dependencies and lockfiles describe installation; development dependencies provide the declarations used by TypeScript.
 
@@ -24,7 +26,7 @@ The host attributes contribution identities to the plugin namespace and rejects 
 
 ## Public modules
 
-Public imports establish runtime dependencies. The host resolves environment-specific exports and binds consumers to the provider's actual exports. The import graph determines initialization order and propagates provider failures. This graph belongs to host loading metadata, separate from author-provided runtime definitions. Package-manager dependency declarations describe how to acquire those packages, without becoming a second runtime admission policy.
+Public imports establish dependencies. The host resolves environment-specific exports and binds consumers to the provider's actual exports. Backend and frontend graphs independently determine initialization order. Startup failure propagation follows all public dependencies, including public-only intermediaries. Opposite dependency directions across environments do not constitute an initialization cycle; cycles within an environment's initialization order fail explicitly. These graphs belong to host loading metadata, separate from author-provided runtime definitions. Package-manager dependency declarations describe how to acquire those packages, without becoming a second runtime admission policy.
 
 A plugin can provide its own public export or declare separate public libraries. Both mechanisms share package-name ownership, so competing enabled providers fail explicitly. A disabled library declaration does not displace an enabled public provider.
 
@@ -142,7 +144,9 @@ Content roots follow the actual encoded persistent JSON within the owning transa
 
 The renderer can contribute cards, tool phases, history records, creation entries, Home session entries, and independent settings pages. Frontend preparation can establish services independently of card mounting and binds them to a cancellation scope.
 
-Imported styles are frontend build dependencies. The host preserves each entry's CSS association through compilation, caching, and startup projection, and loads styles in dependency and registration order before preparing the frontend. Initialization failures and frontend shutdown release the associated styles; individual view mounting does not own them.
+Frontend activation runs after backend publication. A stylesheet, import, or plugin preparation failure makes that frontend and its frontend dependents unavailable without deactivating accepted backend services. Module preparation failures retain the plugin's views and report partial initialization. Frontend outcomes belong to the current page and remain distinct from startup package outcomes; management presents both with stage-specific diagnostics.
+
+Imported styles are frontend build dependencies. The host preserves each entry's CSS association through compilation, artifact handoff, and startup projection, and loads styles in dependency and registration order before preparing the frontend. Initialization failures and frontend shutdown release the associated styles; individual view mounting does not own them.
 
 Individual preflight builds isolate source errors and exclude failed providers and their consumers. Ready renderer entries then compile together so CSS Modules receive distinct names across the shared document. A failure of this final shared build affects its frontend-bearing packages; unrelated backend-only packages retain their successful builds.
 

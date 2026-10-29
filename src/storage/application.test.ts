@@ -14,11 +14,11 @@ const roots: string[] = [];
 function root() { const directory = mkdtempSync(join(tmpdir(), "asterism-prepare-")); roots.push(directory); return directory; }
 afterEach(() => { for (const directory of roots.splice(0)) rmSync(directory, { recursive: true, force: true }); });
 
-// Business logic creates new installations in the current format; preparation must not write files early or falsely report migration.
-it("unified preparation of new data directories creates no files or recovery points", async () => {
+// Business logic creates new persistent stores; preparation may build plugins without reporting a data migration.
+it("preparation leaves new persistent stores uncreated and does not record a migration", async () => {
   const directory = root();
   applicationPackages(directory).setEnabled(0, false);
-  expect(await prepareApplicationData(directory, "0.1.0")).toEqual({ ok: true, plugins: [] });
+  expect((await prepareApplicationData(directory, "0.1.0")).ok).toBe(true);
   expect(existsSync(join(directory, "configuration.json"))).toBe(false);
   expect(existsSync(join(directory, "recovery"))).toBe(false);
 });
