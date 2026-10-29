@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, expect, it } from "vitest";
@@ -17,18 +17,17 @@ async function executable(name: string) {
   return path;
 }
 
-// Queries must apply the profile's PATH override; treating configured entries alone as available would mislead terminal creation, and directories are not executables.
-it("discovers executables using the execution environment, retains unavailable configurations, and exposes no environment variables", async () => {
+// Discovery follows the configured PATH without requiring executable permissions; startup owns execution errors.
+it("discovers paths using the execution environment without requiring executable permissions", async () => {
   const name = "asterism-test-shell.exe";
   const path = await executable(name);
-  const directory = join(root, "directory");
-  await mkdir(directory);
+  await writeFile(path, "not an executable", { mode: 0o644 });
+  await chmod(path, 0o644);
   const settings = {
     selected: "custom",
     profiles: [
       profile("custom", name, { PATH: root, PRIVATE_VALUE: "private-test-value" }),
       profile("missing", join(root, "missing.exe")),
-      profile("directory", directory),
     ],
   };
   const result = await listShellProfiles(settings, { PATH: join(root, "empty") });
@@ -36,7 +35,6 @@ it("discovers executables using the execution environment, retains unavailable c
   expect(result.profiles.map(({ id, available, resolvedExecutable }) => ({ id, available, resolvedExecutable }))).toEqual([
     { id: "custom", available: true, resolvedExecutable: path },
     { id: "missing", available: false, resolvedExecutable: null },
-    { id: "directory", available: false, resolvedExecutable: null },
   ]);
   expect(JSON.stringify(result)).not.toContain("private-test-value");
   expect(result.profiles[0]).not.toHaveProperty("env");
@@ -62,5 +60,5 @@ it("leaves a missing explicit default unresolved while still listing other avail
   const result = await listShellProfiles(settings, {});
   expect(result.resolvedProfile).toBeNull();
   expect(result.profiles[1]?.available).toBe(true);
-  await expect(resolveShell(settings, {})).rejects.toThrow("Shell profile 'missing' has no available executable.");
+  await expect(resolveShell(settings, {})).rejects.toThrow("Shell profile 'missing' has no matching executable path.");
 });

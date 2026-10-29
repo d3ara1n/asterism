@@ -59,7 +59,7 @@ export function defaultAppearance(platform: string): Appearance {
 export function parseAppearance(raw: unknown, platform: string): Appearance {
   const result = appearanceSchema.safeParse(raw && typeof raw === "object" ? raw : {});
   const data = result.success ? result.data : appearanceSchema.parse({});
-  return { ...data, radius: data.radius ?? (platform === "darwin" ? "lg" : platform === "win32" ? "md" : "sm") };
+  return { ...data, radius: data.radius ?? (platform === "darwin" ? "lg" : "sm") };
 }
 
 /** Omitted patch fields stay absent; read fallbacks use catch rather than defaults that partial parsing would materialize. */

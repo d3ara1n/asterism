@@ -1,5 +1,4 @@
-import { access, stat } from "node:fs/promises";
-import { constants } from "node:fs";
+import { lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, isAbsolute, join, resolve } from "node:path";
 import type { ShellProfile, ShellProfileList, ShellSettings } from "@asterism-app/sdk/contracts";
@@ -27,9 +26,12 @@ async function executablePath(executable: string, env: NodeJS.ProcessEnv): Promi
   const candidates = isAbsolute(expanded) ? names : directories.flatMap(directory => names.map(name => join(directory, name)));
   for (const candidate of candidates) {
     try {
-      await access(candidate, windows ? constants.F_OK : constants.X_OK);
-      if ((await stat(candidate)).isFile()) return resolve(candidate);
-    } catch { /* Continue searching for the next executable that actually exists. */ }
+      // Discover the entry without resolving execution aliases or validating whether it can run.
+      await lstat(candidate);
+      return resolve(candidate);
+    } catch (error) {
+      if (!["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) throw error;
+    }
   }
   return null;
 }
@@ -72,5 +74,5 @@ export async function resolveShell(settings: ShellSettings, inherited: NodeJS.Pr
   }
   throw new Error(settings.selected === "auto"
     ? "No configured shell executable was found. Configure a shell profile in Builtin settings."
-    : `Shell profile '${settings.selected}' has no available executable. Configure its executable in Builtin settings.`);
+    : `Shell profile '${settings.selected}' has no matching executable path. Configure its executable in Builtin settings.`);
 }
