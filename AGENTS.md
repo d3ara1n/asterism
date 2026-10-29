@@ -24,7 +24,17 @@ Keep fixed application identity, data layout, and internal channel identities ce
 
 Current example resources validate foundations and do not define the final product catalog. Workbench cards and auxiliary surfaces reuse the shared object and island presentation. Overall visual changes require user confirmation.
 
-Reuse maintained libraries for general controls, animation, layout, drag, and virtualization. Confirm new dependencies separately with rationale and alternatives. For a missing shadcn control, check the registry and use `npx shadcn@latest add <name>`; official controls do not count as new dependencies. Verify relative imports and remove accidental CLI additions.
+Reuse maintained libraries for general controls, animation, layout, drag, and virtualization. Confirm new dependencies separately with rationale and alternatives. For a missing shadcn control, check the registry and use `npx shadcn@latest add <name>`; official controls do not count as new dependencies.
+
+### Vendored shadcn components
+
+`packages/ui/src/ui/` mixes shadcn registry files with project-owned controls. Run the shadcn CLI from the repository root: the `packages/ui` config cannot resolve its aliases, and the root config rewrites the `cn` import to an npm package named `cn` and adds it as a dependency. After every `add` or `--overwrite` of a registry file, restore relative imports (`../utils`, `./button`), drop the `cn` dependency, and reapply the local changes below. Keep this list current whenever a registry file gains or loses a local change.
+
+- `input-group`: `InputGroupAddon` click focuses `[data-slot=input-group-control]` instead of the first `input`, so textareas receive focus and hidden file inputs are skipped.
+- `button`, `badge`: `destructive` uses `text-destructive-foreground` without dark overrides, `link` uses `text-primary-text`; button adds the `selected` variant, badge adds `success` and `warning`.
+- `empty`, `field`, `item`: link hover uses `text-primary-text`.
+- `dialog`, `command`, `spinner`: built-in labels come from `useI18n()` and `commonMessages`; `DialogContent` accepts `closeLabel`, and `CommandDialog` title and description default to localized messages.
+- `progress`: forwards `value` to the Radix root so the value attributes are exposed.
 
 ## Language
 
