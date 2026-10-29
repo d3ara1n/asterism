@@ -28,7 +28,7 @@ export interface ToolObserver {
 const actions: readonly CoreAction[] = [
   { tool: ResourceList,
     resolve: (_args, capabilities) => ({ effect: "read", execution: "parallel", implementation: reference(ResourceListResult), async execute() {
-      return { kind: "succeeded", data: ResourceListResult.schema.parse({ resources: capabilities.list() }) };
+      return { kind: "succeeded", data: ResourceListResult.schema.parse({ resources: await capabilities.list() }) };
     } }) },
   { tool: ResourceInspect,
     resolve(args, capabilities) {

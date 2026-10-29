@@ -119,8 +119,8 @@ export interface ResourceContribution {
     /** Omit the source title when saving; generate a title for each template instance, overriding any previously saved title. */
     createTitle?(): string;
   };
-  /** Declare that this resource can receive links and provide the recipient's tool policy; independent of Agent domain types. */
-  readonly links?: { receive: boolean; tools?(object: ObjectReader): { allow?: readonly string[]; exclude?: readonly string[] } };
+  /** Declare that this resource can receive links; independent of Agent domain types. */
+  readonly links?: { receive: boolean };
   readonly creation?: CreationContribution;
   readonly actions?: readonly ActionContribution[];
   project(resource: ResourceSnapshot, object: ObjectReader): Presentation;

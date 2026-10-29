@@ -155,11 +155,6 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
           await done;
         },
       } : {}),
-      ...(contribution.links?.receive ? { linkTools(sessionId: string, id: string, linked: FoldedObject) {
-        const policy = contribution.links?.tools?.(sdk.reader({ sessionId, id, kind: resource.kind }));
-        const allowed = policy?.allow ? new Set(policy.allow) : null, excluded = new Set(policy?.exclude ?? []);
-        return host.sessions.capabilities([linked], name => (allowed === null || allowed.has(name)) && !excluded.has(name)).describe(linked.id);
-      } } : {}),
       activity: sessionId => ({ busy: runs.activity(sessionId), live: [] }),
       async close() {
         await runs.close();

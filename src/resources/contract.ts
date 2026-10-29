@@ -30,8 +30,6 @@ export interface ResourceController {
    * live contains only temporary model output; the host publishes progress notifications when activities start and end.
    */
   activity?(sessionId: string): { busy: string[]; live: LiveBlock[] };
-  /** Describe available tools of linked resources when this object is the link destination. */
-  linkTools?(sessionId: string, objectId: string, resource: FoldedObject): Json;
   close?(): Promise<void>;
 }
 /** Erased backend resource adapter interface; functions do not cross process boundaries. */

@@ -183,6 +183,7 @@ describe("SDK session resource lifetimes", () => {
     const target = await model(f.app);
     const a = await f.session.create(Create, 0), b = await f.session.create(Create, 1);
     const runA = runner(f, a, target), runB = runner(f, b, target);
+    await f.app.sessions.execute({ type: "object.rename", sessionId: f.sessionId, objectId: b.id, title: `Research "A" <&>'` });
     f.session.link(a, b);
     const position = f.session.snapshot().position.nodeId;
     await f.app.sessions.execute({ type: "link.set", sessionId: f.sessionId, receiverId: a.id, resourceId: b.id, linked: true });
@@ -205,6 +206,11 @@ describe("SDK session resource lifetimes", () => {
       { contract: { id: "resource_attached" }, data: { id: b.id, receiverId: a.id }, context: { recipient: a.id } },
       { contract: { id: "resource_attached" }, data: { id: a.id, receiverId: b.id }, context: { recipient: b.id } },
       { contract: { id: "resource_detached" }, data: { id: b.id, receiverId: a.id }, context: { recipient: a.id } },
+    ]);
+    expect(links.map(record => record.context?.text)).toEqual([
+      `<resource_attached resource_id="${b.id}" type="test.resources/item" title="Research &quot;A&quot; &lt;&amp;&gt;&apos;" />`,
+      `<resource_attached resource_id="${a.id}" type="test.resources/item" title="Item" />`,
+      `<resource_detached resource_id="${b.id}" type="test.resources/item" title="Research &quot;A&quot; &lt;&amp;&gt;&apos;" />`,
     ]);
   });
 

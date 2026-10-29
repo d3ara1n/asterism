@@ -77,7 +77,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
         attach(_data, object, lifetime) {
           lifetime.defer(() => { feedback.delete(object.ref.id); turns.delete(object.ref.id); });
         },
-        links: { receive: true, tools: object => selection.tools(selection.agent(selectionOf(object).selection)) },
+        links: { receive: true },
         creation: implementCreation(CreateAgent, {
           prepare(input) { selection.validate(input.selection); return { action: "accept" }; },
           create(input, object) {

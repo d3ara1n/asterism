@@ -14,6 +14,11 @@ import { cardSize } from "../shared/workbench-sizing.ts";
 /** Session-level origin for host workbench writes. */
 const host = null;
 
+function resourceLinkNotice(event: "resource_attached" | "resource_detached", resource: FoldedObject): string {
+  const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
+  return `<${event} resource_id="${escape(resource.id)}" type="${escape(resource.kind)}" title="${escape(resource.title)}" />`;
+}
+
 type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number; width: number | null; height: number | null };
 type FocusRow = { object_id: string | null; width: number | null };
 
@@ -21,7 +26,6 @@ type FocusRow = { object_id: string | null; width: number | null };
 export class SessionWorkbench {
   constructor(private readonly db: DatabaseSync, private readonly tree: SessionTree,
     private readonly resources: ResourceRegistry,
-    private readonly tools: (sessionId: string, receiverId: string, resource: FoldedObject) => Json,
     private readonly content?: ContentStore) {}
 
   /** Generic resource creation: contributions supply titles and encoded state; creation events retain metadata separately. */
@@ -84,7 +88,7 @@ export class SessionWorkbench {
         for (const link of folded.links.filter(l => l.resourceId === target.id || l.receiverId === target.id)) {
           const resource = folded.objects.find(o => o.id === link.resourceId)!;
           tree.appendToTimeline(command.sessionId, { source: host, recipient: link.receiverId, contract: "resource_detached", data: { id: resource.id, receiverId: link.receiverId },
-            model: link.receiverId === target.id ? null : `Resource "${resource.title}" (resource_id: ${resource.id}) has been detached.` });
+            model: link.receiverId === target.id ? null : resourceLinkNotice("resource_detached", resource) });
         }
         tree.appendToTimeline(command.sessionId, { source: host, recipient: null, contract: "object_removed", data: { id: target.id }, model: null });
         break;
@@ -98,8 +102,8 @@ export class SessionWorkbench {
         if (folded.links.some(l => l.receiverId === receiver.id && l.resourceId === resource.id) === command.linked) break;
         tree.appendToTimeline(command.sessionId, { source: host, recipient: receiver.id, contract: command.linked ? "resource_attached" : "resource_detached",
           data: { id: resource.id, receiverId: receiver.id }, model: command.linked
-            ? `Resource "${resource.title}" (type: ${resource.kind}, resource_id: ${resource.id}) is now linked to you. Tools: ${JSON.stringify(this.tools(command.sessionId, receiver.id, resource))}.`
-            : `Resource "${resource.title}" (resource_id: ${resource.id}) has been detached.` });
+            ? resourceLinkNotice("resource_attached", resource)
+            : resourceLinkNotice("resource_detached", resource) });
         break;
       }
       case "view.set": {

@@ -143,8 +143,7 @@ export class SessionService {
     this.afterCommit = modules.afterCommit;
     this.prepare = modules.prepare;
     this.pluginActivity = modules.activity;
-    this.workbench = new SessionWorkbench(db, this.tree, this.resources,
-      (sessionId, receiverId, resource) => this.linkTools(sessionId, receiverId, resource), this.content);
+    this.workbench = new SessionWorkbench(db, this.tree, this.resources, this.content);
     this.templates = new TemplateStore(db, this.tree, this.workbench, this.content, this.resources);
     modules.initialize();
   }
@@ -263,10 +262,6 @@ export class SessionService {
       && previous.busyObjectIds.every(id => progress.busyObjectIds.includes(id))) return;
     this.watching.set(sessionId, progress);
     this.changed({ kind: "session.progress", sessionId, busyObjectIds: progress.busyObjectIds, timelineBusy: progress.timelineBusy, live });
-  }
-  private linkTools(sessionId: string, receiverId: string, resource: FoldedObject) {
-    const recipient = this.object(sessionId, receiverId);
-    return this.resources.controller(recipient.kind)?.linkTools?.(sessionId, receiverId, resource) ?? [];
   }
   current(sessionId: string): SessionData {
     const nodes = this.tree.nodes(sessionId);

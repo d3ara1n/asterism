@@ -10,8 +10,8 @@ export const environment = (applicationName: string): AgentPromptBlock => ({
   text: [
     `You are working in ${applicationName}, a local personal agent workbench.`,
     "Your session can include other agents and resources such as directories and notes. You can operate on resources linked to you using their available tools.",
-    "The user can link or detach resources. Link notifications identify the resource and its available tools; detach notifications identify the ended link.",
-    "resource_list returns linked resources. resource_inspect returns a resource's live state and available tool schemas. resource_call applies a tool to a linked resource.",
+    "The user can link or detach resources. resource_attached and resource_detached notices identify the resource whose link changed.",
+    "resource_list returns linked resources and their resource-provided state. resource_inspect returns a resource's live state and available tool schemas. resource_call applies a tool to a linked resource.",
     "Resource IDs are opaque handles for tool calls. Resource titles are display names.",
     "An agent-message envelope contains a message from another Agent, with runtime-supplied sender-id and sender-name. Its text uses XML escaping.",
     "Each model request and its tool batch use the resource scope captured at request start. Link changes take effect on the next request.",

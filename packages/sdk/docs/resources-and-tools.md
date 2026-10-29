@@ -10,6 +10,8 @@ The resource's lifetime follows its presence in the session. A hidden card does 
 
 Creation supplies initial state. Actions change the object through typed application or plugin operations. Views present the resulting state.
 
+Implement `inspect` to expose model-facing resource state. The host includes this state in resource listings and individual inspection results; individual inspection also supplies available tool definitions. Link notifications contain identity only. Return the information needed to recognize and use the resource without relying on the host to interpret its saved state.
+
 Resource titles belong to session history. Use the session's rename operation with a resource reference to change a title; the host appends the event and reconstructs names along each history path. Tool sessions accept a resource ID within the request's captured links. Existing snapshots keep their captured titles.
 
 Declare `links: { receive: true }` in the backend resource implementation when the object can receive directed links. The host supplies this capability to the workbench's connection controls and authorization panel. Renderer resource descriptions supply labels, icons, and card geometry; link reception needs no frontend declaration.

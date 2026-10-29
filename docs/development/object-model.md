@@ -54,6 +54,16 @@ Current session and object data is scoped by typed data contracts. Saving it doe
 
 Notes store current text. External files remain external. A URL is input to a capable resource, such as the built-in Web resource, rather than an implicit new object.
 
+## Cohesive state and behavior
+
+Domain owners define the information and operations needed to understand and use an object. Resource implementations project model-facing state, and tool implementations define supported operations and their contracts. Cohesion follows ownership rather than physical co-location: shared tools can serve multiple resource types without moving tool catalogs or policy into resource definitions.
+
+The host composes these contributions through generic interfaces. It handles identity, links, authorization, and dispatch while leaving the meaning of resource-specific state fields to the resource implementation. Model-facing information is an intentional projection, not a dump of saved state or a reconstruction from unrelated outputs.
+
+Notifications and discovery have distinct purposes. A link notification identifies the resource and the relationship change. A resource listing supplies identity and resource-provided state without tool definitions. Individual inspection supplies resource state and expands the capabilities available in the request's captured scope. Listing and inspection use the same state provider rather than maintaining separate descriptions.
+
+Operation results describe the operation that occurred; historical records preserve what was observed then. Instruction documents provide instructions with source attribution. These outputs may legitimately repeat an identity or locator, but they are not substitutes for resource discovery. Consumers obtain resource state and capability contracts through discovery rather than inferring them from document paths, logs, or incidental prose.
+
 ## Resource presence and removal
 
 The current timeline determines resource presence. Creation or cursor movement can make an identity appear; removal or moving before its creation can make it disappear. Presence is independent of which session or card the user views.

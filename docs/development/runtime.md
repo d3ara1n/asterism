@@ -74,6 +74,8 @@ Top-level tools register statically during assembly. Resource tools are discover
 
 The host reserves `resource_list`, `resource_inspect`, and `resource_call`. Inspection and execution share the captured capability view. A resource call validates target identity, captured access, tool support, target shape, and arguments.
 
+Link notifications carry resource identity, not state or tool definitions. Resources own the state exposed through discovery: listing returns that state alongside identity, while inspection also expands the tools available in the captured capability view. The host assembles these results without interpreting resource-specific state fields.
+
 Plugin tool policy filters plugin top-level and resource-tool names. It does not turn the reserved host discovery entries into grants of access.
 
 Overrides follow configured plugin order. The distribution initially places builtin first in the ordinary package list. Top-level names and resource-tool names resolve independently. A later tool declaration replaces its whole definition; a later implementation replaces the same resource-type/tool pair. Referencing a replaced contract does not reactivate it.

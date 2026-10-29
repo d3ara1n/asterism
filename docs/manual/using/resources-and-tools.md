@@ -4,7 +4,7 @@ Add a resource to the workbench, then link it to the agent that needs it. On the
 
 ## Discover an operation
 
-Models can list linked resources with `resource_list`, inspect a selected resource with `resource_inspect`, and invoke its tools through `resource_call`. Inspection supplies the tools and schemas available for that resource.
+Link and detach notifications identify the affected resource. Models can list linked resources with `resource_list`, inspect a selected resource with `resource_inspect`, and invoke its tools through `resource_call`. Listing includes each resource's own current state without tool definitions. Inspection supplies that state and the tools and schemas available for the selected resource.
 
 Use current descriptions for arguments, internal targets, and result formats. Two resource types can support the same operation with different target shapes.
 

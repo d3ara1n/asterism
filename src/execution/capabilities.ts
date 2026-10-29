@@ -25,8 +25,11 @@ export class AgentCapabilities {
     }
   }
 
-  list(): Json {
-    return [...this.linked.values()].map(({ resource }) => ({ resource_id: resource.id, type: resource.kind, title: resource.title }));
+  async list(): Promise<Json> {
+    return Promise.all([...this.linked.values()].map(async ({ resource }) => ({
+      resource_id: resource.id, type: resource.kind, title: resource.title,
+      state: await this.resources.inspect(resource),
+    })));
   }
 
   describe(id: string): Json {

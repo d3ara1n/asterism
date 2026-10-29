@@ -116,12 +116,18 @@ describe("Tool/resource matching and authorization", () => {
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
   });
 
-  it("inspect uses current external state and explicitly reports missing directories after deletion", async () => {
+  it("list and inspect expose current resource-provided state while only inspect expands tools", async () => {
     const { root, resource, scope } = setup(), capabilities = scope();
+    const listed = await invoke(capabilities, "resource_list", {});
+    expect(listed).toMatchObject({ kind: "succeeded", model: { resources: [{
+      resource_id: resource.id, type: resource.kind, title: "root", state: { path: root, exists: true },
+    }] } });
+    expect((listed.model as { resources: Json[] }).resources[0]).not.toHaveProperty("tools");
     expect(await invoke(capabilities, "resource_inspect", { resource_id: resource.id })).toMatchObject({
-      kind: "succeeded", model: { state: { exists: true } },
+      kind: "succeeded", model: { state: { path: root, exists: true }, tools: expect.arrayContaining([expect.objectContaining({ name: "read" })]) },
     });
     rmSync(root, { recursive: true });
+    expect(await invoke(capabilities, "resource_list", {})).toMatchObject({ kind: "succeeded", model: { resources: [{ state: { exists: false } }] } });
     expect(await invoke(capabilities, "resource_inspect", { resource_id: resource.id })).toMatchObject({ kind: "succeeded", model: { state: { exists: false } } });
   });
 

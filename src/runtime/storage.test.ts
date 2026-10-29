@@ -71,7 +71,7 @@ describe("Archived session presence gate", () => {
 });
 
 const focusWorkbench = (db: DatabaseSync, tree: SessionTree) =>
-  new SessionWorkbench(db, tree, {} as ResourceRegistry, () => null);
+  new SessionWorkbench(db, tree, {} as ResourceRegistry);
 
 // Focus layout contract: the projection releases focus once the object leaves the current projection, while the fixed width persists.
 describe("Session focus layout", () => {
