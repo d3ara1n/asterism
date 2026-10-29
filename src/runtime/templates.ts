@@ -93,6 +93,10 @@ export class TemplateStore {
       receiverId: identities.get(link.receiverId)!, resourceId: identities.get(link.resourceId)!,
     });
   }
+  rename(id: string, title: string): void {
+    const result = this.db.prepare("UPDATE templates SET title = ? WHERE id = ?").run(title, id);
+    if (!result.changes) throw new SessionError("not_found", "Template not found.");
+  }
   delete(id: string): void {
     this.content.releaseTemplate(id);
     this.db.prepare("DELETE FROM templates WHERE id = ?").run(id);

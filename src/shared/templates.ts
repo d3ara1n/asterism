@@ -26,5 +26,7 @@ export const templateCommands = [
   z.strictObject({ type: z.literal("template.save"), sessionId: id,
     title: z.string().trim().min(1).max(160), objectIds: z.array(id).min(1) }),
   z.strictObject({ type: z.literal("template.start"), templateId: z.string().uuid() }),
+  z.strictObject({ type: z.literal("template.rename"), templateId: z.string().uuid(),
+    title: z.string().trim().min(1).max(160) }),
   z.strictObject({ type: z.literal("template.delete"), templateId: z.string().uuid() }),
 ] as const;

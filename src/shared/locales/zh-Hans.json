@@ -184,6 +184,8 @@
   "templates.noObjects": "此会话没有支持模板的对象。",
   "templates.loading": "正在读取对象…",
   "templates.starting": "正在创建会话…",
+  "templates.rename": "重命名模板",
+  "templates.renameDescription": "设置模板名称，用于之后创建的新会话。",
   "templates.delete": "删除模板",
   "templates.deleteDescription": "删除「{title}」？已经使用此模板创建的会话会保留。",
   "templates.unavailable": "此模板需要的资源类型不可用。请启用提供该资源的插件后重试。",

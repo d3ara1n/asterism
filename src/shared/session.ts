@@ -80,6 +80,7 @@ export type SessionData = z.infer<typeof sessionDataSchema>;
 export const sessionReplySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("template.source"), objects: z.array(templateObjectSummarySchema) }),
   z.strictObject({ kind: z.literal("template.saved"), templateId: uuid }),
+  z.strictObject({ kind: z.literal("template.renamed") }),
   z.strictObject({ kind: z.literal("template.deleted") }),
   z.strictObject({ kind: z.literal("view"), data: sessionDataSchema }),
   z.strictObject({ kind: z.literal("accepted"), sessionId: id }),

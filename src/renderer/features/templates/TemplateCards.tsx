@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { Info, LayoutTemplate, MoreHorizontal, Trash2 } from "lucide-react";
+import { Info, LayoutTemplate, MoreHorizontal, PenLine, Trash2 } from "lucide-react";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import type { TemplateSummary, TemplateObjectSummary } from "../../../shared/templates";
 import { templateMessages } from "../../../shared/template-messages";
@@ -13,9 +13,10 @@ import { Item } from "@asterism-app/ui/ui/item";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { StatusText } from "@asterism-app/ui/ui/status";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { TemplateObjectLabel } from "./TemplateObjects";
+import { RenameTemplate } from "./RenameTemplate";
 
 const KIND_PREVIEW_LIMIT = 6;
 
@@ -68,6 +69,9 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<UiText | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const openingRename = useRef(false);
   const starting = busy && !deleting;
   const run = async (action: () => Promise<UiText | null>, onSuccess?: () => void) => {
     if (pending.current || !ready) return;
@@ -116,20 +120,29 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
       <div className="absolute right-2 top-2 opacity-0 focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-xs" disabled={!ready || busy} aria-label={i18n.text(templateMessages.actions)}>
+            <Button ref={trigger} variant="ghost" size="icon-xs" disabled={!ready || busy} aria-label={i18n.text(templateMessages.actions)}>
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
-              <Trash2 />{i18n.text(templateMessages.delete)}
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" onCloseAutoFocus={event => {
+            if (openingRename.current) { event.preventDefault(); openingRename.current = false; }
+          }}>
+            <DropdownMenuGroup>
+              <DropdownMenuItem onSelect={() => { openingRename.current = true; setError(null); setRenaming(true); }}>
+                <PenLine />{i18n.text(templateMessages.rename)}…
+              </DropdownMenuItem>
+              <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
+                <Trash2 />{i18n.text(templateMessages.delete)}
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
     </div>
     {starting && <span role="status" className="sr-only">{i18n.text(templateMessages.starting)}</span>}
     {error && !deleting && <p role="alert" className="mt-2 text-sm"><StatusText tone="error">{i18n.text(error)}</StatusText></p>}
+    {renaming && <RenameTemplate template={template} disabled={!ready || busy} onSaved={onChanged}
+      onClose={() => setRenaming(false)} onRestoreFocus={() => trigger.current?.focus()} />}
     <AlertDialog open={deleting} onOpenChange={open => { if (!pending.current) { setDeleting(open); setError(null); } }}>
       <AlertDialogContent>
         <AlertDialogHeader>

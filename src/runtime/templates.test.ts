@@ -135,6 +135,32 @@ it("saves declared reusable data and selected relationships; reuse excludes unde
   expect(app.execute({ type: "workspace.read" }).templates[0]?.objects.map(object => object.title)).toEqual(["A", "B", "Checklist", undefined]);
 });
 
+it("persists template renames for future conversations while preserving existing conversations and saved data", async () => {
+  const first = open();
+  const sourceId = first.app.sessions.tree.create("Source");
+  const item = await first.plugin.session(sourceId).create(Create, { title: "Checklist", seed: "saved content" });
+  const templateId = await save(first.app, sourceId, [item]);
+  const existingId = await start(first.app, templateId);
+  await first.app.sessions.execute({ type: "template.rename", templateId, title: "  Project setup  " });
+  expect(first.app.execute({ type: "workspace.read" }).templates[0]?.title).toBe("Project setup");
+  await close(first.app);
+
+  const second = open(first.root);
+  expect(second.app.execute({ type: "workspace.read" }).templates[0]?.title).toBe("Project setup");
+  expect(second.app.sessions.current(existingId).title).toBe("Reusable workbench");
+  expect(second.app.sessions.current(sourceId).title).toBe("Source");
+  const createdId = await start(second.app, templateId);
+  const created = second.app.sessions.current(createdId);
+  expect(created.title).toBe("Project setup");
+  expect(created.workbench.objects.map(object => object.title)).toEqual(["Checklist"]);
+  expect(second.plugin.object(createdId, Item, created.workbench.objects[0]!.id).get(State))
+    .toEqual({ text: "saved content", file: null });
+
+  await second.app.sessions.execute({ type: "template.delete", templateId });
+  await expect(second.app.sessions.execute({ type: "template.rename", templateId, title: "Missing" }))
+    .rejects.toMatchObject({ code: "not_found" });
+});
+
 it("omits generated titles from storage and previews and generates each instance title only when starting", async () => {
   const createTitle = vi.fn<() => string>()
     .mockReturnValueOnce("Cedar").mockReturnValueOnce("Birch")
