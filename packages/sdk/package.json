@@ -33,7 +33,7 @@
   },
   "files": [
     "src",
-    "!src/**/*.test.ts",
+    "!**/*.test.*",
     "docs",
     "examples",
     "README.md"

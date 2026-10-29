@@ -18,6 +18,8 @@ The `asterism` field declares a namespaced `id` and the needed `runtime`, `rende
 
 Keep shared declarations separate from executable backend and frontend code. Backend work can use local system capabilities; frontend code works through the host's view and communication facilities.
 
+The `.test.` filename marker is reserved for tests, such as `count.test.ts` or `card.test.tsx`. Tests can remain alongside implementation files. Automatic shared-module discovery and application/package distribution exclude `*.test.*`; runtime entries and their imports contain application code only. Plugin compilation reports explicit imports of test files or Vitest instead of silently removing dependencies.
+
 Start with one capability that demonstrates the plugin's purpose. Add further parts when that capability needs them rather than creating an empty framework in advance.
 
 ## Load and verify

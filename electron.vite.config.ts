@@ -4,9 +4,21 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { applicationBrand } from "./src/shared/application.ts";
 import { coreId } from "./src/shared/core.ts";
+import type { Plugin } from "vite";
+import { assertRuntimeModules } from "./src/shared/runtime-modules.ts";
+import { sharedUiModules } from "./scripts/shared-ui-modules.ts";
+
+function runtimeModules(): Plugin {
+  return {
+    name: coreId("runtime-modules"),
+    apply: "build",
+    generateBundle() { assertRuntimeModules(this.getModuleIds()); },
+  };
+}
 
 export default defineConfig({
   main: {
+    plugins: [runtimeModules()],
     build: {
       // Workspace source packages are compiled statically with the app; release artifacts do not read repository .ts files at runtime.
       externalizeDeps: {
@@ -22,6 +34,7 @@ export default defineConfig({
     },
   },
   preload: {
+    plugins: [runtimeModules()],
     build: {
       outDir: resolve("dist/preload"),
       externalizeDeps: false,
@@ -35,7 +48,7 @@ export default defineConfig({
     root: "src/renderer",
     resolve: { alias: { "@": resolve("src/renderer") } },
     plugins: [
-      react(), tailwindcss(),
+      react(), tailwindcss(), runtimeModules(), sharedUiModules(resolve("packages/ui")),
       {
         name: "application-title",
         transformIndexHtml: {

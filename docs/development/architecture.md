@@ -71,11 +71,15 @@ Deadline values and process supervision belong to the coordinator implementation
 
 Main aggregates logs from itself and child processes in `logs/runtime.log`. Records include startup identity, process, severity, and English diagnostics. Logging remains available during storage failures.
 
+Fatal interface initialization and rendering errors report their JavaScript and component stacks through the trusted desktop bridge into the same log. Reporting these failures is independent of the business runtime connection.
+
 ## Plugin build cache and native tools
 
 The plugin cache stores successful build outputs and dependency graphs, not running instances or service state. Its fingerprint includes build inputs, host bindings, package order, enabled packages, platform, and relevant dependencies and configuration.
 
 Bundled packages use the ordinary package list, validation, compilation, and enablement mechanisms. A plugin can provide its own public export or declare separate public API libraries. Package-name ownership is unique across both mechanisms, and the enabled provider supplies the shared module instance in each environment.
+
+The host's shared UI module table is generated from the package's existing exports, including subpath patterns. Discovery enumerates files without evaluating them and generates imports only for public entries. Test files use the reserved `.test.` filename marker; discovery and distribution exclude them, while compilation rejects explicit runtime imports of tests or the test runner.
 
 A cache hit requires the complete output set. Inputs whose resolution cannot be fully tracked use an ordinary uncached build. The cache does not implement an alternative module resolver.
 

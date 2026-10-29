@@ -7,6 +7,7 @@ import type { AppearanceBridge } from "./theme.ts";
 import { templateSummarySchema } from "./templates.ts";
 import { startupStageSchema, type StartupBridge } from "./startup.ts";
 import type { UpdatesBridge } from "./updates.ts";
+import type { RendererFailure } from "./renderer-failure.ts";
 
 export const protocolVersion = 13;
 export const statusChannel = coreChannel("runtime-status");
@@ -78,6 +79,8 @@ export interface DesktopBridge {
   openLocalFile(path: string): Promise<string>;
   /** Open the application log directory in the system file manager; return error text on failure. */
   openLogs(): Promise<string>;
+  /** Persist fatal interface diagnostics in the application log. */
+  reportFailure(failure: RendererFailure): void;
   /** Local paths for dropped files, resolved by Electron webUtils; renderers cannot fabricate File.path. */
   pathForFile(file: File): string;
   onStatus(listener: (status: RuntimeStatus) => void): () => void;

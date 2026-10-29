@@ -21,7 +21,8 @@ import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
 import { allowRendererPermission } from "./permissions.ts";
 import { StartupCoordinator } from "./startup-coordinator.ts";
-import { initializeApplicationLog } from "./logging.ts";
+import { initializeApplicationLog, recordRendererFailure } from "./logging.ts";
+import { rendererFailureChannel, rendererFailureSchema } from "../shared/renderer-failure.ts";
 import { ApplicationUpdates } from "./updates.ts";
 import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel } from "../shared/startup.ts";
 import { recoveryActionSchema, type RecoveryPoint } from "../shared/recovery.ts";
@@ -143,6 +144,13 @@ function createWindow(): void {
   ipcMain.removeHandler(openLogsChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
+  const reportFailure = (event: Electron.IpcMainEvent, raw: unknown) => {
+    if (!trusted(event)) return;
+    const parsed = rendererFailureSchema.safeParse(raw);
+    if (parsed.success) recordRendererFailure(parsed.data, event.sender.getOSProcessId());
+    else console.error("Invalid renderer failure report.", parsed.error.message);
+  };
+  ipcMain.on(rendererFailureChannel, reportFailure);
   ipcMain.handle(startupGetChannel, event => {
     if (!trusted(event)) throw new Error("Untrusted application frame.");
     return startup.state;
@@ -257,6 +265,7 @@ function createWindow(): void {
   });
   current.on("closed", () => {
     stopDesktopWindow();
+    ipcMain.removeListener(rendererFailureChannel, reportFailure);
     ipcMain.removeListener(connectionRequestChannel, requestConnection);
     for (const channel of [startupGetChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryPointChannel, startupRecoveryChannel, startupInitializedChannel]) ipcMain.removeHandler(channel);
     connectSettings = null;

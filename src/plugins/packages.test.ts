@@ -99,6 +99,19 @@ describe("Plugin packages", () => {
     expect(item!.status).toBe("failed");
     expect(item!.error).toMatch(/Build failed/);
   });
+  it("rejects imported test sources before executing them while loading unrelated plugins", async () => {
+    const data = temp(), broken = temp(), healthy = temp();
+    pkg(broken, { id: "acme.test-import", runtime: "src/runtime.ts" },
+      `import "./helper.test.ts";\n${runtime("acme.test-import")}`);
+    writeFileSync(join(broken, "src/helper.test.ts"), 'throw new Error("Test module was executed.");');
+    pkg(healthy, { id: "acme.healthy", runtime: "src/runtime.ts" }, runtime("acme.healthy"));
+    const list = new PackageList(join(data, "plugins.json"));
+    for (const path of [broken, healthy]) list.add({ source: { kind: "path", path } }, data);
+    const loaded = await loadPackages(list, data, join(data, "cache"), []);
+    expect(loaded.map(item => item.status)).toEqual(["failed", "loaded"]);
+    expect(loaded[0]!.error).toContain("Runtime entry imports a test module");
+    expect(loaded[0]!.error).toContain("helper.test.ts");
+  });
   it("source packages provide real resources using only the public SDK without host-internal factories", async () => {
     const data = temp(); const root = temp();
     pkg(root, { id: "acme.sdk", runtime: "src/runtime.ts" }, `

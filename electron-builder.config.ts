@@ -1,17 +1,27 @@
 import type { Configuration } from "electron-builder";
 import { applicationBrand, applicationId, applicationRepository } from "./src/shared/application.ts";
+import { join } from "node:path";
+import { verifyPackagedPlugins } from "./scripts/verify-package.ts";
+import { testFileGlob } from "./src/shared/runtime-modules.ts";
 
 const config: Configuration = {
   appId: applicationId,
   productName: applicationBrand.en,
   directories: { output: "out", buildResources: "assets/icon" },
   files: [
-    "dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md",
+    "dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md", `!${testFileGlob}`,
     // Explicit directory mappings preserve example declarations that the default application filter excludes.
     ...["docs/manual", ...["sdk", "ui", "builtin-api", "builtin"].map(name => `packages/${name}`)]
-      .map(path => ({ from: path, to: path, filter: ["**/*", "!**/node_modules{,/**}"] })),
+      .map(path => ({ from: path, to: path, filter: ["**/*", "!**/node_modules{,/**}", `!${testFileGlob}`] })),
+    // Public libraries resolve through node_modules, whose default dependency filter omits examples.
+    ...["sdk", "builtin-api"].flatMap(name => ["docs", "examples"].map(directory => ({
+      from: `packages/${name}/${directory}`, to: `node_modules/@asterism-app/${name}/${directory}`, filter: ["**/*", `!${testFileGlob}`],
+    }))),
   ],
   asarUnpack: ["docs/manual/**", "packages/**", "node_modules/**"],
+  afterPack(context) {
+    verifyPackagedPlugins(join(context.packager.getResourcesDir(context.appOutDir), "app.asar.unpacked"));
+  },
   extraResources: [{ from: "assets/icon/asterism-full.png", to: "asterism-full.png" }],
   artifactName: "Asterism-${version}-${os}-${arch}.${ext}",
   publish: { provider: "github", owner: applicationRepository.owner, repo: applicationRepository.name, channel: "latest" },

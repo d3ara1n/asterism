@@ -8,6 +8,7 @@ import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, 
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
 import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupStateSchema, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel, startupNotificationsSchema } from "../shared/startup.ts";
 import { recoveryActionSchema } from "../shared/recovery.ts";
+import { rendererFailureChannel } from "../shared/renderer-failure.ts";
 import { updatesGetChannel, updatesSetChannel, updatesCheckChannel, updatesInstallChannel, updatesChangedChannel, updateStateSchema } from "../shared/updates.ts";
 
 let connectionRequested = false;
@@ -102,6 +103,7 @@ const bridge: DesktopBridge = {
     const result: unknown = await ipcRenderer.invoke(openLogsChannel);
     return typeof result === "string" ? result : "The log folder could not be opened.";
   },
+  reportFailure: failure => ipcRenderer.send(rendererFailureChannel, failure),
   pathForFile: file => webUtils.getPathForFile(file),
   platform: process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : "linux",
   window: {

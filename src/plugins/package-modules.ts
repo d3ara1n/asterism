@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BuildOptions, Plugin } from "esbuild";
 import { publicModuleSource, type PublicProvider, type ModuleRealm } from "../shared/public-modules.ts";
 import { PluginBuildCache } from "./build-cache.ts";
+import { assertRuntimeModules } from "../shared/runtime-modules.ts";
 
 /** Package public entry is standard exports["./public"]; types and runtime share ordinary package imports. */
 export interface PackageModule {
@@ -89,7 +90,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
   if (!packages.some(pkg => enabled.has(pkg.id))) return result;
   const cache = new PluginBuildCache(cacheRoot, {
     // Increment the recipe version when build options, resolvers, or host bridging rules change.
-    recipe: 7, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
+    recipe: 8, esbuild: createRequire(import.meta.url)("esbuild/package.json").version, platform: process.platform, arch: process.arch,
     cwd: process.cwd(), nodePath: process.env.NODE_PATH,
     packages, enabled: [...enabled], publicProviders, hostIdentity,
   });
@@ -198,7 +199,13 @@ export async function compileModules(packages: readonly PackageModule[], enabled
           ".wasm": "file", ".mp3": "file", ".ogg": "file",
         } }),
       plugins: [{ name: "asterism-cache-inputs", setup(build) {
-        build.onEnd(result => { if (result.metafile) cache.inputs(Object.keys(result.metafile.inputs)); });
+        build.onEnd(result => {
+          if (result.metafile) {
+            const inputs = Object.keys(result.metafile.inputs);
+            assertRuntimeModules(inputs);
+            cache.inputs(inputs);
+          }
+        });
       } }, hostModule(realm), resolver(realm, entries.length === 1 ? entries[0] : undefined)],
     });
     const active = packages.filter(pkg => enabled.has(pkg.id));

@@ -1,6 +1,7 @@
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { useI18n } from "../shared/i18n";
 import { FailureScreen } from "./FailureScreen";
+import { reportRendererFailure } from "../shared/failure";
 
 import { Component, type ReactNode } from "react";
 
@@ -10,6 +11,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { error: E
   static getDerivedStateFromError(error: Error) { return { error }; }
   componentDidCatch(error: Error, info: { componentStack?: string | null }) {
     console.error("Renderer failed to display the workspace.", error);
+    reportRendererFailure("render", error, info.componentStack);
     this.setState({ stack: info.componentStack ?? null });
   }
   render() {

@@ -5,6 +5,7 @@ import { createInterface } from "node:readline";
 import { format } from "node:util";
 import type { UtilityProcess } from "electron";
 import { applicationStorage } from "../shared/application.ts";
+import type { RendererFailure } from "../shared/renderer-failure.ts";
 
 let file: string | undefined;
 const startupId = randomUUID();
@@ -35,6 +36,15 @@ export function initializeApplicationLog(root: string, version: string): void {
     };
   }
   console.info(`Application starting. version=${version} startupId=${startupId} pid=${process.pid}`);
+}
+
+export function recordRendererFailure(failure: RendererFailure, pid: number): void {
+  const detail = [
+    `Interface failure. stage=${failure.stage} ${failure.message}`,
+    failure.stack,
+    failure.componentStack && `Component stack:\n${failure.componentStack}`,
+  ].filter(Boolean).join("\n");
+  record("renderer", "error", detail, pid);
 }
 
 /** Collect child output by line; readline delivers the final fragment without a newline when the stream ends. */

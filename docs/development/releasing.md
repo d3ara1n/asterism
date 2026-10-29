@@ -30,6 +30,8 @@ Both triggers use the same release computation. With no published baseline, the 
 
 Each platform build uploads installers and update metadata as Actions artifacts. A single publication job runs after every platform succeeds, downloads the complete artifact set, and publishes the matching npm packages before creating a GitHub Release. macOS uses DMG and update ZIP, Windows uses NSIS, and Linux uses AppImage.
 
+Application builds reject test sources and Vitest in runtime module graphs. Before signing, packaging verifies bundled plugin entries and declared manual directories, including public libraries resolved from the packaged dependency tree. These checks inspect compiled inputs and packaged files; they do not establish GUI acceptance.
+
 The final publication step creates a draft, uploads all assets, and makes the release public only after upload succeeds. On failure it attempts to remove only the draft created by that step; it preserves published releases. GitHub and npm do not share a transaction, so npm packages can already be published if a later GitHub operation fails.
 
 ## Compute versions and notes

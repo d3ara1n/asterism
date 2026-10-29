@@ -7,6 +7,7 @@ import { StartupScreen, type StartupFailure } from "./app/StartupScreen";
 import { StartupError, awaitStartup, waitForRuntime } from "./app/boot";
 import { startupMessages } from "../shared/error-display";
 import type { UiText } from "@asterism-app/sdk/contracts";
+import { reportRendererFailure } from "./shared/failure";
 import "./styles.css";
 
 const root = createRoot(document.getElementById("root")!);
@@ -50,6 +51,7 @@ void boot().catch(error => {
   if (lifetime.signal.aborted) return;
   lifetime.abort();
   console.error("Application interface initialization failed.", error);
+  reportRendererFailure("startup", error);
   const failure: StartupFailure = error instanceof StartupError ? error.failure
     : { reason: error instanceof DOMException && error.name === "TimeoutError" ? "timeout" : "initialization",
       detail: error instanceof Error ? error.message : String(error) };
