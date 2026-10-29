@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Download } from "lucide-react";
 import { type ModelParameters, type ModelParameterUpdate } from "../../../shared/configuration";
 import { modelCatalogMessages as messages } from "../../../shared/model-catalog-messages";
+import { parameterModelId } from "../../../shared/model-catalog-id";
 import { providersMessages } from "../../messages/providers";
 import { modelCostMessages } from "../../messages/model-cost";
 import { useI18n } from "../../shared/i18n";
@@ -21,6 +22,11 @@ export function useModelParameters(modelId: string, disabled: boolean, onFetched
   const i18n = useI18n();
   const { run, busy: pending, error } = useConfigurationAction("inline");
   const [report, setReport] = useState<ModelParameterUpdate | null>(null);
+  const lookupId = parameterModelId(modelId);
+  const hint = [
+    lookupId ? i18n.formatMessage(messages.lookupHint, { modelId: lookupId }) : null,
+    i18n.text(messages.hint),
+  ].filter(Boolean).join(" ");
   const fetchParameters = async () => {
     if (!modelId.trim() || pending || disabled) return;
     setReport(null);
@@ -31,8 +37,9 @@ export function useModelParameters(modelId: string, disabled: boolean, onFetched
   };
   return {
     pending,
+    hint,
     action: <Button type="button" size="sm" variant="outline" disabled={!modelId.trim() || disabled || pending}
-      title={i18n.text(messages.hint)} onClick={() => void fetchParameters()}>
+      title={hint} onClick={() => void fetchParameters()}>
       {pending ? <Spinner data-icon="inline-start" /> : <Download data-icon="inline-start" />}
       {i18n.text(pending ? messages.fetching : messages.fetch)}
     </Button>,

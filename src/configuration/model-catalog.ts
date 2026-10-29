@@ -2,7 +2,8 @@ import { Models, type Catalog, type Model, type ModelMetadata } from "@opencode-
 import { z } from "zod";
 import { modelParametersSchema, thinkingSchema, type ModelParameters, type ModelParameterUpdate } from "../shared/configuration.ts";
 import { modelCatalogMessages as messages } from "../shared/model-catalog-messages.ts";
-import { emptyModelRates, modelCostSchema, type ModelCost, type ModelRates, type UnitPrice } from "@asterism-app/sdk/contracts";
+import { emptyModelRates, modelCostSchema, withValues, type ModelCost, type ModelRates, type UnitPrice } from "@asterism-app/sdk/contracts";
+import { parameterModelId } from "../shared/model-catalog-id.ts";
 import { ConfigurationError } from "./errors.ts";
 
 export type LoadModelCatalog = (signal: AbortSignal) => Promise<Catalog>;
@@ -11,12 +12,10 @@ const client = Models.make({ fetch: (url, init) => fetch(url, { ...init, redirec
 export const loadModelCatalog: LoadModelCatalog = signal => client.catalog({ signal });
 
 type Match = { source: string; model: Model | ModelMetadata };
-/** Parameter lookup only: strip vendor/routing prefixes without rewriting saved or transmitted server model IDs. */
-const parameterModelId = (id: string): string => id.slice(id.lastIndexOf("/") + 1);
 
 function selectModel(catalog: Catalog, modelId: string): Match {
   const lookupId = parameterModelId(modelId);
-  if (!lookupId) throw new ConfigurationError("not_found", "No exact model catalog match was found.", messages.notFound);
+  if (!lookupId) throw new ConfigurationError("not_found", "No exact model catalog match was found.", withValues(messages.notFound, { modelId: lookupId }));
   const matches: Match[] = [];
   for (const [key, metadata] of Object.entries(catalog.models)) {
     // The first catalog key segment is the models.dev vendor group, not another form of the user's model ID.
@@ -27,9 +26,9 @@ function selectModel(catalog: Catalog, modelId: string): Match {
     const native = catalog.providers[lab]?.models[entryId];
     if (parameterModelId(native?.id ?? entryId) === lookupId) matches.push({ source: key, model: native ?? metadata });
   }
-  if (matches.length > 1) throw new ConfigurationError("conflict", "Multiple catalog models match this ID.", messages.ambiguous);
+  if (matches.length > 1) throw new ConfigurationError("conflict", "Multiple catalog models match this ID.", withValues(messages.ambiguous, { modelId: lookupId }));
   const match = matches[0];
-  if (!match) throw new ConfigurationError("not_found", "No exact model catalog match was found.", messages.notFound);
+  if (!match) throw new ConfigurationError("not_found", "No exact model catalog match was found.", withValues(messages.notFound, { modelId: lookupId }));
   return match;
 }
 

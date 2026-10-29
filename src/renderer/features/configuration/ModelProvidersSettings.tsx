@@ -30,7 +30,6 @@ import { ModelCostEditor } from "./ModelCostEditor";
 import { modelProtocolLabels } from "./protocols";
 import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
 import { useModelParameters } from "./ModelParameters";
-import { modelCatalogMessages } from "../../../shared/model-catalog-messages";
 import { ConnectionAuthentication, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
 import { ProviderKeyLink } from "./ProviderKeyLink";
 
@@ -347,7 +346,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
 
     </FieldGroup>
       <EditorSection collapsible title={i18n.formatMessage(providersMessages.parameters)} action={parameters.action}
-        hint={i18n.text(modelCatalogMessages.hint)}
+        hint={parameters.hint}
         status={parameters.feedback}>
         <FieldSet><FieldLegend variant="label">{i18n.formatMessage(providersMessages.capabilities)}</FieldLegend>
           <div className="surface">

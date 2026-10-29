@@ -46,7 +46,9 @@ describe("models.dev parameter lookup", () => {
     expect(() => modelParameters(data, "test-model-thinking-latest")).toThrow(expect.objectContaining({ code: "not_found" }));
     data.models["other/test-model"] = { ...data.models["lab/test-model"]!, id: "other/test-model" };
     expect(() => modelParameters(data, "test-model")).toThrow(expect.objectContaining({ code: "conflict" }));
-    expect(() => modelParameters(data, "lab/test-model")).toThrow(expect.objectContaining({ code: "conflict" }));
+    expect(() => modelParameters(data, "lab/test-model")).toThrow(expect.objectContaining({
+      code: "conflict", display: expect.objectContaining({ values: { modelId: "test-model" } }),
+    }));
   });
 
   it("strips all routing prefixes for exact lookup without accepting suffix or case aliases", () => {
@@ -57,7 +59,9 @@ describe("models.dev parameter lookup", () => {
       expect(modelParameters(data, modelId).source).toBe("lab/vendor/model");
     }
     for (const modelId of ["vendor/", "vendor/model-thinking", "vendor/MODEL"])
-      expect(() => modelParameters(data, modelId)).toThrow(expect.objectContaining({ code: "not_found" }));
+      expect(() => modelParameters(data, modelId)).toThrow(expect.objectContaining({
+        code: "not_found", display: expect.objectContaining({ values: { modelId: modelId.slice("vendor/".length) } }),
+      }));
   });
 
   // Capability toggles and budgets are not level lists; missing values must neither clear fields nor imply complete retrieval.
