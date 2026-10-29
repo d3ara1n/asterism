@@ -1,6 +1,10 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const agentsMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
+  overviewSummary: {
+    id: "features_settings_SettingsPage_7",
+    defaultMessage: "Prompts, tools, and delegation",
+  },
   agent: {
     id: "features_configuration_AgentsSettings_1",
     defaultMessage: "Agent",

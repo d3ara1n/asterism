@@ -25,10 +25,6 @@ export const settingsMessages = pluginNamespace("asterism.host").messages("en", 
     id: "languageLabel",
     defaultMessage: "Interface language",
   },
-  rolesTitle: {
-    id: "rolesTitle",
-    defaultMessage: "Roles",
-  },
   aboutTitle: {
     id: "aboutTitle",
     defaultMessage: "About",
@@ -84,18 +80,6 @@ export const settingsMessages = pluginNamespace("asterism.host").messages("en", 
   providersSummary: {
     id: "features_settings_SettingsPage_4",
     defaultMessage: "Model and web service connections",
-  },
-  rolesSummary: {
-    id: "features_settings_SettingsPage_5",
-    defaultMessage: "Reusable model roles",
-  },
-  agents: {
-    id: "features_settings_SettingsPage_6",
-    defaultMessage: "Agents",
-  },
-  agentsSummary: {
-    id: "features_settings_SettingsPage_7",
-    defaultMessage: "Prompts, tools, and delegation",
   },
   languageSystem: {
     id: "languageSystem",

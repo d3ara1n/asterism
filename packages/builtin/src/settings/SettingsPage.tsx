@@ -45,7 +45,7 @@ function StreamingSettingsPage() {
   </div>;
 }
 export const builtinSettingsPages: readonly PluginSettingsPage[] = [
-  { id: "roles", title: rolesMessages.modelRoles, summary: rolesMessages.summary, icon: Cpu, Body: RolesSettings },
-  { id: "agents", title: agentsMessages.agents, summary: agentsMessages.summary, icon: Bot, Body: AgentsSettings },
+  { id: "roles", title: rolesMessages.title, summary: rolesMessages.overviewSummary, icon: Cpu, Body: RolesSettings },
+  { id: "agents", title: agentsMessages.agents, summary: agentsMessages.overviewSummary, icon: Bot, Body: AgentsSettings },
   { id: "streaming", title: messages.streaming, summary: messages.streamingSummary, icon: TextSelect, Body: StreamingSettingsPage },
 ];

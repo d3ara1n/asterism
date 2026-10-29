@@ -76,34 +76,88 @@ export function PluginsSettings({ manager }: { manager: PluginManager }) {
     {manager.restartRequired && <Alert role="status"><AlertDescription>{i18n.text(messages.restartHint)}</AlertDescription></Alert>}
     {manager.error && <Alert variant="destructive"><AlertDescription>{i18n.text(manager.error)}<Button variant="outline" size="sm" disabled={manager.busy} onClick={() => { void manager.run({ type: "workspace.read" }); }}><RefreshCw />{i18n.text(messages.retry)}</Button></AlertDescription></Alert>}
     <ItemGroup>
-      {list.map(plugin => {
-        const status = pluginStatus(plugin, failures);
-        const failure = plugin.error ?? (plugin.id ? failures.get(plugin.id) : undefined);
-        const index = plugin.index;
-        return <Item key={plugin.source} className="items-start border-b last:border-b-0">
-          {plugin.metadata.icon ? <img src={plugin.metadata.icon} alt="" className="size-8 shrink-0 object-contain" /> : <Puzzle className="size-8 shrink-0 text-muted-foreground" aria-hidden="true" />}
-          <ItemContent className="min-w-0">
-            <ItemTitle>{i18n.text(pluginName(plugin))}</ItemTitle>
-            {plugin.metadata.description && <ItemDescription className="text-wrap">{i18n.text(plugin.metadata.description)}</ItemDescription>}
-            <p className="type-caption">{[plugin.metadata.author, plugin.metadata.version].filter(Boolean).join(" · ")}</p>
-            <p className="type-caption break-all">{plugin.id}<br />{plugin.source}</p>
-            <div className="flex flex-wrap gap-2"><StatusBadge tone={tones[status]}>{i18n.text(labels[status])}</StatusBadge>{plugin.bundled && <Badge variant="secondary">{i18n.text(messages.builtIn)}</Badge>}</div>
-            {failure && <Alert variant="destructive"><AlertDescription className="select-text break-words">{failure}</AlertDescription></Alert>}
-          </ItemContent>
-          <ItemActions>
-            <Switch checked={plugin.enabled} disabled={manager.busy} aria-label={i18n.formatMessage(messages.enablePlugin, { plugin_name: i18n.text(pluginName(plugin)) })}
-              onCheckedChange={enabled => { void manager.run({ type: "plugin.enable", index, enabled }); }} />
-            <AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="sm" className="text-destructive" disabled={manager.busy}>{i18n.text(messages.remove)}</Button></AlertDialogTrigger>
-              <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{i18n.text(messages.removeTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.text(messages.removeHint)}</AlertDialogDescription></AlertDialogHeader>
-                <AlertDialogFooter><AlertDialogCancel>{i18n.text(messages.cancel)}</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { void manager.run({ type: "plugin.remove", index }); }}>{i18n.text(messages.remove)}</AlertDialogAction></AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </ItemActions>
-        </Item>;
-      })}
+      {list.map(plugin => (
+        <PluginListItem
+          key={plugin.source}
+          plugin={plugin}
+          status={pluginStatus(plugin, failures)}
+          failure={plugin.error ?? (plugin.id ? failures.get(plugin.id) : undefined)}
+          manager={manager}
+        />
+      ))}
     </ItemGroup>
     {!list.length && !manager.busy && <p className="type-caption py-6 text-center">{i18n.text(messages.noResults)}</p>}
   </div>;
+}
+
+function PluginListItem({ plugin, status, failure, manager }: {
+  plugin: PluginInfo;
+  status: PluginInfo["status"];
+  failure?: string;
+  manager: PluginManager;
+}) {
+  const i18n = useI18n();
+  const name = i18n.text(pluginName(plugin));
+  const { index, metadata } = plugin;
+  const details = [metadata.author, metadata.version, plugin.id, plugin.source].filter(Boolean).join(" · ");
+
+  return (
+    <Item size="sm" className="flex-nowrap items-start border-b last:border-b-0">
+      {metadata.icon ? (
+        <img src={metadata.icon} alt="" className="size-8 shrink-0 object-contain" />
+      ) : (
+        <Puzzle className="size-8 shrink-0 text-muted-foreground" aria-hidden="true" />
+      )}
+      <ItemContent className="min-w-0">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <ItemTitle className="min-w-0 max-w-full wrap-anywhere">{name}</ItemTitle>
+            <StatusBadge tone={tones[status]}>{i18n.text(labels[status])}</StatusBadge>
+            {plugin.bundled && <Badge variant="secondary">{i18n.text(messages.builtIn)}</Badge>}
+          </div>
+          <ItemActions className="shrink-0">
+            <Switch
+              checked={plugin.enabled}
+              disabled={manager.busy}
+              aria-label={i18n.formatMessage(messages.enablePlugin, { plugin_name: name })}
+              onCheckedChange={enabled => { void manager.run({ type: "plugin.enable", index, enabled }); }}
+            />
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-destructive" disabled={manager.busy}>
+                  {i18n.text(messages.remove)}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>{i18n.text(messages.removeTitle)}</AlertDialogTitle>
+                  <AlertDialogDescription>{i18n.text(messages.removeHint)}</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>{i18n.text(messages.cancel)}</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => { void manager.run({ type: "plugin.remove", index }); }}
+                  >
+                    {i18n.text(messages.remove)}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </ItemActions>
+        </div>
+        {metadata.description && (
+          <ItemDescription className="text-wrap wrap-anywhere">{i18n.text(metadata.description)}</ItemDescription>
+        )}
+        <p className="type-caption select-text wrap-anywhere">{details}</p>
+        {failure && (
+          <Alert variant="destructive">
+            <AlertDescription className="select-text wrap-anywhere">{failure}</AlertDescription>
+          </Alert>
+        )}
+      </ItemContent>
+    </Item>
+  );
 }
 
 /** Page communication and opened islands follow the page lifetime; a failed page can be retried independently. */

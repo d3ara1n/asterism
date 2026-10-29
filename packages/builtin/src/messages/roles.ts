@@ -1,6 +1,14 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const rolesMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
+  title: {
+    id: "rolesTitle",
+    defaultMessage: "Roles",
+  },
+  overviewSummary: {
+    id: "features_settings_SettingsPage_5",
+    defaultMessage: "Reusable model roles",
+  },
   model: {
     id: "features_configuration_RolesSettings_7",
     defaultMessage: "Model",
