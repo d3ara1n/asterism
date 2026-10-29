@@ -11,15 +11,6 @@ const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
 const within = (root: string, path: string) => pathWithin(root, path) !== null;
 const failure = (reason: string, message: string): never => { throw new PluginApiError("rejected", message, reason); };
 
-/** Resolve assets against the contributing package, including compiled and symlink-installed packages. */
-export function packageAsset(root: string, path: string): string {
-  if (isAbsolute(path) || path.includes("\0")) throw new PluginApiError("invalid_argument", "Assets use package-relative paths.");
-  const base = realpathSync(root), candidate = resolve(base, path);
-  if (!within(base, candidate)) throw new PluginApiError("invalid_argument", "The asset path is outside the package.");
-  const actual = realpathSync(candidate);
-  if (!within(base, actual)) throw new PluginApiError("invalid_argument", "The asset symbolic link is outside the package.");
-  return actual;
-}
 function skillFile(directory: string, path: string): string {
   if (isAbsolute(path) || path.includes("\0")) return failure("invalid_skill_path", "path is a relative file path within the selected skill package.");
   const candidate = resolve(directory, path);

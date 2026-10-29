@@ -1,12 +1,12 @@
-import type { CallResult } from "@asterism-app/sdk/runtime";
+import type { CallResult, ShellExecution } from "@asterism-app/sdk/runtime";
 import type { Json } from "@asterism-app/sdk/contracts";
 import { MAX_TIMEOUT_SECONDS, type ExecResult, type ShellSettings } from "@asterism-app/sdk/contracts";
 import { ShellOutputBuffer } from "./output.ts";
 import { resolveShell } from "./profiles.ts";
 import { startShellProcess, type ShellProcess } from "./process.ts";
 
-/** Configuration and piped execution for directory exec; each call owns its process, while the host manages cancellation and settling. */
-export class ShellService {
+/** Piped shell execution; each call owns its process, while the host manages cancellation and settling. */
+export class ShellExecutor implements ShellExecution {
   constructor(private readonly settings: () => ShellSettings, private readonly closingSignal: AbortSignal,
     private readonly temporaryRoot?: string) {}
   async inspect(): Promise<Json> {

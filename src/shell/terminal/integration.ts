@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
-import type { ResolvedShell } from "../shell/profiles.ts";
+import type { ResolvedShell } from "../profiles.ts";
 
 /**
  * Shell integration adapter: integration reports only prompts, execution boundaries, exit codes, and the current directory (OSC 133/633 semantics); the shell still handles command editing.

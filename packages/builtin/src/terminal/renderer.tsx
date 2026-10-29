@@ -14,7 +14,7 @@ import { terminalMessages } from "../messages/terminal";
 import { TerminalActions, TerminalCard } from "./TerminalCard";
 import { prepareTerminalImages } from "./image-renderer";
 import { CreateTerminal, TerminalResource, TerminalView, TerminalInput, TerminalRead, TerminalWait, TerminalSee } from "./contract";
-import { TerminalProfilesCatalog, type TerminalStatus } from "@asterism-app/sdk/contracts";
+import { ShellProfilesCatalog, type TerminalStatus } from "@asterism-app/sdk/contracts";
 import type { z } from "zod";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { useRendererObject, useRendererApplication } from "@asterism-app/sdk/renderer";
@@ -26,7 +26,7 @@ const DEFAULT_PROFILE = "default";
 const profileValue = (id: string) => `profile:${id}`;
 
 function TerminalCreation({ initialInput, busy, resolve, cancel }: CreationInputProps<{ title?: string; cwd?: string; profile?: string }>) {
-  const i18n = useI18n(), catalogs = useRendererCatalogs(), settings = catalogs.get(TerminalProfilesCatalog);
+  const i18n = useI18n(), catalogs = useRendererCatalogs(), settings = catalogs.get(ShellProfilesCatalog);
   const application = useRendererApplication();
   const [title, setTitle] = useState(initialInput?.title ?? ""), [cwd, setCwd] = useState(initialInput?.cwd ?? "");
   const [profile, setProfile] = useState<string | undefined>(initialInput?.profile), [browsing, setBrowsing] = useState(false);

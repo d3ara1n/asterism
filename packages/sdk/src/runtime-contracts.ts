@@ -20,9 +20,10 @@ import type { PluginCalls } from "./calls.ts";
 import type { CallContribution } from "./runtime-calls.ts";
 import type { ChannelContribution } from "./runtime-channels.ts";
 import type { TopLevelTool } from "./runtime-tools.ts";
-import type { ModelProviderServices, UsageProviderServices, UsageProvider, UsageServices } from "./runtime-providers.ts";
+import type { ModelProviderServices } from "./runtime-model-providers.ts";
+import type { UsageProviderServices, UsageProvider, UsageServices, ProviderUsage } from "./runtime-usage.ts";
 import type { WebServices, WebProviderServices, WebProviderDefinition } from "./runtime-web.ts";
-import type { ModelProviderPresetContribution } from "./provider-usage.ts";
+import type { ModelProviderPresetContribution } from "./model-provider.ts";
 import type { AgentCatalog, AgentSkillDeclaration, AgentInstructionDeclaration } from "./runtime-agent-catalog.ts";
 import type { SessionCreation } from "./runtime-sessions.ts";
 export type * from "./objects.ts";
@@ -39,9 +40,7 @@ export interface Lifetime {
 }
 export interface PluginContext {
   readonly mcp: import("./runtime-mcp.ts").McpServices;
-  readonly terminalProfiles: import("./runtime-shell.ts").TerminalProfiles;
-  readonly commands: import("./runtime-shell.ts").CommandExecution;
-  readonly terminals: import("./runtime-shell.ts").TerminalSessions;
+  readonly shell: import("./runtime-shell.ts").ShellServices;
   readonly application: import("./runtime-application.ts").ApplicationIdentity;
   readonly manual: import("./runtime-application.ts").ManualCatalog;
   readonly id: string;
@@ -63,7 +62,7 @@ export interface PluginContext {
   readonly modelProviders: ModelProviderServices;
   readonly usageProviders: UsageProviderServices;
   readonly usages: UsageServices;
-  readonly providerUsage: import("./runtime-providers.ts").ProviderUsage;
+  readonly providerUsage: ProviderUsage;
   readonly webProviders: WebProviderServices;
   readonly web: WebServices;
   session(id: string): SessionExecutor;

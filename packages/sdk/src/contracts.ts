@@ -26,6 +26,7 @@ export * from "./model-catalog.ts";
 export * from "./model-cost.ts";
 export * from "./model-cost-estimate.ts";
 export * from "./model-media.ts";
+export * from "./model-provider.ts";
 export * from "./provider-usage.ts";
 export * from "./web.ts";
 

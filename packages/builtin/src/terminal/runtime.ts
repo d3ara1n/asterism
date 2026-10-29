@@ -22,7 +22,7 @@ export function createTerminalModule() { return defineModule(plugin => {
   /** Resources newly created in this run and awaiting an appearance notification; start automatically when they appear. */
   const pendingStart = new Set<string>();
   const images = new Map<string, { resolve(png: Uint8Array): void; reject(error: Error): void }>();
-  const settings = () => plugin.terminalProfiles.get();
+  const settings = () => plugin.shell.profiles.get();
   const release = (id: string): Promise<void> => {
     pendingStart.delete(id);
     const terminal = terminals.get(id);
@@ -33,7 +33,7 @@ export function createTerminalModule() { return defineModule(plugin => {
   function terminal(config: TerminalConfig, ref: ObjectReader["ref"]): InteractiveTerminal {
     const existing = terminals.get(ref.id);
     if (existing) return existing;
-    const created = plugin.terminals.create(config, {
+    const created = plugin.shell.terminals.create(config, {
       // The session list marks only startup failures; individual interactive shell commands do not create completion or persistent-running markers.
       failed(error) {
         if (plugin.lifetime.signal.aborted || terminals.get(ref.id) !== created) return;

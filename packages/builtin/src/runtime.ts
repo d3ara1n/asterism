@@ -41,7 +41,7 @@ export default definePlugin({ namespace: builtin,
             return { snapshot: resolveParadigmConfiguration(settings.get().paradigm), savedId: input.type === "remove" ? null : input.value.id };
           })],
         modules: [defineAgentInstructions([{ id: "environment", text: environment(application.name).text }]),
-        providers, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.commands), createNamingModule(application.userAgent), notes, questions,
+        providers, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.shell), createNamingModule(application.userAgent), notes, questions,
         resourceOperations, mcp, web, mesh, createManualModule(() => plugin.manual.sources(), application.name), createShellModule(), createTerminalModule(),
         defineAgentCreation({ id: CreateMesh.id, creation: CreateMesh,
           description: "Create a Mesh resource in the default channel. Mesh provides list, send, peek, get_profile, and set_profile for Agents exposed to its channel across sessions.",

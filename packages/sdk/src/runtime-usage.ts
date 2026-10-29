@@ -1,5 +1,7 @@
-import type { ModelProviderConnection, ModelProviderPreset, ProviderUsageError, UsageItem, UsageProviderInfo } from "./provider-usage.ts";
+import type { ProviderUsageError, UsageItem, UsageProviderInfo } from "./provider-usage.ts";
 import type { UiText } from "./i18n.ts";
+import type { ProviderUsageState } from "./usage-state.ts";
+import type { ModelResponse } from "./models.ts";
 
 /** Consumers explicitly supply the connection and credentials required for the query. */
 export interface UsageQueryContext {
@@ -33,20 +35,6 @@ export type UsageProvider = QueryUsageProvider | HeadersUsageProvider;
 export class UsageQueryError extends Error {
   constructor(readonly code: ProviderUsageError) { super(`Provider usage query failed: ${code}.`); }
 }
-export interface ModelProviderServices {
-  presets(): readonly ModelProviderPreset[];
-  list(): readonly ModelProviderInfo[];
-  get(id: string): ModelProviderInfo | null;
-  /** Backend only; reads the connection's current credentials, returning null for connections without authentication. */
-  credential(id: string, options?: { signal?: AbortSignal }): Promise<string | null>;
-  /** Connection or preset catalog changes; returns an unsubscribe function and unsubscribes automatically when the plugin closes. */
-  subscribe(listener: () => void): () => void;
-}
-export interface ModelProviderInfo extends ModelProviderConnection {
-  id: string;
-  name: string;
-  enabled: boolean;
-}
 export interface UsageProviderServices {
   list(): readonly UsageProviderInfo[];
   /** Obtain an implementation bound to the provider lifecycle; does not select connections, read credentials, or save results. */
@@ -61,6 +49,6 @@ export interface UsageServices {
 
 /** Host cache and shared queries; consumers supply response headers they obtained themselves. */
 export interface ProviderUsage {
-  query(id: string, options?: { signal?: AbortSignal; refresh?: boolean }): Promise<import("./usage-state.ts").ProviderUsageState>;
-  consume(response: import("./models.ts").ModelResponse): void;
+  query(id: string, options?: { signal?: AbortSignal; refresh?: boolean }): Promise<ProviderUsageState>;
+  consume(response: ModelResponse): void;
 }

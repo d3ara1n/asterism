@@ -17,7 +17,7 @@ export function createShellModule() {
       effect: "read", execution: "parallel",
       async execute(_args, { signal }) {
         if (signal.aborted) return { kind: "cancelled", message: "Shell profile listing was cancelled." };
-        const data = await plugin.terminalProfiles.list();
+        const data = await plugin.shell.profiles.list();
         if (signal.aborted) return { kind: "cancelled", message: "Shell profile listing was cancelled." };
         return { kind: "succeeded", data };
       },

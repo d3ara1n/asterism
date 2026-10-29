@@ -1,9 +1,10 @@
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { McpChanged, ReadUsage, UsageChanged } from "@asterism-app/sdk/contracts";
-import { implementCall, type ManualSource, type ModelProviderServices, type UsageProviderServices } from "@asterism-app/sdk/runtime";
+import { implementCall, type ManualSource } from "@asterism-app/sdk/runtime";
 import type { ConfigurationService } from "../configuration/service.ts";
 import { ProviderUsageService } from "../configuration/usage.ts";
+import { createModelProviderServices, createUsageProviderServices } from "../configuration/provider-services.ts";
 import { McpApplication } from "../mcp/application.ts";
 import { AgentCatalogService } from "../plugins/agent-catalog.ts";
 import type { EventBus } from "../plugins/events.ts";
@@ -23,35 +24,6 @@ export interface SharedServiceOptions {
   skillDirectories: readonly string[];
 }
 
-/** Plugin-facing view of configured model providers; credentials are read at request time. */
-function modelProviders(configuration: ConfigurationService): ModelProviderServices {
-  const connection = (id: string) => {
-    const provider = configuration.current().modelProviders.find(item => item.id === id);
-    if (!provider) return null;
-    const { credentialState: _state, ...value } = provider;
-    return value;
-  };
-  return {
-    presets: () => configuration.extensions.presets(),
-    list: () => configuration.current().modelProviders.map(({ credentialState: _state, ...value }) => value),
-    get: connection,
-    credential: async (id, options) => {
-      options?.signal?.throwIfAborted();
-      const value = await configuration.executionCredential(id);
-      options?.signal?.throwIfAborted();
-      return connection(id)?.auth === "none" ? null : value;
-    },
-    subscribe: listener => configuration.subscribeProviders(listener),
-  };
-}
-function usageProviders(configuration: ConfigurationService): UsageProviderServices {
-  return {
-    list: () => configuration.extensions.usageProviders(),
-    get: id => configuration.extensions.get(id),
-    subscribe: listener => configuration.extensions.subscribe(listener),
-  };
-}
-
 /** The single composition point for host services shared by all plugins; closing ends their connections, processes and caches. */
 export function createSharedServices(options: SharedServiceOptions): SharedServices & { close(): Promise<void> } {
   const { configuration, events } = options;
@@ -60,7 +32,7 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
   const shell = new ShellHost(() => configuration.shellSettings(), join(options.dataRoot, applicationStorage.shellIntegrationDirectory));
   const agentCatalog = new AgentCatalogService(options.skillDirectories);
   const stopCatalog = agentCatalog.subscribe(() => events.publish(SkillsChanged, null, agentCatalog.skills()));
-  const models = modelProviders(configuration), usages = usageProviders(configuration);
+  const models = createModelProviderServices(configuration), usages = createUsageProviderServices(configuration);
   const usage = new ProviderUsageService(models, usages, providerId => events.publish(UsageChanged, null, { providerId }));
   return {
     mcp, shell, usage, agentCatalog, modelProviders: models, usageProviders: usages,

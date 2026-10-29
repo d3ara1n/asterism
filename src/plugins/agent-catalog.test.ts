@@ -2,7 +2,8 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, realpathSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { AgentCatalogService, packageAsset, parseSkillMetadata } from "./agent-catalog.ts";
+import { AgentCatalogService, parseSkillMetadata } from "./agent-catalog.ts";
+import { packageAsset } from "./package-assets.ts";
 
 const roots: string[] = [];
 const signal = new AbortController().signal;

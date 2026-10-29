@@ -37,7 +37,7 @@ export const shellSettingsSchema = z.strictObject({
     ctx.addIssue({ code: "custom", path: ["selected"], message: "Select an existing shell profile or auto." });
 });
 export type ShellSettings = z.infer<typeof shellSettingsSchema>;
-export const TerminalProfilesCatalog = defineData("asterism.shell/profiles", shellSettingsSchema);
+export const ShellProfilesCatalog = defineData("asterism.shell/profiles", shellSettingsSchema);
 
 export const shellProfileListSchema = z.strictObject({
   selected: z.string(),

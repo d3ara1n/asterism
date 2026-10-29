@@ -31,3 +31,13 @@ A tool contribution can capture resource-specific configuration and access at th
 Typed calls connect request and response between services or views. Events announce transient changes. Object channels support sustained data such as an interactive screen.
 
 An action or service call is not automatically a model tool. Expose it deliberately when the model needs that operation.
+
+## Use shell capabilities
+
+Backend plugins access shell profiles, one-shot execution, and interactive terminals through `plugin.shell`. Profiles are shared host configuration: `profiles.get()` reads that configuration, while `profiles.list()` resolves executable availability. Plugins choose how to expose these capabilities through their resources and tools.
+
+Use `shell.execute(cwd, args, options)` for a noninteractive command with piped output, progress, and a final result. Each execution owns its process; cancellation or timeout stops that execution without undoing completed effects.
+
+Use `shell.terminals.create(config, events)` for a persistent interactive session. Start the returned handle when needed and register its disposal with the owning resource or plugin lifetime. Closing a terminal permits reopening the handle; disposing it releases it permanently. Input and readiness waits are separate operations, and cancelling a wait leaves the shell running.
+
+A terminal can serve several views through its typed input/output messages. Plugins connect viewers through object channels and choose their own presentation. Backend reads expose screen text, retained output, or character-cell image data. The host owns the PTY and screen state; a terminal handle does not create a workbench resource or model tool by itself.

@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
-import { descendantsOf } from "../shell/process-tree.ts";
+import { descendantsOf } from "../process-tree.ts";
 import type { ShellSettings } from "@asterism-app/sdk/contracts";
-import { resolveShell } from "../shell/profiles.ts";
+import { resolveShell } from "../profiles.ts";
 import { prepareLaunch, type IntegrationMode } from "./integration.ts";
 import { HeadlessScreen } from "./screen.ts";
 import { inactiveStatus, type TerminalConfig, type TerminalDown, type TerminalState, type TerminalStatus, type TerminalUp } from "@asterism-app/sdk/contracts";
@@ -295,7 +295,7 @@ async function terminate(process: pty.IPty, exited: Promise<void>) {
 interface ViewerState { viewer: TerminalViewer; live: boolean; unacked: number }
 
 /**
- * External instance corresponding to a terminal resource: the resource object is only an entry point; the instance is created on opening and ends on closing or resource disappearance.
+ * Reopenable terminal session; the owning plugin chooses when to start, close, and dispose it.
  * All views share one instance; each view receives a screen snapshot first, followed by subsequent output.
  */
 export class SharedTerminal {

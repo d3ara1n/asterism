@@ -7,7 +7,8 @@ export * from "./runtime-resources.ts";
 export * from "./runtime-calls.ts";
 export * from "./runtime-channels.ts";
 export * from "./runtime-tools.ts";
-export * from "./runtime-providers.ts";
+export type * from "./runtime-model-providers.ts";
+export * from "./runtime-usage.ts";
 export * from "./runtime-web.ts";
 export * from "./runtime-agent-catalog.ts";
 export * from "./runtime-sessions.ts";
@@ -48,4 +49,5 @@ export interface PluginTasks {
 export type * from "./runtime-application.ts";
 
 export * from "./runtime-shell.ts";
+export * from "./runtime-terminal.ts";
 export type * from "./runtime-mcp.ts";

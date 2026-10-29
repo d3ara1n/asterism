@@ -6,7 +6,7 @@ import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts
 import type { ContentLease } from "../runtime/content-store.ts";
 import type { NodeView } from "../session/view.ts";
 import type { McpApplication } from "../mcp/application.ts";
-import type { ShellHost } from "../shell/host.ts";
+import type { ShellServices } from "@asterism-app/sdk/runtime";
 import type { AgentCatalogService } from "./agent-catalog.ts";
 import type { WebProviderRegistry } from "../configuration/web-providers.ts";
 import type { ModelProviderExtensions } from "../configuration/provider-extensions.ts";
@@ -14,7 +14,7 @@ import type { ModelProviderExtensions } from "../configuration/provider-extensio
 /** Application-wide services composed once by the host and shared by every plugin context. */
 export interface SharedServices {
   mcp: McpApplication;
-  shell: Pick<ShellHost, "profiles" | "commands" | "terminals">;
+  shell: ShellServices;
   usage: ProviderUsage;
   agentCatalog: AgentCatalogService;
   modelProviders: ModelProviderServices;
