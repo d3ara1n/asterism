@@ -12,6 +12,8 @@ export interface ToolContract<A extends Json = Json> extends ContractReference {
   description: string;
   guidelines: readonly string[];
   argsSchema: z.ZodType<A>;
+  /** Execution requires an endpoint that can receive user interaction. Output rendering alone does not require it. */
+  requiresInteraction?: boolean;
 }
 /** Tool definitions fix selection descriptions, usage guidance, and args; implementations add only target/result and execution information. */
 export interface ImplementationContract<S extends Json, T extends Json, A extends Json, O extends Json> extends DataContract<O> {

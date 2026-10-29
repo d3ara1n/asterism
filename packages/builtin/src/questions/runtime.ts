@@ -15,6 +15,7 @@ export default defineModule(plugin => {
     events: [QuestionsChanged],
     topLevelTools: [defineTopLevelTool({
       id: AskUserResult.id, name: "ask_user",
+      requiresInteraction: true,
       description: "Ask the user to make a decision or supply missing information. Waits until the user answers or cancels.",
       guidelines: [
         "One call presents a group of single-choice, multiple-choice, or text questions.",

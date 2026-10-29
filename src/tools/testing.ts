@@ -13,10 +13,10 @@ export function implement<S extends Json, T extends Json, A extends Json, D exte
   return {
     reference: reference(contract), resourceKind: contract.resource.kind, tool: contract.tool,
     effect: contract.effect, targetSchema: contract.targetSchema, resultSchema: contract.schema,
-    prepare(resource, target, args, caller) {
+    prepare(resource, target, args, caller, interactive = true) {
       const snapshot = resourceSnapshot({ sessionId: "test", id: resource.id, kind: resource.kind }, resource);
       // These pure execution test handlers do not use object capabilities; sdk-runtime.test.ts verifies real object binding.
-      return contribution.prepare(snapshot, undefined as unknown as ObjectExecutor, target, args, caller);
+      return contribution.prepare(snapshot, undefined as unknown as ObjectExecutor, target, args, caller, interactive);
     },
   };
 }

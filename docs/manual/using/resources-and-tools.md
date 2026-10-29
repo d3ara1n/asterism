@@ -72,4 +72,6 @@ Switching a Mesh's channel keeps its workbench links and local task descriptions
 
 Use the object panel to find resources and reopen their cards. Hiding a card retains the object. Removing a resource removes it from the current workbench and clears its links; historical records remain.
 
+A dashed link shows that it has been disconnected but earlier requests are still using it. Its number is the remaining request count. A dashed resource card has been removed and is finishing existing work or cleanup. New requests cannot use these removed links or resources. The temporary indicators disappear when the outstanding work ends.
+
 Choose **Rename resource** from a card's action menu to change its title. Models can rename a linked resource with `resource_rename`, supplying its `resource_id` and new `title`. Names are limited to 160 characters and must contain non-whitespace text. Renaming records an event, so historical views and branches retain the names on their own paths. The resource ID, links, and underlying files or paths stay the same.

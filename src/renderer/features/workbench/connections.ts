@@ -8,13 +8,14 @@ export const defaultConnectionPorts: ConnectionPort[] = sides.map(side => ({ id:
 
 type LayoutNode = { id: string; position: Point; measured?: { width?: number; height?: number } };
 type Endpoint = { id: string; order: number };
+type DisplayLink = WorkbenchSnapshot["links"][number] & { holds?: number };
 export type ConnectionEdge = {
   id: string; source: string; target: string; sourceHandle: string; targetHandle: string;
-  data: { links: WorkbenchSnapshot["links"] };
+  data: { links: DisplayLink[] };
 };
 
 /** Endpoints are a layout projection: choose among four sides by the other object's position, then sort and distribute on each side by the other object's coordinates, without changing link direction. */
-export function layoutConnections(nodes: readonly LayoutNode[], links: WorkbenchSnapshot["links"]) {
+export function layoutConnections(nodes: readonly LayoutNode[], links: readonly DisplayLink[]) {
   const geometry = new Map(nodes.map(node => {
     const width = node.measured?.width ?? fallbackCardWidth;
     const height = node.measured?.height ?? fallbackCardHeight;
@@ -26,8 +27,9 @@ export function layoutConnections(nodes: readonly LayoutNode[], links: Workbench
   const pairs = new Map<string, ConnectionEdge>();
   for (const link of links) {
     if (!geometry.has(link.resourceId) || !geometry.has(link.receiverId)) continue;
-    // Display identity depends only on the object pair; adding or removing the reverse relationship preserves connection selection and endpoint identities.
-    const id = [link.receiverId, link.resourceId].sort().map(encodeURIComponent).join(":");
+    // Active directions share a connection; pending directions keep separate endpoints and hold labels.
+    const pair = [link.receiverId, link.resourceId].sort().map(encodeURIComponent).join(":");
+    const id = link.holds === undefined ? pair : `${pair}:held:${encodeURIComponent(link.resourceId)}`;
     const existing = pairs.get(id);
     if (existing) existing.data.links.push(link);
     else pairs.set(id, { id, source: link.resourceId, target: link.receiverId, sourceHandle: id, targetHandle: id, data: { links: [link] } });

@@ -14,7 +14,7 @@ export interface AgentCatalog {
   skills(): readonly AgentSkillSource[];
   instructions(): readonly AgentInstruction[];
   refresh(signal: AbortSignal): readonly AgentSkillSource[];
-  /** Read current UTF-8 contents from the captured skill package, independently of later catalog refreshes. */
+  /** Read current UTF-8 contents from the supplied skill package. */
   read(skill: AgentSkill, path: string, signal: AbortSignal): Promise<string>;
 }
 /** Package-relative skill directories; the host supplies the actual contributor identity. */

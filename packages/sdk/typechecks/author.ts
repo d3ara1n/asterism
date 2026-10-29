@@ -38,7 +38,7 @@ export function rejectInvalidUsage(plugin: PluginContext, object: ObjectExecutor
     writer.append(CountChanged, { value: "wrong" });
   });
   // @ts-expect-error Each call must explicitly provide the target, prompt, projected input, and event consumer.
-  plugin.models.run({ object: object.ref, signal: new AbortController().signal });
+  plugin.models.run({ signal: new AbortController().signal });
 }
 
 export function parsedInputExamples() {

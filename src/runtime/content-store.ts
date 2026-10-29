@@ -96,14 +96,19 @@ export class ContentStore {
   private readonly uploads = new Map<string, Upload>();
   private readonly candidates = new Set<string>();
   /** Request holds for an object retain staged tool content until result records register roots; visible only to commits from the same object. */
-  private readonly handovers = new Map<string, ContentLease>();
+  private readonly handovers = new Map<string, Set<ContentLease>>();
   handover(sessionId: string, objectId: string): ContentLease {
     const key = `${sessionId}\0${objectId}`, lease = this.scope();
-    this.handovers.set(key, lease);
+    const leases = this.handovers.get(key) ?? new Set();
+    leases.add(lease);
+    this.handovers.set(key, leases);
     return lease;
   }
   releaseHandover(lease: ContentLease): void {
-    for (const [key, value] of this.handovers) if (value === lease) this.handovers.delete(key);
+    for (const [key, leases] of this.handovers) {
+      leases.delete(lease);
+      if (!leases.size) this.handovers.delete(key);
+    }
   }
   private collecting = false;
   private closed = false;
@@ -182,7 +187,8 @@ export class ContentStore {
     if (access.scope?.refs.has(row.id)) return row;
     if (access.templateId && this.db.prepare("SELECT 1 FROM template_content_roots WHERE template_id = ? AND content_id = ?")
       .get(access.templateId, row.id)) return row;
-    if (access.allowHandover !== false && access.sessionId && this.handovers.get(`${access.sessionId}\0${access.objectId ?? ""}`)?.refs.has(row.id)) return row;
+    if (access.allowHandover !== false && access.sessionId
+      && [...this.handovers.get(`${access.sessionId}\0${access.objectId ?? ""}`) ?? []].some(lease => lease.refs.has(row.id))) return row;
     if (access.sessionId) {
       const roots = this.db.prepare("SELECT kind, root_id FROM content_roots WHERE session_id = ? AND object_id = ? AND content_id = ?")
         .all(access.sessionId, access.objectId ?? "", row.id) as { kind: string; root_id: string }[];

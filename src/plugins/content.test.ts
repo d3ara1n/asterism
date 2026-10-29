@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@asterism-app/sdk/contracts";
-import { implementCall, defineModule, definePlugin, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext } from "@asterism-app/sdk/runtime";
+import { implementCall, defineModule, definePlugin, defineTopLevelTool, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext, type TopLevelTool } from "@asterism-app/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { contentLimits } from "../runtime/content-store.ts";
 import { serveContent } from "../runtime/dispatch.ts";
@@ -28,12 +28,12 @@ afterEach(async () => {
   for (const service of services.splice(0)) await service.close();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; prepareAction?: (content: ContentScope, signal: AbortSignal) => Promise<void>; onCreate?: (object: ObjectExecutor) => void; extra?: ReturnType<typeof definePlugin>[]; adapter?: ModelAdapter } = {}) {
+function fixture(options: { prepare?: (content: ContentScope, signal: AbortSignal) => Promise<void>; prepareAction?: (content: ContentScope, signal: AbortSignal) => Promise<void>; onCreate?: (object: ObjectExecutor) => void; extra?: ReturnType<typeof definePlugin>[]; adapter?: ModelAdapter; topLevelTools?: TopLevelTool[] } = {}) {
   const root = mkdtempSync(join(tmpdir(), "asterism-content-")); roots.push(root);
   let context!: PluginContext;
   const plugin = definePlugin({ namespace: ns, modules: [defineModule(value => {
     context = value;
-    return { resources: [implementResource(Document, View, {
+    return { topLevelTools: options.topLevelTools, resources: [implementResource(Document, View, {
       records: [Saved],
       creation: implementCreation(Create, {
         async prepare(input, { signal, content }) { await content.read(input.file); await options.prepare?.(content, signal); return { action: "accept" }; },
@@ -81,6 +81,22 @@ const text = (data: Uint8Array) => new TextDecoder().decode(data);
 
 // Expectations follow content ownership, synchronous commit, and history contracts; verify the complete public SDK call path.
 describe("Host immutable content", () => {
+  it("keeps concurrent handoffs for one object readable until each handoff closes", async () => {
+    const f = fixture(), input = f.input();
+    const original = await f.store.writer({ scope: input }).stage(bytes("original"));
+    const id = await f.create(original, input.id);
+    const first = f.store.handover(f.sessionId, id), second = f.store.handover(f.sessionId, id);
+    try {
+      const a = await f.store.writer({ scope: first }).stage(bytes("first result"));
+      const b = await f.store.writer({ scope: second }).stage(bytes("second result"));
+      const content = f.object(id).content;
+      expect(text(await content.read(a))).toBe("first result");
+      expect(text(await content.read(b))).toBe("second result");
+      await first.close();
+      expect(text(await content.read(b))).toBe("second result");
+    } finally { await Promise.all([first.close(), second.close()]); }
+  });
+
   // Cross-plugin actions capture valid caller content before the first wait; handoff can complete after the original root is lost.
   it("backend cross-plugin actions require valid content origins and independently retain input until commit", async () => {
     const ns = pluginNamespace("test.action-source");
@@ -390,16 +406,43 @@ describe("Host immutable content", () => {
 
 /** Expectations follow content authorization and request boundaries: files must be readable, and temporary input and requests retain separate holds. */
 describe("Models consuming immutable content", () => {
+  it("retains a top-level result from the caller's existing content roots", async () => {
+    let file!: ContentRef;
+    const f = fixture({ topLevelTools: [defineTopLevelTool({
+      id: ns.name("existing"), name: "existing", description: "Return the existing file.", guidelines: [],
+      argsSchema: z.object({}).describe("No parameters."), resultSchema: contentRefSchema.describe("Existing file."),
+      effect: "read", execution: "parallel",
+      async execute(_args, { object }) { await object.content.read(file); return { kind: "succeeded", data: file }; },
+    })], adapter: { version: "existing", validate() {}, prepare() { return { async *stream() {
+      yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "existing" } };
+      yield { type: "part.end", partId: "call", arguments: {} };
+      yield { type: "finish", reason: "tool-calls", usage: null };
+    } }; } } });
+    await configure(f, true);
+    const input = f.input();
+    file = await f.store.writer({ scope: input }).stage(bytes("existing result"));
+    const id = await f.create(file, input.id);
+    await f.context.content.withScope(async output => {
+      const result = await f.context.execution.run({ access: f.object(id).ref, interactive: false,
+        target: { provider: "media", model: "model" }, requestParentId: null, system: { blocks: [] }, messages: [],
+        signal: new AbortController().signal, observer: { event() {} } }, { output });
+      expect(result.reason).toBe("completed");
+      expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: file });
+      await f.replace(id, { file: null });
+      expect(text(await output.read(file))).toBe("existing result");
+    });
+  });
+
   const request = (file: ContentRef, mediaType = "image/png") => ({
     target: { provider: "media", model: "model" }, system: { blocks: [] },
     messages: [{ kind: "input", parts: [{ kind: "file", file, mediaType, filename: "input.png" }] }],
     signal: new AbortController().signal,
   } satisfies StreamRequest);
-  async function configure(f: ReturnType<typeof fixture>) {
+  async function configure(f: ReturnType<typeof fixture>, tools = false) {
     await f.service.configuration.execute({ type: "modelProvider.save", id: null,
       value: { id: "media", name: "Media", protocol: "openai-responses", baseUrl: "https://example.invalid", enabled: true, auth: "none", compatibility: [] }, credential: { action: "keep" } });
     await f.service.configuration.execute({ type: "model.save", id: null, value: { providerId: "media", name: "Model", modelId: "model", enabled: true, contextWindow: null, cost: null, compatibility: [],
-      capabilities: { reasoning: false, tools: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
+      capabilities: { reasoning: false, tools, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
   }
   const adapter = (seen: ModelInput[]): ModelAdapter => ({ version: "media-test", validate() {}, prepare(input) {
     seen.push(input); return { async *stream() {
@@ -436,10 +479,10 @@ describe("Models consuming immutable content", () => {
     await expect(models.validate(request(file))).rejects.toMatchObject({ reason: "content_scope" });
     await expect(models.validate(request(file), { content: { read: async () => bytes("fake"), async *open() {} } })).rejects.toMatchObject({ reason: "content_scope" });
     await expect(models.validate(request(file), { content: f.object(b).content })).rejects.toMatchObject({ reason: "content_scope" });
-    const denied = await models.run({ ...request(file), object: f.object(b).ref, requestParentId: f.service.sessions.tree.cursor(f.sessionId), observer: { event() {} } });
+    const denied = await f.context.execution.run({ ...request(file), access: f.object(b).ref, interactive: false, requestParentId: f.service.sessions.tree.cursor(f.sessionId), observer: { event() {} } });
     expect(denied).toMatchObject({ reason: "failed", code: "content_scope" });
     expect(seen).toHaveLength(0);
-    const accepted = await models.run({ ...request(file), object: f.object(a).ref, requestParentId: f.service.sessions.tree.cursor(f.sessionId), observer: { event() {} } });
+    const accepted = await f.context.execution.run({ ...request(file), access: f.object(a).ref, interactive: false, requestParentId: f.service.sessions.tree.cursor(f.sessionId), observer: { event() {} } });
     expect(accepted.reason).toBe("completed");
     expect(seen).toHaveLength(1);
   });

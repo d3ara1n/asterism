@@ -19,8 +19,8 @@ export function createSkillsModule(catalog: SkillCatalog) {
         ],
         argsSchema: skillReadArgsSchema, resultSchema: SkillRead.schema,
         effect: "read", execution: "parallel",
-        async execute(args, { signal, object }) {
-          try { return { kind: "succeeded", data: await catalog.read(object.ref.id, args, signal) }; }
+        async execute(args, { signal }) {
+          try { return { kind: "succeeded", data: await catalog.read(args, signal) }; }
           catch (error) {
             if (signal.aborted) return { kind: "cancelled", message: "Skill reading was cancelled." };
             if (error instanceof PluginApiError) return { kind: "rejected", error: { code: error.reason ?? error.code, message: error.message } };

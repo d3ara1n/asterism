@@ -16,12 +16,13 @@ export class AgentCapabilities {
   private readonly linked = new Map<string, { resource: FoldedObject; tools: readonly ToolImplementation[] }>();
   private readonly caller?: ToolCaller;
   constructor(private readonly resources: ResourceRegistry, tools: ToolRegistry,
-    linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller) {
+    linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller, private readonly interactive = true) {
     this.caller = caller && Object.freeze({ ref: Object.freeze({ ...caller.ref }), title: caller.title });
     for (const source of linked) {
       const resource = structuredClone(source);
       this.linked.set(resource.id, { resource, tools: tools.match(resource).filter(implementation => policy(implementation.tool.name))
-        .map(implementation => this.caller ? implementation.capture?.(resource, this.caller) ?? implementation : implementation) });
+        .map(implementation => this.caller && (interactive || !implementation.tool.requiresInteraction)
+          ? implementation.capture?.(resource, this.caller) ?? implementation : implementation) });
     }
   }
 
@@ -33,7 +34,7 @@ export class AgentCapabilities {
   }
 
   describe(id: string): Json {
-    return (this.linked.get(id)?.tools ?? []).map(implementation => ({
+    return (this.linked.get(id)?.tools ?? []).filter(implementation => this.interactive || !implementation.tool.requiresInteraction).map(implementation => ({
       ...projectTool(implementation.tool), implementation: implementation.reference,
       target: schemaOf(implementation.targetSchema), result: schemaOf(implementation.resultSchema),
     }));
@@ -46,7 +47,7 @@ export class AgentCapabilities {
 
   /** Look up display identity within this request only; does not parse arguments, prepare, or execute tools. */
   preview(id: string, name: string): ToolInvocationInfo {
-    const implementation = this.linked.get(id)?.tools.find(tool => tool.tool.name === name);
+    const implementation = this.linked.get(id)?.tools.find(tool => tool.tool.name === name && (this.interactive || !tool.tool.requiresInteraction));
     return { ...this.identity(id), ...(implementation ? { implementation: implementation.reference } : {}) };
   }
 
@@ -64,7 +65,9 @@ export class AgentCapabilities {
     if (!tool && !this.resources.has(target.resource.kind)) return { ...this.identity(id), kind: "rejected", error: { code: "implementation_missing",
       message: `The plugin providing ${target.resource.kind} is unavailable.` } };
     if (!tool) return { ...this.identity(id), kind: "rejected", error: { code: "tool_unavailable", message: "This tool is unavailable for the resource." } };
+    if (!this.interactive && tool.tool.requiresInteraction) return { ...this.identity(id), kind: "rejected",
+      error: { code: "interaction_unavailable", message: "This execution is noninteractive. The tool requires user interaction." } };
     if (!this.caller) throw new Error("Tool execution requires a bound caller.");
-    return { ...tool.prepare(target.resource, selector, args, this.caller), ...this.identity(id) };
+    return { ...tool.prepare(target.resource, selector, args, this.caller, this.interactive), ...this.identity(id) };
   }
 }

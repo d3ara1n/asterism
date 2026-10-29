@@ -1,19 +1,15 @@
 import type { ConfigurationService } from "../configuration/service.ts";
-import type { ContentLease } from "../runtime/content-store.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import { runModelRequest } from "../execution/request.ts";
-import { formatModelExpression, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest } from "@asterism-app/sdk/contracts";
-import type { AgentCapabilities } from "../execution/capabilities.ts";
+import { formatModelExpression, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest, type SystemPrompt } from "@asterism-app/sdk/contracts";
 import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
 import { PluginApiError } from "@asterism-app/sdk/runtime";
 import type { ModelServices } from "@asterism-app/sdk/runtime";
-import { coreDeclarations } from "../execution/core.ts";
 import { inputReferences, validateInput, resolveInput, type ModelContent } from "../model/input.ts";
 import type { ModelItem } from "@asterism-app/sdk/contracts";
 import { errorMessages } from "../shared/error-display.ts";
-import type { BoundTopLevelTool } from "./top-level-tools.ts";
 
 /** Model targets identify concrete provider/model pairs; paradigms resolve their own configuration. */
 export type { ModelTarget, StreamRequest } from "@asterism-app/sdk/contracts";
@@ -23,16 +19,10 @@ export class ModelTargetFailure extends PluginApiError {
 }
 
 interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
-/** Input for one internal adapter call; authorization views and resource environment access stay outside the public SDK. */
-export interface RunRequest extends ModelRunRequest {
-  /** Initiating plugin identity, filled by the host to stamp response-block origins. */
-  plugin: string;
-  capabilities: AgentCapabilities;
-  topLevelTools?: readonly BoundTopLevelTool[];
-  context: Promise<{ file: string; text: string }[]>;
+/** Host transport inputs; tools and conversation correlation are supplied by the consumer. */
+export interface RunRequest extends Omit<ModelRunRequest, "system"> {
+  system: SystemPrompt | Promise<SystemPrompt>;
   content?: HostInputOptions["content"];
-  /** Handoff hold for staged tool content; stays readable until result records register content roots and is released when the request ends. */
-  handover?: () => ContentLease | undefined;
 }
 interface HostInputOptions { content?: (messages: readonly ModelItem[]) => ModelContent | undefined }
 export interface HostModels {
@@ -103,7 +93,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
         request.signal.throwIfAborted();
         validateInput(messages, content);
         adapter.validate({ settings, system, messages, userAgent, sessionId,
-          tools: settings.model.capabilities.tools ? coreDeclarations() : [] });
+          tools: [] });
       } catch (error) {
         if (error instanceof PluginApiError) throw error;
         if (request.signal.aborted) throw error;
@@ -131,24 +121,27 @@ export function createModelServices(configuration: ConfigurationService, adapter
       } finally { await content?.close(); }
     },
     run(request) {
-      const system = typeof request.system === "function" ? request.system : structuredClone(request.system);
+      const system = request.system instanceof Promise ? request.system : structuredClone(request.system);
       const { messages, target, userAgent, sessionId } = structuredClone({
-        messages: request.messages, target: request.target, userAgent: request.userAgent, sessionId: request.object.sessionId,
+        messages: request.messages, target: request.target, userAgent: request.userAgent, sessionId: request.sessionId,
       });
       let content: ModelContent | undefined;
       let captured: Promise<void>;
       try { request.signal.throwIfAborted(); content = capture(messages, request.content); captured = Promise.resolve(); }
       catch (error) { captured = Promise.reject(error); }
-      const environment = Promise.all([resolve(target), request.context, captured]).then(async ([resolved, context]) => ({
-        ...resolved, userAgent, sessionId, capabilities: request.capabilities, topLevelTools: request.topLevelTools,
+      const preparation = [resolve(target), Promise.resolve(system), captured] as const;
+      const environment = Promise.all(preparation).then(async ([resolved, preparedSystem]) => ({
+        ...resolved, userAgent, sessionId, tools: request.tools,
         messages: await resolveInput(messages, content, request.signal),
-        system: typeof system === "function" ? structuredClone(system(context)) : system,
+        system: structuredClone(preparedSystem),
       })).catch(error => {
         if (error instanceof ModelTargetFailure) throw new ModelFailure(error.reason, error.message);
         throw error;
       });
-      const handover = request.handover?.();
-      return runModelRequest(request, environment, handover).finally(() => Promise.all([content?.close(), handover?.close()]));
+      return runModelRequest(request, environment).finally(async () => {
+        await Promise.allSettled(preparation);
+        await content?.close();
+      });
     },
   };
 }

@@ -11,6 +11,7 @@ import { BuiltinApplicationService as ApplicationService, configureBuiltin } fro
 import * as runtimeModules from "./loader.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
 import type { ModelAdapter } from "../model/contract.ts";
+import type { SessionChanged } from "../shared/session.ts";
 
 const roots: string[] = [], apps: ApplicationService[] = [];
 afterEach(async () => {
@@ -19,7 +20,7 @@ afterEach(async () => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function open(root = mkdtempSync(join(tmpdir(), "asterism-mesh-"))) {
+function open(root = mkdtempSync(join(tmpdir(), "asterism-mesh-")), onSessionChanged?: (event: SessionChanged) => void) {
   if (!roots.includes(root)) roots.push(root);
   let plugin!: PluginContext, modules!: ReturnType<typeof runtimeModules.loadPlugins>;
   const original = runtimeModules.loadPlugins;
@@ -29,7 +30,7 @@ function open(root = mkdtempSync(join(tmpdir(), "asterism-mesh-"))) {
   const adapter: ModelAdapter = { version: "test/1", validate() {}, prepare: () => ({
     async *stream() { yield { type: "finish", reason: "stop", usage: null }; },
   }) };
-  const app = new ApplicationService(root, { adapterFactory: () => adapter, plugins: [
+  const app = new ApplicationService(root, { onSessionChanged, adapterFactory: () => adapter, plugins: [
     definePlugin({ namespace: pluginNamespace("test.mesh"), setup(context) { plugin = context; return {}; } }),
   ] }); apps.push(app);
   capture.mockRestore();
@@ -157,12 +158,17 @@ describe("Mesh resource routing", () => {
     expect((await list(f.capabilities(caller), ma)).map(agent => agent.id).sort()).toEqual([0, 1]);
   });
 
-  it("keeps a reattached Mesh present after the previous attachment finishes its cleanup", async () => {
-    const f = open(), s = f.session("History"), a = await f.agent(s, "Atlas");
+  it("reattaches a Mesh after the previous instance finishes retirement", async () => {
+    let complete!: () => void;
+    const retired = new Promise<void>(resolve => { complete = resolve; });
+    const f = open(undefined, event => { if (event.kind === "session.progress" && !event.timelineBusy) complete(); });
+    const s = f.session("History"), a = await f.agent(s, "Atlas");
     const before = s.snapshot().position.nodeId, mesh = await f.mesh(s);
     s.link(a, mesh); s.link(mesh, a);
     const attached = s.snapshot().position.nodeId;
+    await f.app.sessions.execute({ type: "watch", sessionId: s.id });
     await f.app.sessions.execute({ type: "select", sessionId: s.id, nodeId: before });
+    await retired;
     await f.app.sessions.execute({ type: "select", sessionId: s.id, nodeId: attached });
     expect(await list(f.capabilities(a), mesh)).toEqual([{ title: "Atlas", id: 0, type: "worker", descriptions: [] }]);
     expect(await list(f.capabilities(a), mesh)).toHaveLength(1);

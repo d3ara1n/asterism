@@ -3,6 +3,8 @@ import { memo, useLayoutEffect, useRef, type CSSProperties } from "react";
 
 import type { Appearance } from "../../../shared/theme";
 import type { ConnectionEdge } from "./connections";
+import { useI18n } from "../../shared/i18n";
+import { objectsMessages } from "../../messages/objects";
 
 type LinkEdgeType = Edge<ConnectionEdge["data"]>;
 
@@ -47,6 +49,8 @@ function Head({ x, y, side }: { x: number; y: number; side: Position }) {
  */
 function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, data, interactionWidth }:
   EdgeProps<LinkEdgeType> & { kind: Appearance["edgeStyle"] }) {
+  const i18n = useI18n();
+  const holds = data?.links.reduce((total, link) => total + (link.holds ?? 0), 0) ?? 0;
   const mutual = (data?.links.length ?? 0) === 2;
   const sourceEdge = offset(sourceX, sourceY, sourcePosition, -anchorInset);
   const sourceTip = offset(sourceX, sourceY, sourcePosition, dotRadius - anchorInset);
@@ -56,7 +60,7 @@ function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   const start = mutual ? offset(sourceTip.x, sourceTip.y, sourcePosition, inset) : sourceEdge;
   const end = offset(targetTip.x, targetTip.y, targetPosition, inset);
   const endpoints = { sourceX: start.x, sourceY: start.y, sourcePosition, targetX: end.x, targetY: end.y, targetPosition };
-  const [path] = kind === "default" ? getBezierPath(endpoints) : getSmoothStepPath({ ...endpoints, borderRadius: kind === "step" ? 0 : 5 });
+  const [path, labelX, labelY] = kind === "default" ? getBezierPath(endpoints) : getSmoothStepPath({ ...endpoints, borderRadius: kind === "step" ? 0 : 5 });
   const line = useRef<SVGPathElement>(null);
   const chevron = useRef<SVGPathElement>(null);
   // The middle arrow uses the path's arc-length midpoint and tangent there; all three styles share the same measurement.
@@ -75,11 +79,15 @@ function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   }, [path, mutual]);
   return <g className="link-edge" data-selected={selected ? "" : undefined}>
     <path className="link-edge-halo" d={path} />
-    <path ref={line} className="link-edge-line" d={path} />
+    <path ref={line} className="link-edge-line" d={path} strokeDasharray={holds ? "5 4" : undefined} />
     {selected && !mutual && <path className="link-edge-flow" d={path} />}
-    {!mutual && <path ref={chevron} className="link-edge-chevron" d={chevronPath} />}
+    {!mutual && !holds && <path ref={chevron} className="link-edge-chevron" d={chevronPath} />}
     {mutual && <Head x={sourceTip.x} y={sourceTip.y} side={sourcePosition} />}
     <Head x={targetTip.x} y={targetTip.y} side={targetPosition} />
+    {!!holds && <g transform={`translate(${labelX} ${labelY})`} role="img" aria-label={i18n.formatMessage(objectsMessages.linkHolds, { count: holds })}>
+      <rect className="fill-background stroke-border" x={-(String(holds).length * 8 + 12) / 2} y={-10} width={String(holds).length * 8 + 12} height={20} rx={5} />
+      <text className="fill-foreground type-caption" textAnchor="middle" dominantBaseline="central">{holds}</text>
+    </g>}
     <path className="react-flow__edge-interaction" d={path} fill="none" strokeOpacity={0} strokeWidth={interactionWidth} />
   </g>;
 }

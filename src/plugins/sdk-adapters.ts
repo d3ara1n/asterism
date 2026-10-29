@@ -173,11 +173,11 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
       if (bound.contract !== contract) throw new PluginApiError("invalid_argument", "Request capture must preserve the tool implementation contract.");
       return adaptTool(bound, sdk, host);
     } } : {}),
-    prepare(resource, target, args, caller) {
+    prepare(resource, target, args, caller, interactive = true) {
       const captured = snapshot(host, resource);
       const scope: ObjectScope = { active: false, execution: true };
       const prepared = contribution.prepare(captured, sdk.object(captured.ref, scope, captured), target, args,
-        Object.freeze({ ref: Object.freeze({ ...caller.ref }), title: caller.title }));
+        Object.freeze({ ref: Object.freeze({ ...caller.ref }), title: caller.title }), interactive);
       if (!("execute" in prepared)) return prepared;
       return { ...prepared, async execute(signal, publish, handover?: ContentLease) {
         scope.active = true;

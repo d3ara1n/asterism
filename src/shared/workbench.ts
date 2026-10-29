@@ -43,6 +43,8 @@ const objectSchema = z.strictObject({
   id, kind: z.string().min(1).max(160), title: z.string(), presentation: presentationSchema,
   /** Current link capability projected from the registered backend implementation. */
   receivesLinks: z.boolean(),
+  /** Removed from current history; the previous instance is finishing captured work or cleanup. */
+  retiring: z.boolean().optional(),
 });
 export type WorkbenchObject = z.infer<typeof objectSchema>;
 const viewSchema = z.strictObject({ objectId: id, position: pointSchema, hidden: z.boolean(),
@@ -55,5 +57,7 @@ export const workbenchSnapshotSchema = z.strictObject({
   id: sessionId, title: z.string(), objects: z.array(objectSchema), views: z.array(viewSchema), viewport: viewportSchema, focus: focusSchema,
   /** Both directed-link endpoints are resources: resourceId points to receiverId, which receives access eligibility. */
   links: z.array(z.strictObject({ receiverId: id, resourceId: id })),
+  /** Disconnected relationships still held by requests; display only, never a grant of access. */
+  pendingLinks: z.array(z.strictObject({ receiverId: id, resourceId: id, holds: z.number().int().positive() })).optional(),
 });
 export type WorkbenchSnapshot = z.infer<typeof workbenchSnapshotSchema>;

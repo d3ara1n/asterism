@@ -8,6 +8,7 @@ import { ToolRegistry } from "../tools/registry.ts";
 import { AgentCapabilities } from "./capabilities.ts";
 import { resolveInput } from "../model/input.ts";
 import { runModelRequest } from "./request.ts";
+import { bindModelTools } from "./core.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import type { ModelSettings } from "../shared/model.ts";
 
@@ -28,7 +29,7 @@ const calls = (ids: string[], name = "resource_list", args = {}) => [
   ]), { type: "finish" as const, reason: "tool-calls", usage: null },
 ];
 function input(events: ModelRunEvent[], extra: Partial<ModelRunRequest> = {}): ModelRunRequest {
-  return { object: { id: "a", sessionId: "s", kind: "example.agent/worker" }, requestParentId: "origin",
+  return { requestParentId: "origin",
     target: { provider: "p", model: "m" }, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Input" }] }],
     signal: new AbortController().signal, observer: { event(event) { events.push(event); } }, ...extra };
 }
@@ -36,7 +37,7 @@ function model(events: ModelEvent[], prepare = () => {}): ModelAdapter {
   return { validate() {}, version: "test-adapter", prepare() { prepare(); return { async *stream() { yield* events; } }; } };
 }
 async function execute(request: ModelRunRequest, adapter: ModelAdapter, capabilities = empty()) {
-  return runModelRequest(request, Promise.resolve({ adapter, settings, capabilities, system: typeof request.system === "function" ? request.system([]) : request.system, messages: await resolveInput(request.messages, undefined, request.signal) }));
+  return runModelRequest(request, Promise.resolve({ adapter, settings, tools: bindModelTools(capabilities), system: request.system, messages: await resolveInput(request.messages, undefined, request.signal) }));
 }
 const resource = { id: "r", kind: "example.resource/item", title: "Item", data: {} };
 const write = defineImplementation({ ...defineData("example.resource/write", z.number().describe("Current value.")),

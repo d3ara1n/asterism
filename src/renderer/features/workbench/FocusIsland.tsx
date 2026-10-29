@@ -39,7 +39,7 @@ export function FocusIsland({ store, sessionId, objectId, onHome }: {
 
 function FocusedContent({ objectId }: { objectId: string }) {
   const { session, ready } = useWorkbench();
-  const object = session.objects.find(item => item.id === objectId);
+  const object = session.objects.find(item => item.id === objectId && !item.retiring);
   // The workbench ends focus after object removal; render no content in the meantime.
   return object ? <RendererCatalogProvider ready={ready}><FocusedObject object={object} /></RendererCatalogProvider> : null;
 }

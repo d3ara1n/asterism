@@ -3,13 +3,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { defineCreation, defineAction, defineRecord, pluginNamespace, thinkingLevels, type Json, type ResourceRef } from "@asterism-app/sdk/contracts";
-import { definePlugin, defineModule, implementCreation, implementResource, implementPreparer, type PluginContext, type PluginDefinition, type ObjectExecutor, type ToolSession, defineTopLevelTool } from "@asterism-app/sdk/runtime";
+import { contentRefSchema, defineCreation, defineAction, defineRecord, defineImplementation, defineTool, pluginNamespace, thinkingLevels, type ContentRef, type Json, type ResourceRef } from "@asterism-app/sdk/contracts";
+import { definePlugin, defineModule, implementCreation, implementResource, implementPreparer, implementTool, type PluginContext, type PluginDefinition, type ObjectExecutor, type ToolSession, defineTopLevelTool } from "@asterism-app/sdk/runtime";
 import { agentCreations, defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { CreateAgent, ReadAgentCreations } from "@asterism-app/builtin-api/contracts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
 import { BuiltinApplicationService as ApplicationService, configureBuiltin } from "../../packages/builtin/src/testing.ts";
-import type { ModelAdapter } from "../model/contract.ts";
+import type { ModelAdapter, ModelEvent } from "../model/contract.ts";
 import { placementGap } from "../shared/workbench-layout.ts";
 
 const ns = pluginNamespace("test.resources");
@@ -41,7 +41,7 @@ function open(options: { prepare?: (signal: AbortSignal) => Promise<void>; creat
   const root = mkdtempSync(join(tmpdir(), "asterism-session-resources-")); roots.push(root);
   const app = new ApplicationService(root, { plugins: [definition, ...options.plugins ?? []], adapterFactory: options.adapter ? () => options.adapter! : undefined }); apps.push(app);
   const sessionId = app.sessions.tree.create("Resources");
-  return { app, sessionId, plugin, session: plugin.session(sessionId) };
+  return { app, root, sessionId, plugin, session: plugin.session(sessionId) };
 }
 function latch() {
   let release!: () => void;
@@ -71,13 +71,258 @@ function adapter(next: () => { name: string; args: Json }[]): ModelAdapter {
   } };
 }
 function runner(f: ReturnType<typeof open>, actor: ResourceRef, target: Awaited<ReturnType<typeof model>>) {
-  return (allow?: string[]) => f.plugin.models.run({ object: actor, target,
+  return (allow?: string[]) => f.plugin.execution.run({ access: actor, interactive: true, target,
     requestParentId: f.session.snapshot().position.nodeId, system: { blocks: [] }, messages: [], tools: { allow },
     signal: new AbortController().signal, observer: { event() {} },
   });
 }
 
 describe("SDK session resource lifetimes", () => {
+  it.each(["cancel", "failure"] as const)("releases pending link holds when a captured request ends by %s", async mode => {
+    const entered = latch(), finish = latch();
+    const f = open({ adapter: { version: "interrupted", validate() {}, prepare() {
+      return { async *stream(signal): AsyncIterable<ModelEvent> {
+        yield { type: "part.start", part: { id: "text", kind: "text" } };
+        entered.release();
+        await finish.promise;
+        signal.throwIfAborted();
+        throw new Error("Provider failed.");
+      } };
+    } } });
+    const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
+    f.session.link(actor, resource);
+    const controller = new AbortController();
+    const work = f.plugin.execution.run({ access: actor, interactive: false, target, requestParentId: null,
+      system: { blocks: [] }, messages: [], signal: controller.signal, observer: { event() {} } });
+    try {
+      await entered.promise;
+      f.session.remove(resource);
+      expect(f.app.sessions.current(f.sessionId).workbench.pendingLinks).toHaveLength(1);
+      if (mode === "cancel") controller.abort();
+    } finally { finish.release(); }
+    expect((await work).reason).toBe(mode === "cancel" ? "cancelled" : "failed");
+    expect(f.app.sessions.current(f.sessionId).workbench.pendingLinks).toBeUndefined();
+  });
+
+  it("projects directed pending links independently and keeps old holds valid across relinking", async () => {
+    const entered = [latch(), latch()], finish = [latch(), latch()];
+    let request = 0;
+    const f = open({ adapter: { version: "links", validate() {}, prepare() {
+      const index = request++;
+      return { async *stream(): AsyncIterable<ModelEvent> {
+        if (index < 2) { entered[index]!.release(); await finish[index]!.promise; }
+        yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "resource_list" } };
+        yield { type: "part.end", partId: "call", arguments: {} };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } };
+    } } });
+    const target = await model(f.app);
+    const firstOwner = await f.session.create(Create, 0), secondOwner = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
+    f.session.link(firstOwner, resource); f.session.link(secondOwner, resource);
+    const first = runner(f, firstOwner, target)(), second = runner(f, secondOwner, target)();
+    try {
+      await Promise.all(entered.map(gate => gate.promise));
+      f.session.unlink(firstOwner, resource);
+      expect(f.app.sessions.current(f.sessionId).workbench.pendingLinks).toEqual([
+        { receiverId: firstOwner.id, resourceId: resource.id, holds: 1 },
+      ]);
+      f.session.link(firstOwner, resource);
+      expect(f.app.sessions.current(f.sessionId).workbench.pendingLinks).toBeUndefined();
+      f.session.unlink(firstOwner, resource);
+      expect((await runner(f, firstOwner, target)()).tools[0]).toMatchObject({ data: { resources: [] } });
+      finish[0]!.release();
+      expect((await first).tools[0]).toMatchObject({ data: { resources: [{ resource_id: resource.id }] } });
+      expect(f.app.sessions.current(f.sessionId).workbench.pendingLinks).toBeUndefined();
+      expect(f.app.sessions.tree.workbench(f.sessionId).links).toContainEqual({ receiverId: secondOwner.id, resourceId: resource.id });
+    } finally { finish.forEach(gate => gate.release()); await Promise.allSettled([first, second]); }
+  });
+
+  it("retains tool attachments across temporary requests without appending conversation history", async () => {
+    const scope = pluginNamespace("test.temporary");
+    const Resource = scope.resource("resource", z.object({}));
+    const CreateResource = defineCreation(Resource, { id: scope.name("create"), schema: z.object({}) });
+    const File = defineImplementation({ ...scope.data("file", contentRefSchema.describe("Generated content.")), resource: Resource,
+      tool: defineTool({ id: scope.name("generate"), name: "generate", description: "Generate a file.", guidelines: [],
+        argsSchema: z.object({}).describe("No parameters.") }), targetSchema: z.null().describe("The resource."),
+      effect: "read", execution: "parallel" });
+    const plugin = definePlugin({ namespace: scope, setup() { return {
+      resources: [implementResource(Resource, scope.data("view", z.object({})), {
+        creation: implementCreation(CreateResource, { create: () => ({ title: "Generator", data: {} }) }),
+        project: () => ({}), inspect: async () => ({}),
+      })],
+      tools: [implementTool(File, {
+        async call(_data, _target, _args, { object }) {
+          return { kind: "succeeded", data: await object.content.stage(new Uint8Array([1, 2, 3])) };
+        },
+        toModel: file => [{ kind: "file", file, mediaType: "image/png", filename: "result.png" }],
+      })],
+    }; } });
+    let resourceId = "", request = 0;
+    const seen: unknown[] = [];
+    const calls = adapter(() => [{ name: "resource_call", args: { resource_id: resourceId, tool: "generate", args: {} } }]);
+    const f = open({ plugins: [plugin], adapter: { version: "temporary", validate() {}, prepare(input) {
+      seen.push(input.messages);
+      if (request++ === 0) return calls.prepare(input);
+      return { async *stream() {
+        yield { type: "part.start", part: { id: "text", kind: "text" } };
+        yield { type: "part.delta", partId: "text", delta: "Report" };
+        yield { type: "part.end", partId: "text" };
+        yield { type: "finish", reason: "stop", usage: null };
+      } };
+    } } });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    const resource = await f.session.create(CreateResource, {}); resourceId = resource.id;
+    f.session.link(actor, resource);
+    const before = f.app.sessions.tree.nodes(f.sessionId).length;
+    const requestOptions = { access: actor, target, interactive: false, requestParentId: null, system: { blocks: [] },
+      signal: new AbortController().signal, observer: { event(): undefined {} } };
+    let readAfterClose!: () => Promise<Uint8Array>;
+    await f.plugin.content.withScope(async content => {
+      const first = await f.plugin.execution.run({ ...requestOptions, messages: [] }, { content, output: content });
+      expect(first.tools[0]?.kind).toBe("succeeded");
+      const file = first.tools[0]!.data as ContentRef;
+      readAfterClose = () => content.read(file);
+      expect(await content.read(file)).toEqual(new Uint8Array([1, 2, 3]));
+      const second = await f.plugin.execution.run({ ...requestOptions,
+        messages: [{ kind: "input", parts: first.tools[0]!.model }] }, { content, output: content });
+      expect(second.reason).toBe("completed");
+    });
+    expect(seen[1]).toEqual([{ kind: "input", parts: [{ kind: "file", data: new Uint8Array([1, 2, 3]),
+      mediaType: "image/png", filename: "result.png" }] }]);
+    expect(f.app.sessions.tree.nodes(f.sessionId)).toHaveLength(before);
+    await expect(async () => readAfterClose()).rejects.toMatchObject({ code: "unavailable" });
+  });
+
+  it("filters interaction-required tools from discovery and rejects forced calls without entering their implementations", async () => {
+    const scope = pluginNamespace("test.interaction");
+    const Resource = scope.resource("resource", z.object({}));
+    const CreateResource = defineCreation(Resource, { id: scope.name("create"), schema: z.object({}) });
+    const emptyArgs = z.object({}).describe("No parameters.");
+    const bool = z.boolean().describe("Whether interaction is available.");
+    let entered = 0, advertised: string[] = [], resourceId = "";
+    let ownerBusy: boolean | undefined;
+    const Required = defineTool({ id: scope.name("required"), name: "required", description: "Require an answer.", guidelines: [],
+      argsSchema: emptyArgs, requiresInteraction: true });
+    const Dual = defineTool({ id: scope.name("dual"), name: "dual", description: "Run in either mode.", guidelines: [], argsSchema: emptyArgs });
+    const plugin = definePlugin({ namespace: scope, setup() { return {
+      resources: [implementResource(Resource, scope.data("view", z.object({})), {
+        creation: implementCreation(CreateResource, { create: () => ({ title: "Interaction", data: {} }) }),
+        project: () => ({}), inspect: async () => ({}),
+      })],
+      topLevelTools: [
+        defineTopLevelTool({ ...Required, resultSchema: bool, effect: "read", execution: "parallel",
+          async execute() { entered++; return { kind: "succeeded", data: true }; } }),
+        defineTopLevelTool({ ...Dual, resultSchema: bool, effect: "read", execution: "parallel",
+          async execute(_args, { interactive, object }) {
+            ownerBusy = f.app.sessions.current(f.sessionId).progress.busyObjectIds.includes(object.ref.id);
+            return { kind: "succeeded", data: interactive };
+          } }),
+      ],
+      tools: [Required, Dual].map(tool => implementTool(defineImplementation({
+        ...scope.data(`${tool.name}-result`, bool), resource: Resource, tool, targetSchema: z.null().describe("The resource."),
+        effect: "read", execution: "parallel",
+      }), { async call(_data, _target, _args, { interactive }) {
+        if (tool === Required) entered++;
+        return { kind: "succeeded", data: interactive };
+      } })),
+    }; } });
+    const base = adapter((): { name: string; args: Json }[] => [
+      { name: "resource_inspect", args: { resource_id: resourceId } },
+      { name: "required", args: {} }, { name: "dual", args: {} },
+      { name: "resource_call", args: { resource_id: resourceId, tool: "required", args: {} } },
+      { name: "resource_call", args: { resource_id: resourceId, tool: "dual", args: {} } },
+    ]);
+    const f = open({ plugins: [plugin], adapter: { ...base, prepare(input) {
+      advertised = input.tools.map(tool => tool.name); return base.prepare(input);
+    } } });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    const resource = await f.session.create(CreateResource, {}); resourceId = resource.id;
+    f.session.link(actor, resource);
+    const result = await f.plugin.execution.run({ access: actor, interactive: false, target, requestParentId: null,
+      system: { blocks: [] }, messages: [], signal: new AbortController().signal, observer: { event() {} } });
+    expect(advertised).toContain("dual");
+    expect(advertised).not.toContain("required");
+    const inspected = result.tools[0]!.data as { tools: { name: string }[] };
+    expect(inspected.tools.map(tool => tool.name)).toEqual(["dual"]);
+    expect(result.tools[1]).toMatchObject({ kind: "rejected", error: { code: "interaction_unavailable" } });
+    expect(result.tools[3]).toMatchObject({ kind: "rejected", error: { code: "interaction_unavailable" } });
+    expect(result.tools[2]).toMatchObject({ kind: "succeeded", data: false });
+    expect(result.tools[4]).toMatchObject({ kind: "succeeded", data: false });
+    expect(entered).toBe(0);
+    expect(ownerBusy).toBe(false);
+  });
+
+  it("keeps one removed instance for overlapping requests, excludes it from later capture, and does not restore it on restart", async () => {
+    const scope = pluginNamespace("test.held");
+    const Resource = scope.resource("resource", z.object({}));
+    const CreateResource = defineCreation(Resource, { id: scope.name("create"), schema: z.object({}) });
+    const ResourceView = scope.data("view", z.object({}));
+    const Read = defineImplementation({ ...scope.data("read", z.string().describe("Instance value.")), resource: Resource,
+      tool: defineTool({ id: scope.name("read"), name: "read", description: "Read the live instance.", guidelines: [],
+        argsSchema: z.object({}).describe("No parameters.") }), targetSchema: z.null().describe("The resource."),
+      effect: "read", execution: "parallel" });
+    let attachments = 0, instance = false, lifetimeSignal!: AbortSignal;
+    const cleaning = latch(), cleaned = latch(), finishCleanup = latch();
+    const resourcePlugin = definePlugin({ namespace: scope, setup() { return {
+      resources: [implementResource(Resource, ResourceView, {
+        creation: implementCreation(CreateResource, { create: () => ({ title: "Held", data: {} }) }),
+        project: () => ({}), inspect: async () => ({}),
+        attach(_data, _object, lifetime) {
+          attachments++; instance = true; lifetimeSignal = lifetime.signal;
+          lifetime.defer(async () => { cleaning.release(); await finishCleanup.promise; instance = false; cleaned.release(); });
+        },
+      })],
+      tools: [implementTool(Read, { async call() {
+        if (!instance || lifetimeSignal.aborted) throw new Error("The instance was disposed while a request held it.");
+        return { kind: "succeeded", data: "live value" };
+      } })],
+    }; } });
+    const entered = [latch(), latch()], finishRequest = [latch(), latch()];
+    let request = 0, resourceId = "";
+    const f = open({ plugins: [resourcePlugin], adapter: { version: "held", validate() {}, prepare() {
+      const index = request++;
+      return { async *stream(): AsyncIterable<ModelEvent> {
+        if (index < 2) { entered[index]!.release(); await finishRequest[index]!.promise; }
+        yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: index < 2 ? "resource_call" : "resource_list" } };
+        yield { type: "part.end", partId: "call", arguments: index < 2 ? { resource_id: resourceId, tool: "read", args: {} } : {} };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } };
+    } } });
+    const target = await model(f.app);
+    const actor = await f.session.create(Create, 0);
+    const resource = await f.session.create(CreateResource, {});
+    resourceId = resource.id;
+    f.session.link(actor, resource);
+    const run = runner(f, actor, target);
+    const first = run(), second = run();
+    try {
+      await Promise.all(entered.map(gate => gate.promise));
+      f.session.remove(resource);
+      expect(f.app.sessions.tree.workbench(f.sessionId).objects.some(item => item.id === resource.id)).toBe(false);
+      expect(f.app.sessions.current(f.sessionId).workbench.objects.find(item => item.id === resource.id)?.retiring).toBe(true);
+      expect(f.app.sessions.current(f.sessionId).workbench.pendingLinks).toEqual([{ receiverId: actor.id, resourceId: resource.id, holds: 2 }]);
+      expect(lifetimeSignal.aborted).toBe(false);
+      await expect(f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: null })).rejects.toMatchObject({ code: "conflict" });
+      expect((await run()).tools[0]).toMatchObject({ kind: "succeeded", data: { resources: [] } });
+      finishRequest[0]!.release();
+      expect((await first).tools[0]).toMatchObject({ kind: "succeeded", data: "live value" });
+      expect(f.app.sessions.current(f.sessionId).workbench.pendingLinks).toEqual([{ receiverId: actor.id, resourceId: resource.id, holds: 1 }]);
+      expect(lifetimeSignal.aborted).toBe(false);
+      finishRequest[1]!.release();
+      expect((await second).tools[0]).toMatchObject({ kind: "succeeded", data: "live value" });
+      await cleaning.promise;
+      expect(f.app.sessions.current(f.sessionId).workbench.objects.find(item => item.id === resource.id)?.retiring).toBe(true);
+    } finally {
+      finishRequest.forEach(gate => gate.release()); finishCleanup.release();
+      await Promise.allSettled([first, second]);
+    }
+    await cleaned.promise;
+    await f.app.close(); apps.splice(apps.indexOf(f.app), 1);
+    const reopened = new ApplicationService(f.root, { plugins: [resourcePlugin] }); apps.push(reopened);
+    expect(reopened.sessions.tree.workbench(f.sessionId).objects.some(item => item.id === resource.id)).toBe(false);
+    expect(reopened.sessions.current(f.sessionId).workbench.objects.some(item => item.id === resource.id)).toBe(false);
+    expect(attachments).toBe(1);
+  });
   // Resource titles belong to historical paths; frontend commands, SDK reads, and forks must observe the same event result while old snapshots remain fixed.
   it("renames append history and restore titles by path while preserving identity, links, and current data", async () => {
     const f = open(), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 4);

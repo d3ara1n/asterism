@@ -38,7 +38,7 @@ Keep a preparer's scope tied to its business purpose. It does not replace the ag
 
 The host collects skill packages and instruction blocks with their registering plugin's provenance. Builtin selects its effective skills and builds structured instruction blocks for each request. User skills override plugin skills, which override builtin skills.
 
-Declare an Agent preparer to filter skills or remove, change, and append instruction blocks. Preparers run synchronously in plugin initialization order. Each request captures the catalog and preparer set before awaiting linked context, then uses the prepared result for its prompt and tool batch. Removing a skill from that result also makes it unavailable to `skill_read` for that request. A catalog refresh affects later requests.
+Declare an Agent preparer to filter skills or remove, change, and append instruction blocks. Preparers run synchronously in plugin initialization order. Each request captures the catalog and preparer set before awaiting linked context, then uses the prepared result for its prompt. `skill_read` resolves names independently through the current flattened catalog. Removing a skill from the prompt does not restrict reading it; a catalog refresh affects later reads and model requests.
 
 ## Extend presentation
 

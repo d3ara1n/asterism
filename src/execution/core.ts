@@ -1,8 +1,6 @@
 import { jsonSchema, type Json, type ToolOutcome } from "../shared/model.ts";
-import { toolInvocationSchema, type ToolInvocationInfo } from "@asterism-app/sdk/contracts";
-import { reference } from "@asterism-app/sdk/contracts";
+import { reference, toolInvocationSchema, type ToolInvocationInfo, type ToolContract, type ModelTools, type ModelToolCall, type ModelToolObserver } from "@asterism-app/sdk/contracts";
 import type { ToolDeclaration } from "../model/contract.ts";
-import type { ToolContract } from "@asterism-app/sdk/contracts";
 import type { CallResult, Invocation, PreparedResult } from "../tools/contract.ts";
 import { finishToolResult, resolveToolCompletion } from "../tools/result.ts";
 import { declareTool } from "../tools/definition.ts";
@@ -17,12 +15,8 @@ interface CoreAction {
   tool: ToolContract;
   resolve(args: Json, capabilities: AgentCapabilities): Invocation | PreparedResult;
 }
-export interface PendingCall { callId: string; name: string; arguments: Json }
-export interface ToolObserver {
-  prepared?(call: PendingCall, info: ToolInvocationInfo): void;
-  started?(call: PendingCall, info: ToolInvocationInfo): void;
-  published?(call: PendingCall, data: Json): void;
-}
+export type PendingCall = ModelToolCall;
+export type ToolObserver = ModelToolObserver;
 
 // Host entries cannot be overridden; static contributions captured at request start supply plugin top-level tools.
 const actions: readonly CoreAction[] = [
@@ -47,12 +41,21 @@ const actions: readonly CoreAction[] = [
 ];
 
 export function coreDeclarations(tools: readonly BoundTopLevelTool[] = []): ToolDeclaration[] {
-  return [...actions, ...tools].map(({ tool }) => declareTool(tool));
+  return [...actions, ...tools.filter(entry => entry.available)].map(({ tool }) => declareTool(tool));
+}
+
+/** Bind resource dispatch without making the model runner depend on a session or resource identity. */
+export function bindModelTools(capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = [], handover?: ContentLease): ModelTools {
+  return {
+    declarations: coreDeclarations(tools),
+    preview: (name, args) => previewCoreCall(name, args, capabilities, tools),
+    execute: (calls, signal, settle, observer) => executeCoreBatch(calls, capabilities, signal, settle, observer, handover, tools),
+  };
 }
 
 /** Identity hints during argument filling use the captured catalog; the batch still validates complete calls independently. */
 export function previewCoreCall(name: string, args: Json, capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = []): ToolInvocationInfo {
-  const tool = tools.find(entry => entry.tool.name === name);
+  const tool = tools.find(entry => entry.tool.name === name && entry.available);
   if (tool) return { implementation: reference(tool.tool) };
   if (!args || typeof args !== "object" || Array.isArray(args)) return {};
   if (typeof args.resource_id !== "string") return {};
@@ -62,7 +65,7 @@ export function previewCoreCall(name: string, args: Json, capabilities: AgentCap
 }
 
 /** Resolve actual resource tools before scheduling by execution policy; published snapshots do not change the batch's model delivery boundary. */
-export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities | null,
+export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities,
   signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
   observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = []): Promise<void> {
   const resolved = calls.map(call => {
@@ -70,7 +73,7 @@ export async function executeCoreBatch(calls: readonly PendingCall[], capabiliti
     const action = actions.find(action => action.tool.name === call.name);
     const extension = tools.find(entry => entry.tool.name === call.name);
     const definition = action?.tool ?? extension?.tool;
-    if (!definition || !capabilities) result = { kind: "rejected", error: { code: "operation_unavailable", message: "This operation is unavailable." } };
+    if (!definition) result = { kind: "rejected", error: { code: "operation_unavailable", message: "This operation is unavailable." } };
     else {
       const parsed = definition.argsSchema.safeParse(call.arguments);
       if (!parsed.success) result = { kind: "rejected", error: { code: "invalid_arguments",

@@ -3,13 +3,14 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import { createResourceId } from "../resources/id.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
-import type { Json } from "@asterism-app/sdk/contracts";
+import type { Json, ResourceSnapshot } from "@asterism-app/sdk/contracts";
 
 import { type WorkbenchCommand, type WorkbenchLayout, type WorkbenchObject, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 import type { ContentStore, ContentLease, ContentAccess } from "./content-store.ts";
 import { defaultCardPosition } from "../shared/workbench-layout.ts";
 import { placeObject } from "../shared/workbench-placement.ts";
 import { cardSize } from "../shared/workbench-sizing.ts";
+import type { HeldLink } from "./resource-holds.ts";
 
 /** Session-level origin for host workbench writes. */
 const host = null;
@@ -148,10 +149,17 @@ export class SessionWorkbench {
     this.db.prepare("INSERT INTO object_views (session_id, object_id, x, y) VALUES (?, ?, ?, ?)").run(sessionId, objectId, position.x, position.y);
   }
 
-  project(sessionId: string, title: string): WorkbenchSnapshot {
+  project(sessionId: string, title: string, retiring: readonly ResourceSnapshot[] = [], held: readonly HeldLink[] = []): WorkbenchSnapshot {
     const folded = this.tree.workbench(sessionId);
     const objects = folded.objects.map(object => this.projectObject(object));
-    return { id: sessionId, title, objects, links: folded.links, ...this.layout(sessionId) };
+    for (const resource of retiring) {
+      if (folded.objects.some(object => object.id === resource.ref.id)) continue;
+      objects.push({ ...this.projectObject({ id: resource.ref.id, kind: resource.ref.kind, title: resource.title, data: resource.data }),
+        receivesLinks: false, retiring: true });
+    }
+    const pendingLinks = held.filter(link => !folded.links.some(current => current.receiverId === link.receiverId && current.resourceId === link.resourceId));
+    return { id: sessionId, title, objects, links: folded.links, ...(pendingLinks.length ? { pendingLinks } : {}),
+      ...this.layout(sessionId, retiring.map(resource => resource.ref.id)) };
   }
   object(sessionId: string, id: string): WorkbenchObject | null {
     const object = this.tree.workbench(sessionId).objects.find(item => item.id === id);
@@ -164,13 +172,13 @@ export class SessionWorkbench {
       receivesLinks: this.resources.receivesLinks(object.kind),
     };
   }
-  layout(sessionId: string): WorkbenchLayout {
+  layout(sessionId: string, retiring: readonly string[] = []): WorkbenchLayout {
     const ids = new Set(this.tree.workbench(sessionId).objects.map(object => object.id));
     const rows = this.db.prepare("SELECT * FROM object_views WHERE session_id = ?").all(sessionId) as ViewRow[];
     const viewport = this.db.prepare("SELECT x, y, zoom FROM viewports WHERE session_id = ?").get(sessionId) as Viewport | undefined;
     const focus = this.db.prepare("SELECT object_id, width FROM workbench_focus WHERE session_id = ?").get(sessionId) as FocusRow | undefined;
     return {
-      views: rows.filter(row => ids.has(row.object_id)).map(row => ({
+      views: rows.filter(row => ids.has(row.object_id) || retiring.includes(row.object_id)).map(row => ({
         objectId: row.object_id, position: { x: row.x, y: row.y }, hidden: !!row.hidden, collapsed: !!row.collapsed,
         size: row.width === null || row.height === null ? null : { width: row.width, height: row.height },
       })), viewport: viewport ?? { x: 0, y: 0, zoom: 1 },

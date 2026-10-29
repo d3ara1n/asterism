@@ -54,9 +54,10 @@ export interface SessionHost {
   /** No in-flight activity in the session except objectId; used to check finalization before explicit cursor selection. */
   idle(sessionId: string, objectId?: string): boolean;
   progressChanged(sessionId: string): void;
+  retirementChanged(sessionId: string): void;
   viewChanged(sessionId: string, objectId: string): void;
   linked(sessionId: string, objectId: string): FoldedObject[];
-  capabilities(linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller): AgentCapabilities;
+  capabilities(linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller, interactive?: boolean): AgentCapabilities;
   context(linked: readonly FoldedObject[]): Promise<ContextFile[]>;
 }
 export interface ObjectScope {

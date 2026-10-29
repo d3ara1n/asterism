@@ -14,7 +14,7 @@ Mesh provides member discovery, messaging, saved-record investigation, task prof
 - [ ] Add explicit cloning or reference-mapping capabilities when a concrete resource needs external-instance or private-state duplication. Data-copy templates already require resource participation and selected current-data contracts.
 - [ ] Extend context-file discovery, hierarchical scope, ordering, and diagnostics where real tasks require them.
 - [ ] Verify default agent tool and delegation policies against the available capabilities.
-- [ ] Design higher-level delegation and skill composition when needed. Additional relay behavior requires a concrete need beyond the implemented direct communication and cross-session Mesh.
+- [ ] Continue brainstorming foreground and background delegation through `plans/todo-2026-10-29-subagent.md`; the execution foundations are complete, but the feature design is not settled. Additional relay behavior and skill composition require concrete needs beyond the implemented direct communication and cross-session Mesh.
 - [ ] Clarify whether and how backup model roles participate in execution.
 
 Plugin prompt contributions, plugin-carried skills, and explicit skill picking remain deferred extension work. Their existence in a design discussion does not establish an exposed API.

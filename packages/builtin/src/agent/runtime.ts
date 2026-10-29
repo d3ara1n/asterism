@@ -10,7 +10,7 @@ import {
 } from "@asterism-app/builtin-api/contracts";
 import { createSelection, selectionOf } from "./selection.ts";
 import { generateAgentName } from "./name.ts";
-import { createAgentLoop } from "./loop.ts";
+import { createAgentController } from "./controller.ts";
 import { createAdmission } from "./admission.ts";
 import { projectAgentTurnState } from "./state-projection.ts";
 import { agentExecutionState } from "./state.ts";
@@ -36,9 +36,9 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
       utility: () => resolveRoleTarget(builtinConfiguration(plugin).roles, "utility") };
     const feedback = createAgentFeedback();
     plugin.lifetime.defer(feedback.clear);
-    const loop = createAgentLoop({ selection, tasks: plugin.tasks, models: plugin.models, prepareRequest, skills, userAgent: application.userAgent,
+    const controller = createAgentController({ selection, tasks: plugin.tasks, models: plugin.models, execution: plugin.execution, prepareRequest, userAgent: application.userAgent,
       usage, feedback });
-    const admission = createAdmission({ selection, validate: plugin.models.validate, running: loop.running, systemPrompt });
+    const admission = createAdmission({ selection, validate: plugin.models.validate, running: controller.running, systemPrompt });
     const agentObject = (ref: ResourceRef) => {
       if (ref.kind !== Agent.kind) throw new PluginApiError("invalid_argument", "The target is not an Agent.");
       const object = plugin.object(ref.sessionId, Agent, ref.id);
@@ -65,11 +65,11 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
             accepted = resource;
           } };
         }, { signal: context.signal, content: context.content });
-        if (accepted) loop.start(plugin.object(sessionId, Agent, accepted.id));
+        if (accepted) controller.start(plugin.object(sessionId, Agent, accepted.id));
         return { sessionId };
       })],
       events: [AgentSoftwareFeedback],
-      tools: [createPeekTool(peek), createSendTool(), createWaitTool(loop)],
+      tools: [createPeekTool(peek), createSendTool(), createWaitTool(controller)],
       resources: [implementResource(Agent, AgentView, {
         card: agentCard,
         template: { current: [AgentSelection], createTitle: generateAgentName },
@@ -89,7 +89,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
           const value = object.get(AgentSelection);
           const drafts = object.get(AgentDrafts) ?? [];
           const transient = feedback.get(object);
-          if (loop.running(object))
+          if (controller.running(object))
             return { agentId: object.ref.id, selection: value?.selection ?? null, executionState: "running" as const, drafts,
               feedback: [...transient.inline], compressions: [...transient.compressions] };
           const history = object.session.snapshot();
@@ -114,11 +114,11 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
           implementAction(MoveAgentDraft, { async execute(input, object) { moveDraft(object, input); } }),
           implementAction(SubmitAgentInput, {
             async prepare(input, { object, signal, content }) { await admission.prepareSubmit(input, object, signal, content); return { action: "accept" }; },
-            async execute(input, object) { if (admission.submit(input, object)) loop.start(object); },
+            async execute(input, object) { if (admission.submit(input, object)) controller.start(object); },
           }),
           implementAction(ContinueAgent, {
             async prepare(_input, { object, signal, content }) { await admission.prepareResume(object, signal, content); return { action: "accept" }; },
-            async execute(_input, object) { admission.resume(object); loop.start(object); },
+            async execute(_input, object) { admission.resume(object); controller.start(object); },
           }),
           implementAction(ConfigureAgent, { async execute(input, object) {
             object.commit(writer => {
@@ -127,7 +127,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
               writer.set(AgentSelection, { selection: input.selection });
             });
           } }),
-          implementAction(CancelAgent, { async execute(_input, object) { loop.cancel(object); } }),
+          implementAction(CancelAgent, { async execute(_input, object) { controller.cancel(object); } }),
         ],
       })],
     };

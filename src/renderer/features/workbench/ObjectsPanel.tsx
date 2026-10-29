@@ -21,7 +21,7 @@ export function ObjectsPanel() {
   const [hiddenOnly, setHiddenOnly] = useState(false);
   const hidden = new Set(session.views.filter(view => view.hidden).map(view => view.objectId));
   const search = query.trim().toLocaleLowerCase(i18n.locale);
-  const objects = session.objects.filter(object => (!hiddenOnly || hidden.has(object.id))
+  const objects = session.objects.filter(object => !object.retiring && (!hiddenOnly || hidden.has(object.id))
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
   return <IslandPanel title={i18n.formatMessage(objectsMessages.objects)} compact toolbar={<>
     <SearchInput value={query} onChange={setQuery} label={i18n.formatMessage(objectsMessages.searchObjects)} />

@@ -62,7 +62,7 @@ The SDK exposes interactive terminal sessions backed by the host's PTY, screen, 
 
 A newly created terminal starts automatically. Reconstructed terminals after restart or cursor movement remain inactive until explicitly opened or first used for input. Card hiding and session navigation preserve a running instance; closing the terminal ends the instance but retains the resource.
 
-Resource disappearance and shutdown end owned processes. Cleanup waits for termination according to the terminal’s platform process strategy.
+Resource removal stops new discovery; captured requests retain the instance until their holds are released. Disposal and shutdown end owned processes. Cleanup waits for termination according to the terminal's platform process strategy.
 
 Terminal existence alone does not occupy the timeline. Model input, read, see, and wait calls use ordinary tool history and scope.
 

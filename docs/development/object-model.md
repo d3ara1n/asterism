@@ -70,15 +70,19 @@ The current timeline determines resource presence. Creation or cursor movement c
 
 An identity present in both old and new projections retains its lifetime. Reappearing objects use saved identity, creation data, and current data; their provider initializes any external instance.
 
-Removal requires the target’s timeline-dependent work to be settled. It neither implicitly cancels work nor queues behind it. A successful removal records the event and removes all incoming and outgoing links. Historical records and external files remain.
+Removal requires the target's own busy work to finish. A successful removal immediately records the intent and removes the object and its incoming and outgoing links from current discovery. Other requests already holding those relationships can finish using the instance. Their operations may record facts after the removal event. Historical records and external files remain.
 
-The resource lifetime handles cleanup of owned external instances. Hiding a card does not end that lifetime. Shutdown waits for cleanup to finish.
+The resource lifetime handles cleanup of owned external instances. Disposal waits for all incoming and outgoing request holds, then ends the instance's remaining work and cleanup. While it waits, the workbench can show an inert dashed card; this runtime projection does not restore the object's logical presence. Restart reconstructs presence from history without recreating removed instances. Hiding a card does not end its lifetime.
+
+Pending unlink and removal are workbench-managed states derived from historical intent, active request holds, and unfinished disposal. They require no separate persistent pending records. Resource busy state describes the resource implementation's own work. History movement waits for busy work, active session-bound requests, and pending cleanup to finish, including disposal after the last hold is released.
 
 ## Directed links
 
 A link points from the resource being made available to its receiver. The receiver’s resource type declares whether it accepts links. Endpoints must be distinct resources in the same session’s current path.
 
 Opposite directions are independent links with independent history. Runtime operations also check tool support, external policy, and captured request access. Card identity, location, and visibility do not determine those checks.
+
+Requests hold each captured relationship until their work finishes. A disconnected relationship with outstanding holds is displayed as a dashed link with its hold count; it grants no access to new requests. Relationships are identified by their endpoints. A later attachment makes the relationship available again without discarding outstanding holds from earlier requests. Ordinary links without request holds disappear immediately.
 
 ## Tools and saved results
 

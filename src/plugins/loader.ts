@@ -17,6 +17,7 @@ import { toRecord, sessionSnapshot } from "./records.ts";
 import { createSdkContext, type SdkContext } from "./sdk-context.ts";
 import { synchronous } from "./synchronous.ts";
 import { ResourcePresence } from "./presence.ts";
+import type { ResourceHolds } from "../runtime/resource-holds.ts";
 import { adaptResource, adaptTool } from "./sdk-adapters.ts";
 import type { ParsedCall } from "./commands.ts";
 import type { PluginConfiguration, PluginConfigurationCommand } from "../shared/plugin-configuration.ts";
@@ -37,6 +38,7 @@ export interface PreparedPluginStorage {
 }
 export interface PluginHostServices {
   shared: SharedServices;
+  holds: ResourceHolds;
   /** Backend provider dependencies derived from public imports, separate from author definitions. */
   pluginDependencies?: ReadonlyMap<string, readonly string[]>;
   /** Complete package graph, including frontend and public-only packages; separate from backend setup order. */
@@ -65,7 +67,8 @@ export interface LoadedPlugins {
   channels: ChannelRegistry;
   events: EventBus;
   configure(command: PluginConfigurationCommand): PluginConfiguration[];
-  activity(sessionId: string): { busy: string[]; live: LiveBlock[] };
+  activity(sessionId: string): { busy: string[]; live: LiveBlock[]; requests: number };
+  retiring(sessionId: string): readonly ResourceSnapshot[];
   resources: ResourceRegistry;
   tools: ToolRegistry;
   manifest: readonly PluginManifest[];
@@ -183,7 +186,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const eventScope = new PluginEventScope(events, id, lifecycle.group("event"));
       const sdk = createSdkContext({ id, lifetime, dir: storage.dir, log, config: contract => storage.config(contract),
         secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), lifecycle.group("action"), directory, eventScope,
-        calls.client(id, lifecycle.group("call")), (ref, policy, linked) => bindTopLevelTools(topLevelTools, ref, policy, linked));
+        calls.client(id, lifecycle.group("call")), (ref, policy, linked, interactive) => bindTopLevelTools(topLevelTools, ref, policy, linked, interactive));
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];
       entry = { plugin, resources, tools, topLevelTools: [], actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), lifetime };
@@ -325,6 +328,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   const presence = new ResourcePresence();
   /** Object lifetimes exist only for resources declaring attach; parent signals come from the owning plugin lifetime. */
   const objectScopes = new Map<string, LifetimeScope>();
+  const retiring = new Map<string, { resource: ResourceSnapshot; done: Promise<void> }>();
   const ending = new Set<Promise<void>>();
   const attach = (resource: ResourceSnapshot) => {
     const owner = collected.find(entry => entry.resources.some(item => item.kind === resource.ref.kind));
@@ -336,19 +340,26 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     try { backend.attach(resource, scope); }
     catch (error) { log(`Resource ${resource.ref.kind} attach failed.`, error); }
   };
-  /** End object lifetimes: abort signals and cancel runs bound to these objects, then clean up after finalization. */
-  const detach = (refs: readonly ResourceSnapshot["ref"][]): Promise<void> => {
-    const ids = new Set(refs.map(ref => ref.id));
-    const scopes = refs.flatMap(ref => {
+  /** Presence changes immediately; captured users retain the old instance until their requests finish. */
+  const detach = (resources: readonly ResourceSnapshot[]): Promise<void> => {
+    const work = Promise.all(resources.map(resource => {
+      const ref = resource.ref;
       const scope = objectScopes.get(ref.id);
       objectScopes.delete(ref.id);
-      return scope ? [scope] : [];
-    });
-    for (const scope of scopes) scope.abort();
-    const work = (async () => {
-      await Promise.allSettled(collected.map(entry => entry.lifecycle.cancel(object => ids.has(object.id))));
-      await Promise.allSettled(scopes.map(scope => scope.end()));
-    })();
+      const cancel = () => Promise.allSettled(collected.map(entry => entry.lifecycle.cancel(object => object.id === ref.id)));
+      if (!scope && !services.holds.has(ref.id)) return cancel().then(() => {});
+      const done = (async () => {
+        await services.holds.released(ref.id);
+        await cancel();
+        await scope?.end();
+      })().finally(() => {
+        retiring.delete(ref.id);
+        services.sessions.retirementChanged(ref.sessionId);
+      });
+      retiring.set(ref.id, { resource, done });
+      services.sessions.progressChanged(ref.sessionId);
+      return done;
+    })).then(() => {});
     ending.add(work); void work.finally(() => ending.delete(work));
     return work;
   };
@@ -358,7 +369,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     if (change.disappeared.length) channels.release(sessionId, change.disappeared.map(resource => resource.ref.id));
     events.publish(ResourcePresenceChanged, null, { sessionId,
       appeared: change.appeared.map(resource => resource.ref.id), disappeared: change.disappeared.map(resource => resource.ref.id) });
-    const detached = change.disappeared.length ? detach(change.disappeared.map(resource => resource.ref)) : Promise.resolve();
+    const detached = change.disappeared.length ? detach(change.disappeared) : Promise.resolve();
     for (const resource of change.appeared) attach(resource);
     return detached;
   };
@@ -386,16 +397,20 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     activity(sessionId) {
       const model = collected.map(entry => entry.sdk.activity(sessionId));
       const activity = collected.map(entry => entry.lifecycle.activity(sessionId));
-      return { busy: [...new Set([...model.flatMap(run => run.running), ...activity.flatMap(run => run.busy)])],
+      return { busy: [...new Set(activity.flatMap(run => run.busy))],
+        requests: model.reduce((total, run) => total + run.requests, 0),
         live: model.flatMap(run => run.live) };
     },
+    retiring: sessionId => [...retiring.values()].filter(entry => entry.resource.ref.sessionId === sessionId).map(entry => entry.resource),
     resources, tools: new ToolRegistry(resolvedTools.tools), manifest: Object.freeze(manifest.map(entry => Object.freeze(entry))),
     packages: Object.freeze(packages.map(entry => Object.freeze(entry))),
     initialize() {
       for (const session of services.sessions.list()) notifyPresence(session.id, sessionSnapshot(services.sessions.view(session.id)));
     },
     async release(sessionId) {
+      await Promise.allSettled(collected.map(entry => entry.lifecycle.cancel(object => object.sessionId === sessionId)));
       await publishPresence(sessionId, { appeared: [], disappeared: presence.forget(sessionId) });
+      await Promise.allSettled([...retiring.values()].filter(entry => entry.resource.ref.sessionId === sessionId).map(entry => entry.done));
     },
     restore(sessionId) {
       notifyPresence(sessionId, sessionSnapshot(services.sessions.view(sessionId)));

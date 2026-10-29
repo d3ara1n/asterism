@@ -76,11 +76,11 @@ The host tracks application, session, and object lifetimes. Plugin shared servic
 
 Ending a lifetime signals cancellation, waits for dependent work, and runs registered cleanup in reverse order. A signal alone does not prove completion. Cleanup failure is reported while remaining cleanup proceeds.
 
-Objects attach when they enter an active session’s current resource set, including startup and cursor reconstruction. Card mounting is unrelated. Reappearing objects initialize according to their resource implementation.
+Objects attach when they enter an active session's current resource set, including startup and cursor reconstruction. Card mounting is unrelated. Logical removal immediately changes discovery and closes frontend channels. Captured request holds delay instance disposal until existing users finish. Reappearing objects initialize according to their resource implementation; history movement remains blocked while requests or retirement are active.
 
-Busy means work depends on the active timeline. It blocks session cursor changes and removal of the busy object. It does not determine domain execution state or sidebar notifications.
+Resource-owned busy work blocks session cursor changes and removal of that resource. Session-bound request occupancy separately blocks cursor changes and retains captured resources, without automatically making its access owner busy. Neither mechanism determines domain execution state or sidebar notifications.
 
-Managed model/tool work, actions, and explicit busy scopes own their occupancy until real completion. Read-only communication does not become busy merely because it references an object.
+Managed requests, actions, and explicit busy scopes retain their occupancy until real completion. Directed request holds account for concurrent consumers independently of Agent ancestry. Read-only communication does not become busy merely because it references an object. Archival cancels session work and waits for resource retirement before recording the archive state.
 
 Invalidating a projection publishes current domain state without creating a record or changing stored data. Within a transaction, publication follows successful commit.
 
@@ -112,7 +112,7 @@ Preset additions and patches follow dependency and declaration order. Patches me
 
 Usage providers distinguish active queries from response-header interpretation. Consumers supply the selected connection and credentials or response; the generic model service does not implicitly trigger account queries.
 
-The host's shared usage service reads configured credentials, caches query results, and retains explicitly supplied header observations. Model requests use concrete provider/model targets. Role resolution and prompt composition belong to the requesting paradigm; the host transports ordered prompt bodies and supplies captured linked context for plugin assembly.
+The host's shared usage service reads configured credentials, caches query results, and retains explicitly supplied header observations. Model requests use concrete provider/model targets. Role resolution and prompt composition belong to the requesting paradigm. The model runner accepts explicit messages and executable tools; session execution binds current resource access and linked context around it. The output observer owns recording, and workbench progress is an optional sink selected by the consumer.
 
 Backend credentials remain explicit trusted-plugin capabilities. Frontend consumption uses typed domain calls rather than the credential vault.
 

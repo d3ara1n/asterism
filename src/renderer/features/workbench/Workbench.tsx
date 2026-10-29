@@ -137,7 +137,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
     }
   }, [canvas, writable, active, initialObjects]);
   useImperativeHandle(ref, () => canvas, [canvas]);
-  const connections = useMemo(() => layoutConnections(nodes, session.links), [nodes, session.links]);
+  const connections = useMemo(() => layoutConnections(nodes, [...session.links, ...session.pendingLinks ?? []]), [nodes, session.links, session.pendingLinks]);
   // Reuse previous data when endpoints are unchanged, so dragging one card does not rerender other cards' content each frame.
   const nodeData = useRef(new Map<string, ObjectNodeType["data"]>());
   const canvasNodes = useMemo(() => {
@@ -163,7 +163,8 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
   const [selectedEdges, setSelectedEdges] = useState<ReadonlySet<string>>(new Set());
   const edges: WorkbenchEdge[] = useMemo(() => connections.edges.map(edge => ({
     ...edge, type: edgeStyle, selected: selectedEdges.has(edge.id),
-    selectable: writable, deletable: writable, interactionWidth: 16,
+    selectable: writable && edge.data.links.every(link => link.holds === undefined),
+    deletable: writable && edge.data.links.every(link => link.holds === undefined), interactionWidth: 16,
   })), [connections, writable, selectedEdges, edgeStyle]);
   const onEdgesChange = useCallback((changes: EdgeChange<WorkbenchEdge>[]) => {
     setSelectedEdges(previous => {
@@ -175,6 +176,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
   // The backend projects link reception; the source can be any other object.
   const isValidConnection: IsValidConnection = useCallback(({ source, target }) =>
     !!source && !!target && source !== target
+    && objects.has(source) && !objects.get(source)?.retiring
     && objects.get(target)?.receivesLinks === true
     && !session.links.some(link => link.receiverId === target && link.resourceId === source),
   [objects, session.links]);
@@ -184,7 +186,8 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
   const onEdgesDelete = useCallback((removed: WorkbenchEdge[]) => {
     // A merged connection carries the directed relationships it represents; deleting it entirely unlinks each one, while the backend still records separate events.
     for (const edge of removed) for (const link of edge.data?.links ?? []) {
-      void run({ type: "link.set", sessionId: latest.current.id, ...link, linked: false });
+      if (link.holds !== undefined) continue;
+      void run({ type: "link.set", sessionId: latest.current.id, receiverId: link.receiverId, resourceId: link.resourceId, linked: false });
     }
   }, [run]);
   // Dropped content: capture a synchronous snapshot on drop, then hand it to the host creation coordinator for arbitration.

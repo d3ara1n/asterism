@@ -2,27 +2,32 @@ import { randomUUID } from "node:crypto";
 import {
   presentationSchema, type ModelRunRequest, type ModelRunResult, type ModelRunEvent, type ModelSource,
   type ModelCompletion, type ModelResponse, type SystemPrompt, type ModelRequestIdentity, type RequestTiming,
-  describeError, type ErrorDetails,
+  describeError, type ErrorDetails, type ModelTools,
 } from "@asterism-app/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ResolvedModelItem } from "../model/contract.ts";
-import { executeCoreBatch, coreDeclarations, previewCoreCall } from "./core.ts";
-import type { AgentCapabilities } from "./capabilities.ts";
+import { finishToolResult } from "../tools/result.ts";
 import { ResponseBuffer } from "./response.ts";
 import { synchronous } from "../plugins/synchronous.ts";
-import type { ContentLease } from "../runtime/content-store.ts";
-import type { BoundTopLevelTool } from "../plugins/top-level-tools.ts";
 
 export interface ModelExecutionEnvironment extends ModelRequestIdentity {
   adapter: ModelAdapter;
   settings: ModelSettings;
-  capabilities: AgentCapabilities;
-  topLevelTools?: readonly BoundTopLevelTool[];
+  tools?: ModelTools;
   system: SystemPrompt;
   messages: ResolvedModelItem[];
 }
+const unavailableTools: ModelTools = {
+  declarations: [],
+  async execute(calls, _signal, settle) {
+    for (const call of calls) settle(call, finishToolResult({
+      kind: "rejected", error: { code: "operation_unavailable", message: "This operation is unavailable." },
+    }));
+  },
+};
 /** One completion and its entire tool batch. Buffers exist only for this call; outputs go to consumers without touching the timeline. */
-export async function runModelRequest(request: ModelRunRequest, environment: Promise<ModelExecutionEnvironment>, handover?: ContentLease): Promise<ModelRunResult> {
+export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | "observer" | "requestParentId" | "cache" | "completionExtensions">,
+  environment: Promise<ModelExecutionEnvironment>): Promise<ModelRunResult> {
   const controller = new AbortController();
   const signal = AbortSignal.any([request.signal, controller.signal]);
   let deliveryFailed = false;
@@ -50,11 +55,12 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
   let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string; details?: ErrorDetails } = { reason: "completed" };
   try {
     // Consume preparation Promise rejections even after cancellation to avoid unhandled exceptions.
-    const { adapter, settings, capabilities, system, messages, userAgent, sessionId, topLevelTools = [] } = await environment;
+    const { adapter, settings, system, messages, userAgent, sessionId, tools: suppliedTools } = await environment;
+    const execution = settings.model.capabilities.tools ? suppliedTools ?? unavailableTools : unavailableTools;
     signal.throwIfAborted();
     source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
     responseId = randomUUID();
-    const tools = settings.model.capabilities.tools ? coreDeclarations(topLevelTools) : [];
+    const tools = [...execution.declarations];
     const prepared = adapter.prepare({ settings, system, messages, userAgent, sessionId, tools });
     const extendCompletion = request.completionExtensions;
     const extensions = presentationSchema.array().parse(extendCompletion
@@ -71,7 +77,7 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       clearTimeout(progressTimer);
       progressTimer = undefined;
       pendingProgress = pendingProgress.then(async () => {
-        await response.preview((name, args) => previewCoreCall(name, args, capabilities, topLevelTools));
+        await response.preview((name, args) => execution.preview?.(name, args) ?? {});
         progress();
       });
       return pendingProgress;
@@ -98,15 +104,15 @@ export async function runModelRequest(request: ModelRunRequest, environment: Pro
       const calls = response.calls();
       callIds = calls.map(call => call.part.callId);
       const byCall = new Map(calls.map(call => [call.part.callId, call]));
-      await executeCoreBatch(calls.map(call => ({ callId: call.part.callId, name: call.part.name, arguments: call.arguments })),
-        settings.model.capabilities.tools ? capabilities : null, signal, (call, outcome) => {
+      await execution.execute(calls.map(call => ({ callId: call.part.callId, name: call.part.name, arguments: call.arguments })),
+        signal, (call, outcome) => {
           outcomes.set(call.callId, outcome);
           response.settle(byCall.get(call.callId)!, outcome); progress();
         }, {
           prepared(call, info) { response.prepare(byCall.get(call.callId)!, info); progress(); },
           started(call, info) { response.start(byCall.get(call.callId)!, info); progress(); },
           published(call, data) { response.publish(byCall.get(call.callId)!, data); progress(); },
-        }, handover, topLevelTools);
+        });
       if (request.cache?.expectHit && finish.usage?.cacheRead === 0 && (finish.usage.input ?? 0) > 2048)
         diagnostic("cache_miss", "The provider reported no cached input for this request.", "warning");
       // Deliver tool outcomes as feedback for the next request; the outer cancellation signal and controller manage the agent lifetime.

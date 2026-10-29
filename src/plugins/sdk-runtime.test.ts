@@ -106,6 +106,33 @@ async function create(service: ApplicationService, sessionId: string, input = 1)
 }
 
 describe("Host implementation of the workbench SDK", () => {
+  it("runs explicit model tools without a workbench resource or timeline position", async () => {
+    const c = counter();
+    const { service, sessionId } = open([c.plugin], () => ({ version: "generic", validate() {}, prepare(input) {
+      expect(input.tools.map(tool => tool.name)).toEqual(["calculate"]);
+      return { async *stream() {
+        yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "calculate" } };
+        yield { type: "part.end", partId: "call", arguments: {} };
+        yield { type: "finish", reason: "tool-calls", usage: null };
+      } };
+    } }));
+    const target = await configureModel(service);
+    const events: ModelRunEvent[] = [];
+    const result = await c.context().models.run({ target, system: { blocks: [] }, messages: [], requestParentId: "temporary-position",
+      signal: new AbortController().signal, observer: { event(event) { events.push(event); } },
+      tools: {
+        declarations: [{ name: "calculate", description: "Calculate a value.", parameters: { type: "object", properties: {} } }],
+        async execute(calls, _signal, settle) {
+          for (const call of calls) settle(call, { kind: "succeeded", data: 42, model: [{ kind: "text", text: "42" }] });
+        },
+      },
+    });
+    expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded", data: 42 }] });
+    expect(events.find(event => event.type === "block")).toMatchObject({ block: { requestParentId: "temporary-position" } });
+    expect(service.sessions.tree.workbench(sessionId).objects).toEqual([]);
+    expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
+  });
+
   // Writers receive domain objects; state, records, and resource projections must decode their distinct stored shapes exactly once.
   it("round-trips codec state, records, resource creation and presentations while preserving encoded JSON", async () => {
     const codecNs = pluginNamespace("test.codec");
@@ -338,8 +365,8 @@ describe("Host implementation of the workbench SDK", () => {
     } }));
     const target = await configureModel(service);
     const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
-    const run = (allow?: string[]) => c.context().models.run({
-      object, target, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
+    const run = (allow?: string[]) => c.context().execution.run({
+      access: object, interactive: true, target, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
       system: { blocks: [] }, messages: [], tools: { allow }, signal: new AbortController().signal, observer: { event() {} },
     });
     const allowed = await run(["prompt"]);
@@ -397,8 +424,8 @@ describe("Host implementation of the workbench SDK", () => {
     }), undefined, new Map([[first.id, state === "loaded" ? [last.id] : []]]));
     const target = await configureModel(service);
     const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
-    const result = await c.context().models.run({
-      object, target, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
+    const result = await c.context().execution.run({
+      access: object, interactive: true, target, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
       system: { blocks: [] }, messages: [], tools: { allow: ["ask_user"] }, signal: new AbortController().signal, observer: { event() {} },
     });
     const selected = state === "loaded" ? replacement : previous;
@@ -917,7 +944,7 @@ describe("Host implementation of the workbench SDK", () => {
     const id = await create(service, sessionId);
     const object = c.context().object(sessionId, Counter, id);
     const before = object.session.snapshot();
-    const result = await c.context().models.run({ object: object.ref, requestParentId: before.position.nodeId,
+    const result = await c.context().execution.run({ access: object.ref, interactive: true, requestParentId: before.position.nodeId,
       userAgent: "PluginAgent/1.0",
       target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], signal: new AbortController().signal,
       observer: { event(event) { if (event.type !== "progress") object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); }); } },
@@ -925,7 +952,7 @@ describe("Host implementation of the workbench SDK", () => {
     expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded" }], source: { adapter: "test-adapter" } });
     expect(object.session.snapshot().records.query(Execution, { scope: "timeline" }).map(record => record.status)).toEqual(["known"]);
     const count = service.sessions.tree.nodes(sessionId).map(flat).length;
-    await c.context().models.run({ object: object.ref, requestParentId: object.session.snapshot().position.nodeId,
+    await c.context().execution.run({ access: object.ref, interactive: true, requestParentId: object.session.snapshot().position.nodeId,
       userAgent: "PluginAgent/1.0",
       target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Second projection" }] }], signal: new AbortController().signal,
       observer: { event() {} },
@@ -986,7 +1013,7 @@ describe("Host implementation of the workbench SDK", () => {
     const events: ModelRunEvent[] = [];
     let ready!: () => void;
     const started = new Promise<void>(resolve => { ready = resolve; });
-    const request = { object: ref, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
+    const request = { access: ref, interactive: true, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
       target, system: { blocks: [] }, messages: [], signal: controller.signal,
       observer: { event(event: ModelRunEvent): undefined {
         events.push(event);
@@ -994,12 +1021,12 @@ describe("Host implementation of the workbench SDK", () => {
         if (event.type !== "progress") object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); });
       } },
     };
-    const done = c.context().models.run(request);
+    const done = c.context().execution.run(request);
     try {
       await started;
       expect(service.sessions.running).toBe(true);
-      expect(() => c.context().models.run(request)).toThrow();
-      expect(service.sessions.current(sessionId).progress.busyObjectIds).toContain(id);
+      expect(service.sessions.current(sessionId).progress.timelineBusy).toBe(true);
+      expect(service.sessions.current(sessionId).progress.busyObjectIds).not.toContain(id);
     } finally {
       if (mode === "cancel") controller.abort();
       else {

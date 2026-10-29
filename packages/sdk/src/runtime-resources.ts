@@ -66,7 +66,7 @@ export function implementResource<S extends Json, V extends Json>(
 export function implementTool<S extends Json, T extends Json, A extends Json, D extends Json>(
   contract: ImplementationContract<S, T, A, D>, definition: {
     call(data: S, target: T, args: A, context: {
-      object: ObjectExecutor; caller: ToolCaller; signal: AbortSignal; publish(data: NoInfer<D>): void;
+      object: ObjectExecutor; caller: ToolCaller; signal: AbortSignal; interactive: boolean; publish(data: NoInfer<D>): void;
     }): Promise<CallResult<NoInfer<D>>>;
     toModel?(data: D): ToolModelOutput;
   },
@@ -74,7 +74,7 @@ export function implementTool<S extends Json, T extends Json, A extends Json, D 
   const identity = reference(contract);
   return {
     contract: contract as unknown as ToolContribution["contract"],
-    prepare(resource, object, target, args, caller) {
+    prepare(resource, object, target, args, caller, interactive) {
       const state = contract.resource.stateSchema.safeParse(resource.data);
       if (!state.success) return { kind: "failed", implementation: identity,
         error: { code: "invalid_resource", message: "The resource state does not match its backend contract." } };
@@ -103,7 +103,7 @@ export function implementTool<S extends Json, T extends Json, A extends Json, D 
             return encoded;
           };
           try {
-            const result = await definition.call(state.data, parsedTarget.data, parsedArgs.data, { object, caller, signal,
+            const result = await definition.call(state.data, parsedTarget.data, parsedArgs.data, { object, caller, signal, interactive,
               publish(data) { if (active) publish?.(snapshot(data)); } });
             if (result.kind === "succeeded" || result.kind === "partial") {
               if (result.data === undefined) throw new PluginApiError("invalid_argument", "The tool did not provide final data.");

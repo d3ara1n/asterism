@@ -30,6 +30,7 @@ import { ContentStore, type ContentLease, type ContentTarget } from "./content-s
 import { applicationStorage } from "../shared/application.ts";
 import { EventBus } from "../plugins/events.ts";
 import { TemplateStore } from "./templates.ts";
+import { ResourceHolds } from "./resource-holds.ts";
 import type { PluginCandidate, PluginOutcome } from "../shared/plugin-startup.ts";
 
 export interface SessionServiceOptions {
@@ -77,6 +78,8 @@ export class SessionService {
   private readonly prepare: LoadedPlugins["prepare"];
   private readonly afterCommit: LoadedPlugins["afterCommit"];
   private readonly pluginActivity: LoadedPlugins["activity"];
+  private readonly retiring: LoadedPlugins["retiring"];
+  private readonly holds: ResourceHolds;
   constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService, options: SessionServiceOptions = {}) {
     this.changed = options.onChanged ?? (() => {});
     this.tree = new SessionTree(db);
@@ -86,6 +89,7 @@ export class SessionService {
       manualSources: () => options.manualSources?.(this.packages) ?? [], packageRoots: options.packageRoots ?? new Map(), skillDirectories: options.skillDirectories ?? [] });
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     this.content.collectStartup();
+    this.holds = new ResourceHolds(sessionId => this.workbenchChanged(sessionId));
     const host: SessionHost = {
       initialize: (owner, key, prepare, options) => this.initializeSession(owner, key, prepare, options),
       list: () => {
@@ -108,9 +112,17 @@ export class SessionService {
       title: sessionId => this.tree.title(sessionId),
       setTitle: (sessionId, text, source, detail) => this.assignTitle(sessionId, text, source, detail),
       commit: (sessionId, work, objectId) => this.commit(sessionId, work, { objectId }),
-      idle: (sessionId, objectId) => !this.pluginActivity(sessionId).busy.some(id => id !== objectId)
-        && !this.resources.controllers().some(controller => controller.activity?.(sessionId).busy.some(id => id !== objectId)),
+      idle: (sessionId, objectId) => {
+        const activity = this.pluginActivity(sessionId);
+        return !activity.busy.some(id => id !== objectId)
+          && activity.requests === 0 && this.retiring(sessionId).length === 0
+          && !this.resources.controllers().some(controller => controller.activity?.(sessionId).busy.some(id => id !== objectId));
+      },
       progressChanged: sessionId => this.progressChanged(sessionId),
+      retirementChanged: sessionId => {
+        this.workbenchChanged(sessionId);
+        this.progressChanged(sessionId);
+      },
       viewChanged: (sessionId, objectId) => {
         if (this.committing?.sessionId === sessionId) { this.committing.objects.add(objectId); return; }
         if (!this.watching.has(sessionId)) return;
@@ -122,12 +134,12 @@ export class SessionService {
         const ids = new Set(folded.links.filter(link => link.receiverId === objectId).map(link => link.resourceId));
         return folded.objects.filter(object => ids.has(object.id));
       },
-      capabilities: (linked, policy, caller) => new AgentCapabilities(this.resources, this.tools, linked, policy, caller),
+      capabilities: (linked, policy, caller, interactive) => new AgentCapabilities(this.resources, this.tools, linked, policy, caller, interactive),
       context: linked => this.resources.context(linked),
     };
     const refOf = (objectId: string): ResourceRef | null => this.tree.resourceRef(objectId);
     const models = createModelServices(configuration, options.adapterFactory);
-    const modules = loadPlugins(options.plugins ?? [], { events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf,
+    const modules = loadPlugins(options.plugins ?? [], { holds: this.holds, events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf,
       vault: configuration.vault, configurationChanged: options.configurationChanged, preparedStorage: options.preparedStorage,
       pluginDependencies: options.pluginDependencies, packages: options.packages, sessions: host, models, shared: this.shared });
     this.resources = modules.resources;
@@ -143,6 +155,7 @@ export class SessionService {
     this.afterCommit = modules.afterCommit;
     this.prepare = modules.prepare;
     this.pluginActivity = modules.activity;
+    this.retiring = modules.retiring;
     this.workbench = new SessionWorkbench(db, this.tree, this.resources, this.content);
     this.templates = new TemplateStore(db, this.tree, this.workbench, this.content, this.resources);
     modules.initialize();
@@ -215,12 +228,19 @@ export class SessionService {
     else this.afterCommit(sessionId, change, id => this.notify(id));
     return result;
   }
-  /** A session is settled when no resource is active; only then is backtracking allowed. */
+  /** History movement waits for resource work, captured requests, and retirement to finish. */
   private settled(sessionId: string): boolean {
+    const activity = this.pluginActivity(sessionId);
     return ![...this.pendingCreations.values()].some(value => value.sessionId === sessionId)
       && ![...this.pendingActions.values()].some(ref => ref.sessionId === sessionId)
-      && this.pluginActivity(sessionId).busy.length === 0
+      && activity.busy.length === 0
+      && activity.requests === 0 && this.retiring(sessionId).length === 0
       && this.resources.controllers().every(controller => (controller.activity?.(sessionId).busy.length ?? 0) === 0);
+  }
+  private workbenchChanged(sessionId: string): void {
+    if (this.closed || !this.watching.has(sessionId)) return;
+    this.pendingUpdate(sessionId).workbench = true;
+    this.notify(sessionId);
   }
   private notify(sessionId: string): void {
     const update = this.updates.get(sessionId);
@@ -232,7 +252,7 @@ export class SessionService {
         const object = this.workbench.object(sessionId, id);
         return object ? [object] : [];
       }),
-      ...(update.workbench ? { workbench: this.workbench.project(sessionId, title) } : {}),
+      ...(update.workbench ? { workbench: this.workbench.project(sessionId, title, this.retiring(sessionId), this.holds.links(sessionId)) } : {}),
       ...(update.layout && !update.workbench ? { layout: this.workbench.layout(sessionId) } : {}),
     });
   }
@@ -247,7 +267,8 @@ export class SessionService {
     return {
       busyObjectIds: [...new Set([...resources.flatMap(a => a.busy), ...plugin.busy,
         ...[...this.pendingActions.values()].filter(ref => ref.sessionId === sessionId).map(ref => ref.id)])],
-      timelineBusy: [...this.pendingCreations.values()].some(item => item.sessionId === sessionId),
+      timelineBusy: [...this.pendingCreations.values()].some(item => item.sessionId === sessionId)
+        || plugin.requests > 0 || this.retiring(sessionId).length > 0,
       // During input, tool arguments travel only as argumentsText; the frontend derives previews.
       live: [...resources.flatMap(a => a.live), ...plugin.live].map(wireLive) };
   }
@@ -268,7 +289,7 @@ export class SessionService {
     const cursor = this.tree.cursor(sessionId);
     const title = this.tree.title(sessionId);
     return { sessionId, title, cursor, nodes, progress: this.progress(sessionId),
-      workbench: this.workbench.project(sessionId, title) };
+      workbench: this.workbench.project(sessionId, title, this.retiring(sessionId), this.holds.links(sessionId)) };
   }
   /** Resource command entry: prepare outside transactions, then before rechecks current-path membership within the execution commit transaction. */
   private async invoke(sessionId: string, objectId: string, raw: ResourceCall, inputScopeId?: string): Promise<void> {

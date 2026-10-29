@@ -25,6 +25,7 @@ export function workbenchNodes(
     const node: ObjectNodeType = {
       id: object.id, type: "object", position: current?.dragging ? current.position : view.position,
       dragHandle: cardDragHandle, deletable: false, data,
+      draggable: !object.retiring, selectable: !object.retiring, connectable: !object.retiring,
       width: resizing ? current.width : size.width,
       height: view.collapsed ? undefined : resizing ? current.height : size.height,
       measured: current?.measured, selected: current?.selected,

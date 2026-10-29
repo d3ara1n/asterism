@@ -25,5 +25,5 @@ export interface ToolImplementation {
   targetSchema: z.ZodType<Json>;
   resultSchema: z.ZodType<Json>;
   capture?(resource: FoldedObject, caller: ToolCaller): ToolImplementation;
-  prepare(resource: FoldedObject, target: Json, args: Json, caller: ToolCaller): Invocation | PreparedResult;
+  prepare(resource: FoldedObject, target: Json, args: Json, caller: ToolCaller, interactive?: boolean): Invocation | PreparedResult;
 }

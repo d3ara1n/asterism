@@ -36,13 +36,14 @@ export function AccessPanel() {
   const [selectedReceiver, setSelectedReceiver] = useState("");
   const [selectedResource, setSelectedResource] = useState("");
   const [query, setQuery] = useState("");
-  const receivers = session.objects.filter(object => object.receivesLinks);
+  const objects = session.objects.filter(object => !object.retiring);
+  const receivers = objects.filter(object => object.receivesLinks);
   const byReceiver = mode === "receiver";
-  const choices = byReceiver ? receivers : session.objects;
+  const choices = byReceiver ? receivers : objects;
   const selectedId = byReceiver ? selectedReceiver : selectedResource;
   const selected = choices.find(object => object.id === selectedId) ?? choices[0];
   const search = query.trim().toLocaleLowerCase(i18n.locale);
-  const targets = (byReceiver ? session.objects : receivers).filter(object => object.id !== selected?.id
+  const targets = (byReceiver ? objects : receivers).filter(object => object.id !== selected?.id
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
   return <IslandPanel title={i18n.formatMessage(accessMessages.accessLabel)} toolbar={<>
     <ToggleGroup type="single" size="sm" aria-label={i18n.formatMessage(accessMessages.accessLabel)} value={mode} onValueChange={next => { if (next) { setMode(next as typeof mode); setQuery(""); } }}>

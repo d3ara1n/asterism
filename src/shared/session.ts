@@ -66,7 +66,7 @@ export const sessionProgressSchema = z.strictObject({
   live: z.array(liveBlockSchema),
   /** Resource holds depending on the current timeline path, not resource business execution state. */
   busyObjectIds: z.array(id),
-  /** Creation preparation holds before resource identities exist. */
+  /** Request environment occupancy, creation preparation, and resource retirement prevent history movement. */
   timelineBusy: z.boolean(),
 });
 export type SessionProgress = z.infer<typeof sessionProgressSchema>;

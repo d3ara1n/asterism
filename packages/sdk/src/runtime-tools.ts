@@ -10,6 +10,7 @@ export interface TopLevelToolContext<D extends Json = Json> {
   readonly session: ToolSession;
   readonly callId: string;
   readonly signal: AbortSignal;
+  readonly interactive: boolean;
   publish(data: D): void;
 }
 /** Top-level tools declare their definition and implementation together, independently of resource support relationships. */

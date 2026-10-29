@@ -13,6 +13,7 @@ import { AgentCapabilities, type ToolPolicy } from "../execution/capabilities.ts
 import { executeCoreBatch, coreDeclarations } from "../execution/core.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
 import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
+import { ResourceRegistry } from "./registry.ts";
 
 const roots: string[] = [];
 const services: ApplicationService[] = [];
@@ -61,6 +62,26 @@ async function invoke(capabilities: AgentCapabilities, name: string, args: Json)
 }
 
 describe("Tool/resource matching and authorization", () => {
+  it("starts every captured context provider even when another throws synchronously", async () => {
+    let finish!: () => void, started = false, completed = false;
+    const gate = new Promise<void>(resolve => { finish = resolve; });
+    const provider = (kind: string, context: () => Promise<never[]>): import("./contract.ts").ResourceBackend => ({
+      kind, project: () => ({ contract: { id: kind }, data: null }), inspect: async () => null, context,
+    });
+    const resources = new ResourceRegistry([
+      provider("test/failing", () => { throw new Error("Context failed."); }),
+      provider("test/pending", async () => { started = true; await gate; completed = true; return []; }),
+    ]);
+    const work = resources.context([
+      { id: "first", kind: "test/failing", title: "First", data: {} },
+      { id: "second", kind: "test/pending", title: "Second", data: {} },
+    ]);
+    try { expect(started).toBe(true); }
+    finally { finish(); }
+    await expect(work).rejects.toThrow("Context failed.");
+    expect(completed).toBe(true);
+  });
+
   it("request-captured directories and notes remain inspectable and writable after removal during the request, with access revoked on later requests", async () => {
     const { service, sessionId, resource, scope } = setup();
     await service.sessions.execute({ type: "resource.create", sessionId, kind: "asterism.builtin/note", creation: { id: "asterism.builtin/note.create" },

@@ -3,7 +3,6 @@ import type { Json } from "./json.ts";
 import type { ModelInputPart } from "./model-input.ts";
 import type { ContentReader } from "./content-runtime.ts";
 import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.ts";
-import type { ResourceRef } from "./workspace.ts";
 import type { RequestTiming } from "./model-records.ts";
 import type { Presentation } from "./presentation.ts";
 import type { ErrorDetails } from "./error-details.ts";
@@ -86,16 +85,26 @@ export interface ModelResponse {
   receivedAt: number;
   headers: Readonly<Record<string, string>>;
 }
-export interface ModelRunRequest {
-  object: ResourceRef;
-  /** Session identity comes from object; callers may declare their own client identity. */
-  userAgent?: string;
+export interface ModelToolCall { callId: string; name: string; arguments: Json }
+export interface ModelToolObserver {
+  prepared?(call: ModelToolCall, info: ToolInvocationInfo): void;
+  started?(call: ModelToolCall, info: ToolInvocationInfo): void;
+  published?(call: ModelToolCall, data: Json): void;
+}
+/** Executable tools supplied by the requesting paradigm or a host-bound request environment. */
+export interface ModelTools {
+  readonly declarations: readonly { name: string; description: string; parameters: Json }[];
+  preview?(name: string, args: Json): ToolInvocationInfo;
+  execute(calls: readonly ModelToolCall[], signal: AbortSignal,
+    settle: (call: ModelToolCall, outcome: ToolOutcome) => void, observer: ModelToolObserver): Promise<void>;
+}
+export interface ModelRunRequest extends ModelRequestIdentity {
+  /** Opaque conversation position returned in output blocks; the caller owns its meaning. */
   requestParentId: string | null;
   target: ModelTarget;
-  system: SystemPrompt | ((files: readonly PromptFile[]) => SystemPrompt);
+  system: SystemPrompt;
   messages: ModelItem[];
-  /** Filters plugin top-level tools and resource tools selected through actual links by name; does not affect fixed host entry points. */
-  tools?: { allow?: readonly string[]; exclude?: readonly string[] };
+  tools?: ModelTools;
   cache?: { expectHit: boolean };
   /** Synchronously package domain data after final request preparation; delivered with the actual response's completion. */
   completionExtensions?: (context: ModelRequestContext) => readonly Presentation[];
@@ -129,6 +138,6 @@ export interface ModelServices {
   validate(request: Pick<StreamRequest, "target" | "system" | "messages" | "signal" | "userAgent" | "sessionId">, options?: ModelInputOptions): Promise<void>;
   stream(request: StreamRequest, options?: ModelInputOptions): AsyncIterable<ModelEvent>;
   /** One request and its tool batch; neither saves history nor drives the next request. */
-  run(request: ModelRunRequest): Promise<ModelRunResult>;
+  run(request: ModelRunRequest, options?: ModelInputOptions): Promise<ModelRunResult>;
   list(): readonly { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean; thinkingLevels: readonly ThinkingLevel[] } }[];
 }

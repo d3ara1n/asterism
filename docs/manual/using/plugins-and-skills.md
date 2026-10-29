@@ -33,6 +33,6 @@ Refresh **Settings → Skills** after adding or changing packages. The page show
 
 ## Read skills during work
 
-Builtin gives the model the names and descriptions selected for its request. User packages override plugin packages with the same name, and plugin packages override builtin packages. `skill_read` reads a selected skill or one of its supporting text files; `skill_refresh` refreshes discovery for later requests. A skill removed by request preparation is unavailable to that request.
+Builtin gives the model the names and descriptions selected for its request. User packages override plugin packages with the same name, and plugin packages override builtin packages. `skill_read` resolves a name in the current catalog and reads the skill or one of its supporting text files. `skill_refresh` updates discovery for later reads and model requests. Request preparation controls which skills appear in the prompt; it does not restrict reading installed skills.
 
 A skill describes a method. The resources and tools available to the agent determine which operations it can actually perform.

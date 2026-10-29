@@ -6,7 +6,7 @@ A resource represents an object with identity and lifetime. A tool represents a 
 
 Use a resource for something that belongs in a session and can be inspected or operated on. Define how it is created, what state it owns, and what information it presents.
 
-The resource's lifetime follows its presence in the session. A hidden card does not imply that its backend instance should stop.
+The resource attaches when it becomes present in a session. Removal immediately ends discovery, while requests that already hold the resource can finish before its instance is disposed. A hidden card does not imply that its backend instance should stop.
 
 Creation supplies initial state. Actions change the object through typed application or plugin operations. Views present the resulting state.
 
@@ -27,6 +27,14 @@ Use a top-level tool for operations on the execution context or shared resource 
 Describe the operation's purpose and observable behavior. Parameters should explain business meaning that names and types alone do not express. Results should distinguish known success, failure, cancellation, partial output, and uncertain effects.
 
 A tool contribution can capture resource-specific configuration and access at the start of each model request. Return a bound contribution using the same implementation contract; the host uses it for that request's tool batch. This is useful for a resource whose selected network or reachable objects can change while a model is responding. Capture addressing and authorization facts, while reading ordinary mutable content when the operation runs.
+
+Declare `requiresInteraction: true` when a tool cannot complete without user interaction. The host excludes it from noninteractive requests and rejects unsupported calls before entering the implementation. Tools supporting both modes can inspect `interactive` in their execution context. A renderer that only displays progress or results does not make a tool interactive.
+
+Use `plugin.execution.run` to execute one model request with tools bound to a resource's current links and the real session. Supply that resource as the access owner and select the interaction capability. The execution holds captured relationships through the tool batch; subsequent calls capture current links again. Calls sharing an access owner keep independent message inputs and can run concurrently.
+
+Use `plugin.models.run` when supplying messages and executable tools directly. It needs no workbench resource or timeline. Both forms deliver execution records to the observer you provide. `plugin.execution.withProgress` supplies an optional workbench observer for the events you choose to display.
+
+For a temporary conversation, use a content scope to retain generated attachments across requests. Pass it as the input reader and output owner for session-bound execution. Persistent records or a longer-lived scope must retain any surviving results before the temporary scope closes.
 
 ## Connect other interactions
 

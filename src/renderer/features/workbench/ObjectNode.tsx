@@ -14,6 +14,8 @@ import { minimumCardHeight, minimumCardWidth } from "./layout";
 import { ObjectActions } from "./ObjectActions";
 import { ObjectCard, type ViewPatch } from "./ObjectCard";
 import { useObjectView } from "./object-view";
+import { useModuleViews } from "../../modules/views";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
 
 export type ObjectNodeType = Node<{
   object: WorkbenchObject; collapsed: boolean; expandedHeight: number;
@@ -44,10 +46,22 @@ export const ObjectNode = memo(function ObjectNode({ id, data, selected }: NodeP
     {ports.map(port => <Handle key={port.id} id={port.id} type="source"
       position={{ left: Position.Left, right: Position.Right, top: Position.Top, bottom: Position.Bottom }[port.side]}
       style={port.side === "left" || port.side === "right" ? { top: `${port.offset * 100}%` } : { left: `${port.offset * 100}%` }}
-      isConnectableEnd={data.object.receivesLinks} />)}
-    <ObjectNodeContent id={id} data={data} selected={selected} />
+      isConnectable={!data.object.retiring} isConnectableEnd={data.object.receivesLinks} />)}
+    {data.object.retiring ? <RetiringObject data={data} /> : <ObjectNodeContent id={id} data={data} selected={selected} />}
   </>;
 });
+
+/** Removed resources retain only a status shell while their previous instance finishes work. */
+function RetiringObject({ data }: { data: ObjectNodeType["data"] }) {
+  const i18n = useI18n();
+  const descriptor = useModuleViews().resource(data.object.kind);
+  return <ObjectCard title={data.object.title} icon={descriptor.icon} kind={i18n.text(descriptor.label)}
+    collapsed={data.collapsed} expandedHeight={data.expandedHeight} resizing={false} selected={false} retiring actions={<Spinner />} onView={() => {}}>
+    <div className="flex flex-1 items-center justify-center gap-2 p-4" role="status">
+      <p className="type-caption">{i18n.text(objectsMessages.resourceRetiring)}</p>
+    </div>
+  </ObjectCard>;
+}
 
 /**
  * Card content: the workbench owns the frame, and modules provide content through versioned projections; raw data remains viewable when a module is missing.

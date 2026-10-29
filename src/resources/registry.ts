@@ -53,7 +53,9 @@ export class ResourceRegistry {
   }
 
   async context(linked: readonly FoldedObject[]): Promise<ContextFile[]> {
-    const files = await Promise.all(linked.map(resource => this.backends.get(resource.kind)?.context(resource) ?? []));
-    return files.flat();
+    const files = await Promise.allSettled(linked.map(async resource => this.backends.get(resource.kind)?.context(resource) ?? []));
+    const failure = files.find(result => result.status === "rejected");
+    if (failure?.status === "rejected") throw failure.reason;
+    return files.flatMap(result => result.status === "fulfilled" ? result.value : []);
   }
 }

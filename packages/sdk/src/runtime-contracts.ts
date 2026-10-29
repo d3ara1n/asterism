@@ -59,6 +59,8 @@ export interface PluginContext {
   db(): DatabaseSync;
   readonly tasks: PluginTasks;
   readonly models: ModelServices;
+  readonly execution: import("./runtime-execution.ts").ExecutionServices;
+  readonly content: import("./content-runtime.ts").ContentServices;
   readonly modelProviders: ModelProviderServices;
   readonly usageProviders: UsageProviderServices;
   readonly usages: UsageServices;
@@ -129,8 +131,9 @@ export interface ResourceContribution {
   /** Explanation presented to users before ending the current instance; does not block backend removal or wait for external cleanup. */
   disposalWarning?(resource: ResourceSnapshot, object: ObjectReader): UiText | null;
   /**
-   * Called synchronously when an object enters the current set through startup, creation, restoration, or rewinding that makes it reappear; lifetime ends when the object leaves the current set,
-   * its session is archived, or the application exits. Register cleanup here for external instances owned exclusively by the object.
+   * Called synchronously when an object enters the current set through startup, creation, restoration, or rewinding.
+   * Removal ends discovery immediately; lifetime cleanup follows captured request holds. Archival and exit cancel owned work before cleanup.
+   * Register cleanup here for external instances owned exclusively by the object.
    */
   attach?(resource: ResourceSnapshot, object: ObjectReader, lifetime: Lifetime): void;
 }
@@ -152,7 +155,7 @@ export interface ToolContribution {
   readonly contract: ImplementationContract<Json, Json, Json, Json>;
   /** Bind resource-specific access and configuration at the model request boundary. The returned contribution handles that request's calls. */
   capture?(resource: ResourceSnapshot, object: ObjectReader, caller: ToolCaller): ToolContribution;
-  prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json, caller: ToolCaller): ToolInvocation | PreparedResult;
+  prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json, caller: ToolCaller, interactive: boolean): ToolInvocation | PreparedResult;
 }
 export interface ModuleContribution {
   agentSkills?: readonly AgentSkillDeclaration[];

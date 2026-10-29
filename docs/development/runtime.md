@@ -1,6 +1,8 @@
 # Agent runtime and model execution
 
-The built-in Agent owns conversation projection and the execution loop. Host model services perform individual requests and tool batches. Session storage owns persistent history, and the host coordinates generic lifecycle.
+The built-in Agent owns conversation projection and the execution loop. The loop controls request iteration and turn boundaries through supplied conversation and execution operations. Its workbench integration owns persistent drafts, timeline records, compression storage, and presentation.
+
+Host model services perform individual requests and tool batches from explicit messages and executable tools. Session-bound execution separately captures an access owner's environment and binds the shared resource dispatcher. Multiple conversations can use one access owner without sharing message state or a model-request singleton. The caller supplies each response's conversation position; the model service treats it as opaque correlation.
 
 ## Turns and input scheduling
 
@@ -32,6 +34,8 @@ At each request boundary, capture the message path, agent configuration, model t
 
 Changes recorded during a response affect the next request. Captured access does not freeze external file contents.
 
+Each session-bound request acquires shared lifetime holds for its captured directed resource relationships. Independent requests through the same receiver contribute independent holds. Unlink and removal events immediately change history and future discovery. Existing holders keep using the captured instances until their response, tool batch, and cleanup finish. Hold release follows actual completion, including cancellation cleanup.
+
 The Agent stores selection and activity state, not a second message history. System instructions are rebuilt from the current environment and are not persisted as conversation:
 
 - Infrastructure descriptions explain primitives, inputs, outputs, and request boundaries.
@@ -41,7 +45,9 @@ The Agent stores selection and activity state, not a second message history. Sys
 
 Host-authored harness text uses declarative descriptions of primitives. Workflows come from user prompts and skills. User instructions retain their meaning, including negative requirements.
 
-Builtin owns structured prompt blocks and their projection. The host model service accepts neutral source/text blocks and captures linked context for the requesting plugin to assemble. Builtin's ordered request preparers can filter skills and edit blocks before projection. Captured blocks provide identity and origin for diagnostics; their text delimiters do not establish an additional instruction hierarchy.
+Context selection guides model behavior toward the user's intended work. Omitting a skill from a prompt does not make its files inaccessible, and hiding a tool does not establish an operating system sandbox. Resource identity and captured access still govern the shared resource dispatcher. Shells, terminals, and MCP operate with the configured user's access; prompt preparation does not attempt to police equivalent operations through those capabilities.
+
+Builtin owns structured prompt blocks and their projection. The host model service accepts neutral source/text blocks; session-bound execution supplies captured linked context for the requesting plugin to assemble. Builtin's ordered request preparers can filter skills and edit blocks before projection. Captured blocks provide identity and origin for diagnostics; their text delimiters do not establish an additional instruction hierarchy.
 
 ## Skills
 
@@ -49,9 +55,9 @@ The host skill catalog discovers direct child packages under the user's `~/.agen
 
 Discovery occurs at startup or explicit refresh. The host exposes raw sources and same-source duplicate diagnostics. Builtin selects effective skills with user sources above plugin sources above builtin, resolves plugin conflicts deterministically, and sorts its result by name.
 
-Each request captures its effective list after synchronous preparers. `skill_read` resolves names only from that list and reads current text within the captured package. A skill removed by preparation is unavailable to that request. Lexical and resolved paths remain inside its real package root. Reading returns ordinary tool output; it neither executes scripts nor establishes resource links.
+Each request prepares the skill list presented in its prompt. `skill_read` independently resolves names through the current flattened catalog and reads the package's current text. Request preparers control prompt visibility; they do not restrict skill reading. Lexical and resolved paths remain inside the package's real root. Reading returns ordinary tool output; it neither executes scripts nor establishes resource links.
 
-`skill_refresh` rebuilds discovery and reports counts and issues. Subsequent requests use the new catalog.
+`skill_refresh` rebuilds discovery and reports counts and issues. Later reads use the refreshed catalog, and subsequent model requests present the updated list. File reads expose actual filesystem failures.
 
 ## Execution state
 
@@ -68,6 +74,8 @@ Transient failures without output can retain an interruption position and expose
 
 Resource busy state and sidebar notifications are separate mechanisms. Neither substitutes for Agent execution state.
 
+Request occupancy prevents history cursor movement but does not itself mark the access owner busy. Resource-owned tasks and actions determine busy state. Model progress reaches the caller's observer; an optional workbench output sink displays only the events the caller sends to it.
+
 ## Tools and captured access
 
 Top-level tools register statically during assembly. Resource tools are discovered through the captured links, support relations, and agent policy. Resource changes do not mutate protocol tool declarations during a response.
@@ -78,6 +86,8 @@ Link notifications carry resource identity, not state or tool definitions. Resou
 
 Plugin tool policy filters plugin top-level and resource-tool names. It does not turn the reserved host discovery entries into grants of access.
 
+Tools can declare that execution requires user interaction. Noninteractive environments exclude those tools from declarations and resource inspection and reject calls before entering their implementations. Dual-mode tools receive the environment's interaction capability. Result rendering is independent: a data-producing tool can execute without mounting its view.
+
 Overrides follow configured plugin order. The distribution initially places builtin first in the ordinary package list. Top-level names and resource-tool names resolve independently. A later tool declaration replaces its whole definition; a later implementation replaces the same resource-type/tool pair. Referencing a replaced contract does not reactivate it.
 
 Invalid duplicate identities within a plugin fail assembly. Historical results retain the actual implementation identity selected for that call.
@@ -86,13 +96,15 @@ Invalid duplicate identities within a plugin fail assembly. Historical results r
 
 Only a normally completed response with complete arguments starts tools. Truncated or unterminated generation does not execute partial calls.
 
-The host validates, binds invocation context, executes, persists outcomes, and waits for the batch to settle before the next model request. A batch containing sequential tools preserves order. Parallel completion order does not change model result pairing.
+The host validates, binds invocation context, executes, and delivers outcomes to the caller's record consumer. It waits for the batch to finish before returning the request result. A batch containing sequential tools preserves order. Parallel completion order does not change model result pairing.
 
 Progress publishes validated current output without writing history. A final outcome records actual implementation, timing, display data, and model projection. The six outcomes are success, rejection, failure, cancellation, partial result, and unknown effect.
 
 Omitted failure data can retain the last valid progress; explicit null clears it. Late publication after completion has no effect. Unknown writes do not imply rollback.
 
 `toModel` runs at termination. Adapters consume that saved projection, not GUI data. File outputs transfer through content ownership and are delivered for successful or partial outcomes.
+
+Temporary conversations can retain tool attachments in an independent content scope and supply that reader to later requests. Timeline writers and temporary owners acquire their own references before the request handoff closes. Concurrent requests through one access owner have independent handoff holds.
 
 Tool outcomes feed the Agent’s next request; a failed or cancelled tool does not itself terminate the Agent loop. Cancelling the whole Agent propagates through its current work.
 
