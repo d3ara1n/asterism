@@ -21,7 +21,7 @@ import { activityLine } from "./activity.ts";
 
 /** Measurements the delegating model can act on; detailed token fields remain in the saved record. */
 function modelUsage(usage: TaskOutput["usage"]) {
-  return { model: usage.model, requests: usage.requests, seconds: Math.round(usage.elapsedMs / 1000), totalTokens: usage.total };
+  return { model: usage.model, requests: usage.requests, elapsedSeconds: Math.round(usage.elapsedMs / 1000), total: usage.total };
 }
 
 async function operation<T extends Json>(signal: AbortSignal, work: () => T | Promise<T>): Promise<CallResult<T>> {

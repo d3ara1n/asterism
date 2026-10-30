@@ -14,7 +14,7 @@ export const defaultAgents: AgentConfiguration[] = [
       "Rename all snake_case fields to camelCase",
       "Add input validation to POST /login"
     ],
-    "budget": { "maxRequests": 32, "maxDurationSeconds": 2400 }
+    "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
   },
   {
     "id": "explorer",
@@ -28,7 +28,7 @@ export const defaultAgents: AgentConfiguration[] = [
       "Map the routing structure",
       "Summarize what the uncommitted diff changes, file by file"
     ],
-    "budget": { "maxRequests": 32, "maxDurationSeconds": 900 }
+    "budget": { "maxRequests": 4096, "maxDurationSeconds": 900 }
   },
   {
     "id": "reviewer",
@@ -41,7 +41,7 @@ export const defaultAgents: AgentConfiguration[] = [
       "Review the error handling in src/api/ for security issues",
       "Audit this PR diff for performance regressions"
     ],
-    "budget": { "maxRequests": 32, "maxDurationSeconds": 3600 }
+    "budget": { "maxRequests": 4096, "maxDurationSeconds": 3600 }
   },
   {
     "id": "researcher",
@@ -54,7 +54,7 @@ export const defaultAgents: AgentConfiguration[] = [
       "Find the React 19 migration guide",
       "Check GitHub issue #1234 for context"
     ],
-    "budget": { "maxRequests": 32, "maxDurationSeconds": 2400 }
+    "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
   },
   {
     "id": "advisor",
@@ -68,7 +68,7 @@ export const defaultAgents: AgentConfiguration[] = [
       "Review this migration plan against the actual code — what are the risks?",
       "Compare two API designs for the new service using the current call sites"
     ],
-    "budget": { "maxRequests": 32, "maxDurationSeconds": 3600 }
+    "budget": { "maxRequests": 4096, "maxDurationSeconds": 3600 }
   }
 ];
 
