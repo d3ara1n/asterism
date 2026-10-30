@@ -11,6 +11,7 @@ import { fadeTransition } from "../../shared/weave/motion";
 import { Button } from "@asterism-app/ui/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { useWorkbench, WorkbenchScope, type WorkbenchStore } from "./context";
 import { claimFocusRequest, exitFocus, focusIslandElement, focusMediumWidth, setFocusWidth } from "./focus";
 import { useObjectView } from "./object-view";
@@ -54,9 +55,12 @@ function FocusedObject({ object }: { object: WorkbenchObject }) {
   }, [object.id]);
   return <ObjectSurface icon={content.icon} kind={content.kind} title={object.title} actions={content.actions} panels={content.panels}
     controls={<>
-      <DropdownMenu><DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.focusActions)}><MoreHorizontal /></Button>
-      </DropdownMenuTrigger>
+      <DropdownMenu><Tooltip>
+        <TooltipTrigger asChild><DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.focusActions)}><MoreHorizontal /></Button>
+        </DropdownMenuTrigger></TooltipTrigger>
+        <TooltipContent>{i18n.text(objectsMessages.focusActions)}</TooltipContent>
+      </Tooltip>
         <DropdownMenuContent align="end">
           <SizeMenu onScale={scale => { void setFocusWidth(run, session.id, Math.round(focusMediumWidth * scale)); }}
             onRestore={() => { void setFocusWidth(run, session.id, null); }} />

@@ -1,6 +1,7 @@
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator } from "@asterism-app/ui/ui/dropdown-menu";
 
 import { Button } from "@asterism-app/ui/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { MoreHorizontal, PenLine, Trash2 } from "lucide-react";
 
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism-app/ui/ui/alert-dialog";
@@ -32,7 +33,12 @@ export function ObjectActions({ object, appearance, onView }: {
   const [dialog, setDialog] = useState<"rename" | "remove" | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const openingRename = useRef(false);
-  return <><DropdownMenu><DropdownMenuTrigger asChild><Button ref={trigger} variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.objectActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>
+  return <><DropdownMenu><Tooltip>
+    <TooltipTrigger asChild><DropdownMenuTrigger asChild>
+      <Button ref={trigger} variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.objectActions)}><MoreHorizontal /></Button>
+    </DropdownMenuTrigger></TooltipTrigger>
+    <TooltipContent>{i18n.text(objectsMessages.objectActions)}</TooltipContent>
+  </Tooltip>
     <DropdownMenuContent align="end" onCloseAutoFocus={event => {
       if (openingRename.current) { event.preventDefault(); openingRename.current = false; }
     }}>
