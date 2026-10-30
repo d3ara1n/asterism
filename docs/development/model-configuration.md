@@ -38,7 +38,13 @@ Builtin resolves its roles and optional Agent overrides before calling the host.
 
 Roles are reusable selections, not workbench objects. Hidden roles remain usable by internal consumers; disabled roles do not resolve. The utility role does not fall back to the current conversation.
 
-Agent configurations combine instructions, a default model role, and a budget. The budget bounds request count and duration for subagent runs only; workbench Agents have no request or time limit. Budget fields override individually. Agent discovery exposes purpose and task examples; the chosen agent consumes its own detailed instructions. Resource links supply access to resource capabilities.
+Agent configurations combine shared role instructions, a default model role, resource access policy, and subagent settings. Workbench Agents consume the shared instructions. Subagents also consume role-specific additional instructions appended to the shared prompt. Delegated-task behavior and report requirements belong to these configurable instructions.
+
+Subagent settings group those additional instructions with a budget bounding request count and duration for one delegated run. Workbench Agents have no request or time limit. Additional instructions and individual budget fields inherit independently. Agent discovery exposes purpose and task examples; the chosen agent consumes its own detailed instructions. Resource links supply access to resource capabilities.
+
+Resource access policy applies to both workbench Agents and subagents by resource type. Unrestricted mode allows all linked types, an allowlist permits only listed types, and a denylist blocks listed types. The two lists form one mutually exclusive policy; overriding either replaces the inherited policy. An empty allowlist denies every type, while an empty denylist denies none. Policy limits resource tool calls while leaving listing, inspection data, and linked context available.
+
+An Agent-level delegation allowlist applies to outgoing delegation in both workbench and subagent execution. Null permits any enabled role, an empty list permits none, and a nonempty list names permitted target roles. The list replaces its inherited value as a whole. Agent discovery exposes every enabled role's own allowlist as configuration data, independently of the caller. Resource access policy and target role availability remain separate requirements.
 
 Built-in defaults plus explicit user overrides form effective configuration. Custom roles inherit the original default role; custom agents inherit the original worker definition. Editing another effective record does not change this inheritance baseline.
 

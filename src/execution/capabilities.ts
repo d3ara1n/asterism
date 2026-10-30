@@ -16,8 +16,9 @@ export class AgentCapabilities {
   private readonly linked = new Map<string, { resource: FoldedObject; tools: readonly ToolImplementation[] }>();
   private readonly caller?: ToolCaller;
   constructor(private readonly resources: ResourceRegistry, tools: ToolRegistry,
-    linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller, private readonly interactive = true) {
-    this.caller = caller && Object.freeze({ ref: Object.freeze({ ...caller.ref }), title: caller.title });
+    linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller, private readonly interactive = true,
+    private readonly resourcePolicy: (kind: string) => boolean = () => true) {
+    this.caller = caller && Object.freeze({ ...caller, ref: Object.freeze({ ...caller.ref }) });
     for (const source of linked) {
       const resource = structuredClone(source);
       this.linked.set(resource.id, { resource, tools: tools.match(resource).filter(implementation => policy(implementation.tool.name))
@@ -54,13 +55,24 @@ export class AgentCapabilities {
   async inspect(id: string): Promise<PreparedResult> {
     const target = this.linked.get(id);
     if (!target) return denied();
-    const value = { resource_id: id, state: await this.resources.inspect(target.resource), tools: this.describe(id) };
+    const notice = this.restriction(target.resource.kind);
+    const value = { resource_id: id, state: await this.resources.inspect(target.resource), tools: this.describe(id),
+      ...(notice ? { notice } : {}) };
     return { kind: "succeeded", data: value };
+  }
+
+  private restriction(kind: string): string | null {
+    if (this.resourcePolicy(kind)) return null;
+    return this.caller?.agent === undefined
+      ? "This execution cannot call tools on this resource."
+      : `Agent role "${this.caller.agent}" cannot call tools on this resource.`;
   }
 
   resolve(id: string, name: string, selector: Json, args: Json): Invocation | PreparedResult {
     const target = this.linked.get(id);
     if (!target) return denied();
+    const restriction = this.restriction(target.resource.kind);
+    if (restriction) return { ...this.identity(id), kind: "rejected", error: { code: "access_denied", message: restriction } };
     const tool = target.tools.find(implementation => implementation.tool.name === name);
     if (!tool && !this.resources.has(target.resource.kind)) return { ...this.identity(id), kind: "rejected", error: { code: "implementation_missing",
       message: `The plugin providing ${target.resource.kind} is unavailable.` } };

@@ -1,4 +1,4 @@
-import { PluginApiError, type ExecutionServices, type ResourceRef } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type ExecutionServices, type ResourceRef, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../lifecycle.ts";
 import type { PluginHostServices } from "../loader.ts";
 import type { BoundTopLevelTool } from "../top-level-tools.ts";
@@ -14,7 +14,7 @@ interface ExecutionBinding {
   runs: RunGroup;
   objects: Pick<SdkObjects, "own" | "checkRef">;
   checkAvailable(): void;
-  topLevelTools(ref: ResourceRef, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean): BoundTopLevelTool[];
+  topLevelTools(caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean): BoundTopLevelTool[];
 }
 
 /** Resource access, request holds, content handoff, and optional presentation surround the generic runner. */
@@ -52,6 +52,10 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
       const allowed = policyConfig?.allow ? new Set(policyConfig.allow) : null;
       const excluded = new Set(policyConfig?.exclude ?? []);
       const policy = (name: string) => (allowed === null || allowed.has(name)) && !excluded.has(name);
+      const allowedResources = request.resources?.allow ? new Set(request.resources.allow) : null;
+      const excludedResources = new Set(request.resources?.exclude ?? []);
+      const resourcePolicy = (kind: string) => (allowedResources === null || allowedResources.has(kind)) && !excludedResources.has(kind);
+      const caller: ToolCaller = Object.freeze({ ref, title: source.title, ...(request.agent === undefined ? {} : { agent: request.agent }) });
       const interactive = request.interactive;
       const { target, messages, cache, userAgent, requestParentId } = structuredClone({
         target: request.target, messages: request.messages, cache: request.cache, userAgent: request.userAgent, requestParentId: request.requestParentId,
@@ -62,8 +66,8 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
         let handover: ContentLease | undefined;
         try {
           handover = host.content?.handover(ref.sessionId, ref.id);
-          const capabilities = host.sessions.capabilities(linked, policy, { ref, title: source.title }, interactive);
-          const boundTools = topLevelTools(ref, policy, linkedRefs, interactive);
+          const capabilities = host.sessions.capabilities(linked, policy, caller, interactive, resourcePolicy);
+          const boundTools = topLevelTools(caller, policy, linkedRefs, interactive);
           const preparedSystem = host.sessions.context(linked).then(files => typeof system === "function" ? system(files) : system);
           return await host.models.run({ target, system: preparedSystem,
             messages, cache, userAgent, sessionId: ref.sessionId, requestParentId,

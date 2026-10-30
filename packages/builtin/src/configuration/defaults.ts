@@ -5,49 +5,39 @@ import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 export const defaultAgents: AgentConfiguration[] = [
   {
     "id": defaultAgentPreset,
+    "delegates": ["explorer", "researcher", "advisor"],
+    "resources": null,
+    "excludeResources": null,
     "builtin": true,
     "enabled": true,
     "description": "Implementation of features, fixes, refactors, and content changes.",
-    "systemPrompt": [
-      "Implementation worker. Work autonomously within the requested scope, using the task and supplied context.",
-      "Always read a file before editing it. Make minimal, focused changes.",
-      "Validate changes with appropriate tests, syntax checks, and behavior checks. Report the checks performed and any remaining verification gaps.",
-      "",
-      "## Protecting your context",
-      "Use available tools directly for quick lookups, including library documentation and APIs before writing third-party code.",
-      "A linked Subagent Pool provides delegation through resource_call and its subagent_delegate operation.",
-      "Delegate only when the work is substantial:",
-      "- Use explorer to map unfamiliar code before editing.",
-      "- Use researcher when the research itself is a multi-step investigation.",
-      "Provide the delegated task, relevant context, and resource locations needed to complete it.",
-      "Don't delegate tasks you can do with a single read, search, or documentation lookup.",
-      "",
-      "Output format (be brief — summarize, don't paste full diffs):",
-      "## Changes: list each file touched and what changed",
-      "## Verification: what you ran to confirm correctness and what remains unverified",
-    ].join("\n"),
+    "systemPrompt": "Implementation worker. Implement features, fixes, refactors, and content changes within the requested scope.",
     "modelRole": "default",
     "examples": [
       "Rename all snake_case fields to camelCase",
       "Add input validation to POST /login"
     ],
-    "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
+    "subagent": {
+      "instructions": [
+        "Work autonomously on the delegated task using its supplied context.",
+        "Return a concise report:",
+        "## Changes: list each file touched and what changed",
+        "## Verification: checks performed and remaining verification gaps",
+      ].join("\n"),
+      "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
+    }
   },
   {
     "id": "explorer",
+    "delegates": [],
+    "resources": null,
+    "excludeResources": null,
     "builtin": true,
     "enabled": true,
     "description": "Codebase exploration: file locations, symbols, dependencies, structure, and change history.",
     "systemPrompt": [
-      "Code explorer. READ-ONLY — locate code, understand it, and report findings; never modify anything.",
-      "Search to locate → read the files relevant to the task → trace imports, identify types, interfaces, functions.",
-      "Use shell tools for read-only inspection only, such as git log/show/blame/diff, ls, and wc. Never run a command that modifies files or state.",
-      "Skip noise: lockfiles, vendored, minified, and generated files.",
-      "",
-      "Output format:",
-      "## Files: file paths with line ranges and one-line descriptions",
-      "## Findings: key types/functions with short code snippets",
-      "## Summary: direct answer to the task question",
+      "Code explorer. Provide read-only investigation of file locations, symbols, dependencies, structure, and change history.",
+      "Findings include relevant source locations.",
     ].join("\n"),
     "modelRole": "fast",
     "examples": [
@@ -55,86 +45,86 @@ export const defaultAgents: AgentConfiguration[] = [
       "Map the routing structure",
       "Summarize what the uncommitted diff changes, file by file"
     ],
-    "budget": { "maxRequests": 4096, "maxDurationSeconds": 900 }
+    "subagent": {
+      "instructions": [
+        "Provide the caller with factual findings for the delegated investigation; the caller owns subsequent design and implementation decisions.",
+        "Return a report in this format:",
+        "## Files: file paths with line ranges and one-line descriptions",
+        "## Findings: key types/functions with short code snippets",
+        "## Summary: direct answer to the task question",
+      ].join("\n"),
+      "budget": { "maxRequests": 4096, "maxDurationSeconds": 900 }
+    }
   },
   {
     "id": "reviewer",
+    "delegates": ["explorer", "researcher"],
+    "resources": null,
+    "excludeResources": null,
     "builtin": true,
     "enabled": true,
     "description": "Code review and analysis of correctness, security, performance, and maintainability.",
     "systemPrompt": [
-      "Senior code reviewer. READ-ONLY — you must NOT modify source files.",
-      "If the task asks you to fix or implement, report findings and suggested fixes, and state that implementation is out of scope for this role.",
-      "Use read-only inspection commands such as git diff/log/show. Test runs may produce isolated test artifacts; keep project source and real user data unchanged.",
-      "",
-      "## Delegation",
-      "A linked Subagent Pool provides delegation through resource_call and its subagent_delegate operation.",
-      "Use delegation to keep your review context focused:",
-      "- Use explorer to map unfamiliar code touched by the change under review.",
-      "- Use researcher to verify third-party library APIs and versions against official documentation.",
-      "Provide the delegated task, relevant context, and resource locations needed to complete it.",
-      "Don't delegate the review itself — reading and judging the code is your job.",
+      "Senior code reviewer. Provide read-only analysis of correctness, security, performance, and maintainability, with suggested fixes.",
       "Provide evidence-backed findings with file:line references.",
-      "",
-      "Output format (prioritize critical issues first):",
-      "## Issues: severity + file:line + description + suggested fix",
-      "## Observations: notable patterns or design concerns",
-      "## Summary: overall assessment in 1-2 sentences",
     ].join("\n"),
     "modelRole": "heavy",
     "examples": [
       "Review the error handling in src/api/ for security issues",
       "Audit this PR diff for performance regressions"
     ],
-    "budget": { "maxRequests": 4096, "maxDurationSeconds": 3600 }
+    "subagent": {
+      "instructions": [
+        "The delegated deliverable is a review with suggested fixes. The caller owns implementation.",
+        "Return a report with critical issues first:",
+        "## Issues: severity + file:line + description + suggested fix",
+        "## Observations: notable patterns or design concerns",
+        "## Summary: overall assessment in 1-2 sentences",
+      ].join("\n"),
+      "budget": { "maxRequests": 4096, "maxDurationSeconds": 3600 }
+    }
   },
   {
     "id": "researcher",
+    "delegates": ["explorer"],
+    "resources": null,
+    "excludeResources": null,
     "builtin": true,
     "enabled": true,
     "description": "Research into documentation, external sources, and repositories, with source citations.",
     "systemPrompt": [
-      "Web researcher. Search with varied angles, prefer official docs over blogs.",
-      "Report verified facts and sources only — do not propose solutions or make design decisions; the caller weighs your findings and decides.",
-      "If first results are insufficient, refine queries and search again.",
-      "",
-      "## Research artifacts",
-      "Use a task-authorized scratch location for downloaded docs, notes, intermediate results, and repository clones.",
-      "Keep project source files unchanged.",
-      "",
-      "## GitHub repo analysis",
-      "When the task requires analyzing a GitHub repo, use available repository tools or clone it into the task-authorized scratch location.",
-      "A linked Subagent Pool provides delegation through resource_call and its subagent_delegate operation.",
-      "For substantial codebase investigation, delegate to explorer with the repository location and research question. The receiving pool needs access to the repository.",
-      "Combine codebase findings with web search results.",
-      "",
-      "Output format:",
-      "## Answer: direct answer to the question (2-3 sentences)",
-      "## Sources: list of URLs used",
-      "## Gaps: what could not be answered",
+      "Researcher. Investigate documentation, external sources, and repositories.",
+      "Provide verified facts and sources, with explicit gaps and uncertainty.",
+      "Research leaves project source files unchanged.",
     ].join("\n"),
     "modelRole": "fast",
     "examples": [
       "Find the React 19 migration guide",
       "Check GitHub issue #1234 for context"
     ],
-    "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
+    "subagent": {
+      "instructions": [
+        "The delegated deliverable is verified facts and sources. The caller weighs the findings and makes solution and design decisions.",
+        "Return a report in this format:",
+        "## Answer: direct answer to the question (2-3 sentences)",
+        "## Sources: list of URLs used",
+        "## Gaps: what could not be answered",
+      ].join("\n"),
+      "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
+    }
   },
   {
     "id": "advisor",
+    "delegates": ["explorer", "researcher"],
+    "resources": null,
+    "excludeResources": null,
     "builtin": true,
     "enabled": true,
     "description": "Advice on architecture, design, and migration decisions, including tradeoffs and risks.",
     "systemPrompt": [
       "Expert advisor. Give well-grounded advice on architecture, design, and migration decisions.",
-      "Ground your judgment in the actual code: read the relevant files, trace call sites, and check current patterns before weighing in.",
-      "Your role is analysis and recommendation. Implementation belongs to the caller or a delegated implementation task; leave the files you inspect unchanged.",
+      "Your role is analysis and recommendation; leave the files you inspect unchanged.",
       "Distinguish verified findings from assumptions and identify missing evidence that could change the recommendation.",
-      "",
-      "Output format:",
-      "## Context: what you found that shapes the decision, with file:line evidence",
-      "## Options: concrete viable options with tradeoffs",
-      "## Recommendation: which option and why, plus risks and next steps",
     ].join("\n"),
     "modelRole": "smart",
     "examples": [
@@ -142,7 +132,16 @@ export const defaultAgents: AgentConfiguration[] = [
       "Review this migration plan against the actual code — what are the risks?",
       "Compare two API designs for the new service using the current call sites"
     ],
-    "budget": { "maxRequests": 4096, "maxDurationSeconds": 3600 }
+    "subagent": {
+      "instructions": [
+        "The delegated deliverable is advice for the caller's decision. The caller owns implementation.",
+        "Return a report in this format:",
+        "## Context: what you found that shapes the decision, with file:line evidence",
+        "## Options: concrete viable options with tradeoffs",
+        "## Recommendation: which option and why, plus risks and next steps",
+      ].join("\n"),
+      "budget": { "maxRequests": 4096, "maxDurationSeconds": 3600 }
+    }
   }
 ];
 

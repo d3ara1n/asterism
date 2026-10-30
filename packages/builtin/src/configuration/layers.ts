@@ -16,15 +16,19 @@ export const configurationDefaults: ParadigmSnapshot["defaults"] = {
 };
 
 export function normalizeOverrides<T extends ModelRoleOverrides | AgentOverrides>(value: T): T {
+  return normalizeFields(value) as T;
+}
+
+function normalizeFields(value: object): Record<string, unknown> {
   return Object.fromEntries(Object.entries(value).flatMap(([key, item]): [string, unknown][] => {
     if (item === undefined || (typeof item === "string" && item.trim() === "")) return [];
-    // Budget fields override individually; an object without fields overrides nothing.
-    if (key === "budget" && item && typeof item === "object") {
-      const fields = Object.entries(item).filter(([, field]) => field !== undefined);
+    // Nested settings override individually; an object without fields overrides nothing.
+    if ((key === "subagent" || key === "budget") && item && typeof item === "object") {
+      const fields = Object.entries(normalizeFields(item));
       return fields.length ? [[key, Object.fromEntries(fields)]] : [];
     }
     return [[key, item]];
-  })) as T;
+  }));
 }
 
 /** Custom entries inherit only behavior fields; users supply their identities. */
@@ -46,8 +50,13 @@ export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaul
   const base = baseId(agent, defaultAgentPreset);
   const inherited = defaults.agents[base];
   if (!inherited) throw new Error("Built-in agent definition is unavailable.");
+  // The two lists form one policy; overriding either clears the inherited opposite list.
+  const policy = overrides.resources !== undefined || overrides.excludeResources !== undefined
+    ? { resources: overrides.resources ?? null, excludeResources: overrides.excludeResources ?? null } : {};
   return agentSchema.parse({
-    ...inherited, ...overrides, budget: { ...inherited.budget, ...overrides.budget },
+    ...inherited, ...overrides, ...policy,
+    subagent: { ...inherited.subagent, ...overrides.subagent,
+      budget: { ...inherited.subagent.budget, ...overrides.subagent?.budget } },
     id: agent.id, builtin: agent.builtin,
   });
 }

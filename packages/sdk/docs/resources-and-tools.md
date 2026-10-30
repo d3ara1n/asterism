@@ -28,6 +28,8 @@ For model calls, `resource_id` selects the resource, `args` supplies the operati
 
 Use a top-level tool for operations on the execution context or shared resource lifecycle, such as creation and renaming. The host supplies caller identity and execution scope.
 
+Both resource tools and top-level tools receive `caller`, containing the access owner's resource reference and title. When the executing paradigm supplies an Agent role name, it is available as `caller.agent`. The role identifies the executing configuration independently of the access owner; several roles can execute through one shared resource. Role identity carries no configuration object or additional resource access.
+
 Describe the operation's purpose and observable behavior. Parameters should explain business meaning that names and types alone do not express. Results should distinguish known success, failure, cancellation, partial output, and uncertain effects.
 
 A tool contribution can capture resource-specific configuration and access at the start of each model request. Return a bound contribution using the same implementation contract; the host uses it for that request's tool batch. This is useful for a resource whose selected network or reachable objects can change while a model is responding. Capture addressing and authorization facts, while reading ordinary mutable content when the operation runs.
@@ -35,6 +37,8 @@ A tool contribution can capture resource-specific configuration and access at th
 Declare `requiresInteraction: true` when a tool cannot complete without user interaction. The host excludes it from noninteractive requests and rejects unsupported calls before entering the implementation. Tools supporting both modes can inspect `interactive` in their execution context. A renderer that only displays progress or results does not make a tool interactive.
 
 Use `plugin.execution.run` to execute one model request with tools bound to a resource's current links and the real session. Supply that resource as the access owner and select the interaction capability. The execution holds captured relationships through the tool batch; subsequent calls capture current links again. Calls sharing an access owner keep independent message inputs and can run concurrently.
+
+Supply the executing role's name through `agent` and any resource type allowlist or denylist through `resources`. The host captures these inputs with the request. Resource policy is enforced by the shared dispatcher: inspection retains resource state and tool schemas with a notice naming a denied role, and calls on restricted types are rejected before the implementation runs. Listing and linked context remain available. Individual resource tools need no role-policy checks.
 
 Resource holds do not block history movement. Use an object busy scope for work that depends on the timeline, such as a conversation writing its responses there. Object-bound managed tasks protect history by default; use `affectsHistory: false` for external runtime tasks that should still stop when their owning resource leaves the session.
 

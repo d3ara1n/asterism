@@ -9,7 +9,7 @@ Provider connections and models belong to the application. Roles and Agent confi
 | Provider connection | Service endpoint, protocol, credentials, and its model list |
 | Model | A service model ID and its capabilities and generation parameters |
 | Model role | A reusable model selection and thinking level |
-| Agent configuration | Instructions, a default model role, and a subagent budget |
+| Agent configuration | Shared role instructions, a default model role, and subagent settings |
 | Workbench agent | A session object using an agent configuration and optional overrides |
 
 ## Add and check a connection
@@ -32,9 +32,19 @@ Configuration changes apply at request boundaries. An in-progress response conti
 
 ## Configure an agent
 
-Use an agent configuration to describe its purpose, instructions, model role, and budget. Create separate workbench agents when independent conversations or collaboration help the task. The budget limits requests and duration for tasks in a Subagent Pool and does not affect workbench agents.
+Use an agent configuration to describe its purpose, shared role instructions, and model role. The role prompt applies both to workbench agents and to subagents. Keep the role's expertise and standards there.
+
+Subagent settings contain additional instructions and an execution budget. Use the additional instructions for delegated-task responsibilities and report requirements; they append to the shared role prompt. The budget limits requests and duration for one task in a Subagent Pool and does not affect workbench agents. Clearing a prompt or budget override restores its default. Create separate workbench agents when independent conversations or collaboration help the task.
 
 Resource links determine which objects an agent can use. Tool implementations supply the operations supported by those objects. Selecting an agent configuration does not supply target resources.
+
+Resource access settings apply to both workbench agents and subagents. Choose unrestricted access, an allowlist of resource types, or a denylist of resource types. An empty allowlist blocks every type; an empty denylist blocks none. All built-in Agent roles default to unrestricted resource access.
+
+Restricted resources still appear in listings and retain their inspection information. Inspection adds a notice naming the denied Agent role; a tool call on that resource is rejected for that role. Changing the role or its policy applies on the next request. Resource policies control calls through Asterism's resource dispatcher, not network or filesystem operations performed through other permitted resources.
+
+Delegation settings control which roles an Agent can delegate tasks to, whether it runs on the workbench or as a subagent. Each role supplies a default allowlist that can be customized or set to unrestricted. An allowlist permits only selected roles; an empty allowlist disables delegation. The target must also be enabled. This setting controls outgoing delegation, independently of resource access or whether the role can receive a task.
+
+`agent_list` exposes each role's own `delegates` value alongside its purpose and examples: `null` means unrestricted, `[]` means none, and an array names allowed target roles. Delegation calls enforce the calling role's policy and identify both roles when rejecting a disallowed target.
 
 ## Interpret usage
 

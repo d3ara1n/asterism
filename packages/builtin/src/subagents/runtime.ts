@@ -4,7 +4,7 @@ import {
   type CallResult, type ApplicationIdentity, type ProviderUsage, type ResourceRef,
 } from "@asterism-app/sdk/runtime";
 import type { Json } from "@asterism-app/sdk/contracts";
-import { builtin } from "@asterism-app/builtin-api/contracts";
+import { builtin, type AgentConfiguration } from "@asterism-app/builtin-api/contracts";
 import { builtinConfiguration } from "../configuration/runtime.ts";
 import { createRequestAssembly } from "../agent/preparation.ts";
 import type { SkillCatalog } from "../skills/catalog.ts";
@@ -45,6 +45,23 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
       if (!runtime) throw new PluginApiError("unavailable", "The subagent pool is unavailable.");
       return runtime;
     };
+    const delegate = (captured?: readonly AgentConfiguration[]) => implementTool(Delegate, {
+      call(_data, _target, args, { object, caller, signal }) {
+        return operation(signal, () => {
+          const agents = captured ?? builtinConfiguration(plugin).agents;
+          if (caller.agent === undefined)
+            throw new PluginApiError("invalid_argument", "Delegation requires a calling Agent role.");
+          const source = agents.find(agent => agent.id === caller.agent && agent.enabled);
+          if (!source) throw new PluginApiError("not_found", `Calling Agent role "${caller.agent}" is unavailable.`);
+          if (!agents.some(role => role.id === args.role && role.enabled))
+            throw new PluginApiError("not_found", `Agent role ${args.role} is unavailable.`);
+          if (source.delegates !== null && !source.delegates.includes(args.role))
+            throw new PluginApiError("unavailable", `Agent role "${source.id}" cannot delegate tasks to Agent role "${args.role}".`, "access_denied");
+          return pool(object.ref).delegate(args, caller);
+        });
+      },
+      toModel: task => JSON.stringify({ id: task.input.id, role: task.input.role, status: task.status }),
+    });
     return {
       resources: [implementResource(SubagentPool, PoolView, {
         card: subagentPoolCard, links: { receive: true }, records: [Delegation], template: { current: [] },
@@ -79,7 +96,6 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
         project: (_data, object) => ({ tasks: pool(object.ref).list() }),
         inspect: async (_data, object) => ({
           tasks: pool(object.ref).list(),
-          roles: builtinConfiguration(plugin).agents.filter(role => role.enabled).map(({ id, description, examples }) => ({ id, description, examples })),
           parallelism: subagentParallelism,
         }),
         disposalWarning: (_data, object) => pool(object.ref).working ? subagentMessages.runningWarning : null,
@@ -88,13 +104,7 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
         for (const resource of snapshot.resources.all()) if (resource.ref.kind === SubagentPool.kind) pools.get(resource.ref.id)?.changed();
       } }],
       tools: [
-        implementTool(Delegate, { call(_data, _target, args, { object, caller, signal }) {
-          return operation(signal, () => {
-            if (!builtinConfiguration(plugin).agents.some(role => role.id === args.role && role.enabled))
-              throw new PluginApiError("not_found", `Agent role ${args.role} is unavailable.`);
-            return pool(object.ref).delegate(args, caller);
-          });
-        }, toModel: task => JSON.stringify({ id: task.input.id, role: task.input.role, status: task.status }) }),
+        { ...delegate(), capture: () => delegate(builtinConfiguration(plugin).agents) },
         implementTool(Check, { call(_data, target, _args, { object, signal }) {
           return operation(signal, () => pool(object.ref).check(target));
         }, toModel: task => {

@@ -64,6 +64,7 @@ function ResourceInspectBody({ result }: InspectProps) {
   const i18n = useI18n();
   return result?.data ? <div className="space-y-4">
     <section className="space-y-2"><p className="type-label">{i18n.formatMessage(toolsMessages.toolResourceState)}</p><ResourceFields value={result.data.state} /></section>
+    {result.data.notice && <p className="type-caption">{result.data.notice}</p>}
     <section className="space-y-2">
       <p className="type-label">{i18n.formatMessage(toolsMessages.toolAvailableTools)}</p>
       {!result.data.tools.length && <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoTools)}</p>}

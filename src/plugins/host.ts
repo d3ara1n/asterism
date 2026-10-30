@@ -58,7 +58,7 @@ export interface SessionHost {
   retirementChanged(sessionId: string): void;
   viewChanged(sessionId: string, objectId: string): void;
   linked(sessionId: string, objectId: string): FoldedObject[];
-  capabilities(linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller, interactive?: boolean): AgentCapabilities;
+  capabilities(linked: readonly FoldedObject[], policy: ToolPolicy, caller?: ToolCaller, interactive?: boolean, resourcePolicy?: (kind: string) => boolean): AgentCapabilities;
   context(linked: readonly FoldedObject[]): Promise<ContextFile[]>;
 }
 export interface ObjectScope {

@@ -30,9 +30,13 @@ The workbench Agent has no request count or execution time limit; a turn continu
 
 ## Request environment
 
-At each request boundary, capture the message path, agent configuration, model target, credentials, resource links, and execution tool policy. The response and its tool batch use that environment through completion.
+At each request boundary, capture the message path, agent configuration, model target, credentials, resource links, and execution tool and resource policies. The response and its tool batch use that environment through completion.
 
 Changes recorded during a response affect the next request. Captured access does not freeze external file contents.
+
+Tool caller identity carries the access owner's resource reference and title plus the paradigm-supplied Agent role name when present. A workbench Agent uses itself as the access owner; a subagent uses its pool while supplying its own role name. Resource and top-level tool implementations receive this identity without the Agent's configuration or runtime object.
+
+Resource type policy is enforced centrally by the resource dispatcher. Listing remains resource state discovery. Inspection returns the same state and tool definitions, adding a notice only when the current role is denied. Calls on a denied type return a rejected result before entering the resource tool implementation. Denial feedback names the captured role so a later request under a different role can interpret earlier feedback correctly. Resource policy leaves linked context and top-level tool behavior unchanged.
 
 Each session-bound request acquires shared lifetime holds for its captured directed resource relationships. Independent requests through the same receiver contribute independent holds. Unlink and removal events immediately change history and future discovery. Existing holders keep using the captured instances until their response, tool batch, and cleanup finish. Hold release follows actual completion, including cancellation cleanup.
 

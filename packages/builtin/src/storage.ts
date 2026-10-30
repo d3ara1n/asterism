@@ -10,13 +10,21 @@ const settingsV2 = z.object({
 
 /** Storage entry point for the built-in plugin, with the same shape as an external plugin's manifest `asterism.storage`; imports no business runtime. */
 export default defineStorage([
-  { kind: "json", path: ".asterism/config.json", version: 3, migrations: {
+  { kind: "json", path: ".asterism/config.json", version: 4, migrations: {
     2(data) {
       const settings = settingsV2.parse(data);
       for (const agent of settings.paradigm?.agents ?? []) {
         // maxTurns limited workbench Agents; subagent budgets are a separate setting and start from their defaults.
         const { tools: _tools, excludeTools: _exclude, subagentRoles: _delegates, fallbackRole: _fallback, maxTurns: _turns, ...overrides } = agent.overrides;
         agent.overrides = overrides;
+      }
+      return settings;
+    },
+    3(data) {
+      const settings = settingsV2.parse(data);
+      for (const agent of settings.paradigm?.agents ?? []) {
+        const { budget, ...overrides } = agent.overrides;
+        agent.overrides = budget === undefined ? overrides : { ...overrides, subagent: { budget } };
       }
       return settings;
     },

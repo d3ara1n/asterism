@@ -119,6 +119,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
                 const prepare = deps.prepareRequest(agent);
                 let prepared: ReturnType<typeof prepare>;
                 result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
+                  agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },
                   userAgent: deps.userAgent, completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
                   target: deps.selection.target(selection), system: files => { prepared = prepare(files); return prepared.system; }, messages: projectForAgent(snapshot, object.ref.id), signal: current,
                   cache: { expectHit: index > 0 && !compressed },

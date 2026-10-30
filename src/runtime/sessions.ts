@@ -134,7 +134,7 @@ export class SessionService {
         const ids = new Set(folded.links.filter(link => link.receiverId === objectId).map(link => link.resourceId));
         return folded.objects.filter(object => ids.has(object.id));
       },
-      capabilities: (linked, policy, caller, interactive) => new AgentCapabilities(this.resources, this.tools, linked, policy, caller, interactive),
+      capabilities: (linked, policy, caller, interactive, resourcePolicy) => new AgentCapabilities(this.resources, this.tools, linked, policy, caller, interactive, resourcePolicy),
       context: linked => this.resources.context(linked),
     };
     const refOf = (objectId: string): ResourceRef | null => this.tree.resourceRef(objectId);

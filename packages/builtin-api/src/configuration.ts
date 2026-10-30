@@ -15,15 +15,27 @@ export const agentBudgetSchema = z.strictObject({
   maxDurationSeconds: z.number().int().positive().max(2147483),
 });
 export type AgentBudget = z.infer<typeof agentBudgetSchema>;
+const subagentConfigurationSchema = z.strictObject({
+  instructions: z.string().max(100_000),
+  budget: agentBudgetSchema,
+});
+const resourceTypesSchema = z.array(z.string().trim().min(1).max(160)).max(200).nullable();
 const agentFieldsSchema = z.strictObject({
   enabled: z.boolean(), description: z.string().max(20_000), systemPrompt: z.string().max(100_000),
   modelRole: configurationIdSchema.nullable(), examples: z.array(z.string().max(4_000)).max(50),
-  budget: agentBudgetSchema,
+  subagent: subagentConfigurationSchema,
+  resources: resourceTypesSchema,
+  excludeResources: resourceTypesSchema,
+  delegates: z.array(configurationIdSchema).max(200).nullable(),
 });
-export const agentInputSchema = agentFieldsSchema;
-export const agentSchema = agentInputSchema.extend({ id: configurationIdSchema, builtin: z.boolean() });
-// Blank text removes the override on save; false, null, and empty lists retain their respective business meanings. Budget fields override individually.
-export const agentOverridesSchema = agentFieldsSchema.extend({ budget: agentBudgetSchema.partial() }).partial();
+export const agentInputSchema = agentFieldsSchema.refine(value => value.resources === null || value.excludeResources === null,
+  "Resource allowlist and denylist are mutually exclusive.");
+export const agentSchema = agentInputSchema.safeExtend({ id: configurationIdSchema, builtin: z.boolean() });
+// Blank text removes the override on save; false, null, and empty lists retain their respective business meanings. Subagent fields override individually.
+export const agentOverridesSchema = agentFieldsSchema.extend({
+  subagent: subagentConfigurationSchema.extend({ budget: agentBudgetSchema.partial() }).partial(),
+}).partial().refine(value => value.resources == null || value.excludeResources == null,
+  "Resource allowlist and denylist are mutually exclusive.");
 
 export type AgentConfiguration = z.infer<typeof agentSchema>;
 export type AgentOverrides = z.infer<typeof agentOverridesSchema>;

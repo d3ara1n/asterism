@@ -177,7 +177,7 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
       const captured = snapshot(host, resource);
       const scope: ObjectScope = { active: false, execution: true };
       const prepared = contribution.prepare(captured, sdk.object(captured.ref, scope, captured), target, args,
-        Object.freeze({ ref: Object.freeze({ ...caller.ref }), title: caller.title }), interactive);
+        Object.freeze({ ...caller, ref: Object.freeze({ ...caller.ref }) }), interactive);
       if (!("execute" in prepared)) return prepared;
       return { ...prepared, async execute(signal, publish, handover?: ContentLease) {
         scope.active = true;

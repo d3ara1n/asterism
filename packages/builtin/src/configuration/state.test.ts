@@ -7,10 +7,10 @@ const initial = () => structuredClone(defaultParadigmConfiguration);
 describe("Builtin configuration ownership", () => {
   it("keeps explicit false and empty lists while clearing blank overrides to the original baseline", () => {
     const saved = updateParadigmConfiguration(initial(), { type: "agent.save", id: "worker", value: {
-      id: "worker", systemPrompt: "Custom instructions", enabled: false, examples: [],
+      id: "worker", systemPrompt: "Custom instructions", enabled: false, examples: [], delegates: [],
     } });
     expect(resolveParadigmConfiguration(saved).agents.find(agent => agent.id === "worker"))
-      .toMatchObject({ systemPrompt: "Custom instructions", enabled: false, examples: [] });
+      .toMatchObject({ systemPrompt: "Custom instructions", enabled: false, examples: [], delegates: [] });
     const cleared = updateParadigmConfiguration(saved, { type: "agent.save", id: "worker", value: { id: "worker", systemPrompt: " \n " } });
     expect(resolveParadigmConfiguration(cleared).overrides.agents.worker).toEqual({});
     expect(resolveParadigmConfiguration(cleared).agents.find(agent => agent.id === "worker")!.systemPrompt).toBe(configurationDefaults.agents.worker!.systemPrompt);
@@ -46,14 +46,43 @@ describe("Builtin configuration ownership", () => {
   });
   it("updates unoverridden fields without mutating already resolved configuration", () => {
     const oldDefaults = structuredClone(configurationDefaults), nextDefaults = structuredClone(configurationDefaults);
-    oldDefaults.agents.worker!.budget.maxRequests = 1200; nextDefaults.agents.worker!.budget.maxRequests = 3000;
-    nextDefaults.agents.worker!.budget.maxDurationSeconds = 50;
+    oldDefaults.agents.worker!.subagent.budget.maxRequests = 1200; nextDefaults.agents.worker!.subagent.budget.maxRequests = 3000;
+    nextDefaults.agents.worker!.subagent.budget.maxDurationSeconds = 50;
+    nextDefaults.agents.worker!.subagent.instructions = "New delegation instructions";
     nextDefaults.agents.worker!.systemPrompt = "New default"; nextDefaults.roles.default!.thinking = "high";
     // Overriding one budget field keeps inheriting the other from current defaults.
-    const entry = { id: "custom", builtin: false, overrides: { systemPrompt: "Pinned", budget: { maxDurationSeconds: 70 } } };
+    const entry = { id: "custom", builtin: false, overrides: { systemPrompt: "Pinned", subagent: { budget: { maxDurationSeconds: 70 } } } };
     const before = resolveAgentConfiguration(entry, oldDefaults);
-    expect(resolveAgentConfiguration(entry, nextDefaults)).toMatchObject({ budget: { maxRequests: 3000, maxDurationSeconds: 70 }, systemPrompt: "Pinned" });
-    expect(before.budget.maxRequests).toBe(1200);
+    expect(resolveAgentConfiguration(entry, nextDefaults)).toMatchObject({
+      subagent: { instructions: "New delegation instructions", budget: { maxRequests: 3000, maxDurationSeconds: 70 } }, systemPrompt: "Pinned",
+    });
+    expect(before.subagent.budget.maxRequests).toBe(1200);
     expect(resolveRoleConfiguration({ id: "role", builtin: false, overrides: { hidden: false } }, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
+  });
+  it("clears nested blank instructions and empty budgets while preserving sibling overrides", () => {
+    const saved = updateParadigmConfiguration(initial(), { type: "agent.save", id: "worker", value: {
+      id: "worker", systemPrompt: "Shared", subagent: { instructions: " \n ", budget: { maxRequests: 8 } },
+    } });
+    expect(saved.agents.find(agent => agent.id === "worker")!.overrides)
+      .toEqual({ systemPrompt: "Shared", subagent: { budget: { maxRequests: 8 } } });
+    const instructions = updateParadigmConfiguration(saved, { type: "agent.save", id: "worker", value: {
+      id: "worker", subagent: { instructions: "Delegated", budget: {} },
+    } });
+    expect(instructions.agents.find(agent => agent.id === "worker")!.overrides)
+      .toEqual({ subagent: { instructions: "Delegated" } });
+    const cleared = updateParadigmConfiguration(instructions, { type: "agent.save", id: "worker", value: {
+      id: "worker", subagent: { instructions: " ", budget: {} },
+    } });
+    expect(cleared.agents.find(agent => agent.id === "worker")!.overrides).toEqual({});
+  });
+  it("replaces inherited resource policies as a pair and preserves empty allowlists", () => {
+    const defaults = structuredClone(configurationDefaults);
+    defaults.agents.worker!.excludeResources = ["test/web"];
+    const resolve = (overrides: Parameters<typeof resolveAgentConfiguration>[0]["overrides"]) =>
+      resolveAgentConfiguration({ id: "custom", builtin: false, overrides }, defaults);
+    expect(resolve({})).toMatchObject({ resources: null, excludeResources: ["test/web"] });
+    expect(resolve({ resources: ["test/files"] })).toMatchObject({ resources: ["test/files"], excludeResources: null });
+    expect(resolve({ resources: [] })).toMatchObject({ resources: [], excludeResources: null });
+    expect(resolve({ excludeResources: null })).toMatchObject({ resources: null, excludeResources: null });
   });
 });

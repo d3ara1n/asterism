@@ -78,6 +78,72 @@ function runner(f: ReturnType<typeof open>, actor: ResourceRef, target: Awaited<
 }
 
 describe("SDK session resource lifetimes", () => {
+  // Role changes and edited lists must affect the next request, while inspection remains informative and calls enforce the captured policy.
+  it("keeps resource discovery intact and rejects calls with the captured role while passing role identity to tools", async () => {
+    const extension = pluginNamespace("test.resource-policy");
+    const resultSchema = z.string().nullable().describe("Calling Agent role.");
+    const tool = defineImplementation({
+      ...extension.data("role", resultSchema), resource: Item,
+      tool: defineTool({ id: extension.name("tool"), name: "resource_role", description: "Read the calling role.", guidelines: [],
+        argsSchema: z.strictObject({}).describe("No arguments.") }),
+      targetSchema: z.null().describe("The whole resource."), effect: "read", execution: "parallel",
+    });
+    let called = 0, role = "worker", changeDuringRequest = true;
+    const policy: { allow?: string[]; exclude?: string[] } = { exclude: [Item.kind] };
+    let resource!: ResourceRef;
+    const f = open({ plugins: [definePlugin({ namespace: extension, modules: [defineModule(() => ({
+      tools: [implementTool(tool, { async call(_data, _target, _args, { caller }) {
+        called++; return { kind: "succeeded", data: caller.agent ?? null };
+      } })],
+      topLevelTools: [defineTopLevelTool({
+        id: extension.name("top"), name: "calling_role", description: "Read the calling role.", guidelines: [],
+        argsSchema: z.strictObject({}).describe("No arguments."), resultSchema, effect: "read", execution: "parallel",
+        async execute(_args, { caller }) { return { kind: "succeeded", data: caller.agent ?? null }; },
+      })],
+    }))] })], adapter: adapter((): { name: string; args: Json }[] => {
+      if (changeDuringRequest) {
+        role = "explorer"; policy.exclude!.splice(0); changeDuringRequest = false;
+      }
+      return [
+        { name: "resource_list", args: {} },
+        { name: "resource_inspect", args: { resource_id: resource.id } },
+        { name: "resource_call", args: { resource_id: resource.id, tool: "resource_role" } },
+        { name: "calling_role", args: {} },
+      ];
+    }) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    resource = await f.session.create(Create, 7); f.session.link(actor, resource);
+    const run = () => f.plugin.execution.run({ access: actor, agent: role, resources: policy, interactive: true, target,
+      requestParentId: null, system: { blocks: [] }, messages: [], signal: new AbortController().signal, observer: { event() {} } });
+    const first = await run();
+    expect(first.tools[0]!.data).toEqual({ resources: [{ resource_id: resource.id, type: Item.kind, title: "Item", state: { value: 8 } }] });
+    expect(first.tools[1]).toMatchObject({ kind: "succeeded", data: {
+      resource_id: resource.id, state: { value: 8 }, tools: [{ name: "resource_role" }],
+      notice: 'Agent role "worker" cannot call tools on this resource.',
+    } });
+    expect(first.tools[2]).toMatchObject({ kind: "rejected", error: { code: "access_denied",
+      message: 'Agent role "worker" cannot call tools on this resource.' } });
+    expect(first.tools[3]).toMatchObject({ kind: "succeeded", data: "worker" });
+    expect(called).toBe(0);
+
+    const next = await run();
+    expect(next.tools[0]!.data).toEqual(first.tools[0]!.data);
+    expect(next.tools[1]!.data).not.toHaveProperty("notice");
+    expect(next.tools[2]).toMatchObject({ kind: "succeeded", data: "explorer" });
+    expect(next.tools[3]).toMatchObject({ kind: "succeeded", data: "explorer" });
+    expect(called).toBe(1);
+
+    policy.allow = []; delete policy.exclude;
+    expect((await run()).tools[2]).toMatchObject({ kind: "rejected", error: { message: 'Agent role "explorer" cannot call tools on this resource.' } });
+    policy.allow = [Item.kind];
+    expect((await run()).tools[2]).toMatchObject({ kind: "succeeded", data: "explorer" });
+    policy.allow = ["test/other"];
+    expect((await run()).tools[2]).toMatchObject({ kind: "rejected" });
+    delete policy.allow;
+    expect((await run()).tools[2]).toMatchObject({ kind: "succeeded", data: "explorer" });
+    expect(called).toBe(3);
+  });
+
   it.each(["cancel", "failure"] as const)("releases pending link holds when a captured request ends by %s", async mode => {
     const entered = latch(), finish = latch();
     const f = open({ adapter: { version: "interrupted", validate() {}, prepare() {
@@ -648,23 +714,27 @@ describe("Agent resource operation entries", () => {
     expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([{ receiverId: actor.id, resourceId: noteId }]);
   });
 
-  // Agent discovery contract: lists return only selection information for enabled configurations; new configuration fields and private prompts never enter model results.
+  // Discovery exposes each role's own delegation policy without leaking private prompts or budgets.
   it("agent_list exposes selection fields while isolating system prompts and execution configuration", async () => {
     const f = open({ adapter: adapter(() => [{ name: "agent_list", args: {} }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
     await configureBuiltin(f.app, { type: "agent.save", id: "worker", value: { id: "worker",
-      description: "Public purpose", examples: ["Public example"],
-      systemPrompt: "PRIVATE_AGENT_INSTRUCTIONS", budget: { maxRequests: 123 },
+      description: "Public purpose", examples: ["Public example"], delegates: ["explorer"],
+      systemPrompt: "PRIVATE_AGENT_INSTRUCTIONS", subagent: { budget: { maxRequests: 123 } },
     } });
     await configureBuiltin(f.app, { type: "agent.save", id: "reviewer", value: { id: "reviewer", enabled: false } });
+    await configureBuiltin(f.app, { type: "agent.save", id: "explorer", value: { id: "explorer", delegates: [] } });
+    await configureBuiltin(f.app, { type: "agent.save", id: "researcher", value: { id: "researcher", delegates: null } });
     const result = await runner(f, actor, target)();
     expect(result.tools[0]?.kind).toBe("succeeded");
     const entries = result.tools[0]!.data as { id: string }[];
     expect(entries.find(entry => entry.id === "worker")).toEqual({
       id: "worker", description: "Public purpose",
-      examples: ["Public example"],
+      examples: ["Public example"], delegates: ["explorer"],
     });
     expect(entries.some(entry => entry.id === "reviewer")).toBe(false);
+    expect(entries.find(entry => entry.id === "explorer")).toMatchObject({ delegates: [] });
+    expect(entries.find(entry => entry.id === "researcher")).toMatchObject({ delegates: null });
     expect(JSON.stringify(result.tools[0]!.model)).not.toContain("PRIVATE_AGENT_INSTRUCTIONS");
   });
 

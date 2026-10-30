@@ -1,5 +1,5 @@
 import { defaultToolModel, reference, type Json, type ResourceRef, type ToolContract } from "@asterism-app/sdk/contracts";
-import { PluginApiError, type TopLevelTool } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type TopLevelTool, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { Invocation, PreparedResult } from "../tools/contract.ts";
 import type { SdkContext } from "./sdk-context.ts";
 import type { RunGroup } from "./lifecycle.ts";
@@ -12,7 +12,8 @@ export interface BoundTopLevelTool {
   resolve(args: Json, callId: string): Invocation | PreparedResult;
 }
 export interface RegisteredTopLevelTool { tool: TopLevelTool; sdk: SdkContext; runs: RunGroup }
-export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ref: ResourceRef, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean): BoundTopLevelTool[] {
+export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean): BoundTopLevelTool[] {
+  const ref = caller.ref;
   return entries.filter(entry => policy(entry.tool.name)).map(({ tool, sdk, runs }) => ({
     tool,
     available: interactive || !tool.requiresInteraction,
@@ -38,7 +39,7 @@ export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], re
           };
           try {
             const result = await tool.execute(args, {
-              object: sdk.reader(ref, scope), session: sdk.toolSession(ref, linked, scope, current), callId, signal: current, interactive,
+              object: sdk.reader(ref, scope), caller, session: sdk.toolSession(ref, linked, scope, current), callId, signal: current, interactive,
               publish(data) {
                 if (!scope.active) return;
                 latest = encode(data); publish?.(latest);

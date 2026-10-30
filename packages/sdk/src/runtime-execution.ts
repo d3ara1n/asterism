@@ -5,8 +5,12 @@ import type { ResourceRef } from "./workspace.ts";
 export interface ResourceModelRequest extends Omit<ModelRunRequest, "tools" | "system" | "sessionId"> {
   /** Resource whose current links and tool caller identity supply this request's access. */
   access: ResourceRef;
+  /** Paradigm-defined Agent role name, passed to tool implementations as caller identity. */
+  agent?: string;
   system: SystemPrompt | ((files: readonly PromptFile[]) => SystemPrompt);
   tools?: { allow?: readonly string[]; exclude?: readonly string[] };
+  /** Resource type policy for calls; inspection retains information and adds a restriction notice. */
+  resources?: { allow?: readonly string[]; exclude?: readonly string[] };
   /** Whether this execution has a user interaction endpoint. */
   interactive: boolean;
 }

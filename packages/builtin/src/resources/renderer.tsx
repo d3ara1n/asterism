@@ -9,6 +9,7 @@ import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } f
 import { Separator } from "@asterism-app/ui/ui/separator";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { resourceMessages as messages } from "../messages/resources";
+import { agentsMessages } from "../messages/agents";
 import { inputText } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult } from "./contract";
@@ -65,6 +66,10 @@ function AgentListBody({ result }: AgentListProps) {
         {entry.description && <p className="type-caption whitespace-pre-wrap break-words text-pretty text-muted-foreground">
           {entry.description}
         </p>}
+        <dl><Field label={i18n.formatMessage(agentsMessages.delegateTargets)} monospace={false}>
+          {entry.delegates === null ? i18n.formatMessage(agentsMessages.resourcesAll)
+            : entry.delegates.length ? entry.delegates.join(", ") : i18n.formatMessage(agentsMessages.none)}
+        </Field></dl>
         {!!entry.examples.length && <div className="mt-auto space-y-2">
           <Separator />
           <p className="flex items-center gap-1.5 type-label text-muted-foreground">

@@ -21,28 +21,44 @@ import { useRendererIsland as useIsland } from "@asterism-app/sdk/renderer";
 import { Section } from "@asterism-app/ui/settings-layout";
 import { Editor, EditorSection, ModifiedNote, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
+import { ResourceAccessFields } from "./ResourceAccessFields";
+import { DelegationFields } from "./DelegationFields";
 
 type Base = Omit<AgentConfiguration, "id" | "builtin">;
+type Budget = Base["subagent"]["budget"];
 const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : defaultAgentPreset]!;
 
-/** Override normalization: remove blank text and fields matching built-in values; budget fields compare individually. */
+/** Override normalization: remove blank text and fields matching built-in values; subagent fields compare individually. */
 function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
   const result: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(draft)) {
     if (raw === undefined) continue;
+    if (key === "resources" || key === "excludeResources") continue;
     let value = raw;
-    if (key === "budget") {
-      const budget = Object.fromEntries(Object.entries(raw as NonNullable<AgentOverrides["budget"]>)
-        .filter(([field, item]) => item !== undefined && item !== base.budget[field as keyof Base["budget"]]));
-      if (Object.keys(budget).length) result.budget = budget;
+    if (key === "subagent") {
+      const subagent = raw as NonNullable<AgentOverrides["subagent"]>;
+      const budget = Object.fromEntries(Object.entries(subagent.budget ?? {})
+        .filter(([field, item]) => item !== undefined && item !== base.subagent.budget[field as keyof Budget]));
+      const instructions = subagent.instructions;
+      const settings = {
+        ...(instructions?.trim() && instructions !== base.subagent.instructions ? { instructions } : {}),
+        ...(Object.keys(budget).length ? { budget } : {}),
+      };
+      if (Object.keys(settings).length) result.subagent = settings;
       continue;
     }
     if (typeof value === "string" && !value.trim()) continue;
     if (Array.isArray(value)) value = [...new Set(value.map(item => String(item).trim()).filter(Boolean))];
     if (same(value, base[key as keyof Base])) continue;
     result[key] = value;
+  }
+  if (draft.resources !== undefined || draft.excludeResources !== undefined) {
+    const clean = (items: string[] | null | undefined) => items == null ? null : [...new Set(items.map(item => item.trim()).filter(Boolean))];
+    const resources = clean(draft.resources), excludeResources = clean(draft.excludeResources);
+    if (!same(resources, base.resources) || !same(excludeResources, base.excludeResources))
+      Object.assign(result, { resources, excludeResources });
   }
   return result as AgentOverrides;
 }
@@ -132,7 +148,7 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
-  const ids = { identity: useId(), description: useId(), prompt: useId(), role: useId(), requests: useId(), duration: useId() };
+  const ids = { identity: useId(), description: useId(), prompt: useId(), subagent: useId(), role: useId(), requests: useId(), duration: useId() };
   const [id, setId] = useState(initialId);
   const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.agents.find(agent => agent.id === id);
@@ -145,28 +161,33 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   const set = <K extends keyof AgentOverrides>(field: K, next: AgentOverrides[K]) => setDraft(previous => {
     const updated = { ...previous }; if (next === undefined) delete updated[field]; else updated[field] = next; return updated;
   });
-  const setBudget = (field: keyof Base["budget"], next: number | null | undefined) => setDraft(previous => {
-    const budget = { ...previous.budget };
+  const setInstructions = (next: string | undefined) => setDraft(previous => {
+    const subagent = { ...previous.subagent };
+    if (next === undefined) delete subagent.instructions; else subagent.instructions = next;
+    return { ...previous, subagent };
+  });
+  const setBudget = (field: keyof Budget, next: number | null | undefined) => setDraft(previous => {
+    const budget = { ...previous.subagent?.budget };
     if (next == null) delete budget[field]; else budget[field] = next;
-    const updated = { ...previous };
-    if (Object.keys(budget).length) updated.budget = budget; else delete updated.budget;
-    return updated;
+    return { ...previous, subagent: { ...previous.subagent, budget } };
   });
   const effective = <K extends keyof Base>(field: K): Base[K] => (draft[field as keyof AgentOverrides] !== undefined ? draft[field as keyof AgentOverrides] : base[field]) as Base[K];
   const normalized = normalize(draft, base);
   const stored = normalize(strip(id ? snapshot.overrides.agents[id] ?? {} : {}), base);
   const dirty = !current || slug !== id || !same(normalized, stored);
   const modified = (field: keyof AgentOverrides) => field in normalized;
-  const budgetModified = (field: keyof Base["budget"]) => normalized.budget?.[field] !== undefined;
+  const budgetModified = (field: keyof Budget) => normalized.subagent?.budget?.[field] !== undefined;
   // Budget values are required: the placeholder shows the inherited value, and Restore removes the override.
-  const budgetField = (field: keyof Base["budget"], id: string, label: string, max?: number) =>
+  const budgetField = (field: keyof Budget, id: string, label: string, max?: number) =>
     <Field><Label htmlFor={id} modified={budgetModified(field)} onRestore={() => setBudget(field, undefined)}>{label}</Label>
-      <Input id={id} type="number" inputMode="numeric" min={1} max={max} step={1} value={draft.budget?.[field] ?? ""}
-        placeholder={String(base.budget[field])}
+      <Input id={id} type="number" inputMode="numeric" min={1} max={max} step={1} value={draft.subagent?.budget?.[field] ?? ""}
+        placeholder={String(base.subagent.budget[field])}
         className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         onChange={event => setBudget(field, event.target.value === "" ? undefined : Number(event.target.value))} /></Field>;
 
   const examples = effective("examples");
+  const resourcePolicy = draft.resources !== undefined || draft.excludeResources !== undefined
+    ? { resources: draft.resources ?? null, excludeResources: draft.excludeResources ?? null } : base;
   const restore = (...fields: (keyof AgentOverrides)[]) => setDraft(previous => { const updated = { ...previous }; for (const field of fields) delete updated[field]; return updated; });
 
   return <Editor form="agent-form" title={current?.id ?? i18n.formatMessage(agentsMessages.newAgent)} description={builtin ? i18n.formatMessage(agentsMessages.builtinAgent) : undefined} dirty={dirty} busy={busy} error={error}
@@ -199,7 +220,7 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
       <EditorSection title={i18n.formatMessage(agentsMessages.prompts)}><FieldGroup>
         <Field><Label htmlFor={ids.prompt} modified={modified("systemPrompt")} onRestore={() => restore("systemPrompt")}>{i18n.formatMessage(agentsMessages.systemPrompt)}</Label>
           <Textarea id={ids.prompt} rows={10} className="font-mono text-xs" value={draft.systemPrompt ?? ""} placeholder={base.systemPrompt} onChange={event => set("systemPrompt", event.target.value)} />
-          {builtin && <FieldDescription>{i18n.formatMessage(agentsMessages.systemPromptHint)}</FieldDescription>}</Field>
+          <FieldDescription>{i18n.formatMessage(agentsMessages.systemPromptHint)}</FieldDescription></Field>
         <Field><Label modified={modified("examples")} onRestore={() => restore("examples")}>{i18n.formatMessage(agentsMessages.taskExamples)}</Label>
           {examples.length > 0 && <ol className="flex flex-col gap-2">{examples.map((example, index) => <li key={index}>
             <InputGroup>
@@ -211,7 +232,22 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
           <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => set("examples", [...examples, ""])}><Plus />{i18n.formatMessage(agentsMessages.addExample)}</Button></Field>
       </FieldGroup></EditorSection>
 
-      <EditorSection collapsible defaultOpen={false} title={i18n.formatMessage(agentsMessages.budget)} hint={i18n.formatMessage(agentsMessages.budgetHint)}><FieldGroup>
+      <EditorSection title={i18n.formatMessage(agentsMessages.resourceAccess)}>
+        <ResourceAccessFields value={resourcePolicy} modified={modified("resources") || modified("excludeResources")}
+          onRestore={() => restore("resources", "excludeResources")}
+          onChange={policy => setDraft(previous => ({ ...previous, ...policy }))} />
+      </EditorSection>
+
+      <EditorSection title={i18n.formatMessage(agentsMessages.delegation)}>
+        <DelegationFields value={effective("delegates")} agents={snapshot.agents} modified={modified("delegates")}
+          onRestore={() => restore("delegates")} onChange={value => set("delegates", value)} />
+      </EditorSection>
+
+      <EditorSection collapsible defaultOpen={false} title={i18n.formatMessage(agentsMessages.subagent)} hint={i18n.formatMessage(agentsMessages.subagentHint)}><FieldGroup>
+        <Field><Label htmlFor={ids.subagent} modified={normalized.subagent?.instructions !== undefined} onRestore={() => setInstructions(undefined)}>{i18n.formatMessage(agentsMessages.subagentInstructions)}</Label>
+          <Textarea id={ids.subagent} rows={10} className="font-mono text-xs" value={draft.subagent?.instructions ?? ""} placeholder={base.subagent.instructions}
+            onChange={event => setInstructions(event.target.value)} />
+          <FieldDescription>{i18n.formatMessage(agentsMessages.subagentInstructionsHint)}</FieldDescription></Field>
         {budgetField("maxRequests", ids.requests, i18n.formatMessage(agentsMessages.maximumRequests))}
         {budgetField("maxDurationSeconds", ids.duration, i18n.formatMessage(agentsMessages.maximumDuration), 2147483)}
       </FieldGroup></EditorSection>

@@ -11,6 +11,7 @@ export const ResourceListResult = defineData(coreId("resource-list"), z.strictOb
 export const ResourceInspectResult = defineData(coreId("resource-inspect"), z.strictObject({
   resource_id: z.string(),
   state: jsonSchema,
+  notice: z.string().optional(),
   tools: z.array(z.strictObject({
     name: z.string(), description: z.string(), guidelines: z.array(z.string()), args: jsonSchema,
     implementation: contractReferenceSchema, target: jsonSchema, result: jsonSchema,

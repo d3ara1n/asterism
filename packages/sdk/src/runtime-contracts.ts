@@ -147,7 +147,7 @@ export type CallResult<D extends Json = Json> =
   | OptionalData<Exclude<ToolCompletion, { kind: "succeeded" | "partial" }>, D>;
 export type PreparedResult = CallResult & ToolInvocationInfo;
 /** Tool caller identity captured at the request boundary; carries neither private resource state nor operation permissions. */
-export type ToolCaller = Readonly<Pick<ResourceSnapshot, "ref" | "title">>;
+export type ToolCaller = Readonly<Pick<ResourceSnapshot, "ref" | "title"> & { agent?: string }>;
 export interface ToolInvocation extends ToolInvocationInfo {
   effect: "read" | "write";
   execution: "parallel" | "sequential";

@@ -23,15 +23,15 @@ export default defineModule(plugin => ({
   topLevelTools: [
     defineTopLevelTool({
       id: AgentListResult.id, name: "agent_list",
-      description: "List available agent configurations and their purposes and task examples.",
-      guidelines: [],
+      description: "List available agent configurations, their purposes, task examples, and delegation allowlists.",
+      guidelines: ["Each entry's delegates field describes that role's allowed delegation targets: null allows any enabled role, [] allows none, and a list allows only those role IDs."],
       argsSchema: z.strictObject({}).describe("Empty parameter object."),
       resultSchema: AgentListResult.schema,
       effect: "read", execution: "parallel",
       execute(_args, { signal }) {
         return attempt(signal, () => builtinConfiguration(plugin).agents
           .filter(agent => agent.enabled)
-          .map(({ id, description, examples }) => ({ id, description, examples })));
+          .map(({ id, description, examples, delegates }) => ({ id, description, examples, delegates })));
       },
     }),
     defineTopLevelTool({

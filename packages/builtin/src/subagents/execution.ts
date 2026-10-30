@@ -34,12 +34,17 @@ export interface ExecutionDependencies {
   changed(): void;
 }
 
+function resolveAgent(configuration: ReturnType<ExecutionDependencies["configuration"]>, role: string): AgentConfiguration {
+  const agent = configuration.agents.find(agent => agent.id === role && agent.enabled);
+  if (!agent) throw new PluginApiError("unavailable", `Agent role ${role} is unavailable.`);
+  return agent;
+}
+
 /** An explicit model selection replaces the role's model and thinking level; otherwise the role's ModelRole resolves, then the default ModelRole's model. */
 export function resolveTask(configuration: ReturnType<ExecutionDependencies["configuration"]>, input: Pick<DelegationInput, "role" | "model">): {
   agent: AgentConfiguration; target: ModelTarget;
 } {
-  const agent = configuration.agents.find(agent => agent.id === input.role && agent.enabled);
-  if (!agent) throw new PluginApiError("unavailable", `Agent role ${input.role} is unavailable.`);
+  const agent = resolveAgent(configuration, input.role);
   if (input.model) {
     const target = parseModelExpression(input.model.model)!;
     return { agent, target: { ...target, ...(input.model.thinking === null ? {} : { thinking: input.model.thinking }) } };
@@ -117,17 +122,21 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
       const { agent, target } = resolveTask(deps.configuration(), snapshot.input);
       snapshot.output.usage.model = formatModelExpression(target);
       snapshot.status = { phase: "running", activity: "starting" };
-      timer = setTimeout(() => { if (!current.aborted) { exhausted = true; budget.abort(); } }, agent.budget.maxDurationSeconds * 1000);
+      timer = setTimeout(() => { if (!current.aborted) { exhausted = true; budget.abort(); } }, agent.subagent.budget.maxDurationSeconds * 1000);
       consume(); deps.changed();
       let parent: string | null = null;
       let failure: { code: string; message: string } | null = null;
       const status = await runAgentLoop({
-        requestLimit: () => agent.budget.maxRequests,
+        requestLimit: () => agent.subagent.budget.maxRequests,
         completed: async () => { run.accepting = false; },
         consume: boundary => boundary === "request" && consume(),
         async request(index) {
           const blocks: ModelBlock[] = [];
-          const prepare = deps.prepare({ ...agent, systemPrompt: `${agent.systemPrompt}\n\nThis is an independent task conversation. The final text response is the report returned to consumers of the Subagent Pool.` });
+          const currentAgent = resolveAgent(deps.configuration(), snapshot.input.role);
+          const prepare = deps.prepare({ ...currentAgent, systemPrompt: [
+            currentAgent.systemPrompt,
+            currentAgent.subagent.instructions,
+          ].filter(text => text.trim()).join("\n\n") });
           snapshot.output.usage.requests++;
           const event = (event: ModelRunEvent): undefined => {
             if (event.type === "progress") {
@@ -148,6 +157,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
           };
           const response = await deps.execution.run({
             access: deps.access, interactive: false, target, signal: current, requestParentId: parent,
+            agent: currentAgent.id, resources: { allow: currentAgent.resources ?? undefined, exclude: currentAgent.excludeResources ?? undefined },
             userAgent: deps.userAgent, messages, observer: { event },
             tools: { exclude: ["resource_create", "creation_list", "creation_inspect"] },
             system: files => {

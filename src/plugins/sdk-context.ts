@@ -1,6 +1,6 @@
 import { applicationBrand, applicationUserAgent } from "../shared/application.ts";
 import type { SessionDirectory, PluginCalls } from "@asterism-app/sdk/contracts";
-import { PluginApiError, type PluginContext, type ResourceRef } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type PluginContext, type ResourceRef, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "./lifecycle.ts";
 import type { PluginHostServices } from "./loader.ts";
 import type { PluginEventScope } from "./event-scope.ts";
@@ -20,7 +20,7 @@ import { bindShellServices } from "./sdk/shell.ts";
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
 /** Assemble plugin-facing capabilities; each domain adapter owns its data and execution boundaries. */
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,
-  calls: PluginCalls, topLevelTools: (ref: ResourceRef, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean) => BoundTopLevelTool[]) {
+  calls: PluginCalls, topLevelTools: (caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean) => BoundTopLevelTool[]) {
   const scope = createSdkScope(internal.lifetime), { checkAvailable } = scope;
   const objects = bindObjects(internal.id, host, sessionRuns, eventScope, checkAvailable);
   const models = bindModels(internal.id, host, modelRuns, checkAvailable);
