@@ -25,25 +25,30 @@ export function ExecutionErrorDetails({ code, details }: { code: string; details
     {details.httpStatus !== undefined && <Badge variant="outline">HTTP {details.httpStatus}</Badge>}
     <Dialog>
       <DialogTrigger asChild><Button variant="ghost" size="xs"><FileText />{i18n.text(messages.view)}</Button></DialogTrigger>
-      <DialogContent className="nodrag nopan nokey max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="nodrag nopan nokey flex max-h-[calc(100dvh-2rem)] min-w-0 flex-col overflow-hidden sm:max-w-3xl">
+        <DialogHeader className="shrink-0 pr-6">
           <DialogTitle>{i18n.text(messages.title)}{details.httpStatus !== undefined && ` · HTTP ${details.httpStatus}`}</DialogTitle>
-          <DialogDescription className="whitespace-pre-wrap break-words select-text">{details.message}</DialogDescription>
         </DialogHeader>
-        {(details.rawResponse !== undefined || details.rawEvent !== undefined) && <section className="space-y-2">
-          <h3 className="type-label">{i18n.text(messages.raw)}</h3>
-          <JsonView value={details.rawResponse ?? details.rawEvent} />
-        </section>}
-        {details.responseBody !== undefined && <section className="space-y-2">
-          <h3 className="type-label">{i18n.text(messages.body)}</h3>
-          <JsonView value={details.responseBody} />
-        </section>}
-        <section className="space-y-2">
-          <h3 className="type-label">{i18n.text(messages.diagnostic)}</h3>
-          <JsonView value={{ category: code, error: details }} />
-        </section>
-        {copyFailed && <p role="alert" className="type-caption text-destructive">{i18n.text(messages.copyFailed)}</p>}
-        <DialogFooter showCloseButton>
+        <div tabIndex={0} role="region" aria-label={i18n.text(messages.title)}
+          className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pr-2 outline-offset-[-2px]">
+          <div className="flex min-w-0 flex-col gap-5 select-text">
+            <DialogDescription className="whitespace-pre-wrap wrap-anywhere">{details.message}</DialogDescription>
+            {(details.rawResponse !== undefined || details.rawEvent !== undefined) && <section className="flex min-w-0 flex-col gap-2">
+              <h3 className="type-label">{i18n.text(messages.raw)}</h3>
+              <JsonView className="max-h-none overflow-visible" value={details.rawResponse ?? details.rawEvent} />
+            </section>}
+            {details.responseBody !== undefined && <section className="flex min-w-0 flex-col gap-2">
+              <h3 className="type-label">{i18n.text(messages.body)}</h3>
+              <JsonView className="max-h-none overflow-visible" value={details.responseBody} />
+            </section>}
+            <section className="flex min-w-0 flex-col gap-2">
+              <h3 className="type-label">{i18n.text(messages.diagnostic)}</h3>
+              <JsonView className="max-h-none overflow-visible" value={{ category: code, error: details }} />
+            </section>
+          </div>
+        </div>
+        <DialogFooter className="shrink-0 sm:items-center">
+          {copyFailed && <p role="alert" className="type-caption text-destructive sm:mr-auto">{i18n.text(messages.copyFailed)}</p>}
           <Button variant="outline" disabled={copying} onClick={copy}><Copy />{i18n.text(copied ? messages.copied : messages.copy)}</Button>
         </DialogFooter>
       </DialogContent>
