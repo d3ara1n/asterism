@@ -39,6 +39,7 @@
     "@pierre/diffs": "1.6.2",
     "@pierre/trees": "^1.0.0-beta.6",
     "@radix-ui/colors": "3.0.0",
+    "@tisoap/react-flow-smart-edge": "5.0.0",
     "@xterm/addon-serialize": "0.14.0",
     "@xterm/headless": "6.0.0",
     "@xyflow/react": "12.12.0",

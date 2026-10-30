@@ -1,4 +1,5 @@
 import { RendererNavigationProvider, type DropItem } from "@asterism-app/sdk/renderer";
+import { SmartEdgeProvider, type SmartEdgeProviderOptions } from "@tisoap/react-flow-smart-edge";
 import { ReactFlowProvider, ReactFlow, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, ConnectionMode, ConnectionLineType, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
 import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
@@ -23,7 +24,7 @@ import { SessionHistoryPanel } from "../session/History";
 import { AccessPanel } from "./AccessPanel";
 import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
 import { layoutConnections, samePorts, type ConnectionEdge } from "./connections";
-import { handleSizeVariables, linkEdgeTypes } from "./LinkEdge";
+import { handleSizeVariables, linkEdgeTypes, linkRoutingOptions } from "./LinkEdge";
 import { WorkbenchScope, WorkbenchContext, useWorkbench, type WorkbenchEnvironment, type WorkbenchStore, type WorkbenchView } from "./context";
 import { workbenchNodes } from "./nodes";
 import { type ViewPatch } from "./ObjectCard";
@@ -35,6 +36,8 @@ import { WorkbenchBackground } from "./WorkbenchSurface";
 
 const nodeTypes = { object: ObjectNode };
 const connectionLineTypes = { default: ConnectionLineType.Bezier, step: ConnectionLineType.Step, smoothstep: ConnectionLineType.SmoothStep };
+// Always route: a clear endpoint-to-endpoint segment does not mean the native curve clears every card.
+const routingOptions: SmartEdgeProviderOptions = { ...linkRoutingOptions, routeOnlyWhenBlocked: false, routeWhileDragging: true };
 export type PanelKind = "objects" | "history" | "access";
 
 /** Titlebar actions enter the workbench island through this handle; panels open as deeper islands without separate overlays. */
@@ -159,6 +162,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
     nodeData.current = next;
     return result;
   }, [nodes, connections]);
+  const routingNodes = useMemo(() => canvasNodes.filter(node => !node.hidden), [canvasNodes]);
   // Snapshots determine connections, while selection stays local; otherwise controlled connections can never be selected and Delete cannot work.
   const [selectedEdges, setSelectedEdges] = useState<ReadonlySet<string>>(new Set());
   const edges: WorkbenchEdge[] = useMemo(() => connections.edges.map(edge => ({
@@ -225,7 +229,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
     onDragLeave={event => { if (event.currentTarget === event.target) setDropping(false); }} onDrop={onDrop}>
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
     <p className="type-body">{i18n.formatMessage(workbenchMessages.dropHint)}</p></div>}
-  <ReactFlow<ObjectNodeType, WorkbenchEdge>
+  <SmartEdgeProvider nodes={routingNodes} options={routingOptions}><ReactFlow<ObjectNodeType, WorkbenchEdge>
     colorMode={scheme} style={handleSizeVariables} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={linkEdgeTypes} onNodesChange={onNodesChange}
     defaultViewport={session.viewport} minZoom={minZoom} maxZoom={maximumViewportZoom}
     nodesDraggable nodesConnectable={writable} connectionMode={ConnectionMode.Loose} edgesReconnectable={false} isValidConnection={isValidConnection}
@@ -237,7 +241,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
   >
     <WorkbenchBackground />
     <ViewControls session={session} run={run} canvas={canvas} objects={nodes.map(node => node.id)} selected={nodes.filter(node => node.selected).map(node => node.id)} />
-  </ReactFlow></div>;
+  </ReactFlow></SmartEdgeProvider></div>;
 }
 
 function ViewControls({ session, run, canvas, objects, selected }: { session: WorkbenchSnapshot; run: Run; canvas: WorkbenchCanvas; objects: string[]; selected: string[] }) {

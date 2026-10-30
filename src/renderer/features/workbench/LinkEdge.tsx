@@ -1,4 +1,5 @@
 import { getBezierPath, getSmoothStepPath, Position, type Edge, type EdgeProps } from "@xyflow/react";
+import { useSmartEdgePath } from "@tisoap/react-flow-smart-edge";
 import { memo, useLayoutEffect, useRef, type CSSProperties } from "react";
 
 import type { Appearance } from "../../../shared/theme";
@@ -7,6 +8,7 @@ import { useI18n } from "../../shared/i18n";
 import { objectsMessages } from "../../messages/objects";
 
 type LinkEdgeType = Edge<ConnectionEdge["data"]>;
+export const linkRoutingOptions = { nodePadding: 16, borderRadius: 5 };
 
 /** Unit normal pointing outward from the card. */
 const outward: Record<Position, readonly [number, number]> = {
@@ -45,9 +47,9 @@ function Head({ x, y, side }: { x: number; y: number; side: Position }) {
 
 /**
  * Workbench connection: the source endpoint dot, solid destination arrow pointing to its dot, and middle direction arrow together express link direction;
- * flows along that direction when selected. Both ends sit on card-edge endpoints, and paths use the native algorithm for the selected connection style.
+ * flows along that direction when selected. Both ends sit on card-edge endpoints, and all connection styles route around visible cards.
  */
-function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, data, interactionWidth }:
+function LinkEdge({ id, source, target, kind, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, selected, data, interactionWidth }:
   EdgeProps<LinkEdgeType> & { kind: Appearance["edgeStyle"] }) {
   const i18n = useI18n();
   const holds = data?.links.reduce((total, link) => total + (link.holds ?? 0), 0) ?? 0;
@@ -60,23 +62,32 @@ function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, ta
   const start = mutual ? offset(sourceTip.x, sourceTip.y, sourcePosition, inset) : sourceEdge;
   const end = offset(targetTip.x, targetTip.y, targetPosition, inset);
   const endpoints = { sourceX: start.x, sourceY: start.y, sourcePosition, targetX: end.x, targetY: end.y, targetPosition };
-  const [path, labelX, labelY] = kind === "default" ? getBezierPath(endpoints) : getSmoothStepPath({ ...endpoints, borderRadius: kind === "step" ? 0 : 5 });
+  const { route } = useSmartEdgePath({
+    id, source, target, ...endpoints, preset: kind === "default" ? "bezier" : kind, options: linkRoutingOptions,
+  });
+  // Native paths keep endpoints connected while the worker computes a route, or when overlapping cards leave no route.
+  const [path, labelX, labelY] = route?.kind === "routed"
+    ? [route.svgPathString, route.edgeCenterX, route.edgeCenterY]
+    : kind === "default" ? getBezierPath(endpoints) : getSmoothStepPath({ ...endpoints, borderRadius: kind === "step" ? 0 : 5 });
   const line = useRef<SVGPathElement>(null);
   const chevron = useRef<SVGPathElement>(null);
-  // The middle arrow uses the path's arc-length midpoint and tangent there; all three styles share the same measurement.
+  const label = useRef<SVGGElement>(null);
+  // Direction and hold markers share the rendered path's arc-length midpoint, including curved detours.
   useLayoutEffect(() => {
     const element = line.current, mark = chevron.current;
-    if (!element || !mark) return;
+    if (!element) return;
     const length = element.getTotalLength();
-    if (length < midArrowMinLength) { mark.style.visibility = "hidden"; return; }
     const middle = length / 2;
     const at = element.getPointAtLength(middle);
+    label.current?.setAttribute("transform", `translate(${at.x} ${at.y})`);
+    if (!mark) return;
+    if (length < midArrowMinLength) { mark.style.visibility = "hidden"; return; }
     const before = element.getPointAtLength(middle - 0.5);
     const after = element.getPointAtLength(middle + 0.5);
     const angle = Math.atan2(after.y - before.y, after.x - before.x) * 180 / Math.PI;
     mark.setAttribute("transform", `translate(${at.x} ${at.y}) rotate(${angle})`);
     mark.style.visibility = "";
-  }, [path, mutual]);
+  }, [path, mutual, holds]);
   return <g className="link-edge" data-selected={selected ? "" : undefined}>
     <path className="link-edge-halo" d={path} />
     <path ref={line} className="link-edge-line" d={path} strokeDasharray={holds ? "5 4" : undefined} />
@@ -84,7 +95,7 @@ function LinkEdge({ kind, sourceX, sourceY, targetX, targetY, sourcePosition, ta
     {!mutual && !holds && <path ref={chevron} className="link-edge-chevron" d={chevronPath} />}
     {mutual && <Head x={sourceTip.x} y={sourceTip.y} side={sourcePosition} />}
     <Head x={targetTip.x} y={targetTip.y} side={targetPosition} />
-    {!!holds && <g transform={`translate(${labelX} ${labelY})`} role="img" aria-label={i18n.formatMessage(objectsMessages.linkHolds, { count: holds })}>
+    {!!holds && <g ref={label} transform={`translate(${labelX} ${labelY})`} role="img" aria-label={i18n.formatMessage(objectsMessages.linkHolds, { count: holds })}>
       <rect className="fill-background stroke-border" x={-(String(holds).length * 8 + 12) / 2} y={-10} width={String(holds).length * 8 + 12} height={20} rx={5} />
       <text className="fill-foreground type-caption" textAnchor="middle" dominantBaseline="central">{holds}</text>
     </g>}
