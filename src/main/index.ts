@@ -24,6 +24,7 @@ import { StartupCoordinator } from "./startup-coordinator.ts";
 import { initializeApplicationLog, recordRendererFailure } from "./logging.ts";
 import { rendererFailureChannel, rendererFailureSchema } from "../shared/renderer-failure.ts";
 import { ApplicationUpdates } from "./updates.ts";
+import { ApplicationNetwork } from "./network.ts";
 import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel } from "../shared/startup.ts";
 import { recoveryActionSchema, type RecoveryPoint } from "../shared/recovery.ts";
 import { appearanceChangedChannel } from "../shared/theme.ts";
@@ -36,6 +37,7 @@ let window: BrowserWindow | null = null;
 let quitting = false;
 let quitRequest: Promise<boolean> | null = null;
 let updates: ApplicationUpdates | null = null;
+let network: ApplicationNetwork | null = null;
 let notificationsDelivered = false;
 let recoveryPending = false;
 /** Reconnect appearance, language, and update settings if host storage becomes ready after the window appears. */
@@ -223,17 +225,21 @@ function createWindow(): void {
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
   let stopUpdates = () => {};
+  let stopNetwork = () => {};
   // Reapply settings and notify loaded pages if host storage becomes ready after the window appears.
   connectSettings = () => {
     if (current.isDestroyed()) return;
     stopUpdates();
     stopUpdates = updates?.serve(current, trusted, () => requestQuit(false, true)) ?? (() => {});
+    stopNetwork();
+    stopNetwork = network?.serve(current, trusted) ?? (() => {});
     applyThemeSource();
     refreshAppearance();
     current.webContents.send(appearanceChangedChannel, readAppearance());
     current.webContents.send(languageChangedChannel, readLanguage());
   };
   stopUpdates = updates?.serve(current, trusted, () => requestQuit(false, true)) ?? (() => {});
+  stopNetwork = network?.serve(current, trusted) ?? (() => {});
   current.webContents.on("render-process-gone", (_event, details) => {
     closeConnection();
     if (!quitting && details.reason !== "clean-exit")
@@ -278,7 +284,7 @@ function createWindow(): void {
     connectSettings = null;
     closeConnection();
     window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
-    stopAppearance(); stopPreferences(); stopLanguage(); stopUpdates();
+    stopAppearance(); stopPreferences(); stopLanguage(); stopUpdates(); stopNetwork();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });
@@ -311,10 +317,12 @@ const startup = new StartupCoordinator({
   showWindow: () => { if (!quitting && !window) createWindow(); },
   settingsReady: () => {
     enableSettings();
+    network = new ApplicationNetwork();
     try { updates = new ApplicationUpdates(); } catch (error) { console.error("Update settings could not be opened.", error); }
     connectSettings?.();
   },
   startRuntime: async (failures, pluginBuild) => {
+    await network?.apply();
     await runtime.start(join(here, "runtime.js"), dataRoot, failures, pluginBuild);
     void updates?.check();
   },

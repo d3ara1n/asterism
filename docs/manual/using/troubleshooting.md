@@ -10,6 +10,16 @@ Provider messages distinguish authentication, model availability, quota, and req
 
 After changing settings, start or continue a request so it captures the new configuration.
 
+## Network proxy
+
+Open **Settings → General → Network** and select the **Proxy** row to edit it. Choose the system proxy, a direct connection, or a custom HTTP, HTTPS, or SOCKS5 proxy. Custom addresses include the scheme and host, such as `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`. Proxy usernames and passwords are not supported.
+
+Custom bypass rules accept comma-separated hosts, domain patterns, and IP ranges. Loopback addresses connect directly by default. Saved changes apply after Asterism restarts; the Proxy row offers a restart while changes are pending. Saving does not interrupt active requests.
+
+These settings cover updates, model connections, builtin web and usage providers, HTTP MCP, and application web requests. Terminals, external MCP processes, and plugins with independently configured network clients use their own proxy settings.
+
+System mode follows OS proxy resolution, including automatic proxy rules. Runtime requests use the first resolved HTTP, HTTPS, or SOCKS5 proxy and report connection failures without trying alternate proxies.
+
 ## Unavailable resource operations
 
 Check whether the resource still exists on the current timeline and is linked to the intended agent. Inspect the operations available for that resource.

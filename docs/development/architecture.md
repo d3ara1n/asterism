@@ -51,6 +51,16 @@ Settings home contains host pages and plugin-declared configuration pages. Each 
 
 A Plugins card opens a plain management list with plugin information and enablement controls. Settings home has no separate plugin list beneath its page entries, and plugin management items do not act as configuration-page cards.
 
+## Application networking
+
+Network preferences belong to the host and apply at startup. System proxy mode follows operating-system proxy resolution, including automatic proxy rules. Direct mode bypasses proxies. Custom mode supplies one HTTP, HTTPS, or SOCKS5 endpoint and Chromium bypass rules. Loopback destinations retain Chromium's default direct routing. Proxy credentials are not part of this configuration.
+
+The main process applies the same preferences to application networking, renderer requests, and the updater's separate download session. Runtime fetch requests use a process-wide Undici dispatcher; the main process resolves each destination through Chromium, including destinations reached by redirects. Runtime routing uses the first resolved proxy and reports connection failures. It does not replay requests through alternate proxies or share Chromium's failed-proxy cache.
+
+Model execution, provider discovery and probes, builtin web and usage providers, and HTTP MCP consume this shared runtime transport. Node fetch retains ownership of request bodies, response streams, cancellation, and redirect semantics. Plugins using the default fetch transport participate automatically. Independently configured clients, raw sockets, terminals, and external MCP processes retain their own networking behavior. Application proxy settings do not change the inherited shell environment or provide operating-system traffic interception.
+
+Saving preferences preserves the active process configuration until restart, so in-flight work keeps its transport. Proxy resolution and connection pools end with the task runtime.
+
 ## Startup and loading
 
 Startup follows dependency order:
@@ -95,7 +105,7 @@ Application identity and data layout are centralized. Development and installed 
 | --- | --- |
 | Global model, provider, and other paradigm-neutral shared configuration | Host configuration services |
 | Roles, Agent configurations, and other paradigm-specific configuration | Owning plugin through generic plugin storage facilities |
-| Appearance, language, update preferences, window cache | Main process |
+| Appearance, language, update and network preferences, window cache | Main process |
 | Encrypted credential files | Runtime storage with main-process `safeStorage` operations |
 | Session tree, current data, templates, view state, content roots | Runtime SQLite database |
 | Immutable bytes | Runtime content store |

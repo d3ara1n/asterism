@@ -10,6 +10,7 @@ import { startupGetChannel, startupChangedChannel, startupRestartChannel, startu
 import { recoveryActionSchema } from "../shared/recovery.ts";
 import { rendererFailureChannel } from "../shared/renderer-failure.ts";
 import { updatesGetChannel, updatesSetChannel, updatesCheckChannel, updatesInstallChannel, updatesChangedChannel, updateStateSchema } from "../shared/updates.ts";
+import { networkGetChannel, networkSetChannel, networkChangedChannel, networkPreferenceSchema, networkStateSchema } from "../shared/network.ts";
 
 let connectionRequested = false;
 // Hand ports directly to the page without cloning business messages again through contextBridge. The main process accepts trusted main-frame requests only.
@@ -17,6 +18,18 @@ ipcRenderer.on(connectionRequestChannel, event => {
   window.postMessage({ type: connectionPortMessage }, "*", event.ports.length ? [event.ports[0]!] : []);
 });
 const bridge: DesktopBridge = {
+  network: {
+    async get() { return networkStateSchema.parse(await ipcRenderer.invoke(networkGetChannel)); },
+    async set(value) { return networkStateSchema.parse(await ipcRenderer.invoke(networkSetChannel, networkPreferenceSchema.parse(value))); },
+    onChanged(listener) {
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {
+        const parsed = networkStateSchema.safeParse(raw);
+        if (parsed.success) listener(parsed.data);
+      };
+      ipcRenderer.on(networkChangedChannel, handler);
+      return () => ipcRenderer.removeListener(networkChangedChannel, handler);
+    },
+  },
   updates: {
     async get() { return updateStateSchema.parse(await ipcRenderer.invoke(updatesGetChannel)); },
     async set(value) { return updateStateSchema.parse(await ipcRenderer.invoke(updatesSetChannel, value)); },

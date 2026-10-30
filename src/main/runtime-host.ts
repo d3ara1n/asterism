@@ -4,6 +4,7 @@ import { observeProcess } from "./logging.ts";
 import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
 import { RuntimeRequests } from "./requests.ts";
 import { handleSecretRequest } from "./secrets.ts";
+import { handleProxyRequest } from "./proxy.ts";
 import type { StartupStage } from "../shared/startup.ts";
 import type { PluginStorageFailure } from "../shared/recovery.ts";
 
@@ -72,6 +73,14 @@ export class RuntimeHost {
         fail(new Error("Task runtime encountered a fatal process error."));
       });
       child.on("message", raw => {
+        if (raw?.kind === "proxy.request") {
+          void handleProxyRequest(raw).then(response => {
+            if (response && this.child === child) {
+              try { child.postMessage(response); } catch { /* The child has exited. */ }
+            }
+          });
+          return;
+        }
         if (raw?.kind === "secret.request") {
           void handleSecretRequest(raw).then(response => {
             if (response && this.child === child && this.status !== "stopping") {

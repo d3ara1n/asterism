@@ -7,6 +7,7 @@ import type { AppearanceBridge } from "./theme.ts";
 import { templateSummarySchema } from "./templates.ts";
 import { startupStageSchema, type StartupBridge } from "./startup.ts";
 import type { UpdatesBridge } from "./updates.ts";
+import type { NetworkBridge } from "./network.ts";
 import type { RendererFailure } from "./renderer-failure.ts";
 import { pluginDiagnosticSchema } from "./plugin-startup.ts";
 
@@ -69,6 +70,7 @@ export type RuntimeMessage = z.infer<typeof runtimeMessageSchema>;
 export interface DesktopBridge {
   startup: StartupBridge;
   updates: UpdatesBridge;
+  network: NetworkBridge;
   language: LanguageBridge;
   appearance: AppearanceBridge;
   /** Controlled preference container: only keys with host-defined prefixes within preferences can be read or written. */

@@ -26,13 +26,14 @@ export const applicationStorage = {
   languageStore: "language",
   uiStateStore: "ui-state",
   updatesStore: "updates",
+  networkStore: "network",
   chromiumDirectory: "chromium",
   logsDirectory: "logs",
   recoveryDirectory: "recovery",
   runtimeLogFile: "runtime.log",
 } as const;
 
-/** Flat format version for main-process appearance/language/update files; electron-store writes defaults with new files. UI state is an unversioned cache. */
+/** Flat format version for main-process preference files; electron-store writes defaults with new files. UI state is an unversioned cache. */
 export const preferenceVersion = 1;
 
 /** Archived-session retention period, checked only during startup cleanup rather than scheduled work; the UI describes it as about a month. */

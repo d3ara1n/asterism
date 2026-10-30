@@ -11,12 +11,19 @@ import { RendererConnection } from "./connection.ts";
 import type { RendererFrame, RuntimeFrame } from "../shared/connection.ts";
 import { z } from "zod";
 import { pluginStorageFailureSchema } from "../shared/recovery.ts";
+import { setGlobalDispatcher } from "undici";
+import { ProxyClient } from "./proxy-client.ts";
+import { createNetworkDispatcher } from "./network.ts";
 
 // Task processes accept application data roots only from the main process, never renderer file paths.
 const port = process.parentPort;
 if (!port) throw new Error("The task runtime must be started as an Electron utility process.");
 let service: ApplicationService;
 const secrets = new SecretClient(message => port.postMessage(message));
+const proxy = new ProxyClient(message => port.postMessage(message));
+const network = createNetworkDispatcher(url => proxy.resolve(url));
+setGlobalDispatcher(network.dispatcher);
+port.on("message", ({ data }) => proxy.receive(data));
 /** Direct renderer connections handed off by the main process; main-process-assigned numbers support explicit disconnection. */
 const connections = new Map<string, RendererConnection>();
 const broadcast = (frame: RuntimeFrame) => { for (const connection of connections.values()) connection.send(frame); };
@@ -54,7 +61,11 @@ try {
     if (data?.kind === "shutdown") {
       for (const id of [...connections.keys()]) disconnect(id);
       secrets.close();
-      void service.close().finally(() => { process.exit(0); });
+      void service.close().finally(async () => {
+        proxy.close();
+        await network.close();
+        process.exit(0);
+      });
       return;
     }
     if (data?.kind === "ping") { port.postMessage({ kind: "pong" }); return; }
@@ -80,6 +91,8 @@ try {
   console.info(`Task runtime initialization completed in ${Math.round(performance.now() - started)} ms.`);
   port.postMessage({ kind: "ready", version: protocolVersion });
 } catch (error) {
+  proxy.close();
+  await network.close();
   console.error("Task runtime initialization failed.", error);
   port.postMessage(error instanceof DatabaseVersionError
     ? { kind: "fatal", reason: "database_version", message: error.message, directory: error.directory }

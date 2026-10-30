@@ -3,6 +3,7 @@ import { shellMessages } from "@asterism-app/ui/messages/shell";
 import { McpSettings } from "../mcp/Settings";
 import { mcpMessages } from "@asterism-app/ui/messages/mcp";
 import { LanguageSettings } from "./LanguageSettings";
+import { NetworkSettings } from "./NetworkSettings";
 import { HomeEntrySettings } from "./HomeEntrySettings";
 import { SessionsSettings } from "./SessionsSettings";
 import { AboutSettings } from "./AboutSettings";
@@ -41,7 +42,7 @@ type SettingsIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean 
 interface SettingsCategory { id: SettingsCategoryId; title: UiText; summary: UiText; icon: SettingsIcon; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
-  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><HomeEntrySettings /><SessionsSettings /></> },
+  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><NetworkSettings /><HomeEntrySettings /><SessionsSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /></> },
   { id: "skills", title: skillsMessages.title, summary: skillsMessages.summary, icon: BookOpen, content: () => <SkillSettings /> },

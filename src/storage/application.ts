@@ -22,6 +22,7 @@ export const applicationDataPaths: readonly DataPath[] = [
   { path: `${applicationStorage.appearanceStore}.json` },
   { path: `${applicationStorage.languageStore}.json` },
   { path: `${applicationStorage.updatesStore}.json` },
+  { path: `${applicationStorage.networkStore}.json` },
   { path: applicationStorage.credentialsDirectory },
   { path: "extensions" },
   { path: join(applicationStorage.contentDirectory, "sealed"), link: true },
@@ -33,7 +34,7 @@ function preferenceStorage(root: string, name: string): StorageDefinition {
 }
 export function hostStorages(root: string): StorageDefinition[] {
   return [packageListStorage(root), configurationStorage(root), workspaceStorage(root),
-    ...[applicationStorage.appearanceStore, applicationStorage.languageStore, applicationStorage.updatesStore].map(name => preferenceStorage(root, name))];
+    ...[applicationStorage.appearanceStore, applicationStorage.languageStore, applicationStorage.updatesStore, applicationStorage.networkStore].map(name => preferenceStorage(root, name))];
 }
 
 export function pluginStorages(root: string, id: string, declarations: readonly PluginStorageDeclaration[]): StorageDefinition[] {
