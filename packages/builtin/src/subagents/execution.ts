@@ -10,10 +10,13 @@ import { runAgentLoop, type AgentLoopStatus } from "../agent/loop.ts";
 import { responseMessages } from "../agent/response-messages.ts";
 import { ended, type DelegationInput, type FinishedStatus, type TaskCompletion, type TaskSnapshot, type ProcessBlock } from "./contract.ts";
 import type { AuditLog } from "./audit.ts";
+import { activityOf, type DeliveredSteer } from "./activity.ts";
 
 export interface ActiveRun {
   snapshot: TaskSnapshot;
   queue: string[];
+  /** Delivered steering with its position among finalized blocks, for the activity log. */
+  steers: DeliveredSteer[];
   accepting: boolean;
   startedAt: number | null;
   blocks: ProcessBlock[];
@@ -103,6 +106,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
     const consume = () => {
       const inputs = run.queue.splice(0);
       for (const text of inputs) messages.push({ kind: "input", parts: [{ kind: "text", text }] });
+      for (const text of inputs) run.steers.push({ at: run.blocks.length, text });
       if (inputs.length) run.audit.append({ type: "steering-delivered", messages: inputs });
       return inputs.length > 0;
     };
@@ -176,6 +180,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
     }
     const interruption: RunInterruption = exhausted ? { kind: "time" } : signal.aborted ? { kind: "cancelled", reason: signal.reason } : null;
     snapshot.output.undelivered = run.queue.splice(0);
+    snapshot.output.activity = activityOf(run.blocks, [], run.steers);
     const completion: TaskCompletion = { status: classify(ending, interruption), output: snapshot.output, finishedAt: new Date().toISOString() };
     run.audit.append({ type: "finished", completion });
     try { await run.audit.close(); }

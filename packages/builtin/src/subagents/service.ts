@@ -3,9 +3,10 @@ import { PluginApiError, type ObjectExecutor, type SessionExecutor, type ToolCal
 import type { SessionRecord } from "@asterism-app/sdk/contracts";
 import type { ActiveRun } from "./execution.ts";
 import type { AuditLog } from "./audit.ts";
+import { activityOf } from "./activity.ts";
 import {
-  Delegation, emptyOutput, ended, summary, subagentParallelism, type DelegateInput, type DelegationInput, type ProcessFrame,
-  type TaskCompletion, type TaskSnapshot, type TaskSummary,
+  Delegation, emptyOutput, ended, summary, subagentParallelism, recentActivity, type DelegateInput, type DelegationInput, type ProcessFrame,
+  type TaskCompletion, type TaskSnapshot, type TaskSummary, type WaitEntry,
 } from "./contract.ts";
 
 type Entry = { record: SessionRecord; input: DelegationInput; completion: TaskCompletion | null };
@@ -67,6 +68,8 @@ export class SubagentPoolRuntime {
     if (live) {
       const snapshot = structuredClone({ ...live.snapshot, createdAt: entry.record.createdAt });
       if (live.accepting && live.startedAt !== null) snapshot.output.usage.elapsedMs = Math.round(performance.now() - live.startedAt);
+      // Finished jobs kept after a failed save already hold their final activity; buffers are released by then.
+      if (live.snapshot.status.phase !== "finished") snapshot.output.activity = activityOf(live.blocks, live.live, live.steers);
       return snapshot;
     }
     throw new PluginApiError("unavailable", `Task ${entry.input.id} has no live execution or saved result.`);
@@ -104,7 +107,7 @@ export class SubagentPoolRuntime {
     let resolve!: () => void;
     const job: Job = {
       snapshot: { input, status: { phase: "queued" }, output: emptyOutput(), createdAt: new Date().toISOString(), finishedAt: null },
-      recordId: "", controller: new AbortController(), queue: [], accepting: true, startedAt: null, blocks: [], live: [],
+      recordId: "", controller: new AbortController(), queue: [], steers: [], accepting: true, startedAt: null, blocks: [], live: [],
       audit: this.deps.audit(input.runId), done: new Promise<void>(accept => { resolve = accept; }), resolve: () => resolve(),
     };
     job.audit.append({ type: "delegation", input });
@@ -140,18 +143,30 @@ export class SubagentPoolRuntime {
     if (!current) throw new PluginApiError("not_found", "The delegation record is unavailable.");
     return this.snapshot(current);
   }
-  async wait(ids: readonly string[], signal: AbortSignal): Promise<TaskSummary[]> {
+  /** Wait for every selected task to end, publishing each task's status and recent process steps as they change. */
+  async wait(ids: readonly string[], signal: AbortSignal, publish: (entries: WaitEntry[]) => void = () => {}): Promise<WaitEntry[]> {
     signal.throwIfAborted();
     const entries = [...new Set(ids)].map(id => this.require(id));
+    const read = () => entries.map(entry => waitEntry(this.latest(entry)));
     const completion = Promise.all(entries.map(entry => this.jobs.get(entry.input.runId)?.done));
-    await new Promise<void>((resolve, reject) => {
-      const abort = () => { signal.removeEventListener("abort", abort); reject(signal.reason); };
-      signal.addEventListener("abort", abort, { once: true });
-      void completion.then(() => { signal.removeEventListener("abort", abort); resolve(); }, error => {
-        signal.removeEventListener("abort", abort); reject(error);
-      });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const send = () => { timer = undefined; publish(read()); };
+    // A finishing task publishes before its runtime buffers are released, so the last process steps are not lost.
+    const unsubscribe = this.subscribe(finished => {
+      if (finished) { clearTimeout(timer); send(); }
+      else timer ??= setTimeout(send, 40);
     });
-    return entries.map(entry => summary(this.latest(entry)));
+    try {
+      send();
+      await new Promise<void>((resolve, reject) => {
+        const abort = () => { signal.removeEventListener("abort", abort); reject(signal.reason); };
+        signal.addEventListener("abort", abort, { once: true });
+        void completion.then(() => { signal.removeEventListener("abort", abort); resolve(); }, error => {
+          signal.removeEventListener("abort", abort); reject(error);
+        });
+      });
+      return read();
+    } finally { unsubscribe(); clearTimeout(timer); }
   }
   private pump(): void {
     while (!this.closed && this.signal && this.active.size < subagentParallelism && this.queue.length) this.start(this.queue.shift()!);
@@ -196,7 +211,7 @@ export class SubagentPoolRuntime {
       this.deps.failed(error);
     } finally {
       this.changed(true);
-      job.blocks = []; job.live = []; job.queue = [];
+      job.blocks = []; job.live = []; job.queue = []; job.steers = [];
       if (saved) this.jobs.delete(job.snapshot.input.runId);
       job.resolve();
     }
@@ -209,4 +224,9 @@ export class SubagentPoolRuntime {
     for (const job of this.active) job.controller.abort(new Error(reason));
     return this.closing = Promise.all([...this.jobs.values()].map(job => job.done)).then(() => {});
   }
+}
+
+function waitEntry(task: TaskSnapshot): WaitEntry {
+  const { activity } = task.output;
+  return { ...summary(task), activity: activity.slice(-recentActivity), steps: activity.length };
 }

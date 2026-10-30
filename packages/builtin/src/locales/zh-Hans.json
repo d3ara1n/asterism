@@ -612,5 +612,12 @@
   "subagent.unavailable": "当前时间线上没有此任务。",
   "subagent.disconnected": "任务视图已断开。请关闭并重新打开以连接。",
   "subagent.usage": "{requests} 次请求 · {seconds} 秒",
-  "subagent.activity": "{activity, select, starting {正在启动} thinking {正在思考} text {正在撰写} finalizing {正在保存结果} tool {正在使用 {tool}} other {正在工作}}"
+  "subagent.activity": "{activity, select, starting {正在启动} thinking {正在思考} text {正在撰写} finalizing {正在保存结果} tool {正在使用 {tool}} other {正在工作}}",
+  "subagent.finished": "{finished}/{total} 已结束",
+  "subagent.earlierSteps": "之前还有 {count} 步",
+  "subagent.fewerSteps": "只显示最近步骤",
+  "subagent.toolState": "{state, select, running {运行中} succeeded {成功} partial {部分成功} rejected {被拒绝} failed {失败} cancelled {已取消} other {结果未知}}",
+  "subagent.undelivered": "未送达",
+  "subagent.thinking": "思考",
+  "subagent.steering": "追加指令"
 }

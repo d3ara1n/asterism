@@ -24,4 +24,11 @@ export const subagentMessages = builtin.messages("en", defineMessages({
   disconnected: { id: "subagent.disconnected", defaultMessage: "The task view disconnected. Close and reopen it to reconnect." },
   usage: { id: "subagent.usage", defaultMessage: "{requests} requests · {seconds}s" },
   activity: { id: "subagent.activity", defaultMessage: "{activity, select, starting {Starting} thinking {Thinking} text {Writing} finalizing {Saving result} tool {Using {tool}} other {Working}}" },
+  finished: { id: "subagent.finished", defaultMessage: "{finished}/{total} finished" },
+  earlierSteps: { id: "subagent.earlierSteps", defaultMessage: "{count, plural, one {# earlier step} other {# earlier steps}}" },
+  fewerSteps: { id: "subagent.fewerSteps", defaultMessage: "Show recent steps only" },
+  toolState: { id: "subagent.toolState", defaultMessage: "{state, select, running {running} succeeded {succeeded} partial {partially succeeded} rejected {rejected} failed {failed} cancelled {cancelled} other {unknown result}}" },
+  undelivered: { id: "subagent.undelivered", defaultMessage: "Not delivered" },
+  thinking: { id: "subagent.thinking", defaultMessage: "Thinking" },
+  steering: { id: "subagent.steering", defaultMessage: "Instructions" },
 }));

@@ -32,7 +32,7 @@ export function TaskStatus({ status }: { status: TaskSnapshot["status"] }) {
   const state = stateOf(status);
   return <StatusBadge tone={tones[state]}>{useI18n().formatMessage(messages.state, { state })}</StatusBadge>;
 }
-export function TaskReport({ task }: { task: TaskSnapshot }) {
+function TaskReport({ task }: { task: TaskSnapshot }) {
   const i18n = useI18n();
   return <div className="flex min-w-0 flex-col gap-3">
     <div className="flex flex-wrap items-center gap-2"><TaskStatus status={task.status} />
@@ -145,9 +145,13 @@ export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
   return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
     <p className="type-caption px-3 py-2" role="status" aria-atomic="true">{i18n.formatMessage(messages.active, { running, queued })}</p>
     {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VList className="content-scrollbar" data={data.tasks.toReversed()}>{task =>
-        <ListRow key={task.id} title={`${task.id} · ${task.role}`} description={task.task} onOpen={() => select(task.id)}
-          details={task.status.phase === "running" ? <Activity status={task.status} /> : undefined}
-          actions={<TaskStatus status={task.status} />} />}</VList></ItemGroup>
+        <ListRow key={task.id} className="py-1.5" onOpen={() => select(task.id)}
+          buttonProps={{ title: task.task }}
+          title={<span className="flex min-w-0 items-baseline gap-2">
+            <span className="shrink-0 font-mono">{task.id}</span>
+            <span className="min-w-0 truncate font-normal">{task.task}</span>
+          </span>}
+          actions={<><span className="type-caption">{task.role}</span><TaskStatus status={task.status} /></>} />}</VList></ItemGroup>
       : <p className="type-caption p-3">{i18n.text(messages.empty)}</p>}
   </div>;
 }

@@ -37,8 +37,15 @@ export const statusSchema = z.discriminatedUnion("phase", [
   z.strictObject({ phase: z.literal("running"), activity: z.string() }),
   finishedSchema,
 ]);
+const toolStateSchema = z.enum(["running", "succeeded", "partial", "rejected", "failed", "cancelled", "unknown"]);
+export const activityEntrySchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("thinking"), state: z.enum(["running", "done"]) }),
+  z.strictObject({ kind: z.literal("tool"), name: z.string(), subject: z.string().nullable(), state: toolStateSchema }),
+  z.strictObject({ kind: z.literal("steer"), text: z.string() }),
+]);
 export const outputSchema = z.strictObject({
   result: z.string().nullable(), usage: usageSchema,
+  activity: z.array(activityEntrySchema).describe("Thinking and tool steps in order, with delivered steering at its position."),
   undelivered: z.array(z.string()).describe("Steering messages queued but not delivered before the task ended."),
 });
 export const delegationInputSchema = z.strictObject({
@@ -57,6 +64,11 @@ export const snapshotSchema = z.strictObject({
 export const summarySchema = snapshotSchema.omit({ input: true, output: true }).extend({
   id: taskIdSchema, role: z.string(), task: z.string(), usage: usageSchema,
 });
+export const recentActivity = 8;
+export const waitEntrySchema = summarySchema.extend({
+  activity: z.array(activityEntrySchema).max(recentActivity).describe("Most recent process steps."),
+  steps: z.number().int().nonnegative().describe("Total process steps, including earlier ones not listed."),
+});
 export const PoolView = builtin.data("subagent-pool.card", z.strictObject({ tasks: z.array(summarySchema) }));
 
 const empty = z.strictObject({}).describe("No operation parameters.");
@@ -73,7 +85,7 @@ export const Check = define("check", "Read one task's current state or final rep
   taskIdSchema, empty, snapshotSchema, "read");
 export const Wait = define("wait", "Wait until all selected tasks end. Task failure does not fail the wait. Cancelling the wait leaves tasks running.",
   z.array(taskIdSchema).min(1).describe("Task IDs to wait for, such as [\"sub-1\", \"sub-2\"]."), empty,
-  z.strictObject({ tasks: z.array(summarySchema) }).describe("Status and usage for each selected task. Reports are available through subagent_check."), "read");
+  z.strictObject({ tasks: z.array(waitEntrySchema) }).describe("Status, recent process steps, and usage for each selected task. Reports are available through subagent_check."), "read");
 export const Steer = define("steer", "Append task material to a queued or running task. The task receives it at the next request boundary.",
   taskIdSchema, z.strictObject({ message: z.string().min(1) }).describe("Additional instructions or background."),
   z.strictObject({ id: taskIdSchema, accepted: z.literal(true) }).describe("Confirmation that the material entered this task's input queue."), "write");
@@ -91,6 +103,8 @@ export type ModelOverride = z.infer<typeof modelOverrideSchema>;
 export type DelegationInput = z.infer<typeof delegationInputSchema>;
 export type TaskSnapshot = z.infer<typeof snapshotSchema>;
 export type TaskSummary = z.infer<typeof summarySchema>;
+export type WaitEntry = z.infer<typeof waitEntrySchema>;
+export type ActivityEntry = z.infer<typeof activityEntrySchema>;
 export type TaskOutput = z.infer<typeof outputSchema>;
 export type TaskCompletion = z.infer<typeof completionSchema>;
 export type FinishedStatus = z.infer<typeof finishedSchema>;
@@ -105,7 +119,7 @@ export function summary(task: TaskSnapshot): TaskSummary {
     usage: task.output.usage, createdAt: task.createdAt, finishedAt: task.finishedAt };
 }
 export function emptyOutput(): TaskOutput {
-  return { result: null, undelivered: [], usage: { model: null, requests: 0, elapsedMs: 0,
+  return { result: null, activity: [], undelivered: [], usage: { model: null, requests: 0, elapsedMs: 0,
     input: null, output: null, total: null, reasoning: null, cacheRead: null, cacheWrite: null } };
 }
 export function ended(outcome: FinishedStatus["outcome"], code: string | null = null, message: string | null = null): FinishedStatus {

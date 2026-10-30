@@ -12,11 +12,17 @@ import { subagentPoolCard } from "../shared/card-appearance.ts";
 import { subagentMessages } from "../messages/subagents.ts";
 import {
   SubagentPool, CreateSubagentPool, PoolView, Delegation, Delegate, Wait, Check, Steer, Cancel,
-  CancelSubagent, SteerSubagent, PoolChannel, subagentParallelism,
+  CancelSubagent, SteerSubagent, PoolChannel, subagentParallelism, recentActivity, type TaskOutput,
 } from "./contract.ts";
 import { SubagentPoolRuntime } from "./service.ts";
 import { executeSubagent } from "./execution.ts";
 import { AuditLog } from "./audit.ts";
+import { activityLine } from "./activity.ts";
+
+/** Measurements the delegating model can act on; detailed token fields remain in the saved record. */
+function modelUsage(usage: TaskOutput["usage"]) {
+  return { model: usage.model, requests: usage.requests, seconds: Math.round(usage.elapsedMs / 1000), totalTokens: usage.total };
+}
 
 async function operation<T extends Json>(signal: AbortSignal, work: () => T | Promise<T>): Promise<CallResult<T>> {
   try { signal.throwIfAborted(); return { kind: "succeeded", data: await work() }; }
@@ -91,10 +97,17 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
         }, toModel: task => JSON.stringify({ id: task.input.id, role: task.input.role, status: task.status }) }),
         implementTool(Check, { call(_data, target, _args, { object, signal }) {
           return operation(signal, () => pool(object.ref).check(target));
-        } }),
-        implementTool(Wait, { call(_data, targets, _args, { object, signal }) {
-          return operation(signal, async () => ({ tasks: await pool(object.ref).wait(targets, signal) }));
-        } }),
+        }, toModel: task => JSON.stringify({
+          id: task.input.id, role: task.input.role, status: task.status, result: task.output.result,
+          usage: modelUsage(task.output.usage), steps: task.output.activity.length,
+          recentActivity: task.output.activity.slice(-recentActivity).map(activityLine),
+          ...(task.output.undelivered.length ? { undelivered: task.output.undelivered } : {}),
+        }) }),
+        implementTool(Wait, { call(_data, targets, _args, { object, signal, publish }) {
+          return operation(signal, async () => ({ tasks: await pool(object.ref).wait(targets, signal, tasks => publish({ tasks })) }));
+        }, toModel: ({ tasks }) => JSON.stringify({ tasks: tasks.map(task => ({
+          id: task.id, role: task.role, status: task.status, usage: modelUsage(task.usage), steps: task.steps,
+        })) }) }),
         implementTool(Steer, { call(_data, target, args, { object, signal }) {
           return operation(signal, () => { pool(object.ref).steer(target, args.message); return { id: target, accepted: true as const }; });
         } }),
