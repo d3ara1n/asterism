@@ -6,7 +6,7 @@ import { pickDirectoryChannel, openLocalFileChannel, openLogsChannel, localFileP
 import { connectionPortMessage, connectionRequestChannel } from "../shared/connection.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
-import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupStateSchema, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel, startupNotificationsSchema } from "../shared/startup.ts";
+import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupStateSchema, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel, startupNotificationsSchema, startupAcknowledgeMigrationChannel } from "../shared/startup.ts";
 import { recoveryActionSchema } from "../shared/recovery.ts";
 import { rendererFailureChannel } from "../shared/renderer-failure.ts";
 import { updatesGetChannel, updatesSetChannel, updatesCheckChannel, updatesInstallChannel, updatesChangedChannel, updateStateSchema } from "../shared/updates.ts";
@@ -46,9 +46,9 @@ const bridge: DesktopBridge = {
   },
   startup: {
     async initialized() {
-      const parsed = startupNotificationsSchema.safeParse(await ipcRenderer.invoke(startupInitializedChannel));
-      return parsed.success ? parsed.data : [];
+      return startupNotificationsSchema.parse(await ipcRenderer.invoke(startupInitializedChannel));
     },
+    async acknowledgeMigration() { await ipcRenderer.invoke(startupAcknowledgeMigrationChannel); },
     async recover(action) {
       const result: unknown = await ipcRenderer.invoke(startupRecoveryChannel, recoveryActionSchema.parse(action));
       return typeof result === "string" ? result : undefined;

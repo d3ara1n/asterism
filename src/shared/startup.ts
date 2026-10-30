@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { coreChannel } from "./core.ts";
-import { pluginStorageFailureSchema, preparationStageSchema, recoveryPointSchema, type PluginStorageFailure, type RecoveryAction } from "./recovery.ts";
+import { pluginStorageFailureSchema, preparationStageSchema, recoveryPointSchema, type RecoveryAction } from "./recovery.ts";
 
 export const startupGetChannel = coreChannel("startup-get");
 export const startupChangedChannel = coreChannel("startup-changed");
@@ -9,6 +9,7 @@ export const startupDataDirectoryChannel = coreChannel("startup-data-directory")
 export const startupRecoveryChannel = coreChannel("startup-recovery");
 export const startupRecoveryPointChannel = coreChannel("startup-recovery-point");
 export const startupInitializedChannel = coreChannel("startup-initialized");
+export const startupAcknowledgeMigrationChannel = coreChannel("startup-acknowledge-migration");
 /** Data preparation stages are independent of host settings readability; environment stages begin with actual login-environment reads. */
 export const startupStageSchema = z.enum([...preparationStageSchema.options, "dataFinalizing", "environment", "plugins", "workspace"]);
 export type StartupStage = z.infer<typeof startupStageSchema>;
@@ -21,8 +22,12 @@ export const startupStateSchema = z.discriminatedUnion("status", [
     recovery: startupRecoverySchema.optional() }),
 ]);
 export type StartupState = z.infer<typeof startupStateSchema>;
-/** One-time startup notice obtained after home mounts: plugins disabled by storage preparation failure during this startup. */
-export const startupNotificationsSchema = z.array(pluginStorageFailureSchema);
+/** Notices obtained after home mounts; migration acknowledgment is independent of delivery. */
+export const startupNotificationsSchema = z.strictObject({
+  migrationPointId: z.string().nullable(),
+  failures: z.array(pluginStorageFailureSchema),
+});
+export type StartupNotifications = z.infer<typeof startupNotificationsSchema>;
 
 /** Main processes retain startup state so reloaded loading pages can still read failure reasons. */
 export interface StartupBridge {
@@ -33,5 +38,6 @@ export interface StartupBridge {
   /** Perform recovery and restart; a returned string explains failure. */
   recover(action: RecoveryAction): Promise<string | void>;
   openRecoveryPoint(id: string): Promise<string>;
-  initialized(): Promise<PluginStorageFailure[]>;
+  initialized(): Promise<StartupNotifications>;
+  acknowledgeMigration(): Promise<void>;
 }

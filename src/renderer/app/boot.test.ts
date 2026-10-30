@@ -7,7 +7,7 @@ it("reads an existing backend startup failure, preserves its reason, and removes
   const close = vi.fn();
   const failure = { status: "failed", reason: "database_version", detail: "Format mismatch." } as const;
   const bridge: StartupBridge = { get: async () => failure, onChanged: () => close,
-    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => [] };
+    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => ({ migrationPointId: null, failures: [] }), acknowledgeMigration: async () => {} };
   await expect(waitForRuntime(bridge, new AbortController().signal, () => {})).rejects.toEqual(new StartupError(failure));
   expect(close).toHaveBeenCalledTimes(1);
 });
@@ -20,7 +20,7 @@ it("ready notification completes the wait, and a late initial read no longer pub
   const bridge: StartupBridge = {
     onChanged(listener) { receive = listener; return close; },
     get: () => new Promise(resolve => { respond = resolve; }),
-    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => [],
+    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => ({ migrationPointId: null, failures: [] }), acknowledgeMigration: async () => {},
   };
   const ready = waitForRuntime(bridge, new AbortController().signal, progress);
   receive({ status: "starting", stage: "plugins" });
@@ -52,7 +52,7 @@ it("after the desktop bridge read completes, only backend state ends the data pr
   const bridge: StartupBridge = {
     get: async () => ({ status: "starting", stage: "dataBackup" }),
     onChanged(listener) { receive = listener; return close; },
-    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => [],
+    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => ({ migrationPointId: null, failures: [] }), acknowledgeMigration: async () => {},
   };
   const ready = waitForRuntime(bridge, lifetime.signal, observed, initialization.signal);
   await initial;
@@ -70,7 +70,7 @@ it("cancelling initialization before the desktop bridge read completes removes t
   const close = vi.fn();
   const bridge: StartupBridge = {
     get: () => new Promise(resolve => { respond = resolve; }), onChanged: () => close,
-    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => [],
+    restart: async () => {}, openDataDirectory: async () => "", recover: async () => {}, openRecoveryPoint: async () => "", initialized: async () => ({ migrationPointId: null, failures: [] }), acknowledgeMigration: async () => {},
   };
   const ready = waitForRuntime(bridge, new AbortController().signal, () => {}, initialization.signal);
   const reason = new Error("Desktop bridge unavailable.");

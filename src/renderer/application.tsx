@@ -6,6 +6,7 @@ import { HostI18nProvider, setLanguageCatalogs } from "./shared/i18n";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 import { MotionConfig } from "motion/react";
 import { TooltipProvider } from "@asterism-app/ui/ui/tooltip";
+import { Button } from "@asterism-app/ui/ui/button";
 import { ModuleViewsProvider } from "./modules/views";
 import { HostConfigsProvider } from "./modules/configs";
 import { App } from "./app/App";
@@ -29,11 +30,36 @@ import type { UiText } from "@asterism-app/sdk/contracts";
 import { runtime } from "./runtime";
 import { contentInput, contentScopeId } from "./features/creation/content";
 
-/** Retrieve startup notices once after the home page mounts: plugins disabled due to storage preparation failure appear as persistent errors. */
+/** Present migration completion and plugin storage failures after the home page mounts. */
 function StartupNotification() {
   const i18n = useI18n();
   useEffect(() => {
-    void window.host.startup.initialized().then(failures => {
+    void window.host.startup.initialized().then(({ migrationPointId, failures }) => {
+      if (migrationPointId) {
+        const toastId = `migration:${migrationPointId}`;
+        const acknowledge = () => {
+          void window.host.startup.acknowledgeMigration()
+            .then(() => toast.dismiss(toastId))
+            .catch(error => toast.error(String(error)));
+        };
+        toast.success(i18n.text(startupMessages.migratedTitle), {
+          id: toastId,
+          description: <div className="flex flex-col gap-3">
+            <p>{i18n.text(startupMessages.migratedBody)}</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => {
+                void window.host.startup.openRecoveryPoint(migrationPointId)
+                  .then(error => { if (error) toast.error(error); })
+                  .catch(error => toast.error(String(error)));
+              }}>{i18n.text(startupMessages.migratedOpenBackup)}</Button>
+              <Button size="sm" onClick={acknowledge}>{i18n.text(startupMessages.migratedConfirm)}</Button>
+            </div>
+          </div>,
+          duration: Infinity,
+          closeButton: true,
+          onDismiss: acknowledge,
+        });
+      }
       for (const failure of failures) toast.error(i18n.text({ ...startupMessages.pluginStorageFailed, values: failure }),
         { id: `plugin-storage:${failure.id}`, duration: Infinity, closeButton: true });
     }).catch(error => console.error("Startup notifications could not be read.", error));

@@ -25,8 +25,8 @@ import { initializeApplicationLog, recordRendererFailure } from "./logging.ts";
 import { rendererFailureChannel, rendererFailureSchema } from "../shared/renderer-failure.ts";
 import { ApplicationUpdates } from "./updates.ts";
 import { ApplicationNetwork } from "./network.ts";
-import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel } from "../shared/startup.ts";
-import { recoveryActionSchema, type RecoveryPoint } from "../shared/recovery.ts";
+import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel, startupAcknowledgeMigrationChannel, type StartupNotifications } from "../shared/startup.ts";
+import { recoveryActionSchema } from "../shared/recovery.ts";
 import { appearanceChangedChannel } from "../shared/theme.ts";
 import { languageChangedChannel } from "../shared/language.ts";
 import { enableSettings } from "./settings-state.ts";
@@ -95,24 +95,6 @@ function requestQuit(restart = false, installUpdate = false): Promise<boolean> {
 /** App icon file: packaged builds read extraResource from resources; development uses repository assets/icon. */
 function applicationIconFile(name: string): string {
   return app.isPackaged ? join(process.resourcesPath, name) : join(here, "../../assets/icon", name);
-}
-
-/** Prompt once after the home page mounts for a successful migration recovery point; acknowledgment clears the prompt marker. */
-async function showMigrationNotice(current: BrowserWindow): Promise<void> {
-  let point: RecoveryPoint | null;
-  try { point = pendingNotice(dataRoot); } catch (error) { console.error("Recovery points could not be read.", error); return; }
-  if (!point || current.isDestroyed()) return;
-  const locale = () => readLanguage().locale;
-  const answer = await dialog.showMessageBox(current, { type: "info", title: applicationBrand.en,
-    message: startupText(startupMessages.migratedTitle, locale),
-    detail: startupText({ ...startupMessages.migratedBody, values: {
-      changes: point.changes.map(change => `${change.id}: ${change.from} → ${change.to}`).join("\n"),
-      location: recoveryPointDirectory(dataRoot, point.id),
-    } }, locale),
-    buttons: [startupText(startupMessages.migratedConfirm, locale), startupText(startupMessages.openRecoveryPoint, locale)],
-  });
-  try { acknowledgeNotice(dataRoot); } catch (error) { console.error("The migration notice could not be acknowledged.", error); }
-  if (answer.response === 1) await shell.openPath(recoveryPointDirectory(dataRoot, point.id));
 }
 
 function createWindow(): void {
@@ -197,11 +179,18 @@ function createWindow(): void {
     } catch (error) { return error instanceof Error ? error.message : String(error); }
     finally { recoveryPending = false; }
   });
-  ipcMain.handle(startupInitializedChannel, event => {
-    if (!trusted(event) || startup.state.status !== "ready" || notificationsDelivered) return [];
+  ipcMain.handle(startupInitializedChannel, (event): StartupNotifications => {
+    if (!trusted(event) || startup.state.status !== "ready") return { migrationPointId: null, failures: [] };
+    let migrationPointId: string | null = null;
+    try { migrationPointId = pendingNotice(dataRoot)?.id ?? null; }
+    catch (error) { console.error("Recovery points could not be read.", error); }
+    const failures = notificationsDelivered ? [] : startup.storageFailures;
     notificationsDelivered = true;
-    void showMigrationNotice(current);
-    return startup.storageFailures;
+    return { migrationPointId, failures };
+  });
+  ipcMain.handle(startupAcknowledgeMigrationChannel, event => {
+    if (!trusted(event) || startup.state.status !== "ready") throw new Error("Migration acknowledgment is unavailable.");
+    acknowledgeNotice(dataRoot);
   });
   // Renderer and task process connect directly: validate the source only at port handoff, and close old connections on reload, navigation, or crash.
   let connection: string | null = null;
@@ -280,7 +269,7 @@ function createWindow(): void {
     stopDesktopWindow();
     ipcMain.removeListener(rendererFailureChannel, reportFailure);
     ipcMain.removeListener(connectionRequestChannel, requestConnection);
-    for (const channel of [startupGetChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryPointChannel, startupRecoveryChannel, startupInitializedChannel]) ipcMain.removeHandler(channel);
+    for (const channel of [startupGetChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryPointChannel, startupRecoveryChannel, startupInitializedChannel, startupAcknowledgeMigrationChannel]) ipcMain.removeHandler(channel);
     connectSettings = null;
     closeConnection();
     window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
