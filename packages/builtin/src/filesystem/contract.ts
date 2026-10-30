@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineImplementation, defineCreation, defineCall, contentRefSchema } from "@asterism-app/sdk/contracts";
-import { builtin, List, Read, Edit, Write, See, textReadSchema, textChangeSchema } from "@asterism-app/builtin-api/contracts";
+import { builtin, List, Read, Edit, Write, Replace, See, textReadSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
 export const CreateDirectory = defineCreation(Directory, { id: builtin.name("directory.create"),
@@ -31,7 +31,7 @@ export const DirectoryList = defineImplementation({
 
 const filePath = z.string().min(1).max(4096).describe("File path relative to the linked directory root, e.g. 'src/main.ts'. Absolute paths and targets escaping the root through .. or symlinks are rejected.");
 const fileTarget = z.strictObject({ path: filePath })
-  .describe("Select one UTF-8 text file with {\"path\":\"relative/file.txt\"}. Content operations are limited to 8 MiB. edit requires an existing file; write can create missing parents inside the root.");
+  .describe("Select one UTF-8 text file with {\"path\":\"relative/file.txt\"}. Content operations are limited to 8 MiB. edit and replace require an existing file; write can create missing parents inside the root.");
 export const DirectoryRead = defineImplementation({
   ...builtin.data("directory.read", textReadSchema.extend({ path: filePath })
     .describe("Complete selected file lines with absolute line numbers, optional hashes, final-newline state and the next unread line.")),
@@ -54,6 +54,11 @@ export const DirectoryWrite = defineImplementation({
     created: z.boolean().describe("True when this call created the target file; false when it already existed."),
   }).describe("The written file's actual diff and creation status, with an empty anchors array. Full content is limited to 8 MiB.")),
   resource: Directory, tool: Write, targetSchema: fileTarget, effect: "write", execution: "sequential",
+});
+export const DirectoryReplace = defineImplementation({
+  ...builtin.data("directory.replace", textReplaceSchema.extend({ path: filePath })
+    .describe("Match count, actual committed file diff, and fresh anchors. The full resulting file is limited to 8 MiB.")),
+  resource: Directory, tool: Replace, targetSchema: fileTarget, effect: "write", execution: "sequential",
 });
 export const DirectorySee = defineImplementation({
   ...builtin.data("directory.see", z.strictObject({

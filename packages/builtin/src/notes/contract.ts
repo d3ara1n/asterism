@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineImplementation, defineCreation } from "@asterism-app/sdk/contracts";
-import { builtin, Read, Edit, Write, textReadSchema, textChangeSchema } from "@asterism-app/builtin-api/contracts";
+import { builtin, Read, Edit, Write, Replace, textReadSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 
 export const MAX_NOTE_LENGTH = 100_000;
 export const Note = builtin.resource("note", z.object({}));
@@ -24,4 +24,8 @@ export const NoteEdit = defineImplementation({
 export const NoteWrite = defineImplementation({
   ...builtin.data("note.write", textChangeSchema),
   resource: Note, tool: Write, targetSchema, effect: "write", execution: "sequential",
+});
+export const NoteReplace = defineImplementation({
+  ...builtin.data("note.replace", textReplaceSchema),
+  resource: Note, tool: Replace, targetSchema, effect: "write", execution: "sequential",
 });

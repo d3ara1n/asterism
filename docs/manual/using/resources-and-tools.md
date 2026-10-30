@@ -28,6 +28,8 @@ Directory and terminal operations affect the actual machine. Check an operationâ
 
 Notes retain current text. Their earlier tool results may appear in history, but browsing that history does not restore note contents.
 
+Files and notes support anchored edits, full-content writes, and bulk replacement. `edit` changes selected lines using anchors returned by reading, searching, or a previous edit or replacement. `write` supplies complete content. `replace` applies literal text or a JavaScript regular expression to the entire selected target and returns the match count, actual diff, and fresh anchors. Literal replacement text is inserted verbatim; regular-expression replacements support capture groups. A replacement with no matches reports an error and leaves the target unchanged.
+
 ## Consult the manual
 
 Add a Manual resource and link it to an agent, or let the agent create one through the resource creation tools. Creation takes no parameters. The resource provides access to application guides, public-package development material, and documentation directories declared by loaded plugins.

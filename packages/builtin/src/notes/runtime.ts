@@ -1,6 +1,7 @@
 import { noteCard } from "../shared/card-appearance.ts";
 import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@asterism-app/sdk/runtime";
-import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteEdit, NoteWrite, MAX_NOTE_LENGTH } from "./contract.ts";
+import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteEdit, NoteWrite, NoteReplace, MAX_NOTE_LENGTH } from "./contract.ts";
+import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { TextError, readText, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
 
 function currentContent(object: ObjectReader) {
@@ -74,6 +75,21 @@ export default defineModule(() => ({
         } catch (error) { return mutationFailure(error, signal, "Note editing"); }
       },
       toModel: editToModel,
+    }),
+    implementTool(NoteReplace, {
+      async call(_data, _target, args, { object, signal }) {
+        try {
+          signal.throwIfAborted();
+          const before = requireText(object);
+          const replaced = replaceText(before, args);
+          validateNoteText(replaced.text);
+          const data = { matches: replaced.matches, ...textChange(before, replaced.text, titleOf(object), "diff") };
+          signal.throwIfAborted();
+          if (data.changed) save(object, replaced.text);
+          return { kind: "succeeded", data };
+        } catch (error) { return mutationFailure(error, signal, "Note replacement"); }
+      },
+      toModel: replaceToModel,
     }),
     implementTool(NoteWrite, {
       async call(_data, _target, args, { object, signal }) {

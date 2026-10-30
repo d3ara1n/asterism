@@ -4,7 +4,8 @@ import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
 import { TextError, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
-import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee, DirectoryTree } from "./contract.ts";
+import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectoryReplace, DirectorySee, DirectoryTree } from "./contract.ts";
+import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
@@ -125,6 +126,20 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
         } catch (error) { return textFailure(error, signal, "Edit target file"); }
       },
       toModel: data => `${data.path}\n${editToModel(data)}`,
+    }),
+    implementTool(DirectoryReplace, {
+      async call(directory, target, args, { signal }) {
+        try {
+          const selected = await writableTarget(directory.path, target.path);
+          const before = await readTextFile(selected.path, signal);
+          const replaced = replaceText(before.text, args);
+          validateTextSize(replaced.text);
+          const data = { path: target.path, matches: replaced.matches, ...textChange(before.text, replaced.text, target.path, "diff") };
+          if (data.changed) await commitTextFile(selected.path, before, replaced.text, signal);
+          return { kind: "succeeded" as const, data };
+        } catch (error) { return textFailure(error, signal, "Replace target text"); }
+      },
+      toModel: data => `${data.path}\n${replaceToModel(data)}`,
     }),
     implementTool(DirectoryWrite, {
       async call(directory, target, args, { signal }) {

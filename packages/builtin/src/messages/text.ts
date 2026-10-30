@@ -21,6 +21,30 @@ export const textMessages = pluginNamespace("asterism.builtin").messages("en", d
     id: "toolTextEdits",
     defaultMessage: "{count, plural, one {# edit} other {# edits}}",
   },
+  toolTextMatches: {
+    id: "toolTextMatches",
+    defaultMessage: "{count, plural, one {# match} other {# matches}}",
+  },
+  toolTextReplace: {
+    id: "toolTextReplace",
+    defaultMessage: "Replace text",
+  },
+  toolTextLiteral: {
+    id: "toolTextLiteral",
+    defaultMessage: "Literal text",
+  },
+  toolTextRegex: {
+    id: "toolTextRegex",
+    defaultMessage: "Regular expression",
+  },
+  toolTextFind: {
+    id: "toolTextFind",
+    defaultMessage: "Find",
+  },
+  toolTextReplacement: {
+    id: "toolTextReplacement",
+    defaultMessage: "Replace with",
+  },
   contentUnavailable: {
     id: "contentUnavailable",
     defaultMessage: "Saved content is unavailable.",

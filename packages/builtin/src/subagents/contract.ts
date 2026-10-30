@@ -107,8 +107,12 @@ export const Steer = define("steer",
   taskIdSchema, z.strictObject({ message: z.string().min(1).describe("The concrete correction or additional requirement.") }).describe("Material for the task's input queue."),
   z.strictObject({ id: taskIdSchema, accepted: z.literal(true) }).describe("Confirmation that the material entered this task's input queue."), "write");
 export const Cancel = define("cancel",
-  "Stop a queued or running task and wait for its execution to end. Its outcome becomes cancelled with the recorded reason; output produced so far remains available through subagent_check. A finished task is returned unchanged.",
-  [],
+  "Cancel a task in this shared pool.",
+  [
+    "A queued or running task is stopped; the call waits for its execution to end.",
+    "Its outcome becomes cancelled with the recorded reason; output produced so far remains available through subagent_check.",
+    "A finished task is returned unchanged.",
+  ],
   taskIdSchema, z.strictObject({ reason: z.string().optional().describe("Why the task is no longer needed; recorded with its outcome.") }).describe("Optional reason for cancellation."),
   summarySchema.describe("Final task state."), "write");
 export const CancelSubagent = defineCall(builtin.name("subagent.cancel"), {

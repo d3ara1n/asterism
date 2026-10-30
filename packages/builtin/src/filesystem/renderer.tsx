@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
-import { Eye, Folder, BookOpen, FilePenLine, FilePlus2, ListTree, RefreshCw } from "lucide-react";
+import { Eye, Folder, BookOpen, FilePenLine, FilePlus2, ListTree, RefreshCw, Replace } from "lucide-react";
 import { FileTree, useFileTree, useFileTreeSearch } from "@pierre/trees/react";
 import type { GitStatus } from "@pierre/trees";
 
@@ -12,9 +12,9 @@ import { cn } from "@asterism-app/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";
-import { textReadViews, textWriteViews, textEditViews } from "../text-view";
+import { textReadViews, textWriteViews, textEditViews, textReplaceViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
-import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySee } from "./contract";
+import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectoryReplace, DirectorySee } from "./contract";
 import { FilePreview } from "../agent/conversation/Files";
 import { DirectoryInput } from "./creation";
 import { execToolRenderer } from "./exec-view";
@@ -119,6 +119,10 @@ export default {
     toolRenderer(DirectoryEdit, {
       label: textMessages.toolTextEdit, icon: <FilePenLine className="size-3.5" />,
       ...textEditViews,
+    }),
+    toolRenderer(DirectoryReplace, {
+      label: textMessages.toolTextReplace, icon: <Replace className="size-3.5" />,
+      ...textReplaceViews,
     }),
     toolRenderer(DirectoryWrite, {
       label: textMessages.toolTextWrite, icon: <FilePlus2 className="size-3.5" />,

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
-import { FileText, BookOpen, FilePenLine, FilePlus2, Copy } from "lucide-react";
+import { FileText, BookOpen, FilePenLine, FilePlus2, Copy, Replace } from "lucide-react";
 import { toast } from "sonner";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 
@@ -8,8 +8,8 @@ import { Markdown } from "../agent/conversation/Markdown";
 import { commonMessages } from "../messages/common";
 import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";
-import { textReadViews, textWriteViews, textEditViews } from "../text-view";
-import { Note, CreateNote, NoteView, NoteRead, NoteEdit, NoteWrite } from "./contract";
+import { textReadViews, textWriteViews, textEditViews, textReplaceViews } from "../text-view";
+import { Note, CreateNote, NoteView, NoteRead, NoteEdit, NoteWrite, NoteReplace } from "./contract";
 import { NoteInput } from "./creation";
 
 import { noteCard as appearance } from "../shared/card-appearance.ts";
@@ -55,6 +55,10 @@ export default {
     toolRenderer(NoteEdit, {
       label: textMessages.toolTextEdit, icon: <FilePenLine className="size-3.5" />,
       ...textEditViews,
+    }),
+    toolRenderer(NoteReplace, {
+      label: textMessages.toolTextReplace, icon: <Replace className="size-3.5" />,
+      ...textReplaceViews,
     }),
     toolRenderer(NoteWrite, {
       label: textMessages.toolTextWrite, icon: <FilePlus2 className="size-3.5" />,

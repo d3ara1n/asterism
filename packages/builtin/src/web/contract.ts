@@ -18,13 +18,13 @@ export const WebView = builtin.data("web.card", z.object({
   }),
 }));
 export type WebCardData = z.infer<typeof WebView.schema>;
-const targetSchema = z.null().describe("The Web resource provides access to all configured web providers.");
+const targetSchema = z.null().describe("Select the Web resource.");
 export const WebSearch = defineImplementation({
   ...builtin.data("web.search", webSearchResultSchema.describe("Search sources, typed details, actual provider, usage and execution hints.")),
   resource: WebResource, targetSchema, effect: "read", execution: "parallel",
   tool: defineTool({ id: builtin.name("web.tool.search"), name: "web_search",
-    description: "Search the web using the first enabled provider. Results include source URLs, content, structured details and hints describing any conditions that were not applied.",
-    guidelines: ["resource_inspect lists the available web providers and their search and fetch capabilities."],
+    description: "Search the web for sources matching a query.",
+    guidelines: ["Results include source URLs, content, structured details and hints describing any conditions that were not applied."],
     argsSchema: webSearchRequestSchema,
   }),
 });
@@ -32,8 +32,8 @@ export const WebFetch = defineImplementation({
   ...builtin.data("web.fetch", webFetchResultSchema.describe("Retrieved documents, typed details, actual provider, usage and execution hints.")),
   resource: WebResource, targetSchema, effect: "read", execution: "parallel",
   tool: defineTool({ id: builtin.name("web.tool.fetch"), name: "web_fetch",
-    description: "Retrieve readable content and structured information for a URL. Providers are matched by their declared URL patterns in configuration order.",
-    guidelines: ["resource_inspect lists the available web providers and which URL patterns each provider handles."],
+    description: "Retrieve readable content and structured information for a URL.",
+    guidelines: [],
     argsSchema: webFetchRequestSchema,
   }),
 });

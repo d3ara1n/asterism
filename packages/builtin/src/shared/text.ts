@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { structuredPatch, formatPatch } from "diff";
+import { structuredPatch, formatPatch, type StructuredPatchHunk } from "diff";
 import { applyEdits } from "./hashline/apply.ts";
 import { clipDiffLine, excerptNote, READ_EXCERPT_THRESHOLD, rowText, textRow } from "./text-row.ts";
 import { hasFinalNewline, splitLines } from "./hashline/lines.ts";
@@ -61,8 +61,29 @@ export function editText(text: string, edits: Edit[]): { text: string; touchedLi
   if (!applied.ok) throw new TextError(applied.failure.kind === "anchor" ? "anchor_mismatch" : applied.failure.kind === "range" ? "invalid_edit_range" : "edit_no_change", failureMessage(applied.failure));
   return applied;
 }
+/** Added lines and the surviving line at each deletion gap, without unchanged spans between separate changes. */
+function diffTouchedLines(hunks: readonly StructuredPatchHunk[], lineCount: number): number[] {
+  const touched: number[] = [];
+  for (const hunk of hunks) {
+    let line = Math.max(0, hunk.newStart - 1), deletion = false;
+    for (const row of hunk.lines) {
+      if (row.startsWith("-")) deletion = true;
+      else if (row.startsWith("+")) {
+        touched.push(line++);
+        deletion = false;
+      } else if (row.startsWith(" ")) {
+        if (deletion) touched.push(line);
+        line++;
+        deletion = false;
+      }
+    }
+    if (deletion && line < lineCount) touched.push(line);
+  }
+  return touched;
+}
+
 /** Generates the actual diff before writing; rejects the operation if the algorithm exceeds its budget rather than returning a fabricated diff. */
-export function textChange(before: string, after: string, label: string, touched: readonly number[] = []): TextChange {
+export function textChange(before: string, after: string, label: string, touched: readonly number[] | "diff" = []): TextChange {
   label = label.replace(/[\r\n\t]/g, " ");
   const patch = structuredPatch(label, label, before, after, "", "", { context: 3, timeout: 1000, maxEditLength: 10000 });
   if (!patch) throw new TextError("diff_limit", "The content change exceeded the diff computation budget; original content preserved.");
@@ -72,7 +93,7 @@ export function textChange(before: string, after: string, label: string, touched
     if (line.startsWith("-")) removed++;
   }
   const lines = splitLines(after);
-  const indices = [...new Set(touched)].sort((a, b) => a - b);
+  const indices = [...new Set(touched === "diff" ? diffTouchedLines(patch.hunks, lines.length) : touched)].sort((a, b) => a - b);
   const anchors: TextChange["anchors"] = [];
   let anchorBytes = 0;
   for (const i of indices) {

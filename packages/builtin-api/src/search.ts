@@ -33,7 +33,7 @@ export const Grep = defineTool({
     ...globGuidelines,
   ],
   argsSchema: z.strictObject({
-    pattern: pattern.describe("Regular expression to search for, or literal text when literal is true."),
+    pattern: pattern.describe("Pattern in ripgrep's default Rust regex syntax, without / delimiters. Matching is line-oriented; lookaround and pattern backreferences are unsupported. When literal is true, this is literal text."),
     literal: z.boolean().optional().describe("Interpret pattern as literal text; defaults to false."),
     ignoreCase: z.boolean().optional().describe("Use case-insensitive matching; defaults to false."),
     word: z.boolean().optional().describe("Match only at word boundaries; defaults to false."),

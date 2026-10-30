@@ -8,7 +8,7 @@ import { BuiltinApplicationService as ApplicationService } from "../testing.ts";
 import { AgentCapabilities } from "../../../../src/execution/capabilities.ts";
 import { executeCoreBatch } from "../../../../src/execution/core.ts";
 import type { Json, ToolOutcome } from "../../../../src/shared/model.ts";
-import { textReadSchema } from "@asterism-app/builtin-api/contracts";
+import { textReadSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 import { readTextFile, commitTextFile } from "./text-io.ts";
 import { writableTarget } from "./paths.ts";
 
@@ -83,6 +83,21 @@ describe("Directory text tools", () => {
     expect(readFileSync(file, "utf8")).toBe("正文");
     expect(await call("write", { path: "nested/text.txt" }, { content: "" })).toMatchObject({ kind: "succeeded" });
     expect(readFileSync(file, "utf8")).toBe("");
+  });
+
+  it("replacement commits the reported text and returns anchors usable by directory edit", async () => {
+    const { directory, call } = setup(), file = join(directory, "replace.txt");
+    writeFileSync(file, "old\r\nkeep\nold");
+    const result = await call("replace", { path: "replace.txt" }, { find: "old", replace: "new" });
+    expect(result.kind).toBe("succeeded");
+    const data = textReplaceSchema.strip().parse(result.data);
+    expect(data.matches).toBe(2);
+    expect(readFileSync(file, "utf8")).toBe("new\r\nkeep\nnew");
+    const row = data.anchors[1];
+    expect(await call("edit", { path: "replace.txt" }, {
+      edits: [{ op: "replace", anchor: { line: row.line, hash: row.hash }, body: ["last"] }],
+    })).toMatchObject({ kind: "succeeded" });
+    expect(readFileSync(file, "utf8")).toBe("new\r\nkeep\nlast");
   });
 
   it("File I/O rejects binary data and directories, and writes through internal links affect the real file", async () => {

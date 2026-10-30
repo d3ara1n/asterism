@@ -37,10 +37,6 @@ export default defineModule(plugin => {
     }));
     return outcome;
   }
-  const catalog = () => {
-    const states = new Map(plugin.webProviders.list().map(s => [s.id, s]));
-    return { types: plugin.webProviders.types().map(type => ({ id: type.id, label: type.label, search: type.search, fetch: type.fetch, enabled: states.get(type.id)?.enabled ?? false })) };
-  };
   return {
     webProviders: [exaWebProvider, parallelWebProvider],
     resources: [implementResource(WebResource, WebView, {
@@ -51,7 +47,7 @@ export default defineModule(plugin => {
         configured: plugin.webProviders.list().some(state => state.enabled),
         stats: projectStats(sessions.get(object.ref.sessionId) ?? emptyWebStats()),
       }),
-      inspect: async () => catalog(),
+      inspect: async () => ({}),
       attach(_data, object, lifetime) { objects.set(object.ref.id, object.ref); lifetime.defer(() => { objects.delete(object.ref.id); }); },
     })],
     tools: [

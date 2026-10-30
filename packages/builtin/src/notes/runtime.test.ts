@@ -7,6 +7,7 @@ import * as runtimeModules from "../../../../src/plugins/loader.ts";
 import { foldWorkbench } from "../../../../src/session/fold.ts";
 import { flat } from "../../../../src/session/test-nodes.ts";
 import type { SessionDataStore } from "../../../../src/session/data.ts";
+import type { Json } from "@asterism-app/sdk/contracts";
 import { Note, NoteContent } from "./contract.ts";
 
 const roots: string[] = [], services: ApplicationService[] = [];
@@ -36,7 +37,7 @@ describe("current note body", () => {
     expect(note.title).toBe("Untitled note");
     expect(data.get(sessionId, note.id, NoteContent.id)).toEqual({ text: "" });
     expect(modules.resources.project(note).data).toEqual({ text: "" });
-    const call = async (name: string, args: Record<string, never> | { content: string }) => {
+    const call = async (name: string, args: Json) => {
       const invocation = modules.tools.match(note).find(tool => tool.tool.name === name)!.prepare(note, null, args, { ref: { sessionId, id: "caller", kind: "test/agent" }, title: "Caller" });
       if (!("execute" in invocation)) throw new Error("Expected a tool invocation.");
       return invocation.execute(new AbortController().signal);
@@ -47,8 +48,14 @@ describe("current note body", () => {
       expect(await modules.resources.inspect(note)).toMatchObject({ title: "Untitled note", available: false, length: null });
       expect(await call("read", {})).toMatchObject({ kind: "rejected", error: { code: "note_unavailable" } });
       expect(await call("write", { content: "replacement" })).toMatchObject({ kind: "rejected", error: { code: "note_unavailable" } });
+      expect(await call("replace", { find: "old", replace: "new" })).toMatchObject({ kind: "rejected", error: { code: "note_unavailable" } });
       expect(data.get(sessionId, note.id, NoteContent.id)).toEqual(value);
     }
+    data.set(sessionId, note.id, NoteContent.id, { text: "old old" });
+    expect(await call("replace", { find: "old", replace: "x".repeat(60_000) })).toMatchObject({ kind: "rejected", error: { code: "note_too_large" } });
+    expect(data.get(sessionId, note.id, NoteContent.id)).toEqual({ text: "old old" });
+    expect(await call("replace", { find: "old", replace: "new" })).toMatchObject({ kind: "succeeded", data: { matches: 2 } });
+    expect(data.get(sessionId, note.id, NoteContent.id)).toEqual({ text: "new new" });
   });
 
 });

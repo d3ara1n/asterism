@@ -5,7 +5,7 @@ import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@ast
 import type { Json, ToolResult } from "@asterism-app/sdk/contracts";
 import { useMemo } from "react";
 import { FileDiff, type FileDiffOptions } from "@pierre/diffs/react";
-import type { TextRead, TextChange } from "@asterism-app/builtin-api/contracts";
+import type { TextRead, TextChange, TextReplace } from "@asterism-app/builtin-api/contracts";
 import { inputField, inputText, characterCount, toolTextTail, editPreviewText } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
 import { displayText } from "./shared/text-row";
@@ -43,6 +43,27 @@ function TextEditHeader({ target, args, invocation, result }: ToolRenderProps<Te
     subject={[invocation.resource?.title, path].filter(Boolean).join(" / ")}
     meta={<>{data && <>+{data.added} −{data.removed}{Array.isArray(edits) && " · "}</>}
       {Array.isArray(edits) && i18n.formatMessage(textMessages.toolTextEdits, { count: edits.length })}</>} />;
+}
+
+function TextReplaceHeader({ target, args, invocation, result }: ToolRenderProps<TextReplace>) {
+  const i18n = useI18n();
+  const path = inputText(target, "path");
+  const data = result?.data;
+  const mode = i18n.formatMessage(inputField(args, "regex") === true ? textMessages.toolTextRegex : textMessages.toolTextLiteral);
+  const flags = inputText(args, "flags");
+  return <ToolHeader label={i18n.formatMessage(textMessages.toolTextReplace)} monospace={path !== undefined}
+    subject={[invocation.resource?.title, path].filter(Boolean).join(" / ")}
+    meta={<>{mode}{flags ? ` /${flags}` : ""}{data && <> · {i18n.formatMessage(textMessages.toolTextMatches, { count: data.matches })} · +{data.added} −{data.removed}</>}</>} />;
+}
+function TextReplaceBody(props: ToolRenderProps<TextReplace>) {
+  const i18n = useI18n();
+  if (props.result?.data) return <TextChangeBody result={props.result} />;
+  return <div className="space-y-2">
+    <p className="type-caption text-muted-foreground">{i18n.formatMessage(textMessages.toolTextFind)}</p>
+    <TextBodyPreview text={inputText(props.args, "find") ?? ""} />
+    <p className="type-caption text-muted-foreground">{i18n.formatMessage(textMessages.toolTextReplacement)}</p>
+    <TextBodyPreview text={inputText(props.args, "replace") ?? ""} />
+  </div>;
 }
 
 function InputTail({ text, filename }: { text: string; filename?: string }) {
@@ -114,6 +135,7 @@ const diffViewOptions = {
 const readView = { headerRenderer: TextReadHeader, bodyRenderer: TextReadBody };
 const writeView = { headerRenderer: TextWriteHeader, bodyRenderer: TextWriteBody };
 const editView = { headerRenderer: TextEditHeader, bodyRenderer: TextEditBody };
+const replaceView = { headerRenderer: TextReplaceHeader, bodyRenderer: TextReplaceBody };
 export const textReadViews = {
   input: { headerRenderer: TextReadHeader }, execution: readView, result: readView,
 } satisfies ToolRendererDefinition<TextRead>;
@@ -125,3 +147,7 @@ export const textEditViews = {
   input: { ...editView, streaming: ({ args }) => editPreviewText(args).trim().length > 0 },
   execution: editView, result: editView,
 } satisfies ToolRendererDefinition<TextChange>;
+export const textReplaceViews = {
+  input: { ...replaceView, streaming: ({ args }) => !!inputText(args, "find") || !!inputText(args, "replace") },
+  execution: replaceView, result: replaceView,
+} satisfies ToolRendererDefinition<TextReplace>;
