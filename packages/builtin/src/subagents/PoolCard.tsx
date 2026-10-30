@@ -17,6 +17,7 @@ import { ConversationTimeline } from "../agent/conversation/ConversationTimeline
 import { Disclosure } from "../agent/conversation/Disclosure";
 import { savedTimelineBlock, type TimelineItem } from "../agent/conversation/timeline";
 import { subagentMessages as messages } from "../messages/subagents";
+import { ActivityTail } from "./ActivityTail";
 import { PoolChannel, CancelSubagent, SteerSubagent, type TaskSnapshot, type TaskSummary, type ProcessFrame } from "./contract";
 
 function stateOf(status: TaskSnapshot["status"]) { return status.phase === "finished" ? status.outcome : status.phase; }
@@ -132,8 +133,11 @@ function TaskDetail({ id, back }: { id: string; back(): void }) {
       </form>}
       {error && <p role="alert" className="type-caption text-destructive">{error}</p>}
       {delivered && <p role="status" className="type-caption">{i18n.text(messages.delivered)}</p>}
-      {frame && (frame.blocks.length > 0 || frame.live.length > 0) && <section className="flex flex-col gap-3">
-        <h3 className="type-label">{i18n.text(messages.process)}</h3><Process frame={frame} />
+      {frame && (frame.blocks.length > 0 || frame.live.length > 0 || task.output.activity.length > 0) && <section className="flex flex-col gap-3">
+        <h3 className="type-label">{i18n.text(messages.process)}</h3>
+        {frame.blocks.length > 0 || frame.live.length > 0
+          ? <Process frame={frame} />
+          : <ActivityTail entries={task.output.activity} total={task.output.activity.length} />}
       </section>}
     </>}
   </div>;

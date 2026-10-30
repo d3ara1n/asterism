@@ -1,5 +1,14 @@
 import type { Json, ModelLiveBlock } from "@asterism-app/sdk/contracts";
-import type { ActivityEntry, ProcessBlock } from "./contract.ts";
+import type { ActivityEntry, ProcessBlock, TaskSnapshot } from "./contract.ts";
+
+/** A check describes the current activity, using a tool subject only when it matches that activity. */
+export function currentActivity(task: Pick<TaskSnapshot, "status" | "output">): { activity: string; subject: string | null } | null {
+  if (task.status.phase !== "running") return null;
+  const { activity } = task.status;
+  const tool = activity.startsWith("tool:") ? activity.slice(5) : null;
+  const entry = tool ? task.output.activity.findLast(entry => entry.kind === "tool" && entry.name === tool) : null;
+  return { activity, subject: entry?.kind === "tool" ? entry.subject : null };
+}
 
 /** Steering delivered when this many finalized blocks existed; it precedes the next request's output. */
 export interface DeliveredSteer { at: number; text: string }
@@ -68,11 +77,4 @@ export function activityOf(blocks: readonly ProcessBlock[], live: readonly Model
   }
   deliver(Infinity);
   return entries;
-}
-
-/** One readable line per step; model projections and the GUI share it. */
-export function activityLine(entry: ActivityEntry): string {
-  if (entry.kind === "thinking") return entry.state === "running" ? "thinking (running)" : "thinking";
-  if (entry.kind === "steer") return `steering: ${oneLine(entry.text)}`;
-  return `${entry.name}${entry.subject ? ` ${entry.subject}` : ""} (${entry.state})`;
 }

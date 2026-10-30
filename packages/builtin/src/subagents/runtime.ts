@@ -12,12 +12,12 @@ import { subagentPoolCard } from "../shared/card-appearance.ts";
 import { subagentMessages } from "../messages/subagents.ts";
 import {
   SubagentPool, CreateSubagentPool, PoolView, Delegation, Delegate, Wait, Check, Steer, Cancel,
-  CancelSubagent, SteerSubagent, PoolChannel, subagentParallelism, recentActivity, type TaskOutput,
+  CancelSubagent, SteerSubagent, PoolChannel, subagentParallelism, type TaskOutput,
 } from "./contract.ts";
 import { SubagentPoolRuntime } from "./service.ts";
 import { executeSubagent } from "./execution.ts";
 import { AuditLog } from "./audit.ts";
-import { activityLine } from "./activity.ts";
+import { currentActivity } from "./activity.ts";
 
 /** Measurements the delegating model can act on; detailed token fields remain in the saved record. */
 function modelUsage(usage: TaskOutput["usage"]) {
@@ -98,19 +98,19 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
         implementTool(Check, { call(_data, target, _args, { object, signal }) {
           return operation(signal, () => pool(object.ref).check(target));
         }, toModel: task => {
-          const { activity } = task.output, finished = task.status.phase === "finished";
-          // A live snapshot names only its current step; the full progression changes on every read and is shown in the view.
+          const current = currentActivity(task);
           return JSON.stringify({
-            id: task.input.id, role: task.input.role, status: task.status, usage: modelUsage(task.output.usage), steps: activity.length,
-            ...(finished ? { result: task.output.result, recentActivity: activity.slice(-recentActivity).map(activityLine) }
-              : task.status.phase === "running" && activity.length ? { current: activityLine(activity.at(-1)!) } : {}),
+            id: task.input.id, role: task.input.role, status: task.status, usage: modelUsage(task.output.usage),
+            ...(current ? { current } : {}),
+            ...(task.status.phase === "finished" ? { result: task.output.result } : {}),
             ...(task.output.undelivered.length ? { undelivered: task.output.undelivered } : {}),
           });
         } }),
         implementTool(Wait, { call(_data, targets, _args, { object, signal, publish }) {
           return operation(signal, async () => ({ tasks: await pool(object.ref).wait(targets, signal, tasks => publish({ tasks })) }));
         }, toModel: ({ tasks }) => JSON.stringify({ tasks: tasks.map(task => ({
-          id: task.id, role: task.role, status: task.status, usage: modelUsage(task.usage), steps: task.steps,
+          id: task.id, role: task.role,
+          status: task.status.phase === "running" ? { phase: task.status.phase } : task.status,
         })) }) }),
         implementTool(Steer, { call(_data, target, args, { object, signal }) {
           return operation(signal, () => { pool(object.ref).steer(target, args.message); return { id: target, accepted: true as const }; });

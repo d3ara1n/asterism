@@ -93,7 +93,7 @@ export const Check = define("check",
   ],
   taskIdSchema, empty, snapshotSchema, "read");
 export const Wait = define("wait",
-  "Block until all selected tasks end, then return each task's outcome and usage. A failed task does not fail the wait. Cancelling the wait leaves the tasks running.",
+  "Block until all selected tasks end, then return each task's status and outcome. A failed task does not fail the wait. Cancelling the wait leaves the tasks running.",
   [
     "Reports are returned by subagent_check after the wait.",
   ],

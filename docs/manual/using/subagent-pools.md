@@ -20,7 +20,11 @@ Tasks can finish successfully, partially after exhausting a budget, with an erro
 
 ## Observe and guide
 
-Open a task from the pool card to see its input, report, and live process. Additional instructions enter its message queue while it is queued or running. They are delivered at request boundaries. A finished task cannot restart; a new delegation is a new task.
+Task checks provide the same information to the model and the user: a current activity summary and usage while running, or the report, outcome, usage, and undelivered instructions after completion. A check is a snapshot taken at the time of the call.
+
+Waiting returns task states to the model. The wait view shows activity while tasks run, then replaces it with each task's completion status. Reports are retrieved with a check.
+
+Open a task from the pool card to see its input, report, and live process. After the live process is released, the task details show its saved activity log. Additional instructions enter its message queue while it is queued or running. They are delivered at request boundaries. A finished task cannot restart; a new delegation is a new task.
 
 Any Agent with access to the pool can observe, guide, or cancel its shared tasks. The pool card also provides steering and cancellation. Closing a task view does not stop its execution.
 

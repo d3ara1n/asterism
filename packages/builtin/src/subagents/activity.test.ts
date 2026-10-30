@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Json, ModelLiveBlock } from "@asterism-app/sdk/contracts";
-import { activityOf } from "./activity.ts";
-import type { ProcessBlock } from "./contract.ts";
+import { activityOf, currentActivity } from "./activity.ts";
+import { emptyOutput, ended, type ProcessBlock } from "./contract.ts";
 
 const source = { model: "test/model", adapter: "test", scope: "test" };
 function tool(responseId: string, ordinal: number, name: string, args: Json,
@@ -17,6 +17,20 @@ function thinking(responseId: string, ordinal: number): ProcessBlock {
 }
 
 describe("Subagent activity log", () => {
+  it("summarizes the current tool rather than a later steering entry or an earlier invocation", () => {
+    const output = emptyOutput();
+    output.activity = [
+      { kind: "tool", name: "read", implementation: null, subject: "old.ts", state: "succeeded" },
+      { kind: "tool", name: "read", implementation: null, subject: "current.ts", state: "running" },
+      { kind: "steer", text: "Check the imports too." },
+    ];
+    expect(currentActivity({ status: { phase: "running", activity: "tool:read" }, output }))
+      .toEqual({ activity: "tool:read", subject: "current.ts" });
+    expect(currentActivity({ status: { phase: "running", activity: "text" }, output }))
+      .toEqual({ activity: "text", subject: null });
+    expect(currentActivity({ status: ended("succeeded"), output })).toBeNull();
+  });
+
   // Parallel tool calls finalize in completion order; the log must follow the response's own order.
   it("orders steps by response then ordinal and places steering before the response that received it", () => {
     const blocks = [thinking("r1", 0), tool("r1", 2, "grep", { pattern: "auth" }), tool("r1", 1, "read", { path: "src/a.ts" }, "failed"),
