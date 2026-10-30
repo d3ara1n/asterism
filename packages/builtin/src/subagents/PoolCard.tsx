@@ -1,4 +1,5 @@
-import { memo, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { VList } from "virtua";
 import { ArrowLeft, Send, Square, Wrench } from "lucide-react";
 import { useI18n, useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
@@ -138,21 +139,52 @@ function TaskDetail({ id, back }: { id: string; back(): void }) {
   </div>;
 }
 
+const pageVariants = {
+  enter: (direction: number) => ({ opacity: 0, x: direction * 8 }),
+  center: { opacity: 1, x: 0, transition: { duration: 0.18, ease: [0, 0, 0.2, 1] } },
+  exit: (direction: number) => ({
+    opacity: 0, x: direction * -8, transition: { duration: 0.1, ease: [0.4, 0, 1, 1] },
+  } as const),
+} as const;
+
+function PoolPage({ children, direction, ref }: { children: ReactNode; direction: number; ref?: Ref<HTMLDivElement> }) {
+  const present = useIsPresent();
+  const reducedMotion = useReducedMotion();
+  return <motion.div ref={ref} inert={!present} custom={direction}
+    variants={pageVariants} initial={reducedMotion ? false : "enter"}
+    animate={reducedMotion ? { opacity: 1, x: 0, transition: { duration: 0 } } : "center"}
+    exit={reducedMotion ? { opacity: 0, x: 0, transition: { duration: 0 } } : "exit"}
+    className="flex min-h-0 min-w-0 flex-1 flex-col">
+    {children}
+  </motion.div>;
+}
+
 export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
   const object = useRendererObject(), i18n = useI18n();
   const retained = object.retained.get("asterism.builtin/subagent-selection", () => ({ id: null as string | null }));
   const [selected, setSelected] = useState(retained.id);
-  const select = (id: string | null) => { retained.id = id; setSelected(id); };
-  if (selected) return <TaskDetail key={selected} id={selected} back={() => select(null)} />;
+  const direction = useRef<1 | -1>(1);
+  const select = (id: string | null) => {
+    direction.current = id === null ? -1 : 1;
+    retained.id = id; setSelected(id);
+  };
   const running = data.tasks.filter(task => task.status.phase === "running").length;
   const queued = data.tasks.filter(task => task.status.phase === "queued").length;
-  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
-    <p className="type-caption px-3 py-2" role="status" aria-atomic="true">{i18n.formatMessage(messages.active, { running, queued })}</p>
-    {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VList className="content-scrollbar" data={data.tasks.toReversed()}>{task =>
-        <ListRow key={task.id} title={`${task.id} · ${task.role}`} onOpen={() => select(task.id)}
-          description={<span className="block truncate" title={task.task}>{task.task}</span>}
-          details={task.status.phase === "running" ? <Activity status={task.status} /> : undefined}
-          actions={<TaskStatus status={task.status} />} />}</VList></ItemGroup>
-      : <p className="type-caption p-3">{i18n.text(messages.empty)}</p>}
+  return <div className="nodrag nopan relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <AnimatePresence initial={false} mode="popLayout" custom={direction.current}>
+      <PoolPage key={selected ? `task:${selected}` : "list"} direction={direction.current}>
+        {selected ? <TaskDetail id={selected} back={() => select(null)} /> : <>
+          <p className="type-caption px-3 py-2" role="status" aria-atomic="true">{i18n.formatMessage(messages.active, { running, queued })}</p>
+          {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VList className="content-scrollbar" data={data.tasks.toReversed()}>{task =>
+              <ListRow key={task.id} title={`${task.id} · ${task.role}`} onOpen={() => select(task.id)}
+                className="gap-2 px-3 py-1.5 [&_[data-slot=item-title]]:text-xs [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-snug"
+                contentClassName="gap-0.5"
+                description={<span className="block truncate" title={task.task}>{task.task}</span>}
+                details={task.status.phase === "running" ? <Activity status={task.status} /> : undefined}
+                actions={<TaskStatus status={task.status} />} />}</VList></ItemGroup>
+            : <p className="type-caption p-3">{i18n.text(messages.empty)}</p>}
+        </>}
+      </PoolPage>
+    </AnimatePresence>
   </div>;
 }
