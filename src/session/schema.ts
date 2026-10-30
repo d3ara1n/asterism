@@ -1,3 +1,7 @@
+/** Index only unresolved operation records; fixed snapshots capture those bodies without copying completed history. */
+export const pendingRecordsIndexSql = `CREATE INDEX session_nodes_pending ON session_nodes(session_id)
+  WHERE json_extract(payload, '$.pending') = 1;`;
+
 /** Runtime database creation and independent contract tests share the session storage structure. */
 export const sessionSchemaSql = `
   -- archived_at is null for active sessions; otherwise it is the archive time, with startup cleanup deleting sessions past the retention period.
@@ -8,6 +12,7 @@ export const sessionSchemaSql = `
     parent_id TEXT, payload TEXT NOT NULL,
     contract TEXT GENERATED ALWAYS AS (json_extract(payload, '$.contract')) VIRTUAL);
   CREATE INDEX session_nodes_session ON session_nodes(session_id, seq);
+  ${pendingRecordsIndexSql}
   CREATE TABLE cursor_selections (
     seq INTEGER PRIMARY KEY AUTOINCREMENT,
     session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,

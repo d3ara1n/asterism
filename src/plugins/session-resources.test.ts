@@ -252,7 +252,7 @@ describe("SDK session resource lifetimes", () => {
     expect(ownerBusy).toBe(false);
   });
 
-  it("keeps one removed instance for overlapping requests, excludes it from later capture, and does not restore it on restart", async () => {
+  it.each(["remove", "rewind"] as const)("%s retains one instance for overlapping requests, excludes it from later capture, and does not restore it on restart", async mode => {
     const scope = pluginNamespace("test.held");
     const Resource = scope.resource("resource", z.object({}));
     const CreateResource = defineCreation(Resource, { id: scope.name("create"), schema: z.object({}) });
@@ -290,6 +290,7 @@ describe("SDK session resource lifetimes", () => {
     } } });
     const target = await model(f.app);
     const actor = await f.session.create(Create, 0);
+    const beforeResource = f.session.snapshot().position.nodeId;
     const resource = await f.session.create(CreateResource, {});
     resourceId = resource.id;
     f.session.link(actor, resource);
@@ -297,7 +298,10 @@ describe("SDK session resource lifetimes", () => {
     const first = run(), second = run();
     try {
       await Promise.all(entered.map(gate => gate.promise));
-      f.session.remove(resource);
+      expect(f.app.sessions.current(f.sessionId).progress.timelineBusy).toBe(false);
+      expect(f.app.sessions.current(f.sessionId).progress.busyObjectIds).toEqual([]);
+      if (mode === "remove") f.session.remove(resource);
+      else await f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: beforeResource });
       expect(f.app.sessions.tree.workbench(f.sessionId).objects.some(item => item.id === resource.id)).toBe(false);
       expect(f.app.sessions.current(f.sessionId).workbench.objects.find(item => item.id === resource.id)?.retiring).toBe(true);
       expect(f.app.sessions.current(f.sessionId).workbench.pendingLinks).toEqual([{ receiverId: actor.id, resourceId: resource.id, holds: 2 }]);
@@ -322,6 +326,54 @@ describe("SDK session resource lifetimes", () => {
     expect(reopened.sessions.tree.workbench(f.sessionId).objects.some(item => item.id === resource.id)).toBe(false);
     expect(reopened.sessions.current(f.sessionId).workbench.objects.some(item => item.id === resource.id)).toBe(false);
     expect(attachments).toBe(1);
+  });
+
+  // Removing an access owner must cancel its external task before waiting for its outgoing holds.
+  it.each([false, true])("cancels nonbusy owned work on rewind and waits for cleanup with linked resources=%s", async linked => {
+    const entered = latch(), cancelled = latch(), finishCleanup = latch(), finished = latch();
+    let requestSignal!: AbortSignal;
+    const f = open({ adapter: { version: "external", validate() {}, prepare() {
+      return { async *stream(signal): AsyncIterable<ModelEvent> {
+        requestSignal = signal; entered.release();
+        await new Promise<void>(resolve => {
+          if (signal.aborted) resolve();
+          else signal.addEventListener("abort", () => resolve(), { once: true });
+        });
+        cancelled.release();
+        await finishCleanup.promise;
+        signal.throwIfAborted();
+      } };
+    } } });
+    const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
+    if (linked) f.session.link(actor, resource);
+    const beforeRewind = f.session.snapshot().position.nodeId;
+    let reason: string | undefined;
+    f.plugin.tasks.start("external", async signal => {
+      try {
+        const result = await f.plugin.execution.run({ access: actor, interactive: false, target, requestParentId: null,
+          system: { blocks: [] }, messages: [], signal, observer: { event() {} } });
+        reason = result.reason;
+      } finally { finished.release(); }
+    }, { object: actor, affectsHistory: false });
+    try {
+      await entered.promise;
+      expect(f.app.sessions.current(f.sessionId).progress.busyObjectIds).toEqual([]);
+      expect(f.app.sessions.current(f.sessionId).progress.timelineBusy).toBe(false);
+      await f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: null });
+      await cancelled.promise;
+      expect(requestSignal.aborted).toBe(true);
+      expect(f.plugin.tasks.has("external")).toBe(true);
+      expect(f.app.sessions.current(f.sessionId).workbench.pendingLinks ?? []).toEqual(linked ? [
+        { receiverId: actor.id, resourceId: resource.id, holds: 1 },
+      ] : []);
+      expect(f.app.sessions.current(f.sessionId).workbench.objects.find(item => item.id === actor.id)?.retiring).toBe(true);
+      await expect(f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: beforeRewind }))
+        .rejects.toMatchObject({ code: "conflict" });
+    } finally {
+      finishCleanup.release();
+      await finished.promise;
+    }
+    expect(reason).toBe("cancelled");
   });
   // Resource titles belong to historical paths; frontend commands, SDK reads, and forks must observe the same event result while old snapshots remain fixed.
   it("renames append history and restore titles by path while preserving identity, links, and current data", async () => {

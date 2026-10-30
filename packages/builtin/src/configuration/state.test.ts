@@ -7,25 +7,21 @@ const initial = () => structuredClone(defaultParadigmConfiguration);
 describe("Builtin configuration ownership", () => {
   it("keeps explicit false and empty lists while clearing blank overrides to the original baseline", () => {
     const saved = updateParadigmConfiguration(initial(), { type: "agent.save", id: "worker", value: {
-      id: "worker", systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [],
+      id: "worker", systemPrompt: "Custom instructions", enabled: false, examples: [],
     } });
     expect(resolveParadigmConfiguration(saved).agents.find(agent => agent.id === "worker"))
-      .toMatchObject({ systemPrompt: "Custom instructions", enabled: false, tools: [], subagentRoles: [] });
+      .toMatchObject({ systemPrompt: "Custom instructions", enabled: false, examples: [] });
     const cleared = updateParadigmConfiguration(saved, { type: "agent.save", id: "worker", value: { id: "worker", systemPrompt: " \n " } });
     expect(resolveParadigmConfiguration(cleared).overrides.agents.worker).toEqual({});
     expect(resolveParadigmConfiguration(cleared).agents.find(agent => agent.id === "worker")!.systemPrompt).toBe(configurationDefaults.agents.worker!.systemPrompt);
     expect(saved.agents.find(agent => agent.id === "worker")!.overrides.systemPrompt).toBe("Custom instructions");
   });
-  it("uses original defaults for custom entries and treats tool policy as one replacement group", () => {
+  it("uses original defaults for custom entries independently of edited or removed built-ins", () => {
     let value = updateParadigmConfiguration(initial(), { type: "agent.save", id: "worker", value: { id: "worker", systemPrompt: "Changed", enabled: false } });
     value = updateParadigmConfiguration(value, { type: "remove", kind: "agent", id: "worker" });
-    value = updateParadigmConfiguration(value, { type: "agent.save", id: null, value: { id: "custom", tools: [] } });
+    value = updateParadigmConfiguration(value, { type: "agent.save", id: null, value: { id: "custom", examples: [] } });
     expect(resolveParadigmConfiguration(value).agents.find(agent => agent.id === "custom"))
-      .toMatchObject({ systemPrompt: configurationDefaults.agents.worker!.systemPrompt, enabled: true, tools: [] });
-    value = updateParadigmConfiguration(value, { type: "agent.save", id: "explorer", value: { id: "explorer", excludeTools: ["bash"] } });
-    expect(resolveParadigmConfiguration(value).agents.find(agent => agent.id === "explorer")).toMatchObject({ tools: null, excludeTools: ["bash"] });
-    value = updateParadigmConfiguration(value, { type: "agent.save", id: "explorer", value: { id: "explorer", tools: [] } });
-    expect(resolveParadigmConfiguration(value).agents.find(agent => agent.id === "explorer")).toMatchObject({ tools: [], excludeTools: null });
+      .toMatchObject({ systemPrompt: configurationDefaults.agents.worker!.systemPrompt, enabled: true, examples: [] });
   });
   it("rejects duplicate identities and preserves overrides through a custom rename", () => {
     const created = updateParadigmConfiguration(initial(), { type: "role.save", id: null, value: { id: "review", description: "Review code" } });

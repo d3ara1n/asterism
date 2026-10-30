@@ -35,7 +35,7 @@ function namingObserver() {
   const append = vi.fn(() => "appended");
   const snapshot = vi.fn<() => SessionSnapshot>();
   const session = { id: "s", snapshot, title: { set: append },
-    commit(work: (writer: SessionWriter) => undefined) { work({ append, set: vi.fn() }); },
+    commit(work: (writer: SessionWriter) => undefined) { work({ append, begin: vi.fn(() => "pending"), complete: vi.fn(), set: vi.fn() }); },
   } as unknown as SessionExecutor;
   const start = vi.fn<PluginContext["tasks"]["start"]>(() => true);
   const paradigm = structuredClone(defaultParadigmConfiguration);

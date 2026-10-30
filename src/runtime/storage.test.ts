@@ -7,7 +7,7 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import { SessionTree } from "../session/tree.ts";
 import { created, event, removed } from "../session/test-nodes.ts";
 import { sessionRetentionMs } from "../shared/application.ts";
-import { collectExpiredSessions, openDatabase } from "./storage.ts";
+import { collectExpiredSessions, openDatabase, workspaceStorage } from "./storage.ts";
 import { SessionWorkbench } from "./workbench.ts";
 
 const roots: string[] = [], databases: DatabaseSync[] = [];
@@ -18,10 +18,28 @@ afterEach(() => {
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "asterism-storage-")); roots.push(root);
   const db = openDatabase(root); databases.push(db);
-  return { db, tree: new SessionTree(db) };
+  return { root, db, tree: new SessionTree(db) };
 }
 const count = (db: DatabaseSync, table: string, sessionId: string) =>
   Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE session_id = ?`).get(sessionId) as { n: number }).n);
+
+// The pending-record index upgrade preserves existing finalized payloads and allows publication in the same database.
+it("upgrades the preceding workspace format without rewriting existing history", () => {
+  const { root, db, tree } = setup(), sessionId = tree.create("Existing");
+  const original = tree.appendToTimeline(sessionId, event("example/final", { text: "Saved response" }));
+  db.exec("DROP INDEX session_nodes_pending; PRAGMA user_version = 29;");
+  db.close(); databases.splice(databases.indexOf(db), 1);
+  workspaceStorage(root).inspect()!.apply();
+  const reopened = openDatabase(root); databases.push(reopened);
+  const next = new SessionTree(reopened);
+  expect(next.nodes(sessionId)).toEqual([original]);
+  const pending = next.appendToTimeline(sessionId, { ...event("example/operation", { input: "task", output: null }), pending: true });
+  const captured = next.view(sessionId);
+  next.complete(sessionId, pending.id, () => ({ input: "task", output: "report" }));
+  expect(captured.read({ scope: "timeline", edge: "last" })[0]!.node.pending).toBe(true);
+  expect(next.nodes(sessionId)[0]).toEqual(original);
+  expect(next.node(sessionId, pending.id)).toMatchObject({ pending: false, data: { output: "report" } });
+});
 
 // Retention contract: delete only sessions archived before the retention period; associated data disappears with the session.
 describe("Startup cleanup of expired archived sessions", () => {

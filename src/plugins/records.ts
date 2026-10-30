@@ -8,7 +8,8 @@ import { deepFreeze } from "../shared/immutable.ts";
 export function toRecord(node: SessionNode, sequence: number): SessionRecord {
   const { id, sessionId, parentId, createdAt, source, contract, data, model, recipient } = node;
   return deepFreeze({ id, sessionId, parentId, sequence, createdAt, contract: { id: contract },
-    source: structuredClone(source), data: structuredClone(data), context: model === null ? null : { text: model, recipient } });
+    source: structuredClone(source), data: structuredClone(data), context: model === null ? null : { text: model, recipient },
+    ...(node.pending === undefined ? {} : { pending: node.pending }) });
 }
 export function resourceSnapshot(ref: ResourceRef, resource: FoldedObject): ResourceSnapshot {
   return deepFreeze({ ref: { ...ref }, title: resource.title, data: structuredClone(resource.data) });
@@ -43,7 +44,7 @@ export function sessionSnapshot(source: NodeView): SessionSnapshot {
 }
 /**
  * Snapshots hold only fixed-position read handles; each query maps and decodes only selected records.
- * Positions and nodes are immutable and records deeply frozen; identical `all` queries within a snapshot reuse results without copying full history for each projection.
+ * Positions and captured bodies are fixed and records deeply frozen; identical `all` queries within a snapshot reuse results without copying full history.
  */
 export function sessionView(source: NodeView): SessionView {
   const cache = new Map<RecordQuery["scope"], readonly SessionRecord[]>();

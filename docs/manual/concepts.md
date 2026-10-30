@@ -6,7 +6,7 @@ Asterism is a local workbench for working with agents. A session keeps the work 
 
 A **session** contains the inputs, objects, relationships, and history for a piece of work. Several agents can share a session. Each agent has its own conversation, derived from that session’s current history.
 
-An **agent configuration** describes reusable behavior, including instructions, model selection, and tool policy. An **agent** is a running workbench object created from a configuration. Changing which configuration an agent uses does not create a new session.
+An **agent configuration** describes reusable behavior, including instructions, model selection, and execution budgets. An **agent** is a running workbench object created from a configuration. Changing which configuration an agent uses does not create a new session.
 
 ## Resources, links, and tools
 
@@ -14,7 +14,7 @@ A **resource** is an object with an identity and a type. A directory, note, term
 
 A **link** makes a resource available to a receiver, such as an agent. The arrow points from the resource to the receiver. Access in the opposite direction requires its own link.
 
-A **tool** performs an operation. Available resource tools depend on the resource type, its link to the agent, and the agent’s tool policy. Tool visibility and card visibility do not establish access.
+A **tool** performs an operation. Available resource tools depend on the resource type, its link to the agent, and the execution environment. Tool visibility and card visibility do not establish access.
 
 Links control the objects supplied to a model and checked by resource operations. Shells, terminals, plugins, and MCP servers run with the current operating system user’s capabilities. Links are not an operating system sandbox.
 

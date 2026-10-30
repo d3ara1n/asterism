@@ -1,7 +1,8 @@
-import type { SessionRecord, SessionSnapshot, ModelBlock, ModelItem, ModelPart } from "@asterism-app/sdk/contracts";
+import type { SessionRecord, SessionSnapshot, ModelBlock, ModelItem } from "@asterism-app/sdk/contracts";
 import type { z } from "zod";
 import { ContextSummary, Execution, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { projectInputMessage } from "./input-message.ts";
+import { responseMessages } from "./response-messages.ts";
 
 /** Projection depends only on pure contracts; background requests and the frontend context panel share the same rules, and the background entry point converts failures to plugin errors. */
 export class ContextProjectionError extends Error {}
@@ -50,14 +51,7 @@ export function projectAgentContext(snapshot: Pick<SessionSnapshot, "records">, 
   const groups: ContextGroup[] = [];
   const emit = (origin: string | null) => {
     for (const blocks of after.get(origin) ?? []) {
-      const first = blocks[0]!.block;
-      // Rewinding, disconnection, or cancellation may stop after thinking; trailing thinking is not used as the ending of model output.
-      const parts = blocks.map(({ block }) => part(block));
-      while (parts.at(-1)?.kind === "thinking") parts.pop();
-      const items: ModelItem[] = [];
-      if (parts.length) items.push({ kind: "output", scope: first.source.scope, adapter: first.source.adapter, parts });
-      for (const { block } of blocks) if (block.kind === "toolcall" && block.outcome)
-        items.push({ kind: "result", callId: block.callId, name: block.name, outcome: block.outcome });
+      const items = responseMessages(blocks.map(({ block }) => block));
       const indices = blocks.map(({ record }) => positions.get(record.id)!);
       if (items.length) groups.push({ items, first: Math.min(...indices), last: Math.max(...indices) });
     }
@@ -83,10 +77,4 @@ export function projectAgentContext(snapshot: Pick<SessionSnapshot, "records">, 
       throw new ContextProjectionError("The context summary boundary splits a response or reorders context.");
   }
   return { path, summary, groups: groups.filter(group => group.first >= boundary) };
-}
-function part(block: ModelBlock): ModelPart {
-  return block.kind === "toolcall"
-    ? { kind: "toolcall", callId: block.callId, name: block.name, arguments: block.arguments, continuation: block.continuation }
-    : block.kind === "thinking" ? { kind: "thinking", text: block.text, summary: block.summary, continuation: block.continuation }
-      : { kind: "text", text: block.text, continuation: block.continuation };
 }

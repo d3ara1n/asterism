@@ -1,7 +1,7 @@
 import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount, CounterUpdates, counterCard } from "../examples/counter-contract.ts";
 /** SDK author examples and type counterexamples: compile only, without executing plugins, databases, or real model requests. */
 import { z } from "zod";
-import { pluginNamespace, defineAction, resourceCall, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@asterism-app/sdk/contracts";
+import { pluginNamespace, defineAction, resourceCall, defineRecord, defineOperationRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@asterism-app/sdk/contracts";
 import {
   defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, implementChannel,
   type PluginContext, type ObjectReader, type ObjectExecutor, type SessionObserver, type SessionSnapshot, type ResourceRef,
@@ -11,6 +11,7 @@ import { FromText } from "../examples/author.ts";
 
 /** Counterexample basis: typed events, synchronous commits/observation, explicit model input, and resource input. */
 export function rejectInvalidUsage(plugin: PluginContext, object: ObjectExecutor, reader: ObjectReader) {
+  const operation = defineOperationRecord("example/task", { input: z.object({ task: z.string() }), output: z.object({ report: z.string() }) });
   // @ts-expect-error The read facade cannot commit.
   reader.commit(() => {});
   // @ts-expect-error A read-only title cannot be written.
@@ -36,6 +37,14 @@ export function rejectInvalidUsage(plugin: PluginContext, object: ObjectExecutor
     writer.set(Count, { value: "wrong" });
     // @ts-expect-error Event data must match the held contract.
     writer.append(CountChanged, { value: "wrong" });
+    const id = writer.begin(operation, { task: "Inspect" });
+    writer.complete(operation, id, { report: "Finished" });
+    // @ts-expect-error The operation input contract is independent of its output.
+    writer.begin(operation, { report: "Finished" });
+    // @ts-expect-error Completion accepts only the declared result, not replacement input.
+    writer.complete(operation, id, { task: "Replace input" });
+    // @ts-expect-error Ordinary records have no pending completion contract.
+    writer.begin(CountChanged, { value: 1 });
   });
   // @ts-expect-error Each call must explicitly provide the target, prompt, projected input, and event consumer.
   plugin.models.run({ signal: new AbortController().signal });

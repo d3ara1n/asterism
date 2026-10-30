@@ -20,7 +20,7 @@ describe("Agent request and turn boundaries", () => {
       async completed() { completion++; },
       limitReached() { limits++; },
     }), new AbortController().signal);
-    expect(status).toBe("awaiting");
+    expect(status).toBe("limited");
     expect(indices).toEqual([0, 1]);
     expect(limits).toBe(1);
     expect(completion).toBe(0);
@@ -45,7 +45,7 @@ describe("Agent request and turn boundaries", () => {
   });
 
   it.each([
-    { reason: "cancelled" as const, halt: false, expected: "awaiting" },
+    { reason: "cancelled" as const, halt: false, expected: "cancelled" },
     { reason: "failed" as const, halt: true, expected: "failed" },
   ])("$reason with halt=$halt preserves pending input", async ({ reason, halt, expected }) => {
     let consumed = false;

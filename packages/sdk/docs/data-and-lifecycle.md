@@ -40,6 +40,12 @@ Use the host's bound read and execution capabilities. Complete network and file 
 
 A historical snapshot fixes what is observed. A later write acts in the current execution context. Holding a snapshot does not redirect later writes into the past.
 
+For an operation that other consumers must discover before it finishes, declare an operation record with input and output schemas. Begin it in a synchronous commit to publish the input and obtain its record ID. Complete that ID in a later commit with the output. This fills the result at its original position without moving the cursor. The result can be filled once; input and record identity remain fixed.
+
+The record's pending flag distinguishes an unresolved operation from a completed operation whose output is null. Existing snapshots keep their original pending observation; read a new snapshot for current results. Every timeline path containing the operation can read its result, even if another path was selected when it completed.
+
+An object writer can complete that object's pending records. A session writer can finish records owned by its plugin after the emitting object leaves the current path. Completion emits a separate observer notification, not a new-record notification. Resource implementations retain responsibility for ending abandoned work rather than waiting for a runtime that no longer exists.
+
 Transient events announce change. A consumer needing current state establishes its subscription and reads the current value; later notifications prompt another read.
 
 Typed calls describe request and response values with ordinary Zod schemas. The caller supplies the input schema's input; the implementation receives its parsed output, including defaults. The implementation returns JSON accepted by the output schema, and the caller receives that schema's parsed output. These types are inferred from the shared declaration, so a conversion such as string to number does not require separate type annotations.
@@ -51,6 +57,8 @@ Stage immutable bytes through the content service, then store their reference in
 A reference identifies content. Copying its identifier does not by itself grant access or retain the bytes. Pass it through the supported operation scope so ownership remains explicit.
 
 Retention follows references in the JSON actually saved. Preserve content references in that encoding when their bytes must remain available; synthesizing a reference during decoding does not retain content or grant access.
+
+When completing an operation with attachments from an independent temporary scope, supply that scope's content reader. The host validates access and retains those result references in the same transaction as completion. Input references remain retained. Close the temporary scope after completion has committed.
 
 ## End asynchronous work
 

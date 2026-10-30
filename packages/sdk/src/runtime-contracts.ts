@@ -84,6 +84,8 @@ export interface SessionCursorChanged {
 export interface SessionObserver {
   readonly id: string;
   committed?(event: SessionCommitted): undefined;
+  /** Existing operation records received their final outputs; their positions and the cursor are unchanged. */
+  completed?(event: SessionCommitted): undefined;
   cursorChanged?(event: SessionCursorChanged): undefined;
 }
 export type Preparation<C extends Json = Json> =
@@ -132,7 +134,8 @@ export interface ResourceContribution {
   disposalWarning?(resource: ResourceSnapshot, object: ObjectReader): UiText | null;
   /**
    * Called synchronously when an object enters the current set through startup, creation, restoration, or rewinding.
-   * Removal ends discovery immediately; lifetime cleanup follows captured request holds. Archival and exit cancel owned work before cleanup.
+   * Removal ends discovery and cancels owned tasks/model requests immediately; attachment lifetime cleanup follows captured request holds.
+   * Archival and exit cancel session work before cleanup.
    * Register cleanup here for external instances owned exclusively by the object.
    */
   attach?(resource: ResourceSnapshot, object: ObjectReader, lifetime: Lifetime): void;

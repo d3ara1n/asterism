@@ -52,9 +52,9 @@ export class RunLifecycle {
   async settle(group?: RunGroup): Promise<void> {
     await Promise.allSettled([...this.entries].filter(entry => !group || entry.group === group).map(entry => entry.done));
   }
-  /** Cancel runs bound to matching objects and wait for finalization; shared by object scope end and session archival. */
-  async cancel(match: (object: ResourceRef) => boolean): Promise<void> {
-    const bound = [...this.entries].filter(entry => entry.object && match(entry.object));
+  /** Cancel matching work and wait for finalization; detachment stops owned producers before borrowed operations. */
+  async cancel(match: (object: ResourceRef) => boolean, kinds?: readonly Kind[]): Promise<void> {
+    const bound = [...this.entries].filter(entry => entry.object && match(entry.object) && (!kinds || kinds.includes(entry.group.kind)));
     for (const entry of bound) entry.cancel();
     await Promise.allSettled(bound.map(entry => entry.done));
   }

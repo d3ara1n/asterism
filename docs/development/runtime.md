@@ -30,11 +30,13 @@ The request limit counts work requests, not user turns. Its default and budget c
 
 ## Request environment
 
-At each request boundary, capture the message path, agent configuration, model target, credentials, resource links, and tool policy. The response and its tool batch use that environment through completion.
+At each request boundary, capture the message path, agent configuration, model target, credentials, resource links, and execution tool policy. The response and its tool batch use that environment through completion.
 
 Changes recorded during a response affect the next request. Captured access does not freeze external file contents.
 
 Each session-bound request acquires shared lifetime holds for its captured directed resource relationships. Independent requests through the same receiver contribute independent holds. Unlink and removal events immediately change history and future discovery. Existing holders keep using the captured instances until their response, tool batch, and cleanup finish. Hold release follows actual completion, including cancellation cleanup.
+
+Request holds do not lock the timeline. The ordinary Agent protects its turn with an object-bound busy task because it writes conversation records. External runtime work can retain resource capabilities without taking that busy scope. Removing the access owner cancels its managed execution; removing an offered resource preserves other owners' captured requests through completion.
 
 The Agent stores selection and activity state, not a second message history. System instructions are rebuilt from the current environment and are not persisted as conversation:
 

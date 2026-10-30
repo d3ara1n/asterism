@@ -26,6 +26,8 @@ import { environment } from "./agent/system-prompt.ts";
 import { UpdateParadigmConfiguration } from "./configuration/contract.ts";
 import { resolveParadigmConfiguration } from "./configuration/state.ts";
 import { updateParadigmConfiguration } from "./configuration/runtime.ts";
+import { createSubagentPoolModule } from "./subagents/runtime.ts";
+import { CreateSubagentPool, createPoolSchema } from "./subagents/contract.ts";
 
 /** Composes only plugin business logic; the application owns loading, host services, and external plugin dependencies. */
 export default definePlugin({ namespace: builtin,
@@ -42,7 +44,15 @@ export default definePlugin({ namespace: builtin,
           })],
         modules: [defineAgentInstructions([{ id: "environment", text: environment(application.name).text }]),
         providers, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.shell), createNamingModule(application.userAgent), notes, questions,
-        resourceOperations, mcp, web, mesh, createManualModule(() => plugin.manual.sources(), application.name), createShellModule(), createTerminalModule(),
+        resourceOperations, mcp, web, mesh, createSubagentPoolModule(application, usage, skills),
+        createManualModule(() => plugin.manual.sources(), application.name), createShellModule(), createTerminalModule(),
+        defineAgentCreation({ id: CreateSubagentPool.id, creation: CreateSubagentPool,
+          description: "Create a shared Subagent Pool. It runs independent tasks using Agent roles and the resources linked to the pool.",
+          inputSchema: createPoolSchema.extend({ resources: z.array(z.string()).optional()
+            .describe("Resources from your current links to make available to the pool.") }),
+          toInput: ({ resources: _resources, ...input }) => input,
+          toOptions: ({ resources }) => ({ resources }),
+          guidelines: ["The pool's task listing contains short IDs for checking, waiting, steering, and cancelling shared tasks."] }),
         defineAgentCreation({ id: CreateMesh.id, creation: CreateMesh,
           description: "Create a Mesh resource in the default channel. Mesh provides list, send, peek, get_profile, and set_profile for Agents exposed to its channel across sessions.",
           guidelines: ["The Mesh card selects its channel. Link direction independently controls use of the Mesh and exposure of Agents to its channel."] }),
@@ -66,7 +76,7 @@ export default definePlugin({ namespace: builtin,
           guidelines: [
             "agent_list returns available agent configurations and their purposes.",
             "resource_list returns your linked resource IDs.",
-            "Creation and all initial links are committed together. The new Agent uses its own configuration's tool policy.",
+            "Creation and all initial links are committed together.",
           ] }),
         defineAgentCreation({ id: CreateNote.id, creation: CreateNote,
           description: "Create a note with a title and optional initial text.",

@@ -159,22 +159,51 @@ export function bindObjects(owner: string, host: PluginHostServices, sessionRuns
       const captureInput = (value: Json) => {
         if (scope?.input && scope.content) host.content?.retain(scope.content, value, scope.input, owner);
       };
+      const declaredRecord = (contract: RecordContract) => {
+        const declared = records.get(contract.id);
+        if (!declared || !belongsTo(owner, contract.id))
+          throw new PluginApiError("foreign_event", "The plugin did not declare this record contract.");
+        if (contract !== declared)
+          throw new PluginApiError("invalid_argument", "Use the declared record contract instance.");
+        return declared;
+      };
+      const append = (contract: RecordContract, data: Json, pending?: true) => {
+        check();
+        const declared = declaredRecord(contract);
+        const value = encodePluginData(declared, data);
+        captureInput(value);
+        const recordId = writer.append({ contract: declared.id, data: value, model: null, recipient: null,
+          source: { plugin: owner, resource: ref ?? null }, ...(pending ? { pending } : {}) });
+        host.content?.bind(access(id, ref?.id, scope), { kind: "record", id: recordId }, value);
+        return recordId;
+      };
       try {
         synchronous(() => work({
           append(contract, data) {
+            return append(contract, data);
+          },
+          begin(contract, input) {
             check();
-            const declared = records.get(contract.id);
-            if (!declared || !belongsTo(owner, contract.id))
-              throw new PluginApiError("foreign_event", "The plugin did not declare this record contract.");
-            if (contract !== declared)
-              throw new PluginApiError("invalid_argument", "Use the declared record contract instance.");
-            const value = encodePluginData(declared, data);
-            captureInput(value);
-            // Write channels stamp origins: operation handles supply plugin identity and validated object references supply resources.
-            const recordId = writer.append({ contract: declared.id, data: value, model: null, recipient: null,
-              source: { plugin: owner, resource: ref ?? null } });
-            host.content?.bind(access(id, ref?.id, scope), { kind: "record", id: recordId }, value);
-            return recordId;
+            if (!("outputSchema" in declaredRecord(contract)))
+              throw new PluginApiError("invalid_argument", "Use an operation record contract.");
+            return append(contract, { input, output: null }, true);
+          },
+          complete(contract, recordId, output, options) {
+            check();
+            if (!("outputSchema" in declaredRecord(contract)))
+              throw new PluginApiError("invalid_argument", "Use an operation record contract.");
+            writer.complete(recordId, record => {
+              if (record.contract !== contract.id || record.source?.plugin !== owner
+                || (ref && record.source.resource?.id !== ref.id))
+                throw new PluginApiError("foreign_event", "The operation record belongs to another writer.");
+              const original = contract.schema.safeParse(record.data);
+              if (!original.success) throw new PluginApiError("unavailable", "The operation record does not match its contract.");
+              const value = encodePluginData({ id: contract.id, schema: contract.outputSchema }, output);
+              captureInput(value);
+              host.content?.bind(access(id, record.source.resource?.id, scope), { kind: "record", id: recordId }, value, options?.content);
+              // Preserve the original encoded input even when its schema uses a codec.
+              return { ...(record.data as { input: Json; output: Json }), output: value };
+            });
           },
           set(contract, data) {
             check();

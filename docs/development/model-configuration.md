@@ -38,11 +38,11 @@ Builtin resolves its roles and optional Agent overrides before calling the host.
 
 Roles are reusable selections, not workbench objects. Hidden roles remain usable by internal consumers; disabled roles do not resolve. The utility role does not fall back to the current conversation.
 
-Agent configurations combine instructions, a default model role, tool policy, delegation policy, and request budget. Agent discovery exposes purpose and task examples; the chosen agent consumes its own detailed instructions.
+Agent configurations combine instructions, a default model role, and execution budgets. Their time budget governs subagent runs; the ordinary workbench Agent retains its existing turn/request controls without a blanket time limit. Agent discovery exposes purpose and task examples; the chosen agent consumes its own detailed instructions. Resource links supply access to resource capabilities.
 
 Built-in defaults plus explicit user overrides form effective configuration. Custom roles inherit the original default role; custom agents inherit the original worker definition. Editing another effective record does not change this inheritance baseline.
 
-False values, empty lists, null inheritance, and cleared overrides retain their distinct semantics. Tool allow/exclude policies replace as a group. Deletion does not cascade across saved references; the next resolution reports missing dependencies.
+False values, empty lists, null inheritance, and cleared overrides retain their distinct semantics. Deletion does not cascade across saved references; the next resolution reports missing dependencies.
 
 ## Thinking controls
 

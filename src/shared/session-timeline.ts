@@ -20,3 +20,11 @@ export function sessionTimeline(nodes: readonly SessionNode[], at: string | null
   }
   return path.reverse();
 }
+
+/** Append new positions and replace completed operation bodies without moving or duplicating their original nodes. */
+export function applySessionNodes(current: SessionNode[], appended: readonly SessionNode[], completed: readonly SessionNode[] = []): SessionNode[] {
+  const nodes = appended.length ? [...current, ...appended] : current;
+  if (!completed.length) return nodes;
+  const replacements = new Map(completed.map(node => [node.id, node]));
+  return nodes.map(node => replacements.get(node.id) ?? node);
+}

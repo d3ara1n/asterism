@@ -9,3 +9,4 @@ export const terminalCard = { width: 720, height: 440, minWidth: 360, minHeight:
 export const mcpCard = { width: 360, height: 300, minWidth: 280, minHeight: 160 } satisfies CardAppearance;
 export const webCard = { width: 340, height: 300, minWidth: 260, minHeight: 160 } satisfies CardAppearance;
 export const meshCard = { width: 340, height: 300, minWidth: 280, minHeight: 200 } satisfies CardAppearance;
+export const subagentPoolCard = { width: 420, height: 420, minWidth: 320, minHeight: 240 } satisfies CardAppearance;

@@ -30,6 +30,7 @@ export interface SharedServices {
 /** Host-internal storage and execution interfaces; plugins receive SDK facades only. */
 export interface SessionHostWriter {
   append(node: NewNode): string;
+  complete(id: string, finish: (record: SessionNode) => Json): void;
   nodes(): SessionNode[];
 }
 export interface SessionHost {

@@ -57,7 +57,7 @@ export class SessionService {
   readonly channels: LoadedPlugins["channels"];
   readonly events = new EventBus();
   private readonly watching = new Map<string, SessionProgress>();
-  private readonly updates = new Map<string, { nodes: SessionNode[]; objects: Set<string>; workbench: boolean; layout: boolean }>();
+  private readonly updates = new Map<string, { nodes: SessionNode[]; completed: Map<string, SessionNode>; objects: Set<string>; workbench: boolean; layout: boolean }>();
   private closed = false;
   private readonly shared: ReturnType<typeof createSharedServices>;
   private readonly changed: (event: SessionChanged) => void;
@@ -115,7 +115,7 @@ export class SessionService {
       idle: (sessionId, objectId) => {
         const activity = this.pluginActivity(sessionId);
         return !activity.busy.some(id => id !== objectId)
-          && activity.requests === 0 && this.retiring(sessionId).length === 0
+          && this.retiring(sessionId).length === 0
           && !this.resources.controllers().some(controller => controller.activity?.(sessionId).busy.some(id => id !== objectId));
       },
       progressChanged: sessionId => this.progressChanged(sessionId),
@@ -173,13 +173,14 @@ export class SessionService {
     catch (error) { this.db.exec("ROLLBACK"); throw error; }
   }
   /** Single-writer synchronous commit interval: parent lookup, event recording, and cursor updates cannot interleave. */
-  private committing: { sessionId: string; writer: SessionWriter; objects: Set<string> } | null = null;
+  private committing: { sessionId: string; writer: SessionWriter; objects: Set<string>; completed: Set<string> } | null = null;
   private writesClosed = false;
   private commit<T>(sessionId: string, work: (writer: SessionWriter) => T,
     scope: { objectId?: string; workbench?: boolean; layout?: boolean } = {}): T {
     if (this.writesClosed) throw new SessionError("unavailable", "The session service is closed.");
     if (this.committing) {
       if (this.committing.sessionId !== sessionId) throw new SessionError("conflict", "A commit cannot write another session.");
+      const completed = new Set(this.committing.completed);
       this.db.exec("SAVEPOINT nested_session_commit");
       try {
         const result = work(this.committing.writer);
@@ -188,18 +189,22 @@ export class SessionService {
         return result;
       } catch (error) {
         this.db.exec("ROLLBACK TO nested_session_commit; RELEASE nested_session_commit");
+        this.committing.completed.clear();
+        for (const id of completed) this.committing.completed.add(id);
         throw error;
       }
     }
     const head = this.tree.head(sessionId), before = this.tree.position(sessionId), titleBefore = this.tree.titleOf(sessionId);
+    const completed = new Set<string>();
     const writer: SessionWriter = {
       append: node => this.tree.appendToTimeline(sessionId, node).id,
+      complete: (id, finish) => { this.tree.complete(sessionId, id, finish); completed.add(id); },
       nodes: () => this.tree.nodes(sessionId),
     };
     const objects = new Set<string>();
     if (scope.objectId) objects.add(scope.objectId);
     const result = this.transaction(() => {
-      this.committing = { sessionId, writer, objects };
+      this.committing = { sessionId, writer, objects, completed };
       try {
         const result = work(writer);
         // Presence and links affect execution validation; rebuild after successful commits and before observer dispatch.
@@ -212,12 +217,15 @@ export class SessionService {
     const title = this.tree.titleOf(sessionId);
     if (!this.closed && title !== null && title !== titleBefore) this.events.publish(SessionTitleChanged, null, { sessionId, title });
     // Hand off to the plugin dispatch queue after commit; observer commits queue and each session notifies the UI once after draining.
-    const change = { records: this.tree.since(sessionId, head), cursorChanged: before !== this.tree.position(sessionId) };
+    const records = this.tree.since(sessionId, head), appended = new Set(records.map(node => node.id));
+    const change = { records, completed: [...completed].filter(id => !appended.has(id)).map(id => this.tree.node(sessionId, id)),
+      cursorChanged: before !== this.tree.position(sessionId) };
     if (this.watching.has(sessionId)) {
       const update = this.pendingUpdate(sessionId);
       update.nodes.push(...change.records);
+      for (const node of change.completed) update.completed.set(node.id, node);
       for (const objectId of objects) update.objects.add(objectId);
-      for (const node of change.records) {
+      for (const node of [...change.records, ...change.completed]) {
         if (node.source?.resource) update.objects.add(node.source.resource.id);
       }
       update.workbench ||= !!scope.workbench || change.records.some(node =>
@@ -228,13 +236,13 @@ export class SessionService {
     else this.afterCommit(sessionId, change, id => this.notify(id));
     return result;
   }
-  /** History movement waits for resource work, captured requests, and retirement to finish. */
+  /** History movement waits for timeline-dependent work and retirement; captured requests retain resources independently. */
   private settled(sessionId: string): boolean {
     const activity = this.pluginActivity(sessionId);
     return ![...this.pendingCreations.values()].some(value => value.sessionId === sessionId)
       && ![...this.pendingActions.values()].some(ref => ref.sessionId === sessionId)
       && activity.busy.length === 0
-      && activity.requests === 0 && this.retiring(sessionId).length === 0
+      && this.retiring(sessionId).length === 0
       && this.resources.controllers().every(controller => (controller.activity?.(sessionId).busy.length ?? 0) === 0);
   }
   private workbenchChanged(sessionId: string): void {
@@ -248,6 +256,7 @@ export class SessionService {
     if (!update || !this.watching.has(sessionId) || this.closed) return;
     const title = this.tree.title(sessionId);
     this.changed({ kind: "session.changed", sessionId, nodes: update.nodes, title, cursor: this.tree.cursor(sessionId),
+      ...(update.completed.size ? { completed: [...update.completed.values()] } : {}),
       objects: update.workbench ? [] : [...update.objects].flatMap(id => {
         const object = this.workbench.object(sessionId, id);
         return object ? [object] : [];
@@ -258,7 +267,7 @@ export class SessionService {
   }
   private pendingUpdate(sessionId: string) {
     let update = this.updates.get(sessionId);
-    if (!update) { update = { nodes: [], objects: new Set<string>(), workbench: false, layout: false }; this.updates.set(sessionId, update); }
+    if (!update) { update = { nodes: [], completed: new Map(), objects: new Set<string>(), workbench: false, layout: false }; this.updates.set(sessionId, update); }
     return update;
   }
   private progress(sessionId: string): SessionProgress {
@@ -268,7 +277,7 @@ export class SessionService {
       busyObjectIds: [...new Set([...resources.flatMap(a => a.busy), ...plugin.busy,
         ...[...this.pendingActions.values()].filter(ref => ref.sessionId === sessionId).map(ref => ref.id)])],
       timelineBusy: [...this.pendingCreations.values()].some(item => item.sessionId === sessionId)
-        || plugin.requests > 0 || this.retiring(sessionId).length > 0,
+        || this.retiring(sessionId).length > 0,
       // During input, tool arguments travel only as argumentsText; the frontend derives previews.
       live: [...resources.flatMap(a => a.live), ...plugin.live].map(wireLive) };
   }

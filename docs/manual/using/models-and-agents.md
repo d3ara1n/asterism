@@ -9,7 +9,7 @@ Provider connections and models belong to the application. Roles and Agent confi
 | Provider connection | Service endpoint, protocol, credentials, and its model list |
 | Model | A service model ID and its capabilities and generation parameters |
 | Model role | A reusable model selection and thinking level |
-| Agent configuration | Instructions, tool policy, and a default model role |
+| Agent configuration | Instructions, a default model role, and execution budgets |
 | Workbench agent | A session object using an agent configuration and optional overrides |
 
 ## Add and check a connection
@@ -32,9 +32,9 @@ Configuration changes apply at request boundaries. An in-progress response conti
 
 ## Configure an agent
 
-Use an agent configuration to describe its purpose, instructions, and permitted tools. Create separate workbench agents when independent conversations or collaboration help the task.
+Use an agent configuration to describe its purpose, instructions, model role, and execution budgets. Create separate workbench agents when independent conversations or collaboration help the task. The subagent time budget applies to tasks in a Subagent Pool; an unset subagent request limit leaves time as the bound.
 
-An agent’s tool policy filters capabilities. Resource links determine the objects those capabilities can operate on. Configuring a tool does not supply a target resource.
+Resource links determine which objects an agent can use. Tool implementations supply the operations supported by those objects. Selecting an agent configuration does not supply target resources.
 
 ## Interpret usage
 

@@ -18,6 +18,7 @@ export const sourceSchema = z.strictObject({ plugin: id, resource: z.strictObjec
 export const sessionNodeSchema = z.strictObject({
   id, sessionId: id, parentId: id.nullable(), createdAt: z.string(), source: sourceSchema,
   contract: id, data: jsonSchema, model: z.string().nullable(), recipient: id.nullable(),
+  pending: z.boolean().optional(),
 });
 export type SessionNode = z.infer<typeof sessionNodeSchema>;
 export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "createdAt">;
@@ -66,7 +67,7 @@ export const sessionProgressSchema = z.strictObject({
   live: z.array(liveBlockSchema),
   /** Resource holds depending on the current timeline path, not resource business execution state. */
   busyObjectIds: z.array(id),
-  /** Request environment occupancy, creation preparation, and resource retirement prevent history movement. */
+  /** Creation preparation and resource retirement prevent history movement. */
   timelineBusy: z.boolean(),
 });
 export type SessionProgress = z.infer<typeof sessionProgressSchema>;
@@ -97,7 +98,7 @@ export type SessionResult = z.infer<typeof sessionResultSchema>;
 export type SessionChanged =
   | { kind: "session.opened"; sessionId: string; data: SessionData }
   | { kind: "session.changed"; sessionId: string; nodes: SessionNode[]; cursor: string | null; title: string;
-      objects: WorkbenchSnapshot["objects"]; workbench?: WorkbenchSnapshot; layout?: WorkbenchLayout }
+      completed?: SessionNode[]; objects: WorkbenchSnapshot["objects"]; workbench?: WorkbenchSnapshot; layout?: WorkbenchLayout }
   /** live is incremental relative to the last delivery; null means streaming text is unchanged. */
   | { kind: "session.progress"; sessionId: string; busyObjectIds: string[]; timelineBusy: boolean; live: LivePatch | null };
 export interface SessionBridge {

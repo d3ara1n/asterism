@@ -1,6 +1,6 @@
 import type { Json } from "./json.ts";
 import type { DataContract, Presentation } from "./presentation.ts";
-import type { RecordContract } from "./records.ts";
+import type { RecordContract, OperationRecordContract } from "./records.ts";
 import type { ResourceRef, ResourceCreationResult, ResourceSnapshot, SessionSnapshot } from "./workspace.ts";
 import type { ContentReader, ContentScope } from "./content-runtime.ts";
 import type { EventPublisher } from "./events.ts";
@@ -25,6 +25,10 @@ export interface ResourceActionOptions {
 export interface SessionWriter {
   /** Append to the current timeline tip at commit time and advance the cursor; previously obtained read-only snapshots do not determine the append position. */
   append<T extends Json>(contract: RecordContract<T>, data: NoInfer<T>): string;
+  /** Publish an operation's immutable input at the current timeline tip, with its result still pending. */
+  begin<I extends Json, O extends Json>(contract: OperationRecordContract<I, O>, input: NoInfer<I>): string;
+  /** Complete a pending operation on any branch without moving the cursor. Object writers require the same emitting object. */
+  complete<I extends Json, O extends Json>(contract: OperationRecordContract<I, O>, id: string, output: NoInfer<O>, options?: { content?: ContentReader }): void;
   set<T extends Json>(contract: DataContract<T>, data: NoInfer<T>): void;
 }
 export type ObjectWriter = SessionWriter;

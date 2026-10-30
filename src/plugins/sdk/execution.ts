@@ -20,7 +20,6 @@ interface ExecutionBinding {
 /** Resource access, request holds, content handoff, and optional presentation surround the generic runner. */
 export function bindExecution({ owner, host, runs, objects: { own, checkRef }, checkAvailable, topLevelTools }: ExecutionBinding) {
   const live = new Map<symbol, { ref: ResourceRef; blocks: LiveBlock[] }>();
-  const requests = new Map<symbol, ResourceRef>();
   const execution: ExecutionServices = {
     async withProgress(resource, work) {
       checkAvailable(); own(resource.kind); checkRef(resource);
@@ -54,12 +53,10 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
       const excluded = new Set(policyConfig?.exclude ?? []);
       const policy = (name: string) => (allowed === null || allowed.has(name)) && !excluded.has(name);
       const interactive = request.interactive;
-      const key = Symbol();
       const { target, messages, cache, userAgent, requestParentId } = structuredClone({
         target: request.target, messages: request.messages, cache: request.cache, userAgent: request.userAgent, requestParentId: request.requestParentId,
       });
       const system = typeof request.system === "function" ? request.system : structuredClone(request.system);
-      requests.set(key, ref);
       const release = host.holds.acquire(ref, linkedRefs);
       const work = runs.start(async signal => {
         let handover: ContentLease | undefined;
@@ -83,19 +80,13 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
           });
         } finally {
           try { await handover?.close(); }
-          finally {
-            release();
-            requests.delete(key);
-            host.sessions.progressChanged(ref.sessionId);
-          }
+          finally { release(); }
         }
       }, { object: ref, signal: request.signal, affectsHistory: false });
-      host.sessions.progressChanged(ref.sessionId);
       return work.done;
     },
   };
   return { execution, activity: (sessionId: string) => ({
-    requests: [...requests.values()].filter(ref => ref.sessionId === sessionId).length,
     live: [...live.values()].filter(run => run.ref.sessionId === sessionId).flatMap(run => run.blocks),
   }) };
 }

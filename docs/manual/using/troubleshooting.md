@@ -12,7 +12,7 @@ After changing settings, start or continue a request so it captures the new conf
 
 ## Unavailable resource operations
 
-Check whether the resource still exists on the current timeline and is linked to the intended agent. Inspect its available tools and the agent’s tool policy.
+Check whether the resource still exists on the current timeline and is linked to the intended agent. Inspect the operations available for that resource.
 
 For file operations, check the actual file and the directory resource’s root. For network tools, check the configured provider or MCP server. A visible card alone does not prove an operation is available.
 

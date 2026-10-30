@@ -125,7 +125,7 @@ function RoleEditor({ initialId, onSaved }: { initialId: string | null; onSaved(
   const base = snapshot?.defaults.roles[current?.builtin ? current.id : "default"];
   if (!base || !snapshot) return null;
   const dirty = !current || slug !== id || JSON.stringify(pick(stored)) !== JSON.stringify(value);
-  const users = current ? snapshot.agents.filter(agent => agent.modelRole === current.id || agent.fallbackRole === current.id) : [];
+  const users = current ? snapshot.agents.filter(agent => agent.modelRole === current.id) : [];
   return <Editor form="role-form" title={current?.id ?? i18n.formatMessage(rolesMessages.newRole)} description={current?.builtin ? i18n.formatMessage(rolesMessages.builtinRole) : undefined} dirty={dirty} busy={busy} error={error}
     remove={current && !current.builtin ? { title: i18n.formatMessage(rolesMessages.deleteTitle),
       description: i18n.formatMessage(rolesMessages.deleteDescription, { current_name: current.id }),

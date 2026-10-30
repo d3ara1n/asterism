@@ -28,7 +28,7 @@ Templates independently retain the immutable bytes referenced by their saved dat
 
 Builtin defines an Agent as an execution object that can also be a linked resource. Its controller projects context, resolves the request environment, and drives model and tool calls. This representation belongs to builtin; the host does not require other paradigms to represent Agents as resources.
 
-Agents have no intrinsic parent-child hierarchy. Delegation composes creation, links, and communication. Creating another agent does not expand the caller’s own tool policy.
+Agents have no intrinsic parent-child hierarchy. Collaboration composes creation, links, and communication. Creating another agent does not change the caller's resource access.
 
 An explicit creation title supplies the initial name; otherwise the built-in Agent chooses a display name once. Agents created from templates always generate a random display name, including when the source agent was explicitly named. Display names can repeat and do not identify operation targets.
 
@@ -72,9 +72,9 @@ An identity present in both old and new projections retains its lifetime. Reappe
 
 Removal requires the target's own busy work to finish. A successful removal immediately records the intent and removes the object and its incoming and outgoing links from current discovery. Other requests already holding those relationships can finish using the instance. Their operations may record facts after the removal event. Historical records and external files remain.
 
-The resource lifetime handles cleanup of owned external instances. Disposal waits for all incoming and outgoing request holds, then ends the instance's remaining work and cleanup. While it waits, the workbench can show an inert dashed card; this runtime projection does not restore the object's logical presence. Restart reconstructs presence from history without recreating removed instances. Hiding a card does not end its lifetime.
+The resource lifetime handles cleanup of owned external instances. Logical removal cancels the object's managed tasks and model requests. Borrowed tool operations retain their captured capabilities; final disposal waits for incoming and outgoing request holds, then ends remaining work and attachment cleanup. While it waits, the workbench can show an inert dashed card; this runtime projection does not restore the object's logical presence. Restart reconstructs presence from history without recreating removed instances. Hiding a card does not end its lifetime.
 
-Pending unlink and removal are workbench-managed states derived from historical intent, active request holds, and unfinished disposal. They require no separate persistent pending records. Resource busy state describes the resource implementation's own work. History movement waits for busy work, active session-bound requests, and pending cleanup to finish, including disposal after the last hold is released.
+Pending unlink and removal are workbench-managed states derived from historical intent, active request holds, and unfinished disposal. They require no separate persistent pending records. Resource busy state marks work that requires timeline protection. Requests can hold resources without blocking history movement. History movement waits for busy work and pending cleanup, including disposal after the last hold is released.
 
 ## Directed links
 

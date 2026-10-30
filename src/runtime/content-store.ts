@@ -246,9 +246,10 @@ export class ContentStore {
     for (const row of refs.map(ref => this.assert(ref, access))) destination.add(row.id);
   }
   /** Register roots within the owning transaction; access scopes supply session and object identities without passing them twice. */
-  bind(access: ContentAccess & { sessionId: string }, root: { kind: "data" | "record"; id: string }, value: Json): void {
+  bind(access: ContentAccess & { sessionId: string }, root: { kind: "data" | "record"; id: string }, value: Json, reader?: ContentReader): void {
     const refs = contentReferences(value), sessionId = access.sessionId, objectId = access.objectId ?? "";
-    for (const ref of refs) this.assert(ref, access);
+    const source = reader ? this.readerAccess(reader, access.owner ?? "") : access;
+    for (const ref of refs) this.assert(ref, source);
     if (this.db.isTransaction === false) throw new Error("Content roots must be saved inside the owning transaction.");
     if (root.kind === "data") {
       for (const row of this.db.prepare("SELECT content_id FROM content_roots WHERE session_id = ? AND object_id = ? AND kind = ? AND root_id = ?")
@@ -256,7 +257,7 @@ export class ContentStore {
       this.db.prepare("DELETE FROM content_roots WHERE session_id = ? AND object_id = ? AND kind = ? AND root_id = ?")
         .run(sessionId, objectId, root.kind, root.id);
     }
-    // Records append only; terminal metadata may reference the same physical block again without revoking its body dependencies.
+    // Record completion adds output dependencies without revoking the input's content roots.
     const insert = this.db.prepare("INSERT OR IGNORE INTO content_roots VALUES (?, ?, ?, ?, ?)");
     for (const ref of refs) insert.run(sessionId, objectId, root.kind, root.id, ref["$asterism.content"]);
     this.unrooted = undefined; this.scheduleCollection();

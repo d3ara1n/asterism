@@ -3,7 +3,7 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 export const agentsMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   overviewSummary: {
     id: "features_settings_SettingsPage_7",
-    defaultMessage: "Prompts, tools, and delegation",
+    defaultMessage: "Prompts, models, and request limits",
   },
   agent: {
     id: "features_configuration_AgentsSettings_1",
@@ -53,14 +53,6 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
     id: "features_configuration_AgentsSettings_14",
     defaultMessage: " (internal, not available to agents)",
   },
-  removeTag: {
-    id: "features_configuration_AgentsSettings_15",
-    defaultMessage: "Remove {tag}",
-  },
-  addTag: {
-    id: "features_configuration_AgentsSettings_16",
-    defaultMessage: "Add",
-  },
   newAgent: {
     id: "features_configuration_AgentsSettings_17",
     defaultMessage: "New agent",
@@ -105,10 +97,6 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
     id: "features_configuration_AgentsSettings_27",
     defaultMessage: "When unset, the default role is used. Prefills the model when this agent is chosen; you can still pick another model per conversation.",
   },
-  fallbackModelRole: {
-    id: "features_configuration_AgentsSettings_28",
-    defaultMessage: "Fallback model role",
-  },
   prompts: {
     id: "features_configuration_AgentsSettings_29",
     defaultMessage: "Prompts",
@@ -136,66 +124,6 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
   addExample: {
     id: "features_configuration_AgentsSettings_36",
     defaultMessage: "Add example",
-  },
-  toolsAndDelegation: {
-    id: "features_configuration_AgentsSettings_37",
-    defaultMessage: "Tools and delegation",
-  },
-  toolPolicy: {
-    id: "features_configuration_AgentsSettings_38",
-    defaultMessage: "Tool policy",
-  },
-  allAuthorizedTools: {
-    id: "features_configuration_AgentsSettings_41",
-    defaultMessage: "All authorized tools",
-  },
-  onlyListedTools: {
-    id: "features_configuration_AgentsSettings_42",
-    defaultMessage: "Only listed tools",
-  },
-  exceptListedTools: {
-    id: "features_configuration_AgentsSettings_43",
-    defaultMessage: "All except listed tools",
-  },
-  toolNamePlaceholder: {
-    id: "features_configuration_AgentsSettings_44",
-    defaultMessage: "Tool name, e.g. read",
-  },
-  allowlistHint: {
-    id: "features_configuration_AgentsSettings_45",
-    defaultMessage: "An empty allowlist disables plugin tools; the application''s resource controls remain available.",
-  },
-  denylistHint: {
-    id: "features_configuration_AgentsSettings_46",
-    defaultMessage: "Listed tools are hidden and cannot be called.",
-  },
-  toolPolicyHint: {
-    id: "features_configuration_AgentsSettings_47",
-    defaultMessage: "Tool policies narrow what is available. They never grant resource access.",
-  },
-  delegation: {
-    id: "features_configuration_AgentsSettings_48",
-    defaultMessage: "Delegation",
-  },
-  anyAgent: {
-    id: "features_configuration_AgentsSettings_51",
-    defaultMessage: "Any agent",
-  },
-  selectedAgents: {
-    id: "features_configuration_AgentsSettings_52",
-    defaultMessage: "Only selected agents",
-  },
-  noDelegation: {
-    id: "features_configuration_AgentsSettings_53",
-    defaultMessage: "No delegation",
-  },
-  noOtherAgents: {
-    id: "features_configuration_AgentsSettings_54",
-    defaultMessage: "No other agents.",
-  },
-  delegationHint: {
-    id: "features_configuration_AgentsSettings_55",
-    defaultMessage: "Delegation is not connected yet; this setting takes effect once it is.",
   },
   limits: {
     id: "features_configuration_AgentsSettings_56",

@@ -67,7 +67,7 @@ export interface LoadedPlugins {
   channels: ChannelRegistry;
   events: EventBus;
   configure(command: PluginConfigurationCommand): PluginConfiguration[];
-  activity(sessionId: string): { busy: string[]; live: LiveBlock[]; requests: number };
+  activity(sessionId: string): { busy: string[]; live: LiveBlock[] };
   retiring(sessionId: string): readonly ResourceSnapshot[];
   resources: ResourceRegistry;
   tools: ToolRegistry;
@@ -79,7 +79,7 @@ export interface LoadedPlugins {
   /** Republish appearance of all objects after session restoration. */
   restore(sessionId: string): void;
   /** Dispatch observations after commit; once the queue drains, publish once for each affected session. */
-  afterCommit(sessionId: string, change: { records: readonly SessionNode[]; cursorChanged: boolean }, publish: (sessionId: string) => void): void;
+  afterCommit(sessionId: string, change: { records: readonly SessionNode[]; completed?: readonly SessionNode[]; cursorChanged: boolean }, publish: (sessionId: string) => void): void;
   prepare(kind: string, command: ResourceCall, context: { sessionId: string; objectId: string; signal: AbortSignal; content?: ContentLease }): Promise<ParsedCall>;
   close(): Promise<void>;
 }
@@ -95,7 +95,7 @@ interface Collected {
 class TaskHost implements PluginTasks {
   private running = new Map<string, RunningWork<void>>();
   constructor(private readonly log: PluginLogger, private readonly group: RunGroup) {}
-  start(key: string, run: (signal: AbortSignal) => Promise<void>, options: { timeoutMs?: number; object?: ResourceRef } = {}): boolean {
+  start(key: string, run: (signal: AbortSignal) => Promise<void>, options: { timeoutMs?: number; object?: ResourceRef; affectsHistory?: boolean } = {}): boolean {
     if (this.group.closed || this.running.has(key)) return false;
     const work = this.group.start(async signal => {
       // Register keys before execution so setup failure can cancel tasks before business work starts.
@@ -321,7 +321,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     return { ...item, status, diagnostic,
       renderer: status === "loaded" ? item.renderer : null, stylesheet: status === "loaded" ? item.stylesheet : null };
   });
-  type Notification = { sessionId: string; snapshot: SessionSnapshot; records: SessionRecord[]; cursorChanged: boolean };
+  type Notification = { sessionId: string; snapshot: SessionSnapshot; records: SessionRecord[]; completed: SessionRecord[]; cursorChanged: boolean };
   const notifications: Notification[] = [];
   const touched = new Set<string>();
   const observers = collected.flatMap(entry => entry.observers);
@@ -347,8 +347,10 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const scope = objectScopes.get(ref.id);
       objectScopes.delete(ref.id);
       const cancel = () => Promise.allSettled(collected.map(entry => entry.lifecycle.cancel(object => object.id === ref.id)));
-      if (!scope && !services.holds.has(ref.id)) return cancel().then(() => {});
+      // Stop owned producers immediately; borrowed tool calls keep their captured instances until holds drain.
+      const owned = Promise.allSettled(collected.map(entry => entry.lifecycle.cancel(object => object.id === ref.id, ["task", "model"])));
       const done = (async () => {
+        await owned;
         await services.holds.released(ref.id);
         await cancel();
         await scope?.end();
@@ -398,7 +400,6 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const model = collected.map(entry => entry.sdk.activity(sessionId));
       const activity = collected.map(entry => entry.lifecycle.activity(sessionId));
       return { busy: [...new Set(activity.flatMap(run => run.busy))],
-        requests: model.reduce((total, run) => total + run.requests, 0),
         live: model.flatMap(run => run.live) };
     },
     retiring: sessionId => [...retiring.values()].filter(entry => entry.resource.ref.sessionId === sessionId).map(entry => entry.resource),
@@ -415,15 +416,18 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
     restore(sessionId) {
       notifyPresence(sessionId, sessionSnapshot(services.sessions.view(sessionId)));
     },
-    afterCommit(sessionId, { records: nodes, cursorChanged }, publish) {
+    afterCommit(sessionId, { records: nodes, completed = [], cursorChanged }, publish) {
       touched.add(sessionId);
       const observed = (nodes.length > 0 && observers.some(observer => observer.committed))
+        || (completed.length > 0 && observers.some(observer => observer.completed))
         // Always compare resource presence on cursor changes; observers and frontend channels both depend on disappearance notifications.
         || cursorChanged;
       if (observed) {
         // Snapshots are fixed at this commit; subsequently queued commits do not rewrite them.
         const sequences = services.sessions.sequences(sessionId, nodes);
+        const completedSequences = services.sessions.sequences(sessionId, completed);
         notifications.push({ sessionId, records: nodes.map((node, index) => toRecord(node, sequences[index]!)), cursorChanged,
+          completed: completed.map((node, index) => toRecord(node, completedSequences[index]!)),
           snapshot: sessionSnapshot(services.sessions.view(sessionId)) });
       }
       if (dispatching) return;
@@ -439,6 +443,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
               catch (error) { (services.log ?? defaultLog)(entry.plugin.namespace.id, "error", `Observer ${observer.id} ${name} callback failed.`, error); }
             };
             if (event.records.length && observer.committed) run("committed", () => observer.committed!({ records: event.records, snapshot: event.snapshot, session }));
+            if (event.completed.length && observer.completed) run("completed", () => observer.completed!({ records: event.completed, snapshot: event.snapshot, session }));
             if (event.cursorChanged && observer.cursorChanged) run("cursorChanged", () => observer.cursorChanged!({ snapshot: event.snapshot, session }));
           }
         }

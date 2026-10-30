@@ -1,4 +1,4 @@
-import type { z } from "zod";
+import { z } from "zod";
 import type { Json } from "./json.ts";
 import type { Source } from "./workspace.ts";
 
@@ -17,6 +17,8 @@ export interface SessionRecord {
   /** Model-visible text written by the platform, consumed when executors project context; recipient being null means all executors. */
   readonly context: { readonly text: string; readonly recipient: string | null } | null;
   readonly data: Json;
+  /** Present for operations published before completion; false after their one-time result is stored. */
+  readonly pending?: boolean;
 }
 export type Decoded<D> =
   | { readonly status: "known"; readonly record: SessionRecord; readonly data: D }
@@ -42,6 +44,18 @@ export function defineRecord<D extends Json>(id: string, definition: {
       } catch { return { status: "unknown", record, reason: "invalid_data" }; }
     },
   };
+}
+export type OperationData<I extends Json, O extends Json> = { input: I; output: O | null };
+export interface OperationRecordContract<I extends Json = Json, O extends Json = Json> extends RecordContract<OperationData<I, O>> {
+  readonly inputSchema: z.ZodType<I>;
+  readonly outputSchema: z.ZodType<O>;
+}
+/** Publish input with begin, then fill output once with complete; identity and input remain fixed. */
+export function defineOperationRecord<I extends Json, O extends Json>(id: string, definition: {
+  input: z.ZodType<I>; output: z.ZodType<O>;
+}): OperationRecordContract<I, O> {
+  return { ...defineRecord(id, { schema: z.strictObject({ input: definition.input, output: definition.output.nullable() }) }),
+    inputSchema: definition.input, outputSchema: definition.output };
 }
 /** timeline reads the complete ancestor path to the snapshot tip; session reads all session records within the snapshot's upper bound in save order. */
 export interface RecordQuery { readonly scope: "timeline" | "session" }

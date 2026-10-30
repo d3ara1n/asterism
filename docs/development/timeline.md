@@ -1,6 +1,6 @@
 # Timeline and history
 
-Each session owns an immutable record tree and one execution cursor. The host stores generic records and workbench events; plugins interpret their own domain records.
+Each session owns a record tree with fixed identity and ancestry and one execution cursor. The host stores generic records and workbench events; plugins interpret their own domain records. Completed records are immutable. An explicitly pending operation can fill its result once at its original position.
 
 ## Record identity and provenance
 
@@ -20,7 +20,19 @@ Streaming deltas stay in memory. An Agent output block commits once its final da
 
 The response’s highest-ordinal actual block owns its completion metadata, including reported usage, timing, and domain extensions. Other blocks carry no duplicate completion. There is no later patch, separate completion node, or invented node for an empty response.
 
-Concurrent agents append in actual completion order. Historical nodes remain unchanged after commit.
+Concurrent agents append finalized output blocks in actual completion order. Those blocks remain unchanged after commit.
+
+## Publish operations before completion
+
+An operation that must be discoverable while running publishes its input immediately. Its pending record fixes the submission identity, source, time, and parent. Completion stores the output in that same record without advancing the cursor or creating a second historical position. The host validates the declaring plugin and contract; an object writer also retains its original emitting identity.
+
+Completion can occur while another branch is selected. Every path containing the original operation sees its result on subsequent reads. A path before that operation does not contain it. Completion does not replay execution or restore resources.
+
+Snapshot handles retain their original observations, including operations that were pending at capture time. Their pending bodies are captured separately so completed history can remain lazily read. A new snapshot observes the latest completion.
+
+Input and result content roots belong to the same record. Saving the result and retaining its attachments share one transaction; rollback preserves the pending record and publishes no completion. Completion adds result dependencies without revoking input dependencies.
+
+Publication and completion have distinct notifications. Observers receive a completed record as an update, and views replace its body by ID at the existing position. Completion cannot rewrite a finalized record. Plugins can complete their own pending records during resource cleanup through the session writer without requiring that resource to remain on the current path.
 
 ## Preserve partial output
 

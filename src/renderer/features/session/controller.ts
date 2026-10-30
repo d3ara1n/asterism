@@ -2,6 +2,7 @@ import type { UiText } from "@asterism-app/sdk/contracts";
 import { errorDisplay } from "../../../shared/error-display.ts";
 import { applyLive } from "../../../shared/live-patch.ts";
 import { viewLive } from "../../../shared/partial-arguments.ts";
+import { applySessionNodes } from "../../../shared/session-timeline.ts";
 import type { SessionBridge, SessionMutation, SessionResult, SessionData, SessionProgress, SessionChanged, LiveBlock } from "../../../shared/session.ts";
 
 export type SessionView = Omit<SessionData, "progress">;
@@ -87,7 +88,7 @@ export class SessionController {
         objects: event.objects.length ? current.workbench.objects.map(object => objects.get(object.id) ?? object) : current.workbench.objects,
         ...event.layout };
       this.update({ data: { ...current, title: event.title, cursor: event.cursor, workbench,
-        nodes: event.nodes.length ? [...current.nodes, ...event.nodes] : current.nodes } });
+        nodes: applySessionNodes(current.nodes, event.nodes, event.completed) } });
     }
   }
   connect(): () => void {

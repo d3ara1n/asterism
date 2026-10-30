@@ -17,7 +17,7 @@ export interface ExecutionContentOptions {
   output?: RetainedContentScope;
 }
 export interface ExecutionServices {
-  /** Capture the owner's current environment, execute one request and tool batch, then release request holds. */
+  /** Capture the owner's environment and hold resources through one request and tool batch. Callers own any timeline busy scope. */
   run(request: ResourceModelRequest, options?: ExecutionContentOptions): Promise<ModelRunResult>;
   /** Optional workbench output sink; the caller decides which execution events to send to it. */
   withProgress<T>(resource: ResourceRef, work: (observer: ModelRunObserver) => Promise<T>): Promise<T>;

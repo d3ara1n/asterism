@@ -6,7 +6,7 @@ A resource represents an object with identity and lifetime. A tool represents a 
 
 Use a resource for something that belongs in a session and can be inspected or operated on. Define how it is created, what state it owns, and what information it presents.
 
-The resource attaches when it becomes present in a session. Removal immediately ends discovery, while requests that already hold the resource can finish before its instance is disposed. A hidden card does not imply that its backend instance should stop.
+The resource attaches when it becomes present in a session. Removal immediately ends discovery and cancels its managed tasks and model requests. Other owners' requests holding the resource can finish before its attachment lifetime ends and the instance is disposed. A hidden card does not imply that its backend instance should stop.
 
 Creation supplies initial state. Actions change the object through typed application or plugin operations. Views present the resulting state.
 
@@ -35,6 +35,8 @@ A tool contribution can capture resource-specific configuration and access at th
 Declare `requiresInteraction: true` when a tool cannot complete without user interaction. The host excludes it from noninteractive requests and rejects unsupported calls before entering the implementation. Tools supporting both modes can inspect `interactive` in their execution context. A renderer that only displays progress or results does not make a tool interactive.
 
 Use `plugin.execution.run` to execute one model request with tools bound to a resource's current links and the real session. Supply that resource as the access owner and select the interaction capability. The execution holds captured relationships through the tool batch; subsequent calls capture current links again. Calls sharing an access owner keep independent message inputs and can run concurrently.
+
+Resource holds do not block history movement. Use an object busy scope for work that depends on the timeline, such as a conversation writing its responses there. Object-bound managed tasks protect history by default; use `affectsHistory: false` for external runtime tasks that should still stop when their owning resource leaves the session.
 
 Use `plugin.models.run` when supplying messages and executable tools directly. It needs no workbench resource or timeline. Both forms deliver execution records to the observer you provide. `plugin.execution.withProgress` supplies an optional workbench observer for the events you choose to display.
 

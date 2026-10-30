@@ -39,11 +39,8 @@ export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaul
   const base = baseId(agent, defaultAgentPreset);
   const inherited = defaults.agents[base];
   if (!inherited) throw new Error("Built-in agent definition is unavailable.");
-  // Allow/exclude lists form one mutually exclusive policy; overriding one side also removes the opposite built-in side.
-  const policy = overrides.tools !== undefined || overrides.excludeTools !== undefined
-    ? { tools: overrides.tools ?? null, excludeTools: overrides.excludeTools ?? null } : {};
   return agentSchema.parse({
-    ...inherited, ...overrides, ...policy,
+    ...inherited, ...overrides,
     id: agent.id, builtin: agent.builtin,
   });
 }

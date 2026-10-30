@@ -18,7 +18,7 @@ The card reads projected data and invokes the public increment action. Each butt
 
 The example also contributes a Home entry. It prepares a counter, then initializes a session containing it in one transaction. This entry works with the builtin paradigm disabled and requires no conversation input.
 
-The model tool reads the same counter value through its resource implementation. Registering the tool does not grant access: an agent needs a link to the counter and a tool policy that allows the operation.
+The model tool reads the same counter value through its resource implementation. Registering the tool does not grant access: an agent needs a link to the counter, and the operation must be available in its execution environment.
 
 ## Adapt the package
 

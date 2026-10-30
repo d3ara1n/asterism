@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineCall, defineCreation, defineAction, resourceCall, defineRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@asterism-app/sdk/contracts";
+import { defineCall, defineCreation, defineAction, resourceCall, defineRecord, defineOperationRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@asterism-app/sdk/contracts";
 import { defineTopLevelTool, implementCall, defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@asterism-app/sdk/runtime";
 import { BuiltinApplicationService as ApplicationService } from "../../packages/builtin/src/testing.ts";
 import { DatabaseVersionError } from "../runtime/storage.ts";
@@ -17,12 +17,17 @@ import type { ModelAdapter, ModelInput } from "../model/contract.ts";
 import { SubmitAgentInput, StartAgentSession, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { applicationStorage } from "../shared/application.ts";
 import { flat } from "../session/test-nodes.ts";
+import { applySessionNodes } from "../shared/session-timeline.ts";
+import type { SessionChanged } from "../shared/session.ts";
 
 const ns = pluginNamespace("test.counter");
 const Counter = ns.resource("counter", z.strictObject({}));
 const State = ns.data("state", z.number().int());
 const View = ns.data("view", z.object({ value: z.number() }));
 const Changed = defineRecord(ns.name("changed"), { schema: z.object({ value: z.number() }) });
+const Operation = defineOperationRecord(ns.name("operation"), {
+  input: z.object({ task: z.string() }), output: z.object({ report: z.string() }),
+});
 const Command = z.strictObject({ amount: z.number().int() });
 const CreateCounter = defineCreation(Counter, { id: ns.name("create"), schema: z.number().int() });
 const ChangeCount = defineAction(Counter, { id: ns.name("change"), schema: Command });
@@ -1021,12 +1026,11 @@ describe("Host implementation of the workbench SDK", () => {
         if (event.type !== "progress") object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); });
       } },
     };
-    const done = c.context().execution.run(request);
+    const done = object.withBusy(() => c.context().execution.run(request), { signal: controller.signal });
     try {
       await started;
       expect(service.sessions.running).toBe(true);
-      expect(service.sessions.current(sessionId).progress.timelineBusy).toBe(true);
-      expect(service.sessions.current(sessionId).progress.busyObjectIds).not.toContain(id);
+      expect(service.sessions.current(sessionId).progress.busyObjectIds).toContain(id);
     } finally {
       if (mode === "cancel") controller.abort();
       else {
@@ -1039,5 +1043,149 @@ describe("Host implementation of the workbench SDK", () => {
     expect(saved.some(event => event.type === "block")).toBe(true);
     if (mode === "cancel") expect(service.sessions.running).toBe(false);
     else expect(() => object.session.snapshot()).toThrow();
+  });
+});
+// Published operations retain their submission position while their result completes independently of the current branch.
+describe("Pending operation records", () => {
+  it("delivers publication and completion from an observer in order while coalescing the UI update", async () => {
+    const c = counter(), phases: string[] = [], updates: SessionChanged[] = [];
+    let publishedSnapshot!: ReturnType<ObjectReader["session"]["snapshot"]>, completedSnapshot!: ReturnType<ObjectReader["session"]["snapshot"]>;
+    const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({
+      records: [Operation], observers: [{ id: ns.name("immediate-completion"),
+        committed({ records, snapshot, session }) {
+          const pending = records.find(record => record.contract.id === Operation.id);
+          if (!pending) return;
+          phases.push("published"); publishedSnapshot = snapshot;
+          session.commit(writer => { writer.complete(Operation, pending.id, { report: "Immediate result" }); });
+        },
+        completed({ snapshot }) {
+          phases.push("completed"); completedSnapshot = snapshot;
+        },
+      }],
+    }))] });
+    const { service, sessionId } = open([plugin], undefined, event => updates.push(event));
+    await service.sessions.execute({ type: "watch", sessionId });
+    c.context().session(sessionId).commit(writer => { writer.begin(Operation, { task: "Immediate" }); });
+    expect(phases).toEqual(["published", "completed"]);
+    expect(publishedSnapshot.records.first(Operation, { scope: "timeline" })).toMatchObject({ record: { pending: true }, data: { output: null } });
+    expect(completedSnapshot.records.first(Operation, { scope: "timeline" })).toMatchObject({ record: { pending: false } });
+    const changes = updates.filter((event): event is Extract<SessionChanged, { kind: "session.changed" }> => event.kind === "session.changed");
+    expect(changes).toHaveLength(1);
+    expect(applySessionNodes([], changes[0]!.nodes, changes[0]!.completed)).toMatchObject([
+      { pending: false, data: { input: { task: "Immediate" }, output: { report: "Immediate result" } } },
+    ]);
+  });
+
+  it("completes a shared ancestor once, preserves captured snapshots, and delivers replacements without advancing history", async () => {
+    const c = counter(), published: SessionRecord[] = [], completed: SessionRecord[] = [], updates: SessionChanged[] = [];
+    const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({
+      records: [Operation],
+      observers: [{ id: ns.name("operations"),
+        committed({ records }) { published.push(...records.filter(record => record.contract.id === Operation.id)); },
+        completed({ records }) { completed.push(...records); },
+      }],
+    }))] });
+    const { service, sessionId, root } = open([plugin], undefined, update => updates.push(update));
+    const session = c.context().session(sessionId);
+    await service.sessions.execute({ type: "watch", sessionId });
+    let first!: string, second!: string;
+    session.commit(writer => {
+      first = writer.begin(Operation, { task: "First task" });
+      second = writer.begin(Operation, { task: "Second task" });
+    });
+    const captured = session.snapshot();
+    session.commit(writer => { writer.append(Changed, { value: 1 }); });
+    const oldBranch = session.snapshot().position.nodeId;
+    await service.sessions.execute({ type: "select", sessionId, nodeId: second });
+    session.commit(writer => { writer.append(Changed, { value: 2 }); });
+    const current = service.sessions.current(sessionId), count = current.nodes.length;
+    updates.length = 0;
+    session.commit(writer => {
+      writer.complete(Operation, second, { report: "Second report" });
+      writer.complete(Operation, first, { report: "First report" });
+    });
+
+    expect(session.snapshot().position.nodeId).toBe(current.cursor);
+    expect(service.sessions.tree.nodes(sessionId)).toHaveLength(count);
+    expect(published.map(record => record.id)).toEqual([first, second]);
+    expect(completed.map(record => [record.id, record.sequence])).toEqual([[second, 2], [first, 1]]);
+    // The first read can happen after completion; it still observes the originally captured pending state.
+    expect(captured.records.query(Operation, { scope: "timeline" })).toMatchObject([
+      { record: { id: first, pending: true }, data: { input: { task: "First task" }, output: null } },
+      { record: { id: second, pending: true }, data: { input: { task: "Second task" }, output: null } },
+    ]);
+    expect(session.snapshot().records.query(Operation, { scope: "timeline" })).toMatchObject([
+      { record: { id: first, pending: false }, data: { input: { task: "First task" }, output: { report: "First report" } } },
+      { record: { id: second, pending: false }, data: { input: { task: "Second task" }, output: { report: "Second report" } } },
+    ]);
+    const update = updates.find((event): event is Extract<SessionChanged, { kind: "session.changed" }> => event.kind === "session.changed")!;
+    expect(update.nodes).toEqual([]);
+    const rendered = applySessionNodes(current.nodes, update.nodes, update.completed);
+    expect(rendered.map(node => node.id)).toEqual(current.nodes.map(node => node.id));
+    expect(rendered.find(node => node.id === first)).toMatchObject({ pending: false, data: { output: { report: "First report" } } });
+    expect(current.nodes.find(node => node.id === first)?.pending).toBe(true);
+    await service.sessions.execute({ type: "select", sessionId, nodeId: oldBranch });
+    expect(session.snapshot().records.first(Operation, { scope: "timeline" })).toMatchObject({ data: { output: { report: "First report" } } });
+    await service.sessions.execute({ type: "select", sessionId, nodeId: null });
+    expect(session.snapshot().records.query(Operation, { scope: "timeline" })).toEqual([]);
+    await service.close(); services.splice(services.indexOf(service), 1);
+    const reopened = new ApplicationService(root, { plugins: [plugin] }); services.push(reopened);
+    expect(c.context().session(sessionId).snapshot().records.first(Operation, { scope: "session" }))
+      .toMatchObject({ record: { id: first, pending: false }, data: { output: { report: "First report" } } });
+  });
+
+  it("keeps input and final results immutable and checks record contract and emitting resource", async () => {
+    const c = counter();
+    const Other = defineOperationRecord(ns.name("other-operation"), { input: Operation.inputSchema, output: Operation.outputSchema });
+    const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Operation, Other] }))] });
+    const { service, sessionId } = open([plugin]);
+    const session = c.context().session(sessionId);
+    const first = await session.create(CreateCounter, 0), second = await session.create(CreateCounter, 1);
+    const object = c.context().object(sessionId, Counter, first.id), other = c.context().object(sessionId, Counter, second.id);
+    let id!: string, alreadyFinal!: string;
+    object.commit(writer => {
+      id = writer.begin(Operation, { task: "Original" });
+      alreadyFinal = writer.append(Operation, { input: { task: "Already done" }, output: { report: "Existing" } });
+    });
+    const original = service.sessions.tree.node(sessionId, id);
+    expect(() => other.commit(writer => { writer.complete(Operation, id, { report: "Wrong writer" }); })).toThrow("another writer");
+    expect(() => object.commit(writer => { writer.complete(Other, id, { report: "Wrong contract" }); })).toThrow("another writer");
+    expect(() => object.commit(writer => { writer.complete(Operation, alreadyFinal, { report: "Replacement" }); })).toThrow("not pending");
+    // A plugin can finish its resource's operation during cleanup even after that resource has left the current path.
+    session.remove(first);
+    session.commit(writer => { writer.complete(Operation, id, { report: "Stopped" }); });
+    expect(service.sessions.tree.node(sessionId, id)).toEqual({ ...original, pending: false,
+      data: { input: { task: "Original" }, output: { report: "Stopped" } } });
+    expect(() => session.commit(writer => { writer.complete(Operation, id, { report: "Replacement" }); })).toThrow("not pending");
+  });
+
+  it("rolls back pending completions and their notifications, including caught nested commit failures", async () => {
+    const c = counter(), completed: SessionRecord[] = [], updates: SessionChanged[] = [];
+    const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({
+      records: [Operation], observers: [{ id: ns.name("completion"), completed({ records }) { completed.push(...records); } }],
+    }))] });
+    const { service, sessionId } = open([plugin], undefined, event => updates.push(event));
+    const session = c.context().session(sessionId);
+    await service.sessions.execute({ type: "watch", sessionId });
+    let id!: string;
+    session.commit(writer => { id = writer.begin(Operation, { task: "Keep pending on failure" }); });
+    expect(() => session.commit(writer => {
+      writer.complete(Operation, id, { report: "Rolled back" });
+      throw new Error("Abort commit");
+    })).toThrow("Abort commit");
+    session.commit(writer => {
+      try {
+        session.commit(nested => {
+          nested.complete(Operation, id, { report: "Nested rollback" });
+          throw new Error("Abort nested commit");
+        });
+      } catch { /* The outer transaction still commits an unrelated record. */ }
+      writer.append(Changed, { value: 3 });
+    });
+    expect(service.sessions.tree.node(sessionId, id)).toMatchObject({ pending: true, data: { output: null } });
+    expect(completed).toEqual([]);
+    expect(updates.filter(event => event.kind === "session.changed" && event.completed?.length)).toEqual([]);
+    session.commit(writer => { writer.complete(Operation, id, { report: "Committed" }); });
+    expect(completed).toMatchObject([{ id, pending: false, data: { output: { report: "Committed" } } }]);
   });
 });

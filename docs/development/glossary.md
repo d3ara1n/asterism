@@ -8,7 +8,7 @@ These terms distinguish the concepts used when developing Asterism. Each definit
 | --- | --- |
 | Workspace | Persistent ownership of application configuration, sessions, and templates |
 | Session | A piece of ongoing work with one record tree and execution cursor |
-| Agent configuration | Reusable instructions, model defaults, and tool policy |
+| Agent configuration | Reusable instructions, model defaults, and execution budgets |
 | Agent | Execution resource whose conversation projects session history |
 | Resource | Stable object identity, type, state, and lifecycle |
 | Resource presence | Membership in a session’s current reconstructed resource set |

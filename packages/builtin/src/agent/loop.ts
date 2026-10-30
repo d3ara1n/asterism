@@ -13,7 +13,7 @@ export interface AgentLoopPort {
   consume(boundary: "request" | "turn"): boolean;
   limitReached(): void;
 }
-export type AgentLoopStatus = "completed" | "failed" | "awaiting";
+export type AgentLoopStatus = "completed" | "failed" | "cancelled" | "limited";
 
 /** Request iteration and turn boundaries are independent of conversation storage and workbench presentation. */
 export async function runAgentLoop(port: AgentLoopPort, signal: AbortSignal): Promise<AgentLoopStatus> {
@@ -24,13 +24,13 @@ export async function runAgentLoop(port: AgentLoopPort, signal: AbortSignal): Pr
     let status: AgentLoopStatus;
     if (request >= limit) {
       port.limitReached();
-      status = "awaiting";
+      status = "limited";
     } else {
       const result = await port.request(request, signal);
       request++;
-      status = result.reason === "cancelled" ? "awaiting" : result.reason;
+      status = result.reason;
       if (result.halt) return status;
-      if (signal.aborted || result.reason === "cancelled") return "awaiting";
+      if (signal.aborted || result.reason === "cancelled") return "cancelled";
       if (result.reason === "completed") {
         if (request < limit && port.consume("request")) continue;
         if (result.hasTools) continue;

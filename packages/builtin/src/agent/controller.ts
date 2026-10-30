@@ -95,7 +95,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
         let status: ResourceStatus["status"] = "failed";
         try {
           publish("running");
-          status = await runAgentLoop({
+          const outcome = await runAgentLoop({
             requestLimit: () => deps.selection.agent(selectionOf(object).selection).maxTurns ?? 32,
             limitReached() {
               deps.feedback.report(object, { origin: "model", level: "warning", code: "request_limit",
@@ -126,7 +126,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
                 result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
                   userAgent: deps.userAgent, completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
                   target: deps.selection.target(selection), system: files => { prepared = prepare(files); return prepared.system; }, messages: projectForAgent(snapshot, object.ref.id), signal: current,
-                  tools: deps.selection.tools(agent), cache: { expectHit: index > 0 && !compressed },
+                  cache: { expectHit: index > 0 && !compressed },
                   observer: { event(event) { progress.event(event); return observer.event(event); } },
                 }));
               } catch (error) {
@@ -143,6 +143,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
               return { reason: result.reason, hasTools: result.tools.length > 0 };
             },
           }, signal);
+          status = outcome === "cancelled" || outcome === "limited" ? "awaiting" : outcome;
         } catch (error) {
           status = signal.aborted ? "awaiting" : "failed";
           feedback(error, signal);

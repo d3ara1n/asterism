@@ -6,7 +6,7 @@ import { SessionError } from "../shared/session-timeline.ts";
 import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
 import { foldWorkbench, type FoldedState } from "./fold.ts";
 import { deepFreeze } from "../shared/immutable.ts";
-import { SessionTitleAssigned, type ResourceRef } from "@asterism-app/sdk/contracts";
+import { SessionTitleAssigned, type ResourceRef, type Json } from "@asterism-app/sdk/contracts";
 export { SessionError } from "../shared/session-timeline.ts";
 
 export type CursorSelection = {
@@ -20,7 +20,7 @@ export type CursorSelection = {
 
 type NodeIndex = { id: string; seq: number; contract: string };
 
-/** Session tree storage and current timeline execution; nodes are immutable and sessions.cursor determines the current timeline end. */
+/** Session tree storage: fixed node identity and ancestry, with one-time completion of explicitly pending operations. */
 export class SessionTree {
   constructor(private readonly db: DatabaseSync) {}
   private readonly workbenches = new Map<string, { cursor: string | null; state: FoldedState }>();
@@ -90,15 +90,20 @@ export class SessionTree {
       .map(r => sessionNodeSchema.parse(JSON.parse(r.payload)));
   }
 
-  /** Immutable nodes allow deferred reads with fixed endpoints and append bounds, without holding transactions or copying history. */
+  /** Capture unresolved bodies only; completed nodes stay immutable and can be read lazily at fixed endpoints. */
   view(sessionId: string): NodeView {
     const row = this.db.prepare("SELECT title, cursor FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as
       { title: string; cursor: string | null } | undefined;
     if (!row) throw new SessionError("not_found", "Session not found.");
     const upperSeq = this.head(sessionId);
+    const pending = new Map((this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? AND json_extract(payload, '$.pending') = 1")
+      .all(sessionId) as { payload: string }[]).map(({ payload }) => {
+        const node = sessionNodeSchema.parse(JSON.parse(payload));
+        return [node.id, node] as const;
+      }));
     return { id: sessionId, title: row.title, nodeId: row.cursor,
       timelineIds: () => Array.from(this.ancestors(sessionId, row.cursor, upperSeq), entry => entry.id).reverse(),
-      read: query => this.readView(sessionId, row.cursor, upperSeq, query) };
+      read: query => this.readView(sessionId, row.cursor, upperSeq, query, pending) };
   }
 
   /** Deliver structural fields one by one along parent pointers; stop at a last match without moving unrelated bodies. */
@@ -115,16 +120,18 @@ export class SessionTree {
     }
   }
 
-  private readNodes(entries: Iterable<{ id: string }>): SessionNode[] {
+  private readNodes(entries: Iterable<{ id: string }>, pending?: ReadonlyMap<string, SessionNode>): SessionNode[] {
     const read = this.db.prepare("SELECT payload FROM session_nodes WHERE id = ?");
     return Array.from(entries, ({ id }) => {
+      const captured = pending?.get(id);
+      if (captured) return structuredClone(captured);
       const row = read.get(id) as { payload: string } | undefined;
       if (!row) throw new SessionError("not_found", "Session node not found.");
       return sessionNodeSchema.parse(JSON.parse(row.payload));
     });
   }
 
-  private readView(sessionId: string, nodeId: string | null, upperSeq: number, query: NodeQuery): SequencedNode[] {
+  private readView(sessionId: string, nodeId: string | null, upperSeq: number, query: NodeQuery, pending: ReadonlyMap<string, SessionNode>): SequencedNode[] {
     const backwards = query.scope === "timeline" || query.edge === "last";
     const entries = query.scope === "timeline" ? this.ancestors(sessionId, nodeId, upperSeq)
       : this.db.prepare(`SELECT id, seq, contract FROM session_nodes
@@ -141,7 +148,7 @@ export class SessionTree {
     if (backwards) selected.reverse();
     if (!selected.length) return [];
     const sequences = this.numberSequences(sessionId, selected.map(entry => entry.seq));
-    return this.readNodes(selected).map((node, index) => ({ node, sequence: sequences[index]! }));
+    return this.readNodes(selected, pending).map((node, index) => ({ node, sequence: sequences[index]! }));
   }
 
   /** Input follows append order; count only nonoverlapping index ranges without reading other record bodies. */
@@ -159,11 +166,15 @@ export class SessionTree {
   sequences(sessionId: string, nodes: readonly SessionNode[]): number[] {
     if (!nodes.length) return [];
     const position = this.db.prepare("SELECT seq FROM session_nodes WHERE session_id = ? AND id = ?");
-    return this.numberSequences(sessionId, nodes.map(node => {
+    const positions = nodes.map(node => {
       const row = position.get(sessionId, node.id) as { seq: number } | undefined;
       if (!row) throw new SessionError("not_found", "Session node not found.");
       return row.seq;
-    }));
+    });
+    const sorted = [...new Set(positions)].sort((a, b) => a - b);
+    const sequences = this.numberSequences(sessionId, sorted);
+    const byPosition = new Map(sorted.map((position, index) => [position, sequences[index]!]));
+    return positions.map(position => byPosition.get(position)!);
   }
 
   /** Append at the current timeline end at commit time and advance the cursor; does not support writing to arbitrary tree nodes. */
@@ -182,6 +193,23 @@ export class SessionTree {
       throw error;
     }
     return full;
+  }
+
+  node(sessionId: string, id: string): SessionNode {
+    this.cursor(sessionId);
+    const row = this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? AND id = ?").get(sessionId, id) as { payload: string } | undefined;
+    if (!row) throw new SessionError("not_found", "Session record not found.");
+    return sessionNodeSchema.parse(JSON.parse(row.payload));
+  }
+
+  /** Fill a pending record once; its original position, identity, and source remain unchanged. */
+  complete(sessionId: string, id: string, finish: (record: SessionNode) => Json): SessionNode {
+    const node = this.node(sessionId, id);
+    if (node.pending !== true) throw new SessionError("conflict", "The record is not pending.");
+    const completed = sessionNodeSchema.parse({ ...node, data: finish(structuredClone(node)), pending: false });
+    this.db.prepare("UPDATE session_nodes SET payload = ? WHERE session_id = ? AND id = ?")
+      .run(JSON.stringify(completed), sessionId, id);
+    return completed;
   }
 
   /** Select a historical position; callers must ensure sessions are settled. Every node is a valid position without snapping. */

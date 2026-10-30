@@ -40,9 +40,10 @@ export interface PluginSecrets {
   set(key: string, value: string): Promise<void>;
   delete(key: string): Promise<void>;
 }
-/** Host-managed asynchronous tasks within the process: a running key is not started again, and host shutdown cancels tasks; no timeout by default, and tasks are not resumed after restart. */
+/** Host-managed asynchronous tasks: object removal and shutdown cancel owned work and await completion; tasks are not resumed after restart. */
 export interface PluginTasks {
-  start(key: string, run: (signal: AbortSignal) => Promise<void>, options?: { timeoutMs?: number; object?: ResourceRef }): boolean;
+  /** Object-bound tasks protect the timeline by default; external runtime work can opt out while retaining lifetime ownership. */
+  start(key: string, run: (signal: AbortSignal) => Promise<void>, options?: { timeoutMs?: number; object?: ResourceRef; affectsHistory?: boolean }): boolean;
   cancel(key: string): void;
   has(key: string): boolean;
 }

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, pluginNamespace, resourceCall, type ContentRef } from "@asterism-app/sdk/contracts";
+import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, defineOperationRecord, pluginNamespace, resourceCall, type ContentRef } from "@asterism-app/sdk/contracts";
 import { implementCall, defineModule, definePlugin, defineTopLevelTool, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext, type TopLevelTool } from "@asterism-app/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { contentLimits } from "../runtime/content-store.ts";
@@ -20,6 +20,9 @@ const Document = ns.resource("document", z.object({ original: contentRefSchema.o
 const Current = ns.data("current", z.object({ file: contentRefSchema.nullable() }));
 const View = ns.data("view", z.object({ file: contentRefSchema.nullable() }));
 const Saved = defineRecord(ns.name("saved"), { schema: z.object({ file: contentRefSchema }) });
+const Operation = defineOperationRecord(ns.name("operation"), {
+  input: z.object({ file: contentRefSchema }), output: z.object({ file: contentRefSchema }),
+});
 const Create = defineCreation(Document, { id: ns.name("create"), schema: z.object({ file: contentRefSchema, history: z.boolean().default(false), fail: z.boolean().default(false) }) });
 const Replace = defineAction(Document, { id: ns.name("replace"), schema: z.object({ file: contentRefSchema.nullable(), history: z.boolean().default(false), fail: z.boolean().default(false) }) });
 const Generate = defineAction(Document, { id: ns.name("generate"), schema: z.string() });
@@ -34,7 +37,7 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
   const plugin = definePlugin({ namespace: ns, modules: [defineModule(value => {
     context = value;
     return { topLevelTools: options.topLevelTools, resources: [implementResource(Document, View, {
-      records: [Saved],
+      records: [Saved, Operation],
       creation: implementCreation(Create, {
         async prepare(input, { signal, content }) { await content.read(input.file); await options.prepare?.(content, signal); return { action: "accept" }; },
         create(input, object) {
@@ -81,6 +84,38 @@ const text = (data: Uint8Array) => new TextDecoder().decode(data);
 
 // Expectations follow content ownership, synchronous commit, and history contracts; verify the complete public SDK call path.
 describe("Host immutable content", () => {
+  // Completion roots only newly supplied output, retains input dependencies, and does not authorize readers on another path.
+  it("transfers completion attachments from a temporary conversation atomically and retains them across restart", async () => {
+    const f = fixture(), input = f.input();
+    const original = await f.store.writer({ scope: input }).stage(bytes("operation input"));
+    const id = await f.create(original, input.id);
+    await input.close();
+    const before = f.context.session(f.sessionId).snapshot().position.nodeId;
+    let recordId!: string, output!: ContentRef;
+    f.object(id).commit(writer => { recordId = writer.begin(Operation, { file: original }); });
+    await f.service.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: before });
+    await f.context.content.withScope(async content => {
+      output = await content.stage(bytes("operation output"));
+      expect(() => f.context.session(f.sessionId).commit(writer => {
+        writer.complete(Operation, recordId, { file: output }, { content });
+        throw new Error("Abort output");
+      })).toThrow("Abort output");
+      expect(f.service.sessions.tree.node(f.sessionId, recordId).pending).toBe(true);
+      expect(() => f.object(id).content.read(output)).toThrow("does not belong");
+      f.context.session(f.sessionId).commit(writer => { writer.complete(Operation, recordId, { file: output }, { content }); });
+    });
+    expect(() => f.object(id).content.read(output)).toThrow("does not belong");
+    await f.service.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: recordId });
+    f.object(id).commit(writer => { writer.set(Current, { file: null }); });
+    expect(text(await f.object(id).content.read(original))).toBe("operation input");
+    expect(text(await f.object(id).content.read(output))).toBe("operation output");
+    await f.service.close(); services.splice(services.indexOf(f.service), 1);
+    const reopened = new ApplicationService(f.root); services.push(reopened);
+    const reader = reopened.sessions.content.reader({ sessionId: f.sessionId, objectId: id, recordIds: new Set([recordId]) });
+    expect(text(await reader.read(original))).toBe("operation input");
+    expect(text(await reader.read(output))).toBe("operation output");
+  });
+
   it("keeps concurrent handoffs for one object readable until each handoff closes", async () => {
     const f = fixture(), input = f.input();
     const original = await f.store.writer({ scope: input }).stage(bytes("original"));

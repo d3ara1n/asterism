@@ -5,17 +5,16 @@ import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 import type { AgentConfiguration, AgentOverrides } from "@asterism-app/builtin-api/contracts";
 import type { ConfigurationSnapshot } from "./renderer-state";
 import { agentsMessages } from "../messages/agents";
+import { subagentMessages } from "../messages/subagents";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
-import { Checkbox } from "@asterism-app/ui/ui/checkbox";
-import { FieldLabel, FieldGroup, Field, FieldDescription, FieldSet, FieldLegend } from "@asterism-app/ui/ui/field";
+import { FieldLabel, FieldGroup, Field, FieldDescription } from "@asterism-app/ui/ui/field";
 import { Input } from "@asterism-app/ui/ui/input";
 import { InputGroup, InputGroupInput, InputGroupAddon, InputGroupButton } from "@asterism-app/ui/ui/input-group";
 import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { StatusBadge } from "@asterism-app/ui/ui/status";
-import { RadioGroup, RadioGroupItem } from "@asterism-app/ui/ui/radio-group";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem, SelectSeparator } from "@asterism-app/ui/ui/select";
 import { Switch } from "@asterism-app/ui/ui/switch";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
@@ -29,21 +28,16 @@ const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : defaultAgentPreset]!;
 
-/** Override normalization: remove blank text and fields matching built-in values; compare tool allow/exclude lists as a pair. */
+/** Override normalization: remove blank text and fields matching built-in values. */
 function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
   const result: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(draft)) {
-    if (raw === undefined || key === "tools" || key === "excludeTools") continue;
+    if (raw === undefined) continue;
     let value = raw;
     if (typeof value === "string" && !value.trim()) continue;
     if (Array.isArray(value)) value = [...new Set(value.map(item => String(item).trim()).filter(Boolean))];
     if (same(value, base[key as keyof Base])) continue;
     result[key] = value;
-  }
-  if (draft.tools !== undefined || draft.excludeTools !== undefined) {
-    const clean = (list: string[] | null | undefined) => list == null ? null : [...new Set(list.map(item => item.trim()).filter(Boolean))];
-    const tools = clean(draft.tools), excludeTools = clean(draft.excludeTools);
-    if (!same([tools, excludeTools], [base.tools, base.excludeTools])) Object.assign(result, { tools, excludeTools });
   }
   return result as AgentOverrides;
 }
@@ -126,46 +120,20 @@ function RoleSelect({ id, value, onChange }: { id: string; value: string | null;
   </Select>;
 }
 
-/** Chip input: Enter or comma adds, × removes, and Backspace on empty input removes the last item. */
-function TagInput({ id, value, onChange, placeholder }: { id: string; value: string[]; onChange: (value: string[]) => void; placeholder: string }) {
-  const i18n = useI18n();
-  const [text, setText] = useState("");
-  const add = () => { const next = text.trim(); if (next && !value.includes(next)) onChange([...value, next]); setText(""); };
-  return <div className="flex flex-col gap-2">
-    {value.length > 0 && <ul className="flex flex-wrap gap-1.5">{value.map(tag => <li key={tag}>
-      <Badge variant="secondary" className="gap-1 pr-1 font-mono">{tag}
-        <Button type="button" variant="ghost" size="icon-xs" className="size-4 rounded-full" aria-label={i18n.formatMessage(agentsMessages.removeTag, { tag: tag })} onClick={() => onChange(value.filter(item => item !== tag))}><X /></Button>
-      </Badge></li>)}</ul>}
-    <InputGroup>
-      <InputGroupInput id={id} value={text} placeholder={placeholder} className="font-mono" onChange={event => setText(event.target.value)}
-        onKeyDown={event => {
-          if (event.key === "Enter" || event.key === ",") { event.preventDefault(); add(); }
-          else if (event.key === "Backspace" && !text && value.length) onChange(value.slice(0, -1));
-        }} onBlur={add} />
-      <InputGroupAddon align="inline-end"><InputGroupButton disabled={!text.trim()} onClick={add}>{i18n.formatMessage(agentsMessages.addTag)}</InputGroupButton></InputGroupAddon>
-    </InputGroup>
-  </div>;
-}
-
 /* ---------- Editor ---------- */
-
-type ToolMode = "all" | "allow" | "exclude";
-type DelegateMode = "all" | "list" | "none";
 
 function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved(id: string): void }) {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
-  const ids = { identity: useId(), description: useId(), prompt: useId(), role: useId(), fallback: useId(), tools: useId() };
+  const ids = { identity: useId(), description: useId(), prompt: useId(), role: useId() };
   const [id, setId] = useState(initialId);
   const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.agents.find(agent => agent.id === id);
   // Enabling is an immediate row action; the draft does not hold it, preventing mutual overwrites.
   const strip = ({ enabled: _enabled, ...rest }: AgentOverrides): AgentOverrides => rest;
   const [draft, setDraft] = useState<AgentOverrides>(() => strip(id ? snapshot?.overrides.agents[id] ?? {} : {}));
-  const [toolLists, setToolLists] = useState<{ allow: string[]; exclude: string[] }>({ allow: [], exclude: [] });
-  const [delegateMode, setDelegateMode] = useState<DelegateMode | null>(null);
   if (!snapshot) return null;
   const base = baseOf(snapshot, current);
   const builtin = !!current?.builtin;
@@ -178,32 +146,11 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   const dirty = !current || slug !== id || !same(normalized, stored);
   const modified = (field: keyof AgentOverrides) => field in normalized;
 
-  // Tool policy: both sides form one group
-  const groupOverridden = draft.tools !== undefined || draft.excludeTools !== undefined;
-  const tools = groupOverridden ? draft.tools ?? null : base.tools;
-  const excluded = groupOverridden ? draft.excludeTools ?? null : base.excludeTools;
-  const toolMode: ToolMode = tools !== null ? "allow" : excluded !== null ? "exclude" : "all";
-  const setToolMode = (mode: ToolMode) => {
-    if (toolMode === "allow") setToolLists(lists => ({ ...lists, allow: tools ?? [] }));
-    if (toolMode === "exclude") setToolLists(lists => ({ ...lists, exclude: excluded ?? [] }));
-    const keep = (list: string[], fallback: string[] | null) => list.length ? list : fallback ?? [];
-    setDraft(previous => ({ ...previous,
-      tools: mode === "allow" ? keep(toolLists.allow, base.tools) : null,
-      excludeTools: mode === "exclude" ? keep(toolLists.exclude, base.excludeTools) : null }));
-  };
-  const setToolList = (list: string[]) => setDraft(previous => ({ ...previous, tools: toolMode === "allow" ? list : null, excludeTools: toolMode === "exclude" ? list : null }));
-
-  // Delegation: null is unrestricted, an empty list disallows all, and a nonempty list specifies allowed entries
-  const delegates = effective("subagentRoles");
-  const derivedDelegate: DelegateMode = delegates === null ? "all" : delegates.length ? "list" : "none";
-  const shownDelegate = delegateMode ?? derivedDelegate;
-  const others = snapshot.agents.filter(agent => agent.id !== id);
-
   const examples = effective("examples");
   const restore = (...fields: (keyof AgentOverrides)[]) => setDraft(previous => { const updated = { ...previous }; for (const field of fields) delete updated[field]; return updated; });
 
   return <Editor form="agent-form" title={current?.id ?? i18n.formatMessage(agentsMessages.newAgent)} description={builtin ? i18n.formatMessage(agentsMessages.builtinAgent) : undefined} dirty={dirty} busy={busy} error={error}
-    restore={builtin && Object.keys(normalized).length > 0 ? () => { setDraft({}); setDelegateMode(null); setToolLists({ allow: [], exclude: [] }); } : undefined}
+    restore={builtin && Object.keys(normalized).length > 0 ? () => setDraft({}) : undefined}
     remove={current ? { title: i18n.formatMessage(agentsMessages.deleteTitle),
       description: builtin
         ? i18n.formatMessage(agentsMessages.deleteBuiltinDescription, { current_name: current.id })
@@ -213,7 +160,7 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
       event.preventDefault();
       const result = await run({ type: "agent.save", id, value: { ...normalized, id: slug,
         ...(current && snapshot.overrides.agents[current.id]?.enabled !== undefined ? { enabled: snapshot.overrides.agents[current.id]!.enabled } : {}) } });
-      if (result?.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); onSaved(result.savedId); setDraft(strip(result.snapshot.overrides.agents[result.savedId] ?? {})); setDelegateMode(null); }
+      if (result?.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); onSaved(result.savedId); setDraft(strip(result.snapshot.overrides.agents[result.savedId] ?? {})); }
     }}><fieldset disabled={busy}>
 
       <EditorSection title={i18n.formatMessage(agentsMessages.basics)}><FieldGroup>
@@ -227,8 +174,6 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
         <Field><Label htmlFor={ids.role} modified={modified("modelRole")} onRestore={() => restore("modelRole")}>{i18n.formatMessage(agentsMessages.defaultModelRole)}</Label>
           <RoleSelect id={ids.role} value={effective("modelRole")} onChange={next => set("modelRole", next)} />
           <FieldDescription>{i18n.formatMessage(agentsMessages.defaultModelRoleHint)}</FieldDescription></Field>
-        <Field><Label htmlFor={ids.fallback} modified={modified("fallbackRole")} onRestore={() => restore("fallbackRole")}>{i18n.formatMessage(agentsMessages.fallbackModelRole)}</Label>
-          <RoleSelect id={ids.fallback} value={effective("fallbackRole")} onChange={next => set("fallbackRole", next)} /></Field>
       </FieldGroup></EditorSection>
 
       <EditorSection title={i18n.formatMessage(agentsMessages.prompts)}><FieldGroup>
@@ -246,46 +191,11 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
           <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => set("examples", [...examples, ""])}><Plus />{i18n.formatMessage(agentsMessages.addExample)}</Button></Field>
       </FieldGroup></EditorSection>
 
-      <EditorSection title={i18n.formatMessage(agentsMessages.toolsAndDelegation)}><FieldGroup>
-        <FieldSet>
-          <div className="flex items-center justify-between gap-2"><FieldLegend variant="label">{i18n.formatMessage(agentsMessages.toolPolicy)}</FieldLegend>
-            {(modified("tools") || modified("excludeTools")) && <ModifiedNote onRestore={() => restore("tools", "excludeTools")} />}</div>
-          <RadioGroup value={toolMode} onValueChange={next => setToolMode(next as ToolMode)}>
-            {([["all", i18n.formatMessage(agentsMessages.allAuthorizedTools)], ["allow", i18n.formatMessage(agentsMessages.onlyListedTools)], ["exclude", i18n.formatMessage(agentsMessages.exceptListedTools)]] as const).map(([mode, label]) =>
-              <Field key={mode} orientation="horizontal"><RadioGroupItem value={mode} id={`${ids.tools}-${mode}`} /><FieldLabel htmlFor={`${ids.tools}-${mode}`} className="font-normal">{label}</FieldLabel></Field>)}
-          </RadioGroup>
-          {toolMode !== "all" && <Field>
-            <TagInput id={ids.tools} value={(toolMode === "allow" ? tools : excluded) ?? []} onChange={setToolList} placeholder={i18n.formatMessage(agentsMessages.toolNamePlaceholder)} />
-            <FieldDescription>{toolMode === "allow"
-              ? i18n.formatMessage(agentsMessages.allowlistHint)
-              : i18n.formatMessage(agentsMessages.denylistHint)}</FieldDescription>
-          </Field>}
-          <FieldDescription>{i18n.formatMessage(agentsMessages.toolPolicyHint)}</FieldDescription>
-        </FieldSet>
-
-        <FieldSet>
-          <div className="flex items-center justify-between gap-2"><FieldLegend variant="label">{i18n.formatMessage(agentsMessages.delegation)}</FieldLegend>
-            {modified("subagentRoles") && <ModifiedNote onRestore={() => { restore("subagentRoles"); setDelegateMode(null); }} />}</div>
-          <RadioGroup value={shownDelegate} onValueChange={next => {
-            const mode = next as DelegateMode; setDelegateMode(mode);
-            set("subagentRoles", mode === "all" ? null : mode === "none" ? [] : delegates?.length ? delegates : []);
-          }}>
-            {([["all", i18n.formatMessage(agentsMessages.anyAgent)], ["list", i18n.formatMessage(agentsMessages.selectedAgents)], ["none", i18n.formatMessage(agentsMessages.noDelegation)]] as const).map(([mode, label]) =>
-              <Field key={mode} orientation="horizontal"><RadioGroupItem value={mode} id={`${ids.tools}-d-${mode}`} /><FieldLabel htmlFor={`${ids.tools}-d-${mode}`} className="font-normal">{label}</FieldLabel></Field>)}
-          </RadioGroup>
-          {shownDelegate === "list" && <FieldGroup data-slot="checkbox-group" className="gap-3 rounded-md border px-3 py-3">
-            {others.length ? others.map(agent => <Field key={agent.id} orientation="horizontal">
-              <Checkbox id={`${ids.tools}-a-${agent.id}`} checked={!!delegates?.includes(agent.id)}
-                onCheckedChange={next => set("subagentRoles", next === true ? [...(delegates ?? []), agent.id] : (delegates ?? []).filter(item => item !== agent.id))} />
-              <FieldLabel htmlFor={`${ids.tools}-a-${agent.id}`} className="font-normal">{agent.id}</FieldLabel>
-            </Field>) : <FieldDescription>{i18n.formatMessage(agentsMessages.noOtherAgents)}</FieldDescription>}
-          </FieldGroup>}
-          <FieldDescription>{i18n.formatMessage(agentsMessages.delegationHint)}</FieldDescription>
-        </FieldSet>
-      </FieldGroup></EditorSection>
-
       <EditorSection collapsible defaultOpen={false} title={i18n.formatMessage(agentsMessages.limits)}><FieldGroup>
         <OverrideNumberField label={i18n.formatMessage(agentsMessages.maximumRequests)} value={draft.maxTurns} inherited={base.maxTurns} onChange={next => set("maxTurns", next)} min={1} integer empty={i18n.formatMessage(agentsMessages.maximumRequestsPlaceholder)} />
+        <FieldDescription>{i18n.text(subagentMessages.requestBudgetHint)}</FieldDescription>
+        <OverrideNumberField label={i18n.text(subagentMessages.timeBudget)} value={draft.maxDurationSeconds} inherited={base.maxDurationSeconds}
+          onChange={next => set("maxDurationSeconds", next ?? undefined)} empty={String(base.maxDurationSeconds)} min={1} max={2147483} integer />
       </FieldGroup></EditorSection>
 
     </fieldset></form>

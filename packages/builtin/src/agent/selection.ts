@@ -9,7 +9,7 @@ export function selectionOf(object: ObjectReader) {
   if (!value) throw new PluginApiError("not_found", "Agent not found.");
   return value;
 }
-/** Configuration reads always use current values; link descriptions and requests use the same policy rules. */
+/** Configuration reads use current values at each request boundary. */
 export function createSelection(deps: { agents(): readonly AgentConfiguration[]; roles(): readonly ModelRole[] }) {
   const configurations = () => deps.agents().filter(agent => agent.enabled);
   const agentOf = (selection: Selection) => {
@@ -25,9 +25,6 @@ export function createSelection(deps: { agents(): readonly AgentConfiguration[];
     },
     target(selection: Selection) {
       return resolveRoleTarget(deps.roles(), agentOf(selection).modelRole ?? "default", selection);
-    },
-    tools(agent: AgentConfiguration) {
-      return { ...(agent.tools === null ? {} : { allow: agent.tools }), ...(agent.excludeTools === null ? {} : { exclude: agent.excludeTools }) };
     },
   };
 }

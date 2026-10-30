@@ -76,13 +76,15 @@ The host tracks application, session, and object lifetimes. Plugin shared servic
 
 Ending a lifetime signals cancellation, waits for dependent work, and runs registered cleanup in reverse order. A signal alone does not prove completion. Cleanup failure is reported while remaining cleanup proceeds.
 
-Objects attach when they enter an active session's current resource set, including startup and cursor reconstruction. Card mounting is unrelated. Logical removal immediately changes discovery and closes frontend channels. Captured request holds delay instance disposal until existing users finish. Reappearing objects initialize according to their resource implementation; history movement remains blocked while requests or retirement are active.
+Objects attach when they enter an active session's current resource set, including startup and cursor reconstruction. Card mounting is unrelated. Logical removal immediately changes discovery, closes frontend channels, and cancels the object's managed tasks and model requests. Captured request holds keep the instance available to borrowed tool operations until those users finish. Attachment lifetime termination and cleanup follow hold release. Reappearing objects initialize according to their resource implementation; history movement remains blocked while retirement is active.
 
-Resource-owned busy work blocks session cursor changes and removal of that resource. Session-bound request occupancy separately blocks cursor changes and retains captured resources, without automatically making its access owner busy. Neither mechanism determines domain execution state or sidebar notifications.
+Resource-owned busy work blocks session cursor changes and removal of that resource. Model requests capture resource capabilities and retain them through completion without automatically blocking history or making the access owner busy. The caller supplies a busy scope when its work depends on the timeline. These mechanisms do not determine domain execution state or sidebar notifications.
 
-Managed requests, actions, and explicit busy scopes retain their occupancy until real completion. Directed request holds account for concurrent consumers independently of Agent ancestry. Read-only communication does not become busy merely because it references an object. Archival cancels session work and waits for resource retirement before recording the archive state.
+Object-bound managed tasks protect the timeline by default. External runtime tasks can opt out of history occupancy while retaining object ownership, cancellation, and cleanup. Busy scopes and request holds remain until real completion. Directed request holds account for concurrent consumers independently of Agent ancestry. Read-only communication does not become busy merely because it references an object. Archival cancels session work and waits for resource retirement before recording the archive state.
 
 Invalidating a projection publishes current domain state without creating a record or changing stored data. Within a transaction, publication follows successful commit.
+
+Operation records separate fixed input from an eventual output. Publishing establishes their identity and position; completing fills the result once, including on an inactive branch, without moving the cursor. Session writers act within their plugin's ownership, while object writers also require the original emitting object. Record completion, content roots, and completion notifications share the transaction boundary. Snapshot readers preserve their captured pending state.
 
 ## Typed calls, events, and channels
 
