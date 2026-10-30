@@ -135,23 +135,17 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
       ],
       channels: [implementChannel(PoolChannel, channel => {
         const runtime = pool(channel.object.ref);
-        let selected: string | null = null, sent = 0, reset = true, timer: ReturnType<typeof setTimeout> | undefined;
+        let selected: string | null = null, timer: ReturnType<typeof setTimeout> | undefined;
         const send = () => {
           if (channel.signal.aborted || selected === null) return;
-          try {
-            const frame = runtime.process(selected, sent);
-            channel.send({ ...frame, reset });
-            sent += frame.blocks.length; reset = false;
-          } catch (error) {
-            sent = 0; reset = true;
-            channel.send({ task: null, blocks: [], live: [], reset: true, error: error instanceof Error ? error.message : String(error) });
-          }
+          try { channel.send(runtime.process(selected)); }
+          catch (error) { channel.send({ task: null, queued: [], error: error instanceof Error ? error.message : String(error) }); }
         };
         const unsubscribe = runtime.subscribe(finished => {
           if (finished) { clearTimeout(timer); timer = undefined; send(); }
           else timer ??= setTimeout(() => { timer = undefined; send(); }, 40);
         });
-        channel.onMessage(message => { selected = message.id; sent = 0; reset = true; send(); });
+        channel.onMessage(message => { selected = message.id; send(); });
         channel.signal.addEventListener("abort", () => { unsubscribe(); clearTimeout(timer); }, { once: true });
       })],
     };

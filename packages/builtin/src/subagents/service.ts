@@ -76,9 +76,9 @@ export class SubagentPoolRuntime {
   }
   list(): TaskSummary[] { return this.records("timeline").map(entry => summary(this.snapshot(entry))); }
   check(id: string): TaskSnapshot { return this.snapshot(this.require(id)); }
-  process(id: string, offset = 0): ProcessFrame {
+  process(id: string): ProcessFrame {
     const task = this.check(id), run = this.jobs.get(task.input.runId);
-    return { task, blocks: run ? run.blocks.slice(offset) : [], live: run ? [...run.live] : [], error: null };
+    return { task, queued: run?.accepting ? [...run.queue] : [], error: null };
   }
   get working(): boolean { return this.queue.length > 0 || this.active.size > 0; }
   subscribe(listener: (finished: boolean) => void): () => void {

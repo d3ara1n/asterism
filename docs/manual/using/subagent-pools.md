@@ -26,7 +26,7 @@ Task checks provide the same information to the model and the user: a current ac
 
 Waiting returns task states to the model. The wait view shows activity while tasks run, then replaces it with each task's completion status. Reports are retrieved with a check.
 
-Open a task from the pool card to see its input, background, and status. Queued tasks offer additional instructions and cancellation. Running tasks show usage and their live process. Finished tasks show their outcome, usage, and report; the process and activity log are hidden. Additional instructions enter the task's message queue while it is queued or running and are delivered at request boundaries. A finished task cannot restart; a new delegation is a new task.
+Open a task from the pool card to see its input, background, submitter, and status. Queued and running tasks offer additional instructions and cancellation; cancellation asks for confirmation. Running tasks show usage and their live process: one line per thinking, text, or tool step, with instructions at the point they were delivered and instructions still waiting at the end. Finished tasks show their outcome, usage, and report, followed by the instructions the task received and any that arrived too late; the process is hidden. Additional instructions enter the task's message queue while it is queued or running and are delivered at request boundaries. A finished task cannot restart; a new delegation is a new task.
 
 Any Agent with access to the pool can observe, guide, or cancel its shared tasks. The pool card also provides steering and cancellation. Closing a task view does not stop its execution.
 

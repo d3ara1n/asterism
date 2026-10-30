@@ -40,8 +40,8 @@ function toolCall(name: string, args: Json): { name: string; subject: string | n
 }
 
 /**
- * Compact process log: thinking and tool steps in response order, with delivered steering at its actual position.
- * Text output is the report and is not repeated here. Live blocks contribute steps that have not finalized.
+ * Compact process log: thinking, text, and tool steps in response order, with delivered steering at its actual position.
+ * Text steps carry a one-line preview. Live blocks contribute steps that have not finalized.
  */
 export function activityOf(blocks: readonly ProcessBlock[], live: readonly ModelLiveBlock[], steers: readonly DeliveredSteer[]): ActivityEntry[] {
   const entries: ActivityEntry[] = [];
@@ -63,6 +63,7 @@ export function activityOf(blocks: readonly ProcessBlock[], live: readonly Model
     for (const block of [...group].sort((a, b) => a.ordinal - b.ordinal)) {
       finalized.add(`${block.responseId}:${block.ordinal}`);
       if (block.kind === "thinking") entries.push({ kind: "thinking", state: "done" });
+      else if (block.kind === "text") { const text = oneLine(block.text); if (text) entries.push({ kind: "text", preview: text }); }
       else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.arguments),
         implementation: block.outcome?.implementation?.id ?? null, state: block.outcome?.kind ?? "cancelled" });
     }
@@ -72,6 +73,7 @@ export function activityOf(blocks: readonly ProcessBlock[], live: readonly Model
   for (const block of live) {
     if (finalized.has(`${block.responseId}:${block.ordinal}`)) continue;
     if (block.kind === "thinking") entries.push({ kind: "thinking", state: "running" });
+    else if (block.kind === "text") { const text = oneLine(block.text); if (text) entries.push({ kind: "text", preview: text }); }
     else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.arguments),
       implementation: block.invocation?.implementation?.id ?? null, state: "running" });
   }

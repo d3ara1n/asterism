@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   defineCall, defineChannel, defineCreation, defineImplementation, defineOperationRecord, defineTool,
-  modelExpressionSchema, modelUsageSchema, modelBlockSchema, thinkingSchema, type Json, type ModelLiveBlock,
+  modelExpressionSchema, modelUsageSchema, modelBlockSchema, thinkingSchema, type Json,
 } from "@asterism-app/sdk/contracts";
 import { builtin, configurationIdSchema } from "@asterism-app/builtin-api/contracts";
 
@@ -40,12 +40,13 @@ export const statusSchema = z.discriminatedUnion("phase", [
 const toolStateSchema = z.enum(["running", "succeeded", "partial", "rejected", "failed", "cancelled", "unknown"]);
 export const activityEntrySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("thinking"), state: z.enum(["running", "done"]) }),
+  z.strictObject({ kind: z.literal("text"), preview: z.string() }),
   z.strictObject({ kind: z.literal("tool"), name: z.string(), implementation: z.string().nullable(), subject: z.string().nullable(), state: toolStateSchema }),
   z.strictObject({ kind: z.literal("steer"), text: z.string() }),
 ]);
 export const outputSchema = z.strictObject({
   result: z.string().nullable(), usage: usageSchema,
-  activity: z.array(activityEntrySchema).describe("Thinking and tool steps in order, with delivered steering at its position."),
+  activity: z.array(activityEntrySchema).describe("Thinking, text, and tool steps in order, with delivered steering at its position."),
   undelivered: z.array(z.string()).describe("Steering messages queued but not delivered before the task ended."),
 });
 export const delegationInputSchema = z.strictObject({
@@ -132,9 +133,9 @@ export type TaskOutput = z.infer<typeof outputSchema>;
 export type TaskCompletion = z.infer<typeof completionSchema>;
 export type FinishedStatus = z.infer<typeof finishedSchema>;
 export type ProcessBlock = z.infer<typeof modelBlockSchema>;
-export type ProcessFrame = { task: TaskSnapshot | null; blocks: ProcessBlock[]; live: ModelLiveBlock[]; error: string | null };
-export type ProcessUpdate = ProcessFrame & { reset: boolean };
-export const PoolChannel = defineChannel<{ id: string | null }, ProcessUpdate>(builtin.name("subagent-pool.process"));
+/** One task as observed now: its snapshot with the live activity log, and steering still waiting in its input queue. */
+export type ProcessFrame = { task: TaskSnapshot | null; queued: string[]; error: string | null };
+export const PoolChannel = defineChannel<{ id: string | null }, ProcessFrame>(builtin.name("subagent-pool.process"));
 
 export function summary(task: TaskSnapshot): TaskSummary {
   const preview = task.input.task.split("\n")[0]!;

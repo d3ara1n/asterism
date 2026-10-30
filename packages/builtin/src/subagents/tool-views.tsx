@@ -1,31 +1,12 @@
-import { useEffect, useState } from "react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { ActivityTail } from "./ActivityTail";
+import { ActivityTail, InstructionList } from "./ActivityTail";
 import { Markdown } from "../agent/conversation/Markdown";
 import { subagentMessages as messages } from "../messages/subagents";
-import { TaskStateText, TaskStatus } from "./PoolCard";
+import { TaskStateText, TaskStatus, Usage } from "./task-parts";
 import type { DelegateInput, TaskSnapshot, TaskSummary, WaitEntry } from "./contract";
 import { currentActivity } from "./activity";
 
-/** Elapsed time keeps counting between published updates while the task runs. */
-function useLiveElapsed(elapsedMs: number, live: boolean): number {
-  const [received, setReceived] = useState(() => ({ elapsedMs, at: Date.now() }));
-  const [now, setNow] = useState(Date.now);
-  if (received.elapsedMs !== elapsedMs) setReceived({ elapsedMs, at: Date.now() });
-  useEffect(() => {
-    if (!live) return;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [live]);
-  return live ? received.elapsedMs + Math.max(0, now - received.at) : elapsedMs;
-}
-function Usage({ usage, live }: { usage: TaskSummary["usage"]; live: boolean }) {
-  const i18n = useI18n();
-  const elapsedMs = useLiveElapsed(usage.elapsedMs, live);
-  return <p className="type-caption">{usage.model ? `${usage.model} · ` : ""}
-    {i18n.formatMessage(messages.usage, { requests: usage.requests, seconds: Math.round(elapsedMs / 1000) })}</p>;
-}
 /** Status line identifying one task: ID, role, status, and the task's first line. Snapshots show the status as text. */
 function TaskLine({ task, snapshot = false }: { task: Pick<TaskSummary, "id" | "role" | "task" | "status">; snapshot?: boolean }) {
   return <div className="flex min-w-0 items-center gap-2">
@@ -78,10 +59,7 @@ function CheckBody({ result }: CheckProps) {
     </p>}
     {status.phase === "finished" && status.message && <p className="type-caption">{status.message}</p>}
     {finished && (task.output.result ? <Markdown>{task.output.result}</Markdown> : <p className="type-caption">{i18n.text(messages.noReport)}</p>)}
-    {task.output.undelivered.length > 0 && <section className="flex flex-col gap-1">
-      <h4 className="type-caption">{i18n.text(messages.undelivered)}</h4>
-      {task.output.undelivered.map((text, index) => <p key={index} className="type-body whitespace-pre-wrap break-words">{text}</p>)}
-    </section>}
+    <InstructionList activity={[]} undelivered={task.output.undelivered} />
     <Usage usage={task.output.usage} live={false} />
   </div>;
 }
