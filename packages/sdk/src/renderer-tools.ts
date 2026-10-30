@@ -62,6 +62,8 @@ export interface ToolView {
 }
 export interface ToolRenderer {
   contract: ContractReference;
+  /** Display name of the tool, readable without rendering a call. */
+  label?: UiText;
   resolve(props: ToolRenderProps): ToolView | null;
 }
 
@@ -83,7 +85,7 @@ export function toolRenderer<D extends Json, T extends Json = Json, A extends Js
   contract: DataContract<D> & { targetSchema?: z.ZodType<T>; tool?: { argsSchema: z.ZodType<A> } },
   definition: ToolRendererDefinition<D, T, A>,
 ): ToolRenderer {
-  return { contract: reference(contract), resolve(props) {
+  return { contract: reference(contract), label: definition.label, resolve(props) {
     if (props.phase === "input") return definition.input ? render(definition, definition.input, props) : null;
     const data = props.result?.data;
     const parsed = data === null || data === undefined ? null : contract.schema.safeParse(data);

@@ -55,7 +55,7 @@ export function activityOf(blocks: readonly ProcessBlock[], live: readonly Model
       finalized.add(`${block.responseId}:${block.ordinal}`);
       if (block.kind === "thinking") entries.push({ kind: "thinking", state: "done" });
       else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.arguments),
-        state: block.outcome?.kind ?? "cancelled" });
+        implementation: block.outcome?.implementation?.id ?? null, state: block.outcome?.kind ?? "cancelled" });
     }
     count += group.length;
   }
@@ -63,7 +63,8 @@ export function activityOf(blocks: readonly ProcessBlock[], live: readonly Model
   for (const block of live) {
     if (finalized.has(`${block.responseId}:${block.ordinal}`)) continue;
     if (block.kind === "thinking") entries.push({ kind: "thinking", state: "running" });
-    else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.arguments), state: "running" });
+    else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.arguments),
+      implementation: block.invocation?.implementation?.id ?? null, state: "running" });
   }
   deliver(Infinity);
   return entries;

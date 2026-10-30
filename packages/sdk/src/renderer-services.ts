@@ -17,6 +17,8 @@ export interface RendererCatalogs { get<T extends Json>(contract: DataContract<T
 export interface RendererTools {
   resolve(props: ToolRenderProps): ToolView & { props: ToolRenderProps };
   preparation(name: string): string;
+  /** Localized name of a tool by its model-facing name and implementation contract; null when no view declares one. */
+  label(name: string, implementation: string | null): string | null;
 }
 export interface RendererModels { readonly blocks: readonly ModelLiveBlock[] }
 export interface RendererNavigation { home(): void }

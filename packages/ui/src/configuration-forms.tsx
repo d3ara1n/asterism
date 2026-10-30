@@ -91,17 +91,6 @@ export function OverrideToggleField({ value, inherited, onChange, label, hint }:
     <Switch id={id} checked={effective} onCheckedChange={next => onChange(next === inherited ? undefined : next)} />
   </Field>;
 }
-export function OverrideNumberField({ value, inherited, onChange, empty, ...props }: {
-  label: string; value: number | null | undefined; inherited: number | null; onChange: (value: number | null | undefined) => void;
-  empty: string; min?: number; max?: number; integer?: boolean;
-}) {
-  const i18n = useI18n();
-  return <NumberField {...props} value={value ?? null}
-    placeholder={value === null ? empty : `${i18n.formatMessage(formsMessages.builtinList)} · ${inherited ?? empty}`}
-    onChange={next => onChange(next ?? undefined)}
-    onReset={value !== undefined ? () => onChange(undefined) : undefined}
-    onClear={value !== null ? () => onChange(null) : undefined} clearLabel={empty} />;
-}
 /** Unset lists inherit, and explicit empty lists clear; do not infer list policy from empty text. */
 export function OverrideListField({ label, value, inherited, onChange, empty, hint }: {
   label: string; value: string[] | undefined; inherited: string[]; onChange: (value: string[] | undefined) => void; empty: string; hint?: string;

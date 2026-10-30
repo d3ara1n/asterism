@@ -32,6 +32,10 @@ export function TaskStatus({ status }: { status: TaskSnapshot["status"] }) {
   const state = stateOf(status);
   return <StatusBadge tone={tones[state]}>{useI18n().formatMessage(messages.state, { state })}</StatusBadge>;
 }
+/** Status at one moment, such as a snapshot read; plain text so it does not read as live. */
+export function TaskStateText({ status }: { status: TaskSnapshot["status"] }) {
+  return <span className="type-caption">{useI18n().formatMessage(messages.state, { state: stateOf(status) })}</span>;
+}
 function TaskReport({ task }: { task: TaskSnapshot }) {
   const i18n = useI18n();
   return <div className="flex min-w-0 flex-col gap-3">

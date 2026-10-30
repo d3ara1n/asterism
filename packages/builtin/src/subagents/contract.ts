@@ -21,9 +21,9 @@ export const modelOverrideSchema = z.strictObject({
 export const delegateSchema = z.strictObject({
   role: configurationIdSchema.describe("Agent role ID from this pool's role listing."),
   model: modelOverrideSchema.optional().describe("Optional model selection override. Other settings come from the Agent role."),
-  task: z.string().min(1).describe("Task instructions and the requested report."),
-  context: z.string().optional().describe("Explicit background material for the independent conversation."),
-}).describe("Delegate a task using an Agent role and explicit task material.");
+  task: z.string().min(1).describe("The work and the requested report. The task conversation receives only task and context, so every requirement and constraint appears in one of them."),
+  context: z.string().optional().describe("Background material for the task, such as prior findings, selected code, or file lists; delivered separately from the instructions."),
+}).describe("An Agent role and explicit task material.");
 export const usageSchema = modelUsageSchema.extend({
   model: z.string().nullable(), requests: z.number().int().nonnegative(), elapsedMs: z.number().nonnegative(),
 });
@@ -40,7 +40,7 @@ export const statusSchema = z.discriminatedUnion("phase", [
 const toolStateSchema = z.enum(["running", "succeeded", "partial", "rejected", "failed", "cancelled", "unknown"]);
 export const activityEntrySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("thinking"), state: z.enum(["running", "done"]) }),
-  z.strictObject({ kind: z.literal("tool"), name: z.string(), subject: z.string().nullable(), state: toolStateSchema }),
+  z.strictObject({ kind: z.literal("tool"), name: z.string(), implementation: z.string().nullable(), subject: z.string().nullable(), state: toolStateSchema }),
   z.strictObject({ kind: z.literal("steer"), text: z.string() }),
 ]);
 export const outputSchema = z.strictObject({
@@ -73,25 +73,44 @@ export const PoolView = builtin.data("subagent-pool.card", z.strictObject({ task
 
 const empty = z.strictObject({}).describe("No operation parameters.");
 const define = <T extends Json, A extends Json, D extends Json>(
-  name: string, description: string, target: z.ZodType<T>, args: z.ZodType<A>, result: z.ZodType<D>, effect: "read" | "write",
+  name: string, description: string, guidelines: string[], target: z.ZodType<T>, args: z.ZodType<A>, result: z.ZodType<D>, effect: "read" | "write",
 ) => defineImplementation({
   ...builtin.data(`subagent.${name}-result`, result), resource: SubagentPool,
-  tool: defineTool({ id: builtin.name(`tool.subagent_${name}`), name: `subagent_${name}`, description, guidelines: [], argsSchema: args }),
+  tool: defineTool({ id: builtin.name(`tool.subagent_${name}`), name: `subagent_${name}`, description, guidelines, argsSchema: args }),
   targetSchema: target, effect, execution: "parallel",
 });
-export const Delegate = define("delegate", "Submit an independent asynchronous task to this shared pool. Returns its ID; results are retrieved with subagent_check.",
+export const Delegate = define("delegate",
+  "Submit an independent task to this shared pool and return its ID immediately. The task runs asynchronously with the Agent role's instructions and budget and the resources linked to the pool.",
+  [
+    "Several delegations run concurrently; the pool executes up to four at once and queues the rest.",
+    "subagent_wait blocks until selected tasks end; subagent_check then returns each report.",
+  ],
   z.null().describe("Submit to this pool."), delegateSchema, snapshotSchema, "write");
-export const Check = define("check", "Read one task's current state or final report. Reading does not consume the result.",
+export const Check = define("check",
+  "Return an instant snapshot of one task without waiting: queued, running with its current activity and usage so far, or finished with its outcome, report, and usage. Reading does not consume the result; a finished task returns the same report on every read, including after history navigation and restart.",
+  [
+    "A running status, or the same activity across consecutive checks, means the task is still working.",
+  ],
   taskIdSchema, empty, snapshotSchema, "read");
-export const Wait = define("wait", "Wait until all selected tasks end. Task failure does not fail the wait. Cancelling the wait leaves tasks running.",
+export const Wait = define("wait",
+  "Block until all selected tasks end, then return each task's outcome and usage. A failed task does not fail the wait. Cancelling the wait leaves the tasks running.",
+  [
+    "Reports are returned by subagent_check after the wait.",
+  ],
   z.array(taskIdSchema).min(1).describe("Task IDs to wait for, such as [\"sub-1\", \"sub-2\"]."), empty,
-  z.strictObject({ tasks: z.array(waitEntrySchema) }).describe("Status, recent process steps, and usage for each selected task. Reports are available through subagent_check."), "read");
-export const Steer = define("steer", "Append task material to a queued or running task. The task receives it at the next request boundary.",
-  taskIdSchema, z.strictObject({ message: z.string().min(1) }).describe("Additional instructions or background."),
+  z.strictObject({ tasks: z.array(waitEntrySchema) }).describe("Status, recent process steps, and usage for each selected task."), "read");
+export const Steer = define("steer",
+  "Append instructions or background to a queued or running task. The task receives its whole input queue at the next request boundary and keeps its progress. Steering that arrives after the final response began is returned as undelivered with the result.",
+  [
+    "Steering carries a concrete change to the task's requirements. A running status or consecutive checks without a report show that the task is still working, not that its direction is wrong.",
+  ],
+  taskIdSchema, z.strictObject({ message: z.string().min(1).describe("The concrete correction or additional requirement.") }).describe("Material for the task's input queue."),
   z.strictObject({ id: taskIdSchema, accepted: z.literal(true) }).describe("Confirmation that the material entered this task's input queue."), "write");
-export const Cancel = define("cancel", "Cancel a task and wait for its execution to end. Existing output remains available.",
-  taskIdSchema, z.strictObject({ reason: z.string().optional() }).describe("Optional reason for cancellation."),
-  summarySchema.describe("Final task state after cancellation or an already completed task."), "write");
+export const Cancel = define("cancel",
+  "Stop a queued or running task and wait for its execution to end. Its outcome becomes cancelled with the recorded reason; output produced so far remains available through subagent_check. A finished task is returned unchanged.",
+  [],
+  taskIdSchema, z.strictObject({ reason: z.string().optional().describe("Why the task is no longer needed; recorded with its outcome.") }).describe("Optional reason for cancellation."),
+  summarySchema.describe("Final task state."), "write");
 export const CancelSubagent = defineCall(builtin.name("subagent.cancel"), {
   scope: "object", input: z.strictObject({ id: taskIdSchema }), output: z.null(),
 });

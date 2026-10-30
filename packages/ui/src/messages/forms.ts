@@ -25,10 +25,6 @@ export const formsMessages = pluginNamespace("asterism.host").messages("en", def
     id: "features_configuration_forms_6",
     defaultMessage: "Restore",
   },
-  builtinList: {
-    id: "features_configuration_forms_7",
-    defaultMessage: "Built-in",
-  },
   customList: {
     id: "features_configuration_forms_8",
     defaultMessage: "Custom list",

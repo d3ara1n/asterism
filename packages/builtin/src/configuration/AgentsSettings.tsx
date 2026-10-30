@@ -19,7 +19,7 @@ import { Switch } from "@asterism-app/ui/ui/switch";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
 import { useRendererIsland as useIsland } from "@asterism-app/sdk/renderer";
 import { Section } from "@asterism-app/ui/settings-layout";
-import { Editor, EditorSection, ModifiedNote, OverrideNumberField, ReadStatus } from "@asterism-app/ui/configuration-forms";
+import { Editor, EditorSection, ModifiedNote, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
 
 type Base = Omit<AgentConfiguration, "id" | "builtin">;
@@ -132,7 +132,7 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
-  const ids = { identity: useId(), description: useId(), prompt: useId(), role: useId() };
+  const ids = { identity: useId(), description: useId(), prompt: useId(), role: useId(), requests: useId(), duration: useId() };
   const [id, setId] = useState(initialId);
   const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.agents.find(agent => agent.id === id);
@@ -157,6 +157,14 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   const stored = normalize(strip(id ? snapshot.overrides.agents[id] ?? {} : {}), base);
   const dirty = !current || slug !== id || !same(normalized, stored);
   const modified = (field: keyof AgentOverrides) => field in normalized;
+  const budgetModified = (field: keyof Base["budget"]) => normalized.budget?.[field] !== undefined;
+  // Budget values are required: the placeholder shows the inherited value, and Restore removes the override.
+  const budgetField = (field: keyof Base["budget"], id: string, label: string, max?: number) =>
+    <Field><Label htmlFor={id} modified={budgetModified(field)} onRestore={() => setBudget(field, undefined)}>{label}</Label>
+      <Input id={id} type="number" inputMode="numeric" min={1} max={max} step={1} value={draft.budget?.[field] ?? ""}
+        placeholder={String(base.budget[field])}
+        className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        onChange={event => setBudget(field, event.target.value === "" ? undefined : Number(event.target.value))} /></Field>;
 
   const examples = effective("examples");
   const restore = (...fields: (keyof AgentOverrides)[]) => setDraft(previous => { const updated = { ...previous }; for (const field of fields) delete updated[field]; return updated; });
@@ -204,10 +212,8 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
       </FieldGroup></EditorSection>
 
       <EditorSection collapsible defaultOpen={false} title={i18n.formatMessage(agentsMessages.budget)} hint={i18n.formatMessage(agentsMessages.budgetHint)}><FieldGroup>
-        <OverrideNumberField label={i18n.formatMessage(agentsMessages.maximumRequests)} value={draft.budget?.maxRequests} inherited={base.budget.maxRequests}
-          onChange={next => setBudget("maxRequests", next)} empty={String(base.budget.maxRequests)} min={1} integer />
-        <OverrideNumberField label={i18n.formatMessage(agentsMessages.maximumDuration)} value={draft.budget?.maxDurationSeconds} inherited={base.budget.maxDurationSeconds}
-          onChange={next => setBudget("maxDurationSeconds", next)} empty={String(base.budget.maxDurationSeconds)} min={1} max={2147483} integer />
+        {budgetField("maxRequests", ids.requests, i18n.formatMessage(agentsMessages.maximumRequests))}
+        {budgetField("maxDurationSeconds", ids.duration, i18n.formatMessage(agentsMessages.maximumDuration), 2147483)}
       </FieldGroup></EditorSection>
 
     </fieldset></form>

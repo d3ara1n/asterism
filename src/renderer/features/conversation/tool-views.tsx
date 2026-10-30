@@ -117,6 +117,15 @@ const builtinViews = new Map<string, {
 export function toolPreparation(name: string): string {
   return getI18n().text(builtinViews.get(name)?.preparation ?? toolsMessages.toolPreparing);
 }
+/** Fixed entries carry their own names; dispatched and plugin tools use the view registered for their implementation. */
+const fixedLabels = new Map<string, UiText>([
+  [ResourceList.name, toolsMessages.toolResourceList],
+  [ResourceInspect.name, toolsMessages.toolResourceInspect],
+]);
+export function toolLabel(name: string, implementation: string | null, registry: ViewRegistry): string | null {
+  const label = fixedLabels.get(name) ?? (implementation ? registry.toolLabel(implementation) : undefined);
+  return label ? getI18n().text(label) : null;
+}
 export function resolveToolView(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView {
   return builtinViews.get(props.name)?.render(props, registry)
     ?? { props, icon: <Wrench className="size-3.5" />, ...registry.tool(props.invocation.implementation, props) };

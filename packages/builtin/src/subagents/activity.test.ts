@@ -24,10 +24,10 @@ describe("Subagent activity log", () => {
     expect(activityOf(blocks, [], [{ at: 0, text: "First" }, { at: 3, text: "Second" }])).toEqual([
       { kind: "steer", text: "First" },
       { kind: "thinking", state: "done" },
-      { kind: "tool", name: "read", subject: "src/a.ts", state: "failed" },
-      { kind: "tool", name: "grep", subject: "auth", state: "succeeded" },
+      { kind: "tool", name: "read", implementation: null, subject: "src/a.ts", state: "failed" },
+      { kind: "tool", name: "grep", implementation: null, subject: "auth", state: "succeeded" },
       { kind: "steer", text: "Second" },
-      { kind: "tool", name: "read", subject: "intro", state: "succeeded" },
+      { kind: "tool", name: "read", implementation: null, subject: "intro", state: "succeeded" },
     ]);
   });
 
@@ -40,7 +40,7 @@ describe("Subagent activity log", () => {
       { id: "c", responseId: "r1", ordinal: 2, kind: "text", text: "Report", endedAt: null },
     ];
     expect(activityOf([tool("r1", 0, "exec", { command: "ls" }, null)], live, [{ at: 1, text: "Late" }])).toEqual([
-      { kind: "tool", name: "exec", subject: "ls", state: "cancelled" },
+      { kind: "tool", name: "exec", implementation: null, subject: "ls", state: "cancelled" },
       { kind: "steer", text: "Late" },
       { kind: "thinking", state: "running" },
     ]);

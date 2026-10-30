@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Brain, MessageSquarePlus, Wrench } from "lucide-react";
-import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererTools, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
 import { Markdown } from "../agent/conversation/Markdown";
 import { subagentMessages as messages } from "../messages/subagents";
-import { TaskStatus } from "./PoolCard";
+import { TaskStateText, TaskStatus } from "./PoolCard";
 import {
   recentActivity, type ActivityEntry, type DelegateInput, type TaskSnapshot, type TaskSummary, type WaitEntry,
 } from "./contract";
@@ -15,9 +15,9 @@ const toolTones: Record<Extract<ActivityEntry, { kind: "tool" }>["state"], Statu
   running: "progress", succeeded: "success", partial: "warning", rejected: "error", failed: "error", cancelled: "neutral", unknown: "neutral",
 };
 
-/** One row per step: status icon, operation, and a single-line subject. */
+/** One row per step: status icon, the operation's localized name, and a single-line subject. */
 function ActivityRow({ entry }: { entry: ActivityEntry }) {
-  const i18n = useI18n();
+  const i18n = useI18n(), tools = useRendererTools();
   if (entry.kind === "steer") return <li className="flex min-w-0 items-center gap-2">
     <StatusIcon tone="neutral" icon={MessageSquarePlus} className="size-3.5 shrink-0" />
     <span className="shrink-0">{i18n.text(messages.steering)}</span>
@@ -29,7 +29,10 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
   </li>;
   return <li className="flex min-w-0 items-center gap-2">
     <StatusIcon tone={toolTones[entry.state]} icon={entry.state === "running" ? undefined : Wrench} className="size-3.5 shrink-0" />
-    <span className="shrink-0 font-mono">{entry.name}</span>
+    {(() => {
+      const label = tools.label(entry.name, entry.implementation);
+      return label ? <span className="shrink-0" title={entry.name}>{label}</span> : <span className="shrink-0 font-mono">{entry.name}</span>;
+    })()}
     {entry.subject && <span className="min-w-0 truncate font-mono text-muted-foreground" title={entry.subject}>{entry.subject}</span>}
     <span className="sr-only">{i18n.formatMessage(messages.toolState, { state: entry.state })}</span>
   </li>;
@@ -69,13 +72,13 @@ function Usage({ usage, live }: { usage: TaskSummary["usage"]; live: boolean }) 
   return <p className="type-caption">{usage.model ? `${usage.model} · ` : ""}
     {i18n.formatMessage(messages.usage, { requests: usage.requests, seconds: Math.round(elapsedMs / 1000) })}</p>;
 }
-/** Status line identifying one task: ID, role, status, and the task's first line. */
-function TaskLine({ task }: { task: Pick<TaskSummary, "id" | "role" | "task" | "status"> }) {
+/** Status line identifying one task: ID, role, status, and the task's first line. Snapshots show the status as text. */
+function TaskLine({ task, snapshot = false }: { task: Pick<TaskSummary, "id" | "role" | "task" | "status">; snapshot?: boolean }) {
   return <div className="flex min-w-0 items-center gap-2">
     <span className="shrink-0 font-mono">{task.id}</span>
     <span className="shrink-0 type-caption">{task.role}</span>
     <span className="min-w-0 flex-1 truncate" title={task.task}>{task.task}</span>
-    <TaskStatus status={task.status} />
+    {snapshot ? <TaskStateText status={task.status} /> : <TaskStatus status={task.status} />}
   </div>;
 }
 
@@ -105,14 +108,14 @@ function CheckHeader({ phase, target, result }: CheckProps) {
   const i18n = useI18n();
   const status = result?.data?.status;
   return <ToolHeader label={i18n.text(messages.check)} subject={phase === "input" ? undefined : target} monospace
-    meta={status && <TaskStatus status={status} />} />;
+    meta={status && <TaskStateText status={status} />} />;
 }
 function CheckBody({ result }: CheckProps) {
   const i18n = useI18n(), task = result?.data;
   if (!task) return null;
   const { status } = task, finished = status.phase === "finished";
   return <div className="flex min-w-0 flex-col gap-3">
-    <TaskLine task={{ id: task.input.id, role: task.input.role, task: task.input.task.split("\n")[0]!, status }} />
+    <TaskLine snapshot task={{ id: task.input.id, role: task.input.role, task: task.input.task.split("\n")[0]!, status }} />
     <ActivityTail entries={task.output.activity} total={task.output.activity.length} />
     {status.phase === "finished" && status.message && <p className="type-caption">{status.message}</p>}
     {finished && (task.output.result ? <Markdown>{task.output.result}</Markdown> : <p className="type-caption">{i18n.text(messages.noReport)}</p>)}
@@ -177,7 +180,7 @@ type CancelProps = ToolRenderProps<TaskSummary, string, { reason?: string }>;
 function CancelHeader({ phase, target, result }: CancelProps) {
   const status = result?.data?.status;
   return <ToolHeader label={useI18n().text(messages.cancel)} subject={phase === "input" ? undefined : target} monospace
-    meta={status && <TaskStatus status={status} />} />;
+    meta={status && <TaskStateText status={status} />} />;
 }
 function CancelBody({ phase, args }: CancelProps) {
   return phase === "input" || !args.reason ? null : <p className="type-body whitespace-pre-wrap break-words">{args.reason}</p>;
