@@ -17,15 +17,13 @@ import { ConversationTimeline } from "../agent/conversation/ConversationTimeline
 import { Disclosure } from "../agent/conversation/Disclosure";
 import { savedTimelineBlock, type TimelineItem } from "../agent/conversation/timeline";
 import { subagentMessages as messages } from "../messages/subagents";
-import { ActivityTail } from "./ActivityTail";
 import { PoolChannel, CancelSubagent, SteerSubagent, type TaskSnapshot, type TaskSummary, type ProcessFrame } from "./contract";
 
 function stateOf(status: TaskSnapshot["status"]) { return status.phase === "finished" ? status.outcome : status.phase; }
-function Activity({ status }: { status: TaskSnapshot["status"] }) {
+function Activity({ activity }: { activity: string }) {
   const i18n = useI18n();
-  if (status.phase !== "running") return null;
-  const tool = status.activity.startsWith("tool:") ? status.activity.slice(5) : "";
-  return <>{i18n.formatMessage(messages.activity, { activity: tool ? "tool" : status.activity, tool })}</>;
+  const tool = activity.startsWith("tool:") ? activity.slice(5) : "";
+  return <>{i18n.formatMessage(messages.activity, { activity: tool ? "tool" : activity, tool })}</>;
 }
 const tones: Record<ReturnType<typeof stateOf>, StatusTone> = {
   queued: "neutral", running: "progress", succeeded: "success", partial: "warning", failed: "error", cancelled: "neutral",
@@ -38,15 +36,15 @@ export function TaskStatus({ status }: { status: TaskSnapshot["status"] }) {
 export function TaskStateText({ status }: { status: TaskSnapshot["status"] }) {
   return <span className="type-caption">{useI18n().formatMessage(messages.state, { state: stateOf(status) })}</span>;
 }
-function TaskReport({ task }: { task: TaskSnapshot }) {
+function TaskMetadata({ task }: { task: TaskSnapshot }) {
   const i18n = useI18n();
   return <div className="flex min-w-0 flex-col gap-3">
     <div className="flex flex-wrap items-center gap-2"><TaskStatus status={task.status} />
-      <span className="type-caption">{task.input.id} · {task.input.role}</span><span className="type-caption"><Activity status={task.status} /></span></div>
-    <p className="type-caption">{task.output.usage.model ?? ""}
-      {" · "}{i18n.formatMessage(messages.usage, { requests: task.output.usage.requests, seconds: Math.round(task.output.usage.elapsedMs / 1000) })}</p>
-    {task.status.phase === "finished" && task.status.message && <p className="type-caption">{task.status.message}</p>}
-    {task.output.result ? <Markdown>{task.output.result}</Markdown> : <p className="type-caption">{i18n.text(messages.noReport)}</p>}
+      <span className="type-caption">{task.input.id} · {task.input.role}</span>
+      {task.status.phase === "running" && <span className="type-caption"><Activity activity={task.status.activity} /></span>}</div>
+    {task.status.phase !== "queued" && <p className="type-caption">
+      {task.output.usage.model && <>{task.output.usage.model}{" · "}</>}
+      {i18n.formatMessage(messages.usage, { requests: task.output.usage.requests, seconds: Math.round(task.output.usage.elapsedMs / 1000) })}</p>}
   </div>;
 }
 
@@ -89,8 +87,10 @@ function TaskDetail({ id, back }: { id: string; back(): void }) {
     const channel = openChannel.current(PoolChannel);
     let active = true;
     const unsubscribe = channel.onMessage(value => {
-      if (active) setFrame(previous => ({ ...value, blocks: value.reset || !previous ? value.blocks
-        : value.blocks.length ? [...previous.blocks, ...value.blocks] : previous.blocks }));
+      if (active) setFrame(previous => value.task?.status.phase === "running"
+        ? { ...value, blocks: value.reset || !previous ? value.blocks
+          : value.blocks.length ? [...previous.blocks, ...value.blocks] : previous.blocks }
+        : { ...value, blocks: [], live: [] });
     });
     channel.send({ id });
     void channel.closed.then(() => { if (active) setDisconnected(true); });
@@ -119,25 +119,28 @@ function TaskDetail({ id, back }: { id: string; back(): void }) {
     {disconnected && <p role="alert" className="type-caption">{i18n.text(messages.disconnected)}</p>}
     {frame?.error && <p role="alert" className="type-caption">{i18n.text(messages.unavailable)}</p>}
     {task && <>
+      <TaskMetadata task={task} />
       <section className="flex flex-col gap-2"><h3 className="type-label">{i18n.text(messages.task)}</h3>
         <p className="type-body whitespace-pre-wrap break-words">{task.input.task}</p></section>
       {task.input.context && <Disclosure open={backgroundOpen} onOpenChange={setBackgroundOpen} header={<span>{i18n.text(messages.background)}</span>}>
         <Markdown>{task.input.context}</Markdown>
       </Disclosure>}
-      <section className="flex flex-col gap-2"><h3 className="type-label">{i18n.text(messages.report)}</h3><TaskReport task={task} /></section>
+      {task.status.phase === "finished" && <section className="flex flex-col gap-2">
+        <h3 className="type-label">{i18n.text(messages.report)}</h3>
+        {task.status.message && <p className="type-caption">{task.status.message}</p>}
+        {task.output.result ? <Markdown>{task.output.result}</Markdown> : <p className="type-caption">{i18n.text(messages.noReport)}</p>}
+      </section>}
       {working && <form onSubmit={event => { event.preventDefault(); if (text.trim()) void act("steer"); }}>
         <FieldGroup><Field><FieldLabel htmlFor={fieldId}>{i18n.text(messages.instructions)}</FieldLabel>
           <Textarea id={fieldId} value={text} onChange={event => setText(event.target.value)} disabled={!!pending || disconnected} rows={3} /></Field>
           <Button type="submit" size="sm" className="w-fit" disabled={!!pending || !text.trim() || disconnected || !object.view.ready}>
             <Send />{i18n.text(messages.steer)}</Button></FieldGroup>
       </form>}
-      {error && <p role="alert" className="type-caption text-destructive">{error}</p>}
-      {delivered && <p role="status" className="type-caption">{i18n.text(messages.delivered)}</p>}
-      {frame && (frame.blocks.length > 0 || frame.live.length > 0 || task.output.activity.length > 0) && <section className="flex flex-col gap-3">
+      {working && error && <p role="alert" className="type-caption text-destructive">{error}</p>}
+      {working && delivered && <p role="status" className="type-caption">{i18n.text(messages.delivered)}</p>}
+      {task.status.phase === "running" && frame && (frame.blocks.length > 0 || frame.live.length > 0) && <section className="flex flex-col gap-3">
         <h3 className="type-label">{i18n.text(messages.process)}</h3>
-        {frame.blocks.length > 0 || frame.live.length > 0
-          ? <Process frame={frame} />
-          : <ActivityTail entries={task.output.activity} total={task.output.activity.length} />}
+        <Process frame={frame} />
       </section>}
     </>}
   </div>;
@@ -184,7 +187,6 @@ export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
                 className="gap-2 px-3 py-1.5 [&_[data-slot=item-title]]:text-xs [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-snug"
                 contentClassName="gap-0.5"
                 description={<span className="block truncate" title={task.task}>{task.task}</span>}
-                details={task.status.phase === "running" ? <Activity status={task.status} /> : undefined}
                 actions={<TaskStatus status={task.status} />} />}</VList></ItemGroup>
             : <p className="type-caption p-3">{i18n.text(messages.empty)}</p>}
         </>}

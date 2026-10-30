@@ -1,10 +1,8 @@
-import { useState } from "react";
 import { Brain, MessageSquarePlus, Wrench } from "lucide-react";
 import { useI18n, useRendererTools } from "@asterism-app/sdk/renderer";
-import { Button } from "@asterism-app/ui/ui/button";
 import { StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
 import { subagentMessages as messages } from "../messages/subagents";
-import { recentActivity, type ActivityEntry } from "./contract";
+import type { ActivityEntry } from "./contract";
 
 const toolTones: Record<Extract<ActivityEntry, { kind: "tool" }>["state"], StatusTone> = {
   running: "progress", succeeded: "success", partial: "warning", rejected: "error", failed: "error", cancelled: "neutral", unknown: "neutral",
@@ -32,20 +30,13 @@ function ActivityRow({ entry }: { entry: ActivityEntry }) {
     <span className="sr-only">{i18n.formatMessage(messages.toolState, { state: entry.state })}</span>
   </li>;
 }
-/** The most recent steps. When the full log is present, earlier steps expand in place; otherwise their count is shown. */
+/** Recent steps supplied by the pool, with the count of omitted earlier steps. */
 export function ActivityTail({ entries, total }: { entries: readonly ActivityEntry[]; total: number }) {
   const i18n = useI18n();
-  const [expanded, setExpanded] = useState(false);
   if (!total) return null;
-  const complete = entries.length === total;
-  const tail = expanded && complete ? entries : entries.slice(-recentActivity);
-  const hidden = total - tail.length;
+  const hidden = total - entries.length;
   return <div className="flex min-w-0 flex-col gap-1 text-xs">
-    {complete && total > recentActivity
-      ? <Button type="button" variant="link" size="sm" className="h-auto w-fit p-0 type-caption" aria-expanded={expanded}
-        onClick={() => setExpanded(value => !value)}>
-        {expanded ? i18n.text(messages.fewerSteps) : i18n.formatMessage(messages.earlierSteps, { count: hidden })}</Button>
-      : hidden > 0 && <p className="type-caption">{i18n.formatMessage(messages.earlierSteps, { count: hidden })}</p>}
-    <ul className="flex min-w-0 flex-col gap-1">{tail.map((entry, index) => <ActivityRow key={hidden + index} entry={entry} />)}</ul>
+    {hidden > 0 && <p className="type-caption">{i18n.formatMessage(messages.earlierSteps, { count: hidden })}</p>}
+    <ul className="flex min-w-0 flex-col gap-1">{entries.map((entry, index) => <ActivityRow key={hidden + index} entry={entry} />)}</ul>
   </div>;
 }
