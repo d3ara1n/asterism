@@ -22,6 +22,10 @@ Use a session snapshot to query the resources directly linked to a receiver. Res
 
 Use a resource tool when an operation targets a linked object. A shared tool can have implementations for different resource types, each with an appropriate internal target and result.
 
+Choose a tool name for the operation's meaning. Reuse an existing tool declaration when its semantics and operation arguments fit another resource; supply that resource's target and result schemas in its implementation. A distinct operation contract needs a distinct name. Domain qualifiers can clarify scope, such as `terminal_input` for terminal interaction, and remain useful when multiple resource types support that operation. Choose qualifiers according to the operation's meaning, independently of whether its declaration is public or where its code lives.
+
+For model calls, `resource_id` selects the resource, `args` supplies the operation's parameters, and `target` selects what the operation acts on within that resource. The same tool preserves its meaning and `args` schema across resources. Inspection exposes the tools available on the selected resource and their argument, target, and result schemas.
+
 Use a top-level tool for operations on the execution context or shared resource lifecycle, such as creation and renaming. The host supplies caller identity and execution scope.
 
 Describe the operation's purpose and observable behavior. Parameters should explain business meaning that names and types alone do not express. Results should distinguish known success, failure, cancellation, partial output, and uncertain effects.

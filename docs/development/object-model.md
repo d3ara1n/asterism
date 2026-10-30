@@ -88,6 +88,8 @@ Requests hold each captured relationship until their work finishes. A disconnect
 
 A tool contract owns its identity, meaning, argument schema, description, and usage guidance. Resource implementations own target and result schemas and execution behavior. Top-level tools declare their operation directly.
 
+Resource tool names express operation semantics. Across resources that expose the same tool, its meaning and operation arguments remain consistent; available operations, target selection, and results can vary by resource. Distinct operation contracts use distinct names. Domain qualifiers describe the scope of an operation and can remain appropriate when several resource types support it. Naming follows observable behavior independently of declaration visibility or code organization.
+
 An operation’s saved outcome identifies the implementation actually used and the relevant resource at that time. Historical rendering uses those facts even if the current resource or implementation disappears. Unknown data remains available through fallback presentation.
 
 Tool results are records, not a separate artifact entity. A diff view presents a tool result; a relationship inferred from a result does not create a second source of operation history.

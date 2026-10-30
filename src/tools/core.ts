@@ -45,7 +45,9 @@ export const ResourceCall = defineTool({
   name: "resource_call",
   description: "Use an available tool on a linked resource.",
   guidelines: [
-    "args follows the tool's shared schema. target follows the selected resource implementation's schema.",
+    "A tool name identifies an operation. Across resources that expose the same tool, its meaning and args schema remain consistent.",
+    "resource_id selects the resource, args supplies the operation's parameters, and target selects what the operation acts on within that resource. Available tools, target schemas, and result schemas can differ by resource; resource_inspect describes them for the selected resource.",
+    "Domain qualifiers in tool names describe the operation's scope, such as terminal_input for terminal interaction.",
     "Omitting target is equivalent to null; this is valid only when the implementation accepts null.",
     jsonArgumentHint,
   ],
