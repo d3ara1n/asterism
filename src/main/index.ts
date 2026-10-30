@@ -34,7 +34,7 @@ import { acknowledgeNotice, listRecoveryPoints, pendingNotice, recoveryPointDire
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
 let quitting = false;
-let quitRequest: Promise<void> | null = null;
+let quitRequest: Promise<boolean> | null = null;
 let updates: ApplicationUpdates | null = null;
 let notificationsDelivered = false;
 let recoveryPending = false;
@@ -50,8 +50,8 @@ const runtime = new RuntimeHost(status => {
 }, undefined, (stage, detail) => startup.stage(stage, detail));
 
 /** Read current resource prompts before user exit; after confirmation, wait for background cleanup through the existing close flow. */
-function requestQuit(restart = false, installUpdate = false): void {
-  if (quitting || quitRequest) return;
+function requestQuit(restart = false, installUpdate = false): Promise<boolean> {
+  if (quitting || quitRequest) return Promise.resolve(false);
   quitRequest = (async () => {
     const result = await runtime.execute({ type: "workspace.prepare-close" });
     const warnings = result.ok ? result.snapshot.disposalWarnings ?? [] : [];
@@ -65,22 +65,29 @@ function requestQuit(restart = false, installUpdate = false): void {
         defaultId: 0, cancelId: 0,
       };
       const answer = window && !window.isDestroyed() ? await dialog.showMessageBox(window, options) : await dialog.showMessageBox(options);
-      if (answer.response !== 1) return;
+      if (answer.response !== 1) return false;
     }
     quitting = true;
     await Promise.all([startup.stop(), runtime.stop()]);
-    if (installUpdate && updates?.ready) {
+    if (installUpdate && updates) {
       updates.install(error => {
         quitting = false;
         startup.publish({ status: "failed", reason: "runtime", detail: error.message });
         // The workbench has ended its startup subscription; re-enter startup to present failure and restart actions.
         if (window && !window.isDestroyed()) window.webContents.reload();
       });
-      return;
+      return true;
     }
     if (restart) app.relaunch();
     app.quit();
-  })().catch(error => { console.error("Application shutdown failed.", error); }).finally(() => { quitRequest = null; });
+    return true;
+  })().catch(error => {
+    quitting = false;
+    console.error("Application shutdown failed.", error);
+    if (installUpdate) throw error;
+    return false;
+  }).finally(() => { quitRequest = null; });
+  return quitRequest;
 }
 
 /** App icon file: packaged builds read extraResource from resources; development uses repository assets/icon. */

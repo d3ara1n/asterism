@@ -12,6 +12,7 @@ export const updatesMessages = pluginNamespace("asterism.host").messages("en", d
   channelPrereleaseHint: { id: "updates.channelPrereleaseHint", defaultMessage: "Get new features earlier. Prerelease versions may be less stable." },
   check: { id: "updates.check", defaultMessage: "Check for updates" },
   install: { id: "updates.install", defaultMessage: "Restart and install" },
+  restarting: { id: "updates.restarting", defaultMessage: "Restarting…" },
   idle: { id: "updates.idle", defaultMessage: "Updates are checked when Asterism starts." },
   checking: { id: "updates.checking", defaultMessage: "Checking for updates…" },
   current: { id: "updates.current", defaultMessage: "You’re up to date." },

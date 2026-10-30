@@ -147,7 +147,7 @@ Streaming deltas align by response and block identity. Persistent records arrive
 
 GitHub Releases stores platform installers and update metadata. Installed builds select a higher semantic version allowed by the chosen stable/prerelease channel. Changing to stable does not downgrade an installed prerelease.
 
-Checks and downloads use the preference captured at their start. Installation requires an explicit action, normal resource-exit confirmation, and completed runtime shutdown.
+Checks and downloads use the preference captured at their start. Installation requires an explicit action, normal resource-exit confirmation, and completed runtime shutdown. Main owns the restarting state through cleanup and installer handoff; cancellation restores the ready state, and failures remain visible.
 
 macOS builds use a fixed self-signed identity supplied through CI secrets.
 

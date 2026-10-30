@@ -46,6 +46,7 @@ export class ApplicationUpdates {
   get(): UpdateState { return this.state; }
 
   set(includePrerelease: boolean): UpdateState {
+    if (this.state.status === "restarting") return this.state;
     this.store.set("includePrerelease", includePrerelease);
     this.patch({ includePrerelease });
     // In-flight checks and downloads finish their work; the next check uses new preferences.
@@ -54,7 +55,7 @@ export class ApplicationUpdates {
   }
 
   check(): Promise<UpdateState> {
-    if (!this.state.enabled) return Promise.resolve(this.state);
+    if (!this.state.enabled || this.state.status === "restarting") return Promise.resolve(this.state);
     if (this.operation) return this.operation;
     this.operation = this.checkAndDownload().finally(() => { this.operation = null; });
     return this.operation;
@@ -99,9 +100,17 @@ export class ApplicationUpdates {
     return this.state;
   }
 
-  get ready(): boolean { return this.state.status === "ready"; }
+  async restart(quit: () => Promise<boolean>): Promise<void> {
+    if (this.state.status !== "ready") return;
+    this.patch({ status: "restarting", error: null });
+    try {
+      const started = await quit();
+      if (!started && this.get().status === "restarting") this.patch({ status: "ready" });
+    } catch (error) { this.failed(error); }
+  }
+
   install(onFailure: (error: Error) => void): void {
-    if (!this.ready) return;
+    if (this.state.status !== "restarting") return;
     // macOS native signature validation finishes asynchronously afterward; failures can display the startup recovery entry.
     this.updater.once("error", onFailure);
     try { this.updater.quitAndInstall(false, true); }
@@ -113,7 +122,7 @@ export class ApplicationUpdates {
     }
   }
 
-  serve(window: BrowserWindow, trusted: (event: Electron.IpcMainInvokeEvent) => boolean, install: () => void): () => void {
+  serve(window: BrowserWindow, trusted: (event: Electron.IpcMainInvokeEvent) => boolean, install: () => Promise<boolean>): () => void {
     const publish = (state: UpdateState) => {
       if (!window.isDestroyed()) window.webContents.send(updatesChangedChannel, state);
     };
@@ -132,7 +141,10 @@ export class ApplicationUpdates {
       if (!trusted(event)) throw new Error("Untrusted application frame.");
       return this.check();
     });
-    ipcMain.handle(updatesInstallChannel, event => { if (trusted(event) && this.ready) install(); });
+    ipcMain.handle(updatesInstallChannel, event => {
+      if (!trusted(event)) throw new Error("Untrusted application frame.");
+      return this.restart(install);
+    });
     return () => {
       this.listeners.delete(publish);
       for (const channel of channels) ipcMain.removeHandler(channel);

@@ -1,5 +1,6 @@
 import { Button } from "@asterism-app/ui/ui/button";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { ExternalLink } from "lucide-react";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { updatesMessages as messages } from "../../messages/updates";
@@ -8,8 +9,9 @@ import { useUpdates } from "./state";
 
 export function useUpdateSummary() {
   const i18n = useI18n();
-  const { state, failure } = useUpdates();
+  const { state, failure, installing } = useUpdates();
   if (failure) return i18n.text(failure.kind === "load" ? messages.loadFailed : messages.failed);
+  if (installing) return i18n.text(messages.restarting);
   if (!state) return "";
   const message = !state.enabled ? messages.unavailable
     : state.status === "error" ? messages.failed : messages[state.status];
@@ -19,8 +21,9 @@ export function useUpdateSummary() {
 export function UpdateAction() {
   const i18n = useI18n();
   const { state, failure, checking, installing, check, install } = useUpdates();
-  if (state?.status === "ready") return <Button size="sm" disabled={installing} onClick={() => void install()}>
-    {i18n.text(messages.install)}
+  if (state?.status === "ready" || installing) return <Button size="sm" disabled={installing} aria-busy={installing} onClick={() => void install()}>
+    {installing && <Spinner data-icon="inline-start" />}
+    {i18n.text(installing ? messages.restarting : messages.install)}
   </Button>;
   return <Button size="sm" variant="outline" disabled={state?.enabled === false || checking}
     onClick={() => void check()}>

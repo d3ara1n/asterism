@@ -157,6 +157,7 @@
   "updates.channelPrereleaseHint": "提前体验新功能。预发布版本可能不够稳定。",
   "updates.check": "检查更新",
   "updates.install": "重启并安装",
+  "updates.restarting": "正在重启…",
   "updates.idle": "星图启动时会检查更新。",
   "updates.checking": "正在检查更新…",
   "updates.current": "当前已是最新版本。",

@@ -22,7 +22,7 @@ export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
   const titleId = useId();
   if (!state?.enabled) return null;
   const status = failure ? "error" : state.status;
-  if (!open && status !== "downloading" && status !== "ready" && status !== "error") return null;
+  if (!open && status !== "downloading" && status !== "ready" && status !== "restarting" && status !== "error") return null;
 
   return <Popover open={open} onOpenChange={setOpen}>
     <Tooltip>
@@ -34,7 +34,7 @@ export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
               <AnimatePresence initial={false}>
                 <motion.span key={status} className="absolute inset-0 flex items-center justify-center"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
-                  {status === "downloading" || status === "checking" ? <StatusIcon tone="progress" className="size-4" />
+                  {status === "downloading" || status === "checking" || status === "restarting" ? <StatusIcon tone="progress" className="size-4" />
                     : status === "ready" ? <CircleArrowUp className="size-4 text-primary-text" />
                     : <StatusIcon tone={status === "error" ? "error" : "neutral"} className="size-4" />}
                 </motion.span>

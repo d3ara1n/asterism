@@ -11,7 +11,7 @@ export const updateStateSchema = z.strictObject({
   version: z.string(),
   enabled: z.boolean(),
   includePrerelease: z.boolean(),
-  status: z.enum(["idle", "checking", "current", "downloading", "ready", "error"]),
+  status: z.enum(["idle", "checking", "current", "downloading", "ready", "restarting", "error"]),
   availableVersion: z.string().nullable(),
   releaseUrl: z.string().nullable(),
   progress: z.number(),

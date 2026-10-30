@@ -52,7 +52,7 @@ function UpdatePanel() {
   const summary = useUpdateSummary();
   const labelId = useId();
   const status = failure ? "error" : !state ? null : !state.enabled ? "unavailable" : state.status;
-  const tone: StatusTone = status === "error" ? "error" : status === "checking" || status === "downloading" ? "progress"
+  const tone: StatusTone = status === "error" ? "error" : status === "checking" || status === "downloading" || status === "restarting" ? "progress"
     : status === "current" || status === "ready" ? "success" : "neutral";
 
   return <section className="rounded-lg bg-muted px-5 py-4" aria-labelledby={labelId}>
@@ -92,11 +92,11 @@ function UpdatePanel() {
 /** Update channel: stable releases or including prereleases; takes effect immediately, with the description following the selected channel. */
 function ChannelRow() {
   const i18n = useI18n();
-  const { state, saving, set } = useUpdates();
+  const { state, saving, installing, set } = useUpdates();
   const prerelease = state?.includePrerelease ?? false;
   return <Row label={i18n.text(messages.channel)} hint={i18n.text(prerelease ? messages.channelPrereleaseHint : messages.channelStableHint)}>
     <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.text(messages.channel)}
-      value={state ? (prerelease ? "prerelease" : "stable") : ""} disabled={!state || saving}
+      value={state ? (prerelease ? "prerelease" : "stable") : ""} disabled={!state || saving || installing}
       onValueChange={value => { if (value) void set(value === "prerelease"); }}>
       <ToggleGroupItem value="stable">{i18n.text(messages.channelStable)}</ToggleGroupItem>
       <ToggleGroupItem value="prerelease">{i18n.text(messages.channelPrerelease)}</ToggleGroupItem>

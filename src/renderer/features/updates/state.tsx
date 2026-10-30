@@ -44,7 +44,7 @@ function useUpdateService() {
     state, failure,
     checking: pending.has("check") || state?.status === "checking" || state?.status === "downloading",
     saving: pending.has("set"),
-    installing: pending.has("install"),
+    installing: pending.has("install") || state?.status === "restarting",
     check: () => perform("check", () => window.host.updates.check()),
     set: (value: boolean) => perform("set", () => window.host.updates.set(value)),
     install: () => perform("install", () => window.host.updates.install()),
