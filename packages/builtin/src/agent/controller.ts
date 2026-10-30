@@ -96,11 +96,6 @@ export function createAgentController(deps: AgentControllerDependencies) {
         try {
           publish("running");
           const outcome = await runAgentLoop({
-            requestLimit: () => deps.selection.agent(selectionOf(object).selection).maxTurns ?? 32,
-            limitReached() {
-              deps.feedback.report(object, { origin: "model", level: "warning", code: "request_limit",
-                message: "The agent reached the model request limit. Continue explicitly to resume." }, true);
-            },
             consume: boundary => deliverDrafts(object, boundary),
             completed: async current => { await compress(current); },
             async request(index, current) {
@@ -143,7 +138,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
               return { reason: result.reason, hasTools: result.tools.length > 0 };
             },
           }, signal);
-          status = outcome === "cancelled" || outcome === "limited" ? "awaiting" : outcome;
+          status = outcome === "completed" || outcome === "failed" ? outcome : "awaiting";
         } catch (error) {
           status = signal.aborted ? "awaiting" : "failed";
           feedback(error, signal);

@@ -24,6 +24,4 @@ export const subagentMessages = builtin.messages("en", defineMessages({
   disconnected: { id: "subagent.disconnected", defaultMessage: "The task view disconnected. Close and reopen it to reconnect." },
   usage: { id: "subagent.usage", defaultMessage: "{requests} requests · {seconds}s" },
   activity: { id: "subagent.activity", defaultMessage: "{activity, select, starting {Starting} thinking {Thinking} text {Writing} finalizing {Saving result} tool {Using {tool}} other {Working}}" },
-  timeBudget: { id: "subagent.timeBudget", defaultMessage: "Subagent time budget (seconds)" },
-  requestBudgetHint: { id: "subagent.requestBudgetHint", defaultMessage: "An unset request limit leaves subagents bounded by their time budget." },
 }));

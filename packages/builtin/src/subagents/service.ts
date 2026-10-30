@@ -2,6 +2,7 @@ import { nanoid } from "nanoid";
 import { PluginApiError, type ObjectExecutor, type SessionExecutor, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { SessionRecord } from "@asterism-app/sdk/contracts";
 import type { ActiveRun } from "./execution.ts";
+import type { AuditLog } from "./audit.ts";
 import {
   Delegation, emptyOutput, ended, summary, subagentParallelism, type DelegateInput, type DelegationInput, type ProcessFrame,
   type TaskCompletion, type TaskSnapshot, type TaskSummary,
@@ -18,6 +19,7 @@ interface PoolDependencies {
   object: ObjectExecutor;
   session: SessionExecutor;
   execute(run: ActiveRun, signal: AbortSignal): Promise<TaskCompletion>;
+  audit(runId: string): AuditLog;
   changed(): void;
   failed(error: unknown): void;
 }
@@ -103,8 +105,9 @@ export class SubagentPoolRuntime {
     const job: Job = {
       snapshot: { input, status: { phase: "queued" }, output: emptyOutput(), createdAt: new Date().toISOString(), finishedAt: null },
       recordId: "", controller: new AbortController(), queue: [], accepting: true, startedAt: null, blocks: [], live: [],
-      audit: [{ type: "delegation", input }], done: new Promise<void>(accept => { resolve = accept; }), resolve: () => resolve(),
+      audit: this.deps.audit(input.runId), done: new Promise<void>(accept => { resolve = accept; }), resolve: () => resolve(),
     };
+    job.audit.append({ type: "delegation", input });
     try {
       this.deps.object.commit(writer => {
         job.recordId = writer.begin(Delegation, input);
@@ -115,19 +118,19 @@ export class SubagentPoolRuntime {
     this.changed(); this.pump();
     return this.check(input.id);
   }
+  /** Queued and running tasks accept input alike; queue admission is internal to the pool. */
   steer(id: string, message: string): void {
     const entry = this.require(id), job = this.jobs.get(entry.input.runId);
     if (!job?.accepting || job.controller.signal.aborted)
       throw new PluginApiError("conflict", `Task ${id} no longer accepts input.`);
     job.queue.push(message);
-    job.audit.push({ type: "steering-queued", message });
+    job.audit.append({ type: "steering-queued", message });
     this.changed();
   }
   async cancel(id: string, reason = "The task was cancelled."): Promise<TaskSummary> {
     const entry = this.require(id), job = this.jobs.get(entry.input.runId);
     if (job && job.snapshot.status.phase !== "finished") {
-      job.controller.abort(new Error(reason));
-      this.startCancelled(job);
+      if (!this.abandon(job, reason)) job.controller.abort(new Error(reason));
       await job.done;
     }
     return summary(this.latest(entry));
@@ -153,31 +156,37 @@ export class SubagentPoolRuntime {
   private pump(): void {
     while (!this.closed && this.signal && this.active.size < subagentParallelism && this.queue.length) this.start(this.queue.shift()!);
   }
-  private startCancelled(job: Job): void {
-    const index = this.queue.indexOf(job);
-    if (index < 0) return;
-    this.queue.splice(index, 1);
-    this.start(job);
-  }
   private start(job: Job): void {
     this.active.add(job);
-    const signal = this.signal ? AbortSignal.any([this.signal, job.controller.signal]) : job.controller.signal;
-    void this.finish(job, signal).finally(() => {
+    const signal = AbortSignal.any([this.signal!, job.controller.signal]);
+    void this.run(job, signal).then(completion => this.finalize(job, completion)).finally(() => {
       this.active.delete(job);
       this.pump();
     });
   }
-  private async finish(job: Job, signal: AbortSignal): Promise<void> {
-    let saved = false;
-    let completion: TaskCompletion;
-    try { completion = await this.deps.execute(job, signal); }
+  private async run(job: Job, signal: AbortSignal): Promise<TaskCompletion> {
+    try { return await this.deps.execute(job, signal); }
     catch (error) {
       this.deps.failed(error);
-      completion = { status: ended("failed", "execution_failed", error instanceof Error ? error.message : String(error)),
+      return { status: ended("failed", "execution_failed", error instanceof Error ? error.message : String(error)),
         output: job.snapshot.output, finishedAt: new Date().toISOString() };
     }
+  }
+  /** End a task that never left the queue: it records a cancelled outcome without execution or audit. */
+  private abandon(job: Job, reason: string): boolean {
+    const index = this.queue.indexOf(job);
+    if (index < 0) return false;
+    this.queue.splice(index, 1);
+    job.controller.abort(new Error(reason));
+    this.finalize(job, { status: ended("cancelled", "cancelled", reason),
+      output: { ...job.snapshot.output, undelivered: job.queue.splice(0) }, finishedAt: new Date().toISOString() });
+    return true;
+  }
+  /** Sole completion path: fill the Delegation record, publish the final state, and release runtime buffers. */
+  private finalize(job: Job, completion: TaskCompletion): void {
+    job.accepting = false;
+    let saved = false;
     try {
-      job.accepting = false;
       this.deps.session.commit(writer => { writer.complete(Delegation, job.recordId, completion); });
       Object.assign(job.snapshot, completion);
       saved = true;
@@ -186,9 +195,8 @@ export class SubagentPoolRuntime {
       job.snapshot.finishedAt = new Date().toISOString();
       this.deps.failed(error);
     } finally {
-      job.accepting = false;
       this.changed(true);
-      job.blocks = []; job.live = []; job.queue = []; job.audit = [];
+      job.blocks = []; job.live = []; job.queue = [];
       if (saved) this.jobs.delete(job.snapshot.input.runId);
       job.resolve();
     }
@@ -196,10 +204,9 @@ export class SubagentPoolRuntime {
   close(): Promise<void> {
     if (this.closing) return this.closing;
     this.closed = true;
-    for (const job of this.jobs.values()) {
-      job.controller.abort(new Error("The subagent pool was closed."));
-      this.startCancelled(job);
-    }
+    const reason = "The subagent pool was closed.";
+    for (const job of [...this.queue]) this.abandon(job, reason);
+    for (const job of this.active) job.controller.abort(new Error(reason));
     return this.closing = Promise.all([...this.jobs.values()].map(job => job.done)).then(() => {});
   }
 }

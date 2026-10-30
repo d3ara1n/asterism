@@ -1,15 +1,15 @@
 import {
-  formatModelExpression, modelBlockSchema, type ModelBlock, type ModelItem, type ModelLiveBlock,
+  formatModelExpression, modelBlockSchema, parseModelExpression, type ModelBlock, type ModelItem, type ModelLiveBlock,
   type ModelRunEvent, type ModelTarget, type ResourceRef, type Usage,
 } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ContentServices, type ExecutionServices, type ProviderUsage } from "@asterism-app/sdk/runtime";
 import type { AgentConfiguration, ModelRole } from "@asterism-app/builtin-api/contracts";
 import { resolveRoleTarget } from "../configuration/runtime.ts";
 import type { createRequestAssembly } from "../agent/preparation.ts";
-import { runAgentLoop } from "../agent/loop.ts";
+import { runAgentLoop, type AgentLoopStatus } from "../agent/loop.ts";
 import { responseMessages } from "../agent/response-messages.ts";
-import { ended, type DelegateInput, type TaskCompletion, type TaskSnapshot, type ProcessBlock } from "./contract.ts";
-import { saveAudit, type AuditEntry } from "./audit.ts";
+import { ended, type DelegationInput, type FinishedStatus, type TaskCompletion, type TaskSnapshot, type ProcessBlock } from "./contract.ts";
+import type { AuditLog } from "./audit.ts";
 
 export interface ActiveRun {
   snapshot: TaskSnapshot;
@@ -18,7 +18,7 @@ export interface ActiveRun {
   startedAt: number | null;
   blocks: ProcessBlock[];
   live: ModelLiveBlock[];
-  audit: AuditEntry[];
+  audit: AuditLog;
 }
 export interface ExecutionDependencies {
   access: ResourceRef;
@@ -28,17 +28,22 @@ export interface ExecutionDependencies {
   content: ContentServices;
   usage: Pick<ProviderUsage, "consume">;
   userAgent: string;
-  auditDirectory: string;
   changed(): void;
 }
-export function resolveTask(configuration: ReturnType<ExecutionDependencies["configuration"]>, input: Pick<DelegateInput, "role" | "model">): {
+
+/** An explicit model selection replaces the role's model and thinking level; otherwise the role's ModelRole resolves, then the default ModelRole's model. */
+export function resolveTask(configuration: ReturnType<ExecutionDependencies["configuration"]>, input: Pick<DelegationInput, "role" | "model">): {
   agent: AgentConfiguration; target: ModelTarget;
 } {
   const agent = configuration.agents.find(agent => agent.id === input.role && agent.enabled);
   if (!agent) throw new PluginApiError("unavailable", `Agent role ${input.role} is unavailable.`);
+  if (input.model) {
+    const target = parseModelExpression(input.model.model)!;
+    return { agent, target: { ...target, ...(input.model.thinking === null ? {} : { thinking: input.model.thinking }) } };
+  }
   const roleId = agent.modelRole ?? "default", role = configuration.roles.find(role => role.id === roleId && role.enabled);
   if (!role) throw new PluginApiError("unavailable", `Model role ${roleId} is unavailable.`);
-  let model = input.model ?? role.model;
+  let model = role.model;
   if (!model && roleId !== "default") {
     const standard = configuration.roles.find(role => role.id === "default" && role.enabled);
     if (!standard) throw new PluginApiError("unavailable", "The default model role is unavailable.");
@@ -57,38 +62,63 @@ export function accumulateUsage(previous: Usage, next: Usage | null, first: bool
   return usage;
 }
 
+/** How a run's execution ended: the loop result or a thrown error, and an interruption observed on its signals. */
+export type RunEnding =
+  | { kind: "loop"; status: AgentLoopStatus; failure: { code: string; message: string } | null }
+  | { kind: "error"; error: unknown };
+export type RunInterruption = { kind: "time" } | { kind: "cancelled"; reason: unknown } | null;
+
+/** Single outcome decision: an interruption outranks an error, which outranks the loop result. */
+export function classify(ending: RunEnding, interruption: RunInterruption): FinishedStatus {
+  if (interruption?.kind === "time") return ended("partial", "budget_exceeded", "The task reached its time budget.");
+  if (interruption?.kind === "cancelled")
+    return ended("cancelled", "cancelled", interruption.reason instanceof Error ? interruption.reason.message : "The task was cancelled.");
+  if (ending.kind === "error") {
+    const { error } = ending;
+    return ended("failed", error instanceof PluginApiError ? error.reason ?? error.code : "execution_failed",
+      error instanceof Error ? error.message : String(error));
+  }
+  switch (ending.status) {
+    case "completed": return ended("succeeded");
+    case "limited": return ended("partial", "budget_exceeded", "The task reached its request budget.");
+    case "cancelled": return ended("cancelled", "cancelled", "The task was cancelled.");
+    case "failed": return ended("failed", ending.failure?.code ?? "execution_failed", ending.failure?.message ?? "The task failed.");
+  }
+}
+
 /** The runtime owns this conversation; the pool and its records receive only projections and its final report. */
 export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps: ExecutionDependencies): Promise<TaskCompletion> {
   const snapshot = run.snapshot, started = performance.now();
   run.startedAt = started;
   const budget = new AbortController();
+  let exhausted = false;
   const current = AbortSignal.any([signal, budget.signal]);
-  let timer: ReturnType<typeof setTimeout> | undefined;
   return deps.content.withScope(async content => {
+    run.audit.start(content);
     const messages: ModelItem[] = [
       ...(snapshot.input.context ? [{ kind: "context" as const, parts: [{ kind: "text" as const, text: snapshot.input.context }] }] : []),
       { kind: "input", parts: [{ kind: "text", text: snapshot.input.task }] },
     ];
-    let status = ended("failed", "execution_failed", "The task did not complete.");
-    run.audit.push({ type: "input", messages: [...messages] });
+    run.audit.append({ type: "input", messages });
     const consume = () => {
       const inputs = run.queue.splice(0);
       for (const text of inputs) messages.push({ kind: "input", parts: [{ kind: "text", text }] });
-      if (inputs.length) run.audit.push({ type: "steering-delivered", messages: inputs });
+      if (inputs.length) run.audit.append({ type: "steering-delivered", messages: inputs });
       return inputs.length > 0;
     };
+    let ending: RunEnding;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       current.throwIfAborted();
-      const { agent, target } = resolveTask(deps.configuration(), { role: snapshot.input.role, model: snapshot.input.model ?? undefined });
+      const { agent, target } = resolveTask(deps.configuration(), snapshot.input);
       snapshot.output.usage.model = formatModelExpression(target);
       snapshot.status = { phase: "running", activity: "starting" };
-      timer = setTimeout(() => budget.abort(), agent.maxDurationSeconds * 1000);
+      timer = setTimeout(() => { if (!current.aborted) { exhausted = true; budget.abort(); } }, agent.budget.maxDurationSeconds * 1000);
       consume(); deps.changed();
       let parent: string | null = null;
-      const failure: { current: { code: string; message: string } | null } = { current: null };
-      const result = await runAgentLoop({
-        requestLimit: () => agent.maxTurns ?? Infinity,
-        limitReached() {},
+      let failure: { code: string; message: string } | null = null;
+      const status = await runAgentLoop({
+        requestLimit: () => agent.budget.maxRequests,
         completed: async () => { run.accepting = false; },
         consume: boundary => boundary === "request" && consume(),
         async request(index) {
@@ -105,9 +135,9 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
                 snapshot.status.activity = last.kind === "toolcall" ? `tool:${tool ?? last.name}` : last.kind;
               }
             } else {
-              run.audit.push({ type: "execution", event });
+              run.audit.append({ type: "execution", event });
               if (event.type === "block") { blocks.push(event.block); run.blocks.push(modelBlockSchema.parse(event.block)); }
-              if (event.type === "diagnostic" && event.level === "error") failure.current = { code: event.code, message: event.message };
+              if (event.type === "diagnostic" && event.level === "error") failure = { code: event.code, message: event.message };
             }
             snapshot.output.usage.elapsedMs = Math.round(performance.now() - started);
             deps.changed();
@@ -118,7 +148,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
             tools: { exclude: ["resource_create", "creation_list", "creation_inspect"] },
             system: files => {
               const system = prepare(files).system;
-              run.audit.push({ type: "request", index, target, system });
+              run.audit.append({ type: "request", index, target, system });
               return system;
             },
           }, { content, output: content });
@@ -128,33 +158,14 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
           if (last?.kind === "text") snapshot.output.result = last.text;
           Object.assign(snapshot.output.usage, accumulateUsage(snapshot.output.usage, response.completion?.usage ?? null, index === 0));
           if (response.response) deps.usage.consume(response.response);
-          if (response.reason === "failed" && !failure.current)
-            failure.current = { code: response.code, message: response.details?.message ?? "The model request failed." };
+          if (response.reason === "failed" && !failure)
+            failure = { code: response.code, message: response.details?.message ?? "The model request failed." };
           return { reason: response.reason, hasTools: response.tools.length > 0 };
         },
       }, current);
-      switch (result) {
-        case "completed":
-          if (run.queue.length > 0)
-            status = ended("partial", "request_budget", "The task reached its request budget with additional input still queued.");
-          else if (snapshot.output.result === null)
-            status = ended("failed", "empty_report", "The task ended without a text report.");
-          else status = ended("succeeded");
-          break;
-        case "limited":
-          status = ended("partial", "request_budget", "The task reached its request budget.");
-          break;
-        case "cancelled":
-          status = ended("cancelled", "cancelled", "The task was cancelled.");
-          break;
-        case "failed":
-          status = ended("failed", failure.current?.code ?? "execution_failed", failure.current?.message ?? "The task failed.");
-          break;
-      }
+      ending = { kind: "loop", status, failure };
     } catch (error) {
-      status = current.aborted ? ended("cancelled", "cancelled", signal.reason instanceof Error ? signal.reason.message : "The task was cancelled.")
-        : ended("failed", error instanceof PluginApiError ? error.reason ?? error.code : "execution_failed",
-          error instanceof Error ? error.message : String(error));
+      ending = { kind: "error", error };
     } finally {
       clearTimeout(timer);
       run.accepting = false;
@@ -163,15 +174,12 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
       if (snapshot.status.phase === "running") snapshot.status.activity = "finalizing";
       deps.changed();
     }
-    if (current.aborted) status = budget.signal.aborted && current.reason === budget.signal.reason
-      ? ended("partial", "time_budget", "The task reached its time budget.")
-      : ended("cancelled", "cancelled", current.reason instanceof Error ? current.reason.message : "The task was cancelled.");
-    const completion: TaskCompletion = { status, output: snapshot.output, finishedAt: new Date().toISOString() };
-    run.audit.push({ type: "finished", completion });
-    try { await saveAudit(deps.auditDirectory, snapshot.input.runId, run.audit, content); }
-    catch (error) {
-      completion.status = ended("failed", "audit_failed", error instanceof Error ? error.message : String(error));
-    }
+    const interruption: RunInterruption = exhausted ? { kind: "time" } : signal.aborted ? { kind: "cancelled", reason: signal.reason } : null;
+    snapshot.output.undelivered = run.queue.splice(0);
+    const completion: TaskCompletion = { status: classify(ending, interruption), output: snapshot.output, finishedAt: new Date().toISOString() };
+    run.audit.append({ type: "finished", completion });
+    try { await run.audit.close(); }
+    catch (error) { completion.status = ended("failed", "audit_failed", error instanceof Error ? error.message : String(error)); }
     return completion;
   });
 }

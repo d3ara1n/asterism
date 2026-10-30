@@ -12,11 +12,11 @@ The submitting Agent's resources are not automatically available to the pool. A 
 
 Inspect the pool to see its tasks, available Agent roles, and operation schemas. Submit a task with an Agent role and explicit instructions, adding background material when needed. The task has its own conversation. It does not inherit the submitting conversation.
 
-An optional model overrides the role's model choice. Otherwise, an empty model selection in the role uses the default ModelRole's model. Configure that default before delegating. Prompts and budgets come from the Agent role, not from delegation arguments.
+An optional model selection replaces the role's model and thinking level together. Otherwise the role's model role applies, and an empty model there uses the default ModelRole's model. Configure that default before delegating. Prompts and budgets come from the Agent role, not from delegation arguments.
 
 Submission returns immediately. Four tasks can execute in parallel; further tasks wait in the pool's queue. Use the returned ID to read status or the final report. Reading does not consume the result. To wait for several tasks, supply their IDs together as the wait target. Waiting has no timeout argument, and cancelling a wait leaves its tasks running.
 
-Tasks can finish successfully, partially after exhausting a budget, with an error, or by cancellation. Read the task outcome separately from the success of the check or wait operation.
+Tasks can finish successfully, partially after exhausting a budget, with an error, or by cancellation. Read the task outcome separately from the success of the check or wait operation. Instructions that arrived too late to reach the task are listed as undelivered with its result.
 
 ## Observe and guide
 

@@ -654,7 +654,7 @@ describe("Agent resource operation entries", () => {
     const target = await model(f.app), actor = await f.session.create(Create, 0);
     await configureBuiltin(f.app, { type: "agent.save", id: "worker", value: { id: "worker",
       description: "Public purpose", examples: ["Public example"],
-      systemPrompt: "PRIVATE_AGENT_INSTRUCTIONS", maxTurns: 123,
+      systemPrompt: "PRIVATE_AGENT_INSTRUCTIONS", budget: { maxRequests: 123 },
     } });
     await configureBuiltin(f.app, { type: "agent.save", id: "reviewer", value: { id: "reviewer", enabled: false } });
     const result = await runner(f, actor, target)();

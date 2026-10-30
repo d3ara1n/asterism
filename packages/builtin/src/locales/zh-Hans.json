@@ -516,7 +516,7 @@
   "agent.configuration.modelProviders": "模型提供商",
   "rolesTitle": "角色",
   "features_settings_SettingsPage_5": "可复用的模型角色",
-  "features_settings_SettingsPage_7": "提示词、模型和请求上限",
+  "features_settings_SettingsPage_7": "提示词、模型和子代理预算",
   "features_configuration_RolesSettings_7": "模型",
   "features_configuration_RolesSettings_8": "未设置",
   "features_configuration_RolesSettings_9": "不可用的模型",
@@ -572,9 +572,10 @@
   "features_configuration_AgentsSettings_34": "示例 {index___1}",
   "features_configuration_AgentsSettings_35": "移除示例",
   "features_configuration_AgentsSettings_36": "添加示例",
-  "features_configuration_AgentsSettings_56": "限制",
-  "features_configuration_AgentsSettings_59": "每轮最大请求数",
-  "features_configuration_AgentsSettings_60": "运行时默认（32 次）",
+  "features_configuration_AgentsSettings_56": "预算",
+  "features_configuration_AgentsSettings_57": "只影响子代理。",
+  "features_configuration_AgentsSettings_59": "最大请求数",
+  "features_configuration_AgentsSettings_61": "最长时长（秒）",
   "homePlaceholder": "写下你的想法…",
   "firstMessage": "第一条消息",
   "features_home_HomePage_8": "正在创建会话…",
@@ -611,7 +612,5 @@
   "subagent.unavailable": "当前时间线上没有此任务。",
   "subagent.disconnected": "任务视图已断开。请关闭并重新打开以连接。",
   "subagent.usage": "{requests} 次请求 · {seconds} 秒",
-  "subagent.activity": "{activity, select, starting {正在启动} thinking {正在思考} text {正在撰写} finalizing {正在保存结果} tool {正在使用 {tool}} other {正在工作}}",
-  "subagent.timeBudget": "子代理时间预算（秒）",
-  "subagent.requestBudgetHint": "未设置请求上限时，子代理仅受时间预算约束。"
+  "subagent.activity": "{activity, select, starting {正在启动} thinking {正在思考} text {正在撰写} finalizing {正在保存结果} tool {正在使用 {tool}} other {正在工作}}"
 }

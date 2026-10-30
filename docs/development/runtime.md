@@ -8,7 +8,7 @@ Host model services perform individual requests and tool batches from explicit m
 
 A turn groups the inputs an agent handles together. A request is one model response and its tool batch. Blocks are output units, not turn boundaries.
 
-The first input in a turn carries `startsTurn`; subsequent inputs in the batch and steering inputs do not. Stop, failure, budget exhaustion, and explicit continuation retain the turn. A new idle submission or the next batch consumed at a turn boundary begins another turn.
+The first input in a turn carries `startsTurn`; subsequent inputs in the batch and steering inputs do not. Stop, failure, and explicit continuation retain the turn. A new idle submission or the next batch consumed at a turn boundary begins another turn.
 
 Input submission is an Agent action. Exact retries use the same submission identity and complete input; reusing that identity for a different action or input fails.
 
@@ -19,14 +19,14 @@ Idle input commits before execution. While running, accepted inputs enter the pe
 Boundary consumption follows these rules:
 
 - After a response and its tool batch, consume steering inputs in draft order before capturing the next request.
-- At a normal, error, or request-budget turn boundary, consume steering and follow-up inputs in their shared order as the next turn.
+- At a normal or error turn boundary, consume steering and follow-up inputs in their shared order as the next turn.
 - Cancellation leaves drafts and modes intact.
 - Deliver messages and remove their drafts in one transaction, including content ownership transfer.
 - A history commit failure stops execution rather than starting a request with unrecorded input.
 
 Restoring drafts on startup does not send them. The Agent owns scheduling and runs one consuming loop at a time; host activity tracking also covers cleanup after a loop stops consuming.
 
-The request limit counts work requests, not user turns. Its default and budget constants belong to source. Steering does not reset it; a new turn or explicit continuation does. There is no blanket Agent execution timeout.
+The workbench Agent has no request count or execution time limit; a turn continues while responses request tools or steering arrives. Agent configuration budgets apply only to subagent runs.
 
 ## Request environment
 

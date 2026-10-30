@@ -16,8 +16,15 @@ export const configurationDefaults: ParadigmSnapshot["defaults"] = {
 };
 
 export function normalizeOverrides<T extends ModelRoleOverrides | AgentOverrides>(value: T): T {
-  return Object.fromEntries(Object.entries(value).filter(([, item]) =>
-    item !== undefined && !(typeof item === "string" && item.trim() === ""))) as T;
+  return Object.fromEntries(Object.entries(value).flatMap(([key, item]): [string, unknown][] => {
+    if (item === undefined || (typeof item === "string" && item.trim() === "")) return [];
+    // Budget fields override individually; an object without fields overrides nothing.
+    if (key === "budget" && item && typeof item === "object") {
+      const fields = Object.entries(item).filter(([, field]) => field !== undefined);
+      return fields.length ? [[key, Object.fromEntries(fields)]] : [];
+    }
+    return [[key, item]];
+  })) as T;
 }
 
 /** Custom entries inherit only behavior fields; users supply their identities. */
@@ -40,7 +47,7 @@ export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaul
   const inherited = defaults.agents[base];
   if (!inherited) throw new Error("Built-in agent definition is unavailable.");
   return agentSchema.parse({
-    ...inherited, ...overrides,
+    ...inherited, ...overrides, budget: { ...inherited.budget, ...overrides.budget },
     id: agent.id, builtin: agent.builtin,
   });
 }

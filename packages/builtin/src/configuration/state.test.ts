@@ -46,12 +46,14 @@ describe("Builtin configuration ownership", () => {
   });
   it("updates unoverridden fields without mutating already resolved configuration", () => {
     const oldDefaults = structuredClone(configurationDefaults), nextDefaults = structuredClone(configurationDefaults);
-    oldDefaults.agents.worker!.maxTurns = 1200; nextDefaults.agents.worker!.maxTurns = 3000;
+    oldDefaults.agents.worker!.budget.maxRequests = 1200; nextDefaults.agents.worker!.budget.maxRequests = 3000;
+    nextDefaults.agents.worker!.budget.maxDurationSeconds = 50;
     nextDefaults.agents.worker!.systemPrompt = "New default"; nextDefaults.roles.default!.thinking = "high";
-    const entry = { id: "custom", builtin: false, overrides: { systemPrompt: "Pinned" } };
+    // Overriding one budget field keeps inheriting the other from current defaults.
+    const entry = { id: "custom", builtin: false, overrides: { systemPrompt: "Pinned", budget: { maxDurationSeconds: 70 } } };
     const before = resolveAgentConfiguration(entry, oldDefaults);
-    expect(resolveAgentConfiguration(entry, nextDefaults)).toMatchObject({ maxTurns: 3000, systemPrompt: "Pinned" });
-    expect(before.maxTurns).toBe(1200);
+    expect(resolveAgentConfiguration(entry, nextDefaults)).toMatchObject({ budget: { maxRequests: 3000, maxDurationSeconds: 70 }, systemPrompt: "Pinned" });
+    expect(before.budget.maxRequests).toBe(1200);
     expect(resolveRoleConfiguration({ id: "role", builtin: false, overrides: { hidden: false } }, nextDefaults)).toMatchObject({ thinking: "high", hidden: false });
   });
 });

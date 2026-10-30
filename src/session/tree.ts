@@ -5,6 +5,7 @@ import { sessionNodeSchema, type NewNode, type SessionNode } from "../shared/ses
 import { SessionError } from "../shared/session-timeline.ts";
 import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
 import { foldWorkbench, type FoldedState } from "./fold.ts";
+import { SessionStructure, type StructuralNode } from "./structure.ts";
 import { deepFreeze } from "../shared/immutable.ts";
 import { SessionTitleAssigned, type ResourceRef, type Json } from "@asterism-app/sdk/contracts";
 export { SessionError } from "../shared/session-timeline.ts";
@@ -18,13 +19,12 @@ export type CursorSelection = {
   recordedAt: string;
 };
 
-type NodeIndex = { id: string; seq: number; contract: string };
-
 /** Session tree storage: fixed node identity and ancestry, with one-time completion of explicitly pending operations. */
 export class SessionTree {
   constructor(private readonly db: DatabaseSync) {}
   private readonly workbenches = new Map<string, { cursor: string | null; state: FoldedState }>();
   private readonly identities = new Map<string, ResourceRef>();
+  private readonly structures = new Map<string, SessionStructure>();
 
   /** Creation record identity is immutable; reuse after the first ID lookup without rereading historical bodies. */
   resourceRef(id: string): ResourceRef | null {
@@ -72,6 +72,7 @@ export class SessionTree {
     if (!this.db.prepare("UPDATE sessions SET archived_at = ? WHERE id = ? AND archived_at IS NULL").run(at, sessionId).changes)
       throw new SessionError("not_found", "Session not found.");
     this.workbenches.delete(sessionId);
+    this.structures.delete(sessionId);
     for (const [id, ref] of this.identities) if (ref.sessionId === sessionId) this.identities.delete(id);
   }
   /** Unarchive by clearing the field only, without reading session contents. */
@@ -102,22 +103,42 @@ export class SessionTree {
         return [node.id, node] as const;
       }));
     return { id: sessionId, title: row.title, nodeId: row.cursor,
-      timelineIds: () => Array.from(this.ancestors(sessionId, row.cursor, upperSeq), entry => entry.id).reverse(),
+      timelineIds: () => this.pathNodes(sessionId, row.cursor).map(node => node.id),
       read: query => this.readView(sessionId, row.cursor, upperSeq, query, pending) };
   }
 
-  /** Deliver structural fields one by one along parent pointers; stop at a last match without moving unrelated bodies. */
-  private *ancestors(sessionId: string, nodeId: string | null, upperSeq: number): Iterable<NodeIndex> {
-    const read = this.db.prepare("SELECT id, parent_id, seq, contract FROM session_nodes WHERE session_id = ? AND id = ?");
-    let before = upperSeq + 1;
-    for (let id = nodeId; id !== null;) {
-      const entry = read.get(sessionId, id) as (NodeIndex & { parent_id: string | null }) | undefined;
-      if (!entry) throw new SessionError("not_found", "Session node not found.");
-      if (entry.seq >= before) throw new SessionError("conflict", "Session ancestry is outside its append order.");
-      yield entry;
-      id = entry.parent_id;
-      before = entry.seq;
+  /** Committed structure index; rows enter only outside transactions, so rollback and reused positions cannot leave stale entries. */
+  private structure(sessionId: string): SessionStructure {
+    let structure = this.structures.get(sessionId);
+    if (!structure) { structure = new SessionStructure(); this.structures.set(sessionId, structure); }
+    if (!this.db.isTransaction) {
+      const rows = this.db.prepare("SELECT id, parent_id AS parentId, seq, contract FROM session_nodes WHERE session_id = ? AND seq > ? ORDER BY seq")
+        .iterate(sessionId, structure.head) as Iterable<StructuralNode>;
+      for (const row of rows) structure.add({ ...row });
     }
+    return structure;
+  }
+
+  /** Root-to-node path: committed ancestry from the index and any uncommitted tail from storage. */
+  private path(sessionId: string, nodeId: string | null) {
+    const structure = this.structure(sessionId), tail: StructuralNode[] = [];
+    let read: ReturnType<DatabaseSync["prepare"]> | undefined;
+    let id = nodeId;
+    while (id !== null && !structure.get(id)) {
+      read ??= this.db.prepare("SELECT id, parent_id AS parentId, seq, contract FROM session_nodes WHERE session_id = ? AND id = ?");
+      const row = read.get(sessionId, id) as StructuralNode | undefined;
+      if (!row) throw new SessionError("not_found", "Session node not found.");
+      if (tail.length && row.seq >= tail.at(-1)!.seq) throw new SessionError("conflict", "Session ancestry is outside its append order.");
+      tail.push({ ...row });
+      id = row.parentId;
+    }
+    if (tail.length && id !== null && structure.get(id)!.seq >= tail.at(-1)!.seq)
+      throw new SessionError("conflict", "Session ancestry is outside its append order.");
+    return { structure, length: structure.locate(id), tail: tail.reverse() };
+  }
+  private pathNodes(sessionId: string, nodeId: string | null): StructuralNode[] {
+    const { structure, length, tail } = this.path(sessionId, nodeId);
+    return [...structure.select(length), ...tail];
   }
 
   private readNodes(entries: Iterable<{ id: string }>, pending?: ReadonlyMap<string, SessionNode>): SessionNode[] {
@@ -132,49 +153,51 @@ export class SessionTree {
   }
 
   private readView(sessionId: string, nodeId: string | null, upperSeq: number, query: NodeQuery, pending: ReadonlyMap<string, SessionNode>): SequencedNode[] {
-    const backwards = query.scope === "timeline" || query.edge === "last";
-    const entries = query.scope === "timeline" ? this.ancestors(sessionId, nodeId, upperSeq)
-      : this.db.prepare(`SELECT id, seq, contract FROM session_nodes
-          WHERE session_id = ? AND seq <= ? ORDER BY seq ${backwards ? "DESC" : "ASC"}`)
-        .iterate(sessionId, upperSeq) as Iterable<NodeIndex>;
-    const selected: NodeIndex[] = [];
-    for (const entry of entries) {
-      if (query.contracts && !query.contracts.includes(entry.contract)) continue;
-      if (query.edge) {
-        selected[0] = entry;
-        if ((query.edge === "last") === backwards) break;
-      } else selected.push(entry);
+    const matches = (node: StructuralNode) => !query.contracts || query.contracts.includes(node.contract);
+    let structure: SessionStructure, selected: StructuralNode[];
+    if (query.scope === "timeline") {
+      const path = this.path(sessionId, nodeId);
+      structure = path.structure;
+      // Read the indexed prefix immediately: locating another node repositions the shared spine.
+      const indexed = structure.select(path.length, query.contracts, query.edge), extra = path.tail.filter(matches);
+      selected = !query.edge ? [...indexed, ...extra]
+        : query.edge === "first" ? (indexed.length ? indexed : extra.slice(0, 1))
+          : (extra.length ? extra.slice(-1) : indexed);
+    } else {
+      structure = this.structure(sessionId);
+      const extra = upperSeq > structure.head
+        ? (this.db.prepare("SELECT id, parent_id AS parentId, seq, contract FROM session_nodes WHERE session_id = ? AND seq > ? AND seq <= ? ORDER BY seq")
+          .all(sessionId, structure.head, upperSeq) as unknown as StructuralNode[]).filter(matches)
+        : [];
+      const all = [...structure.range(upperSeq, query.contracts), ...extra];
+      selected = !query.edge ? all : query.edge === "first" ? all.slice(0, 1) : all.slice(-1);
     }
-    if (backwards) selected.reverse();
     if (!selected.length) return [];
-    const sequences = this.numberSequences(sessionId, selected.map(entry => entry.seq));
-    return this.readNodes(selected, pending).map((node, index) => ({ node, sequence: sequences[index]! }));
+    return this.readNodes(selected, pending).map((node, index) => ({ node, sequence: this.sequenceOf(sessionId, selected[index]!.seq, structure) }));
   }
 
-  /** Input follows append order; count only nonoverlapping index ranges without reading other record bodies. */
-  private numberSequences(sessionId: string, positions: readonly number[]): number[] {
-    const count = this.db.prepare("SELECT COUNT(*) AS count FROM session_nodes WHERE session_id = ? AND seq > ? AND seq <= ?");
-    let previous = 0, sequence = 0;
-    return positions.map(position => {
-      sequence += Number((count.get(sessionId, previous, position) as { count: number }).count);
-      previous = position;
-      return sequence;
-    });
+  /** One-based session order of an append position; positions above the index count only the unindexed rows from storage. */
+  private sequenceOf(sessionId: string, seq: number, structure: SessionStructure): number {
+    const indexed = structure.rank(seq);
+    if (seq <= structure.head) return indexed;
+    return indexed + Number((this.db.prepare("SELECT COUNT(*) AS count FROM session_nodes WHERE session_id = ? AND seq > ? AND seq <= ?")
+      .get(sessionId, structure.head, seq) as { count: number }).count);
   }
 
   /** Records committed in this batch already have bodies; fill in their session order only. */
   sequences(sessionId: string, nodes: readonly SessionNode[]): number[] {
     if (!nodes.length) return [];
-    const position = this.db.prepare("SELECT seq FROM session_nodes WHERE session_id = ? AND id = ?");
-    const positions = nodes.map(node => {
-      const row = position.get(sessionId, node.id) as { seq: number } | undefined;
-      if (!row) throw new SessionError("not_found", "Session node not found.");
-      return row.seq;
+    const structure = this.structure(sessionId);
+    let position: ReturnType<DatabaseSync["prepare"]> | undefined;
+    return nodes.map(node => {
+      let seq = structure.get(node.id)?.seq;
+      if (seq === undefined) {
+        position ??= this.db.prepare("SELECT seq FROM session_nodes WHERE session_id = ? AND id = ?");
+        seq = (position.get(sessionId, node.id) as { seq: number } | undefined)?.seq;
+      }
+      if (seq === undefined) throw new SessionError("not_found", "Session node not found.");
+      return this.sequenceOf(sessionId, seq, structure);
     });
-    const sorted = [...new Set(positions)].sort((a, b) => a - b);
-    const sequences = this.numberSequences(sessionId, sorted);
-    const byPosition = new Map(sorted.map((position, index) => [position, sequences[index]!]));
-    return positions.map(position => byPosition.get(position)!);
   }
 
   /** Append at the current timeline end at commit time and advance the cursor; does not support writing to arbitrary tree nodes. */
@@ -269,6 +292,6 @@ export class SessionTree {
   /** Read root-to-end timelines; omitted at uses the execution cursor. Reading neither activates positions nor grants append capability. */
   timeline(sessionId: string, at?: string | null): SessionNode[] {
     const cursor = this.cursor(sessionId);
-    return this.readNodes(this.ancestors(sessionId, at === undefined ? cursor : at, this.head(sessionId))).reverse();
+    return this.readNodes(this.pathNodes(sessionId, at === undefined ? cursor : at));
   }
 }

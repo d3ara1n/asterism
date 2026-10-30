@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   defineCall, defineChannel, defineCreation, defineImplementation, defineOperationRecord, defineTool,
-  modelExpressionSchema, modelUsageSchema, modelBlockSchema, type Json, type ModelLiveBlock,
+  modelExpressionSchema, modelUsageSchema, modelBlockSchema, thinkingSchema, type Json, type ModelLiveBlock,
 } from "@asterism-app/sdk/contracts";
 import { builtin, configurationIdSchema } from "@asterism-app/builtin-api/contracts";
 
@@ -14,9 +14,13 @@ export const CreateSubagentPool = defineCreation(SubagentPool, {
   schema: createPoolSchema,
 });
 export const taskIdSchema = z.string().regex(/^sub-[1-9]\d*$/u).describe("A task ID within this pool, such as sub-1.");
+export const modelOverrideSchema = z.strictObject({
+  model: modelExpressionSchema.describe("Model as provider/model."),
+  thinking: thinkingSchema.nullable().describe("Thinking level for this model. Null uses the provider default."),
+}).describe("Model and thinking level replacing the Agent role's model selection.");
 export const delegateSchema = z.strictObject({
   role: configurationIdSchema.describe("Agent role ID from this pool's role listing."),
-  model: modelExpressionSchema.optional().describe("Optional model override, as provider/model. Other settings come from the Agent role."),
+  model: modelOverrideSchema.optional().describe("Optional model selection override. Other settings come from the Agent role."),
   task: z.string().min(1).describe("Task instructions and the requested report."),
   context: z.string().optional().describe("Explicit background material for the independent conversation."),
 }).describe("Delegate a task using an Agent role and explicit task material.");
@@ -33,9 +37,12 @@ export const statusSchema = z.discriminatedUnion("phase", [
   z.strictObject({ phase: z.literal("running"), activity: z.string() }),
   finishedSchema,
 ]);
-export const outputSchema = z.strictObject({ result: z.string().nullable(), usage: usageSchema });
+export const outputSchema = z.strictObject({
+  result: z.string().nullable(), usage: usageSchema,
+  undelivered: z.array(z.string()).describe("Steering messages queued but not delivered before the task ended."),
+});
 export const delegationInputSchema = z.strictObject({
-  id: taskIdSchema, runId: z.string(), role: z.string(), model: z.string().nullable(),
+  id: taskIdSchema, runId: z.string(), role: z.string(), model: modelOverrideSchema.nullable(),
   task: z.string(), context: z.string().nullable(),
   submittedBy: z.strictObject({ id: z.string(), title: z.string() }),
 });
@@ -80,6 +87,7 @@ export const SteerSubagent = defineCall(builtin.name("subagent.steer"), {
   scope: "object", input: z.strictObject({ id: taskIdSchema, message: z.string().min(1) }), output: z.null(),
 });
 export type DelegateInput = z.infer<typeof delegateSchema>;
+export type ModelOverride = z.infer<typeof modelOverrideSchema>;
 export type DelegationInput = z.infer<typeof delegationInputSchema>;
 export type TaskSnapshot = z.infer<typeof snapshotSchema>;
 export type TaskSummary = z.infer<typeof summarySchema>;
@@ -97,7 +105,7 @@ export function summary(task: TaskSnapshot): TaskSummary {
     usage: task.output.usage, createdAt: task.createdAt, finishedAt: task.finishedAt };
 }
 export function emptyOutput(): TaskOutput {
-  return { result: null, usage: { model: null, requests: 0, elapsedMs: 0,
+  return { result: null, undelivered: [], usage: { model: null, requests: 0, elapsedMs: 0,
     input: null, output: null, total: null, reasoning: null, cacheRead: null, cacheWrite: null } };
 }
 export function ended(outcome: FinishedStatus["outcome"], code: string | null = null, message: string | null = null): FinishedStatus {

@@ -3,13 +3,13 @@ import { runAgentLoop, type AgentLoopPort } from "./loop.ts";
 
 function port(overrides: Partial<AgentLoopPort>): AgentLoopPort {
   return { requestLimit: () => 3, request: async () => ({ reason: "completed", hasTools: false }),
-    completed: async () => {}, consume: () => false, limitReached() {}, ...overrides };
+    completed: async () => {}, consume: () => false, ...overrides };
 }
 
 describe("Agent request and turn boundaries", () => {
   it("tool results continue the turn and steering does not reset its request budget", async () => {
     const indices: number[] = [];
-    let limits = 0, completion = 0, steering = true;
+    let completion = 0, steering = true;
     const status = await runAgentLoop(port({
       requestLimit: () => 2,
       async request(index) { indices.push(index); return { reason: "completed", hasTools: true }; },
@@ -18,11 +18,9 @@ describe("Agent request and turn boundaries", () => {
         return false;
       },
       async completed() { completion++; },
-      limitReached() { limits++; },
     }), new AbortController().signal);
     expect(status).toBe("limited");
     expect(indices).toEqual([0, 1]);
-    expect(limits).toBe(1);
     expect(completion).toBe(0);
   });
 

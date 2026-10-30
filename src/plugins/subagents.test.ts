@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
@@ -110,7 +110,8 @@ async function fixture(child: (input: ModelInput, signal: AbortSignal) => AsyncI
 }
 
 describe("Shared Subagent Pool", () => {
-  it.each([null, 1])("delivers steering after the current request or reports exhausted capacity with limit=%s", async limit => {
+  // Steering arriving during the final report is not delivered; the task still succeeds and reports the undelivered material.
+  it.each([32, 1])("delivers steering at the next request boundary or reports it undelivered with maxRequests=%s", async limit => {
     const entered = gate(), release = gate(), observed: string[][] = [];
     const f = await fixture(async function* (input, signal) {
       observed.push(inputText(input));
@@ -118,23 +119,23 @@ describe("Shared Subagent Pool", () => {
       else yield* report("Updated report");
     });
     const pool = await f.createPool();
-    await configureBuiltin(f.app, { type: "agent.save", id: "explorer", value: { id: "explorer", maxTurns: limit } });
+    await configureBuiltin(f.app, { type: "agent.save", id: "explorer", value: { id: "explorer", budget: { maxRequests: limit } } });
     const task = await f.delegate(pool, "Initial task");
     await entered.promise;
     expect((await f.invoke(pool, "steer", task.input.id, { message: "Additional requirement" })).kind).toBe("succeeded");
     release.resolve();
     await f.invoke(pool, "wait", [task.input.id]);
     const completed = await f.check(pool, task.input.id);
-    if (limit === null) {
+    if (limit > 1) {
       expect(observed).toEqual([["Initial task"], ["Initial task", "Additional requirement"]]);
-      expect(completed).toMatchObject({ status: { outcome: "succeeded" }, output: { result: "Updated report" } });
+      expect(completed).toMatchObject({ status: { outcome: "succeeded" }, output: { result: "Updated report", undelivered: [] } });
     } else {
       expect(observed).toEqual([["Initial task"]]);
-      expect(completed).toMatchObject({ status: { outcome: "partial", code: "request_budget" }, output: { result: "Initial report" } });
+      expect(completed).toMatchObject({ status: { outcome: "succeeded" }, output: { result: "Initial report", undelivered: ["Additional requirement"] } });
     }
   });
 
-  it("limits active work to four, delivers queued steering, and keeps tasks running when a wait is cancelled", async () => {
+  it("limits active work to four, delivers queued steering, cancels queued tasks without running them, and keeps tasks running when a wait is cancelled", async () => {
     const released = gate(), fourth = gate(), fifth = gate();
     const inputs: string[][] = [];
     const f = await fixture(async function* (input, signal) {
@@ -145,12 +146,17 @@ describe("Shared Subagent Pool", () => {
       yield* report("Task report");
     });
     const pool = await f.createPool(), tasks: TaskSnapshot[] = [];
-    for (let index = 0; index < 5; index++) tasks.push(await f.delegate(pool, `Task ${index + 1}`, { context: "Explicit background" }));
+    for (let index = 0; index < 6; index++) tasks.push(await f.delegate(pool, `Task ${index + 1}`, { context: "Explicit background" }));
     await fourth.promise;
     expect(inputs).toHaveLength(4);
     expect((await f.check(pool, tasks[4]!.input.id)).status.phase).toBe("queued");
     expect(f.app.sessions.current(f.sessionId).progress.busyObjectIds).not.toContain(pool.id);
     expect((await f.invoke(pool, "steer", tasks[4]!.input.id, { message: "Queued instruction" })).kind).toBe("succeeded");
+    // A queued task ends without execution: no model input, no audit, and its steering is reported undelivered.
+    expect((await f.invoke(pool, "steer", tasks[5]!.input.id, { message: "Never delivered" })).kind).toBe("succeeded");
+    expect(await f.invoke(pool, "cancel", tasks[5]!.input.id)).toMatchObject({ kind: "succeeded", data: { status: { outcome: "cancelled" } } });
+    expect((await f.check(pool, tasks[5]!.input.id)).output).toMatchObject({ undelivered: ["Never delivered"], usage: { requests: 0 } });
+    expect(existsSync(join(f.root, "extensions", builtin.id, "subagent-audits", `${tasks[5]!.input.runId}.jsonl`))).toBe(false);
     const cancelledWait = new AbortController();
     const waiting = f.invoke(pool, "wait", tasks.map(task => task.input.id), {}, cancelledWait.signal);
     cancelledWait.abort(); await waiting;
@@ -162,6 +168,7 @@ describe("Shared Subagent Pool", () => {
     await fifth.promise;
     expect(inputs[4]).toEqual(["Explicit background", "Task 5", "Queued instruction"]);
     released.resolve();
+    expect(inputs.flat()).not.toContain("Task 6");
     expect(inputs.flat().join(" ")).not.toContain("Private parent context");
     expect((await f.invoke(pool, "wait", tasks.map(task => task.input.id))).kind).toBe("succeeded");
     const completed = await f.check(pool, tasks[4]!.input.id);
@@ -247,7 +254,7 @@ describe("Shared Subagent Pool", () => {
     expect(innerRead).toContain("Pool-authorized material");
   });
 
-  it("returns partial output on request-budget exhaustion and ends running tasks on pool removal", async () => {
+  it("returns partial output on budget exhaustion and ends running tasks on pool removal", async () => {
     const entered = gate(), release = gate();
     let poolId = "";
     const f = await fixture(async function* (input, signal) {
@@ -260,10 +267,10 @@ describe("Shared Subagent Pool", () => {
       else { entered.resolve(); await until(release, signal); yield* report("Finished"); }
     });
     const pool = await f.createPool(); poolId = pool.id;
-    await configureBuiltin(f.app, { type: "agent.save", id: "explorer", value: { id: "explorer", maxTurns: 1 } });
+    await configureBuiltin(f.app, { type: "agent.save", id: "explorer", value: { id: "explorer", budget: { maxRequests: 1 } } });
     const budget = await f.delegate(pool, "Budget");
     await f.invoke(pool, "wait", [budget.input.id]);
-    expect(await f.check(pool, budget.input.id)).toMatchObject({ status: { outcome: "partial", code: "request_budget" }, output: { result: "Available findings" } });
+    expect(await f.check(pool, budget.input.id)).toMatchObject({ status: { outcome: "partial", code: "budget_exceeded" }, output: { result: "Available findings" } });
     const running = await f.delegate(pool, "Long task");
     await entered.promise;
     f.context.session(f.sessionId).remove(pool);

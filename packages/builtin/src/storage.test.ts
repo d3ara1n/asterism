@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import storage from "./storage.ts";
 
 describe("Builtin settings migration", () => {
-  // Removing obsolete role fields must not reset model assignments or unrelated customized settings.
-  it("removes Agent policies while preserving role models, prompts, limits, and presentation settings", () => {
+  // Removing obsolete Agent fields must not reset model assignments or unrelated customized settings.
+  it("removes Agent policies and the workbench request limit while preserving role models, prompts, and presentation settings", () => {
     const previous = {
       autoExpand: false, autoCollapse: true,
       paradigm: {
@@ -21,7 +21,7 @@ describe("Builtin settings migration", () => {
       paradigm: {
         roles: [{ id: "default", builtin: true, overrides: { model: "provider/model", thinking: "high" } }],
         agents: [{ id: "custom", builtin: false, overrides: {
-          systemPrompt: "Investigate the supplied task.", modelRole: "default", maxTurns: 7, enabled: false,
+          systemPrompt: "Investigate the supplied task.", modelRole: "default", enabled: false,
         } }],
       },
     });

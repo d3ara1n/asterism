@@ -12,15 +12,15 @@ The pool's task set is shared. Submission provenance explains origin without est
 
 ## Execution contract
 
-Delegation selects an AgentRole and supplies explicit task material. AgentRole supplies instructions, a ModelRole reference, and execution budgets. Only the model can be overridden for an individual delegation. Resolution uses the explicit model, then the selected ModelRole's configured model, then the default ModelRole's configured model. An absent final model is an error. Execution failure does not trigger a retry with another model.
+Delegation selects an AgentRole and supplies explicit task material. AgentRole supplies instructions, a ModelRole reference, and its budget. A delegation can replace the role's model selection with an explicit model and thinking level; that pair is used as given without resolving the ModelRole. Otherwise resolution uses the selected ModelRole's configured model, then the default ModelRole's configured model, with the selected ModelRole's thinking level. An absent final model is an error. Execution failure does not trigger a retry with another model.
 
-The selected role and model resolve when the run starts. Each subsequent request captures its resource environment and prompt preparation inputs. The time budget covers model requests and tool execution, beginning after queue admission; queue waiting does not consume it. A configured request limit also applies. Without that limit, time bounds the run.
+The selected role and model resolve when the run starts. Each subsequent request captures its resource environment and prompt preparation inputs. The budget bounds request count and duration. Duration covers model requests and tool execution, beginning after queue admission; queue waiting does not consume it. Budgets apply only to subagent runs; workbench Agents have none.
 
 All delegation is asynchronous. The pool accepts concurrent submissions and runs at most four tasks in parallel. Waiting is a separate cancellable operation over one or more task targets, without a timeout parameter. Cancelling a wait does not cancel its tasks. Reading a failed task or waiting for it to end can succeed as an operation even though the task failed.
 
-A run owns its conversation, queued input, temporary attachments, cancellation, and execution measurements. Steering appends explicit material to the input queue while queued or running; requests consume it at their boundaries. Finished runs do not accept continuation or restart.
+A run owns its conversation, queued input, temporary attachments, cancellation, and execution measurements. Steering appends explicit material to the input queue whether the task is queued by the pool or running; consumers do not need to know which. Requests consume the whole queue at their boundaries. Steering that arrives after the final response began, or when the run ends otherwise, is returned as undelivered with the result. Finished runs do not accept continuation or restart.
 
-The final report is the last text block. Execution outcomes distinguish success, failure, cancellation, and partial completion from budget exhaustion. Usage includes the resolved model and available measurements. External observation can expose the process without inserting it into the submitting Agent's conversation.
+The final report is the last text block, and may be empty. Execution outcomes distinguish success, failure, cancellation, and partial completion from budget exhaustion. An interruption from cancellation or the duration budget outranks a thrown error, which outranks the loop's own result. Usage includes the resolved model and available measurements. External observation can expose the process without inserting it into the submitting Agent's conversation.
 
 ## Lifecycle and history
 
@@ -34,15 +34,15 @@ An ordinary tool call and a delegation both represent one operation with an even
 
 Persistent result storage follows the Delegation record and its retained content. The pool does not require a separate result database or an indefinitely retained in-memory conversation. Runtime state can be released after final output and required audit data have been stored.
 
-One resource-bound managed task supervises the queue and its active executions without claiming timeline busy. Shutdown signals that supervisor, cancels queued and active work, and waits for finalization. Disposal warnings report unfinished work independently of busy. A result-storage failure remains visible as a runtime failure until teardown rather than being reported as saved.
+One resource-bound managed task supervises the queue and its active executions without claiming timeline busy. All outcomes, including cancellation before admission, complete their Delegation record through one finalization path. A task cancelled while queued never executes. Shutdown signals that supervisor, finalizes queued work as cancelled, cancels active work, and waits for finalization. Disposal warnings report unfinished work independently of busy. A result-storage failure remains visible as a runtime failure until teardown rather than being reported as saved.
 
 ## Identity and audit
 
 A short ID such as `sub-1` is a target within one pool. A globally unique run ID identifies the execution for diagnostics. The Delegation record retains both their relationship and the run ID used for audit lookup.
 
-On run termination, internal process records are stored as a JSONL file named by the run ID in plugin-owned storage. Audit files are retained permanently for investigation. Normal result retrieval reads the Delegation record. The audit is not an alternative report delivery channel or a source for resuming execution.
+Executed runs append internal process records to a JSONL file named by the run ID in plugin-owned storage as the run proceeds. Each line is independent, so an interrupted process loses at most its final line. A task cancelled before admission has no process and no audit. Audit files are retained permanently for investigation. Normal result retrieval reads the Delegation record. The audit is not an alternative report delivery channel or a source for resuming execution.
 
-Audit entries preserve the original input, queued and delivered steering, request instructions, finalized model blocks, diagnostics, and completion measurements. Attachments from delivered tool outcomes are copied beside the audit before the temporary content scope ends. Rejected or invented references in tool arguments remain recorded arguments and do not acquire content ownership. Audit failure is an execution failure with any available report retained.
+Audit entries preserve the original input, queued and delivered steering, request instructions, finalized model blocks, diagnostics, and completion measurements. Attachments from delivered tool outcomes are copied beside the audit when those outcomes arrive, while the temporary content scope is open. Rejected or invented references in tool arguments remain recorded arguments and do not acquire content ownership. Audit failure is an execution failure with any available report retained.
 
 ## Observation
 

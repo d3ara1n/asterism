@@ -125,3 +125,41 @@ describe("Session-level flat tree", () => {
     expect(before.links).toEqual([{ receiverId: "a", resourceId: "b" }]);
   });
 });
+
+// The structural index serves timeline reads; it must not retain rolled-back rows or confuse branches sharing a prefix.
+describe("Timeline structure index", () => {
+  const read = (tree: SessionTree, s: string, query: Parameters<ReturnType<SessionTree["view"]>["read"]>[0]) =>
+    tree.view(s).read(query).map(({ node, sequence }) => [node.data, sequence]);
+
+  it("reads uncommitted tail rows inside a transaction and forgets them after rollback reuses their position", () => {
+    const { db, tree, s } = setup();
+    tree.appendToTimeline(s, record("a"));
+    tree.appendToTimeline(s, record("b"));
+    expect(read(tree, s, { scope: "timeline" })).toEqual([[{ value: "a" }, 1], [{ value: "b" }, 2]]);
+    db.exec("BEGIN");
+    tree.appendToTimeline(s, record("rolled back"));
+    expect(read(tree, s, { scope: "timeline", edge: "last" })).toEqual([[{ value: "rolled back" }, 3]]);
+    expect(read(tree, s, { scope: "session" })).toHaveLength(3);
+    db.exec("ROLLBACK");
+    tree.appendToTimeline(s, record("c"));
+    expect(read(tree, s, { scope: "timeline" })).toEqual([[{ value: "a" }, 1], [{ value: "b" }, 2], [{ value: "c" }, 3]]);
+    expect(read(tree, s, { scope: "session" })).toEqual([[{ value: "a" }, 1], [{ value: "b" }, 2], [{ value: "c" }, 3]]);
+  });
+
+  it("filters contracts per branch after the cursor moves between branches with a shared prefix", () => {
+    const { tree, s } = setup();
+    const root = tree.appendToTimeline(s, event("example/marker", { value: "root" }));
+    tree.appendToTimeline(s, event("example/other", { value: "left" }));
+    const left = tree.appendToTimeline(s, event("example/marker", { value: "left" }));
+    expect(read(tree, s, { scope: "timeline", contracts: ["example/marker"] })).toEqual([[{ value: "root" }, 1], [{ value: "left" }, 3]]);
+    tree.select(s, root.id);
+    tree.appendToTimeline(s, event("example/marker", { value: "right" }));
+    expect(read(tree, s, { scope: "timeline", contracts: ["example/marker"] })).toEqual([[{ value: "root" }, 1], [{ value: "right" }, 4]]);
+    expect(read(tree, s, { scope: "timeline", contracts: ["example/other"] })).toEqual([]);
+    tree.select(s, left.id);
+    expect(read(tree, s, { scope: "timeline", contracts: ["example/marker", "example/other"], edge: "last" })).toEqual([[{ value: "left" }, 3]]);
+    expect(read(tree, s, { scope: "timeline", contracts: ["example/other", "example/marker"] }))
+      .toEqual([[{ value: "root" }, 1], [{ value: "left" }, 2], [{ value: "left" }, 3]]);
+    expect(read(tree, s, { scope: "session", contracts: ["example/marker"], edge: "last" })).toEqual([[{ value: "right" }, 4]]);
+  });
+});

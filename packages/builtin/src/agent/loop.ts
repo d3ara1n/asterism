@@ -7,11 +7,11 @@ export interface AgentRequestOutcome {
   halt?: boolean;
 }
 export interface AgentLoopPort {
-  requestLimit(): number;
+  /** Requests allowed per turn; omitted means unbounded. */
+  requestLimit?(): number;
   request(index: number, signal: AbortSignal): Promise<AgentRequestOutcome>;
   completed(signal: AbortSignal): Promise<void>;
   consume(boundary: "request" | "turn"): boolean;
-  limitReached(): void;
 }
 export type AgentLoopStatus = "completed" | "failed" | "cancelled" | "limited";
 
@@ -20,12 +20,10 @@ export async function runAgentLoop(port: AgentLoopPort, signal: AbortSignal): Pr
   let request = 0;
   for (;;) {
     signal.throwIfAborted();
-    const limit = port.requestLimit();
+    const limit = port.requestLimit?.() ?? Infinity;
     let status: AgentLoopStatus;
-    if (request >= limit) {
-      port.limitReached();
-      status = "limited";
-    } else {
+    if (request >= limit) status = "limited";
+    else {
       const result = await port.request(request, signal);
       request++;
       status = result.reason;

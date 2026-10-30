@@ -16,6 +16,7 @@ import {
 } from "./contract.ts";
 import { SubagentPoolRuntime } from "./service.ts";
 import { executeSubagent } from "./execution.ts";
+import { AuditLog } from "./audit.ts";
 
 async function operation<T extends Json>(signal: AbortSignal, work: () => T | Promise<T>): Promise<CallResult<T>> {
   try { signal.throwIfAborted(); return { kind: "succeeded", data: await work() }; }
@@ -31,6 +32,7 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
   return defineModule(plugin => {
     const pools = new Map<string, SubagentPoolRuntime>();
     const prepare = createRequestAssembly(plugin, skills);
+    const auditDirectory = join(plugin.dir, "subagent-audits");
     const pool = (ref: ResourceRef) => {
       if (ref.kind !== SubagentPool.kind) throw new PluginApiError("invalid_argument", "The target is not a Subagent Pool.");
       const runtime = pools.get(ref.id);
@@ -49,8 +51,9 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
             execute: (run, signal) => executeSubagent(run, signal, {
               access: object.ref, configuration: () => builtinConfiguration(plugin), prepare,
               execution: plugin.execution, content: plugin.content, usage, userAgent: application.userAgent,
-              auditDirectory: join(plugin.dir, "subagent-audits"), changed: () => runtime.changed(),
+              changed: () => runtime.changed(),
             }),
+            audit: runId => new AuditLog(auditDirectory, runId),
             changed() {
               if (!object.snapshot()) return;
               timer ??= setTimeout(() => { timer = undefined; if (object.snapshot()) object.invalidate(); }, 40);

@@ -3,7 +3,7 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 export const agentsMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   overviewSummary: {
     id: "features_settings_SettingsPage_7",
-    defaultMessage: "Prompts, models, and request limits",
+    defaultMessage: "Prompts, models, and subagent budgets",
   },
   agent: {
     id: "features_configuration_AgentsSettings_1",
@@ -125,16 +125,20 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
     id: "features_configuration_AgentsSettings_36",
     defaultMessage: "Add example",
   },
-  limits: {
+  budget: {
     id: "features_configuration_AgentsSettings_56",
-    defaultMessage: "Limits",
+    defaultMessage: "Budget",
+  },
+  budgetHint: {
+    id: "features_configuration_AgentsSettings_57",
+    defaultMessage: "Applies only to subagents.",
   },
   maximumRequests: {
     id: "features_configuration_AgentsSettings_59",
-    defaultMessage: "Maximum requests per turn",
+    defaultMessage: "Maximum requests",
   },
-  maximumRequestsPlaceholder: {
-    id: "features_configuration_AgentsSettings_60",
-    defaultMessage: "Runtime default (32)",
+  maximumDuration: {
+    id: "features_configuration_AgentsSettings_61",
+    defaultMessage: "Maximum duration (seconds)",
   },
 }));

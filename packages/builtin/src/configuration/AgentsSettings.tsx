@@ -5,7 +5,6 @@ import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 import type { AgentConfiguration, AgentOverrides } from "@asterism-app/builtin-api/contracts";
 import type { ConfigurationSnapshot } from "./renderer-state";
 import { agentsMessages } from "../messages/agents";
-import { subagentMessages } from "../messages/subagents";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -28,12 +27,18 @@ const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : defaultAgentPreset]!;
 
-/** Override normalization: remove blank text and fields matching built-in values. */
+/** Override normalization: remove blank text and fields matching built-in values; budget fields compare individually. */
 function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
   const result: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(draft)) {
     if (raw === undefined) continue;
     let value = raw;
+    if (key === "budget") {
+      const budget = Object.fromEntries(Object.entries(raw as NonNullable<AgentOverrides["budget"]>)
+        .filter(([field, item]) => item !== undefined && item !== base.budget[field as keyof Base["budget"]]));
+      if (Object.keys(budget).length) result.budget = budget;
+      continue;
+    }
     if (typeof value === "string" && !value.trim()) continue;
     if (Array.isArray(value)) value = [...new Set(value.map(item => String(item).trim()).filter(Boolean))];
     if (same(value, base[key as keyof Base])) continue;
@@ -140,6 +145,13 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
   const set = <K extends keyof AgentOverrides>(field: K, next: AgentOverrides[K]) => setDraft(previous => {
     const updated = { ...previous }; if (next === undefined) delete updated[field]; else updated[field] = next; return updated;
   });
+  const setBudget = (field: keyof Base["budget"], next: number | null | undefined) => setDraft(previous => {
+    const budget = { ...previous.budget };
+    if (next == null) delete budget[field]; else budget[field] = next;
+    const updated = { ...previous };
+    if (Object.keys(budget).length) updated.budget = budget; else delete updated.budget;
+    return updated;
+  });
   const effective = <K extends keyof Base>(field: K): Base[K] => (draft[field as keyof AgentOverrides] !== undefined ? draft[field as keyof AgentOverrides] : base[field]) as Base[K];
   const normalized = normalize(draft, base);
   const stored = normalize(strip(id ? snapshot.overrides.agents[id] ?? {} : {}), base);
@@ -191,11 +203,11 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
           <Button type="button" variant="outline" size="sm" className="w-fit" onClick={() => set("examples", [...examples, ""])}><Plus />{i18n.formatMessage(agentsMessages.addExample)}</Button></Field>
       </FieldGroup></EditorSection>
 
-      <EditorSection collapsible defaultOpen={false} title={i18n.formatMessage(agentsMessages.limits)}><FieldGroup>
-        <OverrideNumberField label={i18n.formatMessage(agentsMessages.maximumRequests)} value={draft.maxTurns} inherited={base.maxTurns} onChange={next => set("maxTurns", next)} min={1} integer empty={i18n.formatMessage(agentsMessages.maximumRequestsPlaceholder)} />
-        <FieldDescription>{i18n.text(subagentMessages.requestBudgetHint)}</FieldDescription>
-        <OverrideNumberField label={i18n.text(subagentMessages.timeBudget)} value={draft.maxDurationSeconds} inherited={base.maxDurationSeconds}
-          onChange={next => set("maxDurationSeconds", next ?? undefined)} empty={String(base.maxDurationSeconds)} min={1} max={2147483} integer />
+      <EditorSection collapsible defaultOpen={false} title={i18n.formatMessage(agentsMessages.budget)} hint={i18n.formatMessage(agentsMessages.budgetHint)}><FieldGroup>
+        <OverrideNumberField label={i18n.formatMessage(agentsMessages.maximumRequests)} value={draft.budget?.maxRequests} inherited={base.budget.maxRequests}
+          onChange={next => setBudget("maxRequests", next)} empty={String(base.budget.maxRequests)} min={1} integer />
+        <OverrideNumberField label={i18n.formatMessage(agentsMessages.maximumDuration)} value={draft.budget?.maxDurationSeconds} inherited={base.budget.maxDurationSeconds}
+          onChange={next => setBudget("maxDurationSeconds", next)} empty={String(base.budget.maxDurationSeconds)} min={1} max={2147483} integer />
       </FieldGroup></EditorSection>
 
     </fieldset></form>
