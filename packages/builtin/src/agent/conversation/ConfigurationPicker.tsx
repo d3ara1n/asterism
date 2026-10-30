@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import { ArrowLeft, Bot, Brain, ChevronDown, ChevronRight, Cpu, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { availableThinkingLevels, type ThinkingLevel } from "@asterism-app/sdk/contracts";
@@ -13,7 +13,6 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { Separator } from "@asterism-app/ui/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
-import { cn } from "@asterism-app/ui/utils";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { StatusText } from "@asterism-app/ui/ui/status";
 import { configurationMessages } from "../../messages/configuration";
@@ -25,12 +24,14 @@ const FOLLOW = "__agent_default";
 
 /** forward(+1): the new page enters from the right and the old page exits to the left; back(-1): the reverse. */
 const SLIDE_X = 8;
+const PAGE_DURATION = 0.18;
+const PAGE_EASE = [0, 0, 0.2, 1] as const;
 
 const pageVariants = {
   enter: (dir: number) => ({ opacity: 0, x: dir * SLIDE_X }),
   center: {
     opacity: 1, x: 0, pointerEvents: "auto",
-    transition: { type: "tween", duration: 0.18, ease: [0, 0, 0.2, 1] },
+    transition: { type: "tween", duration: PAGE_DURATION, ease: PAGE_EASE },
   },
   exit: (dir: number) => ({
     opacity: 0, x: dir * -SLIDE_X, pointerEvents: "none",
@@ -40,8 +41,8 @@ const pageVariants = {
 
 const reducedPageVariants = {
   enter: () => ({ opacity: 1, x: 0 }),
-  center: { opacity: 1, x: 0, pointerEvents: "auto" },
-  exit: () => ({ opacity: 1, x: 0, pointerEvents: "none" }),
+  center: { opacity: 1, x: 0, pointerEvents: "auto", transition: { duration: 0 } },
+  exit: () => ({ opacity: 0, x: 0, pointerEvents: "none", transition: { duration: 0 } }),
 } as const;
 
 export function AgentConfigurationPicker({ selection, disabled, onChange }: {
@@ -101,10 +102,14 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   const selected = { agent: selection.agent, model: selection.model ?? FOLLOW, thinking: selection.thinking ?? FOLLOW };
   const provider = configuration?.modelProviders.find(item => item.id === providerId);
   const browsingModels = page === "model" && providerId !== null;
+  const pageKey = browsingModels ? `provider:${providerId}` : page ?? "home";
+  function navigate(nextPage: Page | null, nextDirection: 1 | -1, nextProviderId: string | null = null) {
+    direction.current = nextDirection;
+    setProviderId(nextProviderId);
+    setPage(nextPage);
+  }
   function back() {
-    direction.current = -1;
-    if (browsingModels) setProviderId(null);
-    else setPage(null);
+    navigate(browsingModels ? "model" : null, -1);
   }
 
   // Returning from a secondary page restores focus to the original configuration row; Popover restores trigger focus when the entire popover closes.
@@ -118,11 +123,11 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
     if (field === "agent") next.agent = value;
     else if (field === "model") next.model = value === FOLLOW ? null : value;
     else next.thinking = value === FOLLOW ? null : value as ThinkingLevel;
-    if (selected[field] === value) { setPage(null); return; }
+    if (selected[field] === value) { navigate(null, -1); return; }
     submitting.current = true;
     setSaving(true);
     try {
-      if (await onChange(next)) setPage(null);
+      if (await onChange(next)) navigate(null, -1);
     } finally {
       submitting.current = false;
       setSaving(false);
@@ -132,7 +137,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   if (readError) return <StatusText tone="error">{i18n.text(readError)}</StatusText>;
   return <Popover open={open} onOpenChange={value => {
     setOpen(value);
-    if (value) { setPage(null); returnTo.current = "agent"; }
+    if (value) { navigate(null, 1); returnTo.current = "agent"; }
   }}>
     <Tooltip>
       <TooltipTrigger asChild>
@@ -152,82 +157,93 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
         {values.agent} · {modelName} · {thinkingName} · {contextWindow}
       </TooltipContent>
     </Tooltip>
-    <PopoverContent side="top" align="start" collisionPadding={8} aria-label={selectionTitle}
-      className={cn("nodrag nopan flex max-h-(--radix-popover-content-available-height) max-w-[calc(100vw-1rem)] flex-col overflow-hidden p-0",
-        browsingModels ? "w-[42rem]" : "w-80")}
+    <ConfigurationPopover wide={browsingModels} pageKey={pageKey} reducedMotion={!!prefersReducedMotion}
+      side="top" align="start" collisionPadding={8} aria-label={selectionTitle}
       onKeyDown={event => event.stopPropagation()}
       onEscapeKeyDown={event => {
         if (page !== null) { event.preventDefault(); back(); }
       }}>
-      {/* The incoming page owns layout immediately; exiting pages stay inside the content area above the footer. */}
+      {/* Every route replaces one complete page; the shared footer stays outside page transitions. */}
       <div className="relative flex min-h-0 flex-col overflow-hidden">
         <AnimatePresence initial={false} mode="popLayout" custom={direction.current}>
-          {page === null ? (
-            <motion.div key="home"
-              custom={direction.current}
-              variants={variants}
-              initial="enter" animate="center" exit="exit"
-              className="flex min-h-0 flex-col gap-0.5 overflow-y-auto p-1">
+          <motion.div key={pageKey}
+            custom={direction.current}
+            variants={variants}
+            initial="enter" animate="center" exit="exit"
+            className="flex min-h-0 flex-col">
+            {page === null ? <div className="flex min-h-0 flex-col gap-0.5 overflow-y-auto p-1">
               {(["agent", "model", "thinking"] as const).map(field => <ConfigurationRow key={field}
                 ref={element => { rows.current[field] = element; }} icon={icons[field]} label={labels[field]} value={values[field]}
                 disabled={blocked || (field === "thinking" && unsupported)}
                 onClick={() => {
-                  direction.current = 1;
                   returnTo.current = field;
-                  setProviderId(null);
                   providerFocus.current = model ? `provider:${model.providerId}` : FOLLOW;
-                  setPage(field);
+                  navigate(field, 1);
                 }} />)}
-            </motion.div>
-          ) : (
-            <motion.div key={page}
-              custom={direction.current}
-              variants={variants}
-              initial="enter" animate="center" exit="exit"
-              className="flex min-h-0 flex-col">
+            </div> : <>
               <div className="flex shrink-0 items-center gap-2 px-2 py-1.5">
                 <IconButton label={i18n.text(commonMessages.back)} size="icon-xs" onClick={back}><ArrowLeft /></IconButton>
                 <span className="type-label truncate">{browsingModels ? provider?.name ?? providerId : labels[page]}</span>
               </div>
               <Separator />
               {page === "model" ? (
-                <div className="relative flex min-h-0 flex-col overflow-hidden">
-                  <AnimatePresence initial={false} mode="popLayout" custom={direction.current}>
-                    <motion.div key={providerId === null ? "providers" : `provider:${providerId}`}
-                      custom={direction.current}
-                      variants={variants}
-                      initial="enter" animate="center" exit="exit" className="flex min-h-0 flex-col">
-                      {providerId !== null
-                        ? <ProviderModels configuration={configuration} providerId={providerId}
-                            selected={selection.model} effectiveModel={model} disabled={blocked}
-                            onSelect={value => { void choose("model", value); }} />
-                        : <ProviderOptions configuration={configuration}
-                            follow={{ value: FOLLOW, label: follow, description: modelLabel(defaultModel) }}
-                            selected={selected.model} initialActive={providerFocus.current} disabled={blocked}
-                            onFollow={() => { void choose("model", FOLLOW); }}
-                            onProvider={id => {
-                              direction.current = 1;
-                              providerFocus.current = `provider:${id}`;
-                              setProviderId(id);
-                            }} />}
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
+                providerId !== null
+                  ? <ProviderModels configuration={configuration} providerId={providerId}
+                      selected={selection.model} effectiveModel={model} disabled={blocked}
+                      onSelect={value => { void choose("model", value); }} />
+                  : <ProviderOptions configuration={configuration}
+                      follow={{ value: FOLLOW, label: follow, description: modelLabel(defaultModel) }}
+                      selected={selected.model} initialActive={providerFocus.current} disabled={blocked}
+                      onFollow={() => { void choose("model", FOLLOW); }}
+                      onProvider={id => {
+                        providerFocus.current = `provider:${id}`;
+                        navigate("model", 1, id);
+                      }} />
               ) : (
-                <ConfigurationOptions key={page} label={labels[page]} options={options[page]} selected={selected[page]}
+                <ConfigurationOptions label={labels[page]} options={options[page]} selected={selected[page]}
                   disabled={blocked || (page === "thinking" && unsupported)}
                   onSelect={value => { void choose(page, value); }} />
               )}
-            </motion.div>
-          )}
+            </>}
+          </motion.div>
         </AnimatePresence>
       </div>
       <Separator />
       <p aria-live="polite" className="type-caption shrink-0 px-3 py-2 text-muted-foreground">
         {i18n.text(saving ? commonMessages.statusBusy : configurationMessages.nextRequestHint)}
       </p>
-    </PopoverContent>
+    </ConfigurationPopover>
   </Popover>;
+}
+
+/** Measure natural content independently of the animated shell; the footer remains anchored at its bottom. */
+function ConfigurationPopover({ wide, pageKey, reducedMotion, children, ...props }: Omit<ComponentProps<typeof PopoverContent>, "className" | "style" | "asChild"> & {
+  wide: boolean; pageKey: string; reducedMotion: boolean;
+}) {
+  const [content, setContent] = useState<HTMLDivElement | null>(null);
+  const [height, setHeight] = useState<number>();
+  useLayoutEffect(() => {
+    if (!content) { setHeight(undefined); return; }
+    const measure = () => setHeight(content.offsetHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [content, pageKey]);
+
+  return <PopoverContent {...props}
+    className="nodrag nopan relative max-h-(--radix-popover-content-available-height) max-w-[calc(100vw-1rem)] overflow-hidden p-0"
+    style={{
+      boxSizing: "content-box",
+      width: wide ? "42rem" : "20rem",
+      height,
+      transition: reducedMotion ? "none" : `width ${PAGE_DURATION}s cubic-bezier(${PAGE_EASE.join(",")}), height ${PAGE_DURATION}s cubic-bezier(${PAGE_EASE.join(",")})`,
+    }}>
+    <div ref={setContent} className="flex max-h-(--radix-popover-content-available-height) w-full flex-col"
+      style={height === undefined ? undefined : { position: "absolute", bottom: 0 }}>
+      {children}
+    </div>
+  </PopoverContent>;
 }
 
 function ConfigurationRow({ icon: Icon, label, value, ...props }: React.ComponentProps<typeof Button> & {

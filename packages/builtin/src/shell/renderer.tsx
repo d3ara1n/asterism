@@ -2,6 +2,7 @@ import { TerminalSquare } from "lucide-react";
 import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { Badge } from "@asterism-app/ui/ui/badge";
+import { StatusBadge } from "@asterism-app/ui/ui/status";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@asterism-app/ui/ui/item";
 import { shellMessages as messages } from "@asterism-app/ui/messages/shell";
 import { resourceMessages } from "../messages/resources";
@@ -30,7 +31,7 @@ function Body({ result }: Props) {
       <ItemTitle className="flex-wrap">
         {profile.id}
         {profile.id === data.resolvedProfile && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}
-        <Badge variant="outline">{i18n.text(profile.available ? messages.profileAvailable : messages.profileUnavailable)}</Badge>
+        <StatusBadge tone={profile.available ? "success" : "warning"}>{i18n.text(profile.available ? messages.installed : messages.notInstalled)}</StatusBadge>
       </ItemTitle>
       <ItemDescription className="line-clamp-none break-all font-mono">
         {profile.id} · {profile.resolvedExecutable ?? profile.executable}

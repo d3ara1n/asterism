@@ -1,7 +1,7 @@
 import { runtime } from "../../runtime";
 import { pluginName } from "../../../shared/plugin-name";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Puzzle, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import type { PluginSettingsPage } from "@asterism-app/sdk/renderer";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { PluginRegion } from "./scope";
@@ -118,11 +118,6 @@ function PluginListItem({ plugin, status, failure, manager }: {
 
   return (
     <Item size="sm" className="flex-nowrap items-start border-b last:border-b-0">
-      {metadata.icon ? (
-        <img src={metadata.icon} alt="" className="size-8 shrink-0 object-contain" />
-      ) : (
-        <Puzzle className="size-8 shrink-0 text-muted-foreground" aria-hidden="true" />
-      )}
       <ItemContent className="min-w-0">
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">

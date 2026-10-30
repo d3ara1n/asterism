@@ -1,29 +1,54 @@
+import { useId, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import { emptyModelRates, priceUnits, type ModelCost, type ModelRates, type ModalityRates, type UnitPrice } from "@asterism-app/sdk/contracts";
+import { emptyModelRates, type ModelCost, type ModelRates, type ModalityRates, type UnitPrice } from "@asterism-app/sdk/contracts";
 import { modelCostMessages as messages } from "../../messages/model-cost";
 import { useI18n } from "../../shared/i18n";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
-import { FieldDescription, FieldGroup, FieldLegend, FieldSet } from "@asterism-app/ui/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@asterism-app/ui/ui/field";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Input } from "@asterism-app/ui/ui/input";
 import { ChoiceField, EditorSection, NumberField } from "./forms";
 
 const unitLabels = { token: messages.tokenUnit, image: messages.imageUnit, second: messages.secondUnit };
-function Price({ item, value, onChange }: { item: keyof ModalityRates; value: UnitPrice | null; onChange: (value: UnitPrice | null) => void }) {
+const modalityUnits: Record<keyof ModelRates, readonly UnitPrice["unit"][]> = {
+  text: ["token"],
+  image: ["token", "image"],
+  audio: ["token", "second"],
+  video: ["token", "second"],
+};
+
+function Price({ modality, item, value, onChange }: {
+  modality: keyof ModelRates; item: keyof ModalityRates; value: UnitPrice | null; onChange: (value: UnitPrice | null) => void;
+}) {
   const i18n = useI18n();
+  const unitId = useId();
+  // Unit and quantity can be chosen before an amount; a blank amount remains unknown.
+  const [draftBasis, setDraftBasis] = useState<Pick<UnitPrice, "unit" | "per">>({ unit: "token", per: 1_000_000 });
+  const unit = modality === "text" ? "token" : value?.unit ?? draftBasis.unit;
+  const per = value?.per ?? draftBasis.per;
+  const updateBasis = (basis: Pick<UnitPrice, "unit" | "per">) => {
+    setDraftBasis(basis);
+    if (value) onChange({ ...value, ...basis });
+  };
   return <div className="grid grid-cols-3 items-end gap-3">
     <NumberField label={i18n.text(messages[item])} value={value?.amount ?? null} placeholder={i18n.text(messages.unknown)}
-      onChange={amount => onChange(amount === null ? null : { amount, unit: value?.unit ?? "token", per: value?.per ?? 1_000_000 })} />
-    {value && <>
-      <NumberField label={i18n.text(messages.per)} value={value.per} min={Number.MIN_VALUE}
-        onChange={per => onChange({ ...value, per: per ?? 0 })} />
-      <ChoiceField label={i18n.text(messages.unit)} value={value.unit}
-        options={priceUnits.map(unit => ({ value: unit, label: i18n.text(unitLabels[unit]) }))}
+      onChange={amount => {
+        setDraftBasis({ unit, per });
+        onChange(amount === null ? null : { amount, unit, per });
+      }} />
+    <NumberField label={i18n.text(messages.per)} value={per} min={Number.MIN_VALUE}
+      onChange={next => updateBasis({ unit, per: next ?? 0 })} />
+    {modality === "text"
+      ? <Field><FieldLabel htmlFor={unitId}>{i18n.text(messages.unit)}</FieldLabel>
+          <Input id={unitId} value={i18n.text(messages.tokenUnit)} readOnly />
+        </Field>
+      : <ChoiceField label={i18n.text(messages.unit)} value={unit}
+        options={modalityUnits[modality].map(unit => ({ value: unit, label: i18n.text(unitLabels[unit]) }))}
         onChange={selected => {
-          const unit = priceUnits.find(item => item === selected);
-          if (unit) onChange({ ...value, unit, per: unit === "token" ? 1_000_000 : 1 });
-        }} />
-    </>}
+          const next = modalityUnits[modality].find(unit => unit === selected);
+          if (next) updateBasis({ unit: next, per: next === "token" ? 1_000_000 : 1 });
+        }} />}
   </div>;
 }
 function Rates({ value, onChange }: { value: ModelRates; onChange: (value: ModelRates) => void }) {
@@ -38,7 +63,7 @@ function Rates({ value, onChange }: { value: ModelRates; onChange: (value: Model
         </Button>
       </CollapsibleTrigger></h4>
       <CollapsibleContent className="pl-4"><FieldGroup className="gap-3">
-        {(Object.keys(value[modality]) as (keyof ModalityRates)[]).map(item => <Price key={item} item={item} value={value[modality][item]}
+        {(Object.keys(value[modality]) as (keyof ModalityRates)[]).map(item => <Price key={item} modality={modality} item={item} value={value[modality][item]}
           onChange={price => onChange({ ...value, [modality]: { ...value[modality], [item]: price } })} />)}
       </FieldGroup></CollapsibleContent>
     </Collapsible>)}</div>;

@@ -8,6 +8,7 @@ import { Input } from "@asterism-app/ui/ui/input";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
 import { Label } from "@asterism-app/ui/ui/label";
 import { Badge } from "@asterism-app/ui/ui/badge";
+import { StatusBadge } from "@asterism-app/ui/ui/status";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@asterism-app/ui/ui/item";
@@ -74,7 +75,7 @@ export function ShellSettings({ value, disabled, save }: {
         title={<>{saved.id}{value.selected === saved.id && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}</>}
         description={<span className="font-mono text-xs">{preview(saved)}</span>}
         details={installedPath && <span className="flex min-w-0 items-center gap-2">
-          <Badge variant="success">{i18n.text(messages.installed)}</Badge>
+          <StatusBadge tone="success">{i18n.text(messages.installed)}</StatusBadge>
           <span className="truncate font-mono" title={installedPath}>{installedPath}</span>
         </span>}
         actions={<>

@@ -2,7 +2,7 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const modelCostMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   title: { id: "modelCost.title", defaultMessage: "Reference prices" },
-  hint: { id: "modelCost.hint", defaultMessage: "All amounts are in USD, for estimates only. Enter an amount, then choose its unit and quantity (for example, 1,000,000 tokens, 1 image or 60 seconds). Blank means unknown; zero means free. Fetch parameters to fill published API prices." },
+  hint: { id: "modelCost.hint", defaultMessage: "All amounts are in USD, for estimates only. Text uses tokens; images use tokens or image counts; audio and video use tokens or seconds. Set the quantity for each price (for example, 1,000,000 tokens, 1 image or 60 seconds). A blank amount means unknown; zero means free. Fetch parameters to fill published API prices." },
   base: { id: "modelCost.base", defaultMessage: "Base prices" },
   input: { id: "modelCost.input", defaultMessage: "Input" },
   output: { id: "modelCost.output", defaultMessage: "Output" },
