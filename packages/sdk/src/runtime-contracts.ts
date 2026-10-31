@@ -61,6 +61,7 @@ export interface PluginContext {
   readonly models: ModelServices;
   readonly execution: import("./runtime-execution.ts").ExecutionServices;
   readonly content: import("./content-runtime.ts").ContentServices;
+  readonly files: import("./runtime-files.ts").FileServices;
   readonly modelProviders: ModelProviderServices;
   readonly usageProviders: UsageProviderServices;
   readonly usages: UsageServices;
@@ -130,6 +131,8 @@ export interface ResourceContribution {
   project(resource: ResourceSnapshot, object: ObjectReader): Presentation;
   inspect(resource: ResourceSnapshot, object: ObjectReader): Promise<Json>;
   context?(resource: ResourceSnapshot, object: ObjectReader): Promise<ContextFile[]>;
+  /** Resolve a file address against this resource at consumption time; consumers need no link or registration of the reference. */
+  openFile?(resource: ResourceSnapshot, locator: Json, context: { object: ObjectReader; signal: AbortSignal }): AsyncIterable<Uint8Array>;
   /** Explanation presented to users before ending the current instance; does not block backend removal or wait for external cleanup. */
   disposalWarning?(resource: ResourceSnapshot, object: ObjectReader): UiText | null;
   /**

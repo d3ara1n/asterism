@@ -61,6 +61,12 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
       const captured = snapshot(host, object);
       return contribution.context?.(captured, sdk.reader(captured.ref, undefined, captured)) ?? Promise.resolve([]);
     },
+    ...(contribution.openFile ? { openFile: (object: FoldedObject, locator: Json, signal: AbortSignal) => {
+      const captured = snapshot(host, object);
+      return runs.iterate(current => contribution.openFile!(captured, locator, {
+        object: sdk.reader(captured.ref, undefined, captured), signal: current,
+      }), signal, { object: captured.ref, rejectOnAbort: true });
+    } } : {}),
     disposalWarning: object => {
       const captured = snapshot(host, object);
       return contribution.disposalWarning?.(captured, sdk.reader(captured.ref, undefined, captured)) ?? null;

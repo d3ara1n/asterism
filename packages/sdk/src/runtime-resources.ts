@@ -10,6 +10,7 @@ import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, A
 import { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 import type { ToolCaller } from "./runtime-contracts.ts";
 import { encodeJson } from "./data-encoding.ts";
+import type { ResourceSnapshot } from "./workspace.ts";
 
 function parse<T>(schema: z.ZodType<T>, input: unknown, subject: string): T {
   const result = schema.safeParse(input);
@@ -46,18 +47,21 @@ export function implementResource<S extends Json, V extends Json>(
     project(data: NoInfer<S>, object: ObjectReader): NoInfer<V>;
     inspect(data: NoInfer<S>, object: ObjectReader): Promise<Json>;
     context?(data: NoInfer<S>, object: ObjectReader): Promise<ContextFile[]>;
+    openFile?(data: NoInfer<S>, locator: Json, context: { object: ObjectReader; signal: AbortSignal }): AsyncIterable<Uint8Array>;
     disposalWarning?(data: NoInfer<S>, object: ObjectReader): import("./i18n.ts").UiText | null;
     /** Called when an object enters the current set; external instances owned exclusively by the object register cleanup with lifetime. */
     attach?(data: NoInfer<S>, object: ObjectReader, lifetime: Lifetime): void;
   },
 ): ResourceContribution {
-  const attach = definition.attach;
+  const { attach, openFile } = definition;
   return {
     resource, card: definition.card, records: [...definition.records ?? []], links: definition.links, template: definition.template,
     creation: definition.creation, actions: definition.actions,
     project: (snapshot, object) => present(view, definition.project(parse(resource.stateSchema, snapshot.data, "resource"), object)),
     inspect: async (snapshot, object) => jsonSchema.parse(await definition.inspect(parse(resource.stateSchema, snapshot.data, "resource"), object)),
     context: async (snapshot, object) => definition.context?.(parse(resource.stateSchema, snapshot.data, "resource"), object) ?? [],
+    ...(openFile ? { openFile: (snapshot: ResourceSnapshot, locator: Json, context: { object: ObjectReader; signal: AbortSignal }) =>
+      openFile(parse(resource.stateSchema, snapshot.data, "resource"), locator, context) } : {}),
     disposalWarning: (snapshot, object) => definition.disposalWarning?.(parse(resource.stateSchema, snapshot.data, "resource"), object) ?? null,
     ...(attach ? { attach: (snapshot: Parameters<NonNullable<ResourceContribution["attach"]>>[0], object: ObjectReader, lifetime: Lifetime) =>
       attach(parse(resource.stateSchema, snapshot.data, "resource"), object, lifetime) } : {}),

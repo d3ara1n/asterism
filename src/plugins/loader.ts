@@ -145,6 +145,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   events.declarePublic(ResourcePresenceChanged);
   const calls = new CallRegistry(services);
   const channels = new ChannelRegistry(services);
+  let resourceRegistry = new ResourceRegistry([]);
   let topLevelTools: readonly RegisteredTopLevelTool[] = [];
   const manifest: PluginManifest[] = [], collected: Collected[] = [];
   const hostLifecycle = new RunLifecycle(() => {});
@@ -186,7 +187,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const eventScope = new PluginEventScope(events, id, lifecycle.group("event"));
       const sdk = createSdkContext({ id, lifetime, dir: storage.dir, log, config: contract => storage.config(contract),
         secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), lifecycle.group("action"), directory, eventScope,
-        calls.client(id, lifecycle.group("call")), (caller, policy, linked, interactive) => bindTopLevelTools(topLevelTools, caller, policy, linked, interactive));
+        calls.client(id, lifecycle.group("call")), (caller, policy, linked, interactive) => bindTopLevelTools(topLevelTools, caller, policy, linked, interactive),
+        () => resourceRegistry);
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];
       entry = { plugin, resources, tools, topLevelTools: [], actions, observers, preparers, sdk, tasks: taskHost, storage, lifecycle, events: eventScope, preparations: lifecycle.group("prepare"), lifetime };
@@ -315,6 +317,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   topLevelTools = resolvedTools.topLevelTools;
   for (const record of manifest) record.implementations = resolvedTools.implementations.get(record.id) ?? [];
   const resources = new ResourceRegistry(collected.flatMap(entry => entry.resources));
+  resourceRegistry = resources;
   const packages: PluginOutcome[] = candidates.map(item => {
     const diagnostic = item.diagnostic ?? (item.status === "ready" && item.id ? availability.get(item.id) : undefined);
     const status = item.status === "ready" ? diagnostic ? "failed" : "loaded" : item.status;

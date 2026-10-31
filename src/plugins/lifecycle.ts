@@ -69,13 +69,14 @@ export class RunGroup {
     return this.lifecycle.start(this, run, options);
   }
   /** Pull streams reuse run registration; host close can also close the underlying iterator while consumption is paused. */
-  iterate<T>(create: (signal: AbortSignal) => AsyncIterable<T>, signal: AbortSignal): AsyncIterable<T> {
+  iterate<T>(create: (signal: AbortSignal) => AsyncIterable<T>, signal: AbortSignal,
+    options: { object?: ResourceRef; rejectOnAbort?: boolean } = {}): AsyncIterable<T> {
     const group = this;
     let iterator: AsyncIterator<T> | undefined;
     return { [Symbol.asyncIterator]() {
       if (iterator) return iterator;
       let source: AsyncIterator<T> | undefined, work: RunningWork<void> | undefined;
-      let finish: (() => void) | undefined, closing: Promise<void> | undefined, ended = false;
+      let finish: (() => void) | undefined, closing: Promise<void> | undefined, ended = false, returned = false;
       const close = (): Promise<void> => closing ??= (async () => {
         ended = true;
         try { await source?.return?.(); }
@@ -90,15 +91,17 @@ export class RunGroup {
           current.addEventListener("abort", abort, { once: true });
           try { if (current.aborted) abort(); await completed; }
           finally { current.removeEventListener("abort", abort); }
-        }, { signal, affectsHistory: false });
+        }, { signal, object: options.object, affectsHistory: false });
       };
       return iterator = {
         async next() {
+          if (options.rejectOnAbort && !returned) work?.signal.throwIfAborted();
           if (ended) return { done: true as const, value: undefined };
           start();
           if (!source) { await work!.done; return { done: true as const, value: undefined }; }
           try {
             const value = await source.next();
+            if (options.rejectOnAbort) work!.signal.throwIfAborted();
             if (value.done) { ended = true; finish?.(); await work!.done; }
             return value;
           } catch (error) {
@@ -107,6 +110,7 @@ export class RunGroup {
           }
         },
         async return() {
+          returned = true;
           work?.cancel();
           await close();
           await work?.done;

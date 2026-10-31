@@ -80,11 +80,21 @@ Public history contracts provide typed observation. Create, rename, remove, and 
 
 Stage immutable bytes through the content service, then store their reference in persistent data or a record that owns them.
 
-A reference identifies content. Copying its identifier does not by itself grant access or retain the bytes. Pass it through the supported operation scope so ownership remains explicit.
+A `ContentRef` identifies stored immutable content. Copying its identifier does not by itself grant access or retain the bytes. Pass it through the supported operation scope so ownership remains explicit.
 
 Retention follows references in the JSON actually saved. Preserve content references in that encoding when their bytes must remain available; synthesizing a reference during decoding does not retain content or grant access.
 
 When completing an operation with attachments from an independent temporary scope, supply that scope's content reader. The host validates access and retains those result references in the same transaction as completion. Input references remain retained. Close the temporary scope after completion has committed.
+
+## Pass resource file references
+
+Use a `FileRef` to pass an address without reading or retaining content. It contains the full source resource identity and a JSON locator interpreted by that resource. Construct it directly and include it in tool results, typed calls, events, or saved state. No registration, content scope, or consumer link is required.
+
+The source resource implements `openFile` to interpret its locator and produce an asynchronous byte stream. A consumer uses `plugin.files.open(ref, { signal })` and processes chunks as they arrive. Breaking iteration closes the stream. Forward an operation's cancellation signal so its consumption stops with that operation.
+
+Reuse `fileRefSchema` in contracts that return or accept these addresses. Its description supplies the shared meaning. Describe each operation's own use of the reference without coupling its instructions to particular producer or consumer resource types.
+
+Discovery returns addresses and descriptive metadata; it need not open files. Each consumption resolves the source anew across sessions, independently of open UI surfaces. The host does not cache bytes or freeze external files. Changed content is read as it exists at consumption, and missing resources, unavailable providers, or failed reads surface as errors. Persisting a file reference preserves its address, not the bytes it once identified. Use immutable content storage when a business operation needs to preserve a particular version.
 
 ## End asynchronous work
 

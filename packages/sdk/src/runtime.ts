@@ -13,6 +13,7 @@ export * from "./runtime-web.ts";
 export * from "./runtime-agent-catalog.ts";
 export * from "./runtime-sessions.ts";
 export type * from "./content-runtime.ts";
+export type * from "./runtime-files.ts";
 export type * from "./models.ts";
 export type * from "./runtime-execution.ts";
 export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";

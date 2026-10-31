@@ -1,6 +1,6 @@
 import type { z } from "zod";
-import type { ModelLiveBlock, SessionSnapshot, SessionRecord, ModelInputPart } from "@asterism-app/sdk/contracts";
-import { ContextSummary, Execution, AgentInputMessage, type AgentMessageSender } from "@asterism-app/builtin-api/contracts";
+import type { ModelLiveBlock, SessionSnapshot, SessionRecord } from "@asterism-app/sdk/contracts";
+import { ContextSummary, Execution, AgentInputMessage, type AgentMessageSender, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { turnMetrics, type TurnMetricsData } from "./turn-metrics";
 import type { CompressionActivity, InlineFeedback } from "../feedback";
 import type { HistoryBoundary } from "./history-window";
@@ -9,7 +9,7 @@ type SavedBlock = Extract<z.infer<typeof Execution.schema>, { type: "block" }>["
   id: string; createdAt: string;
 };
 export type TimelineItem = SavedBlock | ModelLiveBlock
-  | { kind: "message"; id: string; parts: readonly ModelInputPart[]; sender: AgentMessageSender; startsTurn?: boolean }
+  | { kind: "message"; id: string; parts: readonly AgentInputPart[]; sender: AgentMessageSender; startsTurn?: boolean }
   | { kind: "summary"; id: string; text: string }
   | { kind: "compression"; id: string; status: CompressionActivity["status"] | "completed" | "boundary" }
   | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null; finalResponseId: string | null }

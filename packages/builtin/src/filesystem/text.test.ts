@@ -11,6 +11,9 @@ import type { Json, ToolOutcome } from "../../../../src/shared/model.ts";
 import { textReadSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 import { readTextFile, commitTextFile } from "./text-io.ts";
 import { writableTarget } from "./paths.ts";
+import { pluginNamespace } from "@asterism-app/sdk/contracts";
+import { definePlugin, type PluginContext } from "@asterism-app/sdk/runtime";
+import { DirectoryList } from "./contract.ts";
 
 vi.mock("node:fs/promises", async importOriginal => {
   const actual = await importOriginal<typeof fs>();
@@ -33,7 +36,10 @@ function setup() {
   const capture = vi.spyOn(runtimeModules, "loadPlugins").mockImplementation((...args) => {
     modules = createModules(...args); return modules;
   });
-  const service = new ApplicationService(join(root, "host")); services.push(service);
+  let consumer!: PluginContext;
+  const service = new ApplicationService(join(root, "host"), { plugins: [definePlugin({
+    namespace: pluginNamespace("test.directory-files"), setup(plugin) { consumer = plugin; return {}; },
+  })] }); services.push(service);
   capture.mockRestore();
   const sessionId = service.sessions.tree.create("Files");
   for (const object of [resource, { ...resource, id: "other", title: "Other resource" }]) service.sessions.tree.appendToTimeline(sessionId, {
@@ -47,11 +53,28 @@ function setup() {
     await executeCoreBatch([{ callId: "call", name: "resource_call", arguments: { resource_id: resourceId, tool, target, args } }], cap, signal, (_call, outcome) => results.push(outcome));
     return results[0];
   };
-  return { root, directory, outside, resource, modules, call, caller };
+  return { root, directory, outside, resource, modules, call, caller, consumer };
 }
 
 // Verify authorization, batch failure, and atomic writes in real temporary directories at the execution boundary, avoiding user files.
 describe("Directory text tools", () => {
+  it("lists file addresses without capturing bytes and resolves changed or deleted files only when consumed", async () => {
+    const { directory, call, consumer } = setup();
+    mkdirSync(join(directory, "reports"));
+    const file = join(directory, "reports", "report.bin");
+    writeFileSync(file, "original");
+    const result = await call("list", { path: "reports" });
+    const ref = DirectoryList.schema.parse(result.data).entries[0]!.ref!;
+    expect(ref.locator).toEqual({ path: join("reports", "report.bin") });
+    expect(result.model).toEqual([{ kind: "text", text: expect.stringContaining('"ref":') }]);
+    writeFileSync(file, "updated");
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of consumer.files.open(ref)) chunks.push(chunk);
+    expect(Buffer.concat(chunks).toString()).toBe("updated");
+    rmSync(file);
+    await expect((async () => { for await (const _chunk of consumer.files.open(ref)) {} })())
+      .rejects.toMatchObject({ code: "not_found", reason: "path_not_found" });
+  });
   it("File read passes the target range to text reading, with model content and data coming from the same read", async () => {
     const { directory, call } = setup();
     writeFileSync(join(directory, "text.txt"), "a\nb\nc");

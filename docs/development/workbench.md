@@ -94,9 +94,9 @@ Composer controls follow the Agent’s execution state: stop while running, cont
 
 ## Drafts and turn presentation
 
-Agent drafts preserve complete text, files, sender, and delivery mode. Their preview never replaces the stored input. Mode changes and reorder operations act by identity and follow backend order.
+Agent drafts preserve complete text, stored files, file references, sender, and delivery mode. Their preview never replaces the stored input. File references display descriptive metadata without fetching content. Mode changes and reorder operations act by identity and follow backend order.
 
-Taking a draft into an empty composer removes it from drafts. Swapping with composer content places that content in the old slot as a retained user draft. Taking an incoming Agent or event message into the composer makes subsequent submission user input. Content leases transfer before replacing the visible composer value.
+Taking a draft into an empty composer removes it from drafts. Swapping with composer content places that content in the old slot as a retained user draft. Taking an incoming Agent or event message into the composer makes subsequent submission user input. Stored-file content leases transfer before replacing the visible composer value; file references copy as data.
 
 Lost receipts retain the submission identity and content needed for retry. Explicit failure preserves the original content. Restoration does not send drafts automatically.
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineImplementation, defineCreation, defineCall, contentRefSchema } from "@asterism-app/sdk/contracts";
+import { defineImplementation, defineCreation, defineCall, contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
 import { builtin, List, Read, Edit, Write, Replace, See, textReadSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
@@ -16,6 +16,7 @@ export const DirectoryList = defineImplementation({
     entries: z.array(z.strictObject({
       name: z.string().describe("Entry name within the listed directory."),
       type: z.enum(["directory", "file", "other"]).describe("The entry type; symbolic links and other special entries are reported as other."),
+      ref: fileRefSchema.optional().describe("FileRef for this regular file. Listing does not read file bytes."),
     })).describe("Up to 500 direct entries."),
     truncated: z.boolean().describe("True when the directory contains more than 500 entries and the listing is incomplete."),
   }).describe("A directory listing with its relative path, entry types and truncation status.")),

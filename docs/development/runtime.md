@@ -6,11 +6,13 @@ Host model services perform individual requests and tool batches from explicit m
 
 ## Messages and attribution
 
-An Agent input is a message with ordered text or file parts and one of three sender kinds: user, Agent, or resource event. Resource plugins format event facts as readable text. All three sources share admission, persistent drafts, history records, and execution; sender kind does not select a scheduling path.
+An Agent input is a message with ordered text, stored-file, or file-reference parts and one of three sender kinds: user, Agent, or resource event. Resource plugins format event facts as readable text. All three sources share admission, persistent drafts, history records, and execution; sender kind does not select a scheduling path.
 
 Input record provenance identifies the receiving Agent. Sender attribution separately identifies a user, a communicating Agent, or an emitting resource. Agent and event senders retain a resource reference and the sender name captured with the input. Trusted plugin code supplies this attribution; the Agent Send tool derives it from its bound caller. Source attribution does not grant resource access or establish a reply route.
 
 Model projection wraps Agent and event messages in escaped source envelopes while preserving user text. UI reads the original body and structured sender. Work requests, compaction, and history investigation use the same source semantics. Provider message roles are an encoding detail: the adapter can encode all three input sources as user-role messages without changing their domain attribution.
+
+Stored-file parts supply immutable bytes to a model request. File-reference parts project as address data and retain their original resource source across communication routes. Sending, accepting, rendering, or editing a reference does not resolve it. A tool that consumes a reference requests bytes from the source independently of Agent message delivery.
 
 SDK events are typed transient notifications. A plugin callback may translate one into an Agent event message, resolve recipients, and submit it. Event publication and resource links do not themselves submit messages or start an Agent loop.
 
@@ -154,7 +156,7 @@ Automatic session naming uses actual user input. Agent and event messages retain
 
 ## Model input and protocol adaptation
 
-Input parts are ordered text or immutable file references. The frontend submits the identified media type; the server determines whether it accepts that input. Request media budgets belong to the model-media implementation.
+Model input parts are ordered text or stored-file parts backed by immutable ContentRef values. Resource FileRef values reach this layer as projected text, not binary input. The frontend submits the identified media type for stored files; the server determines whether it accepts that input. Request media budgets belong to the model-media implementation.
 
 The adapters support OpenAI Responses, OpenAI Chat Completions, and Anthropic Messages through AI SDK. Tool definitions omit SDK execution handlers, and retries are explicit rather than implicit. Responses requests disable provider storage.
 

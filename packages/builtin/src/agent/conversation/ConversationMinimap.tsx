@@ -4,6 +4,7 @@ import { ChatMinimap } from "@asterism-app/ui/ui/chat-minimap";
 import { conversationMessages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";
 import { messageSenderLabel } from "../message-presentation";
+import { inputFileName } from "@asterism-app/builtin-api/contracts";
 
 type AgentInputMessage = Extract<TimelineItem, { kind: "message" }>;
 
@@ -11,7 +12,7 @@ type AgentInputMessage = Extract<TimelineItem, { kind: "message" }>;
 function preview(message: AgentInputMessage): string {
   const text = message.parts.filter(part => part.kind === "text").map(part => part.text);
   const sources = text.some(value => value.trim()) ? text
-    : message.parts.filter(part => part.kind === "file").map(part => part.filename ?? part.mediaType);
+    : message.parts.filter(part => part.kind !== "text").map(inputFileName);
   const characters: string[] = [];
   for (const source of sources) {
     if (characters.length) characters.push("\n");

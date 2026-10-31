@@ -20,6 +20,7 @@ export * from "./commands.ts";
 export * from "./i18n.ts";
 export * from "./config.ts";
 export * from "./content.ts";
+export * from "./files.ts";
 export * from "./model-input.ts";
 
 export * from "./model-selection.ts";

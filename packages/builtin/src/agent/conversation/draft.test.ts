@@ -6,6 +6,19 @@ import type { ContentRef } from "@asterism-app/sdk/contracts";
 const ref: ContentRef = { "$asterism.content": "00000000-0000-4000-8000-000000000001" };
 const reader = { read: async () => new Uint8Array(), async *open() {} };
 describe("Message file drafts", () => {
+  it("retrieves and resends references without reading or staging their content", async () => {
+    const forbidden = async (): Promise<never> => { throw new Error("References must not access content storage."); };
+    const content: RendererContentInput = { read: forbidden, open: () => { throw new Error("Unexpected read."); },
+      stage: forbidden, close: async () => {} };
+    const parts = [{ kind: "file-reference" as const, filename: "report.pdf",
+      ref: { source: { sessionId: "other", id: "directory", kind: "example/directory" }, locator: { path: "report.pdf" } } }];
+    const draft = createMessageDraft(() => content);
+    draft.restore(await copyDraft(parts, content, content));
+    expect(draft.parts()).toEqual(parts);
+    draft.remove(0);
+    expect(draft.parts()).toEqual([]);
+    await draft.close();
+  });
   // Complete the attachment hold handoff before retrieval, restoring all text and file information; saving does not normalize the original text.
   it("Retrieved attachments enter an independent editor hold, and original text, names, and media types can be saved or sent again", async () => {
     const bytes = new Uint8Array([1, 2, 3]);

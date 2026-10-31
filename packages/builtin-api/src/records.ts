@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { defineRecord, modelBlockSchema, modelCompletionSchema, modelInputPartsSchema } from "@asterism-app/sdk/contracts";
+import { defineRecord, modelBlockSchema, modelCompletionSchema } from "@asterism-app/sdk/contracts";
 import { builtin } from "./identity.ts";
 import { agentMessageSenderSchema } from "./messaging.ts";
+import { agentInputPartSchema } from "./input.ts";
 
 /** The record source of an input message is the receiving agent; the communication sender is represented independently by sender. */
 export const AgentInputMessage = defineRecord(builtin.name("agent.input-message"), {
-  schema: z.object({ parts: modelInputPartsSchema, startsTurn: z.boolean(), sender: agentMessageSenderSchema }),
+  schema: z.object({ parts: z.array(agentInputPartSchema).min(1), startsTurn: z.boolean(), sender: agentMessageSenderSchema }),
 });
 export const Execution = defineRecord(builtin.name("agent.execution"), {
   schema: z.strictObject({ type: z.literal("block"), block: modelBlockSchema }),

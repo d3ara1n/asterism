@@ -1,16 +1,15 @@
 import { nanoid } from "nanoid";
-import { SubmitAgentInput, CancelAgent, type AgentMessageSender, type SubmitAgentInputData } from "@asterism-app/builtin-api/contracts";
-import type { ModelInputPart } from "@asterism-app/sdk/contracts";
+import { SubmitAgentInput, CancelAgent, type AgentMessageSender, type SubmitAgentInputData, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { PluginApiError, type ObjectReader, type PluginContext, type ResourceRef, type ResourceActionOptions } from "@asterism-app/sdk/runtime";
 
 /** Construct once and retain the complete input for any retry. Delivery mode is independent of source. */
-export function userMessage(parts: ModelInputPart[], mode: SubmitAgentInputData["mode"]): SubmitAgentInputData {
+export function userMessage(parts: AgentInputPart[], mode: SubmitAgentInputData["mode"]): SubmitAgentInputData {
   return { submissionId: nanoid(16), mode, parts, sender: { kind: "user" } };
 }
 
 /** Relay adapters supply the communication resource and the Agent's name on that resource. */
 export function agentMessage(sender: Extract<AgentMessageSender, { kind: "agent" }>,
-  parts: ModelInputPart[], mode: SubmitAgentInputData["mode"]): SubmitAgentInputData {
+  parts: AgentInputPart[], mode: SubmitAgentInputData["mode"]): SubmitAgentInputData {
   return { submissionId: nanoid(16), mode, parts, sender };
 }
 

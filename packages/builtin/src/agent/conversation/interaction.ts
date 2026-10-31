@@ -1,6 +1,5 @@
 import { useI18n, type RendererObjectContext, type RendererReceipt, type ContentReader, type RendererContentInput } from "@asterism-app/sdk/renderer";
-import { SubmitAgentInput, ConfigureAgent, ContinueAgent, CancelAgent, type AgentSelection } from "@asterism-app/builtin-api/contracts";
-import type { ModelInputPart } from "@asterism-app/sdk/contracts";
+import { SubmitAgentInput, ConfigureAgent, ContinueAgent, CancelAgent, type AgentSelection, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { createContext, useContext, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { SubmissionIdentity } from "./submission";
@@ -47,7 +46,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
   const { ready } = object.view;
   const editable = ready && !state.locked;
   const writable = editable && hasSelection;
-  const transfer = async (key: string, parts: readonly ModelInputPart[], source: ContentReader, input: () => RendererContentInput) => {
+  const transfer = async (key: string, parts: readonly AgentInputPart[], source: ContentReader, input: () => RendererContentInput) => {
     const signature = JSON.stringify(parts), existing = current.transfers.get(key);
     if (existing?.signature === signature) return existing.value;
     if (existing) { current.transfers.delete(key); await existing.value.content.close(); }

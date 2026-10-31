@@ -1,6 +1,6 @@
 import { useState, useRef, type DragEvent, type KeyboardEvent } from "react";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { modelInputText } from "@asterism-app/sdk/contracts";
+import { inputFileName } from "@asterism-app/builtin-api/contracts";
 import {
   GripVertical, Inbox, ChevronDown, Paperclip,
   ArrowDownToLine, ArrowLeftRight, Trash2, MoreHorizontal,
@@ -152,8 +152,8 @@ function DraftRow({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const gripRef = useRef<HTMLButtonElement>(null);
 
-  const text = modelInputText(item.parts);
-  const files = item.parts.filter(p => p.kind === "file");
+  const text = item.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
+  const files = item.parts.filter(p => p.kind !== "text");
   const hasText = Boolean(text.trim());
 
   // Keyboard sorting (Alt+↑/↓ on grip)
@@ -244,7 +244,7 @@ function DraftRow({
                 {files.map((f, i) => (
                   <span key={i} className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 type-label text-foreground">
                     <Paperclip className="size-2.5 shrink-0" aria-hidden />
-                    {f.kind === "file" ? (f.filename ?? f.mediaType) : ""}
+                    {inputFileName(f)}
                   </span>
                 ))}
               </div>

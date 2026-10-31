@@ -16,11 +16,14 @@ import { bindModelProviders } from "./sdk/model-providers.ts";
 import { bindUsage } from "./sdk/usage.ts";
 import { bindAgentCatalog } from "./sdk/agent-catalog.ts";
 import { bindShellServices } from "./sdk/shell.ts";
+import { bindFiles } from "./sdk/files.ts";
+import type { ResourceRegistry } from "../resources/registry.ts";
 
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
 /** Assemble plugin-facing capabilities; each domain adapter owns its data and execution boundaries. */
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,
-  calls: PluginCalls, topLevelTools: (caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean) => BoundTopLevelTool[]) {
+  calls: PluginCalls, topLevelTools: (caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean) => BoundTopLevelTool[],
+  resources: () => ResourceRegistry) {
   const scope = createSdkScope(internal.lifetime), { checkAvailable } = scope;
   const objects = bindObjects(internal.id, host, sessionRuns, eventScope, checkAvailable);
   const models = bindModels(internal.id, host, modelRuns, checkAvailable);
@@ -35,6 +38,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     agentCatalog: bindAgentCatalog(shared.agentCatalog, sessionRuns, checkAvailable),
     models,
     execution: execution.execution,
+    files: bindFiles(host, resources, sessionRuns, internal.lifetime.signal, checkAvailable),
     content: {
       async withScope(work) {
         checkAvailable();

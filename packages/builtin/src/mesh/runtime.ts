@@ -74,7 +74,7 @@ export default defineModule(plugin => {
           const captured = accessOf(access, object), recipient = service.resolve(captured, target);
           const sender = captured.members.find(member => memberKey(member.ref) === memberKey(caller.ref));
           await plugin.session(recipient.ref.sessionId).invoke(SubmitAgentInput, recipient.ref, {
-            submissionId: nanoid(16), mode: "steer", parts: [{ kind: "text", text: args.message }],
+            submissionId: nanoid(16), mode: "steer", parts: args.parts,
             sender: { kind: "agent", resource: { ...caller.ref }, name: caller.title,
               mesh: { channel: captured.channelName, id: sender?.profile.id ?? null } },
           }, { signal });

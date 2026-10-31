@@ -1,4 +1,6 @@
 import { directoryCard } from "../shared/card-appearance.ts";
+import { createReadStream } from "node:fs";
+import { z } from "zod";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
@@ -65,6 +67,21 @@ async function readGitStatus(rootPath: string): Promise<{ entries: Array<{ path:
 export function createFilesystemModule(shell: ShellExecution) { return defineModule(() => ({
   resources: [implementResource(Directory, DirectoryView, {
     card: directoryCard,
+    async *openFile(directory, locator, { signal }) {
+      const parsed = z.strictObject({ path: z.string().min(1) }).safeParse(locator);
+      if (!parsed.success) throw new PluginApiError("invalid_argument", "A directory file locator requires a relative path.");
+      try {
+        signal.throwIfAborted();
+        const path = await withinDirectory(directory.path, parsed.data.path);
+        yield* createReadStream(path, { signal });
+      } catch (error) {
+        signal.throwIfAborted();
+        const failure = filesystemFailure(error, "Open referenced file");
+        throw new PluginApiError(failure.kind === "rejected" ? "invalid_argument"
+          : failure.error.code === "path_not_found" || failure.error.code === "resource_not_found" ? "not_found" : "unavailable",
+        failure.error.message, failure.error.code);
+      }
+    },
     template: { current: [] },
     project: directory => ({ path: directory.path }),
     async inspect(directory, object) {
@@ -107,7 +124,13 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
       toModel: execToModel,
     }),
     implementTool(DirectoryList, {
-      call: (directory, target, _args, { signal }) => listFiles(directory.path, target, signal),
+      async call(directory, target, _args, { signal, object }) {
+        const result = await listFiles(directory.path, target, signal);
+        if (result.kind !== "succeeded") return result;
+        return { ...result, data: { ...result.data, entries: result.data.entries.map(entry => entry.type === "file"
+          ? { ...entry, ref: { source: { ...object.ref }, locator: { path: join(result.data.path, entry.name) } } }
+          : entry) } };
+      },
     }),
     implementTool(DirectoryRead, {
       call: (directory, target, args, { signal }) => readFileContent(directory.path, target, args, signal),

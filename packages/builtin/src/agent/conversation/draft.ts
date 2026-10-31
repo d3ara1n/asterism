@@ -1,16 +1,21 @@
-import { type ModelFilePart, type ModelInputPart, type UiText, fileMediaType, modelInputLimits } from "@asterism-app/sdk/contracts";
+import { type UiText, fileMediaType, modelInputLimits } from "@asterism-app/sdk/contracts";
+import type { AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import type { RendererContentInput, ContentReader } from "@asterism-app/sdk/renderer";
 import { mediaMessages } from "../../messages/media.ts";
 
-interface DraftFile { part: ModelFilePart; size: number }
+interface DraftFile { part: Exclude<AgentInputPart, { kind: "text" }>; size: number }
 interface DraftState { text: string; files: readonly DraftFile[]; uploading: boolean; locked: boolean; error: UiText | null }
 
 /** Hands attachments to the editor's own upload hold before removing the persistent root; failure closes the new hold and preserves the original content. */
-export async function copyDraft(parts: readonly ModelInputPart[], source: ContentReader, content: RendererContentInput) {
-  const copied: ModelInputPart[] = [], files: DraftFile[] = [];
+export async function copyDraft(parts: readonly AgentInputPart[], source: ContentReader, content: RendererContentInput) {
+  const copied: AgentInputPart[] = [], files: DraftFile[] = [];
   try {
     for (const part of parts) {
       if (part.kind === "text") { copied.push({ ...part }); continue; }
+      if (part.kind === "file-reference") {
+        const reference = structuredClone(part);
+        copied.push(reference); files.push({ part: reference, size: 0 }); continue;
+      }
       const chunks: Uint8Array<ArrayBuffer>[] = [];
       for await (const chunk of source.open(part.file)) chunks.push(Uint8Array.from(chunk));
       const blob = new Blob(chunks, { type: part.mediaType });
@@ -36,7 +41,7 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
     setText: (text: string) => { if (!state.locked) change({ text }); },
     lock: (locked: boolean) => change({ locked }),
     content: input,
-    parts(trim = true): ModelInputPart[] {
+    parts(trim = true): AgentInputPart[] {
       const text = trim ? state.text.trim() : state.text;
       return [...(text ? [{ kind: "text" as const, text }] : []), ...state.files.map(file => file.part)];
     },
@@ -53,7 +58,7 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
           controller.signal.throwIfAborted();
           // Label MIME accurately; the server decides how files are used.
           const mediaType = fileMediaType(file);
-          if (state.files.length >= modelInputLimits.files || file.size > modelInputLimits.file
+          if (state.files.filter(file => file.part.kind === "file").length >= modelInputLimits.files || file.size > modelInputLimits.file
             || state.files.reduce((total, value) => total + value.size, file.size) > modelInputLimits.total) {
             change({ error: mediaMessages.limit }); break;
           }

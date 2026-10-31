@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "@asterism-app/sdk/contracts";
+import { defineTool, fileReferencePartSchema } from "@asterism-app/sdk/contracts";
 import { builtin } from "./identity.ts";
 
 const messageResourceSchema = z.strictObject({ sessionId: z.string().min(1), id: z.string().min(1), kind: z.string().min(1) });
@@ -27,16 +27,20 @@ export type AgentMessageSender = z.infer<typeof agentMessageSenderSchema>;
 /** The host matches resource types; target is declared by each resource implementation. */
 export const Send = defineTool({
   id: builtin.name("tool.send"), name: "send",
-  description: "Send a message to an Agent through a linked resource.",
+  description: "Send text and file references through a linked resource.",
   guidelines: [
     "resource_id selects the messaging resource. Its target schema describes recipient selection.",
     "The runtime supplies the sender's resource address and Agent name.",
-    "Accepted messages enter the next request boundary while the recipient is running, or start execution while idle.",
-    "Acceptance confirms delivery to the input queue; the recipient processes the message independently.",
+    "A file-reference part carries a FileRef in its ref field. The optional filename specifies the name used for delivery.",
+    "Referenced content is resolved by the consuming implementation.",
   ],
   argsSchema: z.strictObject({
-    message: z.string().min(1).refine(value => value.trim().length > 0, "A message must contain text.")
-      .describe("Message text for the recipient Agent."),
+    parts: z.array(z.union([
+      z.strictObject({ kind: z.literal("text"), text: z.string() }),
+      fileReferencePartSchema,
+    ])).min(1).max(128)
+      .refine(parts => parts.some(part => part.kind !== "text" || part.text.trim().length > 0), "A message requires text or a file reference.")
+      .describe("Ordered text and file references. References identify content provided by their original source resources."),
   }).describe("The message to send."),
 });
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ClipboardEvent, type DragEvent } from "react";
 import { useI18n, type ContentReader } from "@asterism-app/sdk/renderer";
 import { type ModelFilePart, previewsAsImage } from "@asterism-app/sdk/contracts";
+import { inputFileName, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { File as FileIcon, Image as ImageIcon, Paperclip, X } from "lucide-react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Attachment, AttachmentGroup, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@asterism-app/ui/ui/attachment";
@@ -26,7 +27,18 @@ function useFileImage(part: ModelFilePart, content: ContentReader) {
   return { ...preview, fail: () => setPreview({ failed: true }) };
 }
 
-export function FilePreview({ part, content }: { part: ModelFilePart; content: ContentReader }) {
+type InputFile = Exclude<AgentInputPart, { kind: "text" }>;
+
+export function FilePreview({ part, content }: { part: InputFile; content: ContentReader }) {
+  if (part.kind === "file") return <StoredFilePreview part={part} content={content} />;
+  const name = inputFileName(part);
+  return <Attachment className="max-w-48">
+    <AttachmentMedia><FileIcon /></AttachmentMedia>
+    <AttachmentContent><AttachmentTitle title={name}>{name}</AttachmentTitle></AttachmentContent>
+  </Attachment>;
+}
+
+function StoredFilePreview({ part, content }: { part: ModelFilePart; content: ContentReader }) {
   const i18n = useI18n();
   const preview = useFileImage(part, content);
   return <Attachment state={preview.failed ? "error" : "done"} orientation={previewsAsImage(part.mediaType) ? "vertical" : "horizontal"} className="max-w-48">
@@ -57,13 +69,13 @@ function DraftFileDetails({ part, content }: { part: ModelFilePart; content: Con
 }
 
 function DraftFile({ part, content, disabled, onRemove }: {
-  part: ModelFilePart; content: ContentReader; disabled: boolean; onRemove(): void;
+  part: InputFile; content: ContentReader; disabled: boolean; onRemove(): void;
 }) {
   const i18n = useI18n();
-  const name = part.filename ?? part.mediaType;
+  const name = inputFileName(part);
   const dot = part.filename?.lastIndexOf(".") ?? -1;
   const extension = dot > 0 ? name.slice(dot) : "";
-  const Icon = previewsAsImage(part.mediaType) ? ImageIcon : FileIcon;
+  const Icon = part.kind === "file" && previewsAsImage(part.mediaType) ? ImageIcon : FileIcon;
   return <Tooltip delayDuration={400}>
     <Attachment size="xs" className="h-6 min-w-0 max-w-48 flex-nowrap has-data-[slot=attachment-content]:py-0">
       <Icon className="size-3.5 shrink-0" />
@@ -78,7 +90,7 @@ function DraftFile({ part, content, disabled, onRemove }: {
         aria-label={`${i18n.text(mediaMessages.remove)}: ${name}`} title={i18n.text(mediaMessages.remove)}><X /></AttachmentAction></AttachmentActions>
     </Attachment>
     <TooltipContent side="top" sideOffset={8} aria-label={name} className="max-h-(--radix-tooltip-content-available-height) max-w-[min(18rem,var(--radix-tooltip-content-available-width))] overflow-y-auto">
-      <DraftFileDetails part={part} content={content} />
+      {part.kind === "file" ? <DraftFileDetails part={part} content={content} /> : <p>{name}</p>}
     </TooltipContent>
   </Tooltip>;
 }
@@ -86,7 +98,7 @@ function DraftFile({ part, content, disabled, onRemove }: {
 export function DraftFiles({ draft, disabled, className }: { draft: MessageDraft; disabled: boolean; className?: string }) {
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   return <AttachmentGroup className={cn("h-8 min-w-0 flex-1 items-center gap-1 px-1 py-0", className)} style={{ scrollbarWidth: "thin" }}>
-    {state.files.map(({ part }, index) => <DraftFile key={`${part.file["$asterism.content"]}:${index}`} part={part} content={draft.content()}
+    {state.files.map(({ part }, index) => <DraftFile key={`${part.kind === "file" ? part.file["$asterism.content"] : JSON.stringify(part.ref)}:${index}`} part={part} content={draft.content()}
       disabled={disabled || state.uploading} onRemove={() => draft.remove(index)} />)}
   </AttachmentGroup>;
 }

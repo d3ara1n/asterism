@@ -10,7 +10,7 @@ Examples are TypeScript and TSX fragments for a plugin's backend or renderer. Th
 
 ## Messages and their sources
 
-An Agent input is a message with ordered text or file parts and a structured sender. All messages use the same submission action, history record, queue, and body renderer. The sender has three variants:
+An Agent input is a message with ordered text, stored-file, or file-reference parts and a structured sender. All messages use the same submission action, history record, queue, and body renderer. The sender has three variants:
 
 | Source | Meaning | Attribution |
 | --- | --- | --- |
@@ -37,7 +37,9 @@ An idle Agent records accepted input and starts execution. When the Agent is run
 
 For example, a new independent review can use `follow`, while updated facts for the current task can use `steer`. A turn may consume a batch of messages; submission does not promise a separate turn for each message. Successful submission means acceptance, not completion of the Agent's response.
 
-Construct the complete input once and retain it for retries, including the submission ID, sender name, mode, and body. An already accepted submission ID is ignored rather than accepted again. A new message needs a new ID. File parts use content references with explicit read eligibility; pass the appropriate content source with the action when forwarding files.
+Construct the complete input once and retain it for retries, including the submission ID, sender name, mode, and body. An already accepted submission ID is ignored rather than accepted again. A new message needs a new ID.
+
+Stored-file parts (`kind: "file"`) supply immutable content to the model and require the appropriate content reader when forwarded through an action. File-reference parts (`kind: "file-reference"`) carry a `FileRef` in `ref`, with optional `filename` and `mediaType`. They pass through actions, events, drafts, and history as ordinary JSON. Model projection presents their addresses as text; receiving or resending one does not read its bytes or require a content reader.
 
 Cancellation of a submission is separate from cancellation of the Agent's independent execution, which has its own public action. Stopping an Agent preserves pending drafts. Restoring drafts on application startup does not automatically send them.
 
@@ -58,6 +60,8 @@ The SDK event bus delivers typed transient notifications to subscribers. Publish
 ## Implement communication resources
 
 Use the public Send, Peek, GetProfile, and SetProfile tool declarations when a resource provides those operations. Each resource implementation owns its addressing schema and resolves targets within its authorized scope. A shared tool name does not grant direct access to the addressed Agent or its linked resources.
+
+Send accepts ordered `parts` containing text and file references. Each file-reference part carries a `FileRef` in `ref`; its optional `filename` specifies the name used for delivery. Agent and Mesh implementations forward these parts into Agent input without resolving the references. A consuming implementation can stream a referenced file through `plugin.files.open(ref, { signal })`. The original source resource remains in the reference across sessions and intermediate senders. The consuming operation determines how to use the bytes; support for references is explicit in each operation's contract.
 
 For cross-session messaging, obtain the target session executor and submit through the same Agent input action. The public Agent service supplies an Agent's configured type and investigates its saved records without exposing private Agent state. Investigation captures a fixed record snapshot and does not start a turn on the target. Forward cancellation and investigation progress to the caller.
 

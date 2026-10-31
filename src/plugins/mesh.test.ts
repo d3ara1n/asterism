@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { pluginNamespace, type Json, type ResourceRef } from "@asterism-app/sdk/contracts";
 import { definePlugin, type PluginContext, type SessionExecutor } from "@asterism-app/sdk/runtime";
-import { AgentInputMessage, CreateAgent } from "@asterism-app/builtin-api/contracts";
+import { AgentInputMessage, CreateAgent, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { agentServices } from "@asterism-app/builtin-api/runtime";
 import { CreateMesh, CreateMeshChannel, MeshList, MeshGetProfile, MeshView, RenameMeshChannel, SelectMeshChannel } from "../../packages/builtin/src/mesh/contract.ts";
 import { BuiltinApplicationService as ApplicationService, configureBuiltin } from "../../packages/builtin/src/testing.ts";
@@ -134,9 +134,12 @@ describe("Mesh resource routing", () => {
     } });
     await configureBuiltin(f.app, { type: "role.save", id: "default", value: { id: "default", model: "test/test" } });
     const captured = f.capabilities(a);
-    expect(await call(captured, ma, "send", { title: "Atlas" }, { message: "Review login" })).toMatchObject({ kind: "succeeded" });
+    const parts: AgentInputPart[] = [{ kind: "text" as const, text: "Review login" },
+      { kind: "file-reference" as const, filename: "evidence.zip",
+        ref: { source: { sessionId: s.id, id: "original-directory", kind: "asterism.builtin/directory" }, locator: { path: "evidence.zip" } } }];
+    expect(await call(captured, ma, "send", { title: "Atlas" }, { parts })).toMatchObject({ kind: "succeeded" });
     expect(other.snapshot().records.query(AgentInputMessage, { scope: "timeline" }).map(record => record.status === "known" ? record.data : null)).toContainEqual(
-      expect.objectContaining({ parts: [{ kind: "text", text: "Review login" }], sender: expect.objectContaining({ name: "Ada", mesh: { channel: "Default", id: null } }) }));
+      expect.objectContaining({ parts, sender: expect.objectContaining({ name: "Ada", mesh: { channel: "Default", id: null } }) }));
     const peek = vi.spyOn(agentServices(f.plugin), "peek");
     await call(captured, ma, "peek", { title: "Atlas" }, { question: "What arrived?" });
     expect(peek).toHaveBeenCalledWith({ sessionId: b.sessionId, id: b.id, kind: b.kind }, { question: "What arrived?" }, expect.any(AbortSignal), expect.any(Function));

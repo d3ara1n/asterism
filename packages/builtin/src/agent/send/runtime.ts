@@ -9,7 +9,7 @@ export function createSendTool() {
       const recipient = object.snapshot();
       if (!recipient) throw new PluginApiError("not_found", "The recipient Agent is unavailable.");
       await object.session.invoke(SubmitAgentInput, object.ref, {
-        submissionId: nanoid(16), mode: "steer", parts: [{ kind: "text", text: args.message }],
+        submissionId: nanoid(16), mode: "steer", parts: args.parts,
         sender: { kind: "agent", resource: { ...caller.ref }, name: caller.title },
       }, { signal });
       return { kind: "succeeded", data: { name: recipient.title } };

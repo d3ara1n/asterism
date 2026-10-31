@@ -8,6 +8,7 @@ import { projectPeekRecords } from "./peek/snapshot.ts";
 import { contextInsight } from "./context/insight.ts";
 import { serializeForSummary } from "./compression-prompt.ts";
 import { sessionSnapshot } from "../../../../src/plugins/records.ts";
+import { AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 
 function records(...values: NewNode[]): SessionNode[] {
   return values.map((value, index) => node(String(index), index ? String(index - 1) : null, value));
@@ -16,6 +17,18 @@ const project = (path: SessionNode[], agent = "a") => projectForAgent(sessionVie
 
 // Expectations follow the timeline projection contract; storage, path selection, and generic envelope conversion are protected at their own boundaries.
 describe("Agent model projection", () => {
+  it("projects a file address as reusable JSON text without resolving it into a model file", () => {
+    const part = { kind: "file-reference", filename: "report.zip", ref: {
+      source: { sessionId: "another-session", id: "directory", kind: "example/directory" }, locator: { path: "report.zip" },
+    } };
+    const path = records(event(AgentInputMessage.id, { parts: [part], startsTurn: true, sender: { kind: "user" } },
+      { source: { plugin: "asterism.builtin", resource: { sessionId: "s", id: "a", kind: "asterism.builtin/agent" } } }));
+    const projected = project(path);
+    expect(projected).toMatchObject([{ kind: "input", parts: [{ kind: "text" }] }]);
+    const input = projected[0]!;
+    if (input.kind !== "input" || input.parts[0]!.kind !== "text") throw new Error("Expected a text-only input.");
+    expect(JSON.parse(input.parts[0]!.text)).toEqual(part);
+  });
   // Addresses allow relay types; identity and body are escaped separately, and the UI and history investigation consume the same saved source.
   it("Generates envelopes for relay resources and named agents only in model projection, while display preserves original text and source", () => {
     const sender = { kind: "agent" as const, resource: { sessionId: "s", id: "relay", kind: "example/relay" }, name: '审查 "A" & B' };

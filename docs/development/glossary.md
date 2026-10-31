@@ -37,7 +37,7 @@ These terms distinguish the concepts used when developing Asterism. Each definit
 | Snapshot | Fixed observation boundary, not an implicit restoration capability |
 | Current data | Latest session/object values, independent of history reconstruction |
 | Record source | Host-stamped emitting plugin and optional resource |
-| Input message | Text and file parts submitted to an Agent, with source attribution and independent delivery timing |
+| Input message | Text, stored-file, and file-reference parts submitted to an Agent, with source attribution and independent delivery timing |
 | Message sender | User, communicating Agent, or emitting resource, distinct from the receiving record writer |
 | Resource event message | Plugin-formatted facts submitted as an Agent message with the emitting resource's identity and name |
 | Turn | Agent processing of a batch of inputs and steering additions |
@@ -77,6 +77,7 @@ These terms distinguish the concepts used when developing Asterism. Each definit
 | Tool outcome | Final success, rejection, failure, cancellation, partial result, or unknown effect |
 | Agent creation entry | Built-in domain adapter exposing resource creation to models |
 | ContentRef | Reserved JSON value identifying immutable bytes |
+| FileRef | Self-contained source resource address and locator, resolved into a byte stream only when consumed |
 | Content lease | Temporary retention during drafts, work, or reads |
 | Content root | Persistent ownership from a record, current value, or template |
 | Presentation | Typed data interpreted by a compatible display consumer |
