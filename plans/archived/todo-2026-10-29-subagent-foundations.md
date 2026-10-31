@@ -4,7 +4,7 @@ Filed: 2026-10-29.
 
 ## Disposition
 
-The infrastructure changes are implemented. Subagent tools, background scheduling, report delivery, and audit storage remain open design topics in `plans/todo-2026-10-29-subagent.md`. That record is a brainstorming agenda, not an accepted implementation design.
+The infrastructure changes are implemented. At phase-one completion, subagent tools, background scheduling, report delivery, and audit storage remained open design topics. The subsequent Subagent Pool implementation and user acceptance are complete in `plans/archived/todo-2026-10-29-subagent.md`; that record owns the final design and the user's 2026-10-31 acceptance. The validation caveats below describe the phase-one handoff.
 
 Design rationale: `plans/archived/ref-2026-10-29-delegated-agent-execution.md`.
 

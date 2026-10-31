@@ -2,7 +2,7 @@
 
 Filed on 2026-10-26.
 
-Prereleases so far are maintainer test releases with no other users; no stable release exists yet. This plan tracks the work before a stable release. Storage baselines, migration, and recovery acceptance belong to `plans/todo-2026-10-12-storage-migration.md`. New feature interaction and protocol decisions remain separate; a computed version number does not establish product readiness.
+Prereleases so far are maintainer test releases with no other users; no stable release exists yet. This plan tracks the work before a stable release. Current storage migration and recovery acceptance are complete in `plans/archived/todo-2026-10-12-storage-migration.md`; future distribution-baseline obligations are tracked below. New feature interaction and protocol decisions remain separate; a computed version number does not establish product readiness.
 
 ## Prerelease channel
 
@@ -13,6 +13,11 @@ The stable release date/version remains undecided.
 - [x] Cover prerelease-to-stable candidate selection and avoiding downgrade with existing release-selection fixtures.
 - [ ] Verify prerelease-to-stable selection in an installed application when an actual stable candidate exists. No stable release exists yet.
 - [ ] Promote a tested latest candidate and verify stable notes, assets, and update continuation.
+
+## User-distribution storage baseline
+
+- [ ] Record the first build distributed to another user and its persistent format versions. Continuous n-to-n+1 migrations and old-format fixtures are required from that distribution onward.
+- [ ] Verify migration from the earliest user-distributed baseline to the stable candidate once those builds exist.
 
 ## Plugin delivery
 
@@ -39,14 +44,18 @@ Confirmed SDK boundary defects and the template-copy participation boundary are 
 - [x] Accept settings navigation and built-in setting changes/defaults, session-status presentation, startup, and workbench panels.
 - [ ] Finish plugin enable/disable/removal and external settings-page acceptance.
 - [x] Exercise real tasks using Agent/Mesh collaboration, MCP, Web, terminals, and skills.
+- [x] Accept Subagent Pool GUI behavior and live-provider execution. The user confirmed acceptance on 2026-10-31.
+- [ ] Accept the skills settings page. Its implementation record is archived; this feature-specific check remains pending.
 - [ ] Accept long-conversation continuation after automatic compaction.
 - [ ] Resolve remaining stale capability claims as their concrete behavior is accepted.
 
 ## Platform and maintenance
 
-The user has accepted installed task execution and persistence, PTY/search execution, update progress/settings navigation, cancellation of exit with an update ready, and a format-changing installed update on their own environment. Unencountered scenarios and other platforms remain pending.
+The user confirmed desktop build/platform behavior, cross-platform behavior, and storage/migration acceptance on 2026-10-31. These plans are archived. Earlier acceptance includes installed task execution and persistence, PTY/search execution, update progress/settings navigation, cancellation of exit with an update ready, and a format-changing installed update. Remaining installed-update scenarios are tracked separately in `plans/todo-2026-09-17-release-ci.md`.
 
-- [ ] Accept installation, core features, credentials, processes, and updating on each release platform.
+- [x] Accept desktop builds, installation/startup, core platform behavior, credentials, native modules, and process cleanup across the release platforms.
+- [x] Accept current storage migration, recovery, and plugin migration failure isolation.
+- [ ] Complete the remaining installed-update scenarios on each release platform.
 - [ ] Verify plugin compatibility and failure isolation across application updates.
 - [ ] Provide installation and issue-reporting information for the accepted platforms: application version, platform, reproduction, and logs. Models can consult the internal manual for in-product usage guidance.
 - [ ] Complete and accept official branding and platform icons.

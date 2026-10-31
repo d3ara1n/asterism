@@ -4,7 +4,9 @@ Filed: 2026-10-29.
 
 ## Status
 
-Implementation is complete. The builtin Subagent Pool resource provides shared, asynchronous, one-shot executions, persistent Delegation results, permanent process audits, and live task observation. Execution infrastructure is decoupled from timeline protection, generic pending operation records support one-time persisted completion, and obsolete Agent configuration fields have been removed. GUI acceptance and live-provider verification remain manual.
+Implementation and user acceptance are complete. The builtin Subagent Pool resource provides shared, asynchronous, one-shot executions, persistent Delegation results, permanent process audits, and live task observation. Execution infrastructure is decoupled from timeline protection, generic pending operation records support one-time persisted completion, and obsolete Agent configuration fields have been removed. The user confirmed Subagent Pool acceptance on 2026-10-31, closing the pending GUI and live-provider checks.
+
+This confirmation is user acceptance, not a new automated test run. Exact build and provider/model versions were not supplied. The validation notes below preserve the evidence and limitations at implementation handoff.
 
 Phase-one acceptance evidence remains in `plans/archived/todo-2026-10-29-subagent-foundations.md`; its rationale remains in `plans/archived/ref-2026-10-29-delegated-agent-execution.md`. Those records preserve the earlier infrastructure scope and acceptance caveats.
 
@@ -81,7 +83,7 @@ Audit storage is separate from normal report delivery. JSONL entries preserve or
 - Added a settings-format conversion that removes only obsolete Agent override fields while preserving configured models, prompts, limits, and presentation preferences.
 - Added generic pending operation publication and completion, fixed pending snapshots, transactional attachment retention, completion notifications, renderer replacements, and a workspace-format index upgrade preserving existing records.
 
-Validation for operation-record completion passed both TypeScript configurations, 159 tests across 11 focused files, the production build, and the diff check. Cases cover branch visibility, delayed snapshot reads, observer-triggered completion, nested transaction rollback, ownership, finalized-record rejection, attachment retention across restart, and the workspace upgrade. Code review found no outstanding correctness issues in this scope. GUI behavior has not been manually accepted.
+Validation for operation-record completion passed both TypeScript configurations, 159 tests across 11 focused files, the production build, and the diff check. Cases cover branch visibility, delayed snapshot reads, observer-triggered completion, nested transaction rollback, ownership, finalized-record rejection, attachment retention across restart, and the workspace upgrade. Code review found no outstanding correctness issues in this scope. GUI behavior had not yet been manually accepted at that validation stage.
 
 ## Completed implementation
 
@@ -92,10 +94,11 @@ Validation for operation-record completion passed both TypeScript configurations
 - [x] Implement permanent JSONL audits keyed by run ID and connect finalization failures to normal diagnostics.
 - [x] Provide active-work disposal feedback independently of timeline busy, using resource lifecycle presentation.
 - [x] Integrate pool summaries and detailed observation with existing resource UI and object channels.
-- [x] Validate concrete lifecycle, branch/completion, access-capture, model-resolution, message-queue, and cleanup contracts. GUI acceptance remains manual.
+- [x] Validate concrete lifecycle, branch/completion, access-capture, model-resolution, message-queue, and cleanup contracts.
+- [x] Complete GUI and live-provider acceptance, confirmed by the user on 2026-10-31.
 
 Final feature validation passed both TypeScript configurations, 139 tests across 10 focused files, bilingual catalog checks, the production build, an isolated builtin runtime/renderer/storage package build, and the diff check. Contract cases cover parallel admission, queued and active steering, explicit request budgets, shared cancellation, cancelled waits, persistence and interruption recovery, branch visibility, pool-owned resource access, reciprocal pool delegation, retained partial reports, teardown, and audit attachment ownership.
 
-Review identified an observation offset that needed resetting after a task became hidden by history navigation, and an audit input array that needed copying before conversation growth. Both findings were fixed; the audit input case has a regression assertion. No GUI interaction or live-provider run was performed. Production build warnings about large chunks remain.
+Review identified an observation offset that needed resetting after a task became hidden by history navigation, and an audit input array that needed copying before conversation growth. Both findings were fixed; the audit input case has a regression assertion. No GUI interaction or live-provider run was performed during that automated validation. The user subsequently confirmed acceptance as recorded above. Production build warnings about large chunks remain.
 
 Workflow orchestration remains the user's responsibility. Linked pools permit recursive workflows; the application does not infer or repair those workflows. Automatic completion notifications or owner wake-up are not selected.

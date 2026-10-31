@@ -2,13 +2,17 @@
 
 Filed on 2026-10-12.
 
-Version-based preparation, consecutive migrations, recovery points, isolated plugin storage entries, and plugin failure isolation are implemented and verified with isolated data. Installed-build and GUI acceptance is partly complete.
+Version-based preparation, consecutive migrations, recovery points, isolated plugin storage entries, and plugin failure isolation are implemented and verified with isolated data.
+
+## Disposition
+
+The user confirmed storage and migration acceptance on 2026-10-31. The current implementation and recovery acceptance are complete, and this plan is archived. Exact build versions and data fixtures for this confirmation were not supplied. This is user acceptance, not a new automated test run. Acceptance from the first user-distributed baseline to a stable candidate remains a future release obligation in `plans/todo-2026-10-26-release-readiness.md`.
 
 ## Distribution baselines
 
 No build has reached a user other than the maintainer. `v0.1.0-prerelease.1` (`52bddcc`) and `v1.0.0-prerelease.1` (`d81c5c7`) were maintainer test releases that validated the release, update, and distribution workflows; they establish no migration obligation.
 
-The continuous n-to-n+1 obligation starts with the first build distributed to another user. Record that build and its format versions here when it ships. Until then, the plugin paradigm layering work can rebuild incompatible formats, and real development data cleanup still requires explicit authorization. Existing migration steps remain implementation evidence; whether to fold them into a fresh baseline is decided at that point.
+The continuous n-to-n+1 obligation starts with the first build distributed to another user. The release-readiness plan tracks recording that build and its format versions when it ships. Until then, incompatible development formats can be rebuilt, and real development data cleanup still requires explicit authorization. Existing migration steps remain implementation evidence; whether to fold them into a fresh baseline is decided at that point.
 
 ## Implemented
 
@@ -29,13 +33,16 @@ The continuous n-to-n+1 obligation starts with the first build distributed to an
 - [x] The successful-migration notice appears once after Home appears.
 - [x] Recovery-point listing, opening directories, retry, and native confirmations work.
 
-## Remaining acceptance
+## Final acceptance
 
-- [ ] Use isolated data to verify an upgrade skipping intermediate app versions, preserving the same data categories. Use actual format steps rather than inventing production version changes for a demonstration.
-- [ ] Verify migration from the earliest user-distributed baseline to the stable candidate.
-- [ ] Restore and restart into paused recovery, then explicitly retry migration.
-- [ ] Confirm the old data remains recoverable after starting with new data.
-- [ ] Confirm one plugin's failed migration disables it while other features remain usable.
+The following scenarios are closed by the user's 2026-10-31 acceptance:
+
+- [x] An upgrade skipping intermediate app versions preserves sessions, attachments, settings, and plugin data.
+- [x] Restore and restart into paused recovery, then explicitly retry migration.
+- [x] Confirm the old data remains recoverable after starting with new data.
+- [x] Confirm one plugin's failed migration disables it while other features remain usable.
+
+## Historical validation limits
 
 Earlier evidence included a development build migrating real development data 27 → 28 with an unreleased draft of the step. The `v0.1.0-prerelease.1` → `v1.0.0-prerelease.1` update had no migration path and remains evidence of application replacement and fresh start only. The subsequent user confirmation above establishes format-changing installed-update acceptance without assigning it to that earlier version pair.
 

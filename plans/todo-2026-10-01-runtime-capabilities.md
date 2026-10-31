@@ -2,7 +2,7 @@
 
 Filed on 2026-10-01.
 
-The implementation now includes model requests, tool batches, persistent drafts and steering, agent creation/communication, cross-session Mesh channels, context compaction, filesystem search and commands, terminals, MCP, Web, skills, naming, archiving, and conversation virtualization. These capabilities must not be treated as absent because early task notes predated their implementation.
+The implementation now includes model requests, tool batches, persistent drafts and steering, agent creation/communication, cross-session Mesh channels, Subagent Pool execution, context compaction, filesystem search and commands, terminals, MCP, Web, skills, naming, archiving, and conversation virtualization. These capabilities must not be treated as absent because early task notes predated their implementation.
 
 Mesh provides member discovery, messaging, saved-record investigation, task profiles, and persistent name disambiguation across sessions. Directional links determine access and membership, captured at request boundaries. The user has accepted real Agent/Mesh collaboration tasks.
 
@@ -13,11 +13,11 @@ Mesh provides member discovery, messaging, saved-record investigation, task prof
 - [ ] Design captured virtual resources, checkpoints, explicit state restoration, and isolated restored instances.
 - [ ] Add explicit cloning or reference-mapping capabilities when a concrete resource needs external-instance or private-state duplication. Data-copy templates already require resource participation and selected current-data contracts.
 - [ ] Extend context-file discovery, hierarchical scope, ordering, and diagnostics where real tasks require them.
-- [ ] Verify default agent tool and delegation policies against the available capabilities.
-- [ ] Continue brainstorming foreground and background delegation through `plans/todo-2026-10-29-subagent.md`; the execution foundations are complete, but the feature design is not settled. Additional relay behavior and skill composition require concrete needs beyond the implemented direct communication and cross-session Mesh.
-- [ ] Clarify whether and how backup model roles participate in execution.
+- [x] Accept Subagent Pool GUI behavior and live-provider execution, including shared task observation, steering, cancellation, and retained results. The user confirmed acceptance on 2026-10-31; implementation and validation are recorded in `plans/archived/todo-2026-10-29-subagent.md`.
 
-Plugin prompt contributions, plugin-carried skills, and explicit skill picking remain deferred extension work. Their existence in a design discussion does not establish an exposed API.
+Subagent Pool execution is asynchronous, with pool-owned resource access and AgentRole configuration. The obsolete role-level tool policies and fallback-role configuration have been removed. Additional relay behavior and skill composition require concrete needs beyond the implemented pool and Mesh capabilities.
+
+Plugin prompt contributions and plugin-carried skills are implemented. Skills settings-page acceptance remains pending. Explicit composer skill picking remains deferred in `plans/todo-2026-10-25-skill-picker.md`.
 
 ## Model and context follow-up
 
@@ -37,9 +37,9 @@ Cross-model continuation and compaction are implemented. Long-term quality acros
 - [ ] Design explicit content sharing across objects, plugins, and sessions.
 - [ ] Establish creation retry semantics after lost receipts where submission deduplication is not already provided.
 - [ ] Investigate concrete power-loss reconciliation across database and files.
-- [ ] Verify cross-platform filesystem, permission, and symlink behavior.
+- [x] Accept cross-platform filesystem, permission, and symlink behavior as part of the user's cross-platform acceptance on 2026-10-31.
 
-Current content collection and application recovery are implemented. Resource-state restoration is a different capability. Last-write-wins is the agreed local-write behavior; this task does not authorize reinstating file revision conflicts or speculative commit rechecks.
+Current content collection and application recovery are implemented. Storage migration and recovery acceptance were confirmed by the user on 2026-10-31 and are recorded in `plans/archived/todo-2026-10-12-storage-migration.md`. Resource-state restoration is a different capability. Last-write-wins is the agreed local-write behavior; this task does not authorize reinstating file revision conflicts or speculative commit rechecks.
 
 ## Workbench and scale acceptance
 
