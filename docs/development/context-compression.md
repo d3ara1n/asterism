@@ -18,9 +18,9 @@ No legal summarizable prefix means no forced deletion of recent text.
 
 Use the same conversation model through a one-shot stream, explicit thinking off, and no tools. The summary system prompt is independent of the ordinary harness, Agent role, and linked context files.
 
-Material identifies user inputs, Agent senders, assistant replies, tool calls/results, and context. It omits private continuation data and thinking; file descriptions identify references without claiming to have read the files.
+Material distinguishes user messages, Agent messages, and resource event messages using the work request's source envelopes. It also identifies assistant replies, tool calls/results, and context. It omits private continuation data and thinking; file descriptions identify references without claiming to have read the files.
 
-The summary preserves goals, constraints, decisions, progress, unresolved work, necessary identities, and relevant skill references. It distinguishes verified facts from suggestions. Repeated compaction updates the previous summary with newly summarized material.
+The summary preserves goals, constraints, decisions, progress, unresolved work, necessary identities, and relevant skill references. Consequential inputs retain their source kind and the Agent or resource address and name; event facts remain attributable to their source. Verified facts, suggestions, and unverified claims retain distinct status. Repeated compaction updates the previous summary with newly summarized material.
 
 ## Persistence and projection
 

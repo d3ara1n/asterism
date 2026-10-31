@@ -4,6 +4,16 @@ The built-in Agent owns conversation projection and the execution loop. The loop
 
 Host model services perform individual requests and tool batches from explicit messages and executable tools. Session-bound execution separately captures an access owner's environment and binds the shared resource dispatcher. Multiple conversations can use one access owner without sharing message state or a model-request singleton. The caller supplies each response's conversation position; the model service treats it as opaque correlation.
 
+## Messages and attribution
+
+An Agent input is a message with ordered text or file parts and one of three sender kinds: user, Agent, or resource event. Resource plugins format event facts as readable text. All three sources share admission, persistent drafts, history records, and execution; sender kind does not select a scheduling path.
+
+Input record provenance identifies the receiving Agent. Sender attribution separately identifies a user, a communicating Agent, or an emitting resource. Agent and event senders retain a resource reference and the sender name captured with the input. Trusted plugin code supplies this attribution; the Agent Send tool derives it from its bound caller. Source attribution does not grant resource access or establish a reply route.
+
+Model projection wraps Agent and event messages in escaped source envelopes while preserving user text. UI reads the original body and structured sender. Work requests, compaction, and history investigation use the same source semantics. Provider message roles are an encoding detail: the adapter can encode all three input sources as user-role messages without changing their domain attribution.
+
+SDK events are typed transient notifications. A plugin callback may translate one into an Agent event message, resolve recipients, and submit it. Event publication and resource links do not themselves submit messages or start an Agent loop.
+
 ## Turns and input scheduling
 
 A turn groups the inputs an agent handles together. A request is one model response and its tool batch. Blocks are output units, not turn boundaries.
@@ -124,7 +134,7 @@ Closing a question view differs from cancelling the question. Submitted answers 
 
 Agent `send` invokes input admission with host-bound sender identity. Acceptance is distinct from completion. `wait` waits for the target to settle; timing out the wait leaves the target running. Reverse communication requires a reverse link.
 
-Input record provenance identifies the receiving agent; structured sender data identifies who sent the message. Model projection uses an escaped sender envelope, while UI reads structured data. Naming uses real user input.
+Automatic session naming uses actual user input. Agent and event messages retain their own attribution and do not become user requests for naming.
 
 `peek` reads a fixed target-agent history snapshot through an independent utility-model investigation. It does not run the target Agent or inherit its tools. Saved results identify the snapshot, report, query trace, and actual model usage.
 

@@ -119,7 +119,7 @@ function onSolid(background: string, dark: string): string {
   return contrastRatio(background, "#ffffff") >= contrastRatio(background, dark) ? "#ffffff" : dark;
 }
 /** Chart categorical hue order. */
-export const chartHues = ["blue", "teal", "amber", "violet", "crimson", "orange", "cyan", "plum"] as const;
+export const chartHues = ["blue", "teal", "amber", "violet", "crimson", "orange", "cyan", "plum", "indigo"] as const;
 /** Semantic layer: one mapping resolves accent/gray steps into shadcn tokens for light/dark modes; token names never change with selections. */
 export function themeTokens(appearance: Appearance, scheme: Scheme): Record<string, string> {
   const g = scale(appearance.gray, scheme);
@@ -150,6 +150,7 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
     selected: mono ? g(5) : a(3), "selected-foreground": primaryText,
     muted: g(3), "muted-foreground": g(11),
     "external-message": scale("violet", scheme)(3), "external-message-foreground": scale("violet", scheme)(12),
+    "event-message": scale("blue", scheme)(3), "event-message-foreground": scale("blue", scheme)(12),
     accent: g(4), "accent-foreground": fg,
     // Status colors consistently use step 11 with independent foregrounds for solid surfaces.
     destructive: red(11), "destructive-foreground": solidForeground(red(11)),

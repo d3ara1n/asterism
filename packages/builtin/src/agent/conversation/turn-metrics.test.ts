@@ -48,7 +48,7 @@ describe("Per-turn conversation measurements", () => {
     expect(turnMetrics(snapshot(path), "a", false)).toHaveLength(1);
   });
 
-  // This turn starts at this agent's latest user input; earlier turns, other agents' messages, and auxiliary compression cannot change its range or affect weighting.
+  // This turn starts at this agent's latest turn-opening input; earlier turns, other agents' messages, and auxiliary compression cannot change its range or affect weighting.
   it("Calculates hit rate and throughput from totals across requests in the same turn, including requests after resuming", () => {
     const path = [
       node("old-user", null, message("a", "Old")),

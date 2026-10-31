@@ -8,6 +8,8 @@ A **session** contains the inputs, objects, relationships, and history for a pie
 
 An **agent configuration** describes reusable behavior, including instructions, model selection, and execution budgets. An **agent** is a running workbench object created from a configuration. Changing which configuration an agent uses does not create a new session.
 
+An Agent receives **messages** from three sources: the user, another Agent, or a resource reporting an event. Each carries ordinary readable content. Agent and event messages identify their source; event messages describe what happened so the Agent can act according to its configured responsibilities.
+
 ## Resources, links, and tools
 
 A **resource** is an object with an identity and a type. A directory, note, terminal, or another agent can be a resource. A path or URL in a message is information; the corresponding capability comes from a resource.

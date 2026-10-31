@@ -6,6 +6,7 @@ import { Virtualizer, type VirtualizerHandle } from "virtua";
 
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Badge } from "@asterism-app/ui/ui/badge";
+import { cn } from "@asterism-app/ui/utils";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "./Markdown";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -15,6 +16,7 @@ import { FilePreview } from "./Files";
 import { Disclosure } from "./Disclosure";
 import { TurnFooter } from "./TurnFooter";
 import { MessageSender } from "./MessageSender";
+import { messageAppearance } from "../message-presentation";
 import { TimelineViewState, viewStateKeys } from "./view-state";
 import { ExecutionErrorDetails } from "../ErrorDetails";
 import { TurnProcess } from "./TurnProcess";
@@ -91,10 +93,9 @@ function NodeContent({ node }: { node: TimelineItem }) {
   const tag = incomplete ? <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge> : null;
   switch (node.kind) {
     case "message": return <article data-conversation-message={node.id}
-      className={`min-w-0 max-w-[92%] space-y-2 ${node.sender.kind === "agent" ? "mr-auto" : "ml-auto"}`}>
+      className={cn("flex min-w-0 max-w-[92%] flex-col gap-2", node.sender.kind === "user" ? "ml-auto" : "mr-auto")}>
       <MessageSender sender={node.sender} />
-      <div className={`space-y-2 rounded-md px-3 py-2 ${node.sender.kind === "agent"
-        ? "bg-external-message text-external-message-foreground" : "bg-muted text-foreground"}`}>{node.parts.map((part, index) =>
+      <div className={cn("flex flex-col gap-2 rounded-md px-3 py-2", messageAppearance[node.sender.kind].surface)}>{node.parts.map((part, index) =>
         part.kind === "text" ? <Markdown key={index}>{part.text}</Markdown>
           : <FilePreview key={index} part={part} content={object.content} />)}</div></article>;
     case "text": return <article className="space-y-1">{tag}<Markdown streaming={streaming}>{node.text}</Markdown></article>;

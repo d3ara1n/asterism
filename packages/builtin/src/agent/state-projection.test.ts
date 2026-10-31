@@ -18,14 +18,14 @@ function project(values: NewNode[], running = false, interruptions: readonly (st
 
 // Execution-state projection; verifies domain decisions only, without simulating components or a transient state bus.
 describe("Agent execution-state projection", () => {
-  it("Waits for input when there is no user input for this agent; accepted input without a reply can resume, while an active run prioritizes the stop action", () => {
+  it("Waits for input when there is no message for this agent; accepted input without a reply can resume, while an active run prioritizes the stop action", () => {
     expect(project([message("b", "For B")], false, ["0"])).toBe("empty");
     expect(project([message("a", "Go")])).toBe("incomplete");
     expect(project([message("a", "Go")], true)).toBe("running");
     expect(project([message("a", "Go"), answer()], true)).toBe("running");
   });
 
-  it("Restores normal completion from persistent history; other agents and resource events do not reopen the resume action", () => {
+  it("Restores normal completion from persistent history; another agent's inputs and link notices do not reopen the resume action", () => {
     expect(project([
       message("a", "Go"), answer(), message("b", "For B"), attached("a", "dir"),
     ])).toBe("completed");

@@ -3,7 +3,7 @@ import { contextMessages, projectAgentContext } from "../context-projection.ts";
 import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism-app/builtin-api/contracts";
 
 /** Fixed categories and display order for conversation composition. */
-export const conversationCategories = ["user", "agentMessage", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;
+export const conversationCategories = ["user", "agentMessage", "eventMessage", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;
 export type ConversationCategory = typeof conversationCategories[number];
 
 export interface ContextInsight {
@@ -23,7 +23,7 @@ function addParts(parts: readonly ModelInputPart[], category: ConversationCatego
     else target.files++;
   }
 }
-function addItem(item: ModelItem, inputCategory: "user" | "agentMessage", target: ContextInsight["conversation"]) {
+function addItem(item: ModelItem, inputCategory: "user" | "agentMessage" | "eventMessage", target: ContextInsight["conversation"]) {
   if (item.kind === "input" || item.kind === "context")
     return addParts(item.parts, item.kind === "input" ? inputCategory : "context", target);
   if (item.kind === "result") return addParts(item.outcome.model, "result", target);
@@ -49,7 +49,8 @@ export function contextInsight(snapshot: Pick<SessionSnapshot, "records">, agent
   }
   for (const group of context.groups) {
     const input = AgentInputMessage.decode(context.path[group.first]!);
-    const category = input?.status === "known" && input.data.sender.kind === "agent" ? "agentMessage" : "user";
+    const sender = input?.status === "known" ? input.data.sender.kind : "user";
+    const category = sender === "user" ? "user" : sender === "agent" ? "agentMessage" : "eventMessage";
     group.items.forEach(item => addItem(item, category, conversation));
   }
   conversation.total = conversationCategories.reduce((sum, category) => sum + conversation.characters[category], 0);

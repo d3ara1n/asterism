@@ -46,6 +46,14 @@ Delegation settings control which roles an Agent can delegate tasks to, whether 
 
 `agent_list` exposes each role's own `delegates` value alongside its purpose and examples: `null` means unrestricted, `[]` means none, and an array names allowed target roles. Delegation calls enforce the calling role's policy and identify both roles when rejecting a disallowed target.
 
+## Receive messages
+
+Workbench Agents accept user messages, messages from other Agents, and event messages submitted by resource plugins. They share the same conversation and input queue. Incoming Agent messages identify the Agent; event messages have an event icon, blue background, and the source resource's name. The content is ordinary text and attachments.
+
+Accepted input starts an idle Agent. While it is running, inputs can join the next model request or wait for the next turn according to their delivery mode. Drafts show pending messages and their timing. Taking an incoming message into the composer makes its next submission a user message.
+
+A resource integration must implement notification delivery to send event messages. Linking a resource alone does not create that integration. The Agent's instructions define how it handles received facts, and its available resources supply the operations it can perform. Application startup restores saved drafts without sending them automatically.
+
 ## Interpret usage
 
 Response token usage and estimated cost describe model requests. Account balance and quota describe a provider account or plan. They may update through different mechanisms and need not agree with an estimated response cost.

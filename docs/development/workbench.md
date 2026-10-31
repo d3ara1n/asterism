@@ -82,7 +82,7 @@ Selecting a history item or tab changes only a candidate. Explicit continuation,
 
 ## Agent conversation
 
-Messages use structured sender data. User input and incoming Agent messages have distinct alignment and identifiers; model communication envelopes remain implementation data.
+Messages use structured sender data to distinguish user input, incoming Agent messages, and resource events. Incoming messages identify their source; event messages use a shared event icon and blue surface. All sources share body rendering. Model communication envelopes remain implementation data.
 
 The conversation is virtualized. Item identity remains stable through streaming, persistence, and scroll remounts. Live output and the tail remain mounted where required. Text selection and browser find cover mounted content.
 
@@ -96,7 +96,7 @@ Composer controls follow the Agent’s execution state: stop while running, cont
 
 Agent drafts preserve complete text, files, sender, and delivery mode. Their preview never replaces the stored input. Mode changes and reorder operations act by identity and follow backend order.
 
-Taking a draft into an empty composer removes it from drafts. Swapping with composer content places that content in the old slot as a retained user draft. Editing an incoming Agent message makes subsequent submission user input. Content leases transfer before replacing the visible composer value.
+Taking a draft into an empty composer removes it from drafts. Swapping with composer content places that content in the old slot as a retained user draft. Taking an incoming Agent or event message into the composer makes subsequent submission user input. Content leases transfer before replacing the visible composer value.
 
 Lost receipts retain the submission identity and content needed for retry. Explicit failure preserves the original content. Restoration does not send drafts automatically.
 

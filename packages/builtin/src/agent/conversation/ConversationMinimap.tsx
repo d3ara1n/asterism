@@ -3,6 +3,7 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import { ChatMinimap } from "@asterism-app/ui/ui/chat-minimap";
 import { conversationMessages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";
+import { messageSenderLabel } from "../message-presentation";
 
 type AgentInputMessage = Extract<TimelineItem, { kind: "message" }>;
 
@@ -31,7 +32,7 @@ export function ConversationMinimap({ timeline, onSelect }: {
     .map((message, index) => ({
       id: message.id,
       label: i18n.formatMessage(conversationMessages.minimapMessage, { number: index + 1 }),
-      preview: message.sender.kind === "agent" ? `${message.sender.name}\n${preview(message)}` : preview(message),
+      preview: message.sender.kind === "user" ? preview(message) : `${i18n.text(messageSenderLabel(message.sender))}\n${preview(message)}`,
     })), [timeline, i18n]);
   return <ChatMinimap items={items} label={i18n.formatMessage(conversationMessages.minimap)} onSelect={onSelect} />;
 }

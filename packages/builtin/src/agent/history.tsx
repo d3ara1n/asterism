@@ -1,11 +1,12 @@
 import { recordRenderer, useI18n, type RecordRenderer } from "@asterism-app/sdk/renderer";
-import { Brain, MessageSquareText, User, Bot, Wrench, Info } from "lucide-react";
+import { Brain, MessageSquareText, Wrench, Info } from "lucide-react";
 
 import { inputSummary, Execution, AgentInputMessage, ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { conversationMessages } from "../messages/conversation";
+import { messageAppearance, messageSenderLabel } from "./message-presentation";
 
-/** History rows for agent records: styles distinguish user input, thinking, and output without relying on text prefixes. */
+/** History rows distinguish message sources, thinking, and output through structured record data. */
 const RowText = ({ label, className }: { label: string; className?: string }) => <span className={`block truncate leading-5 ${className ?? ""}`}>{label}</span>;
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
@@ -15,8 +16,12 @@ export const agentRecordViews: RecordRenderer[] = [
     label: (data, context) => `${context.text(conversationMessages.contextSummary)} · ${data.summary}`,
   }),
   recordRenderer(AgentInputMessage, {
-    icon: data => data.sender.kind === "agent" ? <Bot className="size-4" /> : <User className="size-4 text-primary-text" />,
-    label: data => data.sender.kind === "agent" ? `${data.sender.name} · ${inputSummary(data.parts)}` : inputSummary(data.parts),
+    icon: data => {
+      const { Icon } = messageAppearance[data.sender.kind];
+      return <Icon className={data.sender.kind === "user" ? "size-4 text-primary-text" : "size-4"} />;
+    },
+    label: (data, context) => data.sender.kind === "user" ? inputSummary(data.parts)
+      : `${context.text(messageSenderLabel(data.sender))} · ${inputSummary(data.parts)}`,
     Row: ({ label }) => <RowText label={label} className="font-medium" />,
   }),
   recordRenderer(Execution, {

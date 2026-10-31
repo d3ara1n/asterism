@@ -1,7 +1,7 @@
 import { modelInputPartsSchema, modelInputText, type ModelInputPart } from "@asterism-app/sdk/contracts";
 
-/** Business limits for a single user input; model requests accumulate history separately. */
-export const userInputPartsSchema = modelInputPartsSchema.max(128)
+/** Shared body limits for one Agent input message, independent of its sender or delivery mode. */
+export const agentInputPartsSchema = modelInputPartsSchema.max(128)
   .refine(parts => parts.some(part => part.kind === "file" || part.text.trim().length > 0), "A message requires text or a file.")
   .refine(parts => modelInputText(parts).length <= 100_000, "The message text exceeds the size limit.");
 export function inputSummary(parts: readonly ModelInputPart[]): string {

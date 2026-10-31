@@ -1,7 +1,7 @@
 import { defineCreation, defineAction, defineCall } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
 import { builtin } from "./identity.ts";
-import { userInputPartsSchema } from "./input.ts";
+import { agentInputPartsSchema } from "./input.ts";
 import { agentSelectionSchema } from "./configuration.ts";
 import { agentMessageSenderSchema } from "./messaging.ts";
 
@@ -14,7 +14,7 @@ export const agentInputModeSchema = z.enum(["steer", "follow"]);
 /** Submissions and drafts share a 16-character Nano ID identity. */
 export const submissionIdSchema = z.string().regex(/^[A-Za-z0-9_-]{16}$/u);
 export const StartAgentSession = defineCall(builtin.name("session.start"), {
-  scope: "plugin", input: z.strictObject({ submissionId: submissionIdSchema, selection: agentSelectionSchema, parts: userInputPartsSchema }),
+  scope: "plugin", input: z.strictObject({ submissionId: submissionIdSchema, selection: agentSelectionSchema, parts: agentInputPartsSchema }),
   output: z.strictObject({ sessionId: z.string().min(1) }),
 });
 /** title is optional; when omitted, the creation entry point generates a random display name. */
@@ -27,7 +27,7 @@ export const CreateAgent = defineCreation(Agent, { id: builtin.name("agent.creat
 export const SubmitAgentInput = defineAction(Agent, {
   id: builtin.name("agent.submit"),
   schema: z.strictObject({
-    submissionId: submissionIdSchema, parts: userInputPartsSchema, mode: agentInputModeSchema,
+    submissionId: submissionIdSchema, parts: agentInputPartsSchema, mode: agentInputModeSchema,
     sender: agentMessageSenderSchema.default({ kind: "user" }),
   }),
 });

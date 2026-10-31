@@ -2,17 +2,24 @@ import { z } from "zod";
 import { defineTool } from "@asterism-app/sdk/contracts";
 import { builtin } from "./identity.ts";
 
-/** The sender retains the communication resource and agent name; recipient addressing is declared by the resource tool implementation. */
+const messageResourceSchema = z.strictObject({ sessionId: z.string().min(1), id: z.string().min(1), kind: z.string().min(1) });
+
+/** Agent and event messages retain the source resource and sender name captured with the input; plugins format event facts as message text. */
 export const agentMessageSenderSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("user") }),
   z.strictObject({
     kind: z.literal("agent"),
-    resource: z.strictObject({ sessionId: z.string().min(1), id: z.string().min(1), kind: z.string().min(1) }),
+    resource: messageResourceSchema,
     name: z.string().min(1),
     mesh: z.strictObject({
       channel: z.string().min(1),
       id: z.number().int().nonnegative().nullable(),
     }).optional().describe("Mesh channel name and sender's numeric name disambiguator. Null means the sender is not exposed to the channel."),
+  }),
+  z.strictObject({
+    kind: z.literal("event"),
+    resource: messageResourceSchema,
+    name: z.string().min(1),
   }),
 ]);
 export type AgentMessageSender = z.infer<typeof agentMessageSenderSchema>;

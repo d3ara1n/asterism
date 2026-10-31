@@ -37,7 +37,9 @@ These terms distinguish the concepts used when developing Asterism. Each definit
 | Snapshot | Fixed observation boundary, not an implicit restoration capability |
 | Current data | Latest session/object values, independent of history reconstruction |
 | Record source | Host-stamped emitting plugin and optional resource |
-| Message sender | Origin of Agent input, distinct from its receiving record writer |
+| Input message | Text and file parts submitted to an Agent, with source attribution and independent delivery timing |
+| Message sender | User, communicating Agent, or emitting resource, distinct from the receiving record writer |
+| Resource event message | Plugin-formatted facts submitted as an Agent message with the emitting resource's identity and name |
 | Turn | Agent processing of a batch of inputs and steering additions |
 | Request | One model response and its tool batch |
 | Block | Output organization and persistence unit |

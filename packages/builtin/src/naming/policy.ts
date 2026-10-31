@@ -24,7 +24,7 @@ export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
     const input = AgentInputMessage.decode(record);
     if (input?.status === "known") {
       const agentInputs = inputs.get(record.source?.resource?.id ?? "") ?? [];
-      if (input.data.sender.kind === "agent") {
+      if (input.data.sender.kind !== "user") {
         if (input.data.startsTurn) {
           agentInputs.push({ position, turn: null });
           inputs.set(record.source?.resource?.id ?? "", agentInputs);

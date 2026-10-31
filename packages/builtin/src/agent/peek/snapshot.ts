@@ -4,7 +4,7 @@ import { projectInputMessage } from "../input-message.ts";
 
 export interface PeekRecord {
   id: string;
-  kind: "user" | "agent" | "assistant" | "tool" | "thinking" | "summary" | "notice" | "context";
+  kind: "user" | "agent" | "event" | "assistant" | "tool" | "thinking" | "summary" | "notice" | "context";
   at: string;
   status: string;
   text: string;
@@ -59,7 +59,7 @@ export function peekOverview(records: readonly PeekRecord[], budget: number): st
   let remaining = budget;
   for (let index = records.length - 1; index >= 0; index--) {
     const record = records[index]!;
-    const inline = record.kind === "user" || record.kind === "agent" || record.kind === "assistant" || record.kind === "summary";
+    const inline = record.kind === "user" || record.kind === "agent" || record.kind === "event" || record.kind === "assistant" || record.kind === "summary";
     const excerpt = inline ? record.text.slice(0, 1200) : "";
     const row = JSON.stringify({ id: record.id, kind: record.kind, at: record.at, status: record.status,
       length: record.text.length, ...(inline ? { excerpt, remaining: record.text.length - excerpt.length } : {}) });

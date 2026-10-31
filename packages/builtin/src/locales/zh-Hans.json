@@ -57,6 +57,8 @@
   "agent_wait_title": "等待助手",
   "agent_wait_state": "{state, select, completed {已完成} incomplete {未完成} empty {尚无回合} other {仍在运行}}",
   "context.agentMessage": "助手消息",
+  "context.eventMessage": "资源事件",
+  "agent_conversation_eventSource": "事件 · {name}",
   "agent_drafts_title": "草稿箱",
   "agent_drafts_moreActions": "更多操作",
   "agent_drafts_save": "存入草稿",

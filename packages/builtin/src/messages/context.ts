@@ -19,6 +19,7 @@ export const contextMessages = pluginNamespace("asterism.builtin").messages("en"
   files: { id: "context.files", defaultMessage: "{count, plural, one {# attachment is not counted.} other {# attachments are not counted.}}" },
   user: { id: "context.user", defaultMessage: "User messages" },
   agentMessage: { id: "context.agentMessage", defaultMessage: "Agent messages" },
+  eventMessage: { id: "context.eventMessage", defaultMessage: "Resource events" },
   assistant: { id: "context.assistant", defaultMessage: "Assistant text" },
   thinking: { id: "context.thinking", defaultMessage: "Thinking" },
   toolcall: { id: "context.toolcall", defaultMessage: "Tool calls" },

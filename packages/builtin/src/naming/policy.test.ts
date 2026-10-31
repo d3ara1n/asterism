@@ -49,6 +49,23 @@ describe("domain material for automatic naming", () => {
     expect(prompt).toMatch(/5.*omit/i);
   });
 
+  it("excludes event turns and their replies without borrowing them for a preceding user turn", () => {
+    const records = [
+      input("user", "a", "Review the design"),
+      output("answer", "a", "user", "The design is consistent."),
+      record("event", AgentInputMessage.id, {
+        sender: { kind: "event", resource: { sessionId: "s", id: "repo", kind: "example/github" }, name: "Repository" },
+        startsTurn: true, parts: [{ kind: "text", text: "PR #128 opened" }],
+      }, "a"),
+      output("review", "a", "event", "PR #128 has a cancellation bug."),
+      input("next", "a", "Explain the design"),
+    ];
+    expect(collectTurns(records)).toEqual([
+      { user: "Review the design", assistant: "The design is consistent." },
+      { user: "Explain the design" },
+    ]);
+  });
+
   it("removes title wrappers and limits length by Unicode characters, preserving an empty title", () => {
     expect(cleanTitle('<title>Title: “修复登录。”</title>')).toBe("修复登录");
     expect(Array.from(cleanTitle("🛠".repeat(70)))).toHaveLength(50);

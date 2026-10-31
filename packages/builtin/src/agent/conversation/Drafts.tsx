@@ -3,7 +3,7 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import { modelInputText } from "@asterism-app/sdk/contracts";
 import {
   GripVertical, Inbox, ChevronDown, Paperclip,
-  Bot, User, ArrowDownToLine, ArrowLeftRight, Trash2, MoreHorizontal,
+  ArrowDownToLine, ArrowLeftRight, Trash2, MoreHorizontal,
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -25,6 +25,7 @@ import { conversationMessages as messages } from "../../messages/conversation";
 import { useConversationInteraction } from "./interaction";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import type { AgentDraft, DraftMode } from "../drafts-contract";
+import { messageAppearance, messageSenderLabel } from "../message-presentation";
 
 /** Draft box panel; shown when items or exchanges awaiting confirmation exist, and occupies no space otherwise. */
 export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
@@ -175,7 +176,7 @@ function DraftRow({
     });
   };
 
-  const isAgent = item.sender.kind === "agent";
+  const { Icon: SenderIcon, surface } = messageAppearance[item.sender.kind];
   const editorHasContent = (() => {
     // Retrieval is an "exchange" when the editor is nonempty
     const state = interaction.draft.getSnapshot();
@@ -183,14 +184,12 @@ function DraftRow({
   })();
 
   // Source marker
-  const senderChip = isAgent ? (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[--color-external-message] px-1.5 text-[--color-external-message-foreground] text-[10px] font-medium leading-4 max-w-[7rem]">
-      <Bot className="size-2.5 shrink-0" aria-hidden />
-      <span className="truncate">{item.sender.kind === "agent" ? item.sender.name : ""}</span>
-    </span>
-  ) : (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 text-muted-foreground text-[10px] font-medium leading-4">
-      <User className="size-2.5 shrink-0" aria-hidden />
+  const senderName = i18n.text(messageSenderLabel(item.sender));
+  const senderChip = (
+    <span title={senderName} className={cn("inline-flex max-w-[7rem] shrink-0 items-center gap-1 rounded-full px-1.5 text-[10px] font-medium leading-4",
+      surface)}>
+      <SenderIcon className="size-2.5 shrink-0" aria-hidden />
+      <span className={item.sender.kind === "user" ? "sr-only" : "truncate"}>{senderName}</span>
     </span>
   );
 

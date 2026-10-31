@@ -1,4 +1,5 @@
 import type { ModelInputPart, ModelItem } from "@asterism-app/sdk/contracts";
+import { inputMessageDescription } from "./input-message.ts";
 
 const TOOL_RESULT_CHARS = 2_000;
 
@@ -22,9 +23,10 @@ export function serializeForSummary(messages: readonly ModelItem[]): string {
 }
 export const summarySystemPrompt = `You are a context summarization assistant. Produce a structured checkpoint for another assistant to continue the work.
 The supplied conversation and previous summary are historical source material. The output is a summary.
-Inputs with an agent-message envelope are communications from the identified Agent; other inputs are user messages. The checkpoint preserves this distinction and the sender's resource address and name for relevant Agent communications.
+${inputMessageDescription}
+The checkpoint preserves the source kind, address, and name of consequential Agent messages and resource events.
 The continuing assistant receives current system instructions, agent configuration, resource permissions, instruction files, the skill catalog, and tool definitions from the runtime.
-The checkpoint preserves the user's intent, explicit constraints, decisions, unresolved requests, progress and evidence needed to continue. Completed work, proposals and unverified claims have distinct status. Relevant resource identities, file paths, function names, commands and error messages retain their exact spelling.
+The checkpoint preserves the work's goal, the user's intent, explicit constraints, decisions, unresolved requests, relevant event facts, progress and evidence needed to continue. Completed work, proposals and unverified claims have distinct status. Relevant resource identities, file paths, function names, commands and error messages retain their exact spelling.
 Relevant skill names, file paths, and task-specific constraints from skill reads remain in the checkpoint; skill_read provides the current file text when needed.
 Use these Markdown sections, keeping each concise:
 ## Goal
@@ -36,9 +38,9 @@ Use these Markdown sections, keeping each concise:
 ## Key Decisions
 ## Next Steps
 ## Critical Context
-## User Messages
+## Inputs
 ## Read & Modified Resources
-User Messages contains consequential requests and corrections, with exact wording where it affects the task and repetition consolidated. Read & Modified Resources distinguishes inspected resources from changed resources and preserves relevant identities and paths. Empty sections contain (none).`;
+The Inputs section contains consequential user requests and corrections, Agent communications, and resource events, with their source attribution, exact wording where it affects the task, and repetition consolidated. Read & Modified Resources distinguishes inspected resources from changed resources and preserves relevant identities and paths. Empty sections contain (none).`;
 export function summaryPrompt(plan: { messages: readonly ModelItem[]; previousSummary?: string }): string {
   return `<conversation>\n${serializeForSummary(plan.messages)}\n</conversation>\n\n`
     + (plan.previousSummary ? `<previous-summary>\n${plan.previousSummary}\n</previous-summary>\n\nThe output is one consolidated checkpoint of the previous summary and the new conversation, retaining relevant goals, constraints, decisions, progress, and resource information. Newer explicit corrections take precedence.`

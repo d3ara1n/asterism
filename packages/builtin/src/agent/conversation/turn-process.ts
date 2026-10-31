@@ -16,7 +16,7 @@ export function groupTurnProcesses(items: readonly TimelineItem[], running: bool
   let inputId: string | null = null;
   const finish = (settled: boolean) => {
     const footer = pending.find(item => item.kind === "turn-metrics");
-    // Reading may begin mid-turn; the turn end retains the original input identity, so folding does not require the user message to remain visible.
+    // Reading may begin mid-turn; the turn end retains the original input identity, so folding does not require the input message to remain visible.
     const turnId = inputId ?? footer?.inputId;
     if (!turnId || !settled) {
       result.push(...pending);

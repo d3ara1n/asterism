@@ -15,6 +15,7 @@ Use semantic tokens from the theme implementation. The chosen accent expresses p
 | `accent` | Temporary hover and keyboard highlight |
 | `muted` | Subdued regions and supporting text |
 | `external-message` | Incoming Agent messages |
+| `event-message` | Resource event messages |
 | `success`, `warning`, `destructive` | Fixed semantic status colors |
 | `background` | Page and control backgrounds |
 | `canvas` | Workbench backing surfaces |
@@ -71,7 +72,7 @@ The tool shell does not impose one global body height. Renderers choose local sc
 
 Shared streaming previews have bounded tail views and are noninteractive. Final results switch to the appropriate full reading view.
 
-User input and external Agent messages differ through placement, labels, and icons as well as color. Process summaries and compaction markers use the common Marker presentation.
+User, Agent, and resource event messages share body rendering. Source presentation has one definition across conversation headers, drafts, history, and navigation previews. Incoming Agent messages use the recorded Agent name and any name disambiguator; event messages use the recorded resource name and event label. Placement, labels, and icons distinguish sources alongside color. Process summaries and compaction markers use the common Marker presentation.
 
 ## Controls and feedback
 

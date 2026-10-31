@@ -1,6 +1,7 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const conversationMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
+  eventSource: { id: "agent_conversation_eventSource", defaultMessage: "Event · {name}" },
   executionProcess: { id: "agent_conversation_executionProcess", defaultMessage: "Execution process" },
   compressing: { id: "agent_conversation_compressing", defaultMessage: "Compacting context…" },
   compressedHistory: { id: "agent_conversation_compressedHistory", defaultMessage: "Earlier conversation compacted" },

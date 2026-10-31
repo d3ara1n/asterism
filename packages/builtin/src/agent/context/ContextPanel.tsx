@@ -21,6 +21,7 @@ const COLUMNS = 20, ROWS = 5;
 const fill: Record<ConversationCategory, string> = {
   user: "bg-chart-1", assistant: "bg-chart-2", thinking: "bg-chart-4", toolcall: "bg-chart-6",
   result: "bg-chart-3", context: "bg-chart-7", summary: "bg-chart-8", agentMessage: "bg-chart-5",
+  eventMessage: "bg-chart-9",
 };
 /** Window usage: used capacity comes from reported input, while the window and reserve come from the measured request's model configuration; unmeasured content is not plotted. */
 function WindowUsage({ insight, selection }: { insight: ContextInsight; selection: z.infer<typeof AgentView.schema>["selection"] }) {
