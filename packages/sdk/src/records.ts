@@ -28,20 +28,28 @@ export interface RecordContract<D extends Json = Json> extends RecordRef {
   readonly schema: z.ZodType<D>;
   /** Return null when the record does not belong to this contract; compatibility and transformations are determined by the schema, and failure preserves the raw record. */
   decode(record: SessionRecord): Decoded<D> | null;
+  /** Decode a batch in its supplied order, omitting other contracts and retaining unknown matching records. */
+  decodeAll(records: readonly SessionRecord[]): Decoded<D>[];
 }
 export function defineRecord<D extends Json>(id: string, definition: {
   schema: z.ZodType<D>;
 }): RecordContract<D> {
   const { schema } = definition;
+  const decode = (record: SessionRecord): Decoded<D> | null => {
+    if (record.contract.id !== id) return null;
+    const data = structuredClone(record.data);
+    try {
+      const parsed = schema.safeParse(data);
+      return parsed.success ? { status: "known", record, data: parsed.data } : { status: "unknown", record, reason: "invalid_data" };
+    } catch { return { status: "unknown", record, reason: "invalid_data" }; }
+  };
   return {
-    id, schema,
-    decode(record) {
-      if (record.contract.id !== id) return null;
-      const data = structuredClone(record.data);
-      try {
-        const parsed = schema.safeParse(data);
-        return parsed.success ? { status: "known", record, data: parsed.data } : { status: "unknown", record, reason: "invalid_data" };
-      } catch { return { status: "unknown", record, reason: "invalid_data" }; }
+    id, schema, decode,
+    decodeAll(records) {
+      return records.flatMap(record => {
+        const value = decode(record);
+        return value ? [value] : [];
+      });
     },
   };
 }

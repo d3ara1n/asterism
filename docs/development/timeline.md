@@ -10,6 +10,8 @@ A record contains its contract identity, payload, and host-stamped source. Plugi
 
 The built-in Agent owns input messages, model output blocks, and summaries. The host does not interpret requests, turns, thinking blocks, naming sources, or provider continuations.
 
+Host resource creation, title changes, removal, and link changes have public SDK record contracts shared by host processing and plugin observation. Typed decoding preserves unreadable matching records rather than treating them as absent. The host emits these facts through resource operations; exposing their contracts does not grant plugins write ownership.
+
 ## Commit complete facts
 
 Session writes use synchronous transactions with a single writer. A commit does not await models, filesystems, or transport. Nested host operations share the enclosing transaction.

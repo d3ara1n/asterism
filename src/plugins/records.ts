@@ -1,6 +1,6 @@
 import type { Decoded, Json, RecordContract, RecordQuery, ResourceRef, ResourceSnapshot, SessionRecord, SessionSnapshot, SessionView } from "@asterism-app/sdk/contracts";
 import type { SessionNode } from "../shared/session.ts";
-import { foldWorkbench, type FoldedObject } from "../session/fold.ts";
+import { foldWorkbench, workbenchRecordIds, type FoldedObject } from "../session/fold.ts";
 import type { NodeView } from "../session/view.ts";
 import { deepFreeze } from "../shared/immutable.ts";
 
@@ -16,7 +16,7 @@ export function resourceSnapshot(ref: ResourceRef, resource: FoldedObject): Reso
 }
 export function sessionSnapshot(source: NodeView): SessionSnapshot {
   const workbench = () => foldWorkbench(source.read({ scope: "timeline",
-    contracts: ["resource_created", "resource_renamed", "object_removed", "resource_attached", "resource_detached"],
+    contracts: workbenchRecordIds,
   }).map(({ node }) => node));
   const snapshot = (object: FoldedObject) => resourceSnapshot({ sessionId: source.id, id: object.id, kind: object.kind }, object);
   return {
@@ -54,10 +54,7 @@ export function sessionView(source: NodeView): SessionView {
     return records;
   };
   const query = <D extends Json>(contract: RecordContract<D>, q: RecordQuery) =>
-    source.read({ ...q, contracts: [contract.id] }).flatMap(({ node, sequence }) => {
-      const decoded = contract.decode(toRecord(node, sequence));
-      return decoded ? [decoded] : [];
-    });
+    contract.decodeAll(source.read({ ...q, contracts: [contract.id] }).map(({ node, sequence }) => toRecord(node, sequence)));
   const lookup = <D extends Json>(contract: RecordContract<D>, q: RecordQuery, edge: "first" | "last"): Decoded<D> | null => {
     const entry = source.read({ ...q, contracts: [contract.id], edge })[0];
     return entry ? contract.decode(toRecord(entry.node, entry.sequence)) : null;

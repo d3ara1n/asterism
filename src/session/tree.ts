@@ -4,10 +4,10 @@ import type { DatabaseSync } from "node:sqlite";
 import { sessionNodeSchema, type NewNode, type SessionNode } from "../shared/session.ts";
 import { SessionError } from "../shared/session-timeline.ts";
 import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
-import { foldWorkbench, type FoldedState } from "./fold.ts";
+import { foldWorkbench, workbenchRecordIds, type FoldedState } from "./fold.ts";
 import { SessionStructure, type StructuralNode } from "./structure.ts";
 import { deepFreeze } from "../shared/immutable.ts";
-import { SessionTitleAssigned, type ResourceRef, type Json } from "@asterism-app/sdk/contracts";
+import { ResourceCreated, SessionTitleAssigned, type ResourceRef, type Json } from "@asterism-app/sdk/contracts";
 export { SessionError } from "../shared/session-timeline.ts";
 
 export type CursorSelection = {
@@ -31,9 +31,9 @@ export class SessionTree {
     const known = this.identities.get(id);
     if (known) return known;
     const row = this.db.prepare(`SELECT session_id AS sessionId, json_extract(payload, '$.data.type') AS kind
-      FROM session_nodes WHERE json_extract(payload, '$.contract') = 'resource_created'
+      FROM session_nodes WHERE json_extract(payload, '$.contract') = ?
       AND json_extract(payload, '$.data.id') = ?
-      AND EXISTS (SELECT 1 FROM sessions s WHERE s.id = session_nodes.session_id AND s.archived_at IS NULL) LIMIT 1`).get(id) as { sessionId: string; kind: string } | undefined;
+      AND EXISTS (SELECT 1 FROM sessions s WHERE s.id = session_nodes.session_id AND s.archived_at IS NULL) LIMIT 1`).get(ResourceCreated.id, id) as { sessionId: string; kind: string } | undefined;
     if (!row) return null;
     const ref = { ...row, id };
     if (!this.db.isTransaction) this.identities.set(id, ref);
@@ -46,7 +46,7 @@ export class SessionTree {
     const previous = this.workbenches.get(sessionId);
     if (previous?.cursor === cursor) return previous.state;
     const state = deepFreeze(foldWorkbench(this.view(sessionId).read({
-      scope: "timeline", contracts: ["resource_created", "resource_renamed", "object_removed", "resource_attached", "resource_detached"],
+      scope: "timeline", contracts: workbenchRecordIds,
     }).map(({ node }) => node)));
     this.workbenches.set(sessionId, { cursor, state });
     return state;

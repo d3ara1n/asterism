@@ -17,7 +17,7 @@ import { createModelServices } from "../plugins/models.ts";
 import { createResourceId } from "../resources/id.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { SessionDataStore } from "../session/data.ts";
-import type { FoldedObject } from "../session/fold.ts";
+import { workbenchRecordIds, type FoldedObject } from "../session/fold.ts";
 import { SessionError, SessionTree } from "../session/tree.ts";
 import type { ModelSettings } from "../shared/model.ts";
 import { sessionCommandSchema, type SessionChanged, type SessionCommand, type SessionData, type SessionProgress, type SessionReply, type SessionNode } from "../shared/session.ts";
@@ -228,8 +228,7 @@ export class SessionService {
       for (const node of [...change.records, ...change.completed]) {
         if (node.source?.resource) update.objects.add(node.source.resource.id);
       }
-      update.workbench ||= !!scope.workbench || change.records.some(node =>
-        ["resource_created", "resource_renamed", "object_removed", "resource_attached", "resource_detached"].includes(node.contract));
+      update.workbench ||= !!scope.workbench || change.records.some(node => workbenchRecordIds.includes(node.contract));
       update.layout ||= !!scope.layout;
     }
     if (this.closed) this.notify(sessionId);

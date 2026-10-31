@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineCall, defineCreation, defineAction, resourceCall, defineRecord, defineOperationRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, type SessionRecord, type ModelRunEvent } from "@asterism-app/sdk/contracts";
+import { defineCall, defineCreation, defineAction, resourceCall, defineRecord, defineOperationRecord, defineImplementation, defineTool, pluginNamespace, modelRunRecordSchema, ResourceCreated, ResourceRemoved, type SessionRecord, type ModelRunEvent } from "@asterism-app/sdk/contracts";
 import { defineTopLevelTool, implementCall, defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, type ObjectReader, type ObjectExecutor, type ObjectWriter, type PluginContext, type PluginDefinition } from "@asterism-app/sdk/runtime";
 import { BuiltinApplicationService as ApplicationService } from "../../packages/builtin/src/testing.ts";
 import { DatabaseVersionError } from "../runtime/storage.ts";
@@ -947,6 +947,8 @@ describe("Host implementation of the workbench SDK", () => {
     const c = counter(), { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId), object = c.context().object(sessionId, Counter, id);
     const before = object.session.snapshot().records.all({ scope: "session" });
+    expect(ResourceCreated.decodeAll(before)).toMatchObject([{ status: "known", data: { id, type: Counter.kind, title: "Counter" } }]);
+    expect(() => object.commit(writer => { writer.append(ResourceRemoved, { id }); })).toThrow();
     const forged = defineRecord(Changed.id, { schema: z.object({ value: z.string() }) });
     expect(() => object.commit(writer => { writer.append(forged, { value: "invalid" }); })).toThrow();
     const undeclared = defineRecord(ns.name("undeclared"), { schema: z.number() });

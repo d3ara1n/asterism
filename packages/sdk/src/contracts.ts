@@ -6,6 +6,7 @@ export * from "./module-contract.ts";
 export type { CardAppearance } from "./card.ts";
 export * from "./plugin.ts";
 export * from "./records.ts";
+export * from "./resource-records.ts";
 export * from "./events.ts";
 export * from "./calls.ts";
 export * from "./channels.ts";

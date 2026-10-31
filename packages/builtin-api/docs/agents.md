@@ -47,7 +47,7 @@ Agent creation and message submission are independent operations. Creating an Ag
 
 The builtin Home entry combines session creation, Agent creation, and acceptance of a user message in one transaction. It prepares the input before committing the new session, so rejected input leaves no empty session behind. The message uses the ordinary input contract, preparers, and acceptance notification. There is no separate first-message event or plugin lifecycle stage.
 
-Creation-related work belongs to resource creation or observation of the resulting creation fact, independently of incoming messages. Generic session record observers can see committed creation records. A creation observer sees the committed state; Home's creation and input may already be present together. Observation is not a blocking initialization hook. Resource-presence notifications and attachment lifetimes describe entry into the current resource set, including reconstruction, rather than only new creation.
+Creation-related work belongs to resource creation or observation of the resulting creation fact, independently of incoming messages. In a session observer's `committed` callback, use the SDK's `ResourceCreated.decodeAll(records)` and select known entries whose `data.type` equals `Agent.kind`. The associated Agent ID is `data.id`; the host-created record's source is null. A creation observer sees the committed state; Home's creation and input may already be present together. Observation is not a blocking initialization hook. Resource-presence notifications and attachment lifetimes describe entry into the current resource set, including reconstruction, rather than only new creation.
 
 ## Resolve recipients
 

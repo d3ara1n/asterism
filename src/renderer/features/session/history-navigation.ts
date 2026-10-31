@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { RecordRenderContext } from "@asterism-app/sdk/renderer";
 import { toRecord } from "../../../plugins/records";
 import type { ViewRegistry } from "../../modules/registry";
-import type { Json } from "@asterism-app/sdk/contracts";
+import { ResourceCreated, ResourceRenamed } from "@asterism-app/sdk/contracts";
 
 import type { SessionNode } from "../../../shared/session";
 import { historyMessages } from "../../messages/history";
@@ -11,7 +11,6 @@ import { getI18n } from "../../shared/i18n";
 export type HistoryResource = { id: string; kind: string; title: string };
 export type HistoryEntry = { node: SessionNode; label: string; icon?: ReactNode; row?: (label: string) => ReactNode; scope: "session" | "resource"; resource: HistoryResource | null };
 export type HistoryView = { kind: "all" | "session" | "resources" } | { kind: "resource"; resourceId: string };
-const record = (value: Json): Record<string, Json> => value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
 const snippet = (value: string) => value.slice(0, 500).replace(/\s+/gu, " ").trim() || "…";
 
 /** Filter by record source; a tool target or an object in a workbench link is not the record's issuer. */
@@ -40,11 +39,11 @@ export function historyResourceViews(entries: readonly HistoryEntry[]): Array<{ 
 export function historyResources(nodes: readonly SessionNode[]): Map<string, HistoryResource> {
   const result = new Map<string, HistoryResource>();
   for (const node of nodes) {
-    if (node.contract !== "resource_created") continue;
-    const data = record(node.data);
-    if (typeof data.id === "string" && typeof data.type === "string") {
-      result.set(data.id, { id: data.id, kind: data.type, title: typeof data.title === "string" ? data.title : getI18n().formatMessage(historyMessages.unknownResource) });
-    }
+    if (node.contract !== ResourceCreated.id) continue;
+    const decoded = ResourceCreated.schema.safeParse(node.data);
+    if (!decoded.success) continue;
+    const { id, type, title } = decoded.data;
+    result.set(id, { id, kind: type, title });
   }
   return result;
 }
@@ -58,9 +57,9 @@ export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRe
   const initialTitles = new Map<string, string>();
   return nodes.map((node, index) => {
     let titles = titlesByNode.get(node.parentId ?? "") ?? initialTitles;
-    if (node.contract === "resource_renamed") {
-      const data = record(node.data);
-      if (typeof data.id === "string" && typeof data.title === "string") titles = new Map(titles).set(data.id, data.title);
+    if (node.contract === ResourceRenamed.id) {
+      const decoded = ResourceRenamed.schema.safeParse(node.data);
+      if (decoded.success) titles = new Map(titles).set(decoded.data.id, decoded.data.title);
     }
     titlesByNode.set(node.id, titles);
     const context: RecordRenderContext = {

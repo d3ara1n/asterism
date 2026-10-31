@@ -50,6 +50,32 @@ Transient events announce change. A consumer needing current state establishes i
 
 Typed calls describe request and response values with ordinary Zod schemas. The caller supplies the input schema's input; the implementation receives its parsed output, including defaults. The implementation returns JSON accepted by the output schema, and the caller receives that schema's parsed output. These types are inferred from the shared declaration, so a conversion such as string to number does not require separate type annotations.
 
+## Read typed history
+
+Public record contracts belong to the package that owns their meaning. The SDK exposes host resource creation, renaming, removal, and link changes. A paradigm's public API supplies its conversation records; a plugin's public package supplies its business records. Import the original contract to decode a record rather than interpreting its JSON fields yourself.
+
+Use `contract.decode(record)` for a single record and `contract.decodeAll(records)` for a commit batch. Batch decoding preserves the supplied order and omits records belonging to other contracts. A matching record returns either `known` with typed `data`, or `unknown` with the original `record` and an invalid-data reason. An unreadable matching record remains visible for reporting and recovery decisions.
+
+```ts
+import { ResourceCreated } from "@asterism-app/sdk/contracts";
+
+for (const created of ResourceCreated.decodeAll(records)) {
+  if (created.status === "unknown") {
+    reportUnreadable(created.record);
+    continue;
+  }
+  handleCreation(created.data, created.record.sessionId);
+}
+```
+
+For stored history, use `snapshot.records.query(ResourceCreated, { scope: "timeline" })`; it returns the same decoded result shape. `first` and `last` select the earliest or latest matching record and preserve `unknown` when that selected record is unreadable. `timeline` selects the snapshot's ancestor path; `session` includes other branches within its captured append bound. These reads retain original record identity and do not rewrite stored data.
+
+A creation record separates resource identity, type, title, and encoded resource state. Its `type` is the resource kind. The nested `data` remains JSON because resource kinds have different state contracts; match the resource kind and decode that state with its resource contract when needed. To read a resource present in a snapshot, use `snapshot.resources.get(resourceContract, id)`. Private current-data entries remain owned by their declaring plugin.
+
+Creation records include new identities instantiated from templates. Moving through history may make an existing resource appear again without creating a new record. Record observers report committed facts; presence events and attachment lifetimes describe membership in the current resource set. A host-created resource record has a null source, with the associated resource identity in its payload.
+
+Public history contracts provide typed observation. Create, rename, remove, and link resources through the session operations; plugin record writers retain their existing ownership checks.
+
 ## Retain file content
 
 Stage immutable bytes through the content service, then store their reference in persistent data or a record that owns them.

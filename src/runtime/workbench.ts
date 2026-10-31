@@ -3,7 +3,7 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import { createResourceId } from "../resources/id.ts";
 import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
-import type { Json, ResourceSnapshot } from "@asterism-app/sdk/contracts";
+import { ResourceCreated, ResourceRenamed, ResourceRemoved, ResourceAttached, ResourceDetached, type RecordContract, type Json, type ResourceSnapshot } from "@asterism-app/sdk/contracts";
 
 import { type WorkbenchCommand, type WorkbenchLayout, type WorkbenchObject, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 import type { ContentStore, ContentLease, ContentAccess } from "./content-store.ts";
@@ -12,12 +12,9 @@ import { placeObject } from "../shared/workbench-placement.ts";
 import { cardSize } from "../shared/workbench-sizing.ts";
 import type { HeldLink } from "./resource-holds.ts";
 
-/** Session-level origin for host workbench writes. */
-const host = null;
-
-function resourceLinkNotice(event: "resource_attached" | "resource_detached", resource: FoldedObject): string {
+function resourceLinkNotice(contract: typeof ResourceAttached | typeof ResourceDetached, resource: FoldedObject): string {
   const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
-  return `<${event} resource_id="${escape(resource.id)}" type="${escape(resource.kind)}" title="${escape(resource.title)}" />`;
+  return `<${contract.id} resource_id="${escape(resource.id)}" type="${escape(resource.kind)}" title="${escape(resource.title)}" />`;
 }
 
 type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number; width: number | null; height: number | null };
@@ -28,6 +25,12 @@ export class SessionWorkbench {
   constructor(private readonly db: DatabaseSync, private readonly tree: SessionTree,
     private readonly resources: ResourceRegistry,
     private readonly content?: ContentStore) {}
+
+  /** Host provenance and payload typing are shared by ordinary operations and template initialization. */
+  private append<D extends Json>(sessionId: string, contract: RecordContract<D>, data: NoInfer<D>,
+    context?: { recipient: string; model: string | null }) {
+    return this.tree.appendToTimeline(sessionId, { source: null, recipient: null, model: null, ...context, contract: contract.id, data });
+  }
 
   /** Generic resource creation: contributions supply titles and encoded state; creation events retain metadata separately. */
   create(sessionId: string, kind: string, input: Json, position: Point, content?: ContentLease): string {
@@ -44,7 +47,7 @@ export class SessionWorkbench {
   insert(sessionId: string, object: { id: string; kind: string; title: string; data: Json },
     position: Point, access: Pick<ContentAccess, "scope" | "templateId"> = {}): string {
     const { id, kind, title, data } = object;
-    const node = this.tree.appendToTimeline(sessionId, { source: host, recipient: null, contract: "resource_created", data: { id, type: kind, title, data }, model: null });
+    const node = this.append(sessionId, ResourceCreated, { id, type: kind, title, data });
     this.content?.bind({ sessionId, objectId: id, ...access }, { kind: "record", id: node.id }, data);
     this.addView(sessionId, id, position);
     return id;
@@ -72,14 +75,12 @@ export class SessionWorkbench {
 
   mutate(command: WorkbenchCommand): void {
     const folded = this.tree.workbench(command.sessionId);
-    const tree = this.tree;
     switch (command.type) {
       case "object.rename": {
         const target = folded.objects.find(o => o.id === command.objectId);
         if (!target) throw new SessionError("not_found", "Object does not belong to this session.");
         if (target.title === command.title) break;
-        tree.appendToTimeline(command.sessionId, { source: host, recipient: null, contract: "resource_renamed",
-          data: { id: target.id, title: command.title }, model: null });
+        this.append(command.sessionId, ResourceRenamed, { id: target.id, title: command.title });
         break;
       }
       case "object.remove": {
@@ -88,10 +89,10 @@ export class SessionWorkbench {
         // Remove all incoming and outgoing links when removing objects.
         for (const link of folded.links.filter(l => l.resourceId === target.id || l.receiverId === target.id)) {
           const resource = folded.objects.find(o => o.id === link.resourceId)!;
-          tree.appendToTimeline(command.sessionId, { source: host, recipient: link.receiverId, contract: "resource_detached", data: { id: resource.id, receiverId: link.receiverId },
-            model: link.receiverId === target.id ? null : resourceLinkNotice("resource_detached", resource) });
+          this.append(command.sessionId, ResourceDetached, { id: resource.id, receiverId: link.receiverId },
+            { recipient: link.receiverId, model: link.receiverId === target.id ? null : resourceLinkNotice(ResourceDetached, resource) });
         }
-        tree.appendToTimeline(command.sessionId, { source: host, recipient: null, contract: "object_removed", data: { id: target.id }, model: null });
+        this.append(command.sessionId, ResourceRemoved, { id: target.id });
         break;
       }
       case "link.set": {
@@ -101,15 +102,14 @@ export class SessionWorkbench {
         if (!receiver || !resource) throw new SessionError("not_found", "The link requires a resource and a receiver that supports links in this session.");
         if (receiver.id === resource.id) throw new SessionError("invalid_request", "A link requires two distinct resources.");
         if (folded.links.some(l => l.receiverId === receiver.id && l.resourceId === resource.id) === command.linked) break;
-        tree.appendToTimeline(command.sessionId, { source: host, recipient: receiver.id, contract: command.linked ? "resource_attached" : "resource_detached",
-          data: { id: resource.id, receiverId: receiver.id }, model: command.linked
-            ? resourceLinkNotice("resource_attached", resource)
-            : resourceLinkNotice("resource_detached", resource) });
+        const contract = command.linked ? ResourceAttached : ResourceDetached;
+        this.append(command.sessionId, contract, { id: resource.id, receiverId: receiver.id },
+          { recipient: receiver.id, model: resourceLinkNotice(contract, resource) });
         break;
       }
       case "view.set": {
         // Layout is outside historical paths; cards for side-branch and removed objects can also move.
-        const exists = tree.resourceRef(command.objectId)?.sessionId === command.sessionId;
+        const exists = this.tree.resourceRef(command.objectId)?.sessionId === command.sessionId;
         if (!exists) throw new SessionError("not_found", "Object does not belong to this session.");
         const previous = this.db.prepare("SELECT * FROM object_views WHERE session_id = ? AND object_id = ?").get(command.sessionId, command.objectId) as ViewRow | undefined;
         const size = command.size === undefined

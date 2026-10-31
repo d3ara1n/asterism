@@ -36,6 +36,8 @@ The built-in public API is a separate package associated with the built-in imple
 
 Public packages own their development guides and source examples according to domain responsibility. Generic authoring material belongs to the SDK; built-in domain material belongs to the built-in public API. Package contents include that material for development outside the application. The manual exposes source directories directly without copying or merging their contents. Compile-time counterexamples remain internal verification material.
 
+Public history facts have contracts at the same ownership boundary as their meaning. The SDK owns host resource lifecycle and relationship records; paradigm and business records belong to their public domain packages. Host writers, reconstruction, presentation, and plugin readers share those declarations. Exporting a read contract does not transfer record ownership or permit plugins to write host-originated facts.
+
 Plugins and their declared public API libraries can declare manual directories in package metadata. Admission validates existing, non-overlapping subdirectories within each declaring package. The application exposes directories from successfully loaded providers under plugin-qualified paths; disabled plugins and plugins with loading or storage failures contribute none. Declarations follow the startup package snapshot, while file contents are read at operation time. Articles carry their own context and remain independently readable.
 
 Provider initialization precedes consumers. Shutdown waits for managed work, then cleans up in reverse dependency order. Public exports do not grant resource access or another plugin’s private state.
@@ -49,6 +51,8 @@ Snapshot creation captures the history endpoint, record upper bound, and title w
 Resource relationship queries use that same captured timeline path. They return present resources directly linked to a receiver whose full identity matches the snapshot, with captured titles and public data. Reverse and transitive relationships remain independent. Observing relationships neither exposes private state nor changes a model request's captured operation scope.
 
 First/last queries decode their selected record and preserve unknown status rather than skipping damaged records. Current-data reads return current values at handling time, independently of historical snapshots.
+
+Single-record decoding and batch decoding share the same contract decoder. Batches preserve input order, filter unrelated contract identities, and retain unreadable matching records with their raw envelopes. Snapshot queries return the same decoded result shape while retaining their captured path and append bound.
 
 Commits are synchronous. Nested same-session commits join the outer transaction; asynchronous commit callbacks fail. Append uses the current cursor at commit time.
 

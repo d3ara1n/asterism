@@ -1,5 +1,5 @@
 import { Agent, AgentInputAccepted, AgentInputMessage, AgentTurnEnded } from "@asterism-app/builtin-api/contracts";
-import { pluginNamespace } from "@asterism-app/sdk/contracts";
+import { pluginNamespace, ResourceCreated } from "@asterism-app/sdk/contracts";
 import { defineModule, definePlugin } from "@asterism-app/sdk/runtime";
 
 /** A plugin can observe Agents without declaring a resource of its own. */
@@ -20,13 +20,23 @@ export default definePlugin({
     });
     return {
       observers: [{
-        id: "delivered-input",
+        id: "agent-records",
         committed({ records }) {
-          for (const record of records) {
-            const message = AgentInputMessage.decode(record);
-            if (message?.status !== "known") continue;
+          for (const created of ResourceCreated.decodeAll(records)) {
+            if (created.status === "unknown") {
+              plugin.log.error(`Cannot decode resource creation record ${created.record.id}.`);
+              continue;
+            }
+            if (created.data.type === Agent.kind)
+              plugin.log.info(`Agent ${created.data.id} was created as ${created.data.title}.`);
+          }
+          for (const message of AgentInputMessage.decodeAll(records)) {
+            if (message.status === "unknown") {
+              plugin.log.error(`Cannot decode Agent input record ${message.record.id}.`);
+              continue;
+            }
             // This record is now part of model context. Steering is delivered with startsTurn=false.
-            plugin.log.info(`Agent ${record.source!.resource!.id} received ${message.data.sender.kind} input ${record.id}; startsTurn=${message.data.startsTurn}.`);
+            plugin.log.info(`Agent ${message.record.source!.resource!.id} received ${message.data.sender.kind} input ${message.record.id}; startsTurn=${message.data.startsTurn}.`);
           }
         },
       }],

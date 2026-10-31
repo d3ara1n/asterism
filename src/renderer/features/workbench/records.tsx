@@ -1,9 +1,12 @@
 import { recordRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
-import { withValues, SessionTitleAssigned } from "@asterism-app/sdk/contracts";
+import { withValues, SessionTitleAssigned, ResourceCreated, ResourceRenamed, ResourceRemoved, ResourceAttached, ResourceDetached, defineRecord } from "@asterism-app/sdk/contracts";
 import { Link, Unlink, Plus, Minus, PanelsTopLeft, PenLine } from "lucide-react";
+import { z } from "zod";
 
 import { historyMessages } from "../../messages/history";
-import { ResourceCreated, ResourceRenamed, ObjectAdded, ObjectRemoved, ResourceAttached, ResourceDetached } from "../../../shared/workbench-records";
+
+/** Display support for a legacy record with no current writer or resource-state effect. */
+const ObjectAdded = defineRecord("object_added", { schema: z.object({ id: z.string() }) });
 
 /** History views for host workbench events; use the same registry as plugin records. */
 export const workbenchRecordViews: RendererModule = {
@@ -16,7 +19,7 @@ export const workbenchRecordViews: RendererModule = {
     recordRenderer(ResourceRenamed, { icon: <PenLine className="size-4" />,
       label: data => withValues(historyMessages.eventRenamed, { title: data.title }) }),
     recordRenderer(ObjectAdded, { icon: <Plus className="size-4" />, label: (data, ctx) => withValues(historyMessages.eventAdded, { title: ctx.resourceTitle(data.id) }) }),
-    recordRenderer(ObjectRemoved, { icon: <Minus className="size-4" />, label: (data, ctx) => withValues(historyMessages.eventRemoved, { title: ctx.resourceTitle(data.id) }) }),
+    recordRenderer(ResourceRemoved, { icon: <Minus className="size-4" />, label: (data, ctx) => withValues(historyMessages.eventRemoved, { title: ctx.resourceTitle(data.id) }) }),
     recordRenderer(ResourceAttached, { icon: <Link className="size-4" />, label: (data, ctx) =>
       withValues(historyMessages.eventLinked, { resource: ctx.resourceTitle(data.id), receiver: ctx.resourceTitle(data.receiverId) }) }),
     recordRenderer(ResourceDetached, { icon: <Unlink className="size-4" />, label: (data, ctx) =>

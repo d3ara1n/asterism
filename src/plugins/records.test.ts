@@ -44,6 +44,18 @@ describe("Contract decoding on shared timelines", () => {
     const invalid = { ...record, data: { value: "bad" } };
     expect(contract.decode(invalid)).toEqual({ status: "unknown", record: invalid, reason: "invalid_data" });
   });
+  it("batch decoding preserves supplied order and unreadable matching records while excluding other contracts", () => {
+    const later = { ...record, id: "later", sequence: 3, data: { value: 3 } };
+    const invalid = { ...record, id: "invalid", sequence: 2, data: { value: "bad" } };
+    const unrelated = { ...record, id: "unrelated", contract: { id: "other.plugin/value" } };
+    const decoded = contract.decodeAll([unrelated, later, invalid, record]);
+    expect(decoded).toEqual([
+      { status: "known", record: later, data: { value: 3 } },
+      { status: "unknown", record: invalid, reason: "invalid_data" },
+      { status: "known", record, data: { value: 1 } },
+    ]);
+    expect(decoded[1]!.record).toBe(invalid);
+  });
   it("upgrade failures preserve original data and do not block other consumers reading the same envelope", () => {
     const next = defineRecord(contract.id, { schema: contract.schema.transform(data => {
       data.value = 99; throw new Error("Unknown legacy payload.");
