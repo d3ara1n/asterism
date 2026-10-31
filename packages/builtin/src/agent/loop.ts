@@ -11,7 +11,9 @@ export interface AgentLoopPort {
   requestLimit?(): number;
   request(index: number, signal: AbortSignal): Promise<AgentRequestOutcome>;
   completed(signal: AbortSignal): Promise<void>;
-  consume(boundary: "request" | "turn"): boolean;
+  consume(): boolean;
+  /** Decides whether to continue with another turn after the current outcome is known. */
+  nextTurn(reason: AgentLoopStatus): boolean;
 }
 export type AgentLoopStatus = "completed" | "failed" | "cancelled" | "limited";
 
@@ -30,13 +32,13 @@ export async function runAgentLoop(port: AgentLoopPort, signal: AbortSignal): Pr
       if (result.halt) return status;
       if (signal.aborted || result.reason === "cancelled") return "cancelled";
       if (result.reason === "completed") {
-        if (request < limit && port.consume("request")) continue;
+        if (request < limit && port.consume()) continue;
         if (result.hasTools) continue;
         await port.completed(signal);
       }
     }
     signal.throwIfAborted();
-    if (!port.consume("turn")) return status;
+    if (!port.nextTurn(status)) return status;
     request = 0;
   }
 }

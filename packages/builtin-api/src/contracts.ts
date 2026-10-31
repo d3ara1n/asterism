@@ -1,5 +1,6 @@
 export * from "./identity.ts";
 export * from "./agent.ts";
+export * from "./agent-events.ts";
 export * from "./messaging.ts";
 export * from "./peek.ts";
 export * from "./text.ts";

@@ -129,7 +129,8 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
       const status = await runAgentLoop({
         requestLimit: () => agent.subagent.budget.maxRequests,
         completed: async () => { run.accepting = false; },
-        consume: boundary => boundary === "request" && consume(),
+        consume,
+        nextTurn: () => false,
         async request(index) {
           const blocks: ModelBlock[] = [];
           const currentAgent = resolveAgent(deps.configuration(), snapshot.input.role);

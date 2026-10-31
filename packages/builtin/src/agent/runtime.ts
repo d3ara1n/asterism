@@ -6,7 +6,7 @@ import { defineModule, implementResource, implementCreation, implementAction, im
 import { registerAgentServices } from "@asterism-app/builtin-api/runtime";
 import {
   Agent, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent, StartAgentSession, inputSummary,
-  AgentInputMessage, Execution, ContextSummary,
+  AgentInputMessage, AgentInputAccepted, AgentTurnEnded, Execution, ContextSummary, type SubmitAgentInputData,
 } from "@asterism-app/builtin-api/contracts";
 import { createSelection, selectionOf } from "./selection.ts";
 import { generateAgentName } from "./name.ts";
@@ -53,7 +53,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
     const turns = new Map<string, { nodeId: string | null; interruptions: readonly (string | null)[]; state: AgentTurnState }>();
     return {
       calls: [implementCall(StartAgentSession, async (input, context) => {
-        let accepted: ResourceRef | undefined;
+        let accepted: { ref: ResourceRef; input: SubmitAgentInputData } | undefined;
         const submission = { submissionId: input.submissionId, parts: input.parts, mode: "follow" as const, sender: { kind: "user" as const } };
         const sessionId = await plugin.createSession(`home:${input.submissionId}`, async preparation => {
           const prepared = await preparation.prepare(CreateAgent, { selection: input.selection });
@@ -62,13 +62,17 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
           return { title: inputSummary(acceptedInput.parts).slice(0, 72), initialize(session) {
             const resource = session.create(prepared);
             admission.acceptInitial(acceptedInput, session.object(Agent, resource.id));
-            accepted = resource;
+            accepted = { ref: resource, input: acceptedInput };
           } };
         }, { signal: context.signal, content: context.content });
-        if (accepted) controller.start(plugin.object(sessionId, Agent, accepted.id));
+        if (accepted) {
+          const object = plugin.object(sessionId, Agent, accepted.ref.id);
+          object.events.publish(AgentInputAccepted, { input: accepted.input, queued: false });
+          controller.start(object);
+        }
         return { sessionId };
       })],
-      events: [AgentSoftwareFeedback],
+      events: [AgentSoftwareFeedback, AgentInputAccepted, AgentTurnEnded],
       tools: [createPeekTool(peek), createSendTool(), createWaitTool(controller)],
       resources: [implementResource(Agent, AgentView, {
         card: agentCard,

@@ -37,9 +37,17 @@ An idle Agent records accepted input and starts execution. When the Agent is run
 
 For example, a new independent review can use `follow`, while updated facts for the current task can use `steer`. A turn may consume a batch of messages; submission does not promise a separate turn for each message. Successful submission means acceptance, not completion of the Agent's response.
 
-Construct the complete input once and retain it for retries, including the submission ID, sender name, mode, and body. Reusing an accepted ID with identical input does not duplicate delivery. Reusing it with changed input fails. File parts use content references with explicit read eligibility; pass the appropriate content source with the action when forwarding files.
+Construct the complete input once and retain it for retries, including the submission ID, sender name, mode, and body. An already accepted submission ID is ignored rather than accepted again. A new message needs a new ID. File parts use content references with explicit read eligibility; pass the appropriate content source with the action when forwarding files.
 
-Cancellation of a submission is separate from cancellation of the Agent's independent execution, which has its own public action. Stopping an Agent preserves pending drafts. Restoring drafts on application startup does not automatically send them. Creating an Agent also does not start execution; submit a message to begin its work. The builtin Home entry creates a session with an initial user message.
+Cancellation of a submission is separate from cancellation of the Agent's independent execution, which has its own public action. Stopping an Agent preserves pending drafts. Restoring drafts on application startup does not automatically send them.
+
+## Creation and input
+
+Agent creation and message submission are independent operations. Creating an Agent establishes an empty resource with its configuration; it does not require a message or start execution. Plugins can create the resource and submit ordinary input later.
+
+The builtin Home entry combines session creation, Agent creation, and acceptance of a user message in one transaction. It prepares the input before committing the new session, so rejected input leaves no empty session behind. The message uses the ordinary input contract, preparers, and acceptance notification. There is no separate first-message event or plugin lifecycle stage.
+
+Creation-related work belongs to resource creation or observation of the resulting creation fact, independently of incoming messages. Generic session record observers can see committed creation records. A creation observer sees the committed state; Home's creation and input may already be present together. Observation is not a blocking initialization hook. Resource-presence notifications and attachment lifetimes describe entry into the current resource set, including reconstruction, rather than only new creation.
 
 ## Resolve recipients
 
@@ -57,9 +65,25 @@ Mesh messages retain their internal sender attribution in history. Model project
 
 ## Prepare incoming input
 
-An external preparer can inspect, replace, or reject any of the three message sources using the original built-in action contract. Its replacement supplies raw action input that will be parsed again. Preparation has read capabilities and does not commit session mutations.
+An external preparer can inspect, replace, or reject any of the three message sources using the original built-in action contract. Its replacement supplies raw action input that will be parsed again. Preparation applies to idle input, queued steering and follow-ups, and Home's initial input. It runs before acceptance, including on retries, so it is not an acceptance notification. Preparation has read capabilities and does not commit session mutations.
 
 Keep a preparer's scope tied to its business purpose. It does not replace the Agent implementation or acquire a private Agent executor.
+
+## Observe input and turn boundaries
+
+Input preparation, acceptance, and delivery are separate observation points. Use a preparer to modify or reject a submission. Subscribe to `AgentInputAccepted` to react after a new input commits. Its payload contains the final prepared `input`, including `submissionId`, and `queued`, which reports whether it entered drafts instead of being delivered immediately. Rejected inputs and retries of accepted submissions produce no new acceptance event. Home publishes acceptance after its complete session-creation transaction succeeds.
+
+Saving a held draft or changing an existing draft's mode is a draft-state operation, not a new input submission. These operations do not emit acceptance events; record observers still see the draft if it is delivered.
+
+Observe `AgentInputMessage` through `SessionObserver.committed` to see actual delivery to conversation history. Queued messages produce this record when consumed; idle inputs produce it during acceptance. Steering records do not start a new turn. These records and acceptance events use separate delivery mechanisms; an idle input's record is committed before its acceptance event is published. Acceptance does not guarantee that a queued message will reach a model request: pending drafts remain editable and can be discarded.
+
+Subscribe to `AgentTurnEnded` for execution boundaries. Every ending carries `reason` and `settled`. A normal turn followed by another queued batch reports `settled: false`; the last turn reports `settled: true` after the loop stops consuming. Failure and cancellation are reported with their own reasons rather than as successful completion. Steering joins the current turn and does not produce an ending by itself.
+
+The event's `inputId` identifies the turn-opening input record, and `position.nodeId` identifies its ending history position before any next-turn inputs. `inputId` can be null when execution has no recorded turn input. By the time a handler runs, the live session may contain later records; use these identities to locate the reported work instead of assuming the current tip is that ending. A stopped turn can be resumed explicitly and emit another ending for the same input. The event does not seal history or promise that the Agent will remain idle.
+
+Both events are transient occurrence notifications on `plugin.ipc.events`, with the receiving Agent as their resource source. Subscribe for all Agents or filter by session and resource identity, and bind subscriptions to the plugin lifetime. A plugin does not need its own resource to subscribe. Handlers run asynchronously and do not participate in input admission or turn scheduling. `settled` describes the consuming loop, while host task cleanup may still be tracked independently. Events are not replayed after restart.
+
+`SessionObserver.completed` concerns finalized operation records; it is not a turn-end callback. Resource status events describe coarse workbench status. Use the Agent's domain notifications when input identity, turn position, or the distinction between turn end and loop end matters.
 
 ## Prepare model requests
 

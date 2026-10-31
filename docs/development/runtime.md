@@ -20,9 +20,9 @@ A turn groups the inputs an agent handles together. A request is one model respo
 
 The first input in a turn carries `startsTurn`; subsequent inputs in the batch and steering inputs do not. Stop, failure, and explicit continuation retain the turn. A new idle submission or the next batch consumed at a turn boundary begins another turn.
 
-Input submission is an Agent action. Exact retries use the same submission identity and complete input; reusing that identity for a different action or input fails.
+Input submission is an Agent action. Retries retain the submission identity and complete input. An already accepted identity is ignored; preparation may still run before admission detects that duplicate.
 
-Builtin's Home entry prepares the first Agent and runs the same registered input preparers before initial admission. It validates the prepared input and commits it with the new session and resource. The initial title is derived from that accepted input.
+Agent creation establishes an empty resource and configuration independently of message submission. Builtin's Home entry composes creation with ordinary input acceptance in one transaction. It runs the same registered input preparers before committing the session, resource, and message together; failed preparation leaves no empty session. The initial title is derived from the accepted input. This atomic assembly introduces no separate first-message lifecycle or notification.
 
 Idle input commits before execution. While running, accepted inputs enter the persistent Agent drafts collection. Drafts retain full parts, sender, and mode, but are not model context until delivered.
 
@@ -37,6 +37,20 @@ Boundary consumption follows these rules:
 Restoring drafts on startup does not send them. The Agent owns scheduling and runs one consuming loop at a time; host activity tracking also covers cleanup after a loop stops consuming.
 
 The workbench Agent has no request count or execution time limit; a turn continues while responses request tools or steering arrives. Agent configuration budgets apply only to subagent runs.
+
+## Observation boundaries
+
+Input preparation is independent of loop startup. Idle input, steering, follow-ups, and Home's first input all pass through the same action preparers. Preparation can replace or reject an attempt and is distinct from committed acceptance.
+
+The Agent publishes input acceptance only after the new submission and its deduplication identity commit. The notification contains the final prepared input and whether it was queued. Home publishes after the outer session-creation transaction, not from its nested input write. Duplicate submissions and failed acceptance publish nothing.
+
+Actual delivery is the append of an Agent input message record. Session record observers see idle delivery during acceptance and queued delivery at a request or turn boundary. Event subscriptions and record observers are separate mechanisms; receipt notification is not a prerequisite for observing an already committed record.
+
+Turn-end notifications are emitted after the runtime decides whether another turn will run. They include the outcome, turn-opening input identity, ending history position, and a settled flag. For a continuing loop, the position is captured before the next input batch is appended. For a stopped loop, runtime running state is cleared before publication. Steering and tool continuation do not end a turn.
+
+Failures, cancellation, and failure to start execution also report their outcomes. A notification describes an execution boundary rather than sealing the historical turn; explicit continuation can resume the same input and later report another ending. Settled means this loop has stopped consuming, independently of remaining host task cleanup. Subsequent submissions may start another loop before a subscriber handles the notification.
+
+These are transient builtin domain events with the Agent as source. Plugins subscribe through the ordinary SDK event mechanism without introducing another observer registry. Notification handlers do not participate in scheduling. Operation-record completion and resource status retain their separate meanings.
 
 ## Request environment
 

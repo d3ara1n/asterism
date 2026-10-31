@@ -14,7 +14,7 @@ import * as runtimeModules from "./loader.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { foldWorkbench } from "../session/fold.ts";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
-import { SubmitAgentInput, StartAgentSession, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
+import { SubmitAgentInput, StartAgentSession, AgentInputMessage, AgentInputAccepted, AgentTurnEnded, CancelAgent, Execution } from "@asterism-app/builtin-api/contracts";
 import { applicationStorage } from "../shared/application.ts";
 import { flat } from "../session/test-nodes.ts";
 import { applySessionNodes } from "../shared/session-timeline.ts";
@@ -635,6 +635,156 @@ describe("Host implementation of the workbench SDK", () => {
     expect(validated[0]).toContain("Prepared");
     expect(validated[0]).not.toContain("Original");
   });
+
+  it("observes accepted inputs independently of delivery and reports turn boundaries without splitting steering", async () => {
+    const accepted: z.infer<typeof AgentInputAccepted.schema>[] = [];
+    const acceptedResources: boolean[] = [];
+    const endings: z.infer<typeof AgentTurnEnded.schema>[] = [];
+    const delivered: SessionRecord[] = [];
+    const prepared: string[] = [];
+    const requests: ModelInput["messages"][] = [];
+    const entered = Array.from({ length: 3 }, () => deferred<void>());
+    const release = Array.from({ length: 3 }, () => actionGate());
+    const firstTurn = deferred<void>(), settled = deferred<void>();
+    let observer!: PluginContext;
+    const listener = definePlugin({ namespace: pluginNamespace("test.agent-events"), modules: [defineModule(plugin => {
+      observer = plugin;
+      plugin.ipc.events.subscribe(AgentInputAccepted, {}, event => {
+        accepted.push(event.data);
+        const snapshot = plugin.session(event.source!.resource!.sessionId).snapshot();
+        acceptedResources.push(snapshot.resources.all().some(resource => resource.ref.id === event.source!.resource!.id));
+      });
+      plugin.ipc.events.subscribe(AgentTurnEnded, {}, event => {
+        endings.push(event.data);
+        if (event.data.settled) settled.resolve(); else firstTurn.resolve();
+      });
+      return {
+        preparers: [implementPreparer(SubmitAgentInput, {
+          id: "prepare-message",
+          prepare(input) {
+            const text = input.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
+            if (text === "Reject") return { action: "reject", code: "blocked", message: "Input rejected." };
+            prepared.push(text);
+            return { action: "replace", input: { ...input, parts: [{ kind: "text" as const, text: `Prepared: ${text}` }] } };
+          },
+        })],
+        observers: [{ id: "delivered", committed({ records }) {
+          delivered.push(...records.filter(record => AgentInputMessage.decode(record)?.status === "known"));
+        } }],
+      };
+    })] });
+    const c = counter();
+    const { service, sessionId } = open([c.plugin, listener], () => ({
+      version: "test", validate() {},
+      prepare(input) {
+        const index = requests.push(input.messages) - 1;
+        return { async *stream() {
+          entered[index]!.resolve();
+          await release[index]!.promise;
+          yield { type: "part.start", part: { id: "body", kind: "text" } } as const;
+          yield { type: "part.delta", partId: "body", delta: `Response ${index + 1}` } as const;
+          yield { type: "part.end", partId: "body" } as const;
+          yield { type: "finish", reason: "stop", usage: null } as const;
+        } };
+      },
+    }));
+    const target = await configureModel(service);
+    const source = await c.context().session(sessionId).create(CreateCounter, 1);
+    const sourceRef = { sessionId: source.sessionId, id: source.id, kind: source.kind };
+    const initial = {
+      submissionId: nanoid(16), selection: { agent: "worker", model: `${target.provider}/${target.model}`, thinking: null },
+      parts: [{ kind: "text" as const, text: "Home" }],
+    };
+    await expect(service.sessions.calls.invoke(StartAgentSession.id, {
+      ...initial, submissionId: nanoid(16), parts: [{ kind: "text", text: "Reject" }],
+    }, {}, null)).rejects.toThrow("Input rejected.");
+    expect(accepted).toEqual([]);
+    const result = await service.sessions.calls.invoke(StartAgentSession.id, initial, {}, null) as { sessionId: string };
+    await entered[0]!.promise;
+    const session = observer.session(result.sessionId);
+    const agent = session.snapshot().resources.all().find(resource => resource.ref.kind === "asterism.builtin/agent")!.ref;
+    const steer = {
+      submissionId: nanoid(16), mode: "steer" as const, parts: [{ kind: "text" as const, text: "Steering" }],
+      sender: { kind: "agent" as const, resource: sourceRef, name: "Reviewer" },
+    };
+    const follow = {
+      submissionId: nanoid(16), mode: "follow" as const, parts: [{ kind: "text" as const, text: "Event facts" }],
+      sender: { kind: "event" as const, resource: sourceRef, name: "Counter" },
+    };
+    await session.invoke(SubmitAgentInput, agent, steer);
+    await session.invoke(SubmitAgentInput, agent, follow);
+    await session.invoke(SubmitAgentInput, agent, steer);
+    await expect(session.invoke(SubmitAgentInput, agent, {
+      submissionId: nanoid(16), mode: "steer", parts: [{ kind: "text", text: "Reject" }],
+    })).rejects.toThrow("Input rejected.");
+    expect(prepared).toEqual(["Home", "Steering", "Event facts", "Steering"]);
+    expect(accepted.map(({ input, queued }) => [input.submissionId, input.sender.kind, input.parts, queued])).toEqual([
+      [initial.submissionId, "user", [{ kind: "text", text: "Prepared: Home" }], false],
+      [steer.submissionId, "agent", [{ kind: "text", text: "Prepared: Steering" }], true],
+      [follow.submissionId, "event", [{ kind: "text", text: "Prepared: Event facts" }], true],
+    ]);
+    expect(delivered).toHaveLength(1);
+    expect(acceptedResources).toEqual([true, true, true]);
+    release[0]!.resolve();
+    await entered[1]!.promise;
+    expect(endings).toEqual([]);
+    expect(JSON.stringify(requests[1])).toContain("Prepared: Steering");
+    expect(JSON.stringify(requests[1])).not.toContain("Prepared: Event facts");
+    expect(delivered).toHaveLength(2);
+    expect(AgentInputMessage.decode(delivered[1]!)).toMatchObject({ status: "known", data: { startsTurn: false } });
+    release[1]!.resolve();
+    await firstTurn.promise;
+    await entered[2]!.promise;
+    expect(endings[0]).toMatchObject({ inputId: delivered[0]!.id, reason: "completed", settled: false });
+    expect(AgentInputMessage.decode(delivered[2]!)).toMatchObject({ status: "known", data: { startsTurn: true } });
+    const history = session.snapshot().records.all({ scope: "timeline" });
+    const firstEnd = history.find(record => record.id === endings[0]!.position.nodeId)!;
+    expect(firstEnd.sequence).toBeLessThan(delivered[2]!.sequence);
+    expect(Execution.decode(firstEnd)).toMatchObject({ status: "known", data: { block: { kind: "text", text: "Response 2" } } });
+    release[2]!.resolve();
+    await settled.promise;
+    expect(endings).toHaveLength(2);
+    expect(endings[1]).toMatchObject({ inputId: delivered[2]!.id, reason: "completed", settled: true });
+    expect(endings[1]!.position).toEqual(session.snapshot().position);
+    expect(JSON.stringify(requests[2])).toContain("Prepared: Event facts");
+    expect(await service.sessions.calls.invoke(StartAgentSession.id, initial, {}, null)).toEqual(result);
+    expect(accepted).toHaveLength(3);
+    expect(requests).toHaveLength(3);
+  });
+
+  it.each(["failed", "cancelled"] as const)("reports a settled %s turn without claiming normal completion", async reason => {
+    const ended = deferred<z.infer<typeof AgentTurnEnded.schema>>();
+    const entered = deferred<void>(), release = actionGate();
+    const endings: z.infer<typeof AgentTurnEnded.schema>[] = [];
+    let observer!: PluginContext;
+    const plugin = definePlugin({ namespace: pluginNamespace("test.agent-ending"), setup(context) {
+      observer = context;
+      context.ipc.events.subscribe(AgentTurnEnded, {}, event => { endings.push(event.data); ended.resolve(event.data); });
+      return {};
+    } });
+    const { service } = open([plugin], () => ({
+      version: "test", validate() {},
+      prepare() { return { async *stream() {
+        entered.resolve();
+        await release.promise;
+        if (reason === "failed") throw new Error("Model request failed.");
+        yield { type: "finish", reason: "stop", usage: null } as const;
+      } }; },
+    }));
+    const target = await configureModel(service);
+    const { sessionId } = await service.sessions.calls.invoke(StartAgentSession.id, {
+      submissionId: nanoid(16), selection: { agent: "worker", model: `${target.provider}/${target.model}`, thinking: null },
+      parts: [{ kind: "text", text: "Work" }],
+    }, {}, null) as { sessionId: string };
+    await entered.promise;
+    const session = observer.session(sessionId);
+    const agent = session.snapshot().resources.all()[0]!.ref;
+    if (reason === "cancelled") await session.invoke(CancelAgent, agent, {});
+    release.resolve();
+    expect(await ended.promise).toMatchObject({ settled: true, reason });
+    expect(endings).toHaveLength(1);
+  });
+
   it("current data is isolated by session and object and other plugin contracts cannot write into this scope", async () => {
     const c = counter(), { service, sessionId } = open([c.plugin]);
     const id = await create(service, sessionId, 3), session = c.context().session(sessionId);

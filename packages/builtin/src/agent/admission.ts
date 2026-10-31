@@ -1,6 +1,6 @@
 import { AgentSelection, AgentDrafts } from "./data.ts";
 import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecutor, type ObjectInitializer, type ObjectWriter, type ContentReader } from "@asterism-app/sdk/runtime";
-import { type SubmitAgentInputData, type AgentSelection as Selection, AgentInputMessage, type AgentConfiguration } from "@asterism-app/builtin-api/contracts";
+import { type SubmitAgentInputData, type AgentSelection as Selection, AgentInputMessage, AgentInputAccepted, type AgentConfiguration } from "@asterism-app/builtin-api/contracts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { SystemPrompt } from "@asterism-app/sdk/contracts";
 import { projectForAgent } from "./projection.ts";
@@ -53,6 +53,7 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
         ready(object);
         writeInput(input, object, writer, queued);
       });
+      object.events.publish(AgentInputAccepted, { input, queued });
       return !queued;
     },
     async prepareResume(object: ObjectReader, signal: AbortSignal, content: ContentReader): Promise<void> {

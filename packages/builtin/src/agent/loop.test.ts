@@ -3,7 +3,7 @@ import { runAgentLoop, type AgentLoopPort } from "./loop.ts";
 
 function port(overrides: Partial<AgentLoopPort>): AgentLoopPort {
   return { requestLimit: () => 3, request: async () => ({ reason: "completed", hasTools: false }),
-    completed: async () => {}, consume: () => false, ...overrides };
+    completed: async () => {}, consume: () => false, nextTurn: () => false, ...overrides };
 }
 
 describe("Agent request and turn boundaries", () => {
@@ -13,8 +13,8 @@ describe("Agent request and turn boundaries", () => {
     const status = await runAgentLoop(port({
       requestLimit: () => 2,
       async request(index) { indices.push(index); return { reason: "completed", hasTools: true }; },
-      consume(boundary) {
-        if (boundary === "request" && steering) { steering = false; return true; }
+      consume() {
+        if (steering) { steering = false; return true; }
         return false;
       },
       async completed() { completion++; },
@@ -26,6 +26,7 @@ describe("Agent request and turn boundaries", () => {
 
   it("a follow-up consumed after the budget boundary starts a fresh turn", async () => {
     const indices: number[] = [];
+    const endings: string[] = [];
     let followUp = true;
     const status = await runAgentLoop(port({
       requestLimit: () => 1,
@@ -33,13 +34,15 @@ describe("Agent request and turn boundaries", () => {
         indices.push(index);
         return { reason: "completed", hasTools: indices.length === 1 };
       },
-      consume(boundary) {
-        if (boundary === "turn" && followUp) { followUp = false; return true; }
+      nextTurn(reason) {
+        endings.push(reason);
+        if (followUp) { followUp = false; return true; }
         return false;
       },
     }), new AbortController().signal);
     expect(status).toBe("completed");
     expect(indices).toEqual([0, 0]);
+    expect(endings).toEqual(["limited", "completed"]);
   });
 
   it.each([
@@ -50,6 +53,7 @@ describe("Agent request and turn boundaries", () => {
     const status = await runAgentLoop(port({
       async request() { return { reason, hasTools: false, halt }; },
       consume() { consumed = true; return false; },
+      nextTurn() { consumed = true; return false; },
     }), new AbortController().signal);
     expect(status).toBe(expected);
     expect(consumed).toBe(false);
@@ -59,8 +63,8 @@ describe("Agent request and turn boundaries", () => {
     let requests = 0, followUp = true;
     expect(await runAgentLoop(port({
       async request() { return { reason: ++requests === 1 ? "failed" : "completed", hasTools: false }; },
-      consume(boundary) {
-        if (boundary === "turn" && followUp) { followUp = false; return true; }
+      nextTurn() {
+        if (followUp) { followUp = false; return true; }
         return false;
       },
     }), new AbortController().signal)).toBe("completed");
@@ -69,6 +73,7 @@ describe("Agent request and turn boundaries", () => {
     await expect(runAgentLoop(port({
       async request() { throw new Error("Context could not be recorded."); },
       consume() { consumed = true; return false; },
+      nextTurn() { consumed = true; return false; },
     }), new AbortController().signal)).rejects.toThrow("Context could not be recorded.");
     expect(consumed).toBe(false);
   });
