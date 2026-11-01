@@ -244,8 +244,10 @@
   "agent_conversation_compressionCancelled": "已取消上下文压缩",
   "agent_conversation_executionProcess": "执行过程",
   "agent_conversation_processToolCount": "{count} 次工具调用",
-  "agent_conversation_minimap": "对话导航",
-  "agent_conversation_minimapMessage": "定位第 {number} 条消息",
+  "agent_conversation_outline": "对话大纲",
+  "agent_conversation_outlinePosition": "第 {current} 条输入，共 {total} 条",
+  "agent_conversation_outlineSearch": "搜索输入",
+  "agent_conversation_inputNumber": "第 {number} 条输入",
   "agent_media_attach": "添加文件",
   "agent_media_remove": "移除文件",
   "agent_media_uploading": "正在添加文件…",
@@ -683,5 +685,6 @@
   "subagent.pending": "等待送达",
   "subagent.output": "输出",
   "subagent.thinking": "思考",
-  "subagent.steering": "追加指令"
+  "subagent.steering": "追加指令",
+  "agent_conversation_chapterStart": "返回本条输入"
 }

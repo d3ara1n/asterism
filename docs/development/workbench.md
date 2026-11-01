@@ -96,7 +96,7 @@ Messages use structured sender data to distinguish user input, incoming Agent me
 
 The conversation is virtualized. Item identity remains stable through streaming, persistence, and scroll remounts. Live output and the tail remain mounted where required. Text selection and browser find cover mounted content.
 
-The virtual list owns measurement, scroll compensation, and item positioning. Following output stops on deliberate reading gestures or navigation and resumes at the end. The minimap scrolls by input position without moving the execution cursor.
+The virtual list owns measurement, scroll compensation, and item positioning. Following output stops on deliberate reading gestures or navigation and resumes at the end. The conversation outline treats each input as a chapter: it locates the reader from virtualizer measurements, surfaces the current input once it scrolls out of view, and navigates by input position without moving the execution cursor.
 
 Markdown uses shared rendering for history and live output. Code preserves copyable source; math uses KaTeX; Mermaid renders completed source and retains source on failure. Streaming animation drains and then yields to static rendering.
 

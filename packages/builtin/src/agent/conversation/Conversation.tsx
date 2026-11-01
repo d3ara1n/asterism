@@ -2,7 +2,7 @@ import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
 import { ArrowDown } from "lucide-react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
-import { ConversationMinimap } from "./ConversationMinimap";
+import { ConversationNavigation, type ConversationNavigationHandle } from "./ConversationNavigation";
 
 import { MessageComposer } from "./Composer";
 import { conversationMessages } from "../../messages/conversation";
@@ -11,7 +11,7 @@ import { useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk
 import { useOutputFollow } from "./output-follow";
 import { useMemo, useRef } from "react";
 
-import { displayedTimeline, savedTimeline, withLive, type TimelineItem } from "./timeline";
+import { displayedTimeline, savedTimeline, withLive } from "./timeline";
 import { TimelineViewState } from "./view-state";
 
 import { useConversationInteraction } from "./interaction";
@@ -35,7 +35,6 @@ export function ConversationActions({ data }: { data: { executionState: AgentExe
   </StatusBadge>;
 }
 
-const emptyTimeline: readonly TimelineItem[] = [];
 /** Item view state is retained with the agent object: virtualized item recycling, card remounts, and focus switches preserve expansion state. */
 const viewStateKey = "asterism.builtin/agent.timeline-view";
 
@@ -63,6 +62,7 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
   const timeline = presence.items;
   const { scroll, list, awayFromBottom, latest, jumpTo, preserveItem, onProcessMount, onScroll, onResize, onScrollEnd } =
     useOutputFollow(timeline, processOwners, presence.skipEntrances);
+  const navigation = useRef<ConversationNavigationHandle>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const composerHidden = useComposerHidden();
 
@@ -80,11 +80,13 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
   return <>
     <AgentUIRegion position="top" />
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <ConversationNavigation ref={navigation} timeline={timeline} scroll={scroll} list={list} onSelect={jumpTo} />
       {/* The virtual list compensates for scroll position itself; disable browser scroll anchoring to prevent conflicts. */}
-      <div ref={scroll} className="min-h-0 flex-1 scroll-pt-4 select-text overflow-y-auto overscroll-contain [overflow-anchor:none]" onScroll={onScroll}>
+      <div ref={scroll} className="min-h-0 flex-1 scroll-pt-4 select-text overflow-y-auto overscroll-contain [overflow-anchor:none]"
+        onScroll={event => { onScroll(event); navigation.current?.update(); }}>
         <VirtualConversationTimeline ref={list} items={timeline} viewState={viewState} scrollRef={scroll}
           target={target} presence={presence} reducedMotion={reducedMotion}
-          onResize={onResize} onScrollEnd={onScrollEnd} onProcessMount={onProcessMount}
+          onResize={() => { onResize(); navigation.current?.update(); }} onScrollEnd={onScrollEnd} onProcessMount={onProcessMount}
           onToggleProcess={id => { preserveItem(id); toggle(id); }} />
         <div className="px-4 pb-4">
           {running && !timeline.some(item => item.kind === "compression" && item.status === "running") &&
@@ -92,10 +94,6 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
           {!timeline.length && !running && <p className="type-caption pt-4">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>
-      <ConversationMinimap timeline={saved?.items ?? emptyTimeline} onSelect={id => {
-        const index = timeline.findIndex(item => item.kind === "message" && item.id === id);
-        if (index >= 0) jumpTo(index);
-      }} />
       {awayFromBottom && <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
         <div className="surface-floating pointer-events-auto">
           <Button variant="ghost" size="sm" onClick={latest}><ArrowDown />{i18n.formatMessage(conversationMessages.latestOutput)}</Button>

@@ -62,12 +62,12 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
       anchor.current = null;
       toBottom();
     },
-    /** Navigates by item index without requiring that item to be mounted. */
-    jumpTo(index: number) {
+    /** Navigates by item index without requiring that item to be mounted; `inset` keeps the item that far below the viewport top. */
+    jumpTo(index: number, inset = 0) {
       follow.current = false;
       gesture.current = false;
-      anchor.current = content[index] ? { key: timelineKey(content[index]), offset: 0 } : null;
-      list.current?.scrollToIndex(index, { align: "start" });
+      anchor.current = content[index] ? { key: timelineKey(content[index]), offset: inset } : null;
+      list.current?.scrollToIndex(index, { align: "start", offset: -inset });
     },
     /** Remembers the trailing summary's position before expansion or collapse; the virtual list compensates for insertion, removal, and later measurement of items above it. */
     preserveItem(key: string) {

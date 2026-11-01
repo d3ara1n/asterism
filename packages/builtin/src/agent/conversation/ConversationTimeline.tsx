@@ -95,7 +95,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "message": return <article data-conversation-message={node.id}
       className={cn("flex min-w-0 max-w-[92%] flex-col gap-2", node.sender.kind === "user" ? "ml-auto" : "mr-auto")}>
       <MessageSender sender={node.sender} />
-      <div className={cn("flex flex-col gap-2 rounded-md px-3 py-2", messageAppearance[node.sender.kind].surface)}>{node.parts.map((part, index) =>
+      <div data-message-surface="" className={cn("flex flex-col gap-2 rounded-md px-3 py-2", messageAppearance[node.sender.kind].surface)}>{node.parts.map((part, index) =>
         part.kind === "text" ? <Markdown key={index}>{part.text}</Markdown>
           : <FilePreview key={index} part={part} content={object.content} />)}</div></article>;
     case "text": return <article className="space-y-1">{tag}<Markdown streaming={streaming}>{node.text}</Markdown></article>;

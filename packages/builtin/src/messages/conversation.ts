@@ -38,14 +38,11 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
   modeUpdateFailed: { id: "agent_drafts_modeUpdateFailed", defaultMessage: "The send timing could not be changed." },
   draftExchangePending: { id: "agent_drafts_exchangePending", defaultMessage: "The draft exchange is awaiting confirmation. Retry to finish restoring the editor." },
   retryTake: { id: "agent_drafts_retryTake", defaultMessage: "Retry" },
-  minimap: {
-    id: "agent_conversation_minimap",
-    defaultMessage: "Conversation navigation",
-  },
-  minimapMessage: {
-    id: "agent_conversation_minimapMessage",
-    defaultMessage: "Go to message {number}",
-  },
+  chapterStart: { id: "agent_conversation_chapterStart", defaultMessage: "Back to this input" },
+  outline: { id: "agent_conversation_outline", defaultMessage: "Conversation outline" },
+  outlinePosition: { id: "agent_conversation_outlinePosition", defaultMessage: "Input {current} of {total}" },
+  outlineSearch: { id: "agent_conversation_outlineSearch", defaultMessage: "Search inputs" },
+  inputNumber: { id: "agent_conversation_inputNumber", defaultMessage: "Input {number}" },
   contextSummary: {
     id: "agent_conversation_contextSummary",
     defaultMessage: "Context compressed",
