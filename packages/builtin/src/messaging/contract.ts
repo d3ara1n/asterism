@@ -79,8 +79,5 @@ export const ReadChat = defineCall(builtin.name("chat.read"), {
 export const SendChat = defineAction(Chat, {
   id: builtin.name("chat.send"), schema: z.strictObject({ text: z.string().min(1), replyTo: z.string().min(1).optional() }),
 });
-export const OpenChat = defineAction(Conversations, {
-  id: builtin.name("conversations.open-chat"), schema: chatCreateSchema,
-});
 export type SubscriptionTarget = z.infer<typeof subscriptionTargetSchema>;
 export type ViewConnection = z.infer<typeof viewConnectionSchema>;

@@ -7,10 +7,11 @@ import { Agent, SubmitAgentInput } from "@asterism-app/builtin-api/contracts";
 import { defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema, ConversationsView, ChatView,
   ConversationsList, ConversationsSubscribe, ConfigureSubscription, SubscriptionChanged, ChatRead, ChatSend,
-  BrowseConversations, listResultSchema, ReadChat, SendChat, ChatMessageSent, OpenChat,
+  BrowseConversations, listResultSchema, ReadChat, SendChat, ChatMessageSent,
   type SubscriptionTarget, type ViewConnection } from "./contract.ts";
 import { coversAddress, foldSubscriptions, matchesSubscription, selectDeliveries, type DeliveryCandidate } from "./subscriptions.ts";
 import { telegramProvider } from "./telegram.ts";
+import { messagingOutcome } from "./outcome.ts";
 import { conversationsCard, chatCard } from "../shared/card-appearance.ts";
 
 type ListTarget = { connectionId: string; since?: string } | null;
@@ -164,7 +165,6 @@ export default defineModule(plugin => {
         inspect: async (_data, object) => ({ subscriptions: subscriptions(object) }),
         actions: [
           implementAction(ConfigureSubscription, { async execute({ target, enabled, title }, object) { configure(object, target, enabled, title); } }),
-          implementAction(OpenChat, { async execute(input, object, signal) { await object.session.create(CreateChat, input, { signal }); } }),
         ],
       }),
       implementResource(Chat, ChatView, {
@@ -182,7 +182,7 @@ export default defineModule(plugin => {
     ],
     tools: [
       capturedTool(captured => implementTool(ConversationsList, {
-        async call(_data, target, _args, { signal }) { return { kind: "succeeded", data: await list(captured(), target, signal) }; },
+        call(_data, target, _args, { signal }) { return messagingOutcome("read", signal, () => list(captured(), target, signal)); },
       })),
       implementTool(ConversationsSubscribe, {
         async call(_data, target, { enabled }, { object }) {
@@ -191,19 +191,23 @@ export default defineModule(plugin => {
         },
       }),
       capturedTool(captured => implementTool(ChatRead, {
-        async call(data, target, _args, { signal }) {
+        call(data, target, _args, { signal }) {
           const { connectionId, ...address } = data;
-          return { kind: "succeeded", data: await (await captured().get(connectionId)).readMessages({ ...address, ...target }, { signal }) };
+          return messagingOutcome("read", signal, async () => (await captured().get(connectionId)).readMessages({ ...address, ...target }, { signal }));
         },
       })),
       capturedTool(captured => implementTool(ChatSend, {
-        async call(data, target, { parts }, { signal }) {
-          if (parts.some(part => part.kind !== "text")) throw new MessagingError("unsupported", "This messaging operation accepts text parts.");
-          const text = parts.map(part => part.kind === "text" ? part.text : "").join("\n");
+        call(data, target, { parts }, { signal }) {
+          // Text parts form the message or caption; file references are resolved by the provider when it sends.
+          const text = parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
+          const files = parts.flatMap(part => part.kind === "file-reference" ? [part] : []);
           const { connectionId, ...address } = data;
-          const message = await (await captured().get(connectionId)).sendMessage({ ...address, ...target, text }, { signal });
-          sent(connectionId, address, message);
-          return { kind: "succeeded", data: message };
+          return messagingOutcome("write", signal, async () => {
+            const message = await (await captured().get(connectionId)).sendMessage(
+              { ...address, ...target, text, ...(files.length ? { files } : {}) }, { signal });
+            sent(connectionId, address, message);
+            return message;
+          });
         },
       })),
     ],

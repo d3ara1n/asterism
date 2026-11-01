@@ -1,12 +1,27 @@
-import { Api, GrammyError, HttpError, type ApiClientOptions } from "grammy";
+import { Api, GrammyError, HttpError, InputFile, type ApiClientOptions } from "grammy";
 import type { Message } from "grammy/types";
 import { MessagingError, type PluginContext, type MessagingProviderDefinition } from "@asterism-app/sdk/runtime";
-import type { MessageSenderRole, MessagingConversation, MessagingMessage } from "@asterism-app/sdk/contracts";
+import type { FileReferencePart, MessageSenderRole, MessagingConversation, MessagingMessage } from "@asterism-app/sdk/contracts";
 import { TelegramStore, forgetTelegramConnection, telegramAccount } from "./telegram-store.ts";
 import { messagingMessages as messages } from "../messages/messaging.ts";
 
-// grammY uses the AbortController shim type in Node; native signals implement the API it consumes.
+// grammY's Node API accepts native signals at its boundary; the adapter below handles the signal it passes on to fetch.
 const apiSignal = (signal: AbortSignal) => signal as unknown as NonNullable<Parameters<Api["getMe"]>[0]>;
+type ShimSignal = { readonly aborted: boolean; addEventListener(type: "abort", listener: () => void, options?: { once: boolean }): void };
+/**
+ * grammY's Node build hands fetch the signal of its abort-controller shim, which native fetch rejects before sending.
+ * Forward it to a native signal so requests run on native fetch and its host dispatcher, which applies the network proxy.
+ */
+export function telegramFetch(fetch: typeof globalThis.fetch = globalThis.fetch): ApiClientOptions["fetch"] {
+  const adapted = (input: string, init: Omit<RequestInit, "signal"> & { signal?: ShimSignal | null } = {}) => {
+    const { signal: source, ...rest } = init;
+    if (!source) return fetch(input, rest);
+    const controller = new AbortController();
+    if (source.aborted) controller.abort(); else source.addEventListener("abort", () => controller.abort(), { once: true });
+    return fetch(input, { ...rest, signal: controller.signal });
+  };
+  return adapted as unknown as ApiClientOptions["fetch"];
+}
 const longPollSeconds = 30;
 
 const mediaLabels: readonly (readonly [keyof Message, string])[] = [
@@ -53,13 +68,49 @@ export function telegramError(error: unknown): unknown {
     if (error.error_code === 400) return new MessagingError("invalid_input", error.description, options);
     return new MessagingError("unavailable", error.description, options);
   }
-  if (error instanceof HttpError) return new MessagingError("request_failed", error.message, { cause: error });
+  if (error instanceof HttpError) {
+    // grammY's message names only the method; the underlying cause explains network and proxy failures.
+    const cause = error.error instanceof Error ? error.error.message : error.error === undefined ? "" : String(error.error);
+    return new MessagingError("request_failed", cause ? `${error.message} ${cause}` : error.message, { cause: error });
+  }
   return error;
 }
 async function call<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
   signal.throwIfAborted();
   try { return await work(); }
   catch (error) { signal.throwIfAborted(); throw telegramError(error); }
+}
+
+const mediaGroupLimit = 10;
+/** Bot API upload limits: photos up to 10 MB, other files up to 50 MB. */
+const photoLimit = 10 * 1024 * 1024, fileLimit = 50 * 1024 * 1024;
+const photoTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+const extensionTypes: Readonly<Record<string, string>> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
+/** Still images within the photo limit are sent as photos; other content, including GIFs, is sent as a document. */
+export function telegramSendsPhoto(file: { filename?: string; mediaType?: string }, size: number): boolean {
+  const extension = file.filename?.split(".").at(-1)?.toLowerCase();
+  const type = file.mediaType?.toLowerCase() ?? (extension ? extensionTypes[extension] : undefined);
+  return !!type && photoTypes.has(type) && size <= photoLimit;
+}
+/** Read a referenced file completely; a source that cannot be read is invalid input, so nothing has been sent. */
+async function telegramUpload(plugin: PluginContext, file: FileReferencePart, signal: AbortSignal) {
+  const name = file.filename ?? "file", chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for await (const chunk of plugin.files.open(file.ref, { signal })) {
+      size += chunk.byteLength;
+      if (size > fileLimit) throw new MessagingError("invalid_input", `File '${name}' exceeds Telegram's 50 MB upload limit.`);
+      chunks.push(chunk);
+    }
+  } catch (error) {
+    signal.throwIfAborted();
+    if (error instanceof MessagingError) throw error;
+    throw new MessagingError("invalid_input", `File '${name}' could not be read: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return { file: new InputFile(bytes, name), photo: telegramSendsPhoto(file, size) };
 }
 
 export function telegramProvider(plugin: PluginContext): MessagingProviderDefinition {
@@ -69,8 +120,7 @@ export function telegramProvider(plugin: PluginContext): MessagingProviderDefini
       helpUrl: "https://core.telegram.org/bots/features#botfather" }],
     forget: connectionId => forgetTelegramConnection(plugin.db(), connectionId),
     async create({ connectionId, settings, signal, publish }) {
-      // The host's native fetch dispatcher applies the configured network proxy.
-      const api = new Api(settings.token!, { fetch: globalThis.fetch as unknown as ApiClientOptions["fetch"] });
+      const api = new Api(settings.token!, { fetch: telegramFetch() });
       const me = await call(signal, () => api.getMe(apiSignal(signal)));
       const store = new TelegramStore(plugin.db(), telegramAccount(connectionId, me.id));
       return {
@@ -99,10 +149,29 @@ export function telegramProvider(plugin: PluginContext): MessagingProviderDefini
         async listConversations(query, { signal }) { signal.throwIfAborted(); return store.list(query); },
         async readMessages(query, { signal }) { signal.throwIfAborted(); return store.read(query); },
         async sendMessage(input, { signal }) {
-          const sent = await call(signal, () => api.sendMessage(input.conversationId, input.text, {
+          const options = {
             ...(input.threadId ? { message_thread_id: Number(input.threadId) } : {}),
             ...(input.replyTo ? { reply_parameters: { message_id: Number(input.replyTo) } } : {}),
-          }, apiSignal(signal)));
+          };
+          const caption = input.text.trim() ? { caption: input.text } : {};
+          const files = input.files ?? [];
+          if (files.length > mediaGroupLimit) throw new MessagingError("invalid_input", `Telegram sends at most ${mediaGroupLimit} files in one message.`);
+          // Files are read before the request, so a missing source fails without sending anything.
+          const uploads = await Promise.all(files.map(file => telegramUpload(plugin, file, signal)));
+          const [first] = uploads;
+          const sent = await call(signal, async () => {
+            if (!first) return api.sendMessage(input.conversationId, input.text, options, apiSignal(signal));
+            if (uploads.length === 1) return first.photo
+              ? api.sendPhoto(input.conversationId, first.file, { ...options, ...caption }, apiSignal(signal))
+              : api.sendDocument(input.conversationId, first.file, { ...options, ...caption }, apiSignal(signal));
+            // A media group mixes photos only with photos; any other file sends the whole group as documents.
+            const extra = (index: number) => index === 0 ? caption : {};
+            const media = uploads.every(upload => upload.photo)
+              ? uploads.map((upload, index) => ({ type: "photo" as const, media: upload.file, ...extra(index) }))
+              : uploads.map((upload, index) => ({ type: "document" as const, media: upload.file, ...extra(index) }));
+            const group = await api.sendMediaGroup(input.conversationId, media, options, apiSignal(signal));
+            return group[0]!;
+          });
           const normalized = telegramMessage(sent, me.id);
           if (store.record(normalized.conversation, normalized.message))
             publish({ kind: "conversation.discovered", conversation: normalized.conversation });

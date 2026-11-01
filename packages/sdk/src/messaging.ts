@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { uiTextSchema } from "./i18n.ts";
 import { providerSettingsSchema } from "./provider-settings.ts";
+import { fileReferencePartSchema } from "./files.ts";
 
 const id = z.string().min(1);
 export const messagingProviderTypeSchema = z.strictObject({
@@ -47,9 +48,10 @@ export const messageQuerySchema = conversationAddressSchema.extend({
 export const messageListSchema = z.strictObject({
   messages: z.array(messageSchema), cursor: id.optional(), truncated: z.boolean(),
 });
+/** Files are references resolved by the provider when sending; text accompanies them as a caption. */
 export const sendMessageSchema = conversationAddressSchema.extend({
-  text: z.string().min(1), replyTo: id.optional(),
-});
+  text: z.string(), replyTo: id.optional(), files: z.array(fileReferencePartSchema).optional(),
+}).refine(value => !!value.text.trim() || !!value.files?.length, "A message requires text or a file.");
 export const messagingEventSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("conversation.discovered"), conversation: conversationSchema }),
   z.strictObject({ kind: z.literal("message.received"), conversation: conversationSchema, message: messageSchema }),

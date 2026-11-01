@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { GrammyError, HttpError } from "grammy";
+import { Api, GrammyError, HttpError } from "grammy";
 import type { Message } from "grammy/types";
 import { MessagingError } from "@asterism-app/sdk/runtime";
-import { telegramError, telegramMessage } from "./telegram.ts";
+import { telegramError, telegramFetch, telegramMessage, telegramSendsPhoto } from "./telegram.ts";
 
 const botId = 100;
 const chat = { id: -5, type: "group", title: "Team" } as const;
@@ -40,5 +40,38 @@ describe("Telegram error classification", () => {
     expect(telegramError(api(400))).toMatchObject({ code: "invalid_input" });
     expect(telegramError(new HttpError("offline", new Error("ECONNRESET")))).toBeInstanceOf(MessagingError);
     expect(telegramError(new HttpError("offline", new Error("ECONNRESET")))).toMatchObject({ code: "request_failed" });
+  });
+});
+
+describe("Telegram transport", () => {
+  // grammY's Node build passes its abort-controller shim signal to fetch; native fetch rejects it, so getMe never succeeded.
+  it("runs grammY requests on a fetch that requires native signals and forwards cancellation in flight", async () => {
+    let hold = false;
+    const strict: typeof fetch = async (_input, init) => {
+      const signal = init?.signal;
+      if (!(signal instanceof AbortSignal)) throw new TypeError("Expected signal to be an instance of AbortSignal.");
+      // A held request settles only through cancellation, so it observes whether the caller's abort reaches native fetch.
+      if (hold) return new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true }));
+      return Response.json({ ok: true, result: { id: botId, is_bot: true, first_name: "Helper", username: "helper" } });
+    };
+    const api = new Api("token", { fetch: telegramFetch(strict) });
+    expect((await api.getMe()).username).toBe("helper");
+    hold = true;
+    const controller = new AbortController();
+    const pending = api.getMe(controller.signal as never);
+    controller.abort();
+    await expect(pending).rejects.toThrow();
+  });
+});
+
+describe("Telegram upload method", () => {
+  // sendPhoto rejects GIFs and files over 10 MB, so those must go through sendDocument.
+  it("sends still images within the photo limit as photos and everything else as documents", () => {
+    expect(telegramSendsPhoto({ filename: "shot.PNG" }, 1024)).toBe(true);
+    expect(telegramSendsPhoto({ mediaType: "image/jpeg" }, 1024)).toBe(true);
+    expect(telegramSendsPhoto({ filename: "large.jpg" }, 11 * 1024 * 1024)).toBe(false);
+    expect(telegramSendsPhoto({ filename: "loop.gif" }, 1024)).toBe(false);
+    expect(telegramSendsPhoto({ filename: "notes.pdf", mediaType: "application/pdf" }, 1024)).toBe(false);
+    expect(telegramSendsPhoto({}, 1024)).toBe(false);
   });
 });

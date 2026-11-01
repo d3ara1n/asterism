@@ -42,8 +42,9 @@ export function MessagingSettings() {
         <Plus data-icon="inline-start" />{i18n.text(messages.add)}</Button></EmptyContent>}
     </Empty> : <ItemGroup className="surface overflow-clip">{connections.map((connection, index) => {
       const type = types.find(type => type.id === connection.providerId);
+      // The registry reports an error only while a failure is retried or terminal, so its presence decides the description.
       const { status, identity, error } = connection.runtime;
-      const description = (status === "failed" || status === "reconnecting") && error ? error
+      const description = error ? error
         : [type ? i18n.text(type.label) : i18n.text(messages.unavailable), identity].filter(Boolean).join(" · ");
       return <div key={connection.id}>
         {index > 0 && <ItemSeparator />}

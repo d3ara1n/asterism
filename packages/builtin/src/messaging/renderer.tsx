@@ -1,16 +1,17 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { ArrowLeft, Bell, BellOff, CornerUpLeft, Hash, List, Megaphone, MessageSquare, RefreshCw, Send, Settings, User, Users, X,
   type LucideIcon } from "lucide-react";
 import { cardRenderer, creationEntry, recordRenderer, toolRenderer, useI18n, useRendererCalls, useRendererObject, useRendererSettings,
-  useRendererViewState, type CreationInputProps, type I18n, type RendererModule, type RendererReceipt } from "@asterism-app/sdk/renderer";
+  type CreationInputProps, type I18n, type RendererModule, type RendererReceipt } from "@asterism-app/sdk/renderer";
 import type { MessagingConversation, MessagingConnectionInfo, MessagingConnectionStatus, MessagingMessage } from "@asterism-app/sdk/contracts";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Toggle } from "@asterism-app/ui/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
-import { ItemGroup } from "@asterism-app/ui/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@asterism-app/ui/ui/item";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "@asterism-app/ui/ui/empty";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
@@ -21,7 +22,7 @@ import { CreationForm } from "../shared/creation-form";
 import { conversationsCard, chatCard } from "../shared/card-appearance";
 import { messagingMessages as messages } from "../messages/messaging";
 import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema, ConversationsView, ChatView,
-  BrowseConversations, ReadChat, SendChat, ChatMessageSent, OpenChat, ConfigureSubscription, SubscriptionChanged,
+  BrowseConversations, ReadChat, SendChat, ChatMessageSent, ConfigureSubscription, SubscriptionChanged,
   ConversationsList, ConversationsSubscribe, ChatRead, ChatSend, type SubscriptionTarget, type ViewConnection } from "./contract";
 import { subscriptionKey } from "./subscriptions";
 import { groupTimeline, relativeUnit } from "./timeline";
@@ -44,13 +45,18 @@ function relativeTime(i18n: I18n, iso: string) {
 function receiptError(i18n: I18n, receipt: RendererReceipt) {
   return receipt.ok ? null : receipt.error.display ? i18n.text(receipt.error.display) : receipt.error.message;
 }
-/** One pending gate per view: concurrent actions from the same view are ignored while one runs. */
-function useOperation() {
+/**
+ * Pending operations keyed by their target: an entry ignores repeated input while it runs,
+ * and other controls stay usable, so one action does not disable the whole view.
+ */
+function useOperations() {
   const i18n = useI18n();
-  const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
-  async function run(work: () => Promise<RendererReceipt | void>): Promise<boolean> {
-    if (pending) return false;
-    setPending(true); setError(null);
+  const active = useRef(new Set<string>());
+  const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
+  const [error, setError] = useState<string | null>(null);
+  async function run(key: string, work: () => Promise<RendererReceipt | void>): Promise<boolean> {
+    if (active.current.has(key)) return false;
+    active.current.add(key); setPending(new Set(active.current)); setError(null);
     try {
       const receipt = await work();
       const failure = receipt ? receiptError(i18n, receipt) : null;
@@ -59,24 +65,24 @@ function useOperation() {
     } catch (error) {
       setError(error instanceof Error ? error.message : i18n.text(messages.failed));
       return false;
-    } finally { setPending(false); }
+    } finally { active.current.delete(key); setPending(new Set(active.current)); }
   }
-  return { pending, error, run, clear: () => setError(null) };
+  return { pending: (key: string) => pending.has(key), error, run, clear: () => setError(null) };
 }
-/** Status that explains itself: failure details replace the generic label when present. */
+/** Status that explains itself: failure details follow the label when present. */
 function ConnectionStatus({ connection }: { connection: Pick<MessagingConnectionInfo, "status" | "error"> }) {
   const i18n = useI18n();
-  const detail = (connection.status === "failed" || connection.status === "reconnecting") && connection.error;
+  const detail = connection.error;
   return <StatusText tone={statusTone[connection.status]} className="max-w-full">
     <span className="truncate" title={detail || undefined}>{i18n.text(statusLabel[connection.status])}{detail ? ` · ${detail}` : ""}</span>
   </StatusText>;
 }
-function NotifyToggle({ label, pressed, disabled, onChange }: { label: string; pressed: boolean; disabled: boolean; onChange(value: boolean): void }) {
+function NotifyToggle({ label, pressed, pending, onChange }: { label: string; pressed: boolean; pending: boolean; onChange(value: boolean): void }) {
   return <Tooltip>
     <TooltipTrigger asChild>
-      <Toggle size="sm" aria-label={label} pressed={pressed} disabled={disabled} onPressedChange={onChange}
+      <Toggle size="sm" aria-label={label} aria-busy={pending || undefined} pressed={pressed} onPressedChange={onChange}
         className="text-muted-foreground data-[state=on]:text-foreground">
-        {pressed ? <Bell /> : <BellOff />}
+        {pending ? <Spinner aria-hidden="true" /> : pressed ? <Bell /> : <BellOff />}
       </Toggle>
     </TooltipTrigger>
     <TooltipContent>{label}</TooltipContent>
@@ -86,16 +92,40 @@ function ErrorLine({ error }: { error: string | null }) {
   return error ? <p role="alert" className="type-caption px-1 text-destructive">{error}</p> : null;
 }
 
-/* ---------- Conversations: connection list, then the selected connection's conversations ---------- */
+const pageVariants = {
+  enter: (direction: number) => ({ opacity: 0, x: direction * 8 }),
+  center: { opacity: 1, x: 0, transition: { duration: 0.18, ease: [0, 0, 0.2, 1] } },
+  exit: (direction: number) => ({ opacity: 0, x: direction * -8, transition: { duration: 0.1, ease: [0.4, 0, 1, 1] } } as const),
+} as const;
+/** Directional page transition: opening slides in from the right, going back slides toward it. */
+function Page({ children, direction }: { children: ReactNode; direction: number }) {
+  const present = useIsPresent(), reducedMotion = useReducedMotion();
+  return <motion.div inert={!present} custom={direction} variants={pageVariants} initial={reducedMotion ? false : "enter"}
+    animate={reducedMotion ? { opacity: 1, x: 0, transition: { duration: 0 } } : "center"}
+    exit={reducedMotion ? { opacity: 0, x: 0, transition: { duration: 0 } } : "exit"}
+    className="flex min-h-0 min-w-0 flex-1 flex-col">
+    {children}
+  </motion.div>;
+}
+
+/* ---------- Conversations: messaging providers, then a provider's observed conversations ---------- */
 
 function ConversationsCard({ data }: { data: z.infer<typeof ConversationsView.schema> }) {
-  const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n(), settings = useRendererSettings(), operation = useOperation();
-  const [selectedId, select] = useRendererViewState<string | null>(`asterism.builtin/conversations/${object.ref.id}`, null);
+  const object = useRendererObject(), i18n = useI18n(), settings = useRendererSettings(), operations = useOperations();
+  const retained = object.retained.get("asterism.builtin/conversations-selection", () => ({ id: null as string | null }));
+  const [selectedId, setSelectedId] = useState(retained.id);
+  const direction = useRef<1 | -1>(1);
+  const select = (id: string | null) => {
+    direction.current = id === null ? -1 : 1;
+    retained.id = id; setSelectedId(id); operations.clear();
+  };
   const selected = data.connections.find(connection => connection.id === selectedId) ?? null;
-  const subscribed = (target: SubscriptionTarget) => data.subscriptions.some(value => subscriptionKey(value) === subscriptionKey(target));
-  const toggle = (target: SubscriptionTarget, enabled: boolean, title: string) =>
-    void operation.run(() => object.invoke(ConfigureSubscription, { target, enabled, title }));
-  const disabled = operation.pending || !object.view.ready;
+  const notify = (target: SubscriptionTarget, title: string, label: string) => {
+    const key = subscriptionKey(target);
+    return <NotifyToggle label={label} pending={operations.pending(key)}
+      pressed={data.subscriptions.some(value => subscriptionKey(value) === key)}
+      onChange={enabled => void operations.run(key, () => object.invoke(ConfigureSubscription, { target, enabled, title }))} />;
+  };
 
   if (!data.connections.length) return <div className="nodrag nopan flex min-h-0 flex-1 flex-col justify-center p-3">
     <Empty>
@@ -105,78 +135,81 @@ function ConversationsCard({ data }: { data: z.infer<typeof ConversationsView.sc
         <Settings data-icon="inline-start" />{i18n.text(messages.openSettings)}</Button></EmptyContent>
     </Empty>
   </div>;
-  if (selected) return <ConnectionConversations connection={selected} back={() => { operation.clear(); select(null); }}
-    subscribed={subscribed} toggle={toggle} disabled={disabled} error={operation.error}
-    open={dialog => void operation.run(() => object.invoke(OpenChat, { connectionId: selected.id, conversationId: dialog.conversationId,
-      ...(dialog.threadId ? { threadId: dialog.threadId } : {}), title: dialog.title }))}
-    load={(signal) => calls.invoke(BrowseConversations, { connectionId: selected.id }, { signal })} />;
-  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2">
-    <h4 className="type-label px-1">{i18n.text(messages.connections)}</h4>
-    <ItemGroup>{data.connections.map(connection => {
-      const label = i18n.formatMessage(messages.subscribeConnection, { name: connection.name });
-      return <ListRow key={connection.id} inactive={connection.status === "disabled"} onOpen={() => { operation.clear(); select(connection.id); }}
-        mediaVariant="icon" media={<StatusIcon tone={statusTone[connection.status]} className="size-4" />}
-        title={connection.name}
-        description={[connection.identity, connection.providerLabel && i18n.text(connection.providerLabel)].filter(Boolean).join(" · ") || undefined}
-        details={connection.status !== "connected" ? <ConnectionStatus connection={connection} /> : undefined}
-        actions={<NotifyToggle label={label} pressed={subscribed({ connectionId: connection.id })} disabled={disabled}
-          onChange={enabled => toggle({ connectionId: connection.id }, enabled, connection.name)} />} />;
-    })}</ItemGroup>
-    <ErrorLine error={operation.error} />
+  return <div className="nodrag nopan relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+    <AnimatePresence initial={false} mode="popLayout" custom={direction.current}>
+      <Page key={selected ? `connection:${selected.id}` : "list"} direction={direction.current}>
+        {selected ? <ConnectionConversations connection={selected} back={() => select(null)} notify={notify} error={operations.error} />
+          : <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2">
+            <h4 className="type-label px-1">{i18n.text(messages.connections)}</h4>
+            <ItemGroup>{data.connections.map(connection => <ListRow key={connection.id} inactive={connection.status === "disabled"}
+              onOpen={() => select(connection.id)} mediaVariant="icon"
+              media={<StatusIcon tone={statusTone[connection.status]} className="size-4" />} title={connection.name}
+              description={[connection.identity, connection.providerLabel && i18n.text(connection.providerLabel)].filter(Boolean).join(" · ") || undefined}
+              details={connection.status !== "connected" ? <ConnectionStatus connection={connection} /> : undefined}
+              actions={notify({ connectionId: connection.id }, connection.name,
+                i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))} />)}</ItemGroup>
+            <ErrorLine error={operations.error} />
+          </div>}
+      </Page>
+    </AnimatePresence>
   </div>;
 }
 
-function ConnectionConversations({ connection, back, subscribed, toggle, open, load, disabled, error }: {
-  connection: ViewConnection; back(): void; disabled: boolean; error: string | null;
-  subscribed(target: SubscriptionTarget): boolean; toggle(target: SubscriptionTarget, enabled: boolean, title: string): void;
-  open(dialog: MessagingConversation): void;
-  load(signal: AbortSignal): Promise<z.infer<typeof BrowseConversations.output>>;
+/** Observed conversations are read-only rows; Chats are created explicitly by a user or an Agent. */
+function ConnectionConversations({ connection, back, notify, error }: {
+  connection: ViewConnection; back(): void; error: string | null;
+  notify(target: SubscriptionTarget, title: string, label: string): ReactNode;
 }) {
-  const i18n = useI18n();
+  const calls = useRendererCalls(), i18n = useI18n();
   const [dialogs, setDialogs] = useState<MessagingConversation[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null), [revision, setRevision] = useState(0);
-  // Reload when the connection reports a new event or its status changes, and on explicit refresh.
+  const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+  // Reload on each observed event, status change, and explicit refresh; the current list stays visible meanwhile.
   useEffect(() => {
     const controller = new AbortController();
-    setLoadError(null);
-    load(controller.signal).then(result => {
+    setLoading(true); setLoadError(null);
+    calls.invoke(BrowseConversations, { connectionId: connection.id }, { signal: controller.signal }).then(result => {
       if (!controller.signal.aborted && result.kind === "conversations") setDialogs(result.conversations);
-    }, error => { if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : i18n.text(messages.failed)); });
+    }, error => { if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : i18n.text(messages.failed)); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-    // load is recreated each render; the connection identity and markers decide when to query again.
-  }, [connection.id, connection.latest, connection.status, revision]);
-  const connectionTarget = { connectionId: connection.id };
-  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
+  }, [calls, connection.id, connection.latest, connection.status, revision]);
+  return <>
     <header className="flex min-w-0 items-center gap-1 border-b px-1.5 py-1.5">
       <IconButton size="icon-xs" label={i18n.text(messages.back)} onClick={back}><ArrowLeft /></IconButton>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="type-section truncate">{connection.name}</span>
         <ConnectionStatus connection={connection} />
       </div>
-      <IconButton size="icon-xs" label={i18n.text(messages.refresh)} onClick={() => setRevision(revision + 1)}><RefreshCw /></IconButton>
-      <NotifyToggle label={i18n.formatMessage(messages.subscribeConnection, { name: connection.name })} pressed={subscribed(connectionTarget)}
-        disabled={disabled} onChange={enabled => toggle(connectionTarget, enabled, connection.name)} />
+      <IconButton size="icon-xs" label={i18n.text(messages.refresh)} aria-busy={loading || undefined}
+        onClick={() => { if (!loading) setRevision(revision + 1); }}>
+        {loading && dialogs ? <Spinner aria-hidden="true" /> : <RefreshCw />}
+      </IconButton>
+      {notify({ connectionId: connection.id }, connection.name, i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))}
     </header>
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2">
       {dialogs === null && !loadError && <div className="flex justify-center py-6"><Spinner aria-hidden="true" /></div>}
       {dialogs?.length === 0 && <p className="type-caption px-1 py-4 text-center text-balance">{i18n.text(messages.empty)}</p>}
       {dialogs && dialogs.length > 0 && <ItemGroup>{dialogs.map(dialog => {
         const target = addressTarget(connection.id, dialog), Icon = dialog.threadId ? Hash : kindIcon[dialog.kind] ?? MessageSquare;
-        return <ListRow key={subscriptionKey(target)} disabled={disabled} onOpen={() => open(dialog)}
-          mediaVariant="icon" media={<Icon />} title={dialog.title}
-          description={dialog.activity ? relativeTime(i18n, dialog.activity) : undefined}
-          actions={<NotifyToggle label={i18n.formatMessage(messages.subscribeConversation, { name: dialog.title })} pressed={subscribed(target)}
-            disabled={disabled} onChange={enabled => toggle(target, enabled, dialog.title)} />} />;
+        return <Item key={subscriptionKey(target)} size="sm">
+          <ItemMedia variant="icon"><Icon /></ItemMedia>
+          <ItemContent className="min-w-0">
+            <ItemTitle className="max-w-full truncate" title={dialog.title}>{dialog.title}</ItemTitle>
+            {dialog.activity && <ItemDescription className="truncate">{relativeTime(i18n, dialog.activity)}</ItemDescription>}
+          </ItemContent>
+          <ItemActions>{notify(target, dialog.title, i18n.formatMessage(messages.subscribeConversation, { name: dialog.title }))}</ItemActions>
+        </Item>;
       })}</ItemGroup>}
       <ErrorLine error={loadError ?? error} />
     </div>
-  </div>;
+  </>;
 }
 
 /* ---------- Chat: message timeline and composer ---------- */
 
 function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
-  const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n(), operation = useOperation();
+  const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n(), operations = useOperations();
   const [items, setItems] = useState<MessagingMessage[] | null>(null), [loadError, setLoadError] = useState<string | null>(null);
   const [text, setText] = useState(""), [replyTo, setReplyTo] = useState<MessagingMessage | null>(null);
   const log = useRef<HTMLOListElement>(null), pinned = useRef(true);
@@ -197,15 +230,16 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
   }, [items]);
   const byId = new Map((items ?? []).map(message => [message.id, message]));
   const nameOf = (message: MessagingMessage) => message.sender.role === "self" ? i18n.text(messages.you) : message.sender.name;
+  // Sending keeps the composer in place: the draft is read-only and repeated submits are ignored, without dimming the card.
+  const usable = !!data.connection?.enabled, sending = operations.pending("send");
   const send = () => {
-    if (!text.trim()) return;
-    void operation.run(async () => {
+    if (!usable || !text.trim()) return;
+    void operations.run("send", async () => {
       const receipt = await object.invoke(SendChat, { text, ...(replyTo ? { replyTo: replyTo.id } : {}) });
       if (receipt.ok) { setText(""); setReplyTo(null); pinned.current = true; }
       return receipt;
     });
   };
-  const blocked = operation.pending || !object.view.ready || !data.connection?.enabled;
   return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
     <header className="flex min-w-0 flex-col border-b px-3 py-1.5">
       <span className="type-caption truncate">
@@ -242,10 +276,11 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
                   <span className="type-caption shrink-0 tabular-nums opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">
                     {i18n.formatDate(Date.parse(message.sentAt), { hour: "2-digit", minute: "2-digit" })}
                   </span>
-                  <IconButton size="icon-xs" label={i18n.text(messages.reply)} disabled={blocked}
+                  {/* Rendered only while replies are possible; a disabled style would override the hover-only visibility. */}
+                  {usable && <IconButton size="icon-xs" label={i18n.text(messages.reply)}
                     className="opacity-0 group-hover/message:opacity-100 focus-visible:opacity-100" onClick={() => setReplyTo(message)}>
                     <CornerUpLeft />
-                  </IconButton>
+                  </IconButton>}
                 </li>;
               })}
             </ol>
@@ -261,17 +296,19 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
         <IconButton size="icon-xs" label={i18n.text(messages.cancelReply)} onClick={() => setReplyTo(null)}><X /></IconButton>
       </div>}
       <div className="flex items-end gap-1.5">
-        <Textarea rows={1} value={text} disabled={blocked} aria-label={i18n.text(messages.text)} placeholder={i18n.text(messages.composerHint)}
-          className="max-h-32 min-h-9 flex-1 resize-none" onChange={event => setText(event.target.value)}
+        <Textarea rows={1} value={text} disabled={!usable} readOnly={sending} aria-label={i18n.text(messages.text)}
+          placeholder={i18n.text(messages.composerHint)} className="max-h-32 min-h-9 flex-1 resize-none"
+          onChange={event => setText(event.target.value)}
           onKeyDown={event => {
             if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
             event.preventDefault(); send();
           }} />
-        <IconButton type="submit" variant="default" size="icon" label={i18n.text(messages.send)} disabled={blocked || !text.trim()}>
-          {operation.pending ? <Spinner aria-hidden="true" /> : <Send />}
+        <IconButton type="submit" variant="default" size="icon" label={i18n.text(messages.send)} aria-busy={sending || undefined}
+          disabled={!usable || !text.trim()}>
+          {sending ? <Spinner aria-hidden="true" /> : <Send />}
         </IconButton>
       </div>
-      <ErrorLine error={operation.error} />
+      <ErrorLine error={operations.error} />
     </form>
   </div>;
 }
