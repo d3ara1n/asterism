@@ -11,7 +11,7 @@ import type { NetworkBridge } from "./network.ts";
 import type { RendererFailure } from "./renderer-failure.ts";
 import { pluginDiagnosticSchema } from "./plugin-startup.ts";
 
-export const protocolVersion = 14;
+export const protocolVersion = 15;
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");
@@ -24,6 +24,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("workspace.prepare-close") }),
   // Plugin package management changes lists only and takes effect after restart; paths must be package roots containing Asterism manifests.
   z.strictObject({ type: z.literal("plugin.add"), path: z.string().min(1).max(4096) }),
+  z.strictObject({ type: z.literal("plugin.add-bundled"), source: z.string().min(1) }),
   z.strictObject({ type: z.literal("plugin.enable"), index: z.number().int().nonnegative(), enabled: z.boolean() }),
   z.strictObject({ type: z.literal("plugin.remove"), index: z.number().int().nonnegative() }),
 ]);
@@ -36,9 +37,9 @@ export const snapshotSchema = z.strictObject({
   templates: z.array(templateSummarySchema),
   /** Trash catalog containing sessions themselves only, used for settings counts and restoration. */
   archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string() })),
-  /** Plugin packages at startup; renderer is the entry path under asterism-plugin://. */
-  plugins: z.array(z.strictObject({ index: z.number().int().nonnegative(), bundled: z.boolean().default(false), id: z.string().nullable(), source: z.string(),
-    status: z.enum(["loaded", "disabled", "invalid", "failed", "pending"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
+  /** Current list with startup outcomes and available bundled packages (null index); renderer paths are under asterism-plugin://. */
+  plugins: z.array(z.strictObject({ index: z.number().int().nonnegative().nullable(), bundled: z.boolean().default(false), id: z.string().nullable(), source: z.string(),
+    status: z.enum(["loaded", "disabled", "invalid", "failed", "pending", "available"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
     diagnostic: pluginDiagnosticSchema.nullable().default(null),
     stylesheet: z.string().nullable(),
     metadata: pluginMetadataSchema.default({}),

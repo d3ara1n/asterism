@@ -10,7 +10,9 @@ The management list shows metadata, loading state, and enablement controls. A pl
 
 A startup failure prevents the plugin and its dependents from contributing capabilities. The management list identifies the failing stage and cause. An unavailable interface is a separate condition: accepted background services can remain running even when the interface cannot initialize. Partial interface initialization means some frontend modules failed while the plugin's views remain available.
 
-The bundled builtin plugin provides the official Agent experience and can be disabled like another plugin. Other plugins can supply their own Home entry. Choose among available entries in General settings. If the selected entry becomes unavailable, choose another; resource templates remain accessible independently.
+The bundled builtin plugin provides the official Agent experience and can be disabled or removed like another plugin. Removed bundled plugins remain listed as **Not added**, with their description and an **Add back** button. This recovery entry is also available when a bundled entry is removed directly from the plugin list file. Adding it back takes effect after restarting.
+
+Other plugins can supply their own Home entry. Choose among available entries in General settings. If the selected entry becomes unavailable, choose another; resource templates remain accessible independently.
 
 Plugins run as trusted local code. Install packages whose behavior you accept. Removing a plugin from the list does not erase its historical session records or automatically clean its private data.
 

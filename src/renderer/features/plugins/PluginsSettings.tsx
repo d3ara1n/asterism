@@ -24,9 +24,9 @@ import type { RendererOutcome } from "../../modules/plugin-outcome";
 
 export type PluginInfo = AppSnapshot["plugins"][number];
 type DisplayStatus = PluginInfo["status"] | "frontendFailed" | "partial";
-const tones: Record<DisplayStatus, StatusTone> = { loaded: "success", disabled: "neutral", invalid: "error", failed: "error", pending: "warning", frontendFailed: "error", partial: "warning" };
+const tones: Record<DisplayStatus, StatusTone> = { loaded: "success", disabled: "neutral", invalid: "error", failed: "error", pending: "warning", frontendFailed: "error", partial: "warning", available: "neutral" };
 const labels = { loaded: messages.loaded, disabled: messages.disabled, invalid: messages.invalidPackage, failed: messages.failed, pending: messages.restartRequired,
-  frontendFailed: messages.frontendFailed, partial: messages.partial };
+  frontendFailed: messages.frontendFailed, partial: messages.partial, available: messages.available };
 const stages = { discovery: messages.discoveryStage, build: messages.buildStage, storage: messages.storageStage, import: messages.importStage,
   setup: messages.setupStage, validation: messages.validationStage, dependency: messages.dependencyStage, style: messages.styleStage,
   prepare: messages.prepareStage, module: messages.moduleStage };
@@ -126,40 +126,48 @@ function PluginListItem({ plugin, status, failure, manager }: {
             {plugin.bundled && <Badge variant="secondary">{i18n.text(messages.builtIn)}</Badge>}
           </div>
           <ItemActions className="shrink-0">
-            <Switch
-              checked={plugin.enabled}
-              disabled={manager.busy}
-              aria-label={i18n.formatMessage(messages.enablePlugin, { plugin_name: name })}
-              onCheckedChange={enabled => { void manager.run({ type: "plugin.enable", index, enabled }); }}
-            />
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-destructive" disabled={manager.busy}>
-                  {i18n.text(messages.remove)}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{i18n.text(messages.removeTitle)}</AlertDialogTitle>
-                  <AlertDialogDescription>{i18n.text(messages.removeHint)}</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>{i18n.text(messages.cancel)}</AlertDialogCancel>
-                  <AlertDialogAction
-                    variant="destructive"
-                    onClick={() => { void manager.run({ type: "plugin.remove", index }); }}
-                  >
+            {index === null ? (
+              <Button variant="outline" size="sm" disabled={manager.busy}
+                onClick={() => { void manager.run({ type: "plugin.add-bundled", source: plugin.source }); }}>
+                <Plus data-icon="inline-start" />{i18n.text(messages.addBack)}
+              </Button>
+            ) : <>
+              <Switch
+                checked={plugin.enabled}
+                disabled={manager.busy}
+                aria-label={i18n.formatMessage(messages.enablePlugin, { plugin_name: name })}
+                onCheckedChange={enabled => { void manager.run({ type: "plugin.enable", index, enabled }); }}
+              />
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="text-destructive" disabled={manager.busy}>
                     {i18n.text(messages.remove)}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{i18n.text(messages.removeTitle)}</AlertDialogTitle>
+                    <AlertDialogDescription>{i18n.text(plugin.bundled ? messages.removeBundledHint : messages.removeHint)}</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>{i18n.text(messages.cancel)}</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={() => { void manager.run({ type: "plugin.remove", index }); }}
+                    >
+                      {i18n.text(messages.remove)}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>}
           </ItemActions>
         </div>
         {metadata.description && (
           <ItemDescription className="text-wrap wrap-anywhere">{i18n.text(metadata.description)}</ItemDescription>
         )}
         <p className="type-caption select-text wrap-anywhere">{details}</p>
+        {index === null && <p className="type-caption">{i18n.text(messages.availableHint)}</p>}
         {status === "frontendFailed" && <p className="type-caption">{i18n.text(messages.frontendFailedHint)}</p>}
         {failure && (
           <Alert variant={status === "partial" ? "default" : "destructive"}>

@@ -8,6 +8,8 @@ A plugin is the unit of identity, metadata, settings, dependencies, and lifetime
 
 Read package metadata independently of executable entries so disabled or failed plugins remain manageable. Backend setup registers contributions synchronously. Asynchronous work belongs to managed tasks or an appropriate lifetime.
 
+The distribution catalog remains discoverable independently of the user's loading list. Removed bundled packages retain metadata and an explicit add action in plugin management; displaying them does not restore their list entries or load their code. Adding a bundled package uses the same identity validation and restart boundary as adding a local package.
+
 Assembly freezes the registered contributions. Package installation, enablement, and upgrades take effect after restart. Package discovery, build, storage, import, and backend assembly failures exclude the affected packages and their dependents before the backend catalog is published. Unrelated plugins continue. The published package outcomes and registered contributions come from the same assembly result.
 
 Storage admission covers every package, including packages without backend setup. Backend setup uses provisional registrations so later setup callbacks can consume provider services. Contribution validation and dependency failure propagation remove excluded owners and cancel their managed work before publication. Cleanup runs under the existing lifetime rules. Setup effects such as committed data, file writes, and external operations are not transactional and are not rolled back.

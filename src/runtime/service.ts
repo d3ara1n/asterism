@@ -6,7 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { ConfigurationService } from "../configuration/service.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot, packageSource, type PackageEntry } from "../plugins/packages.ts";
-import { applicationPackages, applicationManuals } from "../plugins/distribution.ts";
+import { applicationPackages, applicationManuals, bundledPackages } from "../plugins/distribution.ts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { ModelSettings } from "../shared/model.ts";
@@ -75,7 +75,11 @@ export class ApplicationService {
     const command = parsed.data;
     try {
       if (command.type === "plugin.add") this.list.add({ source: { kind: "path", path: command.path } }, this.npmRoot);
-      else if (command.type === "plugin.enable") this.list.setEnabled(command.index, command.enabled);
+      else if (command.type === "plugin.add-bundled") {
+        const entry = bundledPackages.find(entry => packageSource(entry) === command.source);
+        if (!entry) throw new PluginPackageError("invalid_entry", "No such bundled package.");
+        this.list.add(entry, this.npmRoot);
+      } else if (command.type === "plugin.enable") this.list.setEnabled(command.index, command.enabled);
       else if (command.type === "plugin.remove") this.list.remove(command.index);
     } catch (error) {
       if (error instanceof PluginPackageError) throw new ApplicationError(error.code === "duplicate" ? "conflict" : "invalid_request", error.message);
@@ -85,23 +89,30 @@ export class ApplicationService {
     const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt }));
     const archivedSessions = this.sessions.tree.archived().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, archived_at: session.archivedAt }));
     const current = this.list.read();
-    // Match list entries to startup results by source; new or modified entries show as pending restart.
-    const plugins: AppSnapshot["plugins"] = current.map((entry, index) => {
+    const entries = [
+      ...current.map((entry, index) => ({ entry, index })),
+      ...bundledPackages.filter(entry => !current.some(item => packageSource(item) === packageSource(entry)))
+        .map(entry => ({ entry, index: null })),
+    ];
+    // Available distribution entries describe packages without adding them to the loading list.
+    const plugins: AppSnapshot["plugins"] = entries.map(({ entry, index }): AppSnapshot["plugins"][number] => {
       const source = packageSource(entry);
       const startup = this.sessions.packages.find(item => item.source === source);
       const pending = !startup || startup.enabled !== entry.enabled;
       let metadata = startup?.metadata ?? {}, id = startup?.id ?? null, metadataError = startup?.metadataError ?? null;
       const root = packageRoot(entry, this.npmRoot);
-      if (pending) {
+      if (pending || index === null) {
         try { metadata = readPackageMetadata(root); metadataError = null; }
         catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
       }
       if (!id) { try { id = readManifest(root).id; } catch { /* Loading state retains package validation failure reasons. */ } }
+      if (index === null) return { index, source, bundled: true, metadata, enabled: false, id, status: "available",
+        error: metadataError, diagnostic: null, renderer: null, stylesheet: null, dependencies: [] };
       return { index, source, bundled: entry.source.kind === "bundled", metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
         error: (pending ? null : startup.diagnostic?.message) ?? metadataError, diagnostic: pending ? null : startup.diagnostic ?? null, renderer: pending ? null : startup.renderer,
         stylesheet: pending ? null : startup.stylesheet,
         dependencies: [...startup?.rendererDependencies ?? []] };
-    });
+    }).filter((plugin, _, all) => plugin.index !== null || !plugin.id || !all.some(item => item.index !== null && item.id === plugin.id));
     return snapshotSchema.parse({ workspace, sessions, templates: this.sessions.templates.list(), archivedSessions, plugins,
       catalogs: (this.options.catalogs ?? []).filter(catalog => this.sessions.packages.some(item => item.id === catalog.owner && item.status === "loaded")),
       restartRequired: JSON.stringify(current) !== this.started,
