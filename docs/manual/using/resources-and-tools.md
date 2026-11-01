@@ -32,6 +32,18 @@ Notes retain current text. Their earlier tool results may appear in history, but
 
 Files and notes support anchored edits, full-content writes, and bulk replacement. `edit` changes selected lines using anchors returned by reading, searching, or a previous edit or replacement. `write` supplies complete content. `replace` applies literal text or a JavaScript regular expression to the entire selected target and returns the match count, actual diff, and fresh anchors. Literal replacement text is inserted verbatim; regular-expression replacements support capture groups. A replacement with no matches reports an error and leaves the target unchanged.
 
+## Open a directory file
+
+Click a file in a Directory card's tree, or focus the file and press Enter, to open it on the workbench's right. This also works when the Directory card is focused on the left. PNG, JPEG, GIF, and WebP files open in an image viewer with fit-to-window, original-size, and zoom controls. Other files open in the text editor when they contain supported UTF-8 text.
+
+The editor supports text files up to 8 MiB, with syntax highlighting, line numbers, undo and redo, and find and replace. Code font and size follow Appearance settings. Open search with the toolbar or **Cmd+F / Ctrl+F**; search supports case-sensitive, whole-word, and regular-expression matching. Enter finds the next match in the search field and replaces the current match in the replacement field.
+
+Choose **Save** or press **Cmd+S** on macOS or **Ctrl+S** on Windows and Linux. Saving writes the actual file; it does not add a conversation message or change earlier tool results. The editor retains the file's UTF-8 BOM and newline style; mixed newlines use the first newline's style when saved.
+
+Opening another file replaces the editor. Unsaved changes require confirmation before discarding them when switching files, closing, changing sessions, quitting, or reloading the window. Save failures keep the editing buffer available for retry. Files are read when opened; changes made by an agent or another application do not automatically reload the buffer. A later save replaces the file's current text.
+
+In a Git working tree, gutter marks compare the editing buffer with HEAD: green marks show additions, the accent color shows modifications, and small red markers locate deleted lines. Saving retains uncommitted marks. The baseline is read when the editor opens and after saving; external Git operations do not automatically refresh it. Untracked files show additions. Ignored files and files outside Git have no marks. A Git read failure leaves editing available and is indicated in the status bar.
+
 ## Consult the manual
 
 Add a Manual resource and link it to an agent, or let the agent create one through the resource creation tools. Creation takes no parameters. The resource provides access to application guides, public-package development material, and documentation directories declared by loaded plugins.

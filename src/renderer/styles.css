@@ -254,6 +254,7 @@
   .island-panel { @apply flex h-full min-h-0 flex-col; }
   .island-panel-header { @apply flex shrink-0 items-center gap-2 border-b py-2.5 pr-2.5 pl-5; }
   .island-panel-content { @apply min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5; }
+  .island-panel-content[data-layout="fill"] { @apply flex flex-col overflow-hidden p-0; }
   .island[data-peek] { cursor: pointer; }
   .island[data-peek] > .island-body { opacity: 0.6; transition: opacity var(--motion-fast); }
   /* Overflow segmented navigation fills bottom spacing with its hit area and centers visible bars; visible islands darken and focused islands are darkest. */

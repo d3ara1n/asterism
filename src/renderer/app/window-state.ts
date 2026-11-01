@@ -7,7 +7,7 @@ const subscribe = (listener: () => void) => { listeners.add(listener); return ()
 const publish = (state: DesktopWindowState) => { current = state; listeners.forEach(listener => listener()); };
 
 /** Subscribe before reading ahead of the first frame, and directly adopt the current state received. */
-export async function startDesktopWindow(bridge: DesktopWindowBridge): Promise<() => void> {
+export async function startDesktopWindow(bridge: Pick<DesktopWindowBridge, "get" | "onChanged">): Promise<() => void> {
   const stop = bridge.onChanged(publish);
   try {
     const initial = await bridge.get();

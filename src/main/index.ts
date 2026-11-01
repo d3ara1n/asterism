@@ -31,11 +31,13 @@ import { appearanceChangedChannel } from "../shared/theme.ts";
 import { languageChangedChannel } from "../shared/language.ts";
 import { enableSettings } from "./settings-state.ts";
 import { acknowledgeNotice, listRecoveryPoints, pendingNotice, recoveryPointDirectory } from "../storage/preparation.ts";
+import { desktopUnsavedChangesChannel, unsavedChangesSchema } from "../shared/desktop.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
 let quitting = false;
 let quitRequest: Promise<boolean> | null = null;
+let unsavedTitles: string[] = [];
 let updates: ApplicationUpdates | null = null;
 let network: ApplicationNetwork | null = null;
 let notificationsDelivered = false;
@@ -51,10 +53,24 @@ const runtime = new RuntimeHost(status => {
     startup.publish({ status: "failed", reason: "runtime", detail: "The task runtime has stopped." });
 }, undefined, (stage, detail) => startup.stage(stage, detail));
 
-/** Read current resource prompts before user exit; after confirmation, wait for background cleanup through the existing close flow. */
+function unsavedPrompt(): Electron.MessageBoxOptions {
+  const locale = () => readLanguage().locale;
+  return {
+    type: "warning", title: applicationBrand.en,
+    message: startupText(startupMessages.unsavedTitle, locale),
+    detail: startupText({ ...startupMessages.unsavedDescription, values: { titles: unsavedTitles.join("\n") } }, locale),
+    buttons: [startupText(startupMessages.quitCancel, locale), startupText(startupMessages.unsavedDiscard, locale)],
+    defaultId: 0, cancelId: 0,
+  };
+}
+
+/** Confirm unsaved views and live resources before stopping the runtime. */
 function requestQuit(restart = false, installUpdate = false): Promise<boolean> {
   if (quitting || quitRequest) return Promise.resolve(false);
   quitRequest = (async () => {
+    if (unsavedTitles.length && window && !window.isDestroyed()) {
+      if ((await dialog.showMessageBox(window, unsavedPrompt())).response !== 1) return false;
+    }
     const result = await runtime.execute({ type: "workspace.prepare-close" });
     const warnings = result.ok ? result.snapshot.disposalWarnings ?? [] : [];
     if (warnings.length) {
@@ -135,6 +151,19 @@ function createWindow(): void {
   ipcMain.removeHandler(openLogsChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
+  const updateUnsaved = (event: Electron.IpcMainEvent, raw: unknown) => {
+    if (!trusted(event)) return;
+    const parsed = unsavedChangesSchema.safeParse(raw);
+    if (parsed.success) {
+      unsavedTitles = parsed.data;
+      current.setDocumentEdited(unsavedTitles.length > 0);
+    }
+  };
+  ipcMain.on(desktopUnsavedChangesChannel, updateUnsaved);
+  current.webContents.on("will-prevent-unload", event => {
+    // Electron requires the decision before this event returns. Quitting has already confirmed drafts.
+    if (quitting || dialog.showMessageBoxSync(current, unsavedPrompt()) === 1) event.preventDefault();
+  });
   const reportFailure = (event: Electron.IpcMainEvent, raw: unknown) => {
     if (!trusted(event)) return;
     const parsed = rendererFailureSchema.safeParse(raw);
@@ -230,6 +259,7 @@ function createWindow(): void {
   stopUpdates = updates?.serve(current, trusted, () => requestQuit(false, true)) ?? (() => {});
   stopNetwork = network?.serve(current, trusted) ?? (() => {});
   current.webContents.on("render-process-gone", (_event, details) => {
+    unsavedTitles = [];
     closeConnection();
     if (!quitting && details.reason !== "clean-exit")
       dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
@@ -238,8 +268,11 @@ function createWindow(): void {
     console.error("Desktop bridge initialization failed.", error);
     dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
   });
-  current.webContents.on("did-start-navigation", (_event, _url, inPlace, mainFrame) => {
-    if (mainFrame && !inPlace) closeConnection();
+  current.webContents.on("did-navigate", () => {
+    // A cancelled reload retains its live connection and unsaved buffer.
+    closeConnection();
+    unsavedTitles = [];
+    current.setDocumentEdited(false);
   });
   // Return only paths selected in the system dialog; the renderer cannot use this to read files.
   ipcMain.handle(pickDirectoryChannel, async (event, raw: unknown) => {
@@ -266,6 +299,8 @@ function createWindow(): void {
     return shell.openPath(directory);
   });
   current.on("closed", () => {
+    unsavedTitles = [];
+    ipcMain.removeListener(desktopUnsavedChangesChannel, updateUnsaved);
     stopDesktopWindow();
     ipcMain.removeListener(rendererFailureChannel, reportFailure);
     ipcMain.removeListener(connectionRequestChannel, requestConnection);

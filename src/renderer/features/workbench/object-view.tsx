@@ -1,4 +1,5 @@
 import type { CardPanelView } from "@asterism-app/sdk/renderer";
+import { pluginOf } from "@asterism-app/sdk/contracts";
 import type { ReactNode } from "react";
 
 import type { WorkbenchObject } from "../../../shared/workbench";
@@ -7,6 +8,7 @@ import { SlotBoundary } from "../../modules/SlotBoundary";
 import { JsonView, useModuleViews } from "../../modules/views";
 import { useI18n } from "../../shared/i18n";
 import { fallbackCardAppearance } from "./sizing";
+import { PluginIslandProvider } from "../plugins/scope";
 
 /**
  * Resolved object content view: body, auxiliary panels, and resource actions are all bound to object capabilities and isolated by error boundaries.
@@ -23,7 +25,11 @@ export function useObjectView(object: WorkbenchObject) {
     actions: undefined,
     panels: undefined,
   };
-  const bind = (node: ReactNode) => <ObjectServices object={object}>{node}</ObjectServices>;
+  const bind = (node: ReactNode) => <ObjectServices object={object}>
+    <PluginIslandProvider pluginId={pluginOf(object.presentation.contract.id) ?? "unknown"} placement="root">
+      {node}
+    </PluginIslandProvider>
+  </ObjectServices>;
   const panels: CardPanelView[] | undefined = view.panels?.map(panel => ({ ...panel, body: <SlotBoundary>{bind(panel.body)}</SlotBoundary> }));
   return {
     descriptor, view,

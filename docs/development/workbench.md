@@ -68,6 +68,16 @@ The focused object and the island width are session layout state, saved beside c
 
 Without a chosen width, the focus island shares the screen with the main view and the pair fills the window. Size presets set a fixed width that holds regardless of the window. A fixed width can exceed the window; the screen strip then scrolls horizontally and follows the focused island. Restoring the default size returns to the shared layout.
 
+## Content expansion
+
+Resource views can open content in an island to the right of the workbench, whether the source is a canvas card or the leading focus island. Expansion leaves the source in place. Opening another content island replaces the previous one through its close guards. Islands opened from an expanded view continue to its right.
+
+The host owns containment, placement, focus restoration, and close coordination. Plugins own the content and its operations. Expanded content has its own mounted region and receives explicit domain inputs; closing or remounting its source card does not discard its editing state. Resource-bound operations still require the resource to be available.
+
+Content islands are transient frontend state outside history. Session navigation consults close guards before releasing them. Unsaved panels confirm discarding edits on closure, replacement, session navigation, application exit, and window reload. Saving remains an explicit content operation; a failed save retains the draft.
+
+The directory plugin dispatches file content to independent text and image surfaces. The host does not interpret file formats. The text editor reads current text and saves to the actual file. Its buffer belongs to the island, and later backend-processed writes win. Editing does not reinterpret or update earlier tool results. Git gutter marks compare the current buffer with a captured HEAD baseline; they do not add repository management operations.
+
 ## Links and workbench panels
 
 Drag from a resource to a link-capable receiver to establish a directed link. Direction follows resource semantics, not card position. Two opposite links can render as one double-arrow edge while retaining separate stored relations.

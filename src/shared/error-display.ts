@@ -1,6 +1,9 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 export { errorMessages, errorDisplay, failureDisplay } from "@asterism-app/ui/error-display";
 export const startupMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  unsavedTitle: { id: "shutdown.unsavedTitle", defaultMessage: "Discard unsaved changes?" },
+  unsavedDescription: { id: "shutdown.unsavedDescription", defaultMessage: "These views have unsaved changes:\n\n{titles}" },
+  unsavedDiscard: { id: "shutdown.unsavedDiscard", defaultMessage: "Discard changes" },
   quitTitle: { id: "shutdown.title", defaultMessage: "Close running resources?" },
   quitDescription: { id: "shutdown.description", defaultMessage: "These resources may still have running programs. Quitting will end their live instances:\n\n{resources}" },
   quitConfirm: { id: "shutdown.confirm", defaultMessage: "Quit" },

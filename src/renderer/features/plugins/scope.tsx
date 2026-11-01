@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { pluginsMessages as messages } from "../../messages/plugins";
 import { useI18n } from "../../shared/i18n";
 import { IslandPanel, panelIslandWidth } from "../../shared/weave/IslandPanel";
-import { useIsland } from "../../shared/weave/Screen";
+import { useIsland, useRootIsland } from "../../shared/weave/Screen";
 import { pluginPreferences } from "../creation/preferences";
 
 /** Plugin UI errors affect only their own region; the host retains management access. */
@@ -42,12 +42,17 @@ export function PluginCallScope({ children }: { children: ReactNode }) {
  * Adapt the containing host island into a plugin island: identities are isolated by plugin, and the host standardizes width and shell.
  * page is the island containing the settings page: when the page unmounts, close the islands it opened as well (content is invalid, so skip guards).
  */
-export function PluginIslandProvider({ pluginId, page = false, children }: { pluginId: string; page?: boolean; children: ReactNode }) {
-  const island = useIsland();
+export function PluginIslandProvider({ pluginId, page = false, placement = "child", children }: {
+  pluginId: string; page?: boolean; placement?: "root" | "child"; children: ReactNode;
+}) {
+  const containing = useIsland();
+  const root = useRootIsland();
+  const island = placement === "root" ? root : containing;
   const prefix = `plugin-island:${pluginId}:`;
   const adapter = useMemo<RendererIsland>(() => ({
     get child() { const child = island.child; return child?.startsWith(prefix) ? child.slice(prefix.length) : undefined; },
-    open: spec => island.open({ id: prefix + spec.key, label: spec.label, width: panelIslandWidth, origin: spec.origin,
+    open: spec => island.open({ id: prefix + spec.key, label: spec.label,
+      width: spec.size === "content" ? { min: 560, grow: 2 } : panelIslandWidth, origin: spec.origin,
       render: () => <PluginIslandContent pluginId={pluginId} spec={spec} /> }),
     close: options => island.close(options),
     closeChild: options => island.closeChild(options),

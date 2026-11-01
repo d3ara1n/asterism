@@ -27,7 +27,7 @@ import { SettingsPage, isSettingsCategory, type SettingsTarget } from "../featur
 import { SessionArchiveContext } from "../features/settings/SessionsSettings";
 import { settingsPageKey, usePluginSettingsRegistry } from "../modules/settings";
 import { RendererCatalogProvider } from "../modules/object-context";
-import { Screen, type IslandSpec } from "../shared/weave/Screen";
+import { Screen, type IslandSpec, type ScreenHandle } from "../shared/weave/Screen";
 import { Toaster } from "../shared/ui/sonner";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { operationSucceeded, useStateToast } from "../shared/toast";
@@ -61,6 +61,8 @@ export function App({ controller }: { controller: ApplicationController }) {
   const i18n = useI18n();
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const workbench = useRef<WorkbenchHandle>(null);
+  const mainScreen = useRef<ScreenHandle>(null);
+  const navigating = useRef(false);
   const returnFocus = useRef<HTMLElement | null>(null);
   const sidebarToggle = useRef<HTMLButtonElement>(null);
   const [page, setPage] = useState<PageId>("main");
@@ -105,18 +107,26 @@ export function App({ controller }: { controller: ApplicationController }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
-  const navigate = (next: MainView) => {
-    navigation.current++;
-    controller.setVisibleSession(next.kind === "conversation" ? next.sessionId : null);
-    setView(next); setPage("main");
-    controller.clearError();
-    focusMain();
+  const navigate = async (next: MainView): Promise<boolean> => {
+    if (navigating.current) return false;
+    navigating.current = true;
+    try {
+      const changingSession = next.kind !== view.kind
+        || next.kind === "conversation" && view.kind === "conversation" && next.sessionId !== view.sessionId;
+      if (changingSession && mainScreen.current && !(await mainScreen.current.closeChildren())) return false;
+      navigation.current++;
+      controller.setVisibleSession(next.kind === "conversation" ? next.sessionId : null);
+      setView(next); setPage("main");
+      controller.clearError();
+      focusMain();
+      return true;
+    } finally { navigating.current = false; }
   };
   const goHome = () => {
-    navigate({ kind: "home" });
+    void navigate({ kind: "home" });
   };
   const openSession = (sessionId: string) => {
-    navigate({ kind: "conversation", sessionId });
+    void navigate({ kind: "conversation", sessionId });
   };
   const renameSession = (sessionId: string, title: string) => {
     const command = { type: "rename" as const, sessionId, title };
@@ -124,7 +134,9 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   /** When archiving the current session, return home first, then clean up and reread the session catalog. */
   const archiveSession = async (sessionId: string) => {
-    if (view.kind === "conversation" && view.sessionId === sessionId) goHome();
+    if (view.kind === "conversation" && view.sessionId === sessionId && !(await navigate({ kind: "home" }))) {
+      return { ok: false as const, error: { code: "cancelled", message: "Session archiving was cancelled." } };
+    }
     const result = await runtime.session.execute({ type: "archive", sessionId });
     void controller.refresh();
     return result;
@@ -144,7 +156,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     const result = await runtime.session.execute({ type: "template.start", templateId });
     if (!result.ok) return errorDisplay(result.error);
     if (result.reply.kind !== "accepted") throw new Error("Invalid template creation receipt.");
-    if (token === navigation.current) navigate({ kind: "conversation", sessionId: result.reply.sessionId, overview: true });
+    if (token === navigation.current) await navigate({ kind: "conversation", sessionId: result.reply.sessionId, overview: true });
     void controller.refresh();
     return null;
   };
@@ -264,7 +276,7 @@ export function App({ controller }: { controller: ApplicationController }) {
           <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SettingsPage active={inSettings} target={settingsTarget} /></SessionArchiveContext.Provider> },
         { id: "main", label: mainTitle, surface: false,
           // Close deeper islands to the right of the workbench when switching sessions.
-          content: <Screen label={i18n.formatMessage(appMessages.appNavigation)} leading={[...(sidebarVisible ? [sidebar] : []), ...(focus ? [focus] : [])]} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
+          content: <Screen ref={mainScreen} label={i18n.formatMessage(appMessages.appNavigation)} leading={[...(sidebarVisible ? [sidebar] : []), ...(focus ? [focus] : [])]} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
       ]} />
     </Window>
     <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}

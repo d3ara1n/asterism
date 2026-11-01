@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "motion/react";
 
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { windowGeometry } from "../../../shared/desktop";
@@ -38,6 +38,14 @@ export interface IslandApi {
   guard: (guard: CloseGuard) => () => void;
 }
 const IslandContext = createContext<IslandApi | null>(null);
+const RootIslandContext = createContext<IslandApi | null>(null);
+/** Workbench content opens beside the root even when its source is in a leading focus island. */
+export function useRootIsland(): IslandApi {
+  const api = useContext(RootIslandContext);
+  if (!api) throw new Error("useRootIsland must be used inside a Screen.");
+  return api;
+}
+export interface ScreenHandle { closeChildren(): Promise<boolean> }
 /** Use within island content. */
 export function useIsland(): IslandApi {
   const api = useContext(IslandContext);
@@ -60,8 +68,9 @@ export function useCloseGuard(guard: CloseGuard | null) {
  * One screen: controlled islands can be declared to the left of the root; deeper islands to the root's right are managed through open/close.
  * When all min widths fit, distribute by grow and center without translation; otherwise fall back to min and let the viewport follow focus.
  */
-export function Screen({ label, root, leading, className, resetKey }: {
+export function Screen({ label, root, leading, className, resetKey, ref }: {
   label: string; root: IslandSpec; leading?: IslandSpec[]; className?: string;
+  ref?: Ref<ScreenHandle>;
   /** Close all deeper islands when this changes. */ resetKey?: string;
 }) {
   const i18n = useI18n();
@@ -141,6 +150,17 @@ export function Screen({ label, root, leading, className, resetKey }: {
     set.add(fn); guards.current.set(id, set);
     return () => { set.delete(fn); if (!set.size) guards.current.delete(id); };
   };
+  const rootApi = useStableIsland({
+    id: root.id, child: deeper[0]?.id,
+    open: spec => open(root.id, spec),
+    close: async () => false,
+    closeChild: async options => {
+      const child = latest.current.deeper[0];
+      return child ? close(child.id, options?.force) : true;
+    },
+    guard: fn => guard(root.id, fn),
+  });
+  useImperativeHandle(ref, () => ({ closeChildren: () => rootApi.closeChild() }), [rootApi]);
 
   const shift = overflow ? -offset : (width - total) / 2;
   const onWheel = (event: React.WheelEvent) => {
@@ -160,7 +180,7 @@ export function Screen({ label, root, leading, className, resetKey }: {
     requestAnimationFrame(() => viewport.current?.querySelector<HTMLElement>(`[data-island="${CSS.escape(id)}"]`)?.focus({ preventScroll: true }));
   };
 
-  return <div className={cn("weave-viewport", className)} aria-label={label} role="group" ref={viewport} onWheel={onWheel} onKeyDown={onKeyDown}>
+  return <RootIslandContext.Provider value={rootApi}><div className={cn("weave-viewport", className)} aria-label={label} role="group" ref={viewport} onWheel={onWheel} onKeyDown={onKeyDown}>
     {/* Do not lay out islands until viewport width is measured, avoiding a frame of overflow layout at zero width. */}
     <div className="weave-strip" ref={strip} style={{ visibility: width ? undefined : "hidden" }}>
       {/* Each island is absolutely positioned and interpolates to its own target x and width: adding or removing islands makes others smoothly yield from their current positions, without combining whole-strip translation and layout animation. */}
@@ -196,7 +216,17 @@ export function Screen({ label, root, leading, className, resetKey }: {
         </TooltipTrigger><TooltipContent>{name}</TooltipContent></Tooltip>;
       })}
     </div>}
-  </div>;
+  </div></RootIslandContext.Provider>;
+}
+
+function useStableIsland(api: IslandApi): IslandApi {
+  const latest = useRef(api);
+  latest.current = api;
+  return useMemo(() => ({
+    get id() { return latest.current.id; }, get child() { return latest.current.child; },
+    open: spec => latest.current.open(spec), close: options => latest.current.close(options),
+    closeChild: options => latest.current.closeChild(options), guard: fn => latest.current.guard(fn),
+  }), []);
 }
 
 function Island({ ref, spec, width, x, hidden, peek, focused, api, onFocus }: {
@@ -206,13 +236,7 @@ function Island({ ref, spec, width, x, hidden, peek, focused, api, onFocus }: {
   const element = useRef<HTMLElement>(null);
   // Islands opened by content receive focus after mounting.
   useEffect(() => { if (spec.origin) element.current?.focus({ preventScroll: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const latest = useRef(api);
-  latest.current = api;
-  const stable = useMemo<IslandApi>(() => ({
-    get id() { return latest.current.id; }, get child() { return latest.current.child; },
-    open: spec => latest.current.open(spec), close: options => latest.current.close(options),
-    closeChild: options => latest.current.closeChild(options), guard: fn => latest.current.guard(fn),
-  }), []);
+  const stable = useStableIsland(api);
   const focusSelf = useCallback(() => onFocus(), [onFocus]);
   // For islands partially outside the viewport, clicking the exposed portion brings them into view.
   // Expand in place: fade in from a slight offset left of the target position; Motion transitions position and width from their current values.

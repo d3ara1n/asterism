@@ -1,5 +1,5 @@
-import { useEffect, useState, type CSSProperties } from "react";
-import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from "react";
+import { IslandPanel, useI18n, useRendererIsland, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
 import { Eye, Folder, BookOpen, FilePenLine, FilePlus2, ListTree, RefreshCw, Replace } from "lucide-react";
 import { FileTree, useFileTree, useFileTreeSearch } from "@pierre/trees/react";
@@ -23,6 +23,8 @@ import { searchToolRenderers } from "./search-view";
 import { listViews } from "./list-view";
 
 import { directoryCard as appearance } from "../shared/card-appearance.ts";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
+const DirectoryFile = lazy(() => import("./DirectoryFile"));
 
 type SeeProps = ToolRenderProps<z.infer<typeof DirectorySee.schema>>;
 function SeeHeader({ target, invocation }: SeeProps) {
@@ -72,11 +74,23 @@ const treeStyle = {
 /** Card body: edge-aligned filter bar + file tree; explanatory text fills empty-directory, no-match, and read-failure states. */
 function DirectoryTreeBody(_: { data: { path: string } }) {
   const i18n = useI18n();
+  const island = useRendererIsland();
+  const object = useRendererObject();
   const { state } = useDirectoryTreeLink();
   const { model } = useFileTree({ paths: [], initialExpansion: "closed", itemHeight: 28, icons: { set: "complete", colored: false } });
   const search = useFileTreeSearch(model);
   // The input preserves exactly what the user typed; the model trims and lowercases internally for matching without writing it back to the input.
   const [query, setQuery] = useState("");
+  const openFile = (path: string, origin: HTMLElement) => {
+    if (model.getItem(path)?.isDirectory() !== false) return;
+    const resource = object.ref;
+    void island.open({
+      key: `file:${resource.sessionId}:${resource.id}:${path}`, label: path, size: "content", origin,
+      render: () => <Suspense fallback={<IslandPanel title={path}><Spinner /></IslandPanel>}>
+        <DirectoryFile key={path} resource={resource} path={path} />
+      </Suspense>,
+    });
+  };
 
   useEffect(() => {
     if (!state.data) return;
@@ -95,7 +109,20 @@ function DirectoryTreeBody(_: { data: { path: string } }) {
         label={i18n.formatMessage(filesystemMessages.directorySearch)} />
     </div>
     <div className="relative min-h-0 flex-1 pt-1">
-      <div className={cn("h-full", notice && "invisible")}><FileTree model={model} style={treeStyle} /></div>
+      <div className={cn("h-full", notice && "invisible")}><FileTree model={model} style={treeStyle}
+        onClick={event => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+          const row = event.nativeEvent.composedPath().find((node): node is HTMLElement => node instanceof HTMLElement && !!node.dataset.itemPath);
+          if (row) openFile(row.dataset.itemPath!, row);
+        }}
+        onKeyDownCapture={event => {
+          if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+          const item = model.getFocusedItem();
+          if (!item || item.isDirectory()) return;
+          event.preventDefault(); event.stopPropagation();
+          const row = event.nativeEvent.composedPath().find((node): node is HTMLElement => node instanceof HTMLElement && !!node.dataset.itemPath);
+          openFile(item.getPath(), row ?? event.currentTarget);
+        }} /></div>
       {notice && <p className={cn("type-caption absolute inset-x-0 top-0 px-2 py-2", state.error && "text-destructive")}>{notice}</p>}
     </div>
   </div>;

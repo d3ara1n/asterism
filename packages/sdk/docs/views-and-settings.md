@@ -10,6 +10,14 @@ Input previews can be incomplete. Displaying arguments does not establish that e
 
 Use host presentation facilities for the surrounding card or operation. Keep domain content within the view rather than rebuilding application navigation and containment.
 
+## Open expanded content
+
+Resource card views can use the renderer island capability to open plugin content beside the workbench. The same entry works from a focused resource. Settings pages and expanded views open additional islands to their own right. Opening another island from the same source level replaces deeper content, subject to close guards.
+
+Supply a plugin-local identity, accessible label, opening element, and content renderer. Choose a content surface for an editor or another view that needs more width. The host manages layout and focus. The opened view has an independent plugin region; pass its resource reference and other domain inputs explicitly rather than relying on the source component's React context or mount lifetime.
+
+Use the island panel for its title, actions, and close control. Its fill layout lets an editor own scrolling. Mark unsaved content as dirty so closing, replacement, session navigation, and application exit ask before discarding it. A close guard can also retain a view while a save is pending. Closing the island releases its view calls without ending independent backend services.
+
 ## Style plugin views
 
 Import CSS from the renderer entry or its components. Asterism builds the imported styles and loads them before frontend preparation and view registration. CSS references to bundled images and fonts keep their relative paths. Style loading failures appear as frontend plugin failures.

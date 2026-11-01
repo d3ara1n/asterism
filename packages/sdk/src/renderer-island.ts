@@ -2,7 +2,7 @@ import { createContext, createElement, useContext, useEffect, useRef, type Compo
 import type { UiText } from "./i18n.ts";
 
 /**
- * Island: an independent surface column within the host screen; opening one places it to the right of the current island and replaces existing deeper islands.
+ * Island: an independent surface column within the host screen. Resource cards open beside the workbench, including when focused; other islands open to their own right.
  * The host uniformly manages width, position, motion, and focus; plugins provide only identity, an accessible name, and content.
  */
 export interface RendererIslandSpec {
@@ -12,6 +12,8 @@ export interface RendererIslandSpec {
   label: UiText;
   /** The element that opened it: used for the expansion animation and receives focus again after closing. */
   origin?: HTMLElement | null;
+  /** Content surfaces grow wider than the default form panel. */
+  size?: "panel" | "content";
   render: () => ReactNode;
 }
 /** Close guard: returning false (or resolving to false) aborts closing; may asynchronously wait for user confirmation. */
@@ -40,6 +42,8 @@ export interface RendererIslandPanelProps {
   /** Fixed toolbar below the title bar, such as search. */
   toolbar?: ReactNode;
   dirty?: boolean;
+  /** Fill the available area without padding; the content owns scrolling. */
+  layout?: "padded" | "fill";
   children: ReactNode;
 }
 
@@ -51,7 +55,7 @@ function required<T>(value: T | null, name: string): T {
   if (value === null) throw new Error(`Renderer ${name} must be provided by the host.`);
   return value;
 }
-/** The containing island; available within plugin settings pages and islands they open. */
+/** Available within resource cards, plugin settings pages, and islands they open. Opened content has its own region; pass domain inputs explicitly. */
 export function useRendererIsland(): RendererIsland { return required(useContext(Island), "island"); }
 /** Register a close guard for the containing island; null guard permits closing, and the guard always uses the latest callback. */
 export function useRendererCloseGuard(guard: RendererCloseGuard | null) {

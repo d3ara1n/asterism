@@ -18,6 +18,7 @@ import type { ShellExecution } from "@asterism-app/sdk/runtime";
 import { simpleGit } from "simple-git";
 import { searchTools } from "./search.ts";
 import { listFiles, readFileContent } from "./read.ts";
+import { editorCalls } from "./editor-runtime.ts";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (signal.aborted) return { kind: "cancelled", message: `${operation} was cancelled before committing file content.` };
@@ -197,6 +198,7 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
     }),
   ],
   calls: [
+    ...editorCalls,
     implementCall(ReadDirectoryDefaults, async () => ({ path: homedir() })),
     implementCall(DirectoryTree, async (_input, { object, signal }) => {
       const snapshot = object.snapshot();
