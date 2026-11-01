@@ -88,7 +88,7 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
     async inspect(directory, object) {
       const resource = object.snapshot();
       if (!resource) throw new PluginApiError("unavailable", "The directory is not available on this session path.");
-      const base = { type: Directory.kind, title: resource.title, path: directory.path, shell: await shell.inspect() };
+      const base = { type: Directory.kind, title: resource.title, path: directory.path };
       try {
         const info = await stat(directory.path);
         return info.isDirectory() ? { ...base, exists: true }

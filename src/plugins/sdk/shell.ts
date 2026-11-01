@@ -9,7 +9,6 @@ export function bindShellServices(shell: ShellServices, runs: RunGroup, checkAva
       get: () => { checkAvailable(); return structuredClone(shell.profiles.get()); },
       list: () => { checkAvailable(); return runs.start(() => shell.profiles.list(), outside).done; },
     },
-    inspect: () => { checkAvailable(); return runs.start(() => shell.inspect(), outside).done; },
     execute(cwd, args, options) {
       checkAvailable();
       return runs.start(signal => shell.execute(cwd, args, { ...options, signal }), { ...outside, signal: options.signal }).done;

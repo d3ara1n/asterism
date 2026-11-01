@@ -26,6 +26,8 @@ Resource creation has its own discovery and inspection tools. The available crea
 
 Directory and terminal operations affect the actual machine. Check an operation’s result when its effects are uncertain. A history branch does not create an isolated copy of those files or processes.
 
+Directory commands start a fresh noninteractive shell using the application's default shell selection. `shell_profile_list` reports the host platform, configured profiles, resolved executable paths, and default selection. Terminal resources retain their configured profile and report their actual shell instance state through resource discovery and terminal operations.
+
 Directory listings expose references for regular files. A reference identifies a source resource and a location within it. Pass it to an operation that accepts file references, or forward it to another Agent through Send or Mesh. Passing a reference transfers the address; it does not read the file or supply its contents to the receiving model. A consuming operation fetches the file when needed, so later changes are visible and missing files fail at consumption.
 
 Notes retain current text. Their earlier tool results may appear in history, but browsing that history does not restore note contents.

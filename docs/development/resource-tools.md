@@ -42,7 +42,7 @@ An incomplete empty search means no results were returned before stopping. Only 
 
 The host owns shell profile configuration, its settings page, executable resolution, and process execution. The SDK exposes profiles and one-shot commands to any plugin. Builtin's directory exec adapts that capability to its resource and model-facing result. A profile contains the executable, startup arguments, command arguments, and environment overrides. The command is one argument after those configured arguments.
 
-Explicit unavailable profiles fail. Automatic selection searches configured profiles in platform preference order. Listing profiles resolves availability without starting shells or exposing environment secrets.
+Explicit unavailable profiles fail. Automatic selection searches configured profiles in platform preference order. Listing profiles reports the host platform and resolves availability without starting shells or exposing environment secrets. Shared shell configuration belongs to shell capability discovery. Directory inspection describes the directory's identity, path, and existence; an interactive terminal exposes its own configured profile and actual shell instance state.
 
 Directory exec uses the resource as its initial working directory. Commands can change directories or address other system resources under the current user’s privileges. That directory is not a shell sandbox.
 

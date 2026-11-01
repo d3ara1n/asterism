@@ -64,7 +64,7 @@ export async function listShellProfiles(settings: ShellSettings, inherited: Node
   }));
   const available = new Set(profiles.filter(profile => profile.available).map(profile => profile.id));
   const resolvedProfile = orderedProfiles(settings).find(profile => available.has(profile.id))?.id ?? null;
-  return { selected: settings.selected, resolvedProfile, profiles };
+  return { platform: process.platform, selected: settings.selected, resolvedProfile, profiles };
 }
 
 export async function resolveShell(settings: ShellSettings, inherited: NodeJS.ProcessEnv = process.env): Promise<ResolvedShell> {

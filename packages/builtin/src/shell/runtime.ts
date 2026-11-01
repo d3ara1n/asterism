@@ -7,7 +7,7 @@ export function createShellModule() {
     topLevelTools: [defineTopLevelTool({
       id: ShellProfileListResult.id,
       name: "shell_profile_list",
-      description: "List shared shell profiles, executable availability and the default selection for directory exec and terminal creation.",
+      description: "Report the host platform and list shared shell profiles, executable availability and the default selection for directory exec and terminal creation.",
       guidelines: [
         "Directory exec uses the default selection. Terminal creation accepts a profile ID or 'auto'; omitting profile uses the default selection.",
         "Automatic selection follows platform preference order, then remaining custom profiles. Availability reports executable discovery at query time.",

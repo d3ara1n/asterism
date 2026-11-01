@@ -2,7 +2,7 @@ import { builtin } from "@asterism-app/builtin-api/contracts";
 import { shellProfileListSchema, type ExecResult } from "@asterism-app/sdk/contracts";
 
 export const ShellProfileListResult = builtin.data("shell.profile-list", shellProfileListSchema
-  .describe("Shared shell profiles for directory exec and terminal creation. Availability reflects executable discovery at query time."));
+  .describe("Host platform and shared shell profiles for directory exec and terminal creation. Availability reflects executable discovery at query time."));
 
 /** The model consumes output text and truncation notices; the UI shows execution information, and the shared tool layer generates explanations for unsuccessful outcomes. */
 export function execToModel(data: ExecResult): string {

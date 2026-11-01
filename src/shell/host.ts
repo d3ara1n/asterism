@@ -22,7 +22,6 @@ export class ShellHost implements ShellServices {
     } };
     this.calls = [implementCall(ReadShellProfiles, () => this.profiles.list())];
   }
-  inspect: ShellServices["inspect"] = () => this.execution.inspect();
   execute: ShellServices["execute"] = (cwd, args, options) => this.execution.execute(cwd, args, options);
 
   /** Ends commands and reaps terminals that their owners did not release. */

@@ -1,5 +1,4 @@
 import type { CallResult, ShellExecution } from "@asterism-app/sdk/runtime";
-import type { Json } from "@asterism-app/sdk/contracts";
 import { MAX_TIMEOUT_SECONDS, type ExecResult, type ShellSettings } from "@asterism-app/sdk/contracts";
 import { ShellOutputBuffer } from "./output.ts";
 import { resolveShell } from "./profiles.ts";
@@ -9,12 +8,6 @@ import { startShellProcess, type ShellProcess } from "./process.ts";
 export class ShellExecutor implements ShellExecution {
   constructor(private readonly settings: () => ShellSettings, private readonly closingSignal: AbortSignal,
     private readonly temporaryRoot?: string) {}
-  async inspect(): Promise<Json> {
-    try {
-      const shell = await resolveShell(this.settings());
-      return { profile: shell.profile.id, executable: shell.executable, platform: process.platform, interactive: false };
-    } catch (error) { return { platform: process.platform, error: String(error) }; }
-  }
   async execute(cwd: string, args: { command: string; timeout?: number }, options: {
     signal: AbortSignal; publish(data: ExecResult): void;
   }): Promise<CallResult<ExecResult>> {

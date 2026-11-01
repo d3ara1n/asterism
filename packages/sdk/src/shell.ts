@@ -40,6 +40,7 @@ export type ShellSettings = z.infer<typeof shellSettingsSchema>;
 export const ShellProfilesCatalog = defineData("asterism.shell/profiles", shellSettingsSchema);
 
 export const shellProfileListSchema = z.strictObject({
+  platform: z.string().describe("Host operating system platform, such as 'darwin', 'linux', or 'win32'."),
   selected: z.string(),
   resolvedProfile: z.string().nullable(),
   profiles: z.array(z.strictObject({
