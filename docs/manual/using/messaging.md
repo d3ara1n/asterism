@@ -1,6 +1,6 @@
 # External conversations
 
-Messaging lets an Agent use external private chats and groups through resources. Configure a messaging provider in Settings → Providers → Messaging providers. Each configured provider is a connection that represents an external identity, such as a Telegram Bot. Multiple connections may use the same provider.
+Messaging lets an Agent use external private chats and groups through resources. Configure a connection in Settings → Providers → Messaging connections. Each connection represents an external identity, such as a Telegram Bot. Multiple connections may use the same provider.
 
 A connection's status shows whether it is receiving. Connecting and reconnecting retry automatically after temporary failures such as a lost network; reconnecting shows the failure being retried. Failed means the platform rejected the connection, for example because of an invalid token or another receiver; fix the cause and reconnect from settings. Removing a connection also deletes the observations its provider retained for it.
 

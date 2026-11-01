@@ -140,7 +140,6 @@ function ConversationsCard({ data }: { data: z.infer<typeof ConversationsView.sc
       <Page key={selected ? `connection:${selected.id}` : "list"} direction={direction.current}>
         {selected ? <ConnectionConversations connection={selected} back={() => select(null)} notify={notify} error={operations.error} />
           : <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2">
-            <h4 className="type-label px-1">{i18n.text(messages.connections)}</h4>
             <ItemGroup>{data.connections.map(connection => <ListRow key={connection.id} inactive={connection.status === "disabled"}
               onOpen={() => select(connection.id)} mediaVariant="icon"
               media={<StatusIcon tone={statusTone[connection.status]} className="size-4" />} title={connection.name}
