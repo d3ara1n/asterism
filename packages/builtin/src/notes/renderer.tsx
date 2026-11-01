@@ -42,7 +42,7 @@ export default {
   cards: [cardRenderer(NoteView, {
     ...appearance,
     Actions: NoteActions,
-    Body: ({ data }) => { const i18n = useI18n(); return <div className="content-scrollbar min-h-0 flex-1 select-text overflow-auto p-3">
+    Body: ({ data }) => { const i18n = useI18n(); return <div className="min-h-0 flex-1 select-text overflow-auto p-3">
       {data.text !== null ? <Markdown>{data.text}</Markdown>
         : <p className="type-body text-muted-foreground">{i18n.formatMessage(textMessages.contentUnavailable)}</p>}
     </div>; },
