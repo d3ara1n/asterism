@@ -48,6 +48,8 @@ In a Git working tree, gutter marks compare the editing buffer with HEAD: green 
 
 Add a Manual resource and link it to an agent, or let the agent create one through the resource creation tools. Creation takes no parameters. The resource provides access to application guides, public-package development material, and documentation directories declared by loaded plugins.
 
+The card displays a file tree grouped by source. Expand directories, filter paths with the search field, and use Refresh to reload the tree. Click a file, or focus it and press Enter, to open a read-only view on the workbench's right. Text supports selection, copying, syntax highlighting, and search with **Cmd+F / Ctrl+F**. Supported images open in the image viewer. Manual views have no editing or saving controls; files are read when opened.
+
 The agent can list a directory, find files by path pattern, search their contents, and read selected lines. Root entries identify sources: `app`, `sdk`, `builtin-api`, and, when available, `plugins`. Searches at the root cover all sources; a narrower target selects one source or subdirectory. Search globs apply within each selected source directory, and returned paths include their source prefix.
 
 The manual reads files directly from their source locations. Application updates replace application guides; plugin updates replace their own documents. Plugin enablement and directory declarations take effect after restart. The resource stores no document copy, so browsing an earlier session does not select an earlier edition.

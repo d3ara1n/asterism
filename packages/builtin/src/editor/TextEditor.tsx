@@ -24,8 +24,8 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, gitBa
   initialText: string;
   readOnly?: boolean;
   gitBase?: string | null;
-  onChange(text: string): void;
-  onSave(): void;
+  onChange?(text: string): void;
+  onSave?(): void;
   onPosition(position: { line: number; column: number }): void;
   onLanguageError(error: unknown): void;
 }) {
@@ -61,10 +61,10 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, gitBa
           } }),
           settings.of([]), language.of([]),
           EditorView.contentAttributes.of({ "aria-label": filename }),
-          Prec.highest(keymap.of([{ key: "Mod-s", run: () => { callbacks.current.onSave(); return true; } }])),
+          Prec.highest(keymap.of([{ key: "Mod-s", run: () => { callbacks.current.onSave?.(); return true; } }])),
           keymap.of([indentWithTab]),
           EditorView.updateListener.of(update => {
-            if (update.docChanged) callbacks.current.onChange(update.state.doc.toString());
+            if (update.docChanged) callbacks.current.onChange?.(update.state.doc.toString());
             if (update.docChanged || update.selectionSet) {
               const head = update.state.selection.main.head;
               const line = update.state.doc.lineAt(head);
@@ -97,6 +97,7 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, gitBa
     editor.current?.dispatch({ effects: settings.reconfigure([
       EditorState.readOnly.of(readOnly),
       EditorView.editable.of(!readOnly),
+      EditorView.contentAttributes.of(readOnly ? { tabindex: "0", "aria-readonly": "true" } : {}),
       EditorState.phrases.of(i18n.interfaceLocale === "zh-Hans" ? chinesePhrases : {}),
     ]) });
   }, [readOnly, i18n.interfaceLocale, filename, initialText, settings]);

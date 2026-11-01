@@ -17,7 +17,7 @@ export function SearchPanel({ view, query, readOnly }: { view: EditorView; query
   useLayoutEffect(() => { input.current?.focus(); input.current?.select(); view.requestMeasure(); }, [view]);
   const update = (patch: Partial<SearchQuery>) => view.dispatch({ effects: setSearchQuery.of(new SearchQuery({ ...query, ...patch })) });
   const close = () => { closeSearchPanel(view); view.focus(); };
-  return <div className="flex flex-col gap-2 p-3" role="search" aria-label={i18n.text(messages.find)}
+  return <div className="flex flex-col gap-2 p-3" role="search" aria-label={i18n.text(readOnly ? messages.searchText : messages.find)}
     onKeyDown={event => {
       if (event.nativeEvent.isComposing) return;
       if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); return; }

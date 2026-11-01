@@ -1,14 +1,21 @@
 import { z } from "zod";
-import { defineCreation, defineImplementation } from "@asterism-app/sdk/contracts";
+import { defineCall, defineCreation, defineImplementation } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 import { DirectoryList, DirectoryRead } from "../filesystem/contract.ts";
 import { DirectoryFind, DirectoryGrep } from "../filesystem/search-contract.ts";
+import { ReadDirectoryFile } from "../filesystem/editor-contract.ts";
 
 export const Manual = builtin.resource("manual", z.strictObject({}));
 export const CreateManual = defineCreation(Manual, {
   id: builtin.name("manual.create"), schema: z.strictObject({}).describe("No parameters."),
 });
 export const ManualView = builtin.data("manual.card", z.strictObject({}));
+export const ManualTree = defineCall(builtin.name("manual.tree"), {
+  scope: "object", input: z.strictObject({}), output: z.strictObject({ paths: z.array(z.string()) }),
+});
+export const ReadManualFile = defineCall(builtin.name("manual.file.read"), {
+  scope: "object", input: z.strictObject({ path: z.string().min(1) }), output: ReadDirectoryFile.output,
+});
 const path = z.string().min(1).max(4096)
   .describe("Path in the manual's virtual directory, including its source prefix, for example 'sdk/docs/getting-started.md'. Paths remain within the manual; selected symlinks remain inside their declared source directory.");
 const directoryTarget = z.union([z.null(), z.strictObject({ path })])

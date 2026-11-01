@@ -1,10 +1,17 @@
-import { defineModule, implementResource, implementCreation, implementTool } from "@asterism-app/sdk/runtime";
-import { CreateManual, Manual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep } from "./contract.ts";
+import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type ObjectReader } from "@asterism-app/sdk/runtime";
+import { CreateManual, Manual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep, ManualTree, ReadManualFile } from "./contract.ts";
 import { manualCard } from "../shared/card-appearance.ts";
 import type { ManualSource } from "@asterism-app/sdk/runtime";
 import { listManual, readManual, findManual, grepManual } from "./files.ts";
 import { findToModel, grepToModel } from "../filesystem/search-presentation.ts";
 import { readToModel } from "../shared/text.ts";
+import { readManualTree, readManualFile } from "./browser.ts";
+import { fileFailure } from "../filesystem/file-io.ts";
+
+function requireManual(object: ObjectReader) {
+  if (object.ref.kind !== Manual.kind || !object.snapshot())
+    throw new PluginApiError("unavailable", "The manual is not available on this session path.");
+}
 
 export function createManualModule(sources: () => readonly ManualSource[], applicationName: string) {
   return defineModule(() => ({
@@ -18,6 +25,18 @@ export function createManualModule(sources: () => readonly ManualSource[], appli
         sources: sources().map(source => source.path),
       }),
     })],
+    calls: [
+      implementCall(ManualTree, async (_input, { object, signal }) => {
+        requireManual(object);
+        try { return await readManualTree(sources(), signal); }
+        catch (error) { signal.throwIfAborted(); return fileFailure(error); }
+      }),
+      implementCall(ReadManualFile, async ({ path }, { object, signal }) => {
+        requireManual(object);
+        try { return await readManualFile(sources(), path, signal); }
+        catch (error) { signal.throwIfAborted(); return fileFailure(error); }
+      }),
+    ],
     tools: [
       implementTool(ManualList, { call: (_data, target, _args, { signal }) => listManual(sources(), target, signal) }),
       implementTool(ManualRead, {

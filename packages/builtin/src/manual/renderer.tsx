@@ -1,6 +1,7 @@
+import { lazy } from "react";
 import { BookOpen, FileSearch, ListTree, Search } from "lucide-react";
-import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule } from "@asterism-app/sdk/renderer";
-import { Manual, CreateManual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep } from "./contract";
+import { cardRenderer, creationEntry, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
+import { Manual, CreateManual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep, ManualTree } from "./contract";
 import { manualMessages as messages } from "../messages/manual";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
@@ -9,15 +10,26 @@ import { prepareCodeView } from "../shared/code-view";
 import { textReadViews } from "../text-view";
 import { listViews } from "../filesystem/list-view";
 import { findViews, grepViews } from "../filesystem/search-view";
+import { FileTreeBody, FileTreeRefresh } from "../filesystem/FileTree";
+import { createTreeLink } from "../filesystem/tree-link";
+
+const ManualFile = lazy(() => import("./ManualFile"));
+const useManualTreeLink = createTreeLink((calls, ref, signal) => calls.invoke(ManualTree, {}, { object: ref, signal }));
 
 function ManualBody() {
-  return <p className="type-body p-3 text-muted-foreground">{useI18n().text(messages.description)}</p>;
+  const { state } = useManualTreeLink();
+  return <FileTreeBody state={state} FileView={ManualFile} />;
+}
+
+function ManualActions() {
+  const { link, state } = useManualTreeLink();
+  return <FileTreeRefresh loading={state.loading} reload={() => link.reload()} />;
 }
 
 export default {
   prepare: prepareCodeView,
   resources: [{ kind: Manual.kind, label: messages.title, icon: <BookOpen className="size-4" />, card: appearance }],
-  cards: [cardRenderer(ManualView, { ...appearance, Body: ManualBody })],
+  cards: [cardRenderer(ManualView, { ...appearance, Body: ManualBody, Actions: ManualActions })],
   creations: [creationEntry(CreateManual, {
     id: "asterism.builtin/manual.open", label: messages.title, icon: <BookOpen className="size-4" />,
     group: "resources", triggers: { menu: { initialInput: {} } },
