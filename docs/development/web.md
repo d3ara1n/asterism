@@ -4,11 +4,13 @@ Web resources expose application-wide search and URL-fetch providers. Provider a
 
 ## Provider identity and routing
 
-A provider type has a stable slug, capabilities, URL patterns, credential declaration, internal endpoint, and instance factory. Each type has at most one saved configuration.
+A provider type has a stable slug, capabilities, URL patterns, declared settings, and instance factory. Each type has at most one saved configuration. Adding a provider adds that service; users do not name it or choose an identity.
 
-The type slug is its configured identity. Users enable the service and supply credentials; arbitrary endpoint replacement is not part of that configuration. A proxy or self-hosted service can declare a separate provider type.
+The type slug is its configured identity. The upstream endpoint belongs to the adapter; arbitrary endpoint replacement is not part of the configuration. A proxy or self-hosted service can declare a separate provider type.
 
-Saved unavailable types remain visible. Duplicate type registration fails. Provider shutdown revokes contributions and waits for in-flight work.
+Settings use a closed set of kinds that the host renders, validates, and stores. Secret settings hold values such as API keys; their values live in the credential vault, and configuration and snapshots retain only their state. Choice settings hold one declared option and fall back to their declared default when unsaved. A provider that needs no credentials declares no secret. Saving validates values against the currently registered type and requires every required secret to be kept or supplied, so a saved provider is never left incomplete. References to secrets the type no longer declares are removed with that save.
+
+Saved unavailable types remain visible and can be removed but not edited. Duplicate type registration fails. Provider shutdown revokes contributions and waits for in-flight work.
 
 The saved provider list defines priority and can be reordered in settings. Search tries enabled, registered search-capable providers in that order. Fetch uses the same order after filtering for fetch capability and a pattern matching the normalized full URL. Multiple matching patterns do not cause duplicate attempts.
 
@@ -20,7 +22,7 @@ Successful results identify the provider that handled the request and include hi
 
 All Web objects share the same provider service. Each object stores identity and title. Linking it grants access through the ordinary captured resource scope.
 
-Candidate instances and credentials are resolved at the request boundary, before sequential requests begin. Configuration edits affect subsequent requests. Provider resolution, credential reading, and requests use the provider/caller cancellation scope. Explicit resolved handles bind one instance and lifecycle; they do not perform provider fallback.
+Candidate instances, settings, and secrets are resolved at the request boundary, before sequential requests begin. Configuration edits affect subsequent requests. A saved choice the current type no longer offers, or a missing required secret, fails that provider's resolution and advances to the next candidate. Provider resolution, secret reading, and requests use the provider/caller cancellation scope. Explicit resolved handles bind one instance and lifecycle; they do not perform provider fallback.
 
 Web search and fetch remain read-only resource tools. HTTP URLs reject embedded credentials.
 
@@ -42,6 +44,6 @@ Scores retain their provider meaning and do not establish cross-provider ranking
 
 ## Built-in adapters
 
-Exa and Parallel use their official SDKs for search and URL content retrieval. Both preserve supported filters, source metadata, provider warnings, and reported usage. Exa distinguishes text, highlights, and summaries; its API failures retain available upstream error codes, details, and request identifiers. Parallel distinguishes Markdown excerpts from page bodies and reports SKU counts without estimating currency costs.
+Exa and Parallel use their official SDKs for search and URL content retrieval. Each declares an API key and a search choice that applies only to web search: Exa's search type and Parallel's search mode. Both preserve supported filters, source metadata, provider warnings, and reported usage. Exa distinguishes text, highlights, and summaries; its API failures retain available upstream error codes, details, and request identifiers. Parallel distinguishes Markdown excerpts from page bodies and reports SKU counts without estimating currency costs.
 
 Unsupported filters and parameter adjustments become hints. Provider-specific limits and filter precedence stay in the adapter. Empty search is valid; failed content retrieval remains an error. Cancellation passes to each SDK.

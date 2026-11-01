@@ -2,14 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { WebResponse } from "@asterism-app/sdk/contracts";
 import { WebError, type WebProviderDefinition } from "@asterism-app/sdk/runtime";
 import { RunLifecycle } from "../plugins/lifecycle.ts";
-import { limitWebBody, matchesWebUrl, matchWebProviders, WebProviderRegistry } from "./web-providers.ts";
+import { limitWebBody, matchesWebUrl, matchWebProviders, resolveWebSettings, WebProviderRegistry } from "./web-providers.ts";
 
 const types = [
   { id: "specific", fetch: true, urlPatterns: ["https://other.test/*", "https://docs.test/*", "https://docs.test/page"] },
   { id: "generic", fetch: true, urlPatterns: ["*"] },
   { id: "search", fetch: false, urlPatterns: ["*"] },
 ];
-const state = (id: string, enabled = true) => ({ id, enabled });
+const state = (id: string, enabled = true) => ({ id, enabled, settings: {} });
 describe("Web URL routing", () => {
   it("treats only asterisks as wildcards and matches other URL characters literally", () => {
     expect(matchesWebUrl("https://docs.test/page?v=a+b", "https://docs.test/page?v=a+b")).toBe(true);
@@ -35,23 +35,44 @@ afterEach(async () => { await Promise.all(lifecycles.splice(0).map(life => life.
 const empty: WebResponse = { documents: [], hints: [] };
 const options = () => ({ signal: new AbortController().signal });
 function provider(id: string, overrides: Partial<WebProviderDefinition> = {}): WebProviderDefinition {
-  return { id, label: id, search: true, fetch: true, urlPatterns: ["*"], credential: null,
-    defaultBaseUrl: "https://provider.test", create: () => ({ search: async () => empty, fetch: async () => empty }), ...overrides };
+  return { id, label: id, search: true, fetch: true, urlPatterns: ["*"], settings: [],
+    create: () => ({ search: async () => empty, fetch: async () => empty }), ...overrides };
 }
+const apiKey = { kind: "secret" as const, key: "apiKey", label: "API key", required: true };
 function registry(definitions: WebProviderDefinition[], states = definitions.map(item => state(item.id)),
-  credential: (id: string) => Promise<string | null> = async () => null) {
+  secret: (id: string, key: string) => Promise<string | null> = async () => null) {
   const life = new RunLifecycle(() => {});
   lifecycles.push(life);
-  const web = new WebProviderRegistry({ list: () => states, credential });
+  const web = new WebProviderRegistry({ list: () => states, secret });
   web.declare("test.web", definitions, life.group("call"));
   return web;
 }
+
+describe("Web provider settings resolution", () => {
+  const type = { id: "service", settings: [
+    { ...apiKey },
+    { kind: "secret" as const, key: "token", label: "Token", required: false },
+    { kind: "choice" as const, key: "mode", label: "Mode", default: "auto", options: [{ value: "auto", label: "Auto" }, { value: "deep", label: "Deep" }] },
+  ] };
+  const secrets = (values: Record<string, string>) => async (key: string) => values[key] ?? null;
+  // Unsaved choices must use the declared default; saved choices must survive; unset optional secrets stay absent rather than empty.
+  it("applies choice defaults, keeps saved choices, and omits unset optional secrets", async () => {
+    expect(await resolveWebSettings(type, {}, secrets({ apiKey: "key" }))).toEqual({ apiKey: "key", mode: "auto" });
+    expect(await resolveWebSettings(type, { mode: "deep" }, secrets({ apiKey: "key", token: "t" }))).toEqual({ apiKey: "key", token: "t", mode: "deep" });
+  });
+  // A plugin update can remove an option or add a required secret; the provider must not run with a silently substituted value.
+  it("rejects saved choices the declaration no longer offers and missing required secrets", async () => {
+    await expect(resolveWebSettings(type, { mode: "removed" }, secrets({ apiKey: "key" })))
+      .rejects.toMatchObject({ code: "provider_unavailable", message: expect.stringContaining("'removed'") });
+    await expect(resolveWebSettings(type, {}, secrets({}))).rejects.toMatchObject({ code: "credential_unavailable" });
+  });
+});
 
 describe("Ordered web provider fallback", () => {
   it("advances past credential, request, and protocol failures and accepts an empty search", async () => {
     const calls: string[] = [];
     const definitions = [
-      provider("key", { credential: { kind: "api_key" } }),
+      provider("key", { settings: [apiKey] }),
       provider("request", { create: () => ({ search: async () => {
         calls.push("request"); throw new WebError("request_failed", "Service unavailable.");
       } }) }),
@@ -141,8 +162,8 @@ describe("Ordered web provider fallback", () => {
         key = "changed";
         throw new Error("Retry with the captured provider.");
       } }) }),
-      provider("second", { credential: { kind: "api_key" }, create: ({ credential }) => ({
-        search: async () => { used.push(credential); return empty; },
+      provider("second", { settings: [apiKey], create: ({ settings }) => ({
+        search: async () => { used.push(settings.apiKey ?? null); return empty; },
       }) }),
     ], states, async () => key);
     expect((await web.search({ query: "query", maxResults: 5 }, options())).provider).toBe("second");

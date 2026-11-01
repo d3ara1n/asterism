@@ -8,6 +8,7 @@ import { createModelInput, type ModelProviderInput } from "../shared/configurati
 import { modelProviderPresetDraft } from "../shared/provider-presets.ts";
 import { modelProviderPresets } from "../../packages/builtin/src/providers/presets.ts";
 import { ConfigurationService } from "./service.ts";
+import { configurationStorage } from "./store.ts";
 import type { ConnectionProbe } from "./probe.ts";
 import type { ModelCompatibility } from "../shared/model-compatibility.ts";
 import type { DiscoverModels } from "./discovery.ts";
@@ -49,11 +50,12 @@ describe("Real configuration and consumption boundaries", () => {
     cleanups.push(() => life.stop());
     const create = vi.fn(() => ({ fetch: async () => ({ documents: [], hints: [] }) }));
     const definition = { id: "test-web", label: "Test web", search: false, fetch: true, urlPatterns: ["*"],
-      defaultBaseUrl: "https://web.test", credential: { kind: "api_key" as const }, create };
-    service.web.declare("test.web", [definition], life.group("call"));
-    await service.execute({ type: "webProvider.save", id: definition.id, enabled: true,
-      credential: { action: "replace", value: "web-key" } });
-    await service.execute({ type: "webProvider.save", id: "other", enabled: false, credential: { action: "keep" } });
+      settings: [{ kind: "secret" as const, key: "apiKey", label: "API key", required: true }], create };
+    const other = { id: "other", label: "Other", search: true, fetch: false, urlPatterns: [], settings: [], create };
+    service.web.declare("test.web", [definition, other], life.group("call"));
+    await service.execute({ type: "webProvider.save", id: definition.id, enabled: true, settings: {},
+      secrets: { apiKey: { action: "replace", value: "web-key" } } });
+    await service.execute({ type: "webProvider.save", id: "other", enabled: false, settings: {}, secrets: {} });
     await service.execute({ type: "webProvider.reorder", ids: ["other", definition.id] });
     for (const ids of [[definition.id], ["other", "other"], ["other", "unknown"]]) {
       await expect(service.execute({ type: "webProvider.reorder", ids })).rejects.toMatchObject({ code: "invalid_request" });
@@ -63,14 +65,89 @@ describe("Real configuration and consumption boundaries", () => {
     service.close();
     const reopened = new ConfigurationService(root, protector);
     cleanups.push(() => reopened.close());
-    reopened.web.declare("test.web", [definition], life.group("call"));
+    reopened.web.declare("test.web", [definition, other], life.group("call"));
     expect(reopened.current().webProviders.map(item => [item.id, item.enabled])).toEqual([["other", false], [definition.id, true]]);
     await reopened.web.resolve(definition.id, { signal: new AbortController().signal });
-    expect(create).toHaveBeenCalledWith(expect.objectContaining({ credential: "web-key", baseUrl: definition.defaultBaseUrl }));
+    expect(create).toHaveBeenCalledWith({ settings: { apiKey: "web-key" } });
     // Updating a reordered provider preserves its position.
-    await reopened.execute({ type: "webProvider.save", id: definition.id, enabled: false,
-      credential: { action: "replace", value: "new-key" } });
-    expect(reopened.current().webProviders[1]).toMatchObject({ id: definition.id, enabled: false, credentialState: "available" });
+    await reopened.execute({ type: "webProvider.save", id: definition.id, enabled: false, settings: {},
+      secrets: { apiKey: { action: "replace", value: "new-key" } } });
+    expect(reopened.current().webProviders[1]).toMatchObject({ id: definition.id, enabled: false, secrets: { apiKey: "available" } });
+  });
+  // v12 stored one API key reference per web provider; losing it on upgrade would silently disable configured services.
+  it("migrates v12 web provider credentials to the apiKey secret", async () => {
+    const { service, root, protector } = setup();
+    const life = new RunLifecycle(() => {});
+    cleanups.push(() => life.stop());
+    const create = vi.fn(() => ({ search: async () => ({ documents: [], hints: [] }) }));
+    const definition = { id: "keyed", label: "Keyed", search: true, fetch: false, urlPatterns: [],
+      settings: [{ kind: "secret" as const, key: "apiKey", label: "API key", required: true }], create };
+    service.web.declare("test.web", [definition], life.group("call"));
+    await service.execute({ type: "webProvider.save", id: "keyed", enabled: true, settings: {},
+      secrets: { apiKey: { action: "replace", value: "legacy-key" } } });
+    service.close();
+    const file = join(root, "configuration.json");
+    const current = JSON.parse(readFileSync(file, "utf8"));
+    const ref = current.webProviders[0].secretRefs.apiKey;
+    writeFileSync(file, JSON.stringify({ ...current, version: 12, webProviders: [
+      { id: "keyed", enabled: true, credentialRef: ref }, { id: "keyless", enabled: false, credentialRef: null },
+    ] }));
+    configurationStorage(root).inspect()!.apply();
+    const reopened = new ConfigurationService(root, protector);
+    cleanups.push(() => reopened.close());
+    reopened.web.declare("test.web", [definition], life.group("call"));
+    // Credential storage availability is probed by the first command.
+    await reopened.execute({ type: "read" });
+    expect(reopened.current().webProviders).toEqual([
+      { id: "keyed", enabled: true, settings: {}, secrets: { apiKey: "available" } },
+      { id: "keyless", enabled: false, settings: {}, secrets: {} },
+    ]);
+    await reopened.web.resolve("keyed", { signal: new AbortController().signal });
+    expect(create).toHaveBeenCalledWith({ settings: { apiKey: "legacy-key" } });
+  });
+  // Saved values must stay within the current declaration; secrets the type stops declaring are removed from the vault.
+  it("validates web provider settings against the declared type and drops undeclared secrets", async () => {
+    const { service, root } = setup();
+    const life = new RunLifecycle(() => {});
+    cleanups.push(() => life.stop());
+    const create = () => ({ search: async () => ({ documents: [], hints: [] }) });
+    const choice = { kind: "choice" as const, key: "mode", label: "Mode", default: "a", options: [{ value: "a", label: "A" }, { value: "b", label: "B" }] };
+    const secret = { kind: "secret" as const, key: "token", label: "Token", required: false };
+    const base = { id: "svc", label: "Service", search: true, fetch: false, urlPatterns: [], create };
+    service.web.declare("v1", [{ ...base, settings: [choice, secret] }], life.group("call"));
+    for (const command of [
+      { settings: { mode: "c" }, secrets: {} }, { settings: { token: "a" }, secrets: {} },
+      { settings: {}, secrets: { mode: { action: "keep" as const } } }, { settings: { other: "a" }, secrets: {} },
+    ]) await expect(service.execute({ type: "webProvider.save", id: "svc", enabled: true, ...command })).rejects.toMatchObject({ code: "invalid_request" });
+    await expect(service.execute({ type: "webProvider.save", id: "missing", enabled: true, settings: {}, secrets: {} }))
+      .rejects.toMatchObject({ code: "not_found" });
+    await service.execute({ type: "webProvider.save", id: "svc", enabled: true, settings: { mode: "b" },
+      secrets: { token: { action: "replace", value: "token-value" } } });
+    const ref = JSON.parse(readFileSync(join(root, "configuration.json"), "utf8")).webProviders[0].secretRefs.token;
+    expect(service.vault.exists(ref)).toBe(true);
+    service.web.removeOwners(["v1"]);
+    service.web.declare("v2", [{ ...base, settings: [choice] }], life.group("call"));
+    await service.execute({ type: "webProvider.save", id: "svc", enabled: true, settings: { mode: "b" }, secrets: {} });
+    expect(service.current().webProviders[0]).toEqual({ id: "svc", enabled: true, settings: { mode: "b" }, secrets: {} });
+    expect(JSON.parse(readFileSync(join(root, "configuration.json"), "utf8")).webProviders[0].secretRefs).toEqual({});
+    expect(service.vault.exists(ref)).toBe(false);
+  });
+  // A saved provider must be usable: required secrets can be replaced but never left absent, including on first save.
+  it("rejects saves that would leave a required secret absent", async () => {
+    const { service } = setup();
+    const life = new RunLifecycle(() => {});
+    cleanups.push(() => life.stop());
+    service.web.declare("test.web", [{ id: "keyed", label: "Keyed", search: true, fetch: false, urlPatterns: [],
+      settings: [{ kind: "secret", key: "apiKey", label: "API key", required: true }],
+      create: () => ({ search: async () => ({ documents: [], hints: [] }) }) }], life.group("call"));
+    const save = (secrets: Record<string, { action: "keep" } | { action: "clear" } | { action: "replace"; value: string }>) =>
+      service.execute({ type: "webProvider.save", id: "keyed", enabled: true, settings: {}, secrets });
+    await expect(save({})).rejects.toMatchObject({ code: "invalid_request" });
+    expect(service.current().webProviders).toEqual([]);
+    await save({ apiKey: { action: "replace", value: "key" } });
+    await expect(save({ apiKey: { action: "clear" } })).rejects.toMatchObject({ code: "invalid_request" });
+    await save({});
+    expect(service.current().webProviders[0]?.secrets).toEqual({ apiKey: "available" });
   });
   // Editing rules must persist independently per connection; fixed auth methods cannot prevent renaming, toggling, or credential management.
   it("preset fixed fields survive reopen while connection identity and keys remain editable", async () => {

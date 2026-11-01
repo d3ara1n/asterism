@@ -12,19 +12,20 @@ afterEach(() => http.transport.mockReset());
 afterAll(() => { globalThis.fetch = http.original; });
 
 describe("Exa result normalization", () => {
-  // The registry strips trailing slashes before calling create; verify that proxy addresses without trailing slashes route correctly to search and contents paths.
-  it("requests the correct search and contents paths under a proxy endpoint", async () => {
-    const paths: string[] = [];
-    http.transport.mockImplementation(async url => {
-      paths.push(new URL(typeof url === "string" ? url : url instanceof URL ? url.href : url.url).pathname);
+  // The configured search type applies to search only; URL retrieval uses the contents endpoint without a search type.
+  it("sends the configured search type to search and leaves content retrieval unaffected", async () => {
+    const requests: { path: string; body: Record<string, unknown> }[] = [];
+    http.transport.mockImplementation(async (url, init) => {
+      const href = typeof url === "string" ? url : url instanceof URL ? url.href : url.url;
+      requests.push({ path: new URL(href).pathname, body: JSON.parse(String(init?.body)) });
       return new Response(JSON.stringify({ results: [{ id: "page", url: "https://page.test/", text: "Page content" }] }),
         { headers: { "content-type": "application/json" } });
     });
-    const instance = exaWebProvider.create({ baseUrl: "https://proxy.test/exa", credential: "test-key" });
+    const instance = exaWebProvider.create({ settings: { apiKey: "test-key", searchType: "deep" } });
     const options = { signal: new AbortController().signal };
     await instance.search!({ query: "test", maxResults: 1 }, options);
     await instance.fetch!({ url: "https://page.test/" }, options);
-    expect(paths).toEqual(["/exa/search", "/exa/contents"]);
+    expect(requests.map(request => [request.path, request.body.type])).toEqual([["/search", "deep"], ["/contents", undefined]]);
   });
   // Default fetching should retain the body request; query only adds excerpts, and character limits must also adapt to Exa's own parameter range.
   it("selects body options and additional excerpts from fetch arguments and explicitly reports adjustments to upstream limits", async () => {
@@ -34,7 +35,7 @@ describe("Exa result normalization", () => {
       return new Response(JSON.stringify({ results: [{ url: "https://page.test/", text: "Page content" }] }),
         { headers: { "content-type": "application/json" } });
     });
-    const instance = exaWebProvider.create({ baseUrl: "https://proxy.test", credential: "test-key" });
+    const instance = exaWebProvider.create({ settings: { apiKey: "test-key", searchType: "auto" } });
     const options = { signal: new AbortController().signal };
     await instance.fetch!({ url: "https://page.test/" }, options);
     await instance.fetch!({ url: "https://page.test/", query: "focus", maxCharacters: 300 }, options);
@@ -122,7 +123,7 @@ describe("Exa result normalization", () => {
       requestId: "req-invalid", error: { type: "INVALID_REQUEST", code: "INVALID_ARGUMENT",
         message: "Invalid publication date.", detail: { field: "startPublishedDate" } },
     }), { status: 400, headers: { "content-type": "application/json" } }));
-    const instance = exaWebProvider.create({ baseUrl: "https://proxy.test", credential: "test-key" });
+    const instance = exaWebProvider.create({ settings: { apiKey: "test-key", searchType: "auto" } });
     await expect(instance.search!({ query: "test", maxResults: 1 }, { signal: new AbortController().signal })).rejects.toMatchObject({
       code: "invalid_request",
       message: 'Exa request failed (HTTP 400, INVALID_REQUEST, INVALID_ARGUMENT, requestId: req-invalid): Invalid publication date. Details: {"field":"startPublishedDate"}',

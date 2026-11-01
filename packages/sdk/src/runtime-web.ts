@@ -1,5 +1,5 @@
 import type { UiText } from "./i18n.ts";
-import type { WebCredentialDefinition, WebProviderState, WebProviderType, WebSearchRequest, WebFetchRequest, WebResponse, WebSearchResult, WebFetchResult } from "./web.ts";
+import type { WebProviderSetting, WebProviderState, WebProviderType, WebSearchRequest, WebFetchRequest, WebResponse, WebSearchResult, WebFetchResult } from "./web.ts";
 
 export interface WebProviderInstance {
   search?(request: WebSearchRequest, options: { signal: AbortSignal }): Promise<WebResponse>;
@@ -12,11 +12,13 @@ export interface WebProviderDefinition {
   fetch: boolean;
   /** Glob for the complete URL, with * matching any characters; fetch routing matches in declaration order. */
   urlPatterns: readonly string[];
-  defaultBaseUrl: string;
-  /** Required credential type; null means no credentials are required. */
-  credential: WebCredentialDefinition | null;
-  /** Synchronous factory; baseUrl has trailing slashes removed, and credential is null if and only if the credential declaration is null. */
-  create(context: { baseUrl: string; credential: string | null }): WebProviderInstance;
+  /** Settings the user configures for this service, rendered in declaration order. */
+  settings: readonly WebProviderSetting[];
+  /**
+   * Synchronous factory called with values captured at the request boundary.
+   * Choice settings always hold a declared option; required secrets are present; unset optional secrets are absent.
+   */
+  create(context: { settings: Readonly<Record<string, string | undefined>> }): WebProviderInstance;
 }
 export interface WebProviderServices {
   types(): readonly WebProviderType[];

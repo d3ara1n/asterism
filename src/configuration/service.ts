@@ -19,13 +19,14 @@ const saveKinds = { "modelProvider.save": "modelProvider", "model.save": "model"
 export class ConfigurationService {
   readonly extensions = new ModelProviderExtensions();
   readonly web = new WebProviderRegistry({
-    list: () => this.store.list("webProvider").map(({ credentialRef: _ref, ...state }) => state),
-    credential: async id => {
+    list: () => this.store.list("webProvider").map(({ secretRefs: _refs, ...state }) => state),
+    secret: async (id, key) => {
       this.assertOpen();
       const stored = this.store.get("webProvider", id);
       if (!stored) throw new WebError("provider_unavailable", `Web provider '${id}' is not configured.`);
-      if (!stored.credentialRef) return null;
-      try { return await this.vault.read(stored.credentialRef); }
+      const ref = stored.secretRefs[key];
+      if (!ref) return null;
+      try { return await this.vault.read(ref); }
       catch { throw new WebError("credential_unavailable", "The web provider credential could not be read."); }
     },
   });
@@ -136,10 +137,11 @@ export class ConfigurationService {
       mcp: this.store.mcp(),
       shell: this.store.shell(),
       sessionEntry: this.store.sessionEntry(),
-      webProviders: this.store.list("webProvider").map(({ credentialRef, ...state }) => {
+      webProviders: this.store.list("webProvider").map(({ secretRefs, ...state }) => {
         const type = this.web.types().find(t => t.id === state.id);
-        const needsCredential = type ? type.credential !== null : credentialRef !== null;
-        return { ...state, credentialState: needsCredential ? this.credentialState("api_key", credentialRef) : "not_required" as const };
+        // Unavailable types still report their saved secrets so the settings list can show them.
+        const keys = type ? type.settings.filter(setting => setting.kind === "secret").map(setting => setting.key) : Object.keys(secretRefs);
+        return { ...state, secrets: Object.fromEntries(keys.map(key => [key, this.credentialState("api_key", secretRefs[key] ?? null)])) };
       }),
       webProviderTypes: this.web.types(),
       ...this.modelCatalog(),
@@ -157,23 +159,42 @@ export class ConfigurationService {
     }
     if (command.type === "webProvider.save") {
       const { id, enabled } = command;
-      const oldRef = this.store.get("webProvider", id)?.credentialRef ?? null;
-      let ref = oldRef, newRef: string | null = null;
+      const type = this.web.types().find(item => item.id === id);
+      if (!type) throw new ConfigurationError("not_found", "This web provider type is unavailable.");
+      const invalid = () => new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values.");
+      for (const [key, value] of Object.entries(command.settings)) {
+        const setting = type.settings.find(item => item.key === key);
+        if (setting?.kind !== "choice" || !setting.options.some(option => option.value === value)) throw invalid();
+      }
+      const secretKeys = type.settings.filter(setting => setting.kind === "secret").map(setting => setting.key);
+      if (Object.keys(command.secrets).some(key => !secretKeys.includes(key))) throw invalid();
+      // References for secrets the current type no longer declares are dropped with this save.
+      const oldRefs = this.store.get("webProvider", id)?.secretRefs ?? {};
+      // A saved provider is always usable: every required secret is kept or supplied by this save.
+      for (const setting of type.settings) if (setting.kind === "secret" && setting.required) {
+        const update = command.secrets[setting.key] ?? { action: "keep" as const };
+        if (update.action === "clear" || update.action === "keep" && !oldRefs[setting.key]) throw invalid();
+      }
+      const refs: Record<string, string> = {}, written: string[] = [];
       try {
-        if (command.credential.action === "clear") ref = null;
-        else if (command.credential.action === "replace") {
-          if (!this.storageAvailable) throw new Error("System credential protection is unavailable.");
-          newRef = await this.vault.write(command.credential.value);
-          ref = newRef;
+        for (const key of secretKeys) {
+          const update = command.secrets[key] ?? { action: "keep" as const };
+          if (update.action === "replace") {
+            if (!this.storageAvailable) throw new Error("System credential protection is unavailable.");
+            const ref = await this.vault.write(update.value);
+            written.push(ref);
+            refs[key] = ref;
+          } else if (update.action === "keep" && oldRefs[key]) refs[key] = oldRefs[key];
         }
         this.assertOpen();
-        this.store.save({ kind: "webProvider", id, value: { id, enabled }, credentialRef: ref });
+        this.store.save({ kind: "webProvider", id, value: { id, enabled, settings: command.settings }, secretRefs: refs });
       } catch (error) {
-        if (newRef) this.removeCredential(newRef);
+        for (const ref of written) this.removeCredential(ref);
         if (error instanceof ConfigurationError) throw error;
         throw new ConfigurationError("unavailable", "The web provider could not be saved.");
       }
-      if (oldRef && oldRef !== ref) this.removeCredential(oldRef);
+      const kept = new Set(Object.values(refs));
+      for (const ref of Object.values(oldRefs)) if (!kept.has(ref)) this.removeCredential(ref);
       return id;
     }
     if (command.type === "test.start") return this.startTest(command.model);
@@ -204,10 +225,10 @@ export class ConfigurationService {
       return provider.id;
     }
     if (command.type === "remove") {
-      const { credentialRef } = this.store.remove(command.kind, command.id);
+      const { credentialRefs } = this.store.remove(command.kind, command.id);
       this.tests.clear(command.kind, command.id);
       if (command.kind === "modelProvider") this.discoveries.clearProvider(command.id);
-      if (credentialRef) this.removeCredential(credentialRef);
+      for (const ref of credentialRefs) this.removeCredential(ref);
       return command.id;
     }
     if (command.id && !this.store.get(saveKinds[command.type as keyof typeof saveKinds], command.id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");

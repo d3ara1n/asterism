@@ -12,9 +12,10 @@ import { providerEditingMessages } from "../shared/provider-editing-messages.ts"
 import { jsonStorage } from "../storage/migrations.ts";
 
 /** Global configuration format; increment on changes and append an n → n+1 migration to `configurationStorage`. */
-export const configurationVersion = 12;
+export const configurationVersion = 13;
 const storedProviderSchema = modelProviderInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
-const storedWebProviderSchema = webProviderStateSchema.extend({ credentialRef: z.string().uuid().nullable() });
+/** Secret references are keyed by setting key; values live in the credential vault. */
+const storedWebProviderSchema = webProviderStateSchema.extend({ secretRefs: z.record(z.string(), z.string().uuid()) });
 const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
 /** Models use `<providerId>/<modelId>` identities; other entries use id. */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
@@ -43,7 +44,7 @@ const collections = { modelProvider: "modelProviders", webProvider: "webProvider
 export type ConfigurationKind = keyof typeof collections;
 type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collections)[K]][number] };
 type ConfigurationSave =
-  | { kind: "webProvider"; id: string; value: WebProviderState; credentialRef: string | null }
+  | { kind: "webProvider"; id: string; value: WebProviderState; secretRefs: Record<string, string> }
   | { kind: "modelProvider"; id: string | null; value: ModelProviderInput; credentialRef: string | null }
   | { kind: "model"; id: string | null; value: ProviderModel };
 
@@ -51,9 +52,17 @@ function initialConfiguration(): ConfigurationDocument {
   return { version: configurationVersion, mcp: structuredClone(defaultMcpSettings), mcpCredentialRefs: {},
     shell: structuredClone(defaultShellSettings), modelProviders: [], webProviders: [], models: [], sessionEntry: null };
 }
+/** v12 web providers held one API key reference; v13 stores provider settings and secret references by setting key. */
+export function migrateConfiguration12(value: unknown): unknown {
+  const document = value as { webProviders?: { id: string; enabled: boolean; credentialRef: string | null }[] };
+  return { ...document, webProviders: (document.webProviders ?? []).map(({ credentialRef, ...provider }) => ({
+    ...provider, settings: {}, secretRefs: credentialRef ? { apiKey: credentialRef } : {},
+  })) };
+}
 /** Append conversions for released formats here; business reads and writes always consume the current document. */
 export function configurationStorage(root: string) {
-  return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile), version: configurationVersion, migrations: {} });
+  return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile), version: configurationVersion,
+    migrations: { 12: migrateConfiguration12 } });
 }
 
 /** Locate by old identity and replace; reject new identities that conflict with other entries. */
@@ -107,7 +116,7 @@ export class ConfigurationStore {
     const next = structuredClone(this.document);
     const { id } = input;
     switch (input.kind) {
-      case "webProvider": upsert(next.webProviders, input.id, { ...input.value, credentialRef: input.credentialRef }); break;
+      case "webProvider": upsert(next.webProviders, input.id, { ...input.value, secretRefs: input.secretRefs }); break;
       case "modelProvider":
         upsert(next.modelProviders, id, { ...input.value, credentialRef: input.credentialRef });
         // Providers own their models: renaming moves models with them without rewriting saved model references.
@@ -146,7 +155,8 @@ export class ConfigurationStore {
       if (!isDeepStrictEqual(compatibility, input.value.compatibility)) reject();
     }
   }
-  remove(kind: ConfigurationKind, id: string): { credentialRef: string | null } {
+  /** Return the vault references the removed entry owned. */
+  remove(kind: ConfigurationKind, id: string): { credentialRefs: string[] } {
     const old = this.get(kind, id);
     if (!old) throw new ConfigurationError("not_found", "This configuration no longer exists.");
     const next = structuredClone(this.document);
@@ -157,7 +167,8 @@ export class ConfigurationStore {
       case "model": next.models = next.models.filter(item => modelReference(item) !== id); break;
     }
     this.commit(next);
-    return { credentialRef: "credentialRef" in old ? old.credentialRef : null };
+    if ("secretRefs" in old) return { credentialRefs: Object.values(old.secretRefs) };
+    return { credentialRefs: "credentialRef" in old && old.credentialRef ? [old.credentialRef] : [] };
   }
   /** Save all selections together; existing models retain their values and retries do not overwrite user configuration. */
   addModels(models: ProviderModel[]): void {

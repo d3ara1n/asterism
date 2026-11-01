@@ -1,3 +1,4 @@
+import { useId } from "react";
 import type { CredentialState } from "../../../shared/configuration";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
@@ -8,23 +9,35 @@ import { StatusText } from "@asterism-app/ui/ui/status";
 import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
 import { ChoiceField } from "./forms";
+import { ProviderKeyLink } from "./ProviderKeyLink";
 
 export interface ConnectionCredentialDraft {
   action: "keep" | "replace" | "clear";
   key: string;
 }
+/** A replace draft with only whitespace changes nothing; it is submitted as keep. */
+export function credentialChanged(draft: ConnectionCredentialDraft): boolean {
+  return draft.action === "clear" || draft.action === "replace" && draft.key.trim() !== "";
+}
 
-/** Compose authentication controls by method; a fixed method still allows entering, replacing, and clearing credentials. */
-export function ConnectionAuthentication({ auth, editable, credentialState, storageAvailable, draft, onAuthChange, onDraftChange }: {
-  auth: "api_key" | "none";
-  editable: boolean;
+/**
+ * Shared secret input for model and web providers: enter, keep, replace, or (when removable) clear a saved credential.
+ * credentialState is undefined before the first save.
+ */
+export function CredentialField({ label, optionalLabel, description, credentialState, storageAvailable, removable, keyUrl, autoFocus, draft, onDraftChange }: {
+  label: string;
+  /** Shown beside the label for optional credentials. */
+  optionalLabel?: string;
+  description?: string;
   credentialState?: CredentialState;
   storageAvailable: boolean;
+  removable: boolean;
+  keyUrl?: string;
+  autoFocus?: boolean;
   draft: ConnectionCredentialDraft;
-  onAuthChange(auth: "api_key" | "none"): void;
   onDraftChange(draft: ConnectionCredentialDraft): void;
 }) {
-  const i18n = useI18n();
+  const i18n = useI18n(), id = useId();
   const storedKey = credentialState === "available";
   const credentialLabels = {
     not_required: providersMessages.noAuthentication,
@@ -33,27 +46,46 @@ export function ConnectionAuthentication({ auth, editable, credentialState, stor
     storage_unavailable: providersMessages.credentialProtectionUnavailable,
     decryption_failed: providersMessages.decryptionFailed,
   };
+  return <Field>
+    <FieldLabel htmlFor={id}>{label}{optionalLabel && <span className="font-normal text-muted-foreground">{optionalLabel}</span>}</FieldLabel>
+    <Input id={id} type="password" autoComplete="off" autoFocus={autoFocus}
+      value={draft.key} disabled={draft.action === "clear"}
+      onChange={event => onDraftChange({ action: "replace", key: event.target.value })}
+      placeholder={i18n.text(storedKey ? providersMessages.keepSavedKey : providersMessages.pasteApiKey)} />
+    {description && <FieldDescription>{description}</FieldDescription>}
+    <FieldDescription>
+      {draft.action === "clear" ? <StatusText tone="warning">{i18n.text(providersMessages.keyRemovalHint)}</StatusText>
+        : credentialState === "storage_unavailable" || credentialState === "decryption_failed"
+          ? <StatusText tone="error">{i18n.text(credentialLabels[credentialState])}</StatusText>
+        : i18n.text(credentialState ? credentialLabels[credentialState] : providersMessages.keyStorageHint)}
+      {storedKey && removable && <Button type="button" variant="link" size="sm" className="ml-1 h-auto p-0 text-xs"
+        onClick={() => onDraftChange({ key: "", action: draft.action === "clear" ? "keep" : "clear" })}>
+        {i18n.text(draft.action === "clear" ? providersMessages.undo : providersMessages.removeSavedKey)}
+      </Button>}
+    </FieldDescription>
+    {keyUrl && <ProviderKeyLink href={keyUrl}>{i18n.text(providersMessages.getKey)}</ProviderKeyLink>}
+    {!storageAvailable && <Alert variant="destructive"><AlertDescription>{i18n.text(providersMessages.encryptionUnavailable)}</AlertDescription></Alert>}
+  </Field>;
+}
+
+/** Compose authentication controls by method; a fixed method still allows entering, replacing, and clearing credentials. */
+export function ConnectionAuthentication({ auth, editable, credentialState, storageAvailable, keyUrl, draft, onAuthChange, onDraftChange }: {
+  auth: "api_key" | "none";
+  editable: boolean;
+  credentialState?: CredentialState;
+  storageAvailable: boolean;
+  keyUrl?: string;
+  draft: ConnectionCredentialDraft;
+  onAuthChange(auth: "api_key" | "none"): void;
+  onDraftChange(draft: ConnectionCredentialDraft): void;
+}) {
+  const i18n = useI18n();
   return <>
     {editable && <ChoiceField label={i18n.text(providersMessages.authentication)} value={auth}
       options={[{ value: "api_key", label: i18n.text(commonMessages.apiKey) }, { value: "none", label: i18n.text(providersMessages.noAuthenticationOption) }]}
       onChange={next => { if (next === "api_key" || next === "none") onAuthChange(next); }} />}
-    {auth === "api_key" && <Field>
-      <FieldLabel htmlFor="provider-api-key">{i18n.text(commonMessages.apiKey)}</FieldLabel>
-      <Input id="provider-api-key" type="password" autoComplete="off" autoFocus={credentialState === undefined && !editable}
-        value={draft.key} disabled={draft.action === "clear"}
-        onChange={event => onDraftChange({ action: "replace", key: event.target.value })}
-        placeholder={i18n.text(storedKey ? providersMessages.keepSavedKey : providersMessages.pasteApiKey)} />
-      <FieldDescription>
-        {draft.action === "clear" ? <StatusText tone="warning">{i18n.text(providersMessages.keyRemovalHint)}</StatusText>
-          : credentialState === "storage_unavailable" || credentialState === "decryption_failed"
-            ? <StatusText tone="error">{i18n.text(credentialLabels[credentialState])}</StatusText>
-          : i18n.text(credentialState ? credentialLabels[credentialState] : providersMessages.keyStorageHint)}
-        {storedKey && <Button type="button" variant="link" size="sm" className="ml-1 h-auto p-0 text-xs"
-          onClick={() => onDraftChange({ key: "", action: draft.action === "clear" ? "keep" : "clear" })}>
-          {i18n.text(draft.action === "clear" ? providersMessages.undo : providersMessages.removeSavedKey)}
-        </Button>}
-      </FieldDescription>
-      {!storageAvailable && <Alert variant="destructive"><AlertDescription>{i18n.text(providersMessages.encryptionUnavailable)}</AlertDescription></Alert>}
-    </Field>}
+    {auth === "api_key" && <CredentialField label={i18n.text(commonMessages.apiKey)} credentialState={credentialState}
+      storageAvailable={storageAvailable} removable keyUrl={keyUrl} autoFocus={credentialState === undefined && !editable}
+      draft={draft} onDraftChange={onDraftChange} />}
   </>;
 }

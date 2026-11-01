@@ -31,7 +31,8 @@ export const modelProviderInputSchema = z.strictObject({
 });
 export const credentialStateSchema = z.enum(["not_required", "missing", "available", "storage_unavailable", "decryption_failed"]);
 export type CredentialState = z.infer<typeof credentialStateSchema>;
-export const webProviderSchema = webProviderStateSchema.extend({ credentialState: credentialStateSchema });
+/** Secret states are keyed by setting key; values never leave the backend. */
+export const webProviderSchema = webProviderStateSchema.extend({ secrets: z.record(z.string(), credentialStateSchema) });
 export type WebProviderConfiguration = z.infer<typeof webProviderSchema>;
 export const modelProviderSchema = modelProviderInputSchema.extend({ credentialState: credentialStateSchema });
 export const modelInputSchema = z.strictObject({
@@ -95,7 +96,9 @@ const credentialUpdateSchema = z.discriminatedUnion("action", [
 ]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("shell.set"), value: shellSettingsSchema }),
-  z.strictObject({ type: z.literal("webProvider.save"), id: z.string().trim().min(1), enabled: z.boolean(), credential: credentialUpdateSchema }),
+  /** Settings replace saved non-secret values; secrets update only the listed keys. */
+  z.strictObject({ type: z.literal("webProvider.save"), id: z.string().trim().min(1), enabled: z.boolean(),
+    settings: z.record(z.string(), z.string()), secrets: z.record(z.string(), credentialUpdateSchema) }),
   z.strictObject({ type: z.literal("webProvider.reorder"), ids: z.array(z.string().min(1)) }),
   z.strictObject({ type: z.literal("read") }),
   z.strictObject({ type: z.literal("sessionEntry.set"), value: sessionEntrySelectionSchema }),

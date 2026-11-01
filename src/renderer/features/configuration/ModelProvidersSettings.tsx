@@ -30,7 +30,7 @@ import { ModelCostEditor } from "./ModelCostEditor";
 import { modelProtocolLabels } from "./protocols";
 import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
 import { useModelParameters } from "./ModelParameters";
-import { ConnectionAuthentication, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
+import { ConnectionAuthentication, credentialChanged as draftChanged, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
 import { ProviderKeyLink } from "./ProviderKeyLink";
 
 const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({ value, label }));
@@ -187,21 +187,21 @@ export function slugify(name: string, options: { slash?: boolean } = {}): string
 }
 const blank: ProviderValue = { id: "", name: "", protocol: "openai-responses", baseUrl: "", auth: "api_key", compatibility: [] };
 
-/** The selection entry generates configuration and editing rules; the editor neither receives nor retains preset identity. */
+/** The selection entry generates configuration and editing rules; the editor receives only the key link and does not retain preset identity. */
 function ProviderCreation() {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
-  const [initialValue, setInitialValue] = useState<ProviderValue | null>(null);
-  if (initialValue) return <ProviderEditor initialId={null} initialValue={initialValue} />;
+  const [picked, setPicked] = useState<{ value: ProviderValue; keyUrl?: string } | null>(null);
+  if (picked) return <ProviderEditor initialId={null} initialValue={picked.value} keyUrl={picked.keyUrl} />;
   return <Editor form="provider-form" title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false} busy={false} error={null}>
-    <PresetPicker onPick={picked => setInitialValue(picked ? {
-      ...modelProviderPresetDraft(picked, snapshot?.modelProviders.map(provider => provider.id)),
-      name: `${picked.name} · ${presetDescription(picked)}`,
-    } : structuredClone(blank))} />
+    <PresetPicker onPick={preset => setPicked(preset ? { keyUrl: preset.keyUrl, value: {
+      ...modelProviderPresetDraft(preset, snapshot?.modelProviders.map(provider => provider.id)),
+      name: `${preset.name} · ${presetDescription(preset)}`,
+    } } : { value: structuredClone(blank) })} />
   </Editor>;
 }
 
-function ProviderEditor({ initialId, initialValue = blank }: { initialId: string | null; initialValue?: ProviderValue }) {
+function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId: string | null; initialValue?: ProviderValue; keyUrl?: string }) {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
@@ -218,7 +218,7 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
   const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { id: slugify(name) }) }));
 
   const saved = current ? providerValue(current) : null;
-  const credentialChanged = value.auth === "api_key" && (credential.action === "clear" || (credential.action === "replace" && credential.key.trim() !== ""));
+  const credentialChanged = value.auth === "api_key" && draftChanged(credential);
   const dirty = !saved || JSON.stringify(saved) !== JSON.stringify(value) || credentialChanged;
 
   const openModel = (modelId: string | null, origin?: HTMLElement | null) => {
@@ -251,7 +251,7 @@ function ProviderEditor({ initialId, initialValue = blank }: { initialId: string
         {canEditModelProviderField(value, "baseUrl") && <TextField label={i18n.text(commonMessages.baseUrl)} value={value.baseUrl} onChange={next => set("baseUrl", next)} required
           hint={value.auth === "api_key" ? i18n.formatMessage(providersMessages.httpsRequired) : undefined} />}
         <ConnectionAuthentication auth={value.auth} editable={canEditModelProviderField(value, "auth")}
-          credentialState={current?.credentialState} storageAvailable={snapshot?.credentialStorageAvailable ?? false}
+          credentialState={current?.credentialState} storageAvailable={snapshot?.credentialStorageAvailable ?? false} keyUrl={keyUrl}
           draft={credential} onAuthChange={next => set("auth", next)} onDraftChange={setCredential} />
         {canEditModelProviderField(value, "usage") && <ChoiceField label={i18n.text(providersMessages.usage)}
           value={value.usage ? `usage:${value.usage}` : "__none"} onChange={next => next && set("usage", next === "__none" ? null : next.slice(6))}

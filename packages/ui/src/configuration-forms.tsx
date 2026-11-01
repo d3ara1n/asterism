@@ -51,8 +51,9 @@ export function ToggleField({ label, value, onChange }: { label: string; value: 
   const id = useId();
   return <Field orientation="horizontal"><FieldLabel htmlFor={id}>{label}</FieldLabel><Switch id={id} checked={value} onCheckedChange={onChange} /></Field>;
 }
-export function ChoiceField({ label, value, onChange, options, empty }: {
+export function ChoiceField({ label, value, onChange, options, empty, hint }: {
   label: string; value: string | null; onChange: (value: string | null) => void; options: { value: string; label: string; disabled?: boolean }[]; empty?: string;
+  hint?: ReactNode;
 }) {
   const i18n = useI18n();
   const id = useId();
@@ -61,7 +62,7 @@ export function ChoiceField({ label, value, onChange, options, empty }: {
       {empty && <SelectItem value="__none">{empty}</SelectItem>}
       {value && !options.some(option => option.value === value) && <SelectItem value={value} disabled>{i18n.formatMessage(formsMessages.unavailable)} · {value}</SelectItem>}
       {options.map(option => <SelectItem key={option.value} value={option.value} disabled={option.disabled}>{option.label}</SelectItem>)}
-    </SelectContent></Select></Field>;
+    </SelectContent></Select>{hint && <FieldDescription>{hint}</FieldDescription>}</Field>;
 }
 export const lines = (value: string): string[] => [...new Set(value.split("\n").map(line => line.trim()).filter(Boolean))];
 /** Override forms reuse the same selector, with separate options for unset and explicit null. */

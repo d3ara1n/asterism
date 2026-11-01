@@ -3,6 +3,9 @@ import Parallel from "parallel-web";
 import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type WebResponse, type WebSearchRequest } from "@asterism-app/sdk/contracts";
 import { WebError, type WebProviderDefinition } from "@asterism-app/sdk/runtime";
 import { builtin } from "@asterism-app/builtin-api/contracts";
+import { webMessages as messages } from "../messages/web.ts";
+
+const BASE_URL = "https://api.parallel.ai";
 
 const resultSchema = z.object({
   url: webUrlSchema, title: z.string().nullish(), publish_date: z.string().nullish(),
@@ -47,7 +50,8 @@ export function parallelResponse(raw: unknown, leadingHints: WebHint[] = []): We
   };
 }
 
-export function parallelSearchOptions(request: WebSearchRequest) {
+type ParallelMode = NonNullable<Parallel.SearchParams["mode"]>;
+export function parallelSearchOptions(request: WebSearchRequest, mode: ParallelMode = "advanced") {
   const hints: WebHint[] = [];
   if (request.language) hints.push({ code: "unsupported_parameter", parameter: "language", message: "Parallel did not apply the requested language filter." });
   if (request.publishedBefore) hints.push({ code: "unsupported_parameter", parameter: "publishedBefore", message: "Parallel did not apply the requested publication date upper bound." });
@@ -58,6 +62,7 @@ export function parallelSearchOptions(request: WebSearchRequest) {
   const afterDate = request.publishedAfter?.includes("T") ? new Date(request.publishedAfter).toISOString().slice(0, 10) : request.publishedAfter;
   if (afterDate !== request.publishedAfter) hints.push({ code: "parameter_adjusted", parameter: "publishedAfter", message: `Parallel applies publication dates at day precision; the lower bound was reduced to ${afterDate} (UTC).` });
   const options: Parallel.SearchParams = {
+    mode,
     search_queries: [request.query],
     advanced_settings: {
       max_results: Math.min(request.maxResults, 20), location: request.region?.toLowerCase(),
@@ -69,14 +74,21 @@ export function parallelSearchOptions(request: WebSearchRequest) {
 
 export const parallelWebProvider: WebProviderDefinition = {
   id: "parallel", label: "Parallel", search: true, fetch: true, urlPatterns: ["*"],
-  defaultBaseUrl: "https://api.parallel.ai",
-  credential: { kind: "api_key", keyUrl: "https://platform.parallel.ai" },
-  create({ baseUrl, credential }) {
-    if (!credential) throw new WebError("credential_unavailable", "A Parallel API key is required.");
-    const client = new Parallel({ apiKey: credential, baseURL: baseUrl });
+  settings: [
+    { kind: "secret", key: "apiKey", label: messages.apiKey, required: true, helpUrl: "https://platform.parallel.ai" },
+    { kind: "choice", key: "mode", label: messages.parallelMode, description: messages.parallelModeHint, default: "advanced", options: [
+      { value: "turbo", label: messages.parallelTurbo, description: messages.parallelTurboHint },
+      { value: "fast", label: messages.parallelFast, description: messages.parallelFastHint },
+      { value: "basic", label: messages.parallelBasic, description: messages.parallelBasicHint },
+      { value: "advanced", label: messages.parallelAdvanced, description: messages.parallelAdvancedHint },
+    ] },
+  ],
+  create({ settings }) {
+    const client = new Parallel({ apiKey: settings.apiKey!, baseURL: BASE_URL });
+    const mode = settings.mode as ParallelMode;
     return {
       async search(request, { signal }) {
-        const { options, hints } = parallelSearchOptions(request);
+        const { options, hints } = parallelSearchOptions(request, mode);
         return parallelResponse(await client.search(options, { signal }), hints);
       },
       async fetch(request, { signal }) {

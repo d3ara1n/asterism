@@ -1,23 +1,63 @@
-import { useRef, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, GripVertical, Plus } from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, Globe, GripVertical, Plus } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
+import type { WebProviderSetting, WebProviderType } from "@asterism-app/sdk/contracts";
+import type { WebProviderConfiguration } from "../../../shared/configuration";
 import { webProviderMessages as messages } from "../../messages/web-providers";
+import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
 import { useIsland } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
+import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "@asterism-app/ui/ui/empty";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
-import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
+import { Item, ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { Switch } from "@asterism-app/ui/ui/switch";
-import { Field, FieldLabel } from "@asterism-app/ui/ui/field";
-import { Input } from "@asterism-app/ui/ui/input";
-import { Editor, ChoiceField, ToggleField } from "./forms";
+import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@asterism-app/ui/ui/field";
+import { RadioGroup, RadioGroupItem } from "@asterism-app/ui/ui/radio-group";
+import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
+import { cn } from "@asterism-app/ui/utils";
+import { Editor, ChoiceField } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { Section } from "../settings/layout";
 import { ProviderKeyLink } from "./ProviderKeyLink";
+import { CredentialField, credentialChanged, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
+
+type ChoiceSetting = Extract<WebProviderSetting, { kind: "choice" }>;
+type SecretSetting = Extract<WebProviderSetting, { kind: "secret" }>;
+/** Choices with few options render as described radio cards; longer lists use a select. */
+const radioOptionLimit = 4;
+
+/** Effective choice values: saved values where present, otherwise declared defaults. */
+function choiceValues(type: WebProviderType | undefined, saved: Readonly<Record<string, string>>): Record<string, string> {
+  return Object.fromEntries((type?.settings ?? []).filter((setting): setting is ChoiceSetting => setting.kind === "choice")
+    .map(setting => [setting.key, saved[setting.key] ?? setting.default]));
+}
+function useCapabilities() {
+  const i18n = useI18n();
+  return (type: WebProviderType) => [type.search && i18n.text(messages.search), type.fetch && i18n.text(messages.fetch)].filter(Boolean).join(" · ");
+}
+/** Only conditions that stop a saved provider from working are surfaced; a normal provider shows no badge. */
+function useProviderIssue() {
+  const i18n = useI18n();
+  return (type: WebProviderType | undefined, state: WebProviderConfiguration): { tone: StatusTone; label: string } | null => {
+    if (!type) return { tone: "error", label: i18n.text(messages.unavailable) };
+    for (const setting of type.settings) {
+      if (setting.kind !== "secret") continue;
+      const secret = state.secrets[setting.key];
+      if (secret === "decryption_failed") return { tone: "error", label: i18n.text(providersMessages.decryptionFailed) };
+      if (secret === "storage_unavailable") return { tone: "warning", label: i18n.text(providersMessages.credentialProtectionUnavailable) };
+      if (setting.required && secret !== "available") return { tone: "warning", label: i18n.formatMessage(messages.missingSecret, { label: i18n.text(setting.label) }) };
+    }
+    return null;
+  };
+}
+const initial = (label: string) => label.trim().charAt(0).toUpperCase() || "?";
 
 export function WebProvidersSettings() {
   const i18n = useI18n(), island = useIsland();
+  const capabilities = useCapabilities(), issueOf = useProviderIssue();
   const { snapshot } = useSettingsConfiguration(), action = useConfigurationAction("toast");
   const types = snapshot?.webProviderTypes ?? [];
   const states = snapshot?.webProviders ?? [];
@@ -42,47 +82,53 @@ export function WebProvidersSettings() {
     setDraftOrder(ids);
     void saveOrder(ids);
   };
-  const unconfigured = types.filter(type => !states.some(state => state.id === type.id));
   const open = (id: string | null, origin: HTMLElement) => island.open({
     id: `web-provider-${id ?? "new"}`, label: messages.edit, width: panelIslandWidth, origin,
-    render: () => <WebProviderEditor id={id} />,
+    render: () => id === null ? <WebProviderCreation /> : <WebProviderEditor key={id} typeId={id} />,
   });
   return <Section title={i18n.text(messages.title)} hint={i18n.text(messages.hint)}
-    action={<Button size="sm" disabled={!snapshot || !unconfigured.length || busy} onClick={event => open(null, event.currentTarget)}>
+    action={<Button size="sm" disabled={!snapshot || !types.length || busy} onClick={event => open(null, event.currentTarget)}>
       <Plus />{i18n.text(messages.add)}</Button>}>
-    {!states.length ? <p className="type-body p-3 text-muted-foreground">{i18n.text(messages.empty)}</p>
-      : <Reorder.Group as="div" axis="y" values={ordered.map(state => state.id)} onReorder={ids => {
-        latestOrder.current = ids;
-        setDraftOrder(ids);
-      }}>
-        <ItemGroup className="surface overflow-clip">{ordered.map((state, index) => {
-          const type = types.find(type => type.id === state.id);
-          const label = type ? i18n.text(type.label) : state.id;
-          const moveUpLabel = i18n.formatMessage(messages.moveUp, { provider: label });
-          const moveDownLabel = i18n.formatMessage(messages.moveDown, { provider: label });
-          return <SortableProvider key={state.id} id={state.id} label={label} disabled={action.busy || states.length < 2}
-            onDragStart={() => setDragging(true)} onDragEnd={() => {
-              setDragging(false);
-              void saveOrder(latestOrder.current ?? states.map(item => item.id));
-            }}>
-            {handle => <>
-              {index > 0 && <ItemSeparator />}
-              <ListRow leadingActions={handle} title={label} disabled={busy} className="isolate rounded-none"
-                description={type ? [type.search && i18n.text(messages.search), type.fetch && i18n.text(messages.fetch)].filter(Boolean).join(" · ")
-                  : i18n.text(messages.unavailable)}
-                selected={island.child === `web-provider-${state.id}`} onOpen={origin => open(state.id, origin)}
-                actions={<>
-                  <Button variant="ghost" size="icon-sm" disabled={busy || index === 0}
-                    aria-label={moveUpLabel} title={moveUpLabel} onClick={() => move(index, -1)}><ArrowUp /></Button>
-                  <Button variant="ghost" size="icon-sm" disabled={busy || index === ordered.length - 1}
-                    aria-label={moveDownLabel} title={moveDownLabel} onClick={() => move(index, 1)}><ArrowDown /></Button>
-                  <Switch aria-label={i18n.text(messages.enabled)} checked={state.enabled} disabled={busy}
-                    onCheckedChange={enabled => void action.run({ type: "webProvider.save", id: state.id, enabled, credential: { action: "keep" } })} />
-                </>} />
-            </>}
-          </SortableProvider>;
-        })}</ItemGroup>
-      </Reorder.Group>}
+    {snapshot && !states.length ? <Empty className="border">
+      <EmptyHeader><EmptyMedia variant="icon"><Globe /></EmptyMedia><EmptyDescription>{i18n.text(messages.empty)}</EmptyDescription></EmptyHeader>
+      {types.length > 0 && <EmptyContent><Button size="sm" variant="outline" onClick={event => open(null, event.currentTarget)}>
+        <Plus />{i18n.text(messages.addFirst)}</Button></EmptyContent>}
+    </Empty> : snapshot && <Reorder.Group as="div" axis="y" values={ordered.map(state => state.id)} onReorder={ids => {
+      latestOrder.current = ids;
+      setDraftOrder(ids);
+    }}>
+      <ItemGroup className="surface overflow-clip">{ordered.map((state, index) => {
+        const type = types.find(type => type.id === state.id);
+        const label = type ? i18n.text(type.label) : state.id;
+        const issue = issueOf(type, state);
+        const moveUpLabel = i18n.formatMessage(messages.moveUp, { provider: label });
+        const moveDownLabel = i18n.formatMessage(messages.moveDown, { provider: label });
+        return <SortableProvider key={state.id} id={state.id} label={label} disabled={action.busy || states.length < 2}
+          onDragStart={() => setDragging(true)} onDragEnd={() => {
+            setDragging(false);
+            void saveOrder(latestOrder.current ?? states.map(item => item.id));
+          }}>
+          {handle => <>
+            {index > 0 && <ItemSeparator />}
+            <ListRow leadingActions={handle} className="isolate rounded-none" disabled={busy} inactive={!state.enabled}
+              mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{initial(label)}</span>}
+              title={label} description={type && capabilities(type)}
+              selected={island.child === `web-provider-${state.id}`} onOpen={origin => open(state.id, origin)}
+              actions={<>
+                {issue && <StatusBadge tone={issue.tone}>{issue.label}</StatusBadge>}
+                <Button variant="ghost" size="icon-sm" disabled={busy || index === 0}
+                  aria-label={moveUpLabel} title={moveUpLabel} onClick={() => move(index, -1)}><ArrowUp /></Button>
+                <Button variant="ghost" size="icon-sm" disabled={busy || index === ordered.length - 1}
+                  aria-label={moveDownLabel} title={moveDownLabel} onClick={() => move(index, 1)}><ArrowDown /></Button>
+                {/* Saving validates against the type declaration, so unavailable types cannot be toggled. */}
+                <Switch aria-label={i18n.formatMessage(messages.enableProvider, { provider: label })} checked={state.enabled} disabled={busy || !type}
+                  onCheckedChange={enabled => void action.run({ type: "webProvider.save", id: state.id, enabled,
+                    settings: choiceValues(type, state.settings), secrets: {} })} />
+              </>} />
+          </>}
+        </SortableProvider>;
+      })}</ItemGroup>
+    </Reorder.Group>}
   </Section>;
 }
 
@@ -101,45 +147,133 @@ function SortableProvider({ id, label, disabled, onDragStart, onDragEnd, childre
   </Reorder.Item>;
 }
 
-function WebProviderEditor({ id }: { id: string | null }) {
-  const i18n = useI18n(), island = useIsland(), { snapshot } = useSettingsConfiguration();
+/* ---------- Service selection: every registered service, with added ones marked ---------- */
+
+function WebProviderCreation() {
+  const i18n = useI18n(), capabilities = useCapabilities();
+  const { snapshot } = useSettingsConfiguration();
+  const [picked, setPicked] = useState<string | null>(null);
+  if (picked) return <WebProviderEditor typeId={picked} />;
   const types = snapshot?.webProviderTypes ?? [];
-  const states = snapshot?.webProviders ?? [];
-  const saved = id ? states.find(state => state.id === id) : null;
-  const unconfigured = types.filter(type => !states.some(state => state.id === type.id));
-  const [typeId, setTypeId] = useState(() => id ?? unconfigured[0]?.id ?? "");
-  const [apiKey, setApiKey] = useState("");
-  const [enabled, setEnabled] = useState(() => saved?.enabled ?? true);
+  const added = new Set((snapshot?.webProviders ?? []).map(state => state.id));
+  const tile = "min-h-16 flex-col items-start justify-center gap-1 px-3 py-2 text-left";
+  return <Editor form="web-provider-creation" title={i18n.text(messages.add)} dirty={false} busy={false} error={null}>
+    <div className="flex flex-col gap-5">
+      <p className="type-caption">{i18n.text(messages.pickerHint)}</p>
+      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9rem, 1fr))" }}>
+        {types.map(type => {
+          const exists = added.has(type.id);
+          const help = type.settings.find((setting): setting is SecretSetting => setting.kind === "secret" && !!setting.helpUrl);
+          return <div key={type.id} className="flex flex-col gap-1">
+            <Item asChild variant="outline" className={cn(tile, "bg-card", exists ? "opacity-60" : "hover:bg-accent")}>
+              <button type="button" disabled={exists} onClick={() => setPicked(type.id)}>
+                <span className="flex w-full min-w-0 items-center justify-between gap-2">
+                  <span className="type-section truncate">{i18n.text(type.label)}</span>
+                  {exists && <Badge variant="secondary" className="font-normal">{i18n.text(messages.added)}</Badge>}
+                </span>
+                <span className="type-caption">{capabilities(type)}</span>
+              </button>
+            </Item>
+            {!exists && help?.helpUrl && <ProviderKeyLink href={help.helpUrl}>{i18n.text(providersMessages.getKey)}</ProviderKeyLink>}
+          </div>;
+        })}
+      </div>
+    </div>
+  </Editor>;
+}
+
+/* ---------- Service settings ---------- */
+
+function ChoiceSettingField({ setting, value, onChange }: { setting: ChoiceSetting; value: string; onChange(value: string): void }) {
+  const i18n = useI18n(), id = useId();
+  if (setting.options.length > radioOptionLimit) {
+    const selected = setting.options.find(option => option.value === value);
+    const hint = [setting.description, selected?.description].filter(text => text !== undefined).map(text => i18n.text(text)).join(" ");
+    return <ChoiceField label={i18n.text(setting.label)} value={value} hint={hint || undefined}
+      options={setting.options.map(option => ({ value: option.value, label: i18n.text(option.label) }))}
+      onChange={next => { if (next) onChange(next); }} />;
+  }
+  return <FieldSet>
+    <FieldLegend variant="label">{i18n.text(setting.label)}</FieldLegend>
+    {setting.description && <FieldDescription>{i18n.text(setting.description)}</FieldDescription>}
+    <RadioGroup value={value} onValueChange={onChange}>
+      {setting.options.map(option => <FieldLabel key={option.value} htmlFor={`${id}-${option.value}`} className="w-full">
+        <Field orientation="horizontal">
+          <RadioGroupItem id={`${id}-${option.value}`} value={option.value}
+            aria-describedby={option.description ? `${id}-${option.value}-hint` : undefined} />
+          <FieldContent>
+            <FieldTitle>{i18n.text(option.label)}</FieldTitle>
+            {option.description && <FieldDescription id={`${id}-${option.value}-hint`}>{i18n.text(option.description)}</FieldDescription>}
+          </FieldContent>
+        </Field>
+      </FieldLabel>)}
+    </RadioGroup>
+  </FieldSet>;
+}
+
+function SecretSettingField({ setting, state, storageAvailable, draft, onChange }: {
+  setting: SecretSetting; state: WebProviderConfiguration["secrets"][string] | undefined; storageAvailable: boolean;
+  draft: ConnectionCredentialDraft; onChange(draft: ConnectionCredentialDraft): void;
+}) {
+  const i18n = useI18n();
+  // Required secrets can be replaced but not removed; a saved provider always holds them.
+  return <CredentialField label={i18n.text(setting.label)} optionalLabel={setting.required ? undefined : i18n.text(messages.optional)}
+    description={setting.description && i18n.text(setting.description)} credentialState={state} storageAvailable={storageAvailable}
+    removable={!setting.required} keyUrl={setting.helpUrl} draft={draft} onDraftChange={onChange} />;
+}
+
+/** Read-only routing fact for fetch-capable services. */
+function FetchScope({ patterns }: { patterns: readonly string[] }) {
+  const i18n = useI18n();
+  return <Field>
+    <FieldLabel asChild><span>{i18n.text(messages.fetchScope)}</span></FieldLabel>
+    {patterns.includes("*") ? <p className="type-body">{i18n.text(messages.allUrls)}</p>
+      : <ul className="flex flex-wrap gap-1.5">{patterns.map(pattern => <li key={pattern}>
+        <code className="block break-all rounded-md bg-muted px-2 py-0.5 font-mono text-xs">{pattern}</code></li>)}</ul>}
+    <FieldDescription>{i18n.text(messages.fetchScopeHint)}</FieldDescription>
+  </Field>;
+}
+
+function WebProviderEditor({ typeId }: { typeId: string }) {
+  const i18n = useI18n(), island = useIsland(), capabilities = useCapabilities();
+  const { snapshot } = useSettingsConfiguration();
+  const type = snapshot?.webProviderTypes.find(type => type.id === typeId);
+  const saved = snapshot?.webProviders.find(state => state.id === typeId) ?? null;
+  const [choices, setChoices] = useState(() => choiceValues(type, saved?.settings ?? {}));
+  const [secrets, setSecrets] = useState<Record<string, ConnectionCredentialDraft>>({});
   const action = useConfigurationAction("inline");
-  const type = types.find(type => type.id === typeId);
-  if (id && !saved) return null;
-  const keyConfigured = saved?.credentialState === "available";
-  // Existing providers can be saved when credentials or enablement change.
-  const dirty = !saved || apiKey.length > 0 || saved.enabled !== enabled;
-  return <Editor title={id ? i18n.text(type?.label ?? id) : i18n.text(messages.add)} form="web-provider-editor" dirty={dirty}
-    busy={action.busy} error={action.error}
+  const secretDraft = (key: string): ConnectionCredentialDraft => secrets[key] ?? { action: "keep", key: "" };
+  const savedChoices = choiceValues(type, saved?.settings ?? {});
+  const dirty = !saved || Object.values(secrets).some(credentialChanged)
+    || Object.entries(choices).some(([key, value]) => savedChoices[key] !== value);
+  // Mirrors the save contract: every required secret is either already saved or entered now.
+  const complete = !!type?.settings.every(setting => setting.kind !== "secret" || !setting.required
+    || secretDraft(setting.key).key.trim() !== "" || saved?.secrets[setting.key] === "available");
+  const label = type ? i18n.text(type.label) : typeId;
+  return <Editor title={label} description={type ? capabilities(type) : i18n.text(messages.unavailable)}
+    form="web-provider-editor" dirty={dirty} busy={action.busy} error={action.error} saveDisabled={!complete}
     remove={saved ? { title: i18n.text(messages.remove), description: i18n.text(messages.removeHint), onConfirm: async () => {
       if (await action.run({ type: "remove", kind: "webProvider", id: saved.id })) void island.close({ force: true });
     } } : undefined}>
-    <form id="web-provider-editor" className="space-y-6" onSubmit={async event => {
+    <form id="web-provider-editor" onSubmit={async event => {
       event.preventDefault();
-      if (!type) return;
-      const credential = apiKey.trim() ? { action: "replace" as const, value: apiKey.trim() } : { action: "keep" as const };
-      if (await action.run({ type: "webProvider.save", id: typeId, enabled, credential })) {
-        setApiKey("");
+      if (!type || !complete) return;
+      const updates = Object.fromEntries(Object.entries(secrets).filter(([, draft]) => credentialChanged(draft))
+        .map(([key, draft]) => [key, draft.action === "clear" ? { action: "clear" as const } : { action: "replace" as const, value: draft.key.trim() }]));
+      // Enablement is an immediate list action; saving keeps the current value and new services start enabled.
+      if (await action.run({ type: "webProvider.save", id: typeId, enabled: saved?.enabled ?? true, settings: choices, secrets: updates })) {
+        setSecrets({});
         void island.close({ force: true });
       }
-    }}><fieldset disabled={action.busy} className="space-y-6">
-      {!id && <ChoiceField label={i18n.text(messages.type)} value={typeId}
-        options={unconfigured.map(type => ({ value: type.id, label: i18n.text(type.label) }))}
-        onChange={next => { if (next) setTypeId(next); }} />}
-      {saved && <ToggleField label={i18n.text(messages.enabled)} value={enabled} onChange={setEnabled} />}
-      {type?.credential?.kind === "api_key" && <>
-        <Field><FieldLabel htmlFor="web-provider-api-key">{i18n.text(messages.apiKey)}</FieldLabel>
-          <Input id="web-provider-api-key" type="password" autoComplete="off" value={apiKey} onChange={event => setApiKey(event.target.value)}
-            placeholder={keyConfigured ? i18n.text(messages.apiKeySet) : i18n.text(messages.apiKeyEmpty)} /></Field>
-        {type.credential.keyUrl && <ProviderKeyLink href={type.credential.keyUrl}>{i18n.text(messages.keyLink)}</ProviderKeyLink>}
-      </>}
+    }}><fieldset disabled={action.busy} className="flex flex-col gap-6">
+      {!type && <p className="type-body text-muted-foreground">{i18n.text(messages.unavailableHint)}</p>}
+      {type?.settings.map(setting => setting.kind === "secret"
+        ? <SecretSettingField key={setting.key} setting={setting} state={saved?.secrets[setting.key]}
+          storageAvailable={snapshot?.credentialStorageAvailable ?? false}
+          draft={secretDraft(setting.key)} onChange={draft => setSecrets(current => ({ ...current, [setting.key]: draft }))} />
+        : <ChoiceSettingField key={setting.key} setting={setting} value={choices[setting.key] ?? setting.default}
+          onChange={next => setChoices(current => ({ ...current, [setting.key]: next }))} />)}
+      {type?.fetch && <FetchScope patterns={type.urlPatterns} />}
     </fieldset></form>
   </Editor>;
 }

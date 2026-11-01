@@ -1,4 +1,4 @@
-import { webProviderTypeSchema, webResponseSchema, webSearchRequestSchema, webFetchRequestSchema,
+import { webProviderTypeSchema, webResponseSchema, webSearchRequestSchema, webFetchRequestSchema, type UiText,
   type WebProviderState, type WebProviderType, type WebSearchRequest, type WebFetchRequest, type WebResponse } from "@asterism-app/sdk/contracts";
 import { WebError, type WebProviderDefinition, type WebProviderInstance, type WebProviderServices, type WebServices } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
@@ -38,7 +38,28 @@ export function limitWebBody(response: WebResponse, maxCharacters?: number): Web
 interface Entry { owner: string; definition: WebProviderDefinition; info: WebProviderType; runs: RunGroup }
 interface Connections {
   list(): WebProviderState[];
-  credential(id: string): Promise<string | null>;
+  /** Read a saved secret value; null when no value is saved for the key. */
+  secret(id: string, key: string): Promise<string | null>;
+}
+const plainText = (text: UiText) => typeof text === "string" ? text : text.defaultMessage;
+
+/** Validate saved values against the current declaration; missing choices use their declared default. */
+export async function resolveWebSettings(type: Pick<WebProviderType, "id" | "settings">, saved: Readonly<Record<string, string>>,
+  secret: (key: string) => Promise<string | null>): Promise<Record<string, string>> {
+  const values: Record<string, string> = {};
+  for (const setting of type.settings) {
+    if (setting.kind === "choice") {
+      const value = saved[setting.key] ?? setting.default;
+      if (!setting.options.some(option => option.value === value))
+        throw new WebError("provider_unavailable", `Web provider '${type.id}' setting '${plainText(setting.label)}' has unsupported value '${value}'.`);
+      values[setting.key] = value;
+      continue;
+    }
+    const value = await secret(setting.key);
+    if (value !== null) values[setting.key] = value;
+    else if (setting.required) throw new WebError("credential_unavailable", `Web provider '${type.id}' requires ${plainText(setting.label)}.`);
+  }
+  return values;
 }
 
 /** Store provider types; resolve current configuration and credentials for each request. */
@@ -62,7 +83,7 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
       const info = webProviderTypeSchema.parse({
         id: definition.id, label: definition.label, owner,
         search: definition.search, fetch: definition.fetch, urlPatterns: [...definition.urlPatterns],
-        credential: definition.credential ?? null,
+        settings: structuredClone(definition.settings),
       });
       return { owner, definition, info, runs };
     });
@@ -79,7 +100,7 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
     if (!state?.enabled) throw new WebError("provider_unavailable", `Web provider '${id}' is ${state ? "disabled" : "not configured"}.`);
     const entry = this.entries.get(id);
     if (!entry || entry.runs.closed) throw new WebError("provider_unavailable", `Web provider type '${id}' is unavailable.`);
-    return entry;
+    return { entry, state };
   }
   private parseResponse(raw: unknown, maxCharacters?: number) {
     const parsed = webResponseSchema.safeParse(raw);
@@ -87,14 +108,13 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
     return limitWebBody(parsed.data, maxCharacters);
   }
   async resolve(id: string, options: { signal: AbortSignal }): Promise<WebProviderInstance> {
-    const entry = this.captureEntry(id);
-    // Resolve credentials and create the instance within its provider lifecycle.
+    const { entry, state } = this.captureEntry(id);
+    // Resolve settings and secrets and create the instance within its provider lifecycle.
     const instance = await entry.runs.start(async scope => {
       scope.throwIfAborted();
-      const credential = entry.info.credential?.kind === "api_key" ? await this.connections.credential(id) : null;
+      const settings = await resolveWebSettings(entry.info, state.settings, key => this.connections.secret(id, key));
       scope.throwIfAborted();
-      const baseUrl = entry.definition.defaultBaseUrl.replace(/\/+$/u, "");
-      return entry.definition.create({ baseUrl, credential });
+      return entry.definition.create({ settings });
     }, { signal: options.signal, affectsHistory: false }).done;
     const guard = <T>(work: (scope: AbortSignal) => Promise<T>, signal: AbortSignal) =>
       entry.runs.start(async scope => {

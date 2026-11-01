@@ -45,20 +45,29 @@ export const webFetchRequestSchema = z.object({
   maxCharacters: z.number().int().positive().optional().describe("Maximum body characters per document, counted as Unicode code points across body parts. Excerpts and metadata are separate. Omitted uses provider defaults."),
 }).describe("URL, optional additional excerpt focus and body character limit.");
 
-/** Providers declare credential types; the UI renders corresponding inputs by type and does not accept arbitrary JSON. */
-export const webCredentialDefinitionSchema = z.object({
-  kind: z.enum(["api_key"]),
-  keyUrl: webUrlSchema.optional(),
-});
-/** At most one configuration per provider type; id equals the type slug. */
+/**
+ * Provider settings use a closed set of kinds that the host renders, validates, and stores.
+ * Secret values are stored in the credential vault and never appear in configuration snapshots.
+ */
+const settingBase = { key: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/u), label: uiTextSchema, description: uiTextSchema.optional() };
+export const webProviderSettingSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ ...settingBase, kind: z.literal("secret"), required: z.boolean(), helpUrl: webUrlSchema.optional() }),
+  z.strictObject({ ...settingBase, kind: z.literal("choice"), default: z.string().min(1),
+    options: z.array(z.strictObject({ value: z.string().min(1), label: uiTextSchema, description: uiTextSchema.optional() })).min(1) })
+    .refine(setting => new Set(setting.options.map(option => option.value)).size === setting.options.length, "Choice option values are unique.")
+    .refine(setting => setting.options.some(option => option.value === setting.default), "The default is one of the options."),
+]);
+/** At most one configuration per provider type; id equals the type slug. Settings hold saved non-secret values by key. */
 export const webProviderStateSchema = z.strictObject({
   id: z.string().trim().min(1),
   enabled: z.boolean(),
+  settings: z.record(z.string(), z.string()),
 });
 export const webProviderTypeSchema = z.object({
   id: z.string().min(1), label: uiTextSchema, owner: z.string(),
   search: z.boolean(), fetch: z.boolean(), urlPatterns: z.array(z.string().min(1)),
-  credential: webCredentialDefinitionSchema.nullable(),
+  settings: z.array(webProviderSettingSchema).refine(settings => new Set(settings.map(setting => setting.key)).size === settings.length,
+    "Setting keys are unique."),
 });
 /** provider in results is the type slug of the provider that actually handled the request. */
 export const webSearchResultSchema = webResponseSchema.extend({ query: z.string(), provider: z.string() });
@@ -68,7 +77,7 @@ export type WebDocument = z.infer<typeof webDocumentSchema>;
 export type WebResponse = z.infer<typeof webResponseSchema>;
 export type WebSearchRequest = z.infer<typeof webSearchRequestSchema>;
 export type WebFetchRequest = z.infer<typeof webFetchRequestSchema>;
-export type WebCredentialDefinition = z.infer<typeof webCredentialDefinitionSchema>;
+export type WebProviderSetting = z.infer<typeof webProviderSettingSchema>;
 export type WebProviderState = z.infer<typeof webProviderStateSchema>;
 export type WebProviderType = z.infer<typeof webProviderTypeSchema>;
 export type WebSearchResult = z.infer<typeof webSearchResultSchema>;

@@ -3,8 +3,10 @@ import { Exa, ExaError, type ApiWarning, type SearchNotice } from "exa-js";
 import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type WebResponse, type WebSearchRequest } from "@asterism-app/sdk/contracts";
 import { WebError, type WebProviderDefinition } from "@asterism-app/sdk/runtime";
 import { builtin } from "@asterism-app/builtin-api/contracts";
+import { webMessages as messages } from "../messages/web.ts";
 
 const MAX_TEXT_CHARACTERS = 1_000_000;
+const BASE_URL = "https://api.exa.ai";
 
 const resultSchema = z.object({
   id: z.string().optional(), url: webUrlSchema, title: z.string().nullish(), author: z.string().nullish(),
@@ -106,11 +108,11 @@ export function exaResponse(raw: unknown, leadingHints: WebHint[] = []): WebResp
   };
 }
 
-export function exaSearchOptions(request: WebSearchRequest) {
+export function exaSearchOptions(request: WebSearchRequest, searchType = "auto") {
   const hints: WebHint[] = [];
   if (request.language) hints.push({ code: "unsupported_parameter", parameter: "language", message: "Exa did not apply the requested language filter." });
   if (request.maxResults > 100) hints.push({ code: "parameter_adjusted", parameter: "maxResults", message: "Exa accepts at most 100 results; the requested maximum was reduced to 100." });
-  return { hints, options: { type: "auto" as const, numResults: Math.min(request.maxResults, 100),
+  return { hints, options: { type: searchType, numResults: Math.min(request.maxResults, 100),
     includeDomains: request.includeDomains, excludeDomains: request.excludeDomains,
     startPublishedDate: request.publishedAfter, endPublishedDate: request.publishedBefore, userLocation: request.region,
     contents: { highlights: true as const },
@@ -119,14 +121,18 @@ export function exaSearchOptions(request: WebSearchRequest) {
 
 export const exaWebProvider: WebProviderDefinition = {
   id: "exa", label: "Exa", search: true, fetch: true, urlPatterns: ["*"],
-  defaultBaseUrl: "https://api.exa.ai",
-  credential: { kind: "api_key", keyUrl: "https://dashboard.exa.ai/api-keys" },
-  create({ baseUrl, credential }) {
-    if (!credential) throw new WebError("credential_unavailable", "An Exa API key is required.");
-    const client = new Exa(credential, baseUrl, { warnings: "silent" });
+  settings: [
+    { kind: "secret", key: "apiKey", label: messages.apiKey, required: true, helpUrl: "https://dashboard.exa.ai/api-keys" },
+    { kind: "choice", key: "searchType", label: messages.exaSearchType, description: messages.exaSearchTypeHint, default: "auto", options: [
+      { value: "auto", label: messages.exaAuto, description: messages.exaAutoHint },
+      { value: "deep", label: messages.exaDeep, description: messages.exaDeepHint },
+    ] },
+  ],
+  create({ settings }) {
+    const client = new Exa(settings.apiKey!, BASE_URL, { warnings: "silent" });
     return {
       async search(request, { signal }) {
-        const { options, hints } = exaSearchOptions(request);
+        const { options, hints } = exaSearchOptions(request, settings.searchType);
         return exaResponse(await exaRequest(client.search(request.query, options, { signal })), hints);
       },
       async fetch(request, { signal }) {
