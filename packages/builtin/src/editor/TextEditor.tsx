@@ -108,7 +108,7 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, gitBa
     } }) });
   }, [gitBase, i18n, filename, initialText]);
 
-  return <><div ref={container} className="min-h-0 flex-1 overflow-hidden" />
+  return <><div ref={container} className="min-h-0 flex-1 overflow-hidden text-sm" />
     {panel && createPortal(<SearchPanel view={panel.view} query={panel.query} readOnly={readOnly} />, panel.dom)}
   </>;
 }
