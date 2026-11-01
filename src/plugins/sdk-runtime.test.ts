@@ -629,7 +629,7 @@ describe("Host implementation of the workbench SDK", () => {
       selection: { agent: "worker", model: `${target.provider}/${target.model}`, thinking: null },
       parts: [{ kind: "text", text: "Original" }] }, {}, null) as { sessionId: string };
     const view = service.sessions.current(result.sessionId);
-    expect(view.nodes.find(node => node.contract === AgentInputMessage.id)?.data).toMatchObject({ parts: [{ kind: "text", text: "Prepared" }] });
+    expect(service.sessions.tree.nodes(result.sessionId).find(node => node.contract === AgentInputMessage.id)?.data).toMatchObject({ parts: [{ kind: "text", text: "Prepared" }] });
     expect(view.title).toBe("Prepared");
     expect(preparedRef).toEqual({ sessionId: result.sessionId, id: view.workbench.objects[0]!.id, kind: "asterism.builtin/agent" });
     expect(validated[0]).toContain("Prepared");
@@ -1251,6 +1251,7 @@ describe("Pending operation records", () => {
     await service.sessions.execute({ type: "select", sessionId, nodeId: second });
     session.commit(writer => { writer.append(Changed, { value: 2 }); });
     const current = service.sessions.current(sessionId), count = current.nodes.length;
+    const currentBodies = service.sessions.tree.nodes(sessionId);
     updates.length = 0;
     session.commit(writer => {
       writer.complete(Operation, second, { report: "Second report" });
@@ -1272,7 +1273,7 @@ describe("Pending operation records", () => {
     ]);
     const update = updates.find((event): event is Extract<SessionChanged, { kind: "session.changed" }> => event.kind === "session.changed")!;
     expect(update.nodes).toEqual([]);
-    const rendered = applySessionNodes(current.nodes, update.nodes, update.completed);
+    const rendered = applySessionNodes(currentBodies, update.nodes, update.completed);
     expect(rendered.map(node => node.id)).toEqual(current.nodes.map(node => node.id));
     expect(rendered.find(node => node.id === first)).toMatchObject({ pending: false, data: { output: { report: "First report" } } });
     expect(current.nodes.find(node => node.id === first)?.pending).toBe(true);

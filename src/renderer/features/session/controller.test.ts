@@ -5,7 +5,7 @@ import type { SessionBridge, SessionChanged, SessionCommand, SessionResult, Sess
 import { SessionController } from "./controller.ts";
 
 function data(): SessionData {
-  return { sessionId: "s", title: "Session", cursor: null, nodes: [],
+  return { sessionId: "s", title: "Session", cursor: null, nodes: [], pending: [],
     workbench: { id: "s", title: "Session", objects: [], links: [], views: [], viewport: { x: 0, y: 0, zoom: 1 }, focus: { objectId: null, width: null } },
     progress: { busyObjectIds: [], timelineBusy: false, live: [] } };
 }
@@ -33,12 +33,27 @@ const command = (objectId: string) => ({ type: "resource.command" as const, sess
 
 // After opening, receive current data changes directly; local operations neither read complete history nor change workbench loading state.
 describe("Current session data", () => {
+  // Observer commits can finish a just-published operation before the host flushes its notification batch.
+  it("applies completion to a record appended in the same notification before exposing the snapshot", async () => {
+    const f = fixture(), disconnect = f.open();
+    const pending = { id: "operation", sessionId: "s", parentId: null, createdAt: "now", source: null,
+      contract: "test/operation", data: { output: null }, model: null, recipient: null, pending: true };
+    const completed = { ...pending, pending: false, data: { output: "Finished" } };
+    f.notify({ kind: "session.changed", sessionId: "s", nodes: [pending], completed: [completed],
+      cursor: pending.id, title: "Session", objects: [] });
+    const snapshot = f.controller.recordSnapshot()!;
+    expect(snapshot.records.index({ scope: "timeline" })).toMatchObject([{ id: "operation", sequence: 1, pending: false }]);
+    expect(await snapshot.records.all({ scope: "timeline" })).toMatchObject([{ sequence: 1, pending: false, data: { output: "Finished" } }]);
+    expect(f.controller.getSnapshot().data?.pending).toEqual([]);
+    disconnect();
+  });
   it("resource changes replace only the corresponding object, and action receipts do not initiate reads", async () => {
     const f = fixture(), initial = data();
     const object = (id: string) => ({ id, kind: "test/resource", title: id, presentation: { contract: { id: "test/view" }, data: { mode: "none" } }, receivesLinks: false });
     initial.workbench.objects = [object("a"), object("b")];
     const disconnect = f.open(initial);
     const before = f.controller.getSnapshot().data!;
+    const records = f.controller.recordSnapshot();
     const pending = f.controller.execute(command("a"));
     expect(f.controller.getSnapshot().status).toBe("ready");
     const changed = { ...initial.workbench.objects[0]!, presentation: { contract: { id: "test/view" }, data: { mode: "follow" } } };
@@ -46,6 +61,7 @@ describe("Current session data", () => {
     f.requests[1]!.resolve(accepted); await pending;
     const after = f.controller.getSnapshot().data!;
     expect(after.nodes).toBe(before.nodes);
+    expect(f.controller.recordSnapshot()).toBe(records);
     expect(after.workbench.objects[0]).toBe(changed);
     expect(after.workbench.objects[1]).toBe(before.workbench.objects[1]);
     expect(f.requests.map(item => item.command.type)).toEqual(["watch", "resource.command"]);
@@ -80,10 +96,10 @@ describe("Current session data", () => {
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "put", block }] } });
     const node = { id: "n", sessionId: "s", parentId: null, createdAt: "now", source: null, contract: "test/text", data: { text: "Hello" }, model: null, recipient: null };
     f.notify({ kind: "session.changed", sessionId: "s", nodes: [node], cursor: "n", title: "Session", objects: [] });
-    expect(f.controller.getSnapshot().data?.nodes).toEqual([node]);
+    expect(f.controller.getSnapshot().data?.nodes).toMatchObject([{ id: "n", sequence: 1 }]);
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: [], timelineBusy: false, live: { order: [], changes: [] } });
     expect(f.controller.liveOf("a")).toEqual([]);
-    expect(f.controller.getSnapshot().data?.nodes).toEqual([node]);
+    expect(f.controller.getSnapshot().data?.nodes).toMatchObject([{ id: "n", sequence: 1 }]);
     disconnect();
   });
 

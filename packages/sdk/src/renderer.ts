@@ -7,7 +7,9 @@ export * from "./renderer-i18n.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { Json } from "./json.ts";
 import { reference, type ContractReference, type DataContract } from "./presentation.ts";
-import type { ResourceRef, SessionSnapshot } from "./workspace.ts";
+import type { ResourceRef } from "./workspace.ts";
+import type { RendererSessionSnapshot } from "./renderer-session.ts";
+export * from "./renderer-session.ts";
 export * from "./renderer-services.ts";
 export * from "./renderer-calls.ts";
 export * from "./renderer-creation.ts";
@@ -60,7 +62,7 @@ export interface RendererObjectContext {
     error: UiText | null; missing: boolean;
   };
   readonly session: {
-    snapshot(): SessionSnapshot | null;
+    snapshot(): RendererSessionSnapshot | null;
     subscribe(listener: () => void): () => void;
     create<I, O extends Json>(contract: CreationContract<I, Json, O>, input: NoInfer<I> & Json, position: { x: number; y: number }, options?: RendererInputOptions): Promise<RendererReceipt>;
     refresh(): Promise<void>;

@@ -26,7 +26,7 @@ The summary preserves goals, constraints, decisions, progress, unresolved work, 
 
 A successful summary appends an ordinary Agent summary record with its retained boundary, model, prior estimate, and actual completion data.
 
-The summary’s append position and its retention boundary are distinct. Later model projection uses the latest applicable summary plus original records from the retained boundary. It does not stack every older summary.
+The summary's append position and its retention boundary are distinct. Later model projection selects the latest matching summary by contract and emitting Agent, validates its boundary against timeline metadata, and reads original bodies from that retained boundary. Request origins can precede the retained interval and remain validated against the complete metadata path. When a retained response starts before the boundary, its intervening positions are also read to verify that the cut preserves complete projected groups. An unreadable latest summary fails explicitly instead of falling back to an earlier one.
 
 Moving before the summary excludes it. A damaged or invalid boundary fails explicitly instead of silently trimming history.
 

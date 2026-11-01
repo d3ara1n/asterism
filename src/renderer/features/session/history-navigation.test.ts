@@ -4,8 +4,18 @@ import { node, created as make, text, thinking, call, message, event, attached, 
 import { ViewRegistry } from "../../modules/registry";
 import builtinRenderer from "../../../../packages/builtin/src/renderer";
 import { workbenchRecordViews } from "../workbench/records";
-import { historyBefore, historyEntries, historyResources, historyResourceViews, matchesHistoryView } from "./history-navigation";
+import { historyDirectory, historyEntry, historyResourceViews, matchesHistoryView } from "./history-navigation";
 
+import { toRecord } from "../../../plugins/records";
+import { nodeInfo } from "../../../session/view";
+import type { SessionNode } from "../../../shared/session";
+
+function historyEntries(nodes: readonly SessionNode[], views: ViewRegistry) {
+  const infos = nodes.map((node, index) => nodeInfo(node, index + 1));
+  const records = nodes.map((node, index) => toRecord(node, index + 1));
+  const directory = historyDirectory(infos, records);
+  return infos.map((info, index) => historyEntry(info, records[index]!, directory, views));
+}
 const created = (id: string, title: string, kind = "agent") => make(id, title, kind);
 const label = new ViewRegistry([...builtinRenderer.modules ?? [], workbenchRecordViews]);
 
@@ -53,7 +63,6 @@ describe("History navigation contract", () => {
       node("3", "1", event("board.move", {}, { source: { plugin: "example.board", resource: { sessionId: "s", id: "r", kind: "board" } } })),
     ];
     const entries = historyEntries(nodes, label);
-    expect(historyResources(nodes).get("r")).toEqual({ id: "r", kind: "board", title: "Game" });
     expect(entries[2]).toMatchObject({ scope: "resource", resource: { id: "r", title: "Game" } });
     expect(historyResourceViews(entries)).toEqual([{ resource: { id: "r", kind: "board", title: "Game" }, count: 1 }]);
     expect(entries.filter(entry => matchesHistoryView(entry, { kind: "resource", resourceId: "r" })).map(entry => entry.node.id)).toEqual(["3"]);
@@ -74,7 +83,7 @@ describe("History navigation contract", () => {
     expect(entries[3].resource?.title).toBe("Beta");
     expect(entries[4].resource?.title).toBe("Alpha");
   });
-  it("incomplete blocks are also historical positions, and viewing before them uses the real parent node rather than the preceding filtered row", () => {
+  it("keeps incomplete records and separate fork positions when filtering history", () => {
     const nodes = [
       node("1", null, created("a", "A")),
       node("2", "1", thinking("a", "r", 0, "Reasoning")),
@@ -86,9 +95,5 @@ describe("History navigation contract", () => {
     expect(historyEntries(nodes, label).map(entry => entry.node.id)).toEqual(["1", "2", "3", "4", "5", "6"]);
     const filtered = historyEntries(nodes, label).filter(entry => entry.node.id === "3" || entry.node.id === "5");
     expect(filtered.map(entry => entry.node.id)).toEqual(["3", "5"]);
-    expect(historyBefore(nodes, nodes[2])).toBe("2");
-    expect(historyBefore(nodes, nodes[4])).toBe("4");
-    expect(historyBefore(nodes, nodes[5])).toBe("1");
-    expect(historyBefore(nodes, nodes[0])).toBeNull();
   });
 });

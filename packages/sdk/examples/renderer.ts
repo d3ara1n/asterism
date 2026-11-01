@@ -21,7 +21,7 @@ function CounterBody({ data }: { data: z.infer<typeof Card.schema> }) {
       setPending(true);
       void invoke(ChangeCount, { amount: 1 }).finally(() => setPending(false));
     },
-  }, `${data.value} · live ${live ?? "-"} · ${session.snapshot()?.records.all({ scope: "timeline" }).length ?? 0} records`),
+  }, `${data.value} · live ${live ?? "-"} · ${session.snapshot()?.records.index({ scope: "timeline" }).length ?? 0} records`),
   createElement("button", { onClick: () => card.openPanel("details") }, "Details"));
 }
 function CounterDetails({ data }: { data: z.infer<typeof Card.schema> }) {

@@ -2,8 +2,9 @@ import type { UiText } from "@asterism-app/sdk/contracts";
 import { errorDisplay } from "../../../shared/error-display.ts";
 import { applyLive } from "../../../shared/live-patch.ts";
 import { viewLive } from "../../../shared/partial-arguments.ts";
-import { applySessionNodes } from "../../../shared/session-timeline.ts";
 import type { SessionBridge, SessionMutation, SessionResult, SessionData, SessionProgress, SessionChanged, LiveBlock } from "../../../shared/session.ts";
+import type { RendererSessionSnapshot } from "@asterism-app/sdk/renderer";
+import { SessionRecordStore } from "./records";
 
 export type SessionView = Omit<SessionData, "progress">;
 type SessionOperation = Exclude<SessionMutation, { type: "start" }>;
@@ -39,6 +40,7 @@ function sameActivity(a: SessionActivity, b: SessionActivity): boolean {
 
 /** Obtain current data on opening, then apply backend changes in order; return directly when actions complete. */
 export class SessionController {
+  private readonly records: SessionRecordStore;
   private state: SessionViewState = { data: null, status: "loading", navigating: false, readError: null, missing: false };
   private activity: SessionActivity = emptyActivity;
   /** Wire-format streaming blocks: the baseline for applying deltas; display blocks grouped by object derive preview arguments from these. */
@@ -49,7 +51,13 @@ export class SessionController {
   private connections = 0;
   private pending = 0;
   private scope: AbortController | null = null;
-  constructor(private readonly bridge: SessionBridge, readonly sessionId: string, private readonly onRelease?: () => void) {}
+  constructor(private readonly bridge: SessionBridge, readonly sessionId: string, private readonly onRelease?: () => void) {
+    this.records = new SessionRecordStore(bridge, sessionId);
+  }
+  recordSnapshot = (): RendererSessionSnapshot | null => {
+    const data = this.state.data;
+    return data ? this.records.snapshot(data) : null;
+  };
   getSnapshot = (): SessionViewState => this.state;
   getActivity = (): SessionActivity => this.activity;
   /** The object's own live blocks; deltas for other objects do not change the returned value's identity. */
@@ -87,8 +95,8 @@ export class SessionController {
       const workbench = event.workbench ?? { ...current.workbench, title: event.title,
         objects: event.objects.length ? current.workbench.objects.map(object => objects.get(object.id) ?? object) : current.workbench.objects,
         ...event.layout };
-      this.update({ data: { ...current, title: event.title, cursor: event.cursor, workbench,
-        nodes: applySessionNodes(current.nodes, event.nodes, event.completed) } });
+      const { nodes, pending } = this.records.apply(current, event.nodes, event.completed);
+      this.update({ data: { ...current, title: event.title, cursor: event.cursor, workbench, nodes, pending } });
     }
   }
   connect(): () => void {

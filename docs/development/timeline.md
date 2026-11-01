@@ -32,6 +32,8 @@ Completion can occur while another branch is selected. Every path containing the
 
 Snapshot handles retain their original observations, including operations that were pending at capture time. Their pending bodies are captured separately so completed history can remain lazily read. A new snapshot observes the latest completion.
 
+Record metadata and record bodies have separate reading lifetimes. Metadata preserves the complete tree, stable session order, and source identity. Queries first select a scope and positional interval, then apply contract, source, and identity filters before selecting a page. Range anchors belong to the unfiltered scope. Loading a body later does not change the snapshot's path, upper bound, or pending observation.
+
 Input and result content roots belong to the same record. Saving the result and retaining its attachments share one transaction; rollback preserves the pending record and publishes no completion. Completion adds result dependencies without revoking input dependencies.
 
 Publication and completion have distinct notifications. Observers receive a completed record as an update, and views replace its body by ID at the existing position. Completion cannot rewrite a finalized record. Plugins can complete their own pending records during resource cleanup through the session writer without requiring that resource to remain on the current path.

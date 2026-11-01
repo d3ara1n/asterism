@@ -88,13 +88,15 @@ The object panel offers a flat searchable object list, locating and visibility. 
 
 The history panel lists individual records in actual append order. Source filters use record provenance. Branch tabs organize continuations and shared positions.
 
+The complete metadata tree remains navigable while visible history rows read their bodies on demand. Plugin record renderers own labels and row content. Search reads every candidate in the selected branch and source scope in batches, reports progress and failure, and retains matching identities rather than the scanned bodies. An unloaded or failed row is distinct from an unreadable stored record.
+
 Selecting a history item or tab changes only a candidate. Explicit continuation, confirmation, and settled-state checks precede a cursor change. The workbench has no separate historical preview cursor.
 
 ## Agent conversation
 
 Messages use structured sender data to distinguish user input, incoming Agent messages, and resource events. Incoming messages identify their source; event messages use a shared event icon and blue surface. All sources share body rendering. Model communication envelopes remain implementation data.
 
-The conversation is virtualized. Item identity remains stable through streaming, persistence, and scroll remounts. Live output and the tail remain mounted where required. Text selection and browser find cover mounted content.
+The conversation is virtualized and reads a window of recent records. Earlier messages load in batches within the retained reading boundary. A partially visible turn can read its earlier records for complete footer measurements without displaying those messages. Item identity remains stable through streaming, persistence, and scroll remounts. Live output and the tail remain mounted where required. Text selection and browser find cover mounted content.
 
 The virtual list owns measurement, scroll compensation, and item positioning. Following output stops on deliberate reading gestures or navigation and resumes at the end. The conversation outline treats each input as a chapter: it locates the reader from virtualizer measurements, surfaces the current input once it scrolls out of view, and navigates by input position without moving the execution cursor.
 

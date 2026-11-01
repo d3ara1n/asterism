@@ -4,7 +4,7 @@ import type { Source } from "./workspace.ts";
 
 /** Public envelope for session records: the host maps its storage format to this envelope, and plugins decode by contract without depending on internal node structure. */
 export interface RecordRef { readonly id: string }
-export interface SessionRecord {
+export interface RecordInfo {
   readonly id: string;
   readonly sessionId: string;
   readonly parentId: string | null;
@@ -14,11 +14,13 @@ export interface SessionRecord {
   readonly contract: RecordRef;
   /** Writer; stamped by the host according to the write channel, while the associated object belongs in data. */
   readonly source: Source;
+  /** Present for operations published before completion; false after their one-time result is stored. */
+  readonly pending?: boolean;
+}
+export interface SessionRecord extends RecordInfo {
   /** Model-visible text written by the platform, consumed when executors project context; recipient being null means all executors. */
   readonly context: { readonly text: string; readonly recipient: string | null } | null;
   readonly data: Json;
-  /** Present for operations published before completion; false after their one-time result is stored. */
-  readonly pending?: boolean;
 }
 export type Decoded<D> =
   | { readonly status: "known"; readonly record: SessionRecord; readonly data: D }
@@ -66,12 +68,26 @@ export function defineOperationRecord<I extends Json, O extends Json>(id: string
     inputSchema: definition.input, outputSchema: definition.output };
 }
 /** timeline reads the complete ancestor path to the snapshot tip; session reads all session records within the snapshot's upper bound in save order. */
-export interface RecordQuery { readonly scope: "timeline" | "session" }
+export interface RecordQuery {
+  readonly scope: "timeline" | "session";
+  /** Inclusive lower and exclusive upper positions in the selected scope, before filtering. */
+  readonly from?: string;
+  readonly before?: string;
+  readonly contracts?: readonly string[];
+  readonly ids?: readonly string[];
+  /** Emitting resource identity; null selects records without an emitting resource. */
+  readonly source?: string | null;
+  /** Select the first or last matches in append order; results always retain append order. */
+  readonly edge?: "first" | "last";
+  readonly limit?: number;
+}
 /** An observation handle fixed at one read position; reads records on demand and does not switch to the latest state after await. */
 export interface SessionView {
   readonly id: string;
   readonly title: string;
   readonly records: {
+    /** Identities, ancestry, and provenance without materializing record bodies. */
+    index(query: RecordQuery): readonly RecordInfo[];
     all(query: RecordQuery): readonly SessionRecord[];
     /** The earliest matching record; returns unknown if it cannot be decoded, without skipping it. */
     first<D extends Json>(contract: RecordContract<D>, query: RecordQuery): Decoded<D> | null;

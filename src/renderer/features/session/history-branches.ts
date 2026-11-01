@@ -21,7 +21,7 @@ export type HistoryBranches = {
  * Identity comes from the first node, and numbering from append order; cursor changes and further appends do not rename branches.
  * All records participate in the tree structure and can become display rows and navigation targets.
  */
-export function historyBranches(nodes: readonly SessionNode[]): HistoryBranches {
+export function historyBranches(nodes: readonly Pick<SessionNode, "id" | "parentId">[]): HistoryBranches {
   const main: HistoryBranch = { id: "main", number: 0, parentId: null, forkId: null, nodeIds: new Set(), tip: null };
   const branches = [main];
   const owner = new Map<string, HistoryBranch>();

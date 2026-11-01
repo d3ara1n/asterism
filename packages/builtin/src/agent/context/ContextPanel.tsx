@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { motion } from "motion/react";
-import { useI18n, useRendererObject } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererObject, useSessionRead } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { Button } from "@asterism-app/ui/ui/button";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { cn } from "@asterism-app/ui/utils";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { modelReference } from "@asterism-app/sdk/contracts";
@@ -10,11 +12,11 @@ import { resolveAgentModel } from "@asterism-app/builtin-api/contracts";
 import { useSettingsConfiguration } from "../../configuration/renderer-state";
 import { contextMessages as messages } from "../../messages/context";
 import { COMPRESSION_RESERVE } from "../context-budget";
-import { ContextProjectionError } from "../context-projection";
+import { readAgentInsight } from "../renderer-history";
 import type { AgentView } from "../data";
 import { diagnosticModel } from "../diagnostics/cost";
 import { ease, PanelBody, percent, Section, stripes, Swatch, SystemComposition } from "../panel-kit";
-import { allocateTiles, contextInsight, conversationCategories, type ContextInsight, type ConversationCategory } from "./insight";
+import { allocateTiles, conversationCategories, type ContextInsight, type ConversationCategory } from "./insight";
 
 const COLUMNS = 20, ROWS = 5;
 /** Categories take chart colors in a fixed order. */
@@ -117,22 +119,21 @@ function SystemParts({ system }: { system: ContextInsight["system"] }) {
   </Section>;
 }
 
-/** Context panel: reads only the current path and saved measurements; opening or browsing it sends no requests and writes no history. */
+/** Context panel: reads the current path and saved measurements without model requests or history writes. */
 export function ContextPanel({ data }: { data: z.infer<typeof AgentView.schema> }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const snapshot = object.session.snapshot();
-  const result = useMemo((): { ok: true; insight: ContextInsight } | { ok: false } | null => {
-    if (!snapshot) return null;
-    try { return { ok: true, insight: contextInsight(snapshot, object.ref.id) }; }
-    catch (error) { if (error instanceof ContextProjectionError) return { ok: false }; throw error; }
-  }, [snapshot, object.ref.id]);
+  const result = useSessionRead(snapshot, useCallback((snapshot, signal) => readAgentInsight(snapshot, object.ref.id, signal), [object.ref.id]), { keepPrevious: true });
   return <PanelBody>
-    {result && !result.ok && <Alert variant="destructive"><AlertDescription>{i18n.text(messages.unavailable)}</AlertDescription></Alert>}
-    {result?.ok && <>
-      <WindowUsage insight={result.insight} selection={data.selection} />
-      <ConversationMix conversation={result.insight.conversation} />
-      <SystemParts system={result.insight.system} />
+    {result.status === "loading" && !result.data && <p className="type-caption" role="status">{i18n.text(commonMessages.loading)}</p>}
+    {result.error && <Alert variant="destructive"><AlertDescription>{i18n.text(messages.unavailable)}
+      <Button variant="ghost" size="xs" onClick={result.retry}>{i18n.text(commonMessages.retry)}</Button>
+    </AlertDescription></Alert>}
+    {result.data && <>
+      <WindowUsage insight={result.data} selection={data.selection} />
+      <ConversationMix conversation={result.data.conversation} />
+      <SystemParts system={result.data.system} />
     </>}
   </PanelBody>;
 }

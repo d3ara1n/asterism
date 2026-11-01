@@ -2,8 +2,6 @@ import { createElement, useCallback, useMemo, type ReactNode } from "react";
 import { RendererCatalogsProvider, RendererModelsProvider, RendererPreferencesProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@asterism-app/sdk/renderer";
 import { pluginOf, resourceCall, reference, ModelCatalog, ShellProfilesCatalog } from "@asterism-app/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
-import { sessionSnapshot } from "../../plugins/records";
-import { nodeView } from "../../session/view";
 import { useWorkbench } from "../features/workbench/context";
 import { useObjectLive, useSession } from "../features/session/state";
 import { useConfiguration } from "../features/configuration/state";
@@ -32,10 +30,8 @@ export function RendererCatalogProvider({ ready, children }: { ready: boolean; c
 export function useObjectContext(object: WorkbenchObject): RendererObjectContext {
   const workbench = useWorkbench();
   const { controller } = workbench;
-  const { state, snapshot } = useSession(controller);
-  const records = useMemo(() => snapshot
-    ? sessionSnapshot(nodeView(snapshot.sessionId, snapshot.title, snapshot.nodes, snapshot.cursor)) : null,
-  [snapshot?.sessionId, snapshot?.title, snapshot?.nodes, snapshot?.cursor]);
+  const { state } = useSession(controller);
+  const records = controller.recordSnapshot();
   const openChannel = useCallback<RendererObjectContext["openChannel"]>(contract =>
     channels.open(contract, { sessionId: controller.sessionId, id: object.id, kind: object.kind }), [controller.sessionId, object.id, object.kind]);
   const content = useMemo(() => contentReader(() => ({ sessionId: controller.sessionId, objectId: object.id })),

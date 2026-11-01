@@ -1,4 +1,6 @@
 {
+  "agent_conversation_earlierMessages": "加载更早的消息",
+  "agent_conversation_historyReadFailed": "无法加载对话历史。",
   "editor.save": "保存",
   "editor.find": "查找和替换",
   "editor.searchText": "查找",

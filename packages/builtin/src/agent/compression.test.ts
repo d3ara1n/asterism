@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ContextSummary, Execution } from "@asterism-app/builtin-api/contracts";
 import { projectAgentContext, projectForAgent, contextMessages } from "./projection.ts";
 import { estimateContext, planCompression } from "./compression.ts";
@@ -23,6 +23,33 @@ function append(path: SessionNode[], value: NewNode) {
 
 // Compression replaces only the prefix; original text, tool pairing, branches, and request starting points remain unchanged.
 describe("Context compression boundaries", () => {
+  // Tool results commit in completion order; continuing from the first result does not imply that earlier ordinals were compacted.
+  it("allows a branch ending at a higher-ordinal tool result when the retention boundary precedes its request", () => {
+    const path = pathOf(message("a", "Old request"), message("a", "Kept request"), checkpoint("1"),
+      message("a", "New request"), call("a", "parallel", 1, "second", { requestParentId: "3" }),
+      call("a", "parallel", 0, "first", { requestParentId: "3" }));
+    expect(projectForAgent(view(path.slice(0, -1)), "a").filter(item => item.kind === "result")).toHaveLength(1);
+    expect(projectForAgent(view(path), "a").filter(item => item.kind === "result")).toHaveLength(2);
+    append(path, checkpoint("5"));
+    expect(() => context(path)).toThrow("splits a response");
+  });
+  // Metadata may span the entire tree; model projection must not materialize the superseded prefix.
+  it("reads only the latest summary and retained bodies and never falls back from an unreadable latest summary", () => {
+    const path = pathOf(message("a", "Old input"), text("a", "old", 0, "Old output", { requestParentId: "0" }),
+      message("a", "Retained input"), text("a", "new", 0, "Retained output", { requestParentId: "2" }), checkpoint("2"));
+    const source = nodeView("s", "", path, "4");
+    const original = source.read;
+    const observed: string[] = [];
+    vi.spyOn(source, "read").mockImplementation(query => {
+      const values = original(query);
+      observed.push(...values.map(value => value.node.id));
+      return values;
+    });
+    expect(projectForAgent(sessionView(source), "a").slice(1).map(item => item.kind)).toEqual(["input", "output"]);
+    expect(new Set(observed)).toEqual(new Set(["2", "3", "4"]));
+    append(path, event(ContextSummary.id, { malformed: true }, { source: agentSource("a") }));
+    expect(() => context(path)).toThrow("could not be decoded");
+  });
   it("Preserves recent original text, native data, and complete tool batches without losing interleaved events", () => {
     const path = pathOf(message("a", "Old goal"), text("a", "old", 0, "Old answer", { requestParentId: "0" }),
       message("a", "Recent request" + "r".repeat(80_000)),

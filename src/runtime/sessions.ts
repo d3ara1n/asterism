@@ -159,6 +159,7 @@ export class SessionService {
     this.workbench = new SessionWorkbench(db, this.tree, this.resources, this.content);
     this.templates = new TemplateStore(db, this.tree, this.workbench, this.content, this.resources);
     modules.initialize();
+    for (const session of this.tree.list()) if (this.settled(session.id)) this.tree.releaseCache(session.id);
   }
   get running(): boolean { return this.tree.list().some(session => !this.settled(session.id)); }
   disposalWarnings() {
@@ -252,7 +253,11 @@ export class SessionService {
   private notify(sessionId: string): void {
     const update = this.updates.get(sessionId);
     this.updates.delete(sessionId);
-    if (!update || !this.watching.has(sessionId) || this.closed) return;
+    if (!this.watching.has(sessionId)) {
+      if (this.settled(sessionId)) this.tree.releaseCache(sessionId);
+      return;
+    }
+    if (!update || this.closed) return;
     const title = this.tree.title(sessionId);
     this.changed({ kind: "session.changed", sessionId, nodes: update.nodes, title, cursor: this.tree.cursor(sessionId),
       ...(update.completed.size ? { completed: [...update.completed.values()] } : {}),
@@ -281,6 +286,7 @@ export class SessionService {
       live: [...resources.flatMap(a => a.live), ...plugin.live].map(wireLive) };
   }
   private progressChanged(sessionId: string): void {
+    if (!this.watching.has(sessionId) && this.settled(sessionId)) this.tree.releaseCache(sessionId);
     const previous = this.watching.get(sessionId);
     if (!previous || this.closed) return;
     const progress = this.progress(sessionId);
@@ -293,10 +299,12 @@ export class SessionService {
     this.changed({ kind: "session.progress", sessionId, busyObjectIds: progress.busyObjectIds, timelineBusy: progress.timelineBusy, live });
   }
   current(sessionId: string): SessionData {
-    const nodes = this.tree.nodes(sessionId);
+    const view = this.tree.view(sessionId);
+    const nodes = [...view.index({ scope: "session" })];
+    const pending = nodes.filter(node => node.pending).map(info => this.tree.node(sessionId, info.id));
     const cursor = this.tree.cursor(sessionId);
     const title = this.tree.title(sessionId);
-    return { sessionId, title, cursor, nodes, progress: this.progress(sessionId),
+    return { sessionId, title, cursor, nodes, pending, progress: this.progress(sessionId),
       workbench: this.workbench.project(sessionId, title, this.retiring(sessionId), this.holds.links(sessionId)) };
   }
   /** Resource command entry: prepare outside transactions, then before rechecks current-path membership within the execution commit transaction. */
@@ -482,6 +490,7 @@ export class SessionService {
         return { kind: "accepted", sessionId };
       }
       case "read": return { kind: "view", data: this.current(command.sessionId) };
+      case "records.read": return { kind: "records", nodes: this.tree.readRecords(command.sessionId, command.ids) };
       case "watch": {
         const data = this.current(command.sessionId);
         this.watching.set(command.sessionId, data.progress);
@@ -490,6 +499,7 @@ export class SessionService {
       }
       case "unwatch":
         this.watching.delete(command.sessionId);
+        if (this.settled(command.sessionId)) this.tree.releaseCache(command.sessionId);
         return { kind: "accepted", sessionId: command.sessionId };
       case "select":
         if (!this.settled(command.sessionId)) throw new SessionError("conflict", "Wait for all captured resources to settle before moving through history.");

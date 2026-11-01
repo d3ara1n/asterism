@@ -1,6 +1,7 @@
-import { completionData, type ModelInputPart, type ModelItem, type SessionSnapshot } from "@asterism-app/sdk/contracts";
-import { contextMessages, projectAgentContext } from "../context-projection.ts";
-import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism-app/builtin-api/contracts";
+import { completionData, type ModelInputPart, type ModelItem, type SessionSnapshot, type SessionRecord, type ModelBlock, type RecordInfo } from "@asterism-app/sdk/contracts";
+import { contextMessages, agentContextRead, agentSummaryRead, type AgentContext } from "../context-projection.ts";
+import { Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism-app/builtin-api/contracts";
+import { readRecords, type RecordRead } from "../../shared/record-reading.ts";
 
 /** Fixed categories and display order for conversation composition. */
 export const conversationCategories = ["user", "agentMessage", "eventMessage", "assistant", "thinking", "toolcall", "result", "context", "summary"] as const;
@@ -37,7 +38,38 @@ function addItem(item: ModelItem, inputCategory: "user" | "agentMessage" | "even
 
 /** Reads only the current path; conversation composition reuses the next request's model projection, while window usage and the system section use only saved actual measurements. */
 export function contextInsight(snapshot: Pick<SessionSnapshot, "records">, agentId: string): ContextInsight {
-  const context = projectAgentContext(snapshot, agentId);
+  return readRecords(agentInsightRead(snapshot.records.index({ scope: "timeline" }), agentId), snapshot.records.all);
+}
+export function* agentInsightRead(index: readonly RecordInfo[], agentId: string): RecordRead<ContextInsight> {
+  const context = yield* agentContextRead(index, agentId);
+  const measurement = contextMeasurement(context.path, agentId) ?? (yield* latestMeasurementRead(agentId, context.path[0]?.id));
+  return contextInsightFromRecords(context, measurement);
+}
+export function* agentMeasurementsRead(index: readonly RecordInfo[], agentId: string): RecordRead<Pick<ContextInsight, "usage" | "system">> {
+  const summary = yield* agentSummaryRead(index, agentId);
+  return contextMeasurements(summary, yield* latestMeasurementRead(agentId));
+}
+function* latestMeasurementRead(agentId: string, before?: string): RecordRead<ContextMeasurement | null> {
+  let limit = 1;
+  for (;;) {
+    const records = yield { scope: "timeline", contracts: [Execution.id], source: agentId, before, edge: "last", limit };
+    const measurement = contextMeasurement(records, agentId);
+    if (measurement || !records.length) return measurement;
+    before = records[0]!.id;
+    limit = 32;
+  }
+}
+interface ContextMeasurement { record: SessionRecord; block: ModelBlock }
+function contextMeasurement(records: readonly SessionRecord[], agentId: string): ContextMeasurement | null {
+  for (let index = records.length - 1; index >= 0; index--) {
+    const record = records[index]!;
+    if (record.source?.resource?.id !== agentId) continue;
+    const execution = Execution.decode(record);
+    if (execution?.status === "known" && execution.data.block.completion) return { record, block: execution.data.block };
+  }
+  return null;
+}
+function contextInsightFromRecords(context: AgentContext, measurement: ContextMeasurement | null): ContextInsight {
   const conversation: ContextInsight["conversation"] = {
     characters: Object.fromEntries(conversationCategories.map(category => [category, 0])) as Record<ConversationCategory, number>,
     total: 0, files: 0,
@@ -54,23 +86,19 @@ export function contextInsight(snapshot: Pick<SessionSnapshot, "records">, agent
     group.items.forEach(item => addItem(item, category, conversation));
   }
   conversation.total = conversationCategories.reduce((sum, category) => sum + conversation.characters[category], 0);
-
-  let usage: ContextInsight["usage"] = null, system: ContextInsight["system"] = null, compressedAfter = false;
-  for (let index = context.path.length - 1; index >= 0; index--) {
-    const record = context.path[index]!;
-    if (record.source?.resource?.id !== agentId) continue;
-    if (ContextSummary.decode(record)?.status === "known") compressedAfter = true;
-    const execution = Execution.decode(record);
-    if (execution?.status !== "known") continue;
-    const block = execution.data.block;
-    if (!block.completion) continue;
+  return { conversation, ...contextMeasurements(context.summary, measurement) };
+}
+function contextMeasurements(summary: AgentContext["summary"], measurement: ContextMeasurement | null): Pick<ContextInsight, "usage" | "system"> {
+  let usage: ContextInsight["usage"] = null, system: ContextInsight["system"] = null;
+  if (measurement?.block.completion) {
+    const { block, record } = measurement;
+    const compressedAfter = summary !== null && summary.record.sequence > record.sequence;
     const diagnostics = completionData(block.completion, AgentRequestContext);
     if (diagnostics) system = { responseId: block.responseId, diagnostics };
-    const input = block.completion.usage?.input;
+    const input = block.completion?.usage?.input;
     if (input != null) usage = { input, model: block.source.model, scope: block.source.scope, compressedAfter };
-    break;
   }
-  return { usage, conversation, system };
+  return { usage, system };
 }
 
 /** Allocates tiles by largest remainder, with at least one tile per nonzero category; details provide exact values. */

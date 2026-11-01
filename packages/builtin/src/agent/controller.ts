@@ -1,6 +1,6 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices, type ExecutionServices, type ProviderUsage } from "@asterism-app/sdk/runtime";
 import { ResourceStatusChanged, describeError, type ResourceStatus, type ModelRunObserver, type ModelRunResult } from "@asterism-app/sdk/contracts";
-import { Execution, AgentInputMessage, AgentTurnEnded, type AgentTurnEndReason } from "@asterism-app/builtin-api/contracts";
+import { Execution, AgentTurnEnded, type AgentTurnEndReason } from "@asterism-app/builtin-api/contracts";
 import { runAgentLoop } from "./loop.ts";
 import { agentRequestExtensions } from "./request-context.ts";
 import { feedbackOrigin } from "./feedback.ts";
@@ -10,6 +10,8 @@ import type { createRequestAssembly } from "./preparation.ts";
 import { projectForAgent } from "./projection.ts";
 import { compressContext } from "./compression.ts";
 import { deliverDrafts } from "./drafts.ts";
+import { turnStartRead } from "./input-message.ts";
+import { readRecords } from "../shared/record-reading.ts";
 
 interface AgentControllerDependencies {
   selection: AgentSelectionService;
@@ -69,9 +71,8 @@ export function createAgentController(deps: AgentControllerDependencies) {
       if (previous && deps.tasks.has(previous.key)) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
       const boundary = () => {
         const snapshot = object.session.snapshot();
-        const input = snapshot.records.query(AgentInputMessage, { scope: "timeline" })
-          .findLast(message => message.status === "known" && message.record.source?.resource?.id === object.ref.id && message.data.startsTurn);
-        return { inputId: input?.record.id ?? null, position: snapshot.position };
+        const input = readRecords(turnStartRead(object.ref.id), snapshot.records.all);
+        return { inputId: input?.id ?? null, position: snapshot.position };
       };
       const run = {
         key: `agent:${object.ref.id}:${++execution}`, entered: false,

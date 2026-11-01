@@ -1,6 +1,7 @@
 import { SessionError } from "../shared/session-timeline.ts";
+import type { SessionNodeInfo } from "../shared/session.ts";
 
-export interface StructuralNode { readonly id: string; readonly parentId: string | null; readonly seq: number; readonly contract: string }
+export interface StructuralNode extends Omit<SessionNodeInfo, "sequence"> { readonly seq: number }
 
 /**
  * Committed structure of one session: identity, ancestry, append order, and contract, without record bodies.
@@ -47,25 +48,16 @@ export class SessionStructure {
     for (let index = branch.length - 1; index >= 0; index--) this.push(branch[index]!);
     return this.spine.length;
   }
-  /** Prefix nodes in root-to-tip order, optionally filtered by contract and reduced to one edge. */
-  select(length: number, contracts?: readonly string[], edge?: "first" | "last"): StructuralNode[] {
+  /** Prefix nodes in root-to-tip order, optionally narrowed by contract indexes. */
+  select(length: number, contracts?: readonly string[]): StructuralNode[] {
     if (!contracts) {
       if (!length) return [];
-      if (edge) return [this.spine[edge === "first" ? 0 : length - 1]!];
       return this.spine.slice(0, length);
     }
-    const lists = contracts.map(contract => {
+    const lists = [...new Set(contracts)].map(contract => {
       const bucket = this.bucket(contract);
       return { bucket, end: upperBound(bucket, length) };
     });
-    if (edge === "first") {
-      const first = Math.min(...lists.map(({ bucket, end }) => end ? bucket[0]! : Infinity));
-      return first === Infinity ? [] : [this.spine[first]!];
-    }
-    if (edge === "last") {
-      const last = Math.max(...lists.map(({ bucket, end }) => end ? bucket[end - 1]! : -1));
-      return last < 0 ? [] : [this.spine[last]!];
-    }
     const indices = lists.length === 1 ? lists[0]!.bucket.slice(0, lists[0]!.end)
       : lists.flatMap(({ bucket, end }) => bucket.slice(0, end)).sort((a, b) => a - b);
     return indices.map(index => this.spine[index]!);

@@ -1,4 +1,6 @@
 {
+  "history_searching": "正在搜索历史…",
+  "history_readFailed": "无法加载历史记录。",
   "appearance.loadFailed": "无法加载外观设置。",
   "appearance.saveFailed": "无法保存外观设置。",
   "languageLoadFailed": "无法加载语言偏好。",

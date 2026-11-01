@@ -1,6 +1,8 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const historyMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  searching: { id: "history_searching", defaultMessage: "Searching history…" },
+  readFailed: { id: "history_readFailed", defaultMessage: "History could not be loaded." },
   eventRenamed: { id: "eventRenamed", defaultMessage: "Renamed resource: {title}" },
   history: {
     id: "history",

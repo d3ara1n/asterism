@@ -1,15 +1,14 @@
 import type { ReactNode } from "react";
 import type { RecordRenderContext } from "@asterism-app/sdk/renderer";
-import { toRecord } from "../../../plugins/records";
 import type { ViewRegistry } from "../../modules/registry";
-import { ResourceCreated, ResourceRenamed } from "@asterism-app/sdk/contracts";
+import { ResourceCreated, ResourceRenamed, type SessionRecord } from "@asterism-app/sdk/contracts";
 
-import type { SessionNode } from "../../../shared/session";
+import type { SessionNode, SessionNodeInfo } from "../../../shared/session";
 import { historyMessages } from "../../messages/history";
 import { getI18n } from "../../shared/i18n";
 
 export type HistoryResource = { id: string; kind: string; title: string };
-export type HistoryEntry = { node: SessionNode; label: string; icon?: ReactNode; row?: (label: string) => ReactNode; scope: "session" | "resource"; resource: HistoryResource | null };
+export type HistoryEntry = { node: Omit<SessionNode, "data" | "model" | "recipient">; label: string; icon?: ReactNode; row?: (label: string) => ReactNode; scope: "session" | "resource"; resource: HistoryResource | null };
 export type HistoryView = { kind: "all" | "session" | "resources" } | { kind: "resource"; resourceId: string };
 const snippet = (value: string) => value.slice(0, 500).replace(/\s+/gu, " ").trim() || "…";
 
@@ -35,51 +34,40 @@ export function historyResourceViews(entries: readonly HistoryEntry[]): Array<{ 
   return [...sources.values()];
 }
 
-/** Metadata comes from resource creation records across the whole tree, so sources remain identifiable when historical objects are removed or on other branches. */
-export function historyResources(nodes: readonly SessionNode[]): Map<string, HistoryResource> {
-  const result = new Map<string, HistoryResource>();
-  for (const node of nodes) {
-    if (node.contract !== ResourceCreated.id) continue;
-    const decoded = ResourceCreated.schema.safeParse(node.data);
-    if (!decoded.success) continue;
-    const { id, type, title } = decoded.data;
-    result.set(id, { id, kind: type, title });
-  }
-  return result;
-}
-
-/** Preserve input append order and node identity; record contract providers register summaries and icons, while the host distinguishes only sources. */
-export function historyEntries(nodes: readonly SessionNode[], views: Pick<ViewRegistry, "record" | "resource">): HistoryEntry[] {
-  const resources = historyResources(nodes);
-  const i18n = getI18n();
-  // Branches inherit renames from parent nodes; only rename events copy the name map, and subsequent nodes share that branch's immutable version.
-  const titlesByNode = new Map<string, ReadonlyMap<string, string>>();
-  const initialTitles = new Map<string, string>();
-  return nodes.map((node, index) => {
-    let titles = titlesByNode.get(node.parentId ?? "") ?? initialTitles;
-    if (node.contract === ResourceRenamed.id) {
-      const decoded = ResourceRenamed.schema.safeParse(node.data);
-      if (decoded.success) titles = new Map(titles).set(decoded.data.id, decoded.data.title);
+/** Keep only resource names and rename events after reading their owning contracts. */
+export function historyDirectory(nodes: readonly SessionNodeInfo[], records: readonly SessionRecord[]) {
+  const resources = new Map<string, HistoryResource>(), renames = new Map<string, { id: string; title: string }>();
+  for (const record of records) {
+    const created = ResourceCreated.decode(record);
+    if (created?.status === "known") {
+      const { id, title, type } = created.data;
+      resources.set(id, { id, title, kind: type });
     }
-    titlesByNode.set(node.id, titles);
-    const context: RecordRenderContext = {
-      resourceTitle: id => titles.get(id) ?? resources.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource),
-      resourceLabel: kind => views.resource(kind).label,
-      text: value => i18n.text(value),
-      describe: item => views.record(item, context),
-    };
-    const item = toRecord(node, index + 1);
-    const view = views.record(item, context);
-    // Source depends only on record ownership: a record with an associated object is a resource record, otherwise it is a session-level record; the host does not know specific contracts.
-    const owner = item.source?.resource?.id ?? null;
-    const resource = owner ? resources.get(owner) : null;
-    const label = view ? i18n.text(view.label) : i18n.formatMessage(historyMessages.unknownRecord, { id: item.contract.id });
-    return { node, label: snippet(label), icon: view?.icon, row: view?.row, scope: owner ? "resource" : "session",
-      resource: resource ? { ...resource, title: context.resourceTitle(resource.id) } : null };
-  });
+    const renamed = ResourceRenamed.decode(record);
+    if (renamed?.status === "known") renames.set(record.id, renamed.data);
+  }
+  const titles = new Map<string, ReadonlyMap<string, string>>(), empty = new Map<string, string>();
+  for (const node of nodes) {
+    const inherited = titles.get(node.parentId ?? "") ?? empty;
+    const rename = renames.get(node.id);
+    titles.set(node.id, rename ? new Map(inherited).set(rename.id, rename.title) : inherited);
+  }
+  return { resources, titles };
 }
+export type HistoryDirectory = ReturnType<typeof historyDirectory>;
 
-/** “Before” targets the real parent node, unaffected by list filtering. */
-export function historyBefore(nodes: readonly SessionNode[], node: SessionNode): string | null {
-  return nodes.some(parent => parent.id === node.parentId) ? node.parentId : null;
+export function historyEntry(info: SessionNodeInfo, record: SessionRecord | null, directory: HistoryDirectory,
+  views: Pick<ViewRegistry, "record" | "resource">): HistoryEntry {
+  const i18n = getI18n(), titles = directory.titles.get(info.id);
+  const context: RecordRenderContext = {
+    resourceTitle: id => titles?.get(id) ?? directory.resources.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource),
+    resourceLabel: kind => views.resource(kind).label,
+    text: value => i18n.text(value),
+    describe: item => views.record(item, context),
+  };
+  const owner = info.source?.resource?.id, resource = owner ? directory.resources.get(owner) : undefined;
+  const view = record ? views.record(record, context) : null;
+  return { node: info, label: view ? snippet(i18n.text(view.label)) : i18n.formatMessage(historyMessages.unknownRecord, { id: info.contract }),
+    icon: view?.icon, row: view?.row, scope: owner ? "resource" : "session",
+    resource: resource ? { ...resource, title: context.resourceTitle(resource.id) } : null };
 }

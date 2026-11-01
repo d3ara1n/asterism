@@ -83,11 +83,6 @@ export class ResponseBuffer {
     return [...this.blocks.values()].filter((block): block is LiveCall => block.part.kind === "toolcall");
   }
 
-  isToolInput(partId: string): boolean {
-    const block = this.blocks.get(partId);
-    return block?.part.kind === "toolcall" && block.endedAt === null;
-  }
-
   /** Tolerant parsing serves live display only; it cannot replace execution arguments or arguments in incomplete history. */
   async preview(identity: (name: string, args: Json) => ToolInvocationInfo): Promise<void> {
     for (const block of this.calls()) {

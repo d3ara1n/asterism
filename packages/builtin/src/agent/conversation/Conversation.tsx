@@ -9,9 +9,10 @@ import { conversationMessages } from "../../messages/conversation";
 import { useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk/renderer";
 
 import { useOutputFollow } from "./output-follow";
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 
-import { displayedTimeline, savedTimeline, withLive } from "./timeline";
+import { useConversationHistory } from "./use-conversation-history";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { TimelineViewState } from "./view-state";
 
 import { useConversationInteraction } from "./interaction";
@@ -51,11 +52,7 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
   const snapshot = session.snapshot();
   const viewState = object.retained.get(viewStateKey, () => new TimelineViewState());
   const running = executionState === "running";
-  // The saved portion is recomputed only when snapshots or run state change; streaming deltas append only live blocks, preserving historical item identity.
-  const saved = useMemo(() => snapshot ? savedTimeline(snapshot, agentId, running, feedback, {
-    boundary: viewState.historyWindow.read(snapshot.records.all({ scope: "timeline" }), agentId), compressions,
-  }) : null, [snapshot, agentId, running, feedback, compressions, viewState]);
-  const items = useMemo(() => saved ? displayedTimeline(withLive(saved, models.blocks)) : [], [saved, models.blocks]);
+  const { read, items, loadEarlier } = useConversationHistory(snapshot, agentId, viewState.historyWindow, models.blocks, running, feedback, compressions);
   const { timeline: target, processOwners, toggle } = useTurnProcesses(items, viewState, running);
   const reducedMotion = useReducedMotion() === true;
   const presence = useTimelinePresence(target, processOwners, reducedMotion);
@@ -84,6 +81,12 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
       {/* The virtual list compensates for scroll position itself; disable browser scroll anchoring to prevent conflicts. */}
       <div ref={scroll} className="min-h-0 flex-1 scroll-pt-4 select-text overflow-y-auto overscroll-contain [overflow-anchor:none]"
         onScroll={event => { onScroll(event); navigation.current?.update(); }}>
+        {read.data?.earlier && <div className="px-4 pt-3"><Button variant="ghost" size="sm" disabled={read.status === "loading"}
+          onClick={loadEarlier}>
+          {i18n.text(conversationMessages.earlierMessages)}</Button></div>}
+        {read.status === "loading" && !read.data && <p className="type-caption p-4" role="status">{i18n.text(commonMessages.loading)}</p>}
+        {read.status === "error" && <div className="p-4"><p className="type-caption">{i18n.text(conversationMessages.historyReadFailed)}</p>
+          <Button variant="ghost" size="sm" onClick={read.retry}>{i18n.text(commonMessages.retry)}</Button></div>}
         <VirtualConversationTimeline ref={list} items={timeline} viewState={viewState} scrollRef={scroll}
           target={target} presence={presence} reducedMotion={reducedMotion}
           onResize={() => { onResize(); navigation.current?.update(); }} onScrollEnd={onScrollEnd} onProcessMount={onProcessMount}
@@ -91,7 +94,7 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
         <div className="px-4 pb-4">
           {running && !timeline.some(item => item.kind === "compression" && item.status === "running") &&
             <p role="status" className="type-caption flex items-center gap-2 pt-4"><StatusIcon tone="progress" className="size-3" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
-          {!timeline.length && !running && <p className="type-caption pt-4">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
+          {read.status === "ready" && !timeline.length && !running && <p className="type-caption pt-4">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>
       {awayFromBottom && <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">

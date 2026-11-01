@@ -45,7 +45,7 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
       const source = host.sessions.workbench(ref.sessionId).objects.find(object => object.id === ref.id);
       if (!source) throw new PluginApiError("unavailable", "The access owner is not on the current session path.");
       const contentAccess = { owner, sessionId: ref.sessionId, objectId: ref.id,
-        recordIds: new Set(host.sessions.timeline(ref.sessionId).map(node => node.id)), check: checkAvailable };
+        recordIds: new Set(host.sessions.view(ref.sessionId).timelineIds()), check: checkAvailable };
       const linked = host.sessions.linked(ref.sessionId, ref.id);
       const linkedRefs = linked.map(resource => ({ sessionId: ref.sessionId, id: resource.id, kind: resource.kind }));
       const policyConfig = structuredClone(request.tools);

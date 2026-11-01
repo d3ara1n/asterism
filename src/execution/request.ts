@@ -70,7 +70,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
       emit({ type: "block", block });
     }, extensions);
     const progress = () => emit({ type: "progress", blocks: response.live() });
-    // Coalesce frequent tool-argument parsing while publishing text and reasoning immediately; the timer stays within the response lifetime.
+    // Materialize progress once per display batch; terminal events flush before finalization.
     let progressTimer: ReturnType<typeof setTimeout> | undefined;
     let pendingProgress = Promise.resolve();
     const flushProgress = () => {
@@ -88,10 +88,9 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
         // The adapter handles aborts and delivers previously acquired terminal state; check cancellation again before the tool batch starts.
         response.accept(event);
         if (event.type === "part.delta") {
-          if (response.isToolInput(event.partId)) progressTimer ??= setTimeout(() => {
+          progressTimer ??= setTimeout(() => {
             void flushProgress().catch(error => controller.abort(error));
-          }, 50);
-          else progress();
+          }, 32);
         } else await flushProgress();
       }
       signal.throwIfAborted();

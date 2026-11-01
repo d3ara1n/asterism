@@ -1,5 +1,23 @@
-import type { ModelInputPart } from "@asterism-app/sdk/contracts";
+import type { ModelInputPart, SessionRecord } from "@asterism-app/sdk/contracts";
 import type { AgentMessageSender, AgentInputPart } from "@asterism-app/builtin-api/contracts";
+import { AgentInputMessage } from "@asterism-app/builtin-api/contracts";
+import type { RecordRead } from "../shared/record-reading.ts";
+
+/** Locate the turn containing a position, or the latest turn when no position is supplied. */
+export function* turnStartRead(agentId: string, at?: string): RecordRead<SessionRecord | null> {
+  if (at) {
+    const records = yield { scope: "timeline", source: agentId, contracts: [AgentInputMessage.id], ids: [at] };
+    const input = records[0] && AgentInputMessage.decode(records[0]);
+    if (input?.status === "known" && input.data.startsTurn) return input.record;
+  }
+  let before = at;
+  for (;;) {
+    const records = yield { scope: "timeline", contracts: [AgentInputMessage.id], source: agentId, edge: "last", limit: 32, before };
+    const start = AgentInputMessage.decodeAll(records).findLast(input => input.status === "known" && input.data.startsTurn);
+    if (start || !records.length) return start?.record ?? null;
+    before = records[0]!.id;
+  }
+}
 
 /** Shared source semantics for work requests, compaction, and saved-history investigation. */
 export const inputMessageDescription = [

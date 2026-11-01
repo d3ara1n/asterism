@@ -12,7 +12,7 @@ const completion = { finishReason: "stop", rawFinishReason: null, providerRespon
   usage: { input: 100, output: 20, total: 120, cacheRead: null, cacheWrite: null, reasoning: null } } satisfies ModelCompletion;
 function project(path: ReturnType<typeof node>[], running = false, live: readonly ModelLiveBlock[] = [], feedback: readonly InlineFeedback[] = []) {
   const snapshot = sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null));
-  return groupTurnProcesses(displayedTimeline(withLive(savedTimeline(snapshot, "a", running, feedback), live)), running);
+  return groupTurnProcesses(displayedTimeline(withLive(savedTimeline(snapshot.records.all({ scope: "timeline" }), "a", running, feedback), live)), running);
 }
 const ids = (grouped: ReturnType<typeof project>, open: readonly string[] = []) =>
   visibleTurnProcesses(grouped, new Set(open)).map(item => item.id);

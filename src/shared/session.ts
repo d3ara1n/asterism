@@ -21,6 +21,8 @@ export const sessionNodeSchema = z.strictObject({
   pending: z.boolean().optional(),
 });
 export type SessionNode = z.infer<typeof sessionNodeSchema>;
+export const sessionNodeInfoSchema = sessionNodeSchema.omit({ data: true, model: true, recipient: true }).extend({ sequence: z.number().int().positive() });
+export type SessionNodeInfo = z.infer<typeof sessionNodeInfoSchema>;
 export type NewNode = Omit<SessionNode, "id" | "sessionId" | "parentId" | "createdAt">;
 
 // ---- Session capability interfaces ----
@@ -29,6 +31,7 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("read"), sessionId: id }),
   z.strictObject({ type: z.literal("watch"), sessionId: id }),
   z.strictObject({ type: z.literal("unwatch"), sessionId: id }),
+  z.strictObject({ type: z.literal("records.read"), sessionId: id, ids: z.array(id) }),
   // Exit prompts read current instance state at confirmation time without entering projections or triggering reprojection on changes. Omitted objectIds selects all current-path objects.
   z.strictObject({ type: z.literal("disposal.warnings"), sessionId: id, objectIds: z.array(id).max(1000).optional() }),
   z.strictObject({ type: z.literal("select"), sessionId: id, nodeId: id.nullable() }),
@@ -50,7 +53,7 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   ...templateCommands,
 ]);
 export type SessionCommand = z.infer<typeof sessionCommandSchema>;
-export type SessionMutation = Exclude<SessionCommand, { type: "read" | "watch" | "unwatch" | "disposal.warnings" | `template.${string}` }>;
+export type SessionMutation = Exclude<SessionCommand, { type: "read" | "watch" | "unwatch" | "records.read" | "disposal.warnings" | `template.${string}` }>;
 /** Runtime-only output projection without parent pointers, outside selectable history nodes. */
 const liveBase = { id, objectId: id, responseId: id, ordinal: z.number().int().nonnegative() };
 export const liveBlockSchema = z.discriminatedUnion("kind", [
@@ -74,7 +77,8 @@ export type SessionProgress = z.infer<typeof sessionProgressSchema>;
 /** Deliver current data when opening sessions, then apply changes directly. */
 export const sessionDataSchema = z.strictObject({
   sessionId: id, title: z.string(), cursor: id.nullable(),
-  nodes: z.array(sessionNodeSchema),
+  nodes: z.array(sessionNodeInfoSchema),
+  pending: z.array(sessionNodeSchema),
   workbench: workbenchSnapshotSchema, progress: sessionProgressSchema,
 });
 export type SessionData = z.infer<typeof sessionDataSchema>;
@@ -84,6 +88,7 @@ export const sessionReplySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("template.renamed") }),
   z.strictObject({ kind: z.literal("template.deleted") }),
   z.strictObject({ kind: z.literal("view"), data: sessionDataSchema }),
+  z.strictObject({ kind: z.literal("records"), nodes: z.array(sessionNodeSchema) }),
   z.strictObject({ kind: z.literal("accepted"), sessionId: id }),
   z.strictObject({ kind: z.literal("warnings"), warnings: z.array(z.strictObject({ objectId: id, title: z.string(), warning: uiTextSchema })) }),
 ]);

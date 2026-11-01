@@ -149,9 +149,15 @@ Requests are sent once and are not automatically replayed. Long-running business
 
 Frontend subscribers establish the stream before requesting current state. Initial state and later changes arrive through the same ordered connection. Resource changes carry current projections; structural changes and cursor moves carry the reconstructed workbench.
 
+Session views share one fixed observation per session. Opening a session transfers the complete record metadata tree and captured pending bodies; finalized bodies are read by identity as consumers request them. Metadata supports ancestry, provenance, and navigation without loading historical payloads. Concurrent frontend reads share finalized bodies, and unused bodies can be collected when their readers release them.
+
+Backend and frontend history readers use the same scope, range, identity, provenance, and paging semantics. Backend reads are synchronous within the runtime; frontend body reads are asynchronous and expose loading and failure separately from empty results. Pending observations belong to their captured snapshot and never share a finalized body's cache entry. Reconstructible backend indexes can be released when a session is neither observed nor running, independently of resource attachment and external processes.
+
+Query selection has one implementation shared by storage and memory readers. Paradigms own their history selection and projection flows; local and remote execution of those flows differ only in how bodies are obtained. A session's record owner applies appended and completed records, captures observations, and shares cached bodies. Views own reading windows and presentation continuity.
+
 Commands return when their action completes, independently of the view update. Each UI entry owns pending state. Input submission identity supports exact retry without duplicating accepted input.
 
-Streaming deltas align by response and block identity. Persistent records arrive before removal of their live counterparts, preserving component continuity. Partial arguments are display-only; execution uses validated complete arguments.
+Streaming deltas align by response and block identity. Progress materialization is batched within the response lifetime, and terminal transitions flush outstanding progress. Persistent records arrive before removal of their live counterparts; readers retain the last live observation while the corresponding saved range is loading. Partial arguments are display-only; execution uses validated complete arguments.
 
 ## Releases and updates
 

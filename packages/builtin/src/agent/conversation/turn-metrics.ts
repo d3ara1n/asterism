@@ -1,6 +1,6 @@
-import type { SessionSnapshot, Usage } from "@asterism-app/sdk/contracts";
+import type { SessionRecord, Usage } from "@asterism-app/sdk/contracts";
 import { AgentInputMessage } from "@asterism-app/builtin-api/contracts";
-import { diagnosticHistory, type DiagnosticRequest } from "../diagnostics/history";
+import { diagnosticRecords, type DiagnosticRequest } from "../diagnostics/history";
 import { performanceOverview } from "../diagnostics/performance";
 import { cacheUsage } from "../diagnostics/usage";
 import { projectTurnState } from "../state-projection";
@@ -29,14 +29,13 @@ export interface TurnMeasurement {
 }
 
 /** Preserves historical turns; consecutive input in a batch and steer messages belong to the same turn, and only the currently running turn is hidden. */
-export function turnMetrics(snapshot: SessionSnapshot, agentId: string, running: boolean): TurnMeasurement[] {
-  const path = snapshot.records.all({ scope: "timeline" });
+export function turnMetrics(path: readonly SessionRecord[], agentId: string, running: boolean): TurnMeasurement[] {
   const starts = path.flatMap((record, index) => {
     if (record.source?.resource?.id !== agentId) return [];
     const message = AgentInputMessage.decode(record);
     return message?.status === "known" && message.data.startsTurn ? [{ record, index }] : [];
   });
-  const requests = diagnosticHistory(snapshot, agentId, "timeline").requests.filter(request => request.kind === "response");
+  const requests = diagnosticRecords(path, new Set(path.map(record => record.id)), agentId).requests.filter(request => request.kind === "response");
   return starts.flatMap((start, index) => {
     const next = starts[index + 1];
     if (!next && running) return [];

@@ -1,15 +1,15 @@
-import { useMemo } from "react";
+import { useCallback } from "react";
 import { modelReference } from "@asterism-app/sdk/contracts";
-import { useI18n, useRendererCatalogs, useRendererObject } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererCatalogs, useRendererObject, useSessionRead } from "@asterism-app/sdk/renderer";
 import { ModelCatalog } from "@asterism-app/sdk/contracts";
 import { useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { contextMessages as messages } from "../../messages/context";
-import { contextInsight } from "../context/insight";
-import { ContextProjectionError } from "../context-projection";
+import { readAgentMeasurements } from "../renderer-history";
 import { diagnosticModel } from "../diagnostics/cost";
 import { percent } from "../panel-kit";
 import { MetricTooltip } from "./MetricTooltip";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 
 /** Conversation measurements share their source with the context panel; only reported usage from saved requests is shown. */
 export function ContextUsage() {
@@ -18,18 +18,15 @@ export function ContextUsage() {
   const snapshot = object.session.snapshot();
   const configuration = useRendererCatalogs().get(ModelCatalog);
   const { model: current } = useAgentModelSelection();
-  const result = useMemo(() => {
-    if (!snapshot) return null;
-    try { return { usage: contextInsight(snapshot, object.ref.id).usage }; }
-    catch (error) { if (error instanceof ContextProjectionError) return null; throw error; }
-  }, [snapshot, object.ref.id]);
+  const read = useSessionRead(snapshot, useCallback((snapshot, signal) => readAgentMeasurements(snapshot, object.ref.id, signal), [object.ref.id]), { keepPrevious: true });
+  const result = read.data;
   const usage = result?.usage;
   const measured = usage ? diagnosticModel({ model: usage.model, modelScope: usage.scope }, configuration?.models ?? []) : null;
   const changed = measured && current && modelReference(measured) !== modelReference(current);
   const window = measured?.contextWindow ?? null;
   const input = usage && !usage.compressedAfter ? usage.input : null;
   const ratio = input !== null && window ? input / window : null;
-  const status = !result ? messages.unavailable : !usage ? messages.noUsage
+  const status = !result ? read.status === "loading" ? commonMessages.loading : messages.unavailable : !usage ? messages.noUsage
     : usage.compressedAfter ? messages.compressed : !window ? messages.windowUnknown : null;
   const value = ratio !== null ? percent(i18n, input!, window!, 1) : "—";
   const title = `${i18n.text(messages.window)} · ${value}`;

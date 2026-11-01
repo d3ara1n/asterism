@@ -14,11 +14,31 @@ const summary = (keptFrom: string) => event(ContextSummary.id, { summary: "Inter
 const snapshot = (path: ReturnType<typeof node>[]) => sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null));
 function project(path: ReturnType<typeof node>[], window: ConversationHistoryWindow, compressions: readonly CompressionActivity[] = []) {
   const view = snapshot(path);
-  return savedTimeline(view, "a", false, [], { boundary: window.read(view.records.all({ scope: "timeline" }), "a"), compressions });
+  const latest = view.records.last(ContextSummary, { scope: "timeline", source: "a" });
+  const { boundary } = window.observe(view.records.index({ scope: "timeline" }), latest?.status === "known"
+    ? { summaryId: latest.record.id, keptFrom: latest.data.keptFrom } : null);
+  return savedTimeline(view.records.all({ scope: "timeline" }), "a", false, [], { boundary, compressions });
 }
 const ids = (saved: ReturnType<typeof project>) => withLive(saved, []).map(item => item.id);
 
 describe("Conversation reading range after compression", () => {
+  // Loading older pages must stop at the retained boundary, and incoming records must not slide an existing reading window.
+  it("keeps an open reading window fixed while fresh windows page back only as far as the compression boundary", () => {
+    const path = Array.from({ length: 250 }, (_, index) => node(String(index), index ? String(index - 1) : null, message("a", "Input")));
+    path.push(node("summary", "249", summary("200")));
+    const window = new ConversationHistoryWindow();
+    project(path, window);
+    expect(window.observe(snapshot(path).records.index({ scope: "timeline" }), null)).toMatchObject({ from: "200", earlier: false });
+    for (let index = 250; index < 450; index++) path.push(node(String(index), path.at(-1)!.id, message("a", "New input")));
+    project(path, window);
+    const index = snapshot(path).records.index({ scope: "timeline" });
+    expect(window.observe(index, null)).toMatchObject({ from: "200", earlier: false });
+    const reopened = new ConversationHistoryWindow();
+    project(path, reopened);
+    expect(reopened.observe(index, null).earlier).toBe(true);
+    while (reopened.observe(index, null).earlier) reopened.expand(index);
+    expect(reopened.observe(index, null).from).toBe("200");
+  });
   // Compression events usually follow recent replies; trimming at the event would remove replies, while trimming at user input would miss valid retention points within a turn.
   it("Reloading trims at keptFrom, preserves mid-turn content and the final reply, and removes earlier turns' measurements and navigation messages together", () => {
     const path = [

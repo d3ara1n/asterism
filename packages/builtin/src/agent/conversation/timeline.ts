@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { ModelLiveBlock, SessionSnapshot, SessionRecord } from "@asterism-app/sdk/contracts";
+import type { ModelLiveBlock, SessionRecord } from "@asterism-app/sdk/contracts";
 import { ContextSummary, Execution, AgentInputMessage, type AgentMessageSender, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { turnMetrics, type TurnMetricsData } from "./turn-metrics";
 import type { CompressionActivity, InlineFeedback } from "../feedback";
@@ -44,12 +44,12 @@ function item(record: SessionRecord, agentId: string): TimelineItem | null {
 export interface SavedTimeline { items: readonly TimelineItem[]; keys: ReadonlySet<string>; tail: TimelineItem | null }
 
 /** Actual blocks come from the current path, temporary feedback is inserted after existing nodes, and turn summaries sit at turn ends. */
-export function savedTimeline(snapshot: SessionSnapshot, agentId: string, running: boolean, feedback: readonly InlineFeedback[] = [],
-  options: { boundary?: HistoryBoundary | null; compressions?: readonly CompressionActivity[] } = {}): SavedTimeline {
-  const path = snapshot.records.all({ scope: "timeline" });
-  const start = options.boundary ? path.findIndex(record => record.id === options.boundary!.keptFrom) : 0;
+export function savedTimeline(path: readonly SessionRecord[], agentId: string, running: boolean, feedback: readonly InlineFeedback[] = [],
+  options: { boundary?: HistoryBoundary | null; from?: string; compressions?: readonly CompressionActivity[] } = {}): SavedTimeline {
+  const startId = options.from ?? options.boundary?.keptFrom;
+  const start = startId ? path.findIndex(record => record.id === startId) : 0;
   const summaryIndex = options.boundary ? path.findIndex(record => record.id === options.boundary!.summaryId) : -1;
-  if (start < 0 || (options.boundary && summaryIndex < start))
+  if (start < 0)
     throw new Error("The conversation compression boundary is not on the current timeline.");
   const after = new Map<string | null, TimelineItem[]>();
   for (const value of options.compressions ?? []) {
@@ -77,7 +77,7 @@ export function savedTimeline(snapshot: SessionSnapshot, agentId: string, runnin
     if (value && !(value.kind === "compression" && index <= summaryIndex)) saved.push(value);
     saved.push(...(after.get(record.id) ?? []));
   }
-  const summaries = turnMetrics(snapshot, agentId, running).filter(turn => visibleTurns.has(turn.inputId));
+  const summaries = turnMetrics(path, agentId, running).filter(turn => visibleTurns.has(turn.inputId));
   const before = new Map(summaries.map(turn => [turn.nextInputId, turn]));
   const measured = (turn: typeof summaries[number]): TimelineItem => ({
     kind: "turn-metrics", id: `turn-metrics:${turn.inputId}`, inputId: turn.inputId, metrics: turn.metrics, incomplete: turn.incomplete,
@@ -95,6 +95,20 @@ export function savedTimeline(snapshot: SessionSnapshot, agentId: string, runnin
 /** Live blocks follow saved items using response identity; the same block is not displayed twice once persisted. */
 export function withLive(saved: SavedTimeline, live: readonly ModelLiveBlock[]): TimelineItem[] {
   return [...saved.items, ...live.filter(block => !saved.keys.has(timelineKey(block))), ...(saved.tail ? [saved.tail] : [])];
+}
+
+export interface LiveTimelineState {
+  blocks: readonly ModelLiveBlock[];
+  retaining: boolean;
+  visible: readonly ModelLiveBlock[];
+}
+/** Keep removed live blocks only while saved history is catching up; a settled read or path reset releases them. */
+export function liveTimeline(previous: LiveTimelineState | null, blocks: readonly ModelLiveBlock[], retaining: boolean): LiveTimelineState {
+  if (previous?.blocks === blocks && previous.retaining === retaining) return previous;
+  const visible = retaining && previous
+    ? [...new Map([...previous.visible, ...blocks].map(block => [timelineKey(block), block])).values()]
+    : blocks;
+  return { blocks, retaining, visible };
 }
 
 /** Items with displayable content; empty thinking blocks occupy no list position, preventing spacing-only empty items in the virtual list. */

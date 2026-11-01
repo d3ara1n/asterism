@@ -8,7 +8,9 @@ export function projectAgentTurnState(
   agentId: string,
   interruptions: readonly (string | null)[] = [],
 ): AgentTurnState {
-  return projectTurnState(snapshot.records.all({ scope: "timeline" }), agentId, interruptions);
+  const input = snapshot.records.last(AgentInputMessage, { scope: "timeline", source: agentId });
+  if (!input) return "empty";
+  return projectTurnState(snapshot.records.all({ scope: "timeline", from: input.record.id }), agentId, interruptions);
 }
 
 /** The same state rules apply to historical turns; pass that turn's record interval without creating a copy of the history snapshot. */

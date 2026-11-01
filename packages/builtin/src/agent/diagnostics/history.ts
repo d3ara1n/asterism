@@ -22,7 +22,9 @@ export interface DiagnosticHistory { requests: DiagnosticRequest[]; unreadable: 
 /** Groups actual output blocks by response; temporary execution feedback does not contribute to historical statistics. */
 export function diagnosticHistory(snapshot: Pick<SessionView, "records">, agentId: string, scope: DiagnosticScope): DiagnosticHistory {
   const records = snapshot.records.all({ scope });
-  const timelineIds = new Set(snapshot.records.all({ scope: "timeline" }).map(record => record.id));
+  return diagnosticRecords(records, new Set(snapshot.records.index({ scope: "timeline" }).map(record => record.id)), agentId);
+}
+export function diagnosticRecords(records: readonly SessionRecord[], timelineIds: ReadonlySet<string>, agentId: string): DiagnosticHistory {
   const byId = new Map(records.map(record => [record.id, record]));
   const history = new Map<string, HistoryState>();
   const requests = new Map<string, DiagnosticRequest>();

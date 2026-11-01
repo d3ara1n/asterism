@@ -13,7 +13,7 @@ const completion = (input: number, output: number, cacheRead: number, durationMs
   timing: { startedAt: "2026-01-01T00:00:00.000Z", endedAt: "2026-01-01T00:00:02.000Z",
     durationMs, firstOutputMs: 100, firstTextMs: 100, firstReasoningMs: null, lastOutputMs: durationMs - 100, outputChunks: 2, outcome: "completed" },
 } satisfies ModelCompletion);
-const snapshot = (path: ReturnType<typeof node>[]) => sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null));
+const records = (path: ReturnType<typeof node>[]) => sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null)).records.all({ scope: "timeline" });
 
 describe("Per-turn conversation measurements", () => {
   // Independent messages in the same batch and steer messages between requests belong to one turn; only follow starts the next turn.
@@ -28,11 +28,11 @@ describe("Per-turn conversation measurements", () => {
       node("follow2", "follow1", message("a", "More", false)),
       node("r3", "follow2", text("a", "r3", 0, "Next answer", { completion: completion(300, 40, 200, 1000) })),
     ];
-    expect(turnMetrics(snapshot(path), "a", false)).toMatchObject([
+    expect(turnMetrics(records(path), "a", false)).toMatchObject([
       { inputId: "u1", nextInputId: "follow1", incomplete: false, metrics: { count: 2, usage: { input: { value: 300 } } } },
       { inputId: "follow1", nextInputId: null, incomplete: false, metrics: { count: 1 } },
     ]);
-    expect(turnMetrics(snapshot(path), "a", true)).toHaveLength(1);
+    expect(turnMetrics(records(path), "a", true)).toHaveLength(1);
   });
 
   // Hide only the currently running turn; historical turn measurements remain in the conversation.
@@ -41,11 +41,11 @@ describe("Per-turn conversation measurements", () => {
       node("u1", null, message("a", "First")),
       node("r1", "u1", text("a", "r1", 0, "Done", { completion: completion(100, 20, 50, 2000) })),
     ];
-    expect(turnMetrics(snapshot(path), "a", true)).toEqual([]);
-    expect(turnMetrics(snapshot(path), "a", false)[0]?.metrics.count).toBe(1);
+    expect(turnMetrics(records(path), "a", true)).toEqual([]);
+    expect(turnMetrics(records(path), "a", false)[0]?.metrics.count).toBe(1);
     path.push(node("u2", "r1", message("a", "Next")));
-    expect(turnMetrics(snapshot(path), "a", true)).toMatchObject([{ inputId: "u1", nextInputId: "u2", incomplete: false, metrics: { count: 1 } }]);
-    expect(turnMetrics(snapshot(path), "a", false)).toHaveLength(1);
+    expect(turnMetrics(records(path), "a", true)).toMatchObject([{ inputId: "u1", nextInputId: "u2", incomplete: false, metrics: { count: 1 } }]);
+    expect(turnMetrics(records(path), "a", false)).toHaveLength(1);
   });
 
   // This turn starts at this agent's latest turn-opening input; earlier turns, other agents' messages, and auxiliary compression cannot change its range or affect weighting.
@@ -60,7 +60,7 @@ describe("Per-turn conversation measurements", () => {
         completion: completion(999, 999, 0, 1000) }, { source: agentSource("a") })),
       node("r2", "compression", text("a", "r2", 0, "Continued", { completion: completion(300, 80, 270, 1000) })),
     ];
-    const turns = turnMetrics(snapshot(path), "a", false);
+    const turns = turnMetrics(records(path), "a", false);
     expect(turns.map(turn => turn.inputId)).toEqual(["old-user", "u"]);
     const metrics = turns[1]!.metrics;
     expect(metrics.count).toBe(2);
@@ -76,7 +76,7 @@ describe("Per-turn conversation measurements", () => {
       node("u", null, message("a", "Work")),
       node("partial", "u", text("a", "interrupted", 0, "Partial", { complete: false })),
     ];
-    const interruptedTurn = turnMetrics(snapshot(path), "a", false)[0]!;
+    const interruptedTurn = turnMetrics(records(path), "a", false)[0]!;
     expect(interruptedTurn.incomplete).toBe(true);
     expect(interruptedTurn.replyMarkdown).toBeNull();
     const interrupted = interruptedTurn.metrics;
@@ -84,8 +84,8 @@ describe("Per-turn conversation measurements", () => {
     expect(interrupted.usage.output).toEqual({ value: null, count: 0 });
     expect(tokensPerSecond(interrupted.performance.rates.output)).toBeNull();
     path.push(node("resumed", "partial", text("a", "resumed", 0, "Done", { completion: completion(100, 20, 50, 2000) })));
-    expect(turnMetrics(snapshot(path), "a", true)).toEqual([]);
-    const resumedTurn = turnMetrics(snapshot(path), "a", false)[0]!;
+    expect(turnMetrics(records(path), "a", true)).toEqual([]);
+    const resumedTurn = turnMetrics(records(path), "a", false)[0]!;
     expect(resumedTurn.incomplete).toBe(false);
     expect(resumedTurn.replyMarkdown).toBe("Done");
     const resumed = resumedTurn.metrics;
@@ -110,7 +110,7 @@ describe("Per-turn conversation measurements", () => {
       node("u2", "other", message("a", "Next question")),
       node("next", "u2", text("a", "next", 0, "Next answer", { completion: completion(100, 20, 50, 2000) })),
     ];
-    expect(turnMetrics(snapshot(path), "a", false).map(turn => turn.replyMarkdown))
+    expect(turnMetrics(records(path), "a", false).map(turn => turn.replyMarkdown))
       .toEqual([`${first}\n\n${second}`, "Next answer"]);
   });
 
@@ -125,6 +125,6 @@ describe("Per-turn conversation measurements", () => {
       node("earlier", "u", text("a", "earlier", 0, "Earlier response", { completion: completion(100, 20, 50, 2000) })),
       node("last", "earlier", last),
     ];
-    expect(turnMetrics(snapshot(path), "a", false)[0]?.replyMarkdown).toBeNull();
+    expect(turnMetrics(records(path), "a", false)[0]?.replyMarkdown).toBeNull();
   });
 });

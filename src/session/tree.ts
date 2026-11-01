@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { nanoid } from "nanoid";
 import type { DatabaseSync } from "node:sqlite";
-import { sessionNodeSchema, type NewNode, type SessionNode } from "../shared/session.ts";
+import { sessionNodeSchema, type NewNode, type SessionNode, type SessionNodeInfo } from "../shared/session.ts";
 import { SessionError } from "../shared/session-timeline.ts";
 import type { NodeQuery, NodeView, SequencedNode } from "./view.ts";
+import { selectNodes } from "./query.ts";
 import { foldWorkbench, workbenchRecordIds, type FoldedState } from "./fold.ts";
 import { SessionStructure, type StructuralNode } from "./structure.ts";
 import { deepFreeze } from "../shared/immutable.ts";
@@ -19,12 +20,27 @@ export type CursorSelection = {
   recordedAt: string;
 };
 
+const structureColumns = `id, parent_id AS parentId, seq, contract, session_id AS sessionId,
+  json_extract(payload, '$.createdAt') AS createdAt, json_extract(payload, '$.source') AS sourceJson,
+  json_extract(payload, '$.pending') AS pending`;
+type StructureRow = Omit<StructuralNode, "source" | "pending"> & { sourceJson: string | null; pending: number | null };
+function structureNode(row: StructureRow): StructuralNode {
+  const { sourceJson, pending, ...node } = row;
+  return { ...node, source: sourceJson === null ? null : JSON.parse(sourceJson),
+    ...(pending === null ? {} : { pending: pending === 1 }) };
+}
+
 /** Session tree storage: fixed node identity and ancestry, with one-time completion of explicitly pending operations. */
 export class SessionTree {
   constructor(private readonly db: DatabaseSync) {}
   private readonly workbenches = new Map<string, { cursor: string | null; state: FoldedState }>();
   private readonly identities = new Map<string, ResourceRef>();
   private readonly structures = new Map<string, SessionStructure>();
+  /** Read handles capture positions and pending bodies, so their reconstructible indexes can be released independently. */
+  releaseCache(sessionId: string): void {
+    this.structures.delete(sessionId);
+    this.workbenches.delete(sessionId);
+  }
 
   /** Creation record identity is immutable; reuse after the first ID lookup without rereading historical bodies. */
   resourceRef(id: string): ResourceRef | null {
@@ -104,6 +120,7 @@ export class SessionTree {
       }));
     return { id: sessionId, title: row.title, nodeId: row.cursor,
       timelineIds: () => this.pathNodes(sessionId, row.cursor).map(node => node.id),
+      index: query => this.indexView(sessionId, row.cursor, upperSeq, query, pending),
       read: query => this.readView(sessionId, row.cursor, upperSeq, query, pending) };
   }
 
@@ -112,9 +129,9 @@ export class SessionTree {
     let structure = this.structures.get(sessionId);
     if (!structure) { structure = new SessionStructure(); this.structures.set(sessionId, structure); }
     if (!this.db.isTransaction) {
-      const rows = this.db.prepare("SELECT id, parent_id AS parentId, seq, contract FROM session_nodes WHERE session_id = ? AND seq > ? ORDER BY seq")
-        .iterate(sessionId, structure.head) as Iterable<StructuralNode>;
-      for (const row of rows) structure.add({ ...row });
+      const rows = this.db.prepare(`SELECT ${structureColumns} FROM session_nodes WHERE session_id = ? AND seq > ? ORDER BY seq`)
+        .iterate(sessionId, structure.head) as Iterable<StructureRow>;
+      for (const row of rows) structure.add(structureNode(row));
     }
     return structure;
   }
@@ -125,11 +142,11 @@ export class SessionTree {
     let read: ReturnType<DatabaseSync["prepare"]> | undefined;
     let id = nodeId;
     while (id !== null && !structure.get(id)) {
-      read ??= this.db.prepare("SELECT id, parent_id AS parentId, seq, contract FROM session_nodes WHERE session_id = ? AND id = ?");
-      const row = read.get(sessionId, id) as StructuralNode | undefined;
+      read ??= this.db.prepare(`SELECT ${structureColumns} FROM session_nodes WHERE session_id = ? AND id = ?`);
+      const row = read.get(sessionId, id) as StructureRow | undefined;
       if (!row) throw new SessionError("not_found", "Session node not found.");
       if (tail.length && row.seq >= tail.at(-1)!.seq) throw new SessionError("conflict", "Session ancestry is outside its append order.");
-      tail.push({ ...row });
+      tail.push(structureNode(row));
       id = row.parentId;
     }
     if (tail.length && id !== null && structure.get(id)!.seq >= tail.at(-1)!.seq)
@@ -153,27 +170,41 @@ export class SessionTree {
   }
 
   private readView(sessionId: string, nodeId: string | null, upperSeq: number, query: NodeQuery, pending: ReadonlyMap<string, SessionNode>): SequencedNode[] {
-    const matches = (node: StructuralNode) => !query.contracts || query.contracts.includes(node.contract);
-    let structure: SessionStructure, selected: StructuralNode[];
+    const selected = this.indexView(sessionId, nodeId, upperSeq, query, pending);
+    return this.readNodes(selected, pending).map((node, index) => ({ node, sequence: selected[index]!.sequence }));
+  }
+
+  private indexView(sessionId: string, nodeId: string | null, upperSeq: number, query: NodeQuery, pending: ReadonlyMap<string, SessionNode>): SessionNodeInfo[] {
+    // Contract indexes can narrow candidates only when positional anchors do not need the unfiltered scope.
+    const contracts = query.from === undefined && query.before === undefined ? query.contracts : undefined;
+    let structure: SessionStructure, candidates: StructuralNode[];
     if (query.scope === "timeline") {
       const path = this.path(sessionId, nodeId);
       structure = path.structure;
       // Read the indexed prefix immediately: locating another node repositions the shared spine.
-      const indexed = structure.select(path.length, query.contracts, query.edge), extra = path.tail.filter(matches);
-      selected = !query.edge ? [...indexed, ...extra]
-        : query.edge === "first" ? (indexed.length ? indexed : extra.slice(0, 1))
-          : (extra.length ? extra.slice(-1) : indexed);
+      candidates = [...structure.select(path.length, contracts), ...path.tail];
     } else {
       structure = this.structure(sessionId);
       const extra = upperSeq > structure.head
-        ? (this.db.prepare("SELECT id, parent_id AS parentId, seq, contract FROM session_nodes WHERE session_id = ? AND seq > ? AND seq <= ? ORDER BY seq")
-          .all(sessionId, structure.head, upperSeq) as unknown as StructuralNode[]).filter(matches)
+        ? (this.db.prepare(`SELECT ${structureColumns} FROM session_nodes WHERE session_id = ? AND seq > ? AND seq <= ? ORDER BY seq`)
+          .all(sessionId, structure.head, upperSeq) as unknown as StructureRow[]).map(structureNode)
         : [];
-      const all = [...structure.range(upperSeq, query.contracts), ...extra];
-      selected = !query.edge ? all : query.edge === "first" ? all.slice(0, 1) : all.slice(-1);
+      candidates = [...structure.range(upperSeq, contracts), ...extra];
     }
-    if (!selected.length) return [];
-    return this.readNodes(selected, pending).map((node, index) => ({ node, sequence: this.sequenceOf(sessionId, selected[index]!.seq, structure) }));
+    const selected = selectNodes(candidates, query);
+    return selected.map(({ seq, ...node }) => ({ ...node, sequence: this.sequenceOf(sessionId, seq, structure),
+      ...(node.pending === undefined ? {} : { pending: pending.has(node.id) }) }));
+  }
+
+  /** Immutable completed bodies can be fetched by identity; pending observations travel with their snapshot. */
+  readRecords(sessionId: string, ids: readonly string[]): SessionNode[] {
+    this.cursor(sessionId);
+    const read = this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? AND id = ?");
+    return ids.map(id => {
+      const row = read.get(sessionId, id) as { payload: string } | undefined;
+      if (!row) throw new SessionError("not_found", "Session record not found.");
+      return sessionNodeSchema.parse(JSON.parse(row.payload));
+    });
   }
 
   /** One-based session order of an append position; positions above the index count only the unindexed rows from storage. */

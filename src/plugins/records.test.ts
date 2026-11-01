@@ -25,6 +25,33 @@ const value = (id: string, parentId: string | null, data: unknown, type = contra
   node(id, parentId, event(type, data as never, { source: { plugin: "example.plugin", resource: null } }));
 
 describe("Contract decoding on shared timelines", () => {
+  // Range anchors refer to the full scope before filtering, so unrelated boundary records still delimit pages.
+  it("selects source-filtered pages without reading excluded bodies and rejects anchors on another branch", () => {
+    const { tree, sessionId } = stored();
+    const source = (id: string) => ({ plugin: "example.plugin", resource: { sessionId, id, kind: "example.plugin/item" } });
+    const a = tree.appendToTimeline(sessionId, event(contract.id, { value: 1 }, { source: source("a") }));
+    const boundary = tree.appendToTimeline(sessionId, event("other/noise", { body: "Unrelated" }));
+    const b = tree.appendToTimeline(sessionId, event(contract.id, { value: 2 }, { source: source("b") }));
+    const c = tree.appendToTimeline(sessionId, event(contract.id, { value: 3 }, { source: source("a") }));
+    const d = tree.appendToTimeline(sessionId, event(contract.id, { value: 4 }, { source: source("a") }));
+    const parse = vi.spyOn(sessionNodeSchema, "parse");
+    const captured = sessionView(tree.view(sessionId));
+    expect(captured.records.index({ scope: "timeline", from: boundary.id, source: "a", edge: "last", limit: 1 }).map(record => record.id)).toEqual([d.id]);
+    expect(parse).not.toHaveBeenCalled();
+    expect(captured.records.all({ scope: "timeline", from: boundary.id, before: d.id, source: "a" }).map(record => record.id)).toEqual([c.id]);
+    expect(parse).toHaveBeenCalledTimes(1);
+    expect(captured.records.query(contract, { scope: "timeline", contracts: ["other/noise"] })).toEqual([]);
+    expect(captured.records.index({ scope: "timeline", contracts: [contract.id, contract.id], source: "a" }).map(record => record.id)).toEqual([a.id, c.id, d.id]);
+    tree.select(sessionId, a.id);
+    const fork = tree.appendToTimeline(sessionId, event(contract.id, { value: 5 }));
+    const branch = sessionView(tree.view(sessionId));
+    expect(branch.records.index({ scope: "timeline" }).map(record => record.id)).toEqual([a.id, fork.id]);
+    expect(() => branch.records.all({ scope: "timeline", from: b.id })).toThrow("outside the selected scope");
+    expect(captured.records.index({ scope: "session", ids: [fork.id, c.id, a.id] }).map(record => record.id)).toEqual([a.id, c.id]);
+    tree.releaseCache(sessionId);
+    expect(captured.records.all({ scope: "timeline", from: boundary.id, limit: 1 }).map(record => record.id)).toEqual([boundary.id]);
+    expect(captured.records.index({ scope: "session" })).toHaveLength(5);
+  });
   // A new codec reads old payloads without migrating immutable records in place.
   it("decodes old and current payload shapes while preserving original record data", () => {
     const current = z.object({ text: z.string() });
@@ -221,6 +248,6 @@ describe("Contract decoding on shared timelines", () => {
     expect(parse).toHaveBeenCalledTimes(1);
     parse.mockClear();
     expect(view.records.query(contract, { scope: "timeline" }).map(record => record.status)).toEqual(["known", "unknown"]);
-    expect(parse).toHaveBeenCalledTimes(2);
+    expect(parse).not.toHaveBeenCalled();
   });
 });

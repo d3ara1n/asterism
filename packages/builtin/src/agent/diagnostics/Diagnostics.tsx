@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
 import { Button } from "@asterism-app/ui/ui/button";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@asterism-app/ui/ui/tabs";
@@ -199,13 +200,16 @@ export function Diagnostics() {
   return <Tabs className="flex min-h-0 min-w-0 flex-1 flex-col gap-0" value={scope}
     onValueChange={value => { if (value === "timeline" || value === "session") { setScope(value); setSelection(null); } }}>
     <div className="shrink-0 px-3 pt-3">
-      {data.error && <Alert variant="destructive" className="mb-3"><AlertDescription>{i18n.text(data.error)}</AlertDescription></Alert>}
+      {data.error && <Alert variant="destructive" className="mb-3"><AlertDescription>{i18n.text(data.error)}
+        {data.status === "error" && <Button variant="ghost" size="xs" onClick={data.retry}>{i18n.text(commonMessages.retry)}</Button>}
+      </AlertDescription></Alert>}
       <TabsList className="w-full" aria-label={i18n.text(messages.scope)}>
         <TabsTrigger value="timeline">{i18n.text(messages.currentPath)}</TabsTrigger><TabsTrigger value="session">{i18n.text(messages.allBranches)}</TabsTrigger>
       </TabsList>
     </div>
     <TabsContent key={`${scope}:${selection ?? ""}`} value={scope} className="flex min-h-0 flex-1 flex-col">
-      <PanelBody>{body}</PanelBody>
+      <PanelBody>{data.status === "loading" ? <p className="type-caption" role="status">{i18n.text(commonMessages.loading)}</p>
+        : data.status === "ready" ? body : null}</PanelBody>
     </TabsContent>
   </Tabs>;
 }
