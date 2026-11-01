@@ -1,5 +1,6 @@
 import type { UiText } from "./i18n.ts";
-import type { WebProviderSetting, WebProviderState, WebProviderType, WebSearchRequest, WebFetchRequest, WebResponse, WebSearchResult, WebFetchResult } from "./web.ts";
+import type { ProviderSetting, ProviderSettingValues } from "./provider-settings.ts";
+import type { WebProviderState, WebProviderType, WebSearchRequest, WebFetchRequest, WebResponse, WebSearchResult, WebFetchResult } from "./web.ts";
 
 export interface WebProviderInstance {
   search?(request: WebSearchRequest, options: { signal: AbortSignal }): Promise<WebResponse>;
@@ -13,12 +14,12 @@ export interface WebProviderDefinition {
   /** Glob for the complete URL, with * matching any characters; fetch routing matches in declaration order. */
   urlPatterns: readonly string[];
   /** Settings the user configures for this service, rendered in declaration order. */
-  settings: readonly WebProviderSetting[];
+  settings: readonly ProviderSetting[];
   /**
    * Synchronous factory called with values captured at the request boundary.
-   * Choice settings always hold a declared option; required secrets are present; unset optional secrets are absent.
+   * Choice settings always hold a declared option; required values are present; unset optional values are absent.
    */
-  create(context: { settings: Readonly<Record<string, string | undefined>> }): WebProviderInstance;
+  create(context: { settings: ProviderSettingValues }): WebProviderInstance;
 }
 export interface WebProviderServices {
   types(): readonly WebProviderType[];

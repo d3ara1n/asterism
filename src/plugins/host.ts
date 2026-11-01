@@ -9,6 +9,7 @@ import type { McpApplication } from "../mcp/application.ts";
 import type { ShellServices } from "@asterism-app/sdk/runtime";
 import type { AgentCatalogService } from "./agent-catalog.ts";
 import type { WebProviderRegistry } from "../configuration/web-providers.ts";
+import type { MessagingRegistry } from "../configuration/messaging.ts";
 import type { ModelProviderExtensions } from "../configuration/provider-extensions.ts";
 
 /** Application-wide services composed once by the host and shared by every plugin context. */
@@ -20,6 +21,7 @@ export interface SharedServices {
   modelProviders: ModelProviderServices;
   usageProviders: UsageProviderServices;
   webProviders: WebProviderRegistry;
+  messaging: MessagingRegistry;
   extensions: ModelProviderExtensions;
   manualSources(): readonly ManualSource[];
   packageRoots: ReadonlyMap<string, string>;

@@ -12,12 +12,26 @@ import { modelCatalogMessages } from "../shared/model-catalog-messages.ts";
 import { ModelProviderExtensions } from "./provider-extensions.ts";
 import { ModelConnectionTests } from "./connection-tests.ts";
 import { WebProviderRegistry } from "./web-providers.ts";
-import { WebError } from "@asterism-app/sdk/runtime";
+import { WebError, MessagingError } from "@asterism-app/sdk/runtime";
+import type { ProviderSetting } from "@asterism-app/sdk/contracts";
+import { randomUUID } from "node:crypto";
+import { MessagingRegistry } from "./messaging.ts";
+import { reportedSecretKeys, validateProviderSettings, type CredentialUpdate } from "./provider-settings.ts";
 
 const saveKinds = { "modelProvider.save": "modelProvider", "model.save": "model" } as const;
 
 export class ConfigurationService {
   readonly extensions = new ModelProviderExtensions();
+  readonly messaging = new MessagingRegistry({
+    list: () => this.store.list("messaging").map(({ secretRefs: _refs, ...state }) => state),
+    secret: async (id, key) => {
+      const ref = this.store.get("messaging", id)?.secretRefs[key];
+      if (!ref) return null;
+      try { return await this.vault.read(ref); }
+      catch { throw new MessagingError("unavailable", "The messaging credential could not be read."); }
+    },
+    changed: () => { if (!this.closed) this.onChanged(); },
+  });
   readonly web = new WebProviderRegistry({
     list: () => this.store.list("webProvider").map(({ secretRefs: _refs, ...state }) => state),
     secret: async (id, key) => {
@@ -133,16 +147,19 @@ export class ConfigurationService {
     return { modelProviders: this.store.list("modelProvider").map(provider => this.provider(provider)), models: this.store.list("model") };
   }
   private snapshot(): ConfigurationSnapshot {
+    const runtime = this.messaging.connections();
     return {
       mcp: this.store.mcp(),
       shell: this.store.shell(),
       sessionEntry: this.store.sessionEntry(),
-      webProviders: this.store.list("webProvider").map(({ secretRefs, ...state }) => {
-        const type = this.web.types().find(t => t.id === state.id);
-        // Unavailable types still report their saved secrets so the settings list can show them.
-        const keys = type ? type.settings.filter(setting => setting.kind === "secret").map(setting => setting.key) : Object.keys(secretRefs);
-        return { ...state, secrets: Object.fromEntries(keys.map(key => [key, this.credentialState("api_key", secretRefs[key] ?? null)])) };
-      }),
+      messagingProviderTypes: this.messaging.types(),
+      messagingConnections: this.store.list("messaging").map(({ secretRefs, ...state }) => ({
+        ...state, runtime: runtime.find(connection => connection.id === state.id)!,
+        secrets: this.secretStates(this.messaging.types().find(type => type.id === state.providerId)?.settings, secretRefs),
+      })),
+      webProviders: this.store.list("webProvider").map(({ secretRefs, ...state }) => ({
+        ...state, secrets: this.secretStates(this.web.types().find(type => type.id === state.id)?.settings, secretRefs),
+      })),
       webProviderTypes: this.web.types(),
       ...this.modelCatalog(),
       modelProviderPresets: this.extensions.presets(), usageProviders: this.extensions.usageProviders(),
@@ -151,6 +168,8 @@ export class ConfigurationService {
   }
   private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" }>): Promise<string | null> {
     if (command.type === "read") return null;
+    if (command.type === "messaging.save") return this.saveMessaging(command);
+    if (command.type === "messaging.restart") { this.messaging.restart(command.id); return command.id; }
     if (command.type === "shell.set") { this.store.setShell(command.value); return null; }
     if (command.type === "sessionEntry.set") { this.store.selectSessionEntry(command.value); return null; }
     if (command.type === "webProvider.reorder") {
@@ -161,40 +180,12 @@ export class ConfigurationService {
       const { id, enabled } = command;
       const type = this.web.types().find(item => item.id === id);
       if (!type) throw new ConfigurationError("not_found", "This web provider type is unavailable.");
-      const invalid = () => new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values.");
-      for (const [key, value] of Object.entries(command.settings)) {
-        const setting = type.settings.find(item => item.key === key);
-        if (setting?.kind !== "choice" || !setting.options.some(option => option.value === value)) throw invalid();
-      }
-      const secretKeys = type.settings.filter(setting => setting.kind === "secret").map(setting => setting.key);
-      if (Object.keys(command.secrets).some(key => !secretKeys.includes(key))) throw invalid();
-      // References for secrets the current type no longer declares are dropped with this save.
       const oldRefs = this.store.get("webProvider", id)?.secretRefs ?? {};
-      // A saved provider is always usable: every required secret is kept or supplied by this save.
-      for (const setting of type.settings) if (setting.kind === "secret" && setting.required) {
-        const update = command.secrets[setting.key] ?? { action: "keep" as const };
-        if (update.action === "clear" || update.action === "keep" && !oldRefs[setting.key]) throw invalid();
-      }
-      const refs: Record<string, string> = {}, written: string[] = [];
-      try {
-        for (const key of secretKeys) {
-          const update = command.secrets[key] ?? { action: "keep" as const };
-          if (update.action === "replace") {
-            if (!this.storageAvailable) throw new Error("System credential protection is unavailable.");
-            const ref = await this.vault.write(update.value);
-            written.push(ref);
-            refs[key] = ref;
-          } else if (update.action === "keep" && oldRefs[key]) refs[key] = oldRefs[key];
-        }
-        this.assertOpen();
-        this.store.save({ kind: "webProvider", id, value: { id, enabled, settings: command.settings }, secretRefs: refs });
-      } catch (error) {
-        for (const ref of written) this.removeCredential(ref);
-        if (error instanceof ConfigurationError) throw error;
-        throw new ConfigurationError("unavailable", "The web provider could not be saved.");
-      }
-      const kept = new Set(Object.values(refs));
-      for (const ref of Object.values(oldRefs)) if (!kept.has(ref)) this.removeCredential(ref);
+      // A saved provider is always usable: every required value is supplied and every required secret is kept or replaced.
+      const settings = validateProviderSettings(type.settings, command.settings, command.secrets, new Set(Object.keys(oldRefs)));
+      if (!settings) throw new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values.");
+      await this.saveSecrets(type.settings, oldRefs, command.secrets, "The web provider could not be saved.",
+        secretRefs => this.store.save({ kind: "webProvider", id, value: { id, enabled, settings }, secretRefs }));
       return id;
     }
     if (command.type === "test.start") return this.startTest(command.model);
@@ -225,10 +216,12 @@ export class ConfigurationService {
       return provider.id;
     }
     if (command.type === "remove") {
+      const connection = command.kind === "messaging" ? this.store.get("messaging", command.id) : null;
       const { credentialRefs } = this.store.remove(command.kind, command.id);
-      this.tests.clear(command.kind, command.id);
+      if (command.kind !== "messaging") this.tests.clear(command.kind, command.id);
       if (command.kind === "modelProvider") this.discoveries.clearProvider(command.id);
       for (const ref of credentialRefs) this.removeCredential(ref);
+      if (connection) this.messaging.remove(connection.id, connection.providerId);
       return command.id;
     }
     if (command.id && !this.store.get(saveKinds[command.type as keyof typeof saveKinds], command.id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
@@ -266,6 +259,55 @@ export class ConfigurationService {
     return auth === "none" ? "not_required" : !ref || !this.vault.exists(ref) ? "missing"
       : !this.storageAvailable ? "storage_unavailable" : this.vault.failures.has(ref) ? "decryption_failed" : "available";
   }
+  private async saveMessaging(command: Extract<ConfigurationCommand, { type: "messaging.save" }>): Promise<string> {
+    const previous = command.id ? this.store.get("messaging", command.id) : null;
+    if (command.id && !previous) throw new ConfigurationError("not_found", "This messaging connection no longer exists.");
+    if (previous && previous.providerId !== command.value.providerId)
+      throw new ConfigurationError("invalid_request", "A connection's provider cannot be changed.");
+    const type = this.messaging.types().find(type => type.id === command.value.providerId);
+    if (!type) throw new ConfigurationError("not_found", "This messaging provider is unavailable.");
+    const oldRefs = previous?.secretRefs ?? {};
+    const settings = validateProviderSettings(type.settings, command.value.settings, command.secrets, new Set(Object.keys(oldRefs)));
+    if (!settings) throw new ConfigurationError("invalid_request", "Invalid messaging configuration.");
+    const id = command.id ?? randomUUID();
+    await this.saveSecrets(type.settings, oldRefs, command.secrets, "The messaging connection could not be saved.",
+      secretRefs => this.store.save({ kind: "messaging", id: command.id, value: { ...command.value, id, settings }, secretRefs }));
+    // The replacement generation reads the saved configuration; this command's snapshot reports its status.
+    this.messaging.restart(id);
+    return id;
+  }
+  /**
+   * Write replaced secrets, keep retained references, and commit through save.
+   * New references are released when saving fails; references the save no longer holds are released afterwards.
+   */
+  private async saveSecrets(settings: readonly ProviderSetting[], oldRefs: Readonly<Record<string, string>>,
+    updates: Readonly<Record<string, CredentialUpdate>>, failure: string, save: (refs: Record<string, string>) => void): Promise<void> {
+    const refs: Record<string, string> = {}, written: string[] = [];
+    try {
+      for (const setting of settings) {
+        if (setting.kind !== "secret") continue;
+        const update = updates[setting.key] ?? { action: "keep" as const };
+        if (update.action === "replace") {
+          if (!this.storageAvailable) throw new Error("System credential protection is unavailable.");
+          const ref = await this.vault.write(update.value);
+          written.push(ref);
+          refs[setting.key] = ref;
+        } else if (update.action === "keep" && oldRefs[setting.key]) refs[setting.key] = oldRefs[setting.key];
+      }
+      this.assertOpen();
+      save(refs);
+    } catch (error) {
+      for (const ref of written) this.removeCredential(ref);
+      if (error instanceof ConfigurationError) throw error;
+      throw new ConfigurationError("unavailable", failure);
+    }
+    const kept = new Set(Object.values(refs));
+    for (const ref of Object.values(oldRefs)) if (!kept.has(ref)) this.removeCredential(ref);
+  }
+  /** Unavailable types still report their saved secrets so the settings list can show them. */
+  private secretStates(settings: readonly ProviderSetting[] | undefined, refs: Readonly<Record<string, string>>) {
+    return Object.fromEntries(reportedSecretKeys(settings, refs).map(key => [key, this.credentialState("api_key", refs[key] ?? null)]));
+  }
   private removeCredential(ref: string): void {
     try { this.vault.remove(ref); }
     catch { console.error("Unreferenced encrypted credential cleanup failed."); }
@@ -282,6 +324,7 @@ export class ConfigurationService {
   }
   close(): void {
     this.closed = true;
+    this.messaging.close();
     this.shutdown.abort();
     this.discoveries.close();
     this.providerListeners.clear();

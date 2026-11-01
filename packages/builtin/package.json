@@ -29,6 +29,7 @@
     "codemirror": "^6.0.2",
     "diff": "9.0.0",
     "exa-js": "2.26.0",
+    "grammy": "1.46.0",
     "lucide-react": "1.64.0",
     "mermaid": "12.2.0",
     "motion": "14.7.1",

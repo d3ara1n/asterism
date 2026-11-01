@@ -44,6 +44,37 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
 }
 
 describe("Real configuration and consumption boundaries", () => {
+  it("keeps independently named messaging connections and multiple credentials separate", async () => {
+    const { service, root } = setup(), life = new RunLifecycle(() => {});
+    cleanups.push(() => life.stop());
+    service.messaging.declare("test.messaging", [{
+      id: "messenger", label: "Messenger", settings: [
+        { kind: "text", key: "account", label: "Account", required: true },
+        { kind: "secret", key: "token", label: "Token", required: true },
+        { kind: "secret", key: "optional", label: "Optional", required: false },
+      ],
+      async create() { throw new Error("Disabled connections must not initialize."); },
+    }], life.group("call"));
+    const first = await service.execute({ type: "messaging.save", id: null,
+      value: { name: "Support", providerId: "messenger", enabled: false, settings: { account: "support" } },
+      secrets: { token: { action: "replace", value: "support-secret" }, optional: { action: "replace", value: "secondary-secret" } } });
+    const second = await service.execute({ type: "messaging.save", id: null,
+      value: { name: "Team", providerId: "messenger", enabled: false, settings: { account: "team" } },
+      secrets: { token: { action: "replace", value: "team-secret" } } });
+    expect(first.savedId).not.toBe(second.savedId);
+    expect(second.snapshot.messagingConnections.map(connection => connection.name)).toEqual(["Support", "Team"]);
+    await expect(service.execute({ type: "messaging.save", id: first.savedId,
+      value: { name: "Support", providerId: "messenger", enabled: false, settings: { account: "support" } },
+      secrets: { token: { action: "clear" } } })).rejects.toMatchObject({ code: "invalid_request" });
+    const updated = await service.execute({ type: "messaging.save", id: first.savedId,
+      value: { name: "Support", providerId: "messenger", enabled: false, settings: { account: "support" } },
+      secrets: { optional: { action: "clear" } } });
+    expect(updated.snapshot.messagingConnections[0]?.secrets).toEqual({ token: "available", optional: "missing" });
+    const document = readFileSync(join(root, "configuration.json"), "utf8");
+    for (const secret of ["support-secret", "secondary-secret", "team-secret"]) expect(document).not.toContain(secret);
+    await service.execute({ type: "remove", kind: "messaging", id: first.savedId });
+    expect(service.current().messagingConnections.map(connection => connection.id)).toEqual([second.savedId]);
+  });
   it("persists web provider order without changing credentials or enablement", async () => {
     const { service, root, protector } = setup();
     const life = new RunLifecycle(() => {});

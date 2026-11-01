@@ -9,6 +9,7 @@ import { SessionsSettings } from "./SessionsSettings";
 import { AboutSettings } from "./AboutSettings";
 import { AppearanceSettings } from "../appearance/AppearanceSettings";
 import { ModelProvidersSettings } from "../configuration/ModelProvidersSettings";
+import { MessagingSettings } from "../configuration/MessagingSettings";
 import { WebProvidersSettings } from "../configuration/WebProvidersSettings";
 import { SkillSettings } from "../skills/SkillsSettings";
 import { skillsMessages } from "../../messages/skills";
@@ -44,7 +45,7 @@ interface SettingsCategory { id: SettingsCategoryId; title: UiText; summary: UiT
 const categories: SettingsCategory[] = [
   { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><NetworkSettings /><HomeEntrySettings /><SessionsSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
-  { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /></> },
+  { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /><MessagingSettings /></> },
   { id: "skills", title: skillsMessages.title, summary: skillsMessages.summary, icon: BookOpen, content: () => <SkillSettings /> },
   { id: "shell", title: shellMessages.title, summary: shellMessages.summary, icon: Terminal, content: () => <ShellSettingsPage /> },
   { id: "mcp", title: mcpMessages.settings, summary: mcpMessages.summary, icon: Network, content: () => <McpSettings /> },

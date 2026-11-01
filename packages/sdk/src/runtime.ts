@@ -10,6 +10,7 @@ export * from "./runtime-tools.ts";
 export type * from "./runtime-model-providers.ts";
 export * from "./runtime-usage.ts";
 export * from "./runtime-web.ts";
+export * from "./runtime-messaging.ts";
 export * from "./runtime-agent-catalog.ts";
 export * from "./runtime-sessions.ts";
 export type * from "./content-runtime.ts";

@@ -17,10 +17,11 @@ import shell from "./shell/renderer";
 import skills from "./skills/renderer";
 import terminal from "./terminal/renderer";
 import usage from "./usage/renderer";
+import messaging from "./messaging/renderer";
 import web from "./web/renderer";
 import subagents from "./subagents/renderer";
 
-const builtinViews: readonly RendererModule[] = [agent, filesystem, manual, mcp, mesh, naming, notes, questions, resources, shell, skills, terminal, usage, web, subagents];
+const builtinViews: readonly RendererModule[] = [agent, filesystem, manual, mcp, mesh, naming, notes, questions, resources, shell, skills, terminal, usage, web, subagents, messaging];
 export default defineRendererPlugin({
   modules: [...builtinViews, agentFeedbackRenderer], settings: builtinSettingsPages, prepare: prepareHomeEntry,
   sessionEntries: [{ id: "conversation", title: homeMessages.entryTitle, Body: ConversationEntry }],

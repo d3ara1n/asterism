@@ -11,6 +11,7 @@ import { bindObjects } from "./sdk/objects.ts";
 import { bindModels } from "./sdk/models.ts";
 import { bindExecution } from "./sdk/execution.ts";
 import { bindMcp } from "./sdk/mcp.ts";
+import { bindMessaging } from "./sdk/messaging.ts";
 import { bindWeb } from "./sdk/web.ts";
 import { bindModelProviders } from "./sdk/model-providers.ts";
 import { bindUsage } from "./sdk/usage.ts";
@@ -33,6 +34,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     mcp: bindMcp(shared.mcp, sessionRuns, scope),
     shell: bindShellServices(shared.shell, sessionRuns, checkAvailable),
     ...bindWeb(shared.webProviders, sessionRuns, scope),
+    messaging: bindMessaging(shared.messaging, sessionRuns, internal.lifetime, scope),
     modelProviders: bindModelProviders(shared.modelProviders, sessionRuns, scope),
     ...bindUsage(shared.usageProviders, shared.usage, sessionRuns, scope),
     agentCatalog: bindAgentCatalog(shared.agentCatalog, sessionRuns, checkAvailable),

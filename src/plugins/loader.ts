@@ -138,7 +138,7 @@ function initializationOrder(plugins: readonly PluginDefinition[], dependencies:
 
 /** Collect SDK contributions at startup, resolve overrides in plugin order, and freeze the catalog. */
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
-  const { agentCatalog, webProviders, extensions } = services.shared;
+  const { agentCatalog, webProviders, messaging, extensions } = services.shared;
   const dependencies = services.pluginDependencies ?? new Map<string, readonly string[]>();
   const directory = Object.freeze({ list: () => services.sessions.list(), archived: () => services.sessions.archived() });
   const events = services.events ?? new EventBus();
@@ -198,6 +198,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       // Root entries and feature modules share registration; each module registers cleanup responsibility with plugin.lifetime during setup.
       const register = (contribution: ModuleContribution) => {
         agentCatalog.register(id, sdk.context.assets, contribution.agentSkills ?? [], contribution.agentInstructions ?? []);
+        if (contribution.messagingProviders?.length) messaging.declare(id, contribution.messagingProviders, lifecycle.group("call"));
         if (contribution.webProviders?.length) webProviders.declare(id, contribution.webProviders, lifecycle.group("call"));
         if (contribution.usageProviders?.length || contribution.modelProviderPresets?.length)
           extensions.declare(id, contribution.usageProviders ?? [], contribution.modelProviderPresets ?? [], lifecycle.group("call"), dependencies.get(id));
@@ -257,6 +258,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       if (entry) {
         extensions.removeOwners([id]);
         webProviders.removeOwners([id]);
+        messaging.removeOwners([id]);
         calls.removeOwner(id); channels.removeOwner(id);
         entry.events.stop(); events.removeOwner(id);
         entry.lifecycle.stop();
@@ -298,6 +300,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
   }
   extensions.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
   webProviders.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
+  messaging.removeOwners([...invalidEntries].map(entry => entry.plugin.namespace.id));
   // setup and post-validation failures share one reverse cleanup pass so providers cannot bypass failed consumers still cleaning up.
   const failedCleanup = (async () => {
     await Promise.allSettled([...invalidEntries].map(entry => entry.lifecycle.close()));
@@ -486,6 +489,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       closed = true;
       extensions.removeOwners(collected.map(entry => entry.plugin.namespace.id));
       webProviders.removeOwners(collected.map(entry => entry.plugin.namespace.id));
+      messaging.removeOwners(collected.map(entry => entry.plugin.namespace.id));
       for (const entry of collected) entry.events.stop();
       events.close();
       for (const lifecycle of lifecycles) lifecycle.stop();

@@ -1,7 +1,8 @@
-import { webProviderTypeSchema, webResponseSchema, webSearchRequestSchema, webFetchRequestSchema, type UiText,
+import { webProviderTypeSchema, webResponseSchema, webSearchRequestSchema, webFetchRequestSchema,
   type WebProviderState, type WebProviderType, type WebSearchRequest, type WebFetchRequest, type WebResponse } from "@asterism-app/sdk/contracts";
 import { WebError, type WebProviderDefinition, type WebProviderInstance, type WebProviderServices, type WebServices } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
+import { resolveProviderSettings, ProviderSettingError } from "./provider-settings.ts";
 
 /** Match the full normalized URL, treating only asterisks as wildcards. */
 export function matchesWebUrl(pattern: string, url: string): boolean {
@@ -41,25 +42,15 @@ interface Connections {
   /** Read a saved secret value; null when no value is saved for the key. */
   secret(id: string, key: string): Promise<string | null>;
 }
-const plainText = (text: UiText) => typeof text === "string" ? text : text.defaultMessage;
-
-/** Validate saved values against the current declaration; missing choices use their declared default. */
+/** Resolve settings with the shared rules and report failures as web provider errors. */
 export async function resolveWebSettings(type: Pick<WebProviderType, "id" | "settings">, saved: Readonly<Record<string, string>>,
   secret: (key: string) => Promise<string | null>): Promise<Record<string, string>> {
-  const values: Record<string, string> = {};
-  for (const setting of type.settings) {
-    if (setting.kind === "choice") {
-      const value = saved[setting.key] ?? setting.default;
-      if (!setting.options.some(option => option.value === value))
-        throw new WebError("provider_unavailable", `Web provider '${type.id}' setting '${plainText(setting.label)}' has unsupported value '${value}'.`);
-      values[setting.key] = value;
-      continue;
-    }
-    const value = await secret(setting.key);
-    if (value !== null) values[setting.key] = value;
-    else if (setting.required) throw new WebError("credential_unavailable", `Web provider '${type.id}' requires ${plainText(setting.label)}.`);
+  try { return await resolveProviderSettings(type.settings, saved, secret); }
+  catch (error) {
+    if (!(error instanceof ProviderSettingError)) throw error;
+    const setting = type.settings.find(item => item.key === error.key);
+    throw new WebError(setting?.kind === "secret" ? "credential_unavailable" : "provider_unavailable", `Web provider '${type.id}': ${error.message}`);
   }
-  return values;
 }
 
 /** Store provider types; resolve current configuration and credentials for each request. */

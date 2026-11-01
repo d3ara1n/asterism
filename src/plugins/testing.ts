@@ -1,4 +1,5 @@
 import { ModelProviderExtensions } from "../configuration/provider-extensions.ts";
+import { MessagingRegistry } from "../configuration/messaging.ts";
 import { WebProviderRegistry } from "../configuration/web-providers.ts";
 import { AgentCatalogService } from "./agent-catalog.ts";
 import type { SharedServices } from "./host.ts";
@@ -15,6 +16,7 @@ export function testHostServices(overrides: Partial<Omit<PluginHostServices, "sh
     shared: {
       agentCatalog: new AgentCatalogService([]), extensions: new ModelProviderExtensions(),
       webProviders: new WebProviderRegistry({ list: () => [], secret: async () => null }),
+      messaging: new MessagingRegistry({ list: () => [], secret: async () => null, changed() {} }),
       manualSources: () => [], packageRoots: new Map(), calls: [],
       ...shared,
     } as SharedServices,

@@ -1,0 +1,365 @@
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import type { z } from "zod";
+import { ArrowLeft, Bell, BellOff, CornerUpLeft, Hash, List, Megaphone, MessageSquare, RefreshCw, Send, Settings, User, Users, X,
+  type LucideIcon } from "lucide-react";
+import { cardRenderer, creationEntry, recordRenderer, toolRenderer, useI18n, useRendererCalls, useRendererObject, useRendererSettings,
+  useRendererViewState, type CreationInputProps, type I18n, type RendererModule, type RendererReceipt } from "@asterism-app/sdk/renderer";
+import type { MessagingConversation, MessagingConnectionInfo, MessagingConnectionStatus, MessagingMessage } from "@asterism-app/sdk/contracts";
+import { Button } from "@asterism-app/ui/ui/button";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Toggle } from "@asterism-app/ui/ui/toggle";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { Textarea } from "@asterism-app/ui/ui/textarea";
+import { ItemGroup } from "@asterism-app/ui/ui/item";
+import { ListRow } from "@asterism-app/ui/ui/list-row";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "@asterism-app/ui/ui/empty";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { StatusIcon, StatusText, type StatusTone } from "@asterism-app/ui/ui/status";
+import { ChoiceField, TextField } from "@asterism-app/ui/configuration-forms";
+import { cn } from "@asterism-app/ui/utils";
+import { CreationForm } from "../shared/creation-form";
+import { conversationsCard, chatCard } from "../shared/card-appearance";
+import { messagingMessages as messages } from "../messages/messaging";
+import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema, ConversationsView, ChatView,
+  BrowseConversations, ReadChat, SendChat, ChatMessageSent, OpenChat, ConfigureSubscription, SubscriptionChanged,
+  ConversationsList, ConversationsSubscribe, ChatRead, ChatSend, type SubscriptionTarget, type ViewConnection } from "./contract";
+import { subscriptionKey } from "./subscriptions";
+import { groupTimeline, relativeUnit } from "./timeline";
+
+const statusTone: Record<MessagingConnectionStatus, StatusTone> = {
+  connected: "success", connecting: "progress", reconnecting: "warning", failed: "error", disabled: "neutral", unavailable: "neutral",
+};
+const statusLabel = {
+  connected: messages.connected, connecting: messages.connecting, reconnecting: messages.reconnecting,
+  failed: messages.disconnected, disabled: messages.disabled, unavailable: messages.unavailable,
+} satisfies Record<MessagingConnectionStatus, unknown>;
+const kindIcon: Record<string, LucideIcon> = { private: User, group: Users, supergroup: Users, channel: Megaphone };
+const addressTarget = (connectionId: string, address: { conversationId: string; threadId?: string }): SubscriptionTarget =>
+  ({ connectionId, conversationId: address.conversationId, ...(address.threadId ? { threadId: address.threadId } : {}) });
+
+function relativeTime(i18n: I18n, iso: string) {
+  const { value, unit } = relativeUnit(Date.parse(iso), Date.now());
+  return new Intl.RelativeTimeFormat(i18n.locale, { numeric: "auto", style: "short" }).format(value, unit);
+}
+function receiptError(i18n: I18n, receipt: RendererReceipt) {
+  return receipt.ok ? null : receipt.error.display ? i18n.text(receipt.error.display) : receipt.error.message;
+}
+/** One pending gate per view: concurrent actions from the same view are ignored while one runs. */
+function useOperation() {
+  const i18n = useI18n();
+  const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
+  async function run(work: () => Promise<RendererReceipt | void>): Promise<boolean> {
+    if (pending) return false;
+    setPending(true); setError(null);
+    try {
+      const receipt = await work();
+      const failure = receipt ? receiptError(i18n, receipt) : null;
+      setError(failure);
+      return failure === null;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : i18n.text(messages.failed));
+      return false;
+    } finally { setPending(false); }
+  }
+  return { pending, error, run, clear: () => setError(null) };
+}
+/** Status that explains itself: failure details replace the generic label when present. */
+function ConnectionStatus({ connection }: { connection: Pick<MessagingConnectionInfo, "status" | "error"> }) {
+  const i18n = useI18n();
+  const detail = (connection.status === "failed" || connection.status === "reconnecting") && connection.error;
+  return <StatusText tone={statusTone[connection.status]} className="max-w-full">
+    <span className="truncate" title={detail || undefined}>{i18n.text(statusLabel[connection.status])}{detail ? ` · ${detail}` : ""}</span>
+  </StatusText>;
+}
+function NotifyToggle({ label, pressed, disabled, onChange }: { label: string; pressed: boolean; disabled: boolean; onChange(value: boolean): void }) {
+  return <Tooltip>
+    <TooltipTrigger asChild>
+      <Toggle size="sm" aria-label={label} pressed={pressed} disabled={disabled} onPressedChange={onChange}
+        className="text-muted-foreground data-[state=on]:text-foreground">
+        {pressed ? <Bell /> : <BellOff />}
+      </Toggle>
+    </TooltipTrigger>
+    <TooltipContent>{label}</TooltipContent>
+  </Tooltip>;
+}
+function ErrorLine({ error }: { error: string | null }) {
+  return error ? <p role="alert" className="type-caption px-1 text-destructive">{error}</p> : null;
+}
+
+/* ---------- Conversations: connection list, then the selected connection's conversations ---------- */
+
+function ConversationsCard({ data }: { data: z.infer<typeof ConversationsView.schema> }) {
+  const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n(), settings = useRendererSettings(), operation = useOperation();
+  const [selectedId, select] = useRendererViewState<string | null>(`asterism.builtin/conversations/${object.ref.id}`, null);
+  const selected = data.connections.find(connection => connection.id === selectedId) ?? null;
+  const subscribed = (target: SubscriptionTarget) => data.subscriptions.some(value => subscriptionKey(value) === subscriptionKey(target));
+  const toggle = (target: SubscriptionTarget, enabled: boolean, title: string) =>
+    void operation.run(() => object.invoke(ConfigureSubscription, { target, enabled, title }));
+  const disabled = operation.pending || !object.view.ready;
+
+  if (!data.connections.length) return <div className="nodrag nopan flex min-h-0 flex-1 flex-col justify-center p-3">
+    <Empty>
+      <EmptyHeader><EmptyMedia variant="icon"><MessageSquare /></EmptyMedia>
+        <EmptyDescription>{i18n.text(messages.noConnections)}</EmptyDescription></EmptyHeader>
+      <EmptyContent><Button size="sm" variant="outline" onClick={() => settings.openHost("providers")}>
+        <Settings data-icon="inline-start" />{i18n.text(messages.openSettings)}</Button></EmptyContent>
+    </Empty>
+  </div>;
+  if (selected) return <ConnectionConversations connection={selected} back={() => { operation.clear(); select(null); }}
+    subscribed={subscribed} toggle={toggle} disabled={disabled} error={operation.error}
+    open={dialog => void operation.run(() => object.invoke(OpenChat, { connectionId: selected.id, conversationId: dialog.conversationId,
+      ...(dialog.threadId ? { threadId: dialog.threadId } : {}), title: dialog.title }))}
+    load={(signal) => calls.invoke(BrowseConversations, { connectionId: selected.id }, { signal })} />;
+  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2">
+    <h4 className="type-label px-1">{i18n.text(messages.connections)}</h4>
+    <ItemGroup>{data.connections.map(connection => {
+      const label = i18n.formatMessage(messages.subscribeConnection, { name: connection.name });
+      return <ListRow key={connection.id} inactive={connection.status === "disabled"} onOpen={() => { operation.clear(); select(connection.id); }}
+        mediaVariant="icon" media={<StatusIcon tone={statusTone[connection.status]} className="size-4" />}
+        title={connection.name}
+        description={[connection.identity, connection.providerLabel && i18n.text(connection.providerLabel)].filter(Boolean).join(" · ") || undefined}
+        details={connection.status !== "connected" ? <ConnectionStatus connection={connection} /> : undefined}
+        actions={<NotifyToggle label={label} pressed={subscribed({ connectionId: connection.id })} disabled={disabled}
+          onChange={enabled => toggle({ connectionId: connection.id }, enabled, connection.name)} />} />;
+    })}</ItemGroup>
+    <ErrorLine error={operation.error} />
+  </div>;
+}
+
+function ConnectionConversations({ connection, back, subscribed, toggle, open, load, disabled, error }: {
+  connection: ViewConnection; back(): void; disabled: boolean; error: string | null;
+  subscribed(target: SubscriptionTarget): boolean; toggle(target: SubscriptionTarget, enabled: boolean, title: string): void;
+  open(dialog: MessagingConversation): void;
+  load(signal: AbortSignal): Promise<z.infer<typeof BrowseConversations.output>>;
+}) {
+  const i18n = useI18n();
+  const [dialogs, setDialogs] = useState<MessagingConversation[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null), [revision, setRevision] = useState(0);
+  // Reload when the connection reports a new event or its status changes, and on explicit refresh.
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoadError(null);
+    load(controller.signal).then(result => {
+      if (!controller.signal.aborted && result.kind === "conversations") setDialogs(result.conversations);
+    }, error => { if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : i18n.text(messages.failed)); });
+    return () => controller.abort();
+    // load is recreated each render; the connection identity and markers decide when to query again.
+  }, [connection.id, connection.latest, connection.status, revision]);
+  const connectionTarget = { connectionId: connection.id };
+  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
+    <header className="flex min-w-0 items-center gap-1 border-b px-1.5 py-1.5">
+      <IconButton size="icon-xs" label={i18n.text(messages.back)} onClick={back}><ArrowLeft /></IconButton>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className="type-section truncate">{connection.name}</span>
+        <ConnectionStatus connection={connection} />
+      </div>
+      <IconButton size="icon-xs" label={i18n.text(messages.refresh)} onClick={() => setRevision(revision + 1)}><RefreshCw /></IconButton>
+      <NotifyToggle label={i18n.formatMessage(messages.subscribeConnection, { name: connection.name })} pressed={subscribed(connectionTarget)}
+        disabled={disabled} onChange={enabled => toggle(connectionTarget, enabled, connection.name)} />
+    </header>
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2">
+      {dialogs === null && !loadError && <div className="flex justify-center py-6"><Spinner aria-hidden="true" /></div>}
+      {dialogs?.length === 0 && <p className="type-caption px-1 py-4 text-center text-balance">{i18n.text(messages.empty)}</p>}
+      {dialogs && dialogs.length > 0 && <ItemGroup>{dialogs.map(dialog => {
+        const target = addressTarget(connection.id, dialog), Icon = dialog.threadId ? Hash : kindIcon[dialog.kind] ?? MessageSquare;
+        return <ListRow key={subscriptionKey(target)} disabled={disabled} onOpen={() => open(dialog)}
+          mediaVariant="icon" media={<Icon />} title={dialog.title}
+          description={dialog.activity ? relativeTime(i18n, dialog.activity) : undefined}
+          actions={<NotifyToggle label={i18n.formatMessage(messages.subscribeConversation, { name: dialog.title })} pressed={subscribed(target)}
+            disabled={disabled} onChange={enabled => toggle(target, enabled, dialog.title)} />} />;
+      })}</ItemGroup>}
+      <ErrorLine error={loadError ?? error} />
+    </div>
+  </div>;
+}
+
+/* ---------- Chat: message timeline and composer ---------- */
+
+function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
+  const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n(), operation = useOperation();
+  const [items, setItems] = useState<MessagingMessage[] | null>(null), [loadError, setLoadError] = useState<string | null>(null);
+  const [text, setText] = useState(""), [replyTo, setReplyTo] = useState<MessagingMessage | null>(null);
+  const log = useRef<HTMLOListElement>(null), pinned = useRef(true);
+  const status = data.connection?.status ?? "unavailable";
+  // Reload on mount, on each observed event for this conversation, and when the connection becomes usable.
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoadError(null);
+    calls.invoke(ReadChat, null, { object: object.ref, signal: controller.signal }).then(result => {
+      if (!controller.signal.aborted) setItems(result.messages);
+    }, error => { if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : i18n.text(messages.failed)); });
+    return () => controller.abort();
+  }, [calls, object.ref.id, data.latest, status === "connected"]);
+  // Stay at the newest message unless the reader has scrolled away from it.
+  useLayoutEffect(() => {
+    const element = log.current;
+    if (element && pinned.current) element.scrollTop = element.scrollHeight;
+  }, [items]);
+  const byId = new Map((items ?? []).map(message => [message.id, message]));
+  const nameOf = (message: MessagingMessage) => message.sender.role === "self" ? i18n.text(messages.you) : message.sender.name;
+  const send = () => {
+    if (!text.trim()) return;
+    void operation.run(async () => {
+      const receipt = await object.invoke(SendChat, { text, ...(replyTo ? { replyTo: replyTo.id } : {}) });
+      if (receipt.ok) { setText(""); setReplyTo(null); pinned.current = true; }
+      return receipt;
+    });
+  };
+  const blocked = operation.pending || !object.view.ready || !data.connection?.enabled;
+  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
+    <header className="flex min-w-0 flex-col border-b px-3 py-1.5">
+      <span className="type-caption truncate">
+        {[data.connection?.name ?? data.connectionId, data.connection?.identity].filter(Boolean).join(" · ")}
+      </span>
+      {status !== "connected" && <ConnectionStatus connection={data.connection ?? { status }} />}
+    </header>
+    <ol ref={log} role="log" aria-label={i18n.text(messages.chat)}
+      className="flex min-h-0 flex-1 select-text flex-col gap-3 overflow-auto px-3 py-2"
+      onScroll={event => { const element = event.currentTarget; pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24; }}>
+      {items === null && !loadError && <li className="flex flex-1 items-center justify-center"><Spinner aria-hidden="true" /></li>}
+      {items?.length === 0 && <li className="type-caption flex flex-1 items-center justify-center">{i18n.text(messages.noMessages)}</li>}
+      {groupTimeline(items ?? []).map((group, index, groups) => {
+        const first = group.messages[0]!, newDay = groups[index - 1]?.day !== group.day;
+        const day = newDay && <li className="type-caption self-center tabular-nums">
+          {i18n.formatDate(Date.parse(first.sentAt), { dateStyle: "medium" })}
+        </li>;
+        if (group.sender.role === "system") return <Group key={first.id} day={day}>{group.messages.map(message =>
+          <li key={message.id} className="type-caption self-center text-center">{message.text}</li>)}</Group>;
+        const self = group.sender.role === "self";
+        return <Group key={first.id} day={day}>
+          <li className={cn("flex min-w-0 flex-col gap-0.5", self ? "items-end" : "items-start")}>
+            <span className="type-label px-1">{nameOf(first)}</span>
+            <ol className={cn("flex min-w-0 max-w-[85%] flex-col gap-0.5", self ? "items-end" : "items-start")}>
+              {group.messages.map(message => {
+                const quoted = message.replyTo ? byId.get(message.replyTo) : undefined;
+                return <li key={message.id} className={cn("group/message flex min-w-0 items-end gap-1", self && "flex-row-reverse")}>
+                  <div className={cn("min-w-0 rounded-lg px-2.5 py-1.5", self ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                    {message.replyTo && <p className={cn("type-caption mb-1 truncate border-l-2 pl-1.5", self ? "border-primary-foreground/50 text-primary-foreground/80" : "border-border")}>
+                      {i18n.formatMessage(messages.inReplyTo, { name: quoted ? nameOf(quoted) : message.replyTo })}{quoted ? ` · ${quoted.text}` : ""}
+                    </p>}
+                    <p className="type-body whitespace-pre-wrap break-words">{message.text}</p>
+                  </div>
+                  <span className="type-caption shrink-0 tabular-nums opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">
+                    {i18n.formatDate(Date.parse(message.sentAt), { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  <IconButton size="icon-xs" label={i18n.text(messages.reply)} disabled={blocked}
+                    className="opacity-0 group-hover/message:opacity-100 focus-visible:opacity-100" onClick={() => setReplyTo(message)}>
+                    <CornerUpLeft />
+                  </IconButton>
+                </li>;
+              })}
+            </ol>
+          </li>
+        </Group>;
+      })}
+    </ol>
+    <ErrorLine error={loadError} />
+    <form className="flex flex-col gap-1.5 border-t p-2" onSubmit={event => { event.preventDefault(); send(); }}>
+      {replyTo && <div className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1">
+        <CornerUpLeft className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="type-caption min-w-0 flex-1 truncate">{i18n.formatMessage(messages.replyingTo, { name: nameOf(replyTo) })} · {replyTo.text}</span>
+        <IconButton size="icon-xs" label={i18n.text(messages.cancelReply)} onClick={() => setReplyTo(null)}><X /></IconButton>
+      </div>}
+      <div className="flex items-end gap-1.5">
+        <Textarea rows={1} value={text} disabled={blocked} aria-label={i18n.text(messages.text)} placeholder={i18n.text(messages.composerHint)}
+          className="max-h-32 min-h-9 flex-1 resize-none" onChange={event => setText(event.target.value)}
+          onKeyDown={event => {
+            if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+            event.preventDefault(); send();
+          }} />
+        <IconButton type="submit" variant="default" size="icon" label={i18n.text(messages.send)} disabled={blocked || !text.trim()}>
+          {operation.pending ? <Spinner aria-hidden="true" /> : <Send />}
+        </IconButton>
+      </div>
+      <ErrorLine error={operation.error} />
+    </form>
+  </div>;
+}
+function Group({ day, children }: { day: ReactNode; children: ReactNode }) {
+  return <>{day}{children}</>;
+}
+
+/* ---------- Chat creation: pick an observed conversation or enter its address ---------- */
+
+const manualChoice = "__manual";
+function ChatInput({ initialInput, busy, resolve, cancel }: CreationInputProps<z.input<typeof chatCreateSchema>>) {
+  const calls = useRendererCalls(), i18n = useI18n();
+  const [connections, setConnections] = useState<MessagingConnectionInfo[]>([]);
+  const [dialogs, setDialogs] = useState<MessagingConversation[]>([]);
+  const [connectionId, setConnectionId] = useState(initialInput?.connectionId ?? "");
+  const [choice, setChoice] = useState<string | null>(initialInput ? manualChoice : null);
+  const [conversationId, setConversationId] = useState(initialInput?.conversationId ?? "");
+  const [threadId, setThreadId] = useState(initialInput?.threadId ?? "");
+  const [title, setTitle] = useState(initialInput?.title ?? "");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    void calls.invoke(BrowseConversations, null, { signal: controller.signal }).then(result => {
+      if (controller.signal.aborted || result.kind !== "connections") return;
+      setConnections(result.connections);
+      setConnectionId(current => current || (result.connections.find(connection => connection.enabled)?.id ?? ""));
+    }, error => { if (!controller.signal.aborted) setError(String(error)); });
+    return () => controller.abort();
+  }, [calls]);
+  useEffect(() => {
+    if (!connectionId) return;
+    const controller = new AbortController();
+    setDialogs([]);
+    void calls.invoke(BrowseConversations, { connectionId }, { signal: controller.signal }).then(result => {
+      if (!controller.signal.aborted && result.kind === "conversations") setDialogs(result.conversations);
+    }, () => { /* Listing is optional; the address can be entered manually. */ });
+    return () => controller.abort();
+  }, [calls, connectionId]);
+  const key = (dialog: MessagingConversation) => JSON.stringify([dialog.conversationId, dialog.threadId ?? null]);
+  const manual = choice === manualChoice || !dialogs.length;
+  return <CreationForm busy={busy} disabled={!connectionId || !conversationId.trim() || !title.trim()} onCancel={cancel}
+    onSubmit={() => resolve({ connectionId, conversationId: conversationId.trim(), title, ...(threadId.trim() ? { threadId: threadId.trim() } : {}) })}>
+    <ChoiceField label={i18n.text(messages.connection)} value={connectionId || null}
+      options={connections.map(connection => ({ value: connection.id, label: connection.identity ? `${connection.name} · ${connection.identity}` : connection.name }))}
+      onChange={value => { setConnectionId(value ?? ""); setChoice(null); }} />
+    {dialogs.length > 0 && <ChoiceField label={i18n.text(messages.observed)} value={choice}
+      options={[...dialogs.map(dialog => ({ value: key(dialog), label: dialog.title })), { value: manualChoice, label: i18n.text(messages.manual) }]}
+      onChange={value => {
+        setChoice(value);
+        const dialog = dialogs.find(item => key(item) === value);
+        if (!dialog) return;
+        setConversationId(dialog.conversationId); setThreadId(dialog.threadId ?? ""); setTitle(dialog.title);
+      }} />}
+    <TextField label={i18n.text(messages.title)} value={title} onChange={setTitle} required />
+    {manual && <>
+      <TextField label={i18n.text(messages.conversation)} value={conversationId} onChange={setConversationId} required />
+      <TextField label={i18n.text(messages.thread)} value={threadId} onChange={setThreadId} />
+    </>}
+    {error && <p role="alert" className="type-caption text-destructive">{error}</p>}
+  </CreationForm>;
+}
+
+export default {
+  resources: [
+    { kind: Conversations.kind, label: messages.conversations, icon: <List className="size-4" />, card: conversationsCard },
+    { kind: Chat.kind, label: messages.chat, icon: <MessageSquare className="size-4" />, card: chatCard },
+  ],
+  cards: [
+    cardRenderer(ConversationsView, { ...conversationsCard, Body: ConversationsCard }),
+    cardRenderer(ChatView, { ...chatCard, Body: ChatCard }),
+  ],
+  creations: [
+    creationEntry(CreateConversations, { id: CreateConversations.id, label: messages.conversations, icon: <List className="size-4" />,
+      group: "resources", triggers: { menu: { initialInput: {} } } }),
+    creationEntry(CreateChat, { id: CreateChat.id, label: messages.chat, icon: <MessageSquare className="size-4" />,
+      group: "resources", triggers: { menu: {} }, InputView: ChatInput }),
+  ],
+  records: [recordRenderer(ChatMessageSent, {
+    icon: <Send className="size-4" />, label: data => ({ ...messages.sentRecord, values: { text: data.text } }),
+  }), recordRenderer(SubscriptionChanged, {
+    icon: data => data.enabled ? <Bell className="size-4" /> : <BellOff className="size-4" />,
+    label: data => ({ ...(data.enabled ? messages.notificationOn : messages.notificationOff),
+      values: { target: data.title ?? data.target.conversationId ?? data.target.connectionId } }),
+  })],
+  tools: [
+    toolRenderer(ConversationsList, { label: messages.conversations, icon: <List className="size-4" /> }),
+    toolRenderer(ConversationsSubscribe, { label: messages.notification, icon: <Bell className="size-4" /> }),
+    toolRenderer(ChatRead, { label: messages.read, icon: <MessageSquare className="size-4" /> }),
+    toolRenderer(ChatSend, { label: messages.send, icon: <Send className="size-4" /> }),
+  ],
+} satisfies RendererModule;

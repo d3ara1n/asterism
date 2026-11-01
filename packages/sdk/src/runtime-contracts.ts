@@ -23,6 +23,7 @@ import type { TopLevelTool } from "./runtime-tools.ts";
 import type { ModelProviderServices } from "./runtime-model-providers.ts";
 import type { UsageProviderServices, UsageProvider, UsageServices, ProviderUsage } from "./runtime-usage.ts";
 import type { WebServices, WebProviderServices, WebProviderDefinition } from "./runtime-web.ts";
+import type { MessagingServices, MessagingProviderDefinition } from "./runtime-messaging.ts";
 import type { ModelProviderPresetContribution } from "./model-provider.ts";
 import type { AgentCatalog, AgentSkillDeclaration, AgentInstructionDeclaration } from "./runtime-agent-catalog.ts";
 import type { SessionCreation } from "./runtime-sessions.ts";
@@ -68,6 +69,7 @@ export interface PluginContext {
   readonly providerUsage: ProviderUsage;
   readonly webProviders: WebProviderServices;
   readonly web: WebServices;
+  readonly messaging: MessagingServices;
   session(id: string): SessionExecutor;
   /** Obtain an object handle using a named resource contract; the host validates plugin ownership of the contract, object existence, and matching type, and stamps records accordingly. */
   object<S extends Json>(sessionId: string, contract: ResourceContract<S>, id: string): ObjectExecutor;
@@ -167,6 +169,7 @@ export interface ModuleContribution {
   agentSkills?: readonly AgentSkillDeclaration[];
   agentInstructions?: readonly AgentInstructionDeclaration[];
   webProviders?: readonly WebProviderDefinition[];
+  messagingProviders?: readonly MessagingProviderDefinition[];
   usageProviders?: readonly UsageProvider[];
   modelProviderPresets?: readonly ModelProviderPresetContribution[];
   calls?: readonly CallContribution[];

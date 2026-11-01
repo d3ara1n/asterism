@@ -30,7 +30,9 @@ export * from "./model-cost-estimate.ts";
 export * from "./model-media.ts";
 export * from "./model-provider.ts";
 export * from "./provider-usage.ts";
+export * from "./provider-settings.ts";
 export * from "./web.ts";
+export * from "./messaging.ts";
 
 export * from "./session-title.ts";
 

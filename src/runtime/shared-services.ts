@@ -36,7 +36,7 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
   const usage = new ProviderUsageService(models, usages, providerId => events.publish(UsageChanged, null, { providerId }));
   return {
     mcp, shell, usage, agentCatalog, modelProviders: models, usageProviders: usages,
-    webProviders: configuration.web, extensions: configuration.extensions,
+    webProviders: configuration.web, messaging: configuration.messaging, extensions: configuration.extensions,
     manualSources: options.manualSources, packageRoots: options.packageRoots,
     calls: [
       ...mcp.calls, ...shell.calls,

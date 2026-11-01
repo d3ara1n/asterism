@@ -1,7 +1,7 @@
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Globe, GripVertical, Plus } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
-import type { WebProviderSetting, WebProviderType } from "@asterism-app/sdk/contracts";
+import type { ProviderSetting, WebProviderType } from "@asterism-app/sdk/contracts";
 import type { WebProviderConfiguration } from "../../../shared/configuration";
 import { webProviderMessages as messages } from "../../messages/web-providers";
 import { providersMessages } from "../../messages/providers";
@@ -14,26 +14,17 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Item, ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { Switch } from "@asterism-app/ui/ui/switch";
-import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@asterism-app/ui/ui/field";
-import { RadioGroup, RadioGroupItem } from "@asterism-app/ui/ui/radio-group";
+import { Field, FieldDescription, FieldLabel } from "@asterism-app/ui/ui/field";
 import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
 import { cn } from "@asterism-app/ui/utils";
-import { Editor, ChoiceField } from "./forms";
+import { Editor } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { Section } from "../settings/layout";
 import { ProviderKeyLink } from "./ProviderKeyLink";
-import { CredentialField, credentialChanged, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
+import { credentialChanged, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
+import { ProviderSettingFields, secretUpdates, settingValues, settingsComplete } from "./ProviderSettingFields";
 
-type ChoiceSetting = Extract<WebProviderSetting, { kind: "choice" }>;
-type SecretSetting = Extract<WebProviderSetting, { kind: "secret" }>;
-/** Choices with few options render as described radio cards; longer lists use a select. */
-const radioOptionLimit = 4;
-
-/** Effective choice values: saved values where present, otherwise declared defaults. */
-function choiceValues(type: WebProviderType | undefined, saved: Readonly<Record<string, string>>): Record<string, string> {
-  return Object.fromEntries((type?.settings ?? []).filter((setting): setting is ChoiceSetting => setting.kind === "choice")
-    .map(setting => [setting.key, saved[setting.key] ?? setting.default]));
-}
+type SecretSetting = Extract<ProviderSetting, { kind: "secret" }>;
 function useCapabilities() {
   const i18n = useI18n();
   return (type: WebProviderType) => [type.search && i18n.text(messages.search), type.fetch && i18n.text(messages.fetch)].filter(Boolean).join(" · ");
@@ -123,7 +114,7 @@ export function WebProvidersSettings() {
                 {/* Saving validates against the type declaration, so unavailable types cannot be toggled. */}
                 <Switch aria-label={i18n.formatMessage(messages.enableProvider, { provider: label })} checked={state.enabled} disabled={busy || !type}
                   onCheckedChange={enabled => void action.run({ type: "webProvider.save", id: state.id, enabled,
-                    settings: choiceValues(type, state.settings), secrets: {} })} />
+                    settings: settingValues(type?.settings, state.settings), secrets: {} })} />
               </>} />
           </>}
         </SortableProvider>;
@@ -182,46 +173,6 @@ function WebProviderCreation() {
   </Editor>;
 }
 
-/* ---------- Service settings ---------- */
-
-function ChoiceSettingField({ setting, value, onChange }: { setting: ChoiceSetting; value: string; onChange(value: string): void }) {
-  const i18n = useI18n(), id = useId();
-  if (setting.options.length > radioOptionLimit) {
-    const selected = setting.options.find(option => option.value === value);
-    const hint = [setting.description, selected?.description].filter(text => text !== undefined).map(text => i18n.text(text)).join(" ");
-    return <ChoiceField label={i18n.text(setting.label)} value={value} hint={hint || undefined}
-      options={setting.options.map(option => ({ value: option.value, label: i18n.text(option.label) }))}
-      onChange={next => { if (next) onChange(next); }} />;
-  }
-  return <FieldSet>
-    <FieldLegend variant="label">{i18n.text(setting.label)}</FieldLegend>
-    {setting.description && <FieldDescription>{i18n.text(setting.description)}</FieldDescription>}
-    <RadioGroup value={value} onValueChange={onChange}>
-      {setting.options.map(option => <FieldLabel key={option.value} htmlFor={`${id}-${option.value}`} className="w-full">
-        <Field orientation="horizontal">
-          <RadioGroupItem id={`${id}-${option.value}`} value={option.value}
-            aria-describedby={option.description ? `${id}-${option.value}-hint` : undefined} />
-          <FieldContent>
-            <FieldTitle>{i18n.text(option.label)}</FieldTitle>
-            {option.description && <FieldDescription id={`${id}-${option.value}-hint`}>{i18n.text(option.description)}</FieldDescription>}
-          </FieldContent>
-        </Field>
-      </FieldLabel>)}
-    </RadioGroup>
-  </FieldSet>;
-}
-
-function SecretSettingField({ setting, state, storageAvailable, draft, onChange }: {
-  setting: SecretSetting; state: WebProviderConfiguration["secrets"][string] | undefined; storageAvailable: boolean;
-  draft: ConnectionCredentialDraft; onChange(draft: ConnectionCredentialDraft): void;
-}) {
-  const i18n = useI18n();
-  // Required secrets can be replaced but not removed; a saved provider always holds them.
-  return <CredentialField label={i18n.text(setting.label)} optionalLabel={setting.required ? undefined : i18n.text(messages.optional)}
-    description={setting.description && i18n.text(setting.description)} credentialState={state} storageAvailable={storageAvailable}
-    removable={!setting.required} keyUrl={setting.helpUrl} draft={draft} onDraftChange={onChange} />;
-}
-
 /** Read-only routing fact for fetch-capable services. */
 function FetchScope({ patterns }: { patterns: readonly string[] }) {
   const i18n = useI18n();
@@ -239,16 +190,13 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
   const { snapshot } = useSettingsConfiguration();
   const type = snapshot?.webProviderTypes.find(type => type.id === typeId);
   const saved = snapshot?.webProviders.find(state => state.id === typeId) ?? null;
-  const [choices, setChoices] = useState(() => choiceValues(type, saved?.settings ?? {}));
+  const [values, setValues] = useState(() => settingValues(type?.settings, saved?.settings ?? {}));
   const [secrets, setSecrets] = useState<Record<string, ConnectionCredentialDraft>>({});
   const action = useConfigurationAction("inline");
-  const secretDraft = (key: string): ConnectionCredentialDraft => secrets[key] ?? { action: "keep", key: "" };
-  const savedChoices = choiceValues(type, saved?.settings ?? {});
+  const savedValues = settingValues(type?.settings, saved?.settings ?? {});
   const dirty = !saved || Object.values(secrets).some(credentialChanged)
-    || Object.entries(choices).some(([key, value]) => savedChoices[key] !== value);
-  // Mirrors the save contract: every required secret is either already saved or entered now.
-  const complete = !!type?.settings.every(setting => setting.kind !== "secret" || !setting.required
-    || secretDraft(setting.key).key.trim() !== "" || saved?.secrets[setting.key] === "available");
+    || Object.entries(values).some(([key, value]) => savedValues[key] !== value);
+  const complete = !!type && settingsComplete(type.settings, values, secrets, saved?.secrets);
   const label = type ? i18n.text(type.label) : typeId;
   return <Editor title={label} description={type ? capabilities(type) : i18n.text(messages.unavailable)}
     form="web-provider-editor" dirty={dirty} busy={action.busy} error={action.error} saveDisabled={!complete}
@@ -258,21 +206,17 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
     <form id="web-provider-editor" onSubmit={async event => {
       event.preventDefault();
       if (!type || !complete) return;
-      const updates = Object.fromEntries(Object.entries(secrets).filter(([, draft]) => credentialChanged(draft))
-        .map(([key, draft]) => [key, draft.action === "clear" ? { action: "clear" as const } : { action: "replace" as const, value: draft.key.trim() }]));
       // Enablement is an immediate list action; saving keeps the current value and new services start enabled.
-      if (await action.run({ type: "webProvider.save", id: typeId, enabled: saved?.enabled ?? true, settings: choices, secrets: updates })) {
+      if (await action.run({ type: "webProvider.save", id: typeId, enabled: saved?.enabled ?? true, settings: values, secrets: secretUpdates(secrets) })) {
         setSecrets({});
         void island.close({ force: true });
       }
     }}><fieldset disabled={action.busy} className="flex flex-col gap-6">
       {!type && <p className="type-body text-muted-foreground">{i18n.text(messages.unavailableHint)}</p>}
-      {type?.settings.map(setting => setting.kind === "secret"
-        ? <SecretSettingField key={setting.key} setting={setting} state={saved?.secrets[setting.key]}
-          storageAvailable={snapshot?.credentialStorageAvailable ?? false}
-          draft={secretDraft(setting.key)} onChange={draft => setSecrets(current => ({ ...current, [setting.key]: draft }))} />
-        : <ChoiceSettingField key={setting.key} setting={setting} value={choices[setting.key] ?? setting.default}
-          onChange={next => setChoices(current => ({ ...current, [setting.key]: next }))} />)}
+      {type && <ProviderSettingFields settings={type.settings} values={values} secretStates={saved?.secrets}
+        storageAvailable={snapshot?.credentialStorageAvailable ?? false}
+        onValue={(key, value) => setValues(current => ({ ...current, [key]: value }))}
+        drafts={secrets} onDraft={(key, draft) => setSecrets(current => ({ ...current, [key]: draft }))} />}
       {type?.fetch && <FetchScope patterns={type.urlPatterns} />}
     </fieldset></form>
   </Editor>;

@@ -5,7 +5,7 @@ import {
 } from "@asterism-app/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
-import { webProviderStateSchema, webProviderTypeSchema } from "@asterism-app/sdk/contracts";
+import { messagingConnectionSchema, messagingConnectionInfoSchema, messagingProviderTypeSchema, webProviderStateSchema, webProviderTypeSchema } from "@asterism-app/sdk/contracts";
 import { modelCompatibilitySchema } from "./model-compatibility.ts";
 
 const id = z.string().min(1).max(160);
@@ -33,6 +33,10 @@ export const credentialStateSchema = z.enum(["not_required", "missing", "availab
 export type CredentialState = z.infer<typeof credentialStateSchema>;
 /** Secret states are keyed by setting key; values never leave the backend. */
 export const webProviderSchema = webProviderStateSchema.extend({ secrets: z.record(z.string(), credentialStateSchema) });
+export const messagingConfigurationSchema = messagingConnectionSchema.extend({
+  secrets: z.record(z.string(), credentialStateSchema), runtime: messagingConnectionInfoSchema,
+});
+export type MessagingConfiguration = z.infer<typeof messagingConfigurationSchema>;
 export type WebProviderConfiguration = z.infer<typeof webProviderSchema>;
 export const modelProviderSchema = modelProviderInputSchema.extend({ credentialState: credentialStateSchema });
 export const modelInputSchema = z.strictObject({
@@ -83,6 +87,8 @@ export const configurationSnapshotSchema = z.strictObject({
   mcp: mcpSettingsSchema,
   shell: shellSettingsSchema,
   sessionEntry: sessionEntrySelectionSchema.nullable(),
+  messagingConnections: z.array(messagingConfigurationSchema),
+  messagingProviderTypes: z.array(messagingProviderTypeSchema),
   webProviders: z.array(webProviderSchema),
   webProviderTypes: z.array(webProviderTypeSchema),
   modelProviders: z.array(modelProviderSchema), models: z.array(modelSchema),
@@ -95,6 +101,9 @@ const credentialUpdateSchema = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("replace"), value: z.string().trim().min(1).max(16_384) }),
 ]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
+  z.strictObject({ type: z.literal("messaging.save"), id: z.string().min(1).nullable(),
+    value: messagingConnectionSchema.omit({ id: true }), secrets: z.record(z.string(), credentialUpdateSchema) }),
+  z.strictObject({ type: z.literal("messaging.restart"), id: z.string().min(1) }),
   z.strictObject({ type: z.literal("shell.set"), value: shellSettingsSchema }),
   /** Settings replace saved non-secret values; secrets update only the listed keys. */
   z.strictObject({ type: z.literal("webProvider.save"), id: z.string().trim().min(1), enabled: z.boolean(),
@@ -105,7 +114,7 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   // Save targets the current ID; a different ID in value means rename.
   z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderInputSchema, credential: credentialUpdateSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
-  z.strictObject({ type: z.literal("remove"), kind: z.enum(["modelProvider", "webProvider", "model"]), id: z.string().min(1).max(321) }),
+  z.strictObject({ type: z.literal("remove"), kind: z.enum(["modelProvider", "webProvider", "messaging", "model"]), id: z.string().min(1).max(321) }),
   z.strictObject({ type: z.literal("test.start"), model: modelExpressionSchema }),
   z.strictObject({ type: z.literal("test.cancel"), id }),
   z.strictObject({ type: z.literal("discovery.start"), providerId: modelProviderIdSchema }),

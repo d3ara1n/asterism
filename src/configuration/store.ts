@@ -6,7 +6,7 @@ import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
 import { canEditModelProviderField, modelReference, modelSchema, modelProviderInputSchema, sessionEntrySelectionSchema,
   type ModelProviderInput, type ProviderModel } from "../shared/configuration.ts";
-import { mcpSettingsSchema, defaultMcpSettings, shellSettingsSchema, defaultShellSettings, modelCostSchema, webProviderStateSchema, type WebProviderState } from "@asterism-app/sdk/contracts";
+import { mcpSettingsSchema, defaultMcpSettings, shellSettingsSchema, defaultShellSettings, modelCostSchema, webProviderStateSchema, type WebProviderState, messagingConnectionSchema, type MessagingConnection } from "@asterism-app/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 import { jsonStorage } from "../storage/migrations.ts";
@@ -25,10 +25,11 @@ const documentSchema = z.strictObject({
   mcpCredentialRefs: z.record(z.string(), z.string().uuid()),
   shell: shellSettingsSchema,
   webProviders: z.array(storedWebProviderSchema),
+  messagingConnections: z.array(messagingConnectionSchema.extend({ secretRefs: z.record(z.string(), z.string().uuid()) })),
   modelProviders: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   sessionEntry: sessionEntrySelectionSchema.nullable(),
 }).superRefine((document, context) => {
-  for (const key of ["modelProviders", "webProviders", "models"] as const) {
+  for (const key of ["modelProviders", "webProviders", "messagingConnections", "models"] as const) {
     const ids = new Set<string>();
     document[key].forEach((item, index) => {
       const key_ = keyOf(item);
@@ -40,22 +41,26 @@ const documentSchema = z.strictObject({
 
 type ConfigurationDocument = z.infer<typeof documentSchema>;
 export type StoredModelProvider = z.infer<typeof storedProviderSchema>;
-const collections = { modelProvider: "modelProviders", webProvider: "webProviders", model: "models" } as const;
+const collections = { messaging: "messagingConnections", modelProvider: "modelProviders", webProvider: "webProviders", model: "models" } as const;
 export type ConfigurationKind = keyof typeof collections;
 type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collections)[K]][number] };
 type ConfigurationSave =
+  | { kind: "messaging"; id: string | null; value: MessagingConnection; secretRefs: Record<string, string> }
   | { kind: "webProvider"; id: string; value: WebProviderState; secretRefs: Record<string, string> }
   | { kind: "modelProvider"; id: string | null; value: ModelProviderInput; credentialRef: string | null }
   | { kind: "model"; id: string | null; value: ProviderModel };
 
 function initialConfiguration(): ConfigurationDocument {
   return { version: configurationVersion, mcp: structuredClone(defaultMcpSettings), mcpCredentialRefs: {},
-    shell: structuredClone(defaultShellSettings), modelProviders: [], webProviders: [], models: [], sessionEntry: null };
+    shell: structuredClone(defaultShellSettings), messagingConnections: [], modelProviders: [], webProviders: [], models: [], sessionEntry: null };
 }
-/** v12 web providers held one API key reference; v13 stores provider settings and secret references by setting key. */
+/**
+ * v12 web providers held one API key reference; v13 stores provider settings and secret references by setting key,
+ * and adds messaging connections.
+ */
 export function migrateConfiguration12(value: unknown): unknown {
   const document = value as { webProviders?: { id: string; enabled: boolean; credentialRef: string | null }[] };
-  return { ...document, webProviders: (document.webProviders ?? []).map(({ credentialRef, ...provider }) => ({
+  return { ...document, messagingConnections: [], webProviders: (document.webProviders ?? []).map(({ credentialRef, ...provider }) => ({
     ...provider, settings: {}, secretRefs: credentialRef ? { apiKey: credentialRef } : {},
   })) };
 }
@@ -116,6 +121,7 @@ export class ConfigurationStore {
     const next = structuredClone(this.document);
     const { id } = input;
     switch (input.kind) {
+      case "messaging": upsert(next.messagingConnections, input.id, { ...input.value, secretRefs: input.secretRefs }); break;
       case "webProvider": upsert(next.webProviders, input.id, { ...input.value, secretRefs: input.secretRefs }); break;
       case "modelProvider":
         upsert(next.modelProviders, id, { ...input.value, credentialRef: input.credentialRef });
@@ -162,6 +168,7 @@ export class ConfigurationStore {
     const next = structuredClone(this.document);
     // Delete the provider and its models in one save without changing saved session selections.
     switch (kind) {
+      case "messaging": next.messagingConnections = next.messagingConnections.filter(item => item.id !== id); break;
       case "webProvider": next.webProviders = next.webProviders.filter(item => item.id !== id); break;
       case "modelProvider": next.modelProviders = next.modelProviders.filter(item => item.id !== id); next.models = next.models.filter(item => item.providerId !== id); break;
       case "model": next.models = next.models.filter(item => modelReference(item) !== id); break;

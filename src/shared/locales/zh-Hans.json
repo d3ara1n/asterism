@@ -862,5 +862,22 @@
   "home.entryTitle": "会话入口",
   "home.entrySummary": "从首页开始工作时使用的插件界面。",
   "home.entryFailed": "{plugin_name} 无法显示会话入口。",
-  "home.retry": "重试"
+  "home.retry": "重试",
+  "messaging.title": "通信",
+  "messaging.hint": "配置用于外部对话的通信身份。",
+  "messaging.add": "添加连接",
+  "messaging.edit": "通信连接",
+  "messaging.name": "连接名称",
+  "messaging.provider": "提供商",
+  "messaging.enabled": "启用",
+  "messaging.restart": "重新连接",
+  "messaging.remove": "删除连接？",
+  "messaging.removeHint": "移除此连接及保存的凭据。已有对话资源仍保留其引用。",
+  "messaging.empty": "添加通信连接以使用外部对话。",
+  "messaging.unavailable": "提供商不可用",
+  "messaging.disabled": "已停用",
+  "messaging.connecting": "连接中",
+  "messaging.connected": "已连接",
+  "messaging.failed": "连接失败",
+  "messaging.reconnecting": "重新连接中"
 }

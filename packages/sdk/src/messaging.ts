@@ -1,0 +1,71 @@
+import { z } from "zod";
+import { uiTextSchema } from "./i18n.ts";
+import { providerSettingsSchema } from "./provider-settings.ts";
+
+const id = z.string().min(1);
+export const messagingProviderTypeSchema = z.strictObject({
+  id, owner: id, label: uiTextSchema, settings: providerSettingsSchema,
+});
+export const messagingConnectionSchema = z.strictObject({
+  id, providerId: id, name: z.string().trim().min(1).max(160), enabled: z.boolean(),
+  settings: z.record(z.string(), z.string()),
+});
+/**
+ * Connection runtime state. Reconnecting retains the last identity and reports the failure being retried;
+ * failed is terminal until the configuration changes or the user reconnects.
+ */
+export const messagingConnectionStatusSchema = z.enum(["disabled", "unavailable", "connecting", "connected", "reconnecting", "failed"]);
+export const messagingConnectionInfoSchema = messagingConnectionSchema.omit({ settings: true }).extend({
+  status: messagingConnectionStatusSchema,
+  identity: z.string().optional(), error: z.string().optional(),
+});
+/** Provider-owned addresses and cursors are opaque to the host. */
+export const conversationAddressSchema = z.strictObject({
+  conversationId: id, threadId: id.optional(),
+});
+export const conversationSchema = conversationAddressSchema.extend({
+  title: z.string(), kind: z.string(), activity: z.string().optional(),
+  change: z.enum(["discovered", "messages"]).optional(),
+});
+/**
+ * A sender's relation to the connection: self is the connection's own identity, participant is another party,
+ * and system is content produced by the platform rather than authored by a party.
+ */
+export const messageSenderRoleSchema = z.enum(["self", "participant", "system"]);
+export const messageSenderSchema = z.strictObject({ id, name: z.string(), role: messageSenderRoleSchema });
+export const messageSchema = z.strictObject({
+  id, sender: messageSenderSchema, text: z.string(),
+  sentAt: z.string(), replyTo: id.optional(), threadId: id.optional(),
+});
+export const conversationQuerySchema = z.strictObject({ since: id.optional() });
+export const conversationListSchema = z.strictObject({
+  conversations: z.array(conversationSchema), cursor: id.optional(), truncated: z.boolean(),
+});
+export const messageQuerySchema = conversationAddressSchema.extend({
+  since: id.optional(), limit: z.number().int().positive().optional(),
+});
+export const messageListSchema = z.strictObject({
+  messages: z.array(messageSchema), cursor: id.optional(), truncated: z.boolean(),
+});
+export const sendMessageSchema = conversationAddressSchema.extend({
+  text: z.string().min(1), replyTo: id.optional(),
+});
+export const messagingEventSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("conversation.discovered"), conversation: conversationSchema }),
+  z.strictObject({ kind: z.literal("message.received"), conversation: conversationSchema, message: messageSchema }),
+]);
+export type MessagingProviderType = z.infer<typeof messagingProviderTypeSchema>;
+export type MessagingConnection = z.infer<typeof messagingConnectionSchema>;
+export type MessagingConnectionStatus = z.infer<typeof messagingConnectionStatusSchema>;
+export type MessagingConnectionInfo = z.infer<typeof messagingConnectionInfoSchema>;
+export type ConversationAddress = z.infer<typeof conversationAddressSchema>;
+export type MessagingConversation = z.infer<typeof conversationSchema>;
+export type MessageSenderRole = z.infer<typeof messageSenderRoleSchema>;
+export type MessagingMessage = z.infer<typeof messageSchema>;
+export type ConversationQuery = z.infer<typeof conversationQuerySchema>;
+export type ConversationList = z.infer<typeof conversationListSchema>;
+export type MessageQuery = z.infer<typeof messageQuerySchema>;
+export type MessageList = z.infer<typeof messageListSchema>;
+export type SendMessage = z.infer<typeof sendMessageSchema>;
+export type MessagingEvent = z.infer<typeof messagingEventSchema>;
+export type ConnectionEvent = { connectionId: string; event: MessagingEvent };

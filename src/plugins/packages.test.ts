@@ -90,6 +90,17 @@ describe("Plugin packages", () => {
     expect(loaded.map(item => [item.manifest?.id, item.status])).toEqual([["acme.a", "ready"], ["acme.b", "disabled"]]);
     expect(loaded[0]!.definition?.namespace.id).toBe("acme.a");
   });
+  it("bundles extensionless JavaScript imports ending in .node instead of treating them as native binaries", async () => {
+    const root = temp(), data = temp();
+    pkg(root, { id: "acme.platform", runtime: "src/runtime.ts" },
+      `import { identity } from "./bridge.cjs";\n${runtime("acme.platform")}\nif (identity !== "javascript") throw new Error("Wrong platform module.");`);
+    writeFileSync(join(root, "src/bridge.cjs"), 'exports.identity = require("./platform.node").identity;');
+    writeFileSync(join(root, "src/platform.node.js"), 'exports.identity = "javascript";');
+    const list = new PackageList(join(data, "plugins.json"));
+    list.add({ source: { kind: "path", path: root } }, data);
+    const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
+    expect(loaded!.status, loaded!.diagnostic?.message).toBe("ready");
+  });
   it("rejects imported test sources before executing them while loading unrelated plugins", async () => {
     const data = temp(), broken = temp(), healthy = temp();
     pkg(broken, { id: "acme.test-import", runtime: "src/runtime.ts" },

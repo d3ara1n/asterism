@@ -122,6 +122,13 @@ export async function compileModules(packages: readonly PackageModule[], enabled
     const roots = [...packages].sort((a, b) => b.root.length - a.root.length);
     const pluginOwner = (path: string) => roots.find(pkg => pathWithin(pkg.root, path) !== null);
     const resolver = (realm: ModuleRealm, entry?: PackageModule): Plugin => ({ name: "asterism-public-modules", setup(build) {
+      if (realm === "runtime") build.onResolve({ filter: /\.node$/ }, async args => {
+        if (args.pluginData?.nativeResolution) return;
+        const resolved = await build.resolve(args.path, { kind: args.kind, resolveDir: args.resolveDir,
+          pluginData: { ...args.pluginData, nativeResolution: true } });
+        if (resolved.errors.length || !resolved.path.endsWith(".node")) return resolved;
+        return { path: unpackedArchivePath(resolved.path) ?? resolved.path, external: true };
+      });
       const depend = (source: PackageModule | undefined, provider: string) => {
         for (const consumer of [source, entry]) if (consumer && consumer.id !== provider) {
           for (const map of [result.dependencies, realm === "runtime" ? result.runtimeDependencies : result.rendererDependencies]) {
@@ -181,7 +188,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
       outExtension: { ".js": ".mjs" }, bundle: true, splitting: true, format: "esm", write: false,
       platform: realm === "runtime" ? "node" : "browser", target: realm === "runtime" ? "node22" : "chrome130",
       logLevel: "silent", sourcemap: "linked", metafile: true,
-      ...(realm === "runtime" ? { external: ["*.node"], banner: { js: "import { createRequire as __asterismCreateRequire } from 'node:module'; const require = __asterismCreateRequire(import.meta.url);" } }
+      ...(realm === "runtime" ? { banner: { js: "import { createRequire as __asterismCreateRequire } from 'node:module'; const require = __asterismCreateRequire(import.meta.url);" } }
         : { jsx: "automatic", loader: {
           ".png": "file", ".jpg": "file", ".jpeg": "file", ".gif": "file", ".webp": "file", ".avif": "file", ".svg": "file", ".ico": "file",
           ".woff": "file", ".woff2": "file", ".ttf": "file", ".otf": "file", ".eot": "file",
