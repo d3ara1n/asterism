@@ -13,10 +13,11 @@ type ReadProps = ToolRenderProps<z.infer<typeof SkillRead.schema>>;
 type RefreshProps = ToolRenderProps<z.infer<typeof SkillRefresh.schema>>;
 
 function SkillReadHeader({ args, result }: ReadProps) {
+  const i18n = useI18n();
   const name = result?.data?.name ?? inputText(args, "name") ?? "";
   const path = result?.data?.path ?? inputText(args, "path") ?? "SKILL.md";
   const offset = inputField(args, "offset"), limit = inputField(args, "limit");
-  return <ToolHeader label={name} subject={path} monospace
+  return <ToolHeader label={i18n.text(skillsMessages.read)} subject={[name, path].filter(Boolean).join(" / ")} monospace
     meta={`offset ${typeof offset === "number" ? offset : 1} · limit ${typeof limit === "number" ? limit : 1000}`} />;
 }
 function SkillReadBody({ result }: ReadProps) {
