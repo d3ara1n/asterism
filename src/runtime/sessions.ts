@@ -655,6 +655,9 @@ export class SessionService {
     this.tree.cursor(sessionId);
     if (this.archiving.has(sessionId)) throw new SessionError("conflict", "This session is already being archived.");
     this.archiving.add(sessionId);
+    // End view delivery before disposal invalidates resource instances used by projections.
+    this.watching.delete(sessionId);
+    this.updates.delete(sessionId);
     try {
       for (const [key, controller] of this.creating) if (key.startsWith(`${sessionId}/`)) controller.abort();
       const creations = [...this.pendingCreations.values()].filter(pending => pending.sessionId === sessionId);
@@ -662,8 +665,6 @@ export class SessionService {
       await Promise.allSettled(creations.map(pending => pending.done));
       await this.releasePlugins(sessionId);
       this.tree.archive(sessionId);
-      this.watching.delete(sessionId);
-      this.updates.delete(sessionId);
     } finally { this.archiving.delete(sessionId); }
   }
   async close(): Promise<void> {

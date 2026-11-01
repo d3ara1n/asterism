@@ -912,7 +912,7 @@ describe("Agent resource operation entries", () => {
 
 // Lifetime contract: archival, restoration, and exit share object scopes; archived sessions are absent from plugin catalogs and session reads.
 describe("Object lifetimes and session archival", () => {
-  it("archival ends object scopes and removes them from plugin catalogs, restoration reattaches, and exit ends them again", async () => {
+  it("archival stops watched projections before ending object scopes, and restoration reattaches them", async () => {
     const probe = pluginNamespace("test.lifetime");
     const Probe = probe.resource("probe", z.strictObject({}));
     const CreateProbe = defineCreation(Probe, { id: probe.name("create"), schema: z.null() });
@@ -922,7 +922,11 @@ describe("Object lifetimes and session archival", () => {
       context = plugin;
       return { resources: [implementResource(Probe, probe.data("view", z.null()), {
         creation: implementCreation(CreateProbe, { create: () => ({ title: "Probe", data: {} }) }),
-        project: () => null, inspect: async () => null,
+        project: () => {
+          if (signal?.aborted) throw new Error("The resource instance has ended.");
+          return null;
+        },
+        inspect: async () => null,
         attach(_data, object, scope) {
           events.push(`attach:${object.ref.id}`); signal = scope.signal;
           scope.defer(() => { events.push(`end:${object.ref.id}`); });
@@ -932,6 +936,7 @@ describe("Object lifetimes and session archival", () => {
     const { app, sessionId } = open({ plugins: [lifetime] });
     const { id } = await context.session(sessionId).create(CreateProbe, null);
     expect(events).toEqual([`attach:${id}`]);
+    await app.sessions.execute({ type: "watch", sessionId });
 
     await app.sessions.execute({ type: "archive", sessionId });
     expect(events).toEqual([`attach:${id}`, `end:${id}`]);
