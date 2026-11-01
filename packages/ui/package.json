@@ -6,6 +6,7 @@
   "exports": {
     "./error-display": "./src/error-display.ts",
     "./mcp-status": "./src/mcp-status.tsx",
+    "./use-settings-action": "./src/use-settings-action.ts",
     "./use-lifetime": "./src/use-lifetime.ts",
     "./tool-header": "./src/tool-header.tsx",
     "./streaming-preview": "./src/streaming-preview.tsx",

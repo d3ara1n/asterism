@@ -16,7 +16,7 @@ import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
-import { useSettingsConfiguration } from "../configuration/state";
+import { useMcpSettings } from "../configuration/state";
 import { PluginIslandProvider } from "../plugins/scope";
 import { SaveMcpServer, ReadMcpCredentials, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, AuthorizeMcpServer, DisconnectMcpServer, ResetMcpAuth,
   type McpServerConfig, type McpServerState, type McpCredentialUpdate } from "@asterism-app/sdk/contracts";
@@ -33,14 +33,14 @@ const islandKey = (serverId: string | null) => `mcp:${serverId ?? "new"}`;
 
 /** The settings page shows the shared read status; the body waits for the snapshot. */
 export function McpSettings() {
-  const { snapshot } = useSettingsConfiguration();
-  return snapshot && <PluginIslandProvider pluginId="asterism.host" page><McpSettingsBody /></PluginIslandProvider>;
+  const settings = useMcpSettings();
+  return settings && <PluginIslandProvider pluginId="asterism.host" page><McpSettingsBody /></PluginIslandProvider>;
 }
 /** Rendered only below a loaded configuration snapshot. */
 function useMcpServers() {
-  const { snapshot } = useSettingsConfiguration();
-  if (!snapshot) throw new Error("MCP settings render after the configuration snapshot loads.");
-  return snapshot.mcp.servers;
+  const settings = useMcpSettings();
+  if (!settings) throw new Error("MCP settings render after the configuration snapshot loads.");
+  return settings.servers;
 }
 
 /** The backend owns expiration; this clock only renders its remaining time. */

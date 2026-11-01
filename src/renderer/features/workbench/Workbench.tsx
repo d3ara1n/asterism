@@ -1,6 +1,6 @@
 import { RendererNavigationProvider, type DropItem } from "@asterism-app/sdk/renderer";
 import { SmartEdgeProvider, type SmartEdgeProviderOptions } from "@tisoap/react-flow-smart-edge";
-import { ReactFlowProvider, ReactFlow, Panel, useReactFlow, applyNodeChanges, applyEdgeChanges, ConnectionMode, ConnectionLineType, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
+import { ReactFlowProvider, ReactFlow, useReactFlow, applyNodeChanges, applyEdgeChanges, ConnectionMode, ConnectionLineType, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
 import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 
@@ -32,7 +32,7 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
 import { ObjectsPanel } from "./ObjectsPanel";
 import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents";
-import { WorkbenchBackground } from "./WorkbenchSurface";
+import { WorkbenchBackground, WorkbenchFooter } from "./WorkbenchSurface";
 
 const nodeTypes = { object: ObjectNode };
 const connectionLineTypes = { default: ConnectionLineType.Bezier, step: ConnectionLineType.Step, smoothstep: ConnectionLineType.SmoothStep };
@@ -230,7 +230,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
     <p className="type-body">{i18n.formatMessage(workbenchMessages.dropHint)}</p></div>}
   <SmartEdgeProvider nodes={routingNodes} options={routingOptions}><ReactFlow<ObjectNodeType, WorkbenchEdge>
-    colorMode={scheme} style={handleSizeVariables} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={linkEdgeTypes} onNodesChange={onNodesChange}
+    proOptions={{ hideAttribution: true }} colorMode={scheme} style={handleSizeVariables} nodes={canvasNodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={linkEdgeTypes} onNodesChange={onNodesChange}
     defaultViewport={session.viewport} minZoom={minZoom} maxZoom={maximumViewportZoom}
     nodesDraggable nodesConnectable={writable} connectionMode={ConnectionMode.Loose} edgesReconnectable={false} isValidConnection={isValidConnection}
     connectionLineType={connectionLineTypes[edgeStyle]}
@@ -240,7 +240,7 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
     onMoveEnd={(event, viewport) => { if (event) void run({ type: "viewport.set", sessionId: session.id, viewport }); }}
   >
     <WorkbenchBackground />
-    <ViewControls session={session} run={run} canvas={canvas} objects={nodes.map(node => node.id)} selected={nodes.filter(node => node.selected).map(node => node.id)} />
+    <WorkbenchFooter><ViewControls session={session} run={run} canvas={canvas} objects={nodes.map(node => node.id)} selected={nodes.filter(node => node.selected).map(node => node.id)} /></WorkbenchFooter>
   </ReactFlow></SmartEdgeProvider></div>;
 }
 
@@ -260,8 +260,8 @@ function ViewControls({ session, run, canvas, objects, selected }: { session: Wo
     [i18n.formatMessage(commonMessages.fitObjects), Maximize, () => canvas.locateObjects(objects)],
     ...(selected.length ? [[i18n.formatMessage(objectsMessages.focusSelection), Crosshair, () => canvas.locateObjects(selected)] as const] : []),
   ] as const;
-  return <Panel position="bottom-right" className="surface flex flex-col p-0.5">
+  return <div className="surface pointer-events-auto flex flex-col p-0.5">
     {controls.map(([label, Icon, action], index) =>
       <IconButton key={index} label={label} onClick={() => { void action(); }}><Icon /></IconButton>)}
-  </Panel>;
+  </div>;
 }

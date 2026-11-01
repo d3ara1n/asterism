@@ -4,14 +4,11 @@ import type { ConfigurationService } from "./service.ts";
 /** Plugin-facing view of configured model providers; credentials are read at request time. */
 export function createModelProviderServices(configuration: ConfigurationService): ModelProviderServices {
   const connection = (id: string) => {
-    const provider = configuration.current().modelProviders.find(item => item.id === id);
-    if (!provider) return null;
-    const { credentialState: _state, ...value } = provider;
-    return value;
+    return configuration.modelProviders().find(item => item.id === id) ?? null;
   };
   return {
     presets: () => configuration.extensions.presets(),
-    list: () => configuration.current().modelProviders.map(({ credentialState: _state, ...value }) => value),
+    list: () => configuration.modelProviders(),
     get: connection,
     credential: async (id, options) => {
       options?.signal?.throwIfAborted();

@@ -1,6 +1,10 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const workbenchMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  linkLegend: {
+    id: "workbench.linkLegend",
+    defaultMessage: "Connections grant access. Arrows point to the recipient.",
+  },
   layout: { id: "workbench.layout", defaultMessage: "Layout" },
   arrange: { id: "workbench.arrange", defaultMessage: "Arrange" },
   arranging: { id: "workbench.arranging", defaultMessage: "Arranging…" },

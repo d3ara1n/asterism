@@ -11,7 +11,7 @@ import { formatNumberText, limitNumber, parseNumberText, stepNumber } from "../n
  * When value is null, emptyLabel appears as placeholder text and is read by assistive technology as the current value.
  */
 function NumberInput({
-  value, defaultValue, onValueChange, min, max, step = 1, precision = 2, unit, emptyLabel, locale, label, resetLabel, className,
+  value, defaultValue, onValueChange, min, max, step = 1, precision = 2, unit, emptyLabel, locale, label, resetLabel, readOnly = false, className,
 }: {
   value: number | null
   /** Target value for clearing and restoring; null returns to the emptyLabel state. */
@@ -27,31 +27,31 @@ function NumberInput({
   locale: string
   label: string
   resetLabel: string
+  /** Pause changes while preserving focus and consuming arrow keys. */
+  readOnly?: boolean
   className?: string
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null)
-  // Display the new value immediately after submission without waiting for the external save round trip.
-  const [current, setCurrent] = React.useState(value)
-  React.useEffect(() => { setCurrent(value) }, [value])
   const [editing, setEditing] = React.useState<string | null>(null)
 
-  const formatted = current === null ? "" : formatNumberText(current, locale)
+  // Submitted values remain controlled by the owner; a failed save leaves the displayed value unchanged.
+  const formatted = value === null ? "" : formatNumberText(value, locale)
   const text = editing ?? formatted
 
   const apply = (next: number | null) => {
-    setCurrent(next)
     if (next !== value) onValueChange(next)
   }
   const commit = () => {
-    if (editing === null) return
+    if (readOnly || editing === null) return
     const parsed = parseNumberText(editing)
     setEditing(null)
     if (parsed === undefined) return
     apply(parsed === null ? defaultValue : limitNumber(parsed, min, max, precision))
   }
   const nudge = (direction: 1 | -1, event: React.KeyboardEvent) => {
+    if (readOnly) return
     const amount = event.altKey ? step / 10 : event.shiftKey ? step * 10 : step
-    const typed = editing === null ? current : parseNumberText(editing)
+    const typed = editing === null ? value : parseNumberText(editing)
     // Empty values step from defaultValue; without a numeric default, they start from the lower bound.
     const base = typeof typed === "number" ? typed : defaultValue ?? min
     setEditing(null)
@@ -65,9 +65,9 @@ function NumberInput({
   )}>
     <input ref={inputRef} type="text" inputMode="decimal" role="spinbutton" spellCheck={false} autoComplete="off"
       aria-label={label} aria-valuemin={min} aria-valuemax={max}
-      aria-valuenow={current ?? undefined}
-      aria-valuetext={current === null ? emptyLabel : unit ? `${formatted} ${unit}` : undefined}
-      value={text} placeholder={emptyLabel}
+      aria-valuenow={value ?? undefined}
+      aria-valuetext={value === null ? emptyLabel : unit ? `${formatted} ${unit}` : undefined}
+      value={text} placeholder={emptyLabel} readOnly={readOnly}
       className="h-full min-w-0 flex-1 bg-transparent pl-2.5 text-sm tabular-nums outline-none placeholder:text-muted-foreground"
       onFocus={event => event.currentTarget.select()}
       onChange={event => setEditing(event.currentTarget.value)}
@@ -78,8 +78,8 @@ function NumberInput({
         else if (event.key === "Escape" && editing !== null) { event.preventDefault(); event.stopPropagation(); setEditing(null) }
         else if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); nudge(event.key === "ArrowUp" ? 1 : -1, event) }
       }} />
-    {unit && (editing !== null || current !== null) && <span aria-hidden="true" className="pr-1.5 text-xs text-muted-foreground">{unit}</span>}
-    {current !== defaultValue && editing === null && <IconButton size="icon-xs" label={resetLabel} className="mr-0.5 text-muted-foreground"
+    {unit && (editing !== null || value !== null) && <span aria-hidden="true" className="pr-1.5 text-xs text-muted-foreground">{unit}</span>}
+    {value !== defaultValue && editing === null && <IconButton size="icon-xs" label={resetLabel} disabled={readOnly} className="mr-0.5 text-muted-foreground"
       onClick={() => { apply(defaultValue); inputRef.current?.focus() }}><RotateCcw /></IconButton>}
   </div>
 }

@@ -1,16 +1,16 @@
-import { randomUUID } from "node:crypto";
 import { configurationCommandSchema, createModelInput, modelReference, modelProviderSchema, resolveProviderModel,
-  type ConfigurationCommand, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ProviderModel, type ModelParameterUpdate } from "../shared/configuration.ts";
+  type ConfigurationCommand, type ConfigurationSnapshot, type ModelProvider, type ModelParameterUpdate } from "../shared/configuration.ts";
 import type { SecretProtector } from "../shared/secrets.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
 import { ConfigurationError } from "./errors.ts";
-import { ConfigurationStore, type ConfigurationKind, type StoredModelProvider } from "./store.ts";
+import { ConfigurationStore, type StoredModelProvider } from "./store.ts";
 import { CredentialVault } from "./credentials.ts";
-import { classifyProbeError, runConnectionProbe, type ConnectionProbe } from "./probe.ts";
+import { runConnectionProbe, type ConnectionProbe } from "./probe.ts";
 import { discoverModels, ModelDiscoveries, type DiscoverModels } from "./discovery.ts";
 import { loadModelCatalog, modelParameters, type LoadModelCatalog } from "./model-catalog.ts";
 import { modelCatalogMessages } from "../shared/model-catalog-messages.ts";
 import { ModelProviderExtensions } from "./provider-extensions.ts";
+import { ModelConnectionTests } from "./connection-tests.ts";
 import { WebProviderRegistry } from "./web-providers.ts";
 import { WebError } from "@asterism-app/sdk/runtime";
 
@@ -44,13 +44,14 @@ export class ConfigurationService {
   private storageAvailable = false;
   private readonly discoveries: ModelDiscoveries;
   private readonly shutdown = new AbortController();
-  private tests = new Map<string, { value: ConnectionTest; controller: AbortController; timer: ReturnType<typeof setTimeout>; started: number }>();
+  private readonly tests: ModelConnectionTests;
   constructor(root: string, protector: SecretProtector, private readonly onChanged: () => void = () => {},
-    private readonly probe: ConnectionProbe = runConnectionProbe, private readonly testTimeoutMs = 30_000,
+    probe: ConnectionProbe = runConnectionProbe, testTimeoutMs = 30_000,
     discover: DiscoverModels = discoverModels, private readonly catalog: LoadModelCatalog = loadModelCatalog) {
     this.store = new ConfigurationStore(root);
     this.vault = new CredentialVault(root, protector);
     this.discoveries = new ModelDiscoveries(onChanged, discover, testTimeoutMs);
+    this.tests = new ModelConnectionTests(onChanged, probe, testTimeoutMs);
   }
   execute(raw: unknown): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate }> {
     const parsed = configurationCommandSchema.safeParse(raw);
@@ -118,9 +119,17 @@ export class ConfigurationService {
   }
   private provider(stored: StoredModelProvider): ModelProvider {
     const { credentialRef: ref, ...value } = stored;
-    const credentialState = stored.auth === "none" ? "not_required" : !ref || !this.vault.exists(ref) ? "missing"
-      : !this.storageAvailable ? "storage_unavailable" : this.vault.failures.has(ref) ? "decryption_failed" : "available";
+    const credentialState = this.credentialState(stored.auth, ref);
     return modelProviderSchema.parse({ ...value, credentialState });
+  }
+  /** Runtime consumers read only their domain; the settings snapshot remains a transport projection. */
+  modelProviders(): Omit<ModelProvider, "credentialState">[] {
+    this.assertOpen();
+    return this.store.list("modelProvider").map(({ credentialRef: _ref, ...value }) => value);
+  }
+  modelCatalog(): Pick<ConfigurationSnapshot, "modelProviders" | "models"> {
+    this.assertOpen();
+    return { modelProviders: this.store.list("modelProvider").map(provider => this.provider(provider)), models: this.store.list("model") };
   }
   private snapshot(): ConfigurationSnapshot {
     return {
@@ -133,10 +142,9 @@ export class ConfigurationService {
         return { ...state, credentialState: needsCredential ? this.credentialState("api_key", credentialRef) : "not_required" as const };
       }),
       webProviderTypes: this.web.types(),
-      modelProviders: this.store.list("modelProvider").map(provider => this.provider(provider)),
+      ...this.modelCatalog(),
       modelProviderPresets: this.extensions.presets(), usageProviders: this.extensions.usageProviders(),
-      models: this.store.list("model"),
-      tests: [...this.tests.values()].map(test => ({ ...test.value })), discoveries: this.discoveries.snapshot(), credentialStorageAvailable: this.storageAvailable,
+      tests: this.tests.snapshot(), discoveries: this.discoveries.snapshot(), credentialStorageAvailable: this.storageAvailable,
     };
   }
   private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" }>): Promise<string | null> {
@@ -169,7 +177,7 @@ export class ConfigurationService {
       return id;
     }
     if (command.type === "test.start") return this.startTest(command.model);
-    if (command.type === "test.cancel") { this.cancelTest(command.id); return command.id; }
+    if (command.type === "test.cancel") { this.tests.cancel(command.id); return command.id; }
     if (command.type === "discovery.start") {
       const stored = this.store.get("modelProvider", command.providerId);
       if (!stored) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
@@ -197,7 +205,7 @@ export class ConfigurationService {
     }
     if (command.type === "remove") {
       const { credentialRef } = this.store.remove(command.kind, command.id);
-      this.clearFinishedTests(command.kind, command.id);
+      this.tests.clear(command.kind, command.id);
       if (command.kind === "modelProvider") this.discoveries.clearProvider(command.id);
       if (credentialRef) this.removeCredential(credentialRef);
       return command.id;
@@ -207,7 +215,7 @@ export class ConfigurationService {
       case "model.save":
         if (!this.store.get("modelProvider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
         this.store.save({ kind: "model", id: command.id, value: command.value });
-        this.clearFinishedTests("model", command.id ?? modelReference(command.value));
+        this.tests.clear("model", command.id ?? modelReference(command.value));
         return modelReference(command.value);
       case "modelProvider.save": break;
     }
@@ -224,7 +232,7 @@ export class ConfigurationService {
       }
       this.assertOpen();
       this.store.save({ kind: "modelProvider", id: command.id, value: command.value, credentialRef: ref });
-      this.clearFinishedTests("modelProvider", command.id ?? id);
+      this.tests.clear("modelProvider", command.id ?? id);
     } catch (error) {
       if (newRef) this.removeCredential(newRef);
       if (error instanceof ConfigurationError) throw error;
@@ -241,72 +249,21 @@ export class ConfigurationService {
     try { this.vault.remove(ref); }
     catch { console.error("Unreferenced encrypted credential cleanup failed."); }
   }
-  private clearFinishedTests(kind: ConfigurationKind, id: string): void {
-    for (const [key, test] of this.tests) {
-      if (test.value.state !== "running" &&
-          (kind === "modelProvider" && test.value.providerId === id || kind === "model" && test.value.model === id))
-        this.tests.delete(key);
-    }
-  }
   private startTest(modelId: string): string {
-    const resolved = resolveProviderModel(this.snapshot(), modelId);
+    const resolved = resolveProviderModel(this.modelCatalog(), modelId);
     if (!resolved) throw new ConfigurationError("not_found", "The model or provider no longer exists or is disabled. Reload settings.");
     const { model, provider } = resolved;
-    const storedProvider = this.store.get("modelProvider", provider.id)!;
-    for (const [key, test] of this.tests) {
-      if (this.tests.size < 50) break;
-      if (test.value.state !== "running") this.tests.delete(key);
-    }
-    const id = randomUUID();
-    const controller = new AbortController();
-    const value: ConnectionTest = { id, providerId: provider.id, model: modelReference(model),
-      state: "running", startedAt: new Date().toISOString(), durationMs: null, error: null, message: null };
-    const timer = setTimeout(() => {
-      this.finishTest(id, { state: "failed", error: "timeout", message: "The connection test timed out." });
-      controller.abort();
-    }, this.testTimeoutMs);
-    this.tests.set(id, { value, controller, timer, started: performance.now() });
-    // Capture configuration and credentials when testing is requested; later edits do not change this request.
-    void this.runTest(id, provider, model, storedProvider.credentialRef, controller.signal);
-    return id;
-  }
-  private async runTest(id: string, provider: ModelProvider, model: ProviderModel, reference: string | null, signal: AbortSignal): Promise<void> {
-    let apiKey = "";
-    if (provider.auth === "api_key") {
-      try {
-        if (!reference || !this.storageAvailable) throw new Error("Credential is unavailable.");
-        apiKey = await this.vault.read(reference);
-      } catch {
-        this.finishTest(id, { state: "failed", error: "credential", message: "The credential is missing or cannot be decrypted. Enter it again in settings." });
-        return;
-      }
-    }
-    if (signal.aborted || this.closed) return;
-    try {
-      await this.probe({ provider, model, apiKey, signal });
-      this.finishTest(id, { state: "succeeded", error: null, message: "Connection succeeded." });
-    } catch (error) {
-      if (!signal.aborted) this.finishTest(id, { state: "failed", ...classifyProbeError(error) });
-    }
-  }
-  private finishTest(id: string, result: Pick<ConnectionTest, "state" | "error" | "message">): void {
-    const test = this.tests.get(id);
-    if (!test || test.value.state !== "running" || this.closed) return;
-    clearTimeout(test.timer);
-    Object.assign(test.value, result, { durationMs: Math.round(performance.now() - test.started) });
-    this.onChanged();
-  }
-  private cancelTest(id: string): void {
-    const test = this.tests.get(id);
-    if (!test) throw new ConfigurationError("not_found", "This connection test is no longer available.");
-    this.finishTest(id, { state: "cancelled", error: "cancelled", message: "Connection test cancelled." });
-    test.controller.abort();
+    const reference = this.store.get("modelProvider", provider.id)!.credentialRef;
+    return this.tests.start(provider, model, async () => {
+      if (!reference || !this.storageAvailable) throw new Error("Credential is unavailable.");
+      return this.vault.read(reference);
+    });
   }
   close(): void {
     this.closed = true;
     this.shutdown.abort();
     this.discoveries.close();
     this.providerListeners.clear();
-    for (const test of this.tests.values()) { clearTimeout(test.timer); test.controller.abort(); }
+    this.tests.close();
   }
 }

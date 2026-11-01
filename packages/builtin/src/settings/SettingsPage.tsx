@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Bot, Cpu, TextSelect } from "lucide-react";
 import { useI18n, useRendererConfiguration, type PluginSettingsPage } from "@asterism-app/sdk/renderer";
 import { BuiltinSettings, settingsMessages as messages } from "./contract";
@@ -7,7 +6,7 @@ import { Switch } from "@asterism-app/ui/ui/switch";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
-import { failureDisplay } from "@asterism-app/ui/error-display";
+import { useSettingsAction } from "@asterism-app/ui/use-settings-action";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { RolesSettings } from "../configuration/RolesSettings";
 import { AgentsSettings } from "../configuration/AgentsSettings";
@@ -18,14 +17,7 @@ import { agentsMessages } from "../messages/agents";
 function StreamingSettingsPage() {
   const i18n = useI18n();
   const config = useRendererConfiguration(BuiltinSettings);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<UiText | null>(null);
-  const save = async (work: () => Promise<void>) => {
-    setBusy(true); setError(null);
-    try { await work(); return true; }
-    catch (failure) { setError(failureDisplay(failure, messages.saveFailed)); return false; }
-    finally { setBusy(false); }
-  };
+  const { run: save, busy, error } = useSettingsAction(messages.saveFailed);
   const reset = () => config.save({ ...config.value, autoExpand: true, autoCollapse: true });
   const row = (key: "autoExpand" | "autoCollapse", label: UiText) => <Item key={key}>
     <ItemContent><ItemTitle>{i18n.text(label)}</ItemTitle></ItemContent>

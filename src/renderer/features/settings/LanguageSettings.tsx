@@ -3,25 +3,30 @@ import { useEffect, useState } from "react";
 
 import type { LanguageState } from "../../../shared/language";
 import { settingsMessages } from "../../messages/settings";
-import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { useSettingsAction } from "@asterism-app/ui/use-settings-action";
+import type { UiText } from "@asterism-app/sdk/contracts";
+import { ConfigurationActionError, ReadStatus } from "../configuration/forms";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism-app/ui/ui/select";
 import { Section, Row } from "./layout";
 
 export function LanguageSettings() {
   const i18n = useI18n();
   const [state, setState] = useState<LanguageState | null>(null);
-  const [busy, setBusy] = useState(false), [failed, setFailed] = useState(false);
+  const [readError, setReadError] = useState<UiText | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const { run, busy, error } = useSettingsAction(settingsMessages.languageSaveFailed);
   useEffect(() => {
     let active = true;
-    const stop = window.host.language.onChanged(value => { if (active) setState(value); });
-    void window.host.language.get().then(value => { if (active) setState(value); }).catch(() => { if (active) setFailed(true); });
+    const accept = (value: LanguageState) => { if (active) { setState(value); setReadError(null); } };
+    const stop = window.host.language.onChanged(accept);
+    void window.host.language.get().then(accept).catch(() => { if (active) setReadError(settingsMessages.languageLoadFailed); });
     return () => { active = false; stop(); };
-  }, []);
+  }, [attempt]);
   return <Section title={i18n.text(settingsMessages.languageTitle)}>
+    <ReadStatus loaded={!!state} error={readError} onRetry={() => { setReadError(null); setAttempt(value => value + 1); }} />
     <Row label={i18n.text(settingsMessages.languageLabel)} hint={i18n.text(settingsMessages.languageSummary)}>
       <Select value={state?.preference ?? "system"} disabled={!state || busy} onValueChange={preference => {
-        setBusy(true); setFailed(false);
-        void window.host.language.set(preference).then(setState).catch(() => setFailed(true)).finally(() => setBusy(false));
+        void run(async () => { setState(await window.host.language.set(preference)); setReadError(null); });
       }}>
         <SelectTrigger className="w-40" aria-label={i18n.text(settingsMessages.languageLabel)}><SelectValue /></SelectTrigger>
         <SelectContent>
@@ -31,6 +36,6 @@ export function LanguageSettings() {
         </SelectContent>
       </Select>
     </Row>
-    {failed && <Alert variant="destructive"><AlertDescription>{i18n.text(settingsMessages.languageSaveFailed)}</AlertDescription></Alert>}
+    <ConfigurationActionError error={error} />
   </Section>;
 }

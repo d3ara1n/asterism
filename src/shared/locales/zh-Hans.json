@@ -1,4 +1,7 @@
 {
+  "appearance.loadFailed": "无法加载外观设置。",
+  "appearance.saveFailed": "无法保存外观设置。",
+  "languageLoadFailed": "无法加载语言偏好。",
   "plugins.frontendFailed": "界面不可用",
   "plugins.frontendFailedHint": "界面未能初始化，已可用的后台服务仍在运行。",
   "plugins.partial": "界面部分初始化失败",
@@ -691,6 +694,7 @@
   "features_workbench_Workbench_1": "使用「添加」，或把内容拖到这里。",
   "features_workbench_Workbench_2": "松开以添加为资源",
   "workbench.syncing": "正在同步工作台…",
+  "workbench.linkLegend": "连线表示访问授权，箭头指向获得访问权的对象。",
   "workbench.layout": "布局",
   "workbench.arrange": "整理",
   "workbench.arranging": "正在整理…",

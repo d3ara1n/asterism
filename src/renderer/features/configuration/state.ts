@@ -1,9 +1,11 @@
 import { runtime } from "../../runtime";
 import { errorDisplay } from "../../../shared/error-display.ts";
 import type { UiText } from "@asterism-app/sdk/contracts";
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import type { ConfigurationCommand, ConfigurationResult, ConfigurationSnapshot } from "../../../shared/configuration";
 import { getI18n } from "../../shared/i18n";
+import { useSettingsAction } from "@asterism-app/ui/use-settings-action";
+import { errorMessages } from "@asterism-app/ui/error-display";
 import { toast } from "../../shared/toast";
 
 type ConfigurationOperation = Exclude<ConfigurationCommand, { type: "read" }>;
@@ -14,9 +16,11 @@ export function useConfiguration(active: boolean) {
   const [snapshot, setSnapshot] = useState<ConfigurationSnapshot | null>(null);
   const [readError, setReadError] = useState<UiText | null>(null);
   const load = useCallback(async () => {
-    const result = await runtime.configuration.execute({ type: "read" });
-    if (result.ok) { setSnapshot(result.snapshot); setReadError(null); }
-    else setReadError(errorDisplay(result.error));
+    try {
+      const result = await runtime.configuration.execute({ type: "read" });
+      if (result.ok) { setSnapshot(result.snapshot); setReadError(null); }
+      else setReadError(errorDisplay(result.error));
+    } catch { setReadError(errorMessages.unavailable); }
   }, []);
   useEffect(() => {
     if (!active) return;
@@ -26,7 +30,7 @@ export function useConfiguration(active: boolean) {
   }, [active, load]);
   const execute = useCallback(async (command: ConfigurationOperation): Promise<ConfigurationResult> => {
     const result = await runtime.configuration.execute(command);
-    if (result.ok) setSnapshot(result.snapshot);
+    if (result.ok) { setSnapshot(result.snapshot); setReadError(null); }
     return result;
   }, []);
   return { snapshot, readError, load, execute };
@@ -52,25 +56,25 @@ export function useSettingsConfiguration(): Pick<ConfigurationState, "snapshot" 
  */
 export function useConfigurationAction(feedback: "inline" | "toast") {
   const { execute } = useConfigurationContext();
-  const pending = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<UiText | null>(null);
+  const action = useSettingsAction(errorMessages.unavailable,
+    feedback === "toast" ? message => toast.error(getI18n().text(message)) : undefined);
   const run = async (command: ConfigurationOperation): Promise<ConfigurationSuccess | null> => {
-    if (pending.current) return null;
-    pending.current = true;
-    setBusy(true);
-    setError(null);
-    try {
+    const receipt = await action.run(async () => {
       const result = await execute(command);
-      if (result.ok) return result;
-      const message = errorDisplay(result.error);
-      if (feedback === "inline") setError(message);
-      else toast.error(getI18n().text(message));
-      return null;
-    } finally {
-      pending.current = false;
-      setBusy(false);
-    }
+      if (!result.ok) throw Object.assign(new Error(result.error.message), { display: errorDisplay(result.error) });
+      return result;
+    });
+    return receipt?.value ?? null;
   };
-  return { run, busy, error };
+  return { ...action, run };
+}
+
+/** Domain projections share the host transport without exposing unrelated configuration to their consumers. */
+export function useShellSettings() {
+  const { snapshot } = useConfigurationContext();
+  return snapshot?.shell ?? null;
+}
+export function useMcpSettings() {
+  const { snapshot } = useConfigurationContext();
+  return snapshot?.mcp ?? null;
 }

@@ -14,7 +14,7 @@ import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@asterism-app/ui/ui/item";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
 import { shellMessages as messages } from "@asterism-app/ui/messages/shell";
-import { useSettingsConfiguration, useConfigurationAction } from "../configuration/state";
+import { useShellSettings, useConfigurationAction } from "../configuration/state";
 import { PluginIslandProvider } from "../plugins/scope";
 import { defaultShellSettings } from "@asterism-app/sdk/contracts";
 import { ReadShellProfiles, shellPresets, shellSettingsSchema, type ShellSettings as Settings, type ShellProfile, type ShellProfileList } from "@asterism-app/sdk/contracts";
@@ -205,10 +205,10 @@ function ShellProfileEditor({ id: initialId, initial, onSaved }: { id: string; i
 
 /** Rendered only below a loaded configuration snapshot. */
 function useShellConfiguration() {
-  const { snapshot } = useSettingsConfiguration();
+  const settings = useShellSettings();
   const action = useConfigurationAction("inline");
-  if (!snapshot) throw new Error("Shell settings render after the configuration snapshot loads.");
-  return { value: snapshot.shell, error: action.error, busy: action.busy,
+  if (!settings) throw new Error("Shell settings render after the configuration snapshot loads.");
+  return { value: settings, error: action.error, busy: action.busy,
     save: async (value: Settings) => !!await action.run({ type: "shell.set", value }) };
 }
 function ShellSettingsBody() {
@@ -222,6 +222,6 @@ function ShellSettingsBody() {
 }
 /** The settings page shows the shared read status; the body waits for the snapshot. */
 export function ShellSettingsPage() {
-  const { snapshot } = useSettingsConfiguration();
-  return snapshot && <PluginIslandProvider pluginId="asterism.host" page><ShellSettingsBody /></PluginIslandProvider>;
+  const settings = useShellSettings();
+  return settings && <PluginIslandProvider pluginId="asterism.host" page><ShellSettingsBody /></PluginIslandProvider>;
 }

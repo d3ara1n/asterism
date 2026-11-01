@@ -1,6 +1,8 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const appearanceMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  loadFailed: { id: "appearance.loadFailed", defaultMessage: "Appearance settings could not be loaded." },
+  saveFailed: { id: "appearance.saveFailed", defaultMessage: "Appearance settings could not be saved." },
   jade: {
     id: "features_appearance_AppearanceSettings_1",
     defaultMessage: "Jade",

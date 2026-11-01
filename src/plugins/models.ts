@@ -48,7 +48,7 @@ export function resolveTarget(snapshot: Pick<ConfigurationSnapshot, "modelProvid
 
 export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): HostModels {
   // Refresh credential availability before requests; catalog reads synchronously use current configuration.
-  const current = () => configuration.current();
+  const current = () => configuration.modelCatalog();
   const resolve = async (target: ModelTarget, execute = true): Promise<ResolvedTarget> => {
     await configuration.execute({ type: "read" });
     const config = current();

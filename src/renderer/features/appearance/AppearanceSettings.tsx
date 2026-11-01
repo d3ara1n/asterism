@@ -13,7 +13,8 @@ import { ItemGroup, ItemSeparator, Item, ItemContent, ItemTitle, ItemDescription
 import { SwatchGroup, ColorSwatch, TileSwatch } from "@asterism-app/ui/ui/swatch";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { Section } from "../settings/layout";
-import { updateAppearance, useAppearance, useScheme } from "./state";
+import { ReadStatus } from "../configuration/forms";
+import { refreshAppearance, useAppearanceReadState, useAppearanceAction, useAppearance, useScheme } from "./state";
 
 const paletteMessages: Record<string, import("@asterism-app/sdk/contracts").UiMessage> = {
   tundra: appearanceMessages.paletteTundra, graphite: appearanceMessages.paletteGraphite, sky: appearanceMessages.paletteSky, ink: appearanceMessages.paletteInk,
@@ -47,14 +48,15 @@ const radiusCorner: Record<Appearance["radius"], string> = { none: "0px", sm: "3
 /** Terminal font size resets to its default; code font size resets to automatic, where arrow keys start from the default font size. */
 function FontSizeField({ kind, value }: { kind: "terminal" | "code"; value: number | null }) {
   const i18n = useI18n();
+  const { save, busy } = useAppearanceAction();
   const code = kind === "code";
-  return <NumberInput value={value} defaultValue={code ? null : defaultFontSize} {...fontSizeRange} unit="px" locale={i18n.locale}
+  return <NumberInput value={value} readOnly={busy} defaultValue={code ? null : defaultFontSize} {...fontSizeRange} unit="px" locale={i18n.locale}
     emptyLabel={code ? i18n.formatMessage(appearanceMessages.auto) : undefined}
     label={i18n.formatMessage(code ? appearanceMessages.codeFontSize : appearanceMessages.terminalFontSize)}
     resetLabel={i18n.formatMessage(code ? appearanceMessages.resetCodeFontSize : appearanceMessages.resetTerminalFontSize)}
     onValueChange={next => {
-      if (code) void updateAppearance({ codeFontSize: next });
-      else if (next !== null) void updateAppearance({ terminalFontSize: next });
+      if (code) void save({ codeFontSize: next });
+      else if (next !== null) void save({ terminalFontSize: next });
     }} />;
 }
 
@@ -97,16 +99,20 @@ function ConnectionPreview({ kind }: { kind: Appearance["edgeStyle"] }) {
 export function AppearanceSettings() {
   const i18n = useI18n();
   const appearance = useAppearance();
+  const read = useAppearanceReadState();
+  const { save, busy } = useAppearanceAction();
   const scheme = useScheme();
   const [picking, setPicking] = useState(false);
   return <div className="flex flex-col">
+    <ReadStatus loaded={read.ready} error={read.error} onRetry={() => void refreshAppearance()} />
+    <fieldset disabled={!read.ready || busy} className="flex min-w-0 flex-col border-0 p-0">
     <LivePreview appearance={appearance} />
 
     <Section title={i18n.formatMessage(appearanceMessages.color)} action={<Button size="sm" variant="outline" onClick={() => setPicking(true)}><Palette />{i18n.formatMessage(appearanceMessages.choosePalette)}</Button>}>
       <ItemGroup className="surface">
         <Row label={i18n.formatMessage(appearanceMessages.mode)} hint={i18n.formatMessage(appearanceMessages.modeHint)}>
           <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.modeLabel)} value={appearance.mode}
-            onValueChange={mode => mode && void updateAppearance({ mode: mode as Appearance["mode"] })}>
+            onValueChange={mode => mode && void save({ mode: mode as Appearance["mode"] })}>
             <ToggleGroupItem value="system" className="px-2.5"><Monitor />{i18n.formatMessage(appearanceMessages.system)}</ToggleGroupItem>
             <ToggleGroupItem value="light" className="px-2.5"><Sun />{i18n.formatMessage(appearanceMessages.light)}</ToggleGroupItem>
             <ToggleGroupItem value="dark" className="px-2.5"><Moon />{i18n.formatMessage(appearanceMessages.dark)}</ToggleGroupItem>
@@ -114,7 +120,7 @@ export function AppearanceSettings() {
         </Row>
         <ItemSeparator />
         <Row label={i18n.formatMessage(appearanceMessages.accentColor)} hint={getAccentLabels()[appearance.accent]}>
-          <SwatchGroup aria-label={i18n.formatMessage(appearanceMessages.accentColorLabel)} value={appearance.accent} onValueChange={accent => void updateAppearance({ accent: accent as AccentId })}>
+          <SwatchGroup aria-label={i18n.formatMessage(appearanceMessages.accentColorLabel)} value={appearance.accent} onValueChange={accent => void save({ accent: accent as AccentId })}>
             {accentIds.map(id => <ColorSwatch key={id} value={id} label={getAccentLabels()[id]} className="border-transparent">
               <span className="absolute inset-0" style={{ background: themeTokens({ ...appearance, accent: id }, scheme).primary }} />
             </ColorSwatch>)}
@@ -122,7 +128,7 @@ export function AppearanceSettings() {
         </Row>
         <ItemSeparator />
         <Row label={i18n.formatMessage(appearanceMessages.gray)} hint={getGrayLabels()[appearance.gray]}>
-          <SwatchGroup aria-label={i18n.formatMessage(appearanceMessages.grayLabel)} value={appearance.gray} onValueChange={gray => void updateAppearance({ gray: gray as GrayId })}>
+          <SwatchGroup aria-label={i18n.formatMessage(appearanceMessages.grayLabel)} value={appearance.gray} onValueChange={gray => void save({ gray: gray as GrayId })}>
             {grayIds.map(id => {
               const t = themeTokens({ ...appearance, gray: id }, scheme);
               return <ColorSwatch key={id} value={id} label={getGrayLabels()[id]}>
@@ -142,7 +148,7 @@ export function AppearanceSettings() {
       <ItemGroup className="surface">
         <Row label={i18n.formatMessage(appearanceMessages.cornerRadius)}>
           <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.cornerRadiusLabel)} value={appearance.radius}
-            onValueChange={radius => radius && void updateAppearance({ radius: radius as Appearance["radius"] })}>
+            onValueChange={radius => radius && void save({ radius: radius as Appearance["radius"] })}>
             {([["none", i18n.formatMessage(appearanceMessages.square)], ["sm", i18n.formatMessage(appearanceMessages.small)], ["md", i18n.formatMessage(appearanceMessages.medium)], ["lg", i18n.formatMessage(appearanceMessages.large)]] as const).map(([v, text]) =>
               <ToggleGroupItem key={v} value={v} aria-label={text} title={text} className="px-2.5">
                 <span aria-hidden="true" className="size-3.5 border-t-2 border-l-2 border-current" style={{ borderTopLeftRadius: radiusCorner[v] }} />
@@ -152,7 +158,7 @@ export function AppearanceSettings() {
         <ItemSeparator />
         <Row label={i18n.formatMessage(appearanceMessages.density)} hint={i18n.formatMessage(appearanceMessages.densityHint)}>
           <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.densityLabel)} value={appearance.density}
-            onValueChange={density => density && void updateAppearance({ density: density as Appearance["density"] })}>
+            onValueChange={density => density && void save({ density: density as Appearance["density"] })}>
             <ToggleGroupItem value="compact" className="px-2.5">{i18n.formatMessage(appearanceMessages.compact)}</ToggleGroupItem>
             <ToggleGroupItem value="standard" className="px-2.5">{i18n.formatMessage(appearanceMessages.standard)}</ToggleGroupItem>
             <ToggleGroupItem value="comfortable" className="px-2.5">{i18n.formatMessage(appearanceMessages.comfortable)}</ToggleGroupItem>
@@ -164,32 +170,32 @@ export function AppearanceSettings() {
     <Section title={i18n.formatMessage(appearanceMessages.fonts)} hint={i18n.formatMessage(appearanceMessages.fontsHint)}>
       <ItemGroup className="surface">
         <Row label={i18n.formatMessage(appearanceMessages.interfaceFont)}>
-          <FontPicker aria-label={i18n.formatMessage(appearanceMessages.interfaceFontLabel)} value={appearance.uiFont} onValueChange={uiFont => void updateAppearance({ uiFont })} {...getFontText()} />
+          <FontPicker aria-label={i18n.formatMessage(appearanceMessages.interfaceFontLabel)} value={appearance.uiFont} onValueChange={uiFont => void save({ uiFont })} {...getFontText()} />
         </Row>
         <ItemSeparator />
         <Row label={i18n.formatMessage(appearanceMessages.terminalFont)}>
           <FontSizeField kind="terminal" value={appearance.terminalFontSize} />
           <FontPicker aria-label={i18n.formatMessage(appearanceMessages.terminalFont)} monospaceOnly showAllLabel={i18n.formatMessage(appearanceMessages.showAllFonts)}
-            value={appearance.terminalFont} onValueChange={terminalFont => void updateAppearance({ terminalFont })} {...getFontText()} />
+            value={appearance.terminalFont} onValueChange={terminalFont => void save({ terminalFont })} {...getFontText()} />
         </Row>
         <ItemSeparator />
         <Row label={i18n.formatMessage(appearanceMessages.codeFont)}>
           <FontSizeField kind="code" value={appearance.codeFontSize} />
           <FontPicker aria-label={i18n.formatMessage(appearanceMessages.codeFontLabel)} monospaceOnly showAllLabel={i18n.formatMessage(appearanceMessages.showAllFonts)}
-            value={appearance.codeFont} onValueChange={codeFont => void updateAppearance({ codeFont })} {...getFontText()} />
+            value={appearance.codeFont} onValueChange={codeFont => void save({ codeFont })} {...getFontText()} />
         </Row>
       </ItemGroup>
     </Section>
 
     <Section title={i18n.formatMessage(appearanceMessages.canvas)} hint={i18n.formatMessage(appearanceMessages.canvasHint)}>
       <p className="type-label mb-2">{i18n.formatMessage(appearanceMessages.canvasTexture)}</p>
-      <SwatchGroup aria-label={i18n.formatMessage(appearanceMessages.canvasTexture)} value={appearance.canvas} onValueChange={canvas => void updateAppearance({ canvas: canvas as Appearance["canvas"] })}>
+      <SwatchGroup aria-label={i18n.formatMessage(appearanceMessages.canvasTexture)} value={appearance.canvas} onValueChange={canvas => void save({ canvas: canvas as Appearance["canvas"] })}>
         {([["dots", i18n.formatMessage(appearanceMessages.dots)], ["lines", i18n.formatMessage(appearanceMessages.grid)], ["cross", i18n.formatMessage(appearanceMessages.crosses)], ["none", i18n.formatMessage(appearanceMessages.none)]] as const).map(([v, text]) =>
           <TileSwatch key={v} value={v} label={text}><Texture kind={v} /></TileSwatch>)}
       </SwatchGroup>
       <p className="type-label mb-2 mt-4">{i18n.formatMessage(appearanceMessages.edgeStyle)}</p>
       <SwatchGroup aria-label={i18n.formatMessage(appearanceMessages.edgeStyle)} value={appearance.edgeStyle}
-        onValueChange={edgeStyle => void updateAppearance({ edgeStyle: edgeStyle as Appearance["edgeStyle"] })}>
+        onValueChange={edgeStyle => void save({ edgeStyle: edgeStyle as Appearance["edgeStyle"] })}>
         {([["default", appearanceMessages.edgeCurved], ["step", appearanceMessages.edgeStep], ["smoothstep", appearanceMessages.edgeSmoothStep]] as const).map(([value, label]) =>
           <TileSwatch key={value} value={value} label={i18n.formatMessage(label)}>
             <ConnectionPreview kind={value} />
@@ -197,6 +203,7 @@ export function AppearanceSettings() {
       </SwatchGroup>
     </Section>
 
+    </fieldset>
     <PaletteDialog open={picking} onOpenChange={setPicking} appearance={appearance} />
   </div>;
 }
@@ -246,6 +253,7 @@ function LivePreview({ appearance }: { appearance: Appearance }) {
 function PaletteDialog({ open, onOpenChange, appearance }: { open: boolean; onOpenChange: (open: boolean) => void; appearance: Appearance }) {
   const i18n = useI18n();
   const scheme = useScheme();
+  const { save, busy } = useAppearanceAction();
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent>
       <DialogHeader>
@@ -257,7 +265,7 @@ function PaletteDialog({ open, onOpenChange, appearance }: { open: boolean; onOp
           const t = themeTokens({ ...appearance, accent: palette.accent, gray: palette.gray }, scheme);
           const name = i18n.text(paletteMessages[palette.id]!);
           return <Item key={palette.id} asChild variant="outline" className="flex-col items-stretch gap-0 overflow-hidden bg-card p-0 text-left hover:border-ring/60"><button type="button"
-            onClick={() => { void updateAppearance({ accent: palette.accent, gray: palette.gray }); onOpenChange(false); }}>
+            disabled={busy} onClick={() => { void save({ accent: palette.accent, gray: palette.gray }).then(saved => { if (saved) onOpenChange(false); }); }}>
             {/* Miniature UI: background, cards, primary color bars, and secondary text bars. */}
             <span aria-hidden="true" className="flex h-16 gap-1.5 p-2" style={{ background: t.canvas }}>
               <span className="flex flex-1 flex-col gap-1 rounded-sm border p-1.5" style={{ background: t.card, borderColor: t.border }}>

@@ -287,7 +287,6 @@
 @keyframes startup-reveal { from { opacity: 0; } }
 @keyframes startup-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .startup-indicator { animation-duration: 2.4s; } }
-.react-flow__attribution { background: transparent !important; font-size: 9px !important; }
 /* xflow cursors derive entirely from state classes, independently of keys; workbench gestures are left-button box selection on empty space,
    middle/right-button panning, Space + left-button panning, and titlebar-only card dragging. Prefix selectors with .react-flow
    to reliably override xflow's own styles. */

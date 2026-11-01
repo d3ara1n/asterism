@@ -9,6 +9,7 @@ import { Spinner } from "@asterism-app/ui/ui/spinner";
 import {
   Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet, FieldTitle,
 } from "@asterism-app/ui/ui/field";
+import { useSettingsAction } from "@asterism-app/ui/use-settings-action";
 import { failureDisplay } from "@asterism-app/ui/error-display";
 import { networkPreferenceSchema, proxyAddress, type NetworkPreference, type NetworkState } from "../../../shared/network";
 import { networkMessages as messages } from "../../messages/network";
@@ -65,8 +66,7 @@ function ProxyEditor({ saved }: { saved: NetworkPreference }) {
   const i18n = useI18n(), island = useIsland(), id = useId();
   const [draft, setDraft] = useState(saved);
   const [serverInvalid, setServerInvalid] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<UiText | null>(null);
+  const { run, busy, error } = useSettingsAction(messages.saveFailed);
   const dirty = JSON.stringify(draft) !== JSON.stringify(saved);
   const form = `${id}-form`;
 
@@ -75,12 +75,7 @@ function ProxyEditor({ saved }: { saved: NetworkPreference }) {
     const next = draft.mode === "custom" ? draft : { ...draft, server: proxyAddress(draft.server) ?? saved.server };
     const parsed = networkPreferenceSchema.safeParse(next);
     if (!parsed.success) { setServerInvalid(true); return; }
-    setBusy(true); setError(null);
-    try {
-      await window.host.network.set(parsed.data);
-      void island.close({ force: true });
-    } catch (failure) { setError(failureDisplay(failure, messages.saveFailed)); }
-    finally { setBusy(false); }
+    if (await run(() => window.host.network.set(parsed.data))) void island.close({ force: true });
   };
 
   return <Editor title={i18n.text(messages.proxy)} form={form} dirty={dirty} busy={busy} error={error}>

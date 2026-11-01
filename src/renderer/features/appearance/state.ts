@@ -1,3 +1,8 @@
+import type { UiText } from "@asterism-app/sdk/contracts";
+import { useSettingsAction } from "@asterism-app/ui/use-settings-action";
+import { appearanceMessages } from "../../messages/appearance";
+import { getI18n } from "../../shared/i18n";
+import { toast } from "../../shared/toast";
 import { useSyncExternalStore } from "react";
 import { defaultAppearance, densityRootPx, fontStack, monoStack, sansStack, themeTokens, type Appearance, type AppearancePatch, type Scheme } from "../../../shared/theme";
 
@@ -9,6 +14,7 @@ let current: Appearance = defaultAppearance(window.host.platform);
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
 let scheme: Scheme = darkQuery.matches ? "dark" : "light";
 const listeners = new Set<() => void>();
+let readState: { ready: boolean; error: UiText | null } = { ready: false, error: null };
 
 function render() {
   const root = document.documentElement;
@@ -27,19 +33,19 @@ function render() {
 
 function apply(appearance: Appearance) {
   current = appearance;
+  readState = { ready: true, error: null };
   render();
 }
 
 export function startAppearance(): void {
   render();
   darkQuery.addEventListener("change", event => { scheme = event.matches ? "dark" : "light"; render(); });
-  void window.host.appearance.get().then(apply).catch(error => console.error("Appearance settings could not be loaded.", error));
   window.host.appearance.onChanged(apply);
+  void refreshAppearance();
 }
 
 export async function updateAppearance(patch: AppearancePatch): Promise<void> {
-  try { apply(await window.host.appearance.set(patch)); }
-  catch (error) { console.error("Appearance settings could not be saved.", error); }
+  apply(await window.host.appearance.set(patch));
 }
 
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
@@ -51,4 +57,21 @@ export function useAppearance(): Appearance {
 /** Currently resolved light/dark mode for components requiring an explicit mode, such as React Flow colorMode. */
 export function useScheme(): Scheme {
   return useSyncExternalStore(subscribe, () => scheme);
+}
+
+/** Default tokens remain usable during startup; settings expose read failures and retry explicitly. */
+export async function refreshAppearance(): Promise<void> {
+  try { apply(await window.host.appearance.get()); }
+  catch {
+    readState = { ...readState, error: appearanceMessages.loadFailed };
+    listeners.forEach(listener => listener());
+  }
+}
+export function useAppearanceReadState() {
+  return useSyncExternalStore(subscribe, () => readState);
+}
+/** Feedback belongs to the control entry, not the appearance store. */
+export function useAppearanceAction() {
+  const action = useSettingsAction(appearanceMessages.saveFailed, message => toast.error(getI18n().text(message)));
+  return { busy: action.busy, save: async (patch: AppearancePatch) => !!await action.run(() => updateAppearance(patch)) };
 }

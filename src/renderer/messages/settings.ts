@@ -1,6 +1,7 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const settingsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  languageLoadFailed: { id: "languageLoadFailed", defaultMessage: "The language preference could not be loaded." },
   settings: {
     id: "settings",
     defaultMessage: "Settings",
