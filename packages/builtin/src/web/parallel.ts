@@ -92,12 +92,16 @@ export const parallelWebProvider: WebProviderDefinition = {
         return parallelResponse(await client.search(options, { signal }), hints);
       },
       async fetch(request, { signal }) {
-        const response = parallelResponse(await client.extract({
+        const raw = await client.extract({
           urls: [request.url], ...(request.query && { objective: request.query }),
           advanced_settings: { full_content: request.maxCharacters === undefined ? true : { max_chars_per_result: request.maxCharacters } },
-        }, { signal }));
-        if (!response.documents.some(document => document.content.some(part => part.kind === "body")))
-          throw new WebError("request_failed", response.hints.map(hint => hint.message).join("\n") || "Parallel returned no page body for this URL.");
+        }, { signal });
+        const response = parallelResponse(raw);
+        if (!response.documents.some(document => document.content.some(part => part.kind === "body"))) {
+          const status = raw.errors?.find(error => error.url === request.url)?.http_status_code;
+          throw new WebError("request_failed", response.hints.map(hint => hint.message).join("\n") || "Parallel returned no page body for this URL.",
+            status != null && status >= 400 ? status : undefined);
+        }
         return response;
       },
     };

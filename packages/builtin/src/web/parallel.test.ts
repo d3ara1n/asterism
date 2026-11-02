@@ -85,8 +85,8 @@ describe("Parallel official SDK boundary", () => {
       .mockResolvedValueOnce(reply({ extract_id: "extract-2", results: [{ url: "https://page.test/", full_content: null, excerpts: ["Passage"] }], errors: [] })));
     const provider = parallelWebProvider.create({ settings: { apiKey: "test-key", mode: "advanced" } });
     const options = { signal: new AbortController().signal };
-    await expect(provider.fetch!({ url: "https://page.test/" }, options)).rejects.toMatchObject({ code: "request_failed", message: expect.stringContaining("fetch_failed (HTTP 403)") });
-    await expect(provider.fetch!({ url: "https://page.test/" }, options)).rejects.toMatchObject({ code: "request_failed", message: "Parallel returned no page body for this URL." });
+    await expect(provider.fetch!({ url: "https://page.test/" }, options)).rejects.toMatchObject({ code: "request_failed", sourceStatus: 403, message: expect.stringContaining("fetch_failed (HTTP 403)") });
+    await expect(provider.fetch!({ url: "https://page.test/" }, options)).rejects.toMatchObject({ code: "request_failed", sourceStatus: undefined, message: "Parallel returned no page body for this URL." });
   });
 
   // The SDK creates a transport signal; caller cancellation must reach it.

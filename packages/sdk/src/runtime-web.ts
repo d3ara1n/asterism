@@ -35,5 +35,6 @@ export interface WebServices {
 }
 export type WebErrorCode = "provider_unavailable" | "credential_unavailable" | "unsupported" | "invalid_request" | "protocol" | "request_failed";
 export class WebError extends Error {
-  constructor(readonly code: WebErrorCode, message: string) { super(message); }
+  /** sourceStatus identifies an HTTP failure of the requested page, never the provider API. */
+  constructor(readonly code: WebErrorCode, message: string, readonly sourceStatus?: number) { super(message); }
 }

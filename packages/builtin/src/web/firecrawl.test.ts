@@ -22,7 +22,9 @@ describe("Firecrawl search and scrape contracts", () => {
     expect(result.hints).toEqual([{ code: "provider_warning", message: "Partial results" }]);
     expect(() => firecrawlSearchResponse({ success: false, error: "Request rejected", code: "REJECTED" })).toThrow("REJECTED");
     expect(() => firecrawlFetchResponse({ success: true, data: { markdown: "# Not found", metadata: { statusCode: 404 } } }, "https://page.test/"))
-      .toThrow("HTTP 404");
+      .toThrow(expect.objectContaining({ code: "request_failed", sourceStatus: 404, message: expect.stringContaining("HTTP 404") }));
+    expect(() => firecrawlFetchResponse({ success: true, data: { metadata: { statusCode: 200, error: "Extraction failed." } } }, "https://page.test/"))
+      .toThrow(expect.objectContaining({ sourceStatus: undefined, message: expect.stringContaining("Extraction failed.") }));
     expect(() => firecrawlFetchResponse({ success: true, data: {} }, "https://page.test/")).toThrow("no page body");
   });
 

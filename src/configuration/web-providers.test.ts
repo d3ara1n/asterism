@@ -143,6 +143,81 @@ describe("Ordered web provider fallback", () => {
     });
   });
 
+  it("stops after matching source failures despite different provider diagnostics", async () => {
+    const next = vi.fn(async () => empty);
+    const web = registry([
+      provider("first", { create: () => ({ fetch: async () => { throw new WebError("request_failed", "Page not found.", 404); } }) }),
+      provider("second", { create: () => ({ fetch: async () => { throw new WebError("request_failed", "Unable to extract: HTTP 404.", 404); } }) }),
+      provider("unused", { create: () => ({ fetch: next }) }),
+    ]);
+    await expect(web.fetch({ url: "https://docs.test/missing" }, options())).rejects.toMatchObject({
+      code: "request_failed", sourceStatus: 404,
+      message: "Web provider fallback stopped after two consecutive identical failures. Web provider 'first' failed: Page not found. Web provider 'second' failed: Unable to extract: HTTP 404.",
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("stops search fallback on identical errors without a source status", async () => {
+    const next = vi.fn(async () => empty);
+    const web = registry([
+      ...["first", "second"].map(id => provider(id, { create: () => ({
+        search: async () => { throw new TypeError("fetch failed"); },
+      }) })),
+      provider("unused", { create: () => ({ search: next }) }),
+    ]);
+    await expect(web.search({ query: "query", maxResults: 5 }, options())).rejects.toThrow("two consecutive identical failures");
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("requires adjacent matches rather than accumulating earlier failures", async () => {
+    const calls: string[] = [];
+    const next = vi.fn(async () => empty);
+    const web = registry([
+      ...[404, 403, 404, 404].map((status, index) => provider(`attempt-${index}`, { create: () => ({
+        fetch: async () => { calls.push(`attempt-${index}`); throw new WebError("request_failed", `Failure ${index}.`, status); },
+      }) })),
+      provider("unused", { create: () => ({ fetch: next }) }),
+    ]);
+    await expect(web.fetch({ url: "https://docs.test/page" }, options())).rejects.toMatchObject({ sourceStatus: 404 });
+    expect(calls).toEqual(["attempt-0", "attempt-1", "attempt-2", "attempt-3"]);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { reason: "different messages sharing a broad error code",
+      first: new WebError("request_failed", "Quota exceeded."), second: new WebError("request_failed", "Service unavailable.") },
+    { reason: "different error codes sharing a message",
+      first: new WebError("protocol", "Failed."), second: new WebError("request_failed", "Failed.") },
+    { reason: "different error names sharing a message",
+      first: new TypeError("Failed."), second: new Error("Failed.") },
+    { reason: "different source statuses sharing a message",
+      first: new WebError("request_failed", "Page failed.", 403), second: new WebError("request_failed", "Page failed.", 404) },
+    { reason: "a source status and an unclassified HTTP diagnostic",
+      first: new WebError("request_failed", "HTTP 404", 404), second: new WebError("request_failed", "HTTP 404") },
+  ])("continues past $reason", async ({ first, second }) => {
+    const web = registry([
+      provider("first", { create: () => ({ fetch: async () => { throw first; } }) }),
+      provider("second", { create: () => ({ fetch: async () => { throw second; } }) }),
+      provider("success"),
+    ]);
+    const result = await web.fetch({ url: "https://docs.test/page" }, options());
+    expect(result.provider).toBe("success");
+    expect(result.hints).toHaveLength(2);
+  });
+
+  it("a credential resolution failure interrupts matching source failures", async () => {
+    const unavailable = () => ({ fetch: async () => { throw new WebError("request_failed", "Not found.", 404); } });
+    const web = registry([
+      provider("first", { create: unavailable }),
+      provider("key", { settings: [apiKey] }),
+      provider("third", { create: unavailable }),
+      provider("success"),
+    ]);
+    const result = await web.fetch({ url: "https://docs.test/page" }, options());
+    expect(result.provider).toBe("success");
+    expect(result.hints).toHaveLength(3);
+  });
+
   it("rejects invalid input and unmatched URLs before resolving providers", async () => {
     const create = vi.fn(() => ({ search: async () => empty, fetch: async () => empty }));
     const web = registry([provider("specific", { create, urlPatterns: ["https://docs.test/*"] })]);

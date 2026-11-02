@@ -65,7 +65,8 @@ export function firecrawlFetchResponse(raw: unknown, requestedUrl: string, query
     message: "Firecrawl does not provide focused excerpts alongside the page body." }] : []);
   const { markdown, metadata, ...extra } = parseWebResponse("Firecrawl", scrapeSchema, data);
   if (metadata?.error || (metadata?.statusCode !== undefined && metadata.statusCode >= 400))
-    throw new WebError("request_failed", `Firecrawl could not retrieve the page (HTTP ${metadata?.statusCode ?? "unknown"}): ${metadata?.error ?? "Page request failed."}`);
+    throw new WebError("request_failed", `Firecrawl could not retrieve the page (HTTP ${metadata?.statusCode ?? "unknown"}): ${metadata?.error ?? "Page request failed."}`,
+      metadata?.statusCode !== undefined && metadata.statusCode >= 400 ? metadata.statusCode : undefined);
   if (!markdown?.trim()) throw new WebError("request_failed", "Firecrawl returned no page body for this URL.");
   const finalUrl = webUrlSchema.safeParse(metadata?.url);
   return {

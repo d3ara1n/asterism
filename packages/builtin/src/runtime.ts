@@ -18,6 +18,7 @@ import { createTerminalModule } from "./terminal/runtime.ts";
 import { CreateTerminal } from "./terminal/contract.ts";
 import mcp from "./mcp/runtime.ts";
 import web from "./web/runtime.ts";
+import { CreateWeb } from "./web/contract.ts";
 import { SkillCatalog } from "./skills/catalog.ts";
 import { createSkillsModule } from "./skills/runtime.ts";
 import messaging, { messagingCreations } from "./messaging/runtime.ts";
@@ -60,6 +61,9 @@ export default definePlugin({ namespace: builtin,
         defineAgentCreation({ id: CreateManual.id, creation: CreateManual,
           description: "Open the Asterism manual for software use and plugin development. Provides list, find, grep, and read over application guides, public package examples, and documentation exposed by loaded plugins.",
           guidelines: [] }),
+        defineAgentCreation({ id: CreateWeb.id, creation: CreateWeb,
+          description: "Create a Web resource for web searches and URL content retrieval through the application's configured web providers.",
+          guidelines: ["Web resources share the application's provider configuration and priority order."] }),
         defineAgentCreation({ id: CreateTerminal.id, creation: CreateTerminal,
           description: "Create a shared interactive terminal. Its shell and screen remain available between tool calls and while viewing other sessions.",
           guidelines: ["The terminal runs as the current OS user. Input, screen observation and waiting for the shell are separate resource tools.",

@@ -58,7 +58,7 @@ The manual reads files directly from their source locations. Application updates
 
 ## Use network capabilities
 
-Configure web providers in **Settings → Providers**. Link a Web resource to the agent for searches and URL retrieval. Provider capabilities and URL matching determine the service used.
+Configure web providers in **Settings → Providers**. Link a Web resource to the agent for searches and URL retrieval, or let the agent create one through the resource creation tools with an optional title. Web resources share the application's provider configuration and priority order. Provider capabilities and URL matching determine the service used.
 
 Configure MCP servers in the built-in plugin’s settings. Link an MCP Host resource to the agent to expose the enabled server collection. Server authentication and connection errors appear in that collection; a resource link is not a separate server login.
 

@@ -36,6 +36,18 @@ export function limitWebBody(response: WebResponse, maxCharacters?: number): Web
   }) };
 }
 
+function sameWebFailure(previous: unknown, current: unknown): boolean {
+  if (!(previous instanceof Error) || !(current instanceof Error))
+    return typeof previous === "string" && typeof current === "string" && previous === current;
+  const previousCode = previous instanceof WebError ? previous.code : undefined;
+  const currentCode = current instanceof WebError ? current.code : undefined;
+  if (previous.name !== current.name || previousCode !== currentCode) return false;
+  const previousStatus = previous instanceof WebError ? previous.sourceStatus : undefined;
+  const currentStatus = current instanceof WebError ? current.sourceStatus : undefined;
+  if (previousStatus !== undefined || currentStatus !== undefined) return previousStatus === currentStatus;
+  return previous.message === current.message;
+}
+
 interface Entry { owner: string; definition: WebProviderDefinition; info: WebProviderType; runs: RunGroup }
 interface Connections {
   list(): WebProviderState[];
@@ -131,6 +143,7 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
     const candidates = await Promise.allSettled(ids.map(id => this.resolve(id, { signal })));
     const failures: WebResponse["hints"] = [];
     let lastError: unknown;
+    let repeatedFailure = false;
     for (const [index, candidate] of candidates.entries()) {
       signal.throwIfAborted();
       const id = ids[index]!;
@@ -141,12 +154,15 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
         return { ...response, provider: id, hints: [...failures, ...response.hints] };
       } catch (error) {
         signal.throwIfAborted();
+        repeatedFailure = sameWebFailure(lastError, error);
         lastError = error;
         failures.push({ code: "provider_failed", message: `Web provider '${id}' failed: ${error instanceof Error ? error.message : String(error)}` });
+        if (repeatedFailure) break;
       }
     }
+    const reason = repeatedFailure ? "Web provider fallback stopped after two consecutive identical failures." : "All eligible web providers failed.";
     throw new WebError(lastError instanceof WebError ? lastError.code : "request_failed",
-      `All eligible web providers failed. ${failures.map(failure => failure.message).join(" ")}`);
+      `${reason} ${failures.map(failure => failure.message).join(" ")}`, lastError instanceof WebError ? lastError.sourceStatus : undefined);
   }
   async search(request: WebSearchRequest, options: { signal: AbortSignal }) {
     const parsed = webSearchRequestSchema.parse(request);

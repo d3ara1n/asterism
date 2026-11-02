@@ -14,9 +14,9 @@ Saved unavailable types remain visible and can be removed but not edited. Duplic
 
 The saved provider list defines priority and can be reordered in settings. Search tries enabled, registered search-capable providers in that order. Fetch uses the same order after filtering for fetch capability and a pattern matching the normalized full URL. Multiple matching patterns do not cause duplicate attempts.
 
-Patterns use the declared wildcard semantics without specificity sorting. Requests with no eligible provider fail explicitly. Credential, request, and response-validation failures advance to the next eligible provider. The first valid response ends the sequence, including an empty search result. Caller cancellation stops the sequence. Invalid input fails before any provider is invoked.
+Patterns use the declared wildcard semantics without specificity sorting. Requests with no eligible provider fail explicitly. Credential, request, and response-validation failures advance to the next eligible provider until two consecutive failures match. Matching requires the same error name and Web error code, and either the same explicit source HTTP failure status or, when neither has one, the same complete error message. Identical thrown strings also match. A different failure resets the comparison. The first valid response ends the sequence, including an empty search result. Caller cancellation stops the sequence. Invalid input fails before any provider is invoked.
 
-Successful results identify the provider that handled the request and include hints for earlier failures. If all candidates fail, the error includes each provider's failure and retains the final failure's error code when available. Usage contains only quantities reported by the successful response; failed attempts may still incur upstream charges.
+Successful results identify the provider that handled the request and include hints for earlier failures. If fallback stops or all candidates fail, the error explains the stopping reason, includes each attempted provider's failure, and retains the final failure's error code and source HTTP failure status when available. Usage contains only quantities reported by the successful response; failed attempts may still incur upstream charges.
 
 ## Invocation and resources
 
@@ -34,7 +34,7 @@ Results preserve ordered source documents and distinguish snippets, excerpts, bo
 
 Typed presentation details retain provider-specific data. Hints report actual ignored filters, adjusted parameters, or other execution differences. Usage records reported quantities and units rather than estimating them.
 
-Adapters normalize diagnostics when upstream codes and structured fields establish their meaning. Recognized request fields map to public parameters; provider-only fields remain in the original diagnostic details. Unknown diagnostics retain their upstream meaning, and cancellation remains distinct from failure.
+Adapters normalize diagnostics when upstream codes and structured fields establish their meaning. Source HTTP failure statuses describe the requested page; provider API HTTP statuses remain separate diagnostics. Adapters retain explicit source failures in thrown errors so different providers' wording does not prevent matching. Unknown source statuses remain unknown rather than being inferred from message text. Recognized request fields map to public parameters; provider-only fields remain in the original diagnostic details. Unknown diagnostics retain their upstream meaning, and cancellation remains distinct from failure.
 
 An optional fetch body budget counts Unicode code points across all body blocks of each document. Excerpts, summaries, and metadata remain separate. The common service enforces the budget after validation, including resolved-handle calls.
 
