@@ -16,7 +16,7 @@ import { telegramProvider } from "./telegram.ts";
 import { discordProvider } from "./discord.ts";
 import { slackProvider } from "./slack.ts";
 import { qqProvider } from "./qq.ts";
-import { messagingOutcome } from "./outcome.ts";
+import { messagingOutcome, messagingUiCall } from "./outcome.ts";
 import { conversationsCard, chatCard } from "../shared/card-appearance.ts";
 
 type ListTarget = { connectionId: string; since?: string } | null;
@@ -160,12 +160,12 @@ export default defineModule(plugin => {
     messagingProviders: [telegramProvider(plugin), discordProvider(plugin), slackProvider(plugin), qqProvider(plugin)],
     observers: [{ id: "messaging.subscriptions", cursorChanged: invalidateAll }],
     calls: [
-      implementCall(BrowseConversations, (input, { signal }) => list(capture(), input, signal)),
-      implementCall(ReadChat, async (input, { object, signal }) => {
+      implementCall(BrowseConversations, (input, { signal }) => messagingUiCall(signal, () => list(capture(), input, signal))),
+      implementCall(ReadChat, (input, { object, signal }) => messagingUiCall(signal, async () => {
         const { connectionId, ...address } = binding(object);
         const result = await (await capture().get(connectionId)).readMessages({ ...address, ...input }, { signal });
         return { ...result, messages: result.messages.map(message => chatMessage(object.ref, message)) };
-      }),
+      })),
     ],
     resources: [
       implementResource(Conversations, ConversationsView, {
@@ -185,13 +185,13 @@ export default defineModule(plugin => {
         creation: implementCreation(CreateChat, { create: ({ title, ...data }) => ({ title, data }) }),
         project: (data, object) => chatView(data, object.ref),
         inspect: async (data, object) => chatView(data, object.ref),
-        actions: [implementAction(SendChat, { async execute({ text, replyTo }, object, signal) {
+        actions: [implementAction(SendChat, { execute: ({ text, replyTo }, object, signal) => messagingUiCall(signal, async () => {
           const { connectionId, ...address } = binding(object);
           const message = chatMessage(object.ref, await (await capture().get(connectionId)).sendMessage(
             { ...address, parts: [{ kind: "text", text }], ...(replyTo ? { replyTo } : {}) }, { signal }));
           object.commit(writer => { writer.append(ChatMessageSent, message); });
           sent(connectionId, address, message);
-        } })],
+        }) })],
       }),
     ],
     tools: [

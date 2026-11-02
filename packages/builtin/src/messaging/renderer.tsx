@@ -166,16 +166,19 @@ function ConnectionConversations({ connection, back, notify, error }: {
   const [dialogs, setDialogs] = useState<MessagingConversation[] | null>(null);
   const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const usable = connection.enabled && connection.status !== "unavailable";
   // Reload on each observed event, status change, and explicit refresh; the current list stays visible meanwhile.
   useEffect(() => {
+    setLoadError(null);
+    if (!usable) { setDialogs(null); setLoading(false); return; }
     const controller = new AbortController();
-    setLoading(true); setLoadError(null);
+    setLoading(true);
     calls.invoke(BrowseConversations, { connectionId: connection.id }, { signal: controller.signal }).then(result => {
       if (!controller.signal.aborted && result.kind === "conversations") setDialogs(result.conversations);
     }, error => { if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : i18n.text(messages.failed)); })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [calls, connection.id, connection.latest, connection.status, revision]);
+  }, [calls, connection.id, connection.latest, connection.status, revision, usable]);
   return <>
     <header className="flex min-w-0 items-center gap-1 border-b px-1.5 py-1.5">
       <IconButton size="icon-xs" label={i18n.text(messages.back)} onClick={back}><ArrowLeft /></IconButton>
@@ -183,14 +186,14 @@ function ConnectionConversations({ connection, back, notify, error }: {
         <span className="type-section truncate">{connection.name}</span>
         <ConnectionStatus connection={connection} />
       </div>
-      <IconButton size="icon-xs" label={i18n.text(messages.refresh)} aria-busy={loading || undefined}
+      <IconButton size="icon-xs" label={i18n.text(messages.refresh)} aria-busy={loading || undefined} disabled={!usable}
         onClick={() => { if (!loading) setRevision(revision + 1); }}>
         {loading && dialogs ? <Spinner aria-hidden="true" /> : <RefreshCw />}
       </IconButton>
       {notify({ connectionId: connection.id }, connection.name, i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))}
     </header>
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2">
-      {dialogs === null && !loadError && <div className="flex justify-center py-6"><Spinner aria-hidden="true" /></div>}
+      {loading && dialogs === null && !loadError && <div className="flex justify-center py-6"><Spinner aria-hidden="true" /></div>}
       {dialogs?.length === 0 && <p className="type-caption px-1 py-4 text-center text-balance">{i18n.text(messages.empty)}</p>}
       {dialogs && dialogs.length > 0 && <ItemGroup>{dialogs.map(dialog => {
         const target = addressTarget(connection.id, dialog), Icon = dialog.threadId ? Hash : kindIcon[dialog.kind] ?? MessageSquare;
@@ -248,15 +251,17 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
   const [text, setText] = useState(""), [replyTo, setReplyTo] = useState<MessagingMessage | null>(null);
   const log = useRef<HTMLOListElement>(null), pinned = useRef(true);
   const status = data.connection?.status ?? "unavailable";
+  const usable = !!data.connection?.enabled && status !== "unavailable";
   // Reload on mount, on each observed event for this conversation, and when the connection becomes usable.
   useEffect(() => {
-    const controller = new AbortController();
     setLoadError(null);
+    if (!usable) { setItems(null); setReplyTo(null); return; }
+    const controller = new AbortController();
     calls.invoke(ReadChat, null, { object: object.ref, signal: controller.signal }).then(result => {
       if (!controller.signal.aborted) setItems(result.messages);
     }, error => { if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : i18n.text(messages.failed)); });
     return () => controller.abort();
-  }, [calls, object.ref.id, data.latest, status === "connected"]);
+  }, [calls, object.ref.id, data.connectionId, data.latest, status === "connected", usable]);
   // Stay at the newest message unless the reader has scrolled away from it.
   useLayoutEffect(() => {
     const element = log.current;
@@ -265,7 +270,7 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
   const byId = new Map((items ?? []).map(message => [message.id, message]));
   const nameOf = (message: MessagingMessage) => message.sender.role === "self" ? i18n.text(messages.you) : message.sender.name;
   // Sending keeps the composer in place: the draft is read-only and repeated submits are ignored, without dimming the card.
-  const usable = !!data.connection?.enabled, sending = operations.pending("send");
+  const sending = operations.pending("send");
   const send = () => {
     if (!usable || !text.trim()) return;
     void operations.run("send", async () => {
@@ -284,7 +289,7 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
     <ol ref={log} role="log" aria-label={i18n.text(messages.chat)}
       className="flex min-h-0 flex-1 select-text flex-col gap-3 overflow-auto px-3 py-2"
       onScroll={event => { const element = event.currentTarget; pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24; }}>
-      {items === null && !loadError && <li className="flex flex-1 items-center justify-center"><Spinner aria-hidden="true" /></li>}
+      {usable && items === null && !loadError && <li className="flex flex-1 items-center justify-center"><Spinner aria-hidden="true" /></li>}
       {items?.length === 0 && <li className="type-caption flex flex-1 items-center justify-center">{i18n.text(messages.noMessages)}</li>}
       {groupTimeline(items ?? []).map((group, index, groups) => {
         const first = group.messages[0]!, newDay = groups[index - 1]?.day !== group.day;

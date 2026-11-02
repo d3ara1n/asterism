@@ -1,7 +1,21 @@
-import { MessagingError, type CallResult } from "@asterism-app/sdk/runtime";
+import { MessagingError, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
 import type { Json } from "@asterism-app/sdk/contracts";
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
+
+/** Renderer calls and actions expose expected messaging failures through the plugin error transport. */
+export async function messagingUiCall<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
+  signal.throwIfAborted();
+  try { return await work(); }
+  catch (error) {
+    signal.throwIfAborted();
+    if (!(error instanceof MessagingError)) throw error;
+    const failure = new PluginApiError(error.code === "invalid_input" || error.code === "invalid_cursor" ? "invalid_argument" : "unavailable",
+      error.message, error.code);
+    failure.cause = error;
+    throw failure;
+  }
+}
 
 /** Preparation has not contacted the platform's message-delivery endpoint. Keep its original error classification. */
 class UnsentMessageError extends MessagingError {
