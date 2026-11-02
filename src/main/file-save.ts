@@ -52,12 +52,14 @@ export function serveFileSaves(window: BrowserWindow, trusted: (event: IpcMainIn
     } catch (error) { await discard(entry); throw error; }
     return { kind: "done" };
   });
-  window.webContents.on("did-navigate", reset);
-  window.webContents.on("render-process-gone", reset);
+  // Cleanup runs from the window's closed event, when the BrowserWindow getter is no longer usable; keep the contents reference.
+  const contents = window.webContents;
+  contents.on("did-navigate", reset);
+  contents.on("render-process-gone", reset);
   return () => {
     ipcMain.removeHandler(fileSaveChannel);
-    window.webContents.removeListener("did-navigate", reset);
-    window.webContents.removeListener("render-process-gone", reset);
+    contents.removeListener("did-navigate", reset);
+    contents.removeListener("render-process-gone", reset);
     reset();
   };
 }
