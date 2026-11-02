@@ -103,16 +103,15 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
     <div className="group relative">
       <Item variant="outline" asChild className="w-full overflow-hidden bg-card p-0 text-left hover:bg-accent/50 disabled:opacity-50">
         <button type="button" disabled={!ready || busy} aria-busy={starting} onClick={() => void run(() => onStart(template.id))}>
-          {/* The folder color marks where new sessions land; the folder name stays in the caption and information. */}
+          {/* The folder color marks where new sessions land; the folder name stays in the information tooltip. */}
           <span className={cn("relative flex h-20 w-full overflow-hidden text-muted-foreground", folder ? folderTint(folder.color) : "bg-muted")} aria-hidden="true">
             <TemplatePreview objects={template.objects} />
             {starting && <span className="absolute inset-0 flex items-center justify-center bg-muted/80"><Spinner className="size-8" /></span>}
           </span>
           <span className="block w-full min-w-0 px-3 pb-3">
             <span className="block truncate font-medium" title={template.title}>{template.title}</span>
-            <span className="type-caption mt-1 flex min-w-0 items-center gap-1.5 pr-8">
-              {folder && <><FolderDot color={folder.color} /><span className="truncate">{folder.name}</span><span aria-hidden="true">·</span></>}
-              <span className="shrink-0">{i18n.formatMessage(templateMessages.objectCount, { count: template.objects.length })}</span>
+            <span className="type-caption mt-1 block truncate pr-8">
+              {i18n.formatMessage(templateMessages.objectCount, { count: template.objects.length })}
             </span>
           </span>
         </button>
