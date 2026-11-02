@@ -63,7 +63,7 @@ function open(root?: string, receive = true, template: ResourceContribution["tem
 }
 async function close(app: ApplicationService) { await app.close(); apps.delete(app); }
 async function save(app: ApplicationService, sessionId: string, refs: ResourceRef[]) {
-  const reply = await app.sessions.execute({ type: "template.save", sessionId, title: "Reusable workbench", objectIds: refs.map(ref => ref.id) });
+  const reply = await app.sessions.execute({ type: "template.save", sessionId, title: "Reusable workbench", objectIds: refs.map(ref => ref.id), folderId: null });
   if (reply.kind !== "template.saved") throw new Error("Expected a saved template.");
   return reply.templateId;
 }

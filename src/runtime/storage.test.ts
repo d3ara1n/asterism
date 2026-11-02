@@ -8,6 +8,7 @@ import { SessionTree } from "../session/tree.ts";
 import { created, event, removed } from "../session/test-nodes.ts";
 import { sessionRetentionMs } from "../shared/application.ts";
 import { collectExpiredSessions, openDatabase, workspaceStorage } from "./storage.ts";
+import { FolderStore } from "../session/folders.ts";
 import { SessionWorkbench } from "./workbench.ts";
 
 const roots: string[] = [], databases: DatabaseSync[] = [];
@@ -20,6 +21,17 @@ function setup() {
   const db = openDatabase(root); databases.push(db);
   return { root, db, tree: new SessionTree(db) };
 }
+/** Rebuild the format-30 shape: no folders table, and sessions and templates without membership columns. */
+function revertFolders(db: DatabaseSync) {
+  db.exec(`PRAGMA foreign_keys = OFF;
+    CREATE TABLE sessions_v30 (id TEXT PRIMARY KEY, title TEXT NOT NULL, initial_title TEXT NOT NULL, created_at TEXT NOT NULL, cursor TEXT, archived_at TEXT);
+    INSERT INTO sessions_v30 SELECT id, title, initial_title, created_at, cursor, archived_at FROM sessions;
+    DROP TABLE sessions; ALTER TABLE sessions_v30 RENAME TO sessions;
+    CREATE TABLE templates_v30 (id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at TEXT NOT NULL, data_json TEXT NOT NULL) STRICT;
+    INSERT INTO templates_v30 SELECT id, title, created_at, data_json FROM templates;
+    DROP TABLE templates; ALTER TABLE templates_v30 RENAME TO templates;
+    DROP TABLE folders; PRAGMA foreign_keys = ON;`);
+}
 const count = (db: DatabaseSync, table: string, sessionId: string) =>
   Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE session_id = ?`).get(sessionId) as { n: number }).n);
 
@@ -27,6 +39,7 @@ const count = (db: DatabaseSync, table: string, sessionId: string) =>
 it("upgrades the preceding workspace format without rewriting existing history", () => {
   const { root, db, tree } = setup(), sessionId = tree.create("Existing");
   const original = tree.appendToTimeline(sessionId, event("example/final", { text: "Saved response" }));
+  revertFolders(db);
   db.exec("DROP INDEX session_nodes_pending; PRAGMA user_version = 29;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
@@ -39,6 +52,29 @@ it("upgrades the preceding workspace format without rewriting existing history",
   expect(captured.read({ scope: "timeline", edge: "last" })[0]!.node.pending).toBe(true);
   expect(next.nodes(sessionId)[0]).toEqual(original);
   expect(next.node(sessionId, pending.id)).toMatchObject({ pending: false, data: { output: "report" } });
+});
+
+// Membership columns added by ALTER must keep the delete contract: removing a folder releases its members instead of failing or deleting them.
+it("adds folder membership without assigning existing rows, and deleting a folder releases its members", () => {
+  const { root, db, tree } = setup(), sessionId = tree.create("Existing");
+  const templateId = "7a1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d", folderId = "0b1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e";
+  db.prepare("INSERT INTO templates (id, title, created_at, data_json) VALUES (?, ?, ?, ?)")
+    .run(templateId, "Template", new Date().toISOString(), JSON.stringify({ objects: [], links: [], views: [] }));
+  revertFolders(db);
+  db.exec("PRAGMA user_version = 30;");
+  db.close(); databases.splice(databases.indexOf(db), 1);
+  workspaceStorage(root).inspect()!.apply();
+  const reopened = openDatabase(root); databases.push(reopened);
+  const folders = new FolderStore(reopened);
+  const templateFolder = () => (reopened.prepare("SELECT folder_id FROM templates WHERE id = ?").get(templateId) as { folder_id: string | null }).folder_id;
+  expect(folders.sessionFolders().get(sessionId)).toBeNull();
+  expect(templateFolder()).toBeNull();
+  folders.create(folderId, "Work", "blue");
+  folders.moveSession(sessionId, folderId); folders.moveTemplate(templateId, folderId);
+  expect(folders.sessionFolders().get(sessionId)).toBe(folderId);
+  folders.delete(folderId);
+  expect(folders.sessionFolders().get(sessionId)).toBeNull();
+  expect(templateFolder()).toBeNull();
 });
 
 // Retention contract: delete only sessions archived before the retention period; associated data disappears with the session.

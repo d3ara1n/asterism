@@ -8,6 +8,12 @@ Home displays the selected plugin's starting interface. The builtin entry starts
 
 With several entries available, choose one in General settings. If that plugin becomes unavailable, choose another entry. Templates on Home work independently of this selection.
 
+## Organize with folders
+
+Folders group the sessions and templates that belong to the same work. Create one from the sidebar, from the folder control on Home, or from a session's **Move to folder** menu, and give it a name and a color. The folder chosen on Home receives the next session you start there; **No folder** is always available.
+
+The sidebar lists each folder as a collapsible group with its color, followed by sessions without a folder. Move a session from its menu at any time. Deleting a folder keeps its sessions and templates and moves them to **No folder**.
+
 ## Continue work
 
 Select a saved session from the sidebar. Its agent cards display conversations for the current timeline. Stop and continue operate on an agent’s execution; switching sessions does not stop it.
@@ -30,9 +36,9 @@ A compaction marker identifies the summary and reading boundary. Compaction chan
 
 ## Reuse a workbench setup
 
-Save a template from the session menu and choose from the objects that support templates. Each resource defines its reusable data: for example, a note keeps its body and an agent keeps its configuration. The template also stores links and card arrangement.
+Save a template from the session menu and choose from the objects that support templates. Each resource defines its reusable data: for example, a note keeps its body and an agent keeps its configuration. The template also stores links and card arrangement. Its folder starts as the source session's folder; change it while saving or later from the template menu.
 
-Select the template on **Home** to create a new session. The new session has fresh resource identities and no copied conversation history or running process instances. Agents receive newly generated random names, even if the source agents had custom names. Other resources retain their saved names unless their type also generates names for template instances. Referenced external locations still refer to the external world.
+Select the template on **Home** to create a new session in the template's folder. A template card's preview carries its folder color, and its caption names the folder. The new session has fresh resource identities and no copied conversation history or running process instances. Agents receive newly generated random names, even if the source agents had custom names. Other resources retain their saved names unless their type also generates names for template instances. Referenced external locations still refer to the external world.
 
 ## Archive and restore
 

@@ -4,7 +4,9 @@ The workbench presents objects and their execution while keeping frontend state 
 
 ## Home, navigation, and settings
 
-Startup opens Home without automatically loading an existing session. The sidebar lists session summaries. Selecting a session loads its workbench. Home hosts a plugin-provided entry interface; that plugin owns the interaction, business validation, and assembly of a new session with its initial title. The host imposes no initial-message or Agent-resource requirement.
+Startup opens Home without automatically loading an existing session. The sidebar lists session summaries grouped by folder: named folders in stable name order, each collapsible and showing its color, then sessions without a folder. Without any folder the list is flat. Session order within a group follows the session catalog. Selecting a session loads its workbench. Home hosts a plugin-provided entry interface; that plugin owns the interaction, business validation, and assembly of a new session with its initial title. The host imposes no initial-message or Agent-resource requirement.
+
+Home keeps a folder selection for the next started session. The host supplies the folder control and its selection to the entry, which places the control in its own interface and passes the selection to session creation. Template cards tint their preview with the folder color of the folder that receives their sessions and name that folder in their caption.
 
 The sole entry is displayed directly. With several entries, General settings holds the user's choice. An unavailable selection requires a new choice rather than silent replacement. Without an entry, Home explains that an Agent paradigm plugin is required. Host template access remains independent of entry availability.
 

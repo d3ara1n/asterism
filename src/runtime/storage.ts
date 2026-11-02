@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { sessionSchemaSql, pendingRecordsIndexSql } from "../session/schema.ts";
+import { sessionSchemaSql, pendingRecordsIndexSql, folderSchemaSql, folderColumnSql } from "../session/schema.ts";
 import { applicationStorage, sessionRetentionMs } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
 import { templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 import { mcpSchemaSql } from "../mcp/storage.ts";
 
-export const workspaceDatabaseVersion = 30;
+export const workspaceDatabaseVersion = 31;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
@@ -81,7 +81,13 @@ const focusTableSql = `
 /** Explicit format transitions preserve supported data; only openDatabase creates new databases. */
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
-    version: workspaceDatabaseVersion, migrations: { 29: db => { db.exec(pendingRecordsIndexSql); } } });
+    version: workspaceDatabaseVersion, migrations: {
+      29: db => { db.exec(pendingRecordsIndexSql); },
+      // Existing sessions and templates start without a folder; no membership is invented for them.
+      30: db => { db.exec(`${folderSchemaSql}
+        ALTER TABLE sessions ADD COLUMN ${folderColumnSql};
+        ALTER TABLE templates ADD COLUMN ${folderColumnSql};`); },
+    } });
 }
 /** Startup cleanup hard-deletes archived sessions past retention, cascades associated rows through foreign keys, and leaves orphan content for the subsequently constructed store. */
 export function collectExpiredSessions(db: DatabaseSync, now = Date.now()): number {

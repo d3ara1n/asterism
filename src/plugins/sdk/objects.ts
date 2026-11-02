@@ -291,7 +291,7 @@ export function bindObjects(owner: string, host: PluginHostServices, sessionRuns
           }));
         } finally { scope.active = false; }
       } };
-    }, { signal, content: options.content }), { ...outside, signal: options.signal }).done;
+    }, { signal, content: options.content, folderId: options.folderId ?? null }), { ...outside, signal: options.signal }).done;
   };
   return {
     own, checkRef, session, createSession, object, reader, content, linkAbort,

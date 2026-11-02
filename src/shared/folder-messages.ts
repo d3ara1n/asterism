@@ -1,0 +1,26 @@
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
+
+export const folderMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  folder: { id: "folders.folder", defaultMessage: "Folder" },
+  noFolder: { id: "folders.none", defaultMessage: "No folder" },
+  create: { id: "folders.create", defaultMessage: "New folder" },
+  createDescription: { id: "folders.createDescription", defaultMessage: "Group conversations and templates that belong to the same work." },
+  edit: { id: "folders.edit", defaultMessage: "Edit folder" },
+  editDescription: { id: "folders.editDescription", defaultMessage: "Change the folder name and color." },
+  name: { id: "folders.name", defaultMessage: "Folder name" },
+  color: { id: "folders.color", defaultMessage: "Color" },
+  delete: { id: "folders.delete", defaultMessage: "Delete folder" },
+  deleteDescription: { id: "folders.deleteDescription", defaultMessage: "Delete \u201c{name}\u201d? Its conversations and templates are kept and move to No folder." },
+  moveTo: { id: "folders.moveTo", defaultMessage: "Move to folder" },
+  actions: { id: "folders.actions", defaultMessage: "Actions for {name}" },
+  empty: { id: "folders.empty", defaultMessage: "No conversations" },
+  notFound: { id: "folders.notFound", defaultMessage: "This folder no longer exists. Choose another folder and try again." },
+  colorRed: { id: "folders.color.red", defaultMessage: "Red" },
+  colorOrange: { id: "folders.color.orange", defaultMessage: "Orange" },
+  colorAmber: { id: "folders.color.amber", defaultMessage: "Amber" },
+  colorGreen: { id: "folders.color.green", defaultMessage: "Green" },
+  colorTeal: { id: "folders.color.teal", defaultMessage: "Teal" },
+  colorBlue: { id: "folders.color.blue", defaultMessage: "Blue" },
+  colorViolet: { id: "folders.color.violet", defaultMessage: "Violet" },
+  colorPink: { id: "folders.color.pink", defaultMessage: "Pink" },
+}));

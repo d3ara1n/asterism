@@ -13,11 +13,15 @@ import { PluginRegion } from "../plugins/scope";
 import { resolveSessionEntry, sessionEntryKey } from "./entries";
 import type { TemplateSummary } from "../../../shared/templates";
 import { TemplateCards } from "../templates/TemplateCards";
+import { existingFolder, useFolders } from "../folders/context";
+import { HomeFolderPicker, HomeFolderProvider, type HomeFolderState } from "../folders/menus";
 
 /** Home owns entry selection and templates; the selected plugin supplies its entire starting interaction. */
-export function HomePage({ active, onSettings, ready, onCreated, templates, onTemplateStart, onTemplatesChanged }: {
+export function HomePage({ active, onSettings, ready, onCreated, templates, onTemplateStart, onTemplatesChanged, folder }: {
   active: boolean; onSettings(): void; ready: boolean; onCreated(sessionId: string): void;
   templates: readonly TemplateSummary[]; onTemplateStart(id: string): Promise<UiText | null>; onTemplatesChanged(): void;
+  /** Folder that receives the next session started from the entry; the application keeps it across navigation. */
+  folder: HomeFolderState;
 }) {
   const i18n = useI18n();
   const { snapshot, readError } = useConfiguration(active);
@@ -25,7 +29,9 @@ export function HomePage({ active, onSettings, ready, onCreated, templates, onTe
   const [attempt, setAttempt] = useState(0);
   const entry = snapshot ? resolveSessionEntry(sessionEntries, snapshot.sessionEntry) : null;
   const Body = entry?.Body;
-  return <div className="home-page"><div className="home-content">
+  const { folders } = useFolders();
+  const folderId = existingFolder(folders, folder.id)?.id ?? null;
+  return <HomeFolderProvider value={folder}><div className="home-page"><div className="home-content">
     <div className="mx-auto w-full max-w-2xl">
       <header className="mb-8 flex flex-col items-center text-center">
         <BrandMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{i18n.text(appMessages.appName)}</h1>
@@ -34,7 +40,7 @@ export function HomePage({ active, onSettings, ready, onCreated, templates, onTe
       {entry && Body ? <PluginRegion key={`${sessionEntryKey(entry)}:${attempt}`} pluginId={entry.pluginId} page fallback={<Alert variant="destructive"><AlertDescription>
         {i18n.formatMessage(homeMessages.entryFailed, { plugin_name: i18n.text(entry.pluginName) })}<Button variant="outline" size="sm" onClick={() => setAttempt(value => value + 1)}>{i18n.text(homeMessages.retry)}</Button>
       </AlertDescription></Alert>}>
-        <Body active={active} ready={ready} open={onCreated} />
+        <Body active={active} ready={ready} open={onCreated} folder={{ id: folderId, Picker: HomeFolderPicker }} />
       </PluginRegion> : <div className="flex flex-col items-center gap-3 text-center">
         <p role="status" className="type-body text-muted-foreground">{i18n.text(readError ?? (!snapshot ? commonMessages.loading
           : !sessionEntries.length ? homeMessages.noEntry : snapshot.sessionEntry ? homeMessages.entryUnavailable : homeMessages.chooseEntry))}</p>
@@ -42,5 +48,5 @@ export function HomePage({ active, onSettings, ready, onCreated, templates, onTe
       </div>}
     </div>
     <TemplateCards templates={templates} ready={ready} onStart={onTemplateStart} onChanged={onTemplatesChanged} />
-  </div></div>;
+  </div></div></HomeFolderProvider>;
 }

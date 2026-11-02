@@ -4,7 +4,7 @@ This document owns domain semantics. TypeScript declarations, database schemas, 
 
 ## Workspace and session
 
-A workspace owns global configuration, capability providers, sessions, templates, and application data. Its storage directory grants no implicit model access to files.
+A workspace owns global configuration, capability providers, folders, sessions, templates, and application data. Its storage directory grants no implicit model access to files.
 
 A session is the time and space of ongoing work: its history and workbench. Its generated ID is identity; its title is presentation. Home has no session identity. A plugin-provided entry assembles a session and supplies its initial title, or the host creates one from a template. Session creation must not require a conversation message or an Agent resource.
 
@@ -13,6 +13,12 @@ Each session owns one history tree and an execution cursor. Builtin conversation
 Archiving ends the session’s object lifetimes before marking it archived. Normal session and resource lookup then treats it as absent. A separate recycle-bin directory exposes archived sessions for restoration. Restoration clears the archive marker and reattaches objects.
 
 Startup collection deletes sessions older than the retention threshold. It removes their dependent rows and content roots as a whole. The threshold is an implementation constant, and deletion timing depends on startup.
+
+## Folders
+
+A folder is a workspace-owned grouping of sessions and templates with a name and a palette color. Membership is optional: a session or template either belongs to one folder or to no folder, and no folder is a normal state rather than a missing assignment. Folders hold no session content, grant no access, and are independent of Agent paradigms.
+
+The entry that creates a session may name its folder; the folder must exist when the session commits. A session started from a template lands in the template's folder. Moving a session or template changes only its membership and records nothing in session history. Deleting a folder keeps its members and leaves them without a folder.
 
 ## Workbench templates
 

@@ -19,6 +19,7 @@ Use semantic tokens from the theme implementation. The chosen accent expresses p
 | `success`, `warning`, `destructive` | Fixed semantic status colors |
 | `background` | Page and control backgrounds |
 | `canvas` | Workbench backing surfaces |
+| `folder-*` | Decorative folder identity: dots and preview tints |
 
 Pair colored surfaces with their corresponding foreground token. Contrast requirements apply in both schemes. Graphite derives emphasis from the chosen gray palette rather than a separate chromatic accent.
 
@@ -102,7 +103,7 @@ Use the shared display, page, section, body, caption, label, and code roles. Int
 
 The host publishes typography through root CSS tokens. Plugin DOM content inherits those styles; renderers that require explicit font options consume the resolved tokens and apply changes to existing views. Interactive terminals and terminal images use the same font settings. Font changes recalculate terminal geometry without restarting the shell.
 
-Use Lucide icons. Chart category colors are independent of status and accent colors. Pair each graphic with visible labels and values; colors alone do not encode meaning.
+Use Lucide icons. Chart category colors and folder colors are independent of status and accent colors. Pair each graphic with visible labels and values; colors alone do not encode meaning, so a folder color always appears with its folder name.
 
 Switches express immediate booleans, checkboxes express form or multi-selection, radios express explained single choices, tabs change content, and searchable choices use the shared command/popover combination.
 

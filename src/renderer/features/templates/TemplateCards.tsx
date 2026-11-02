@@ -17,6 +17,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { TemplateObjectLabel } from "./TemplateObjects";
 import { RenameTemplate } from "./RenameTemplate";
+import { folderMessages } from "../../../shared/folder-messages";
+import { existingFolder, useFolders } from "../folders/context";
+import { FolderDialog } from "../folders/FolderDialog";
+import { MoveToFolderMenu } from "../folders/menus";
+import { FolderDot, folderTint } from "../folders/marks";
+import { cn } from "@asterism-app/ui/utils";
 
 const KIND_PREVIEW_LIMIT = 6;
 
@@ -65,13 +71,16 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
   template: TemplateSummary; ready: boolean; onStart: (id: string) => Promise<UiText | null>; onChanged: () => void;
 }) {
   const i18n = useI18n();
+  const { folders, run: runFolder } = useFolders();
+  const folder = existingFolder(folders, template.folderId);
+  const [creatingFolder, setCreatingFolder] = useState(false);
   const pending = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<UiText | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
-  const openingRename = useRef(false);
+  const openingDialog = useRef(false);
   const starting = busy && !deleting;
   const run = async (action: () => Promise<UiText | null>, onSuccess?: () => void) => {
     if (pending.current || !ready) return;
@@ -89,17 +98,22 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
     if (!result.ok) return errorDisplay(result.error);
     return null;
   };
+  const move = (folderId: string | null) => run(() => runFolder({ type: "template.move", templateId: template.id, folderId }));
   return <div className="min-w-0">
     <div className="group relative">
       <Item variant="outline" asChild className="w-full overflow-hidden bg-card p-0 text-left hover:bg-accent/50 disabled:opacity-50">
         <button type="button" disabled={!ready || busy} aria-busy={starting} onClick={() => void run(() => onStart(template.id))}>
-          <span className="relative flex h-20 w-full overflow-hidden bg-muted text-muted-foreground" aria-hidden="true">
+          {/* The folder color marks where new sessions land; the folder name stays in the caption and information. */}
+          <span className={cn("relative flex h-20 w-full overflow-hidden text-muted-foreground", folder ? folderTint(folder.color) : "bg-muted")} aria-hidden="true">
             <TemplatePreview objects={template.objects} />
             {starting && <span className="absolute inset-0 flex items-center justify-center bg-muted/80"><Spinner className="size-8" /></span>}
           </span>
           <span className="block w-full min-w-0 px-3 pb-3">
             <span className="block truncate font-medium" title={template.title}>{template.title}</span>
-            <span className="type-caption mt-1 block pr-8">{i18n.formatMessage(templateMessages.objectCount, { count: template.objects.length })}</span>
+            <span className="type-caption mt-1 flex min-w-0 items-center gap-1.5 pr-8">
+              {folder && <><FolderDot color={folder.color} /><span className="truncate">{folder.name}</span><span aria-hidden="true">·</span></>}
+              <span className="shrink-0">{i18n.formatMessage(templateMessages.objectCount, { count: template.objects.length })}</span>
+            </span>
           </span>
         </button>
       </Item>
@@ -113,6 +127,8 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
             <ul className="max-h-64 space-y-2 overflow-y-auto">
               {template.objects.map(object => <li key={object.id}><TemplateObjectLabel object={object} /></li>)}
             </ul>
+            <p className="mt-3 flex items-center gap-1.5">{i18n.text(folderMessages.folder)}:
+              {folder ? <><FolderDot color={folder.color} />{folder.name}</> : i18n.text(folderMessages.noFolder)}</p>
             <p className="mt-3 opacity-70">{i18n.formatMessage(templateMessages.created, { time: Date.parse(template.createdAt) })}</p>
           </TooltipContent>
         </Tooltip>
@@ -125,12 +141,14 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" onCloseAutoFocus={event => {
-            if (openingRename.current) { event.preventDefault(); openingRename.current = false; }
+            if (openingDialog.current) { event.preventDefault(); openingDialog.current = false; }
           }}>
             <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => { openingRename.current = true; setError(null); setRenaming(true); }}>
+              <DropdownMenuItem onSelect={() => { openingDialog.current = true; setError(null); setRenaming(true); }}>
                 <PenLine />{i18n.text(templateMessages.rename)}…
               </DropdownMenuItem>
+              <MoveToFolderMenu value={template.folderId} onMove={folderId => { void move(folderId); }}
+                onCreate={() => { openingDialog.current = true; setError(null); setCreatingFolder(true); }} />
               <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
                 <Trash2 />{i18n.text(templateMessages.delete)}
               </DropdownMenuItem>
@@ -143,6 +161,8 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
     {error && !deleting && <p role="alert" className="mt-2 text-sm"><StatusText tone="error">{i18n.text(error)}</StatusText></p>}
     {renaming && <RenameTemplate template={template} disabled={!ready || busy} onSaved={onChanged}
       onClose={() => setRenaming(false)} onRestoreFocus={() => trigger.current?.focus()} />}
+    {creatingFolder && <FolderDialog onSaved={folderId => { void move(folderId); }} onClose={() => setCreatingFolder(false)}
+      onRestoreFocus={() => trigger.current?.focus()} />}
     <AlertDialog open={deleting} onOpenChange={open => { if (!pending.current) { setDeleting(open); setError(null); } }}>
       <AlertDialogContent>
         <AlertDialogHeader>

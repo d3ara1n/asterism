@@ -119,10 +119,18 @@ export interface PluginSettingsPage {
   locations?: readonly string[];
   Body: ComponentType<{ location?: string }>;
 }
+/** Host folder selection for the next session started from the entry. */
+export interface SessionEntryFolder {
+  /** Selected folder identity, or null for no folder; pass it as the `folderId` session creation option. */
+  readonly id: string | null;
+  /** Host-rendered folder control for the entry's own toolbar; selection and folder creation stay with the host. */
+  readonly Picker: ComponentType<{ disabled?: boolean }>;
+}
 export interface SessionEntryProps {
   active: boolean;
   ready: boolean;
   open(sessionId: string): void;
+  folder: SessionEntryFolder;
 }
 export interface PluginSessionEntry {
   id: string;

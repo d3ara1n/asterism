@@ -16,6 +16,8 @@ import type { SessionChanged } from "../shared/session.ts";
 import { pluginErrorDisplay } from "./plugin-errors.ts";
 import type { PreparedPluginStorage } from "../plugins/loader.ts";
 import { SessionService } from "./sessions.ts";
+import { FolderStore } from "../session/folders.ts";
+import { SessionError } from "../shared/session-timeline.ts";
 import { collectExpiredSessions, openDatabase } from "./storage.ts";
 import { ContentTransferService } from "./content-transfer.ts";
 import type { ManualSource } from "@asterism-app/sdk/runtime";
@@ -32,10 +34,12 @@ export class ApplicationService {
   readonly sessions: SessionService;
   readonly content: ContentTransferService;
   private readonly db: DatabaseSync;
+  private readonly folders: FolderStore;
   private readonly list: PackageList;
   private readonly started: string;
   constructor(root: string, private readonly options: { packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
     this.db = openDatabase(root);
+    this.folders = new FolderStore(this.db);
     this.list = applicationPackages(root);
     this.started = JSON.stringify(options.packageEntries ?? this.list.read());
     this.npmRoot = join(root, "plugins");
@@ -81,12 +85,19 @@ export class ApplicationService {
         this.list.add(entry, this.npmRoot);
       } else if (command.type === "plugin.enable") this.list.setEnabled(command.index, command.enabled);
       else if (command.type === "plugin.remove") this.list.remove(command.index);
+      else if (command.type === "folder.create") this.folders.create(command.id, command.name, command.color);
+      else if (command.type === "folder.update") this.folders.update(command.id, command.name, command.color);
+      else if (command.type === "folder.delete") this.folders.delete(command.id);
+      else if (command.type === "session.move") this.folders.moveSession(command.sessionId, command.folderId);
+      else if (command.type === "template.move") this.folders.moveTemplate(command.templateId, command.folderId);
     } catch (error) {
       if (error instanceof PluginPackageError) throw new ApplicationError(error.code === "duplicate" ? "conflict" : "invalid_request", error.message);
+      if (error instanceof SessionError) throw new ApplicationError(error.code, error.message, error.display);
       throw error;
     }
     const workspace = this.db.prepare("SELECT * FROM workspace LIMIT 1").get();
-    const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt }));
+    const membership = this.folders.sessionFolders();
+    const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, folder_id: membership.get(session.id) ?? null }));
     const archivedSessions = this.sessions.tree.archived().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, archived_at: session.archivedAt }));
     const current = this.list.read();
     const entries = [
@@ -113,7 +124,7 @@ export class ApplicationService {
         stylesheet: pending ? null : startup.stylesheet,
         dependencies: [...startup?.rendererDependencies ?? []] };
     }).filter((plugin, _, all) => plugin.index !== null || !plugin.id || !all.some(item => item.index !== null && item.id === plugin.id));
-    return snapshotSchema.parse({ workspace, sessions, templates: this.sessions.templates.list(), archivedSessions, plugins,
+    return snapshotSchema.parse({ workspace, folders: this.folders.list(), sessions, templates: this.sessions.templates.list(), archivedSessions, plugins,
       catalogs: (this.options.catalogs ?? []).filter(catalog => this.sessions.packages.some(item => item.id === catalog.owner && item.status === "loaded")),
       restartRequired: JSON.stringify(current) !== this.started,
       ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings() } : {}) });

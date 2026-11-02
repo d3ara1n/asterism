@@ -5,13 +5,14 @@ import { coreChannel } from "./core.ts";
 import type { DesktopPlatform, DesktopWindowBridge } from "./desktop.ts";
 import type { AppearanceBridge } from "./theme.ts";
 import { templateSummarySchema } from "./templates.ts";
+import { folderCommands, folderIdSchema, folderSchema } from "./folders.ts";
 import { startupStageSchema, type StartupBridge } from "./startup.ts";
 import type { UpdatesBridge } from "./updates.ts";
 import type { NetworkBridge } from "./network.ts";
 import type { RendererFailure } from "./renderer-failure.ts";
 import { pluginDiagnosticSchema } from "./plugin-startup.ts";
 
-export const protocolVersion = 15;
+export const protocolVersion = 16;
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");
@@ -27,13 +28,16 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("plugin.add-bundled"), source: z.string().min(1) }),
   z.strictObject({ type: z.literal("plugin.enable"), index: z.number().int().nonnegative(), enabled: z.boolean() }),
   z.strictObject({ type: z.literal("plugin.remove"), index: z.number().int().nonnegative() }),
+  // Folder catalog and membership changes return the refreshed snapshot so navigation regroups at once.
+  ...folderCommands,
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export const runtimeStatusSchema = z.enum(["starting", "ready", "unavailable", "stopping"]);
 export type RuntimeStatus = z.infer<typeof runtimeStatusSchema>;
 export const snapshotSchema = z.strictObject({
   workspace: z.strictObject({ id, title: z.string() }),
-  sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string() })),
+  folders: z.array(folderSchema),
+  sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), folder_id: folderIdSchema })),
   templates: z.array(templateSummarySchema),
   /** Trash catalog containing sessions themselves only, used for settings counts and restoration. */
   archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string() })),

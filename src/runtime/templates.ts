@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { SessionDataStore } from "../session/data.ts";
+import { requireFolder } from "../session/folders.ts";
+import { folderColumnSql } from "../session/schema.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
 import { templateDataSchema, type TemplateSummary, type TemplateData } from "../shared/templates.ts";
 import { templateMessages } from "../shared/template-messages.ts";
@@ -11,7 +13,7 @@ import { createResourceId } from "../resources/id.ts";
 
 export const templateSchemaSql = `
   CREATE TABLE templates (
-    id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at TEXT NOT NULL, data_json TEXT NOT NULL
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at TEXT NOT NULL, data_json TEXT NOT NULL, ${folderColumnSql}
   ) STRICT;
 `;
 
@@ -24,12 +26,12 @@ export class TemplateStore {
     this.data = new SessionDataStore(db);
   }
   list(): TemplateSummary[] {
-    const rows = this.db.prepare(`SELECT id, title, created_at AS createdAt,
+    const rows = this.db.prepare(`SELECT id, title, created_at AS createdAt, folder_id AS folderId,
       (SELECT json_group_array(json_object('id', json_extract(value, '$.id'),
         'kind', json_extract(value, '$.kind'), 'title', json_extract(value, '$.title')))
         FROM json_each(templates.data_json, '$.objects')) AS objects
       FROM templates ORDER BY created_at DESC, rowid DESC`).all() as
-      { id: string; title: string; createdAt: string; objects: string }[];
+      { id: string; title: string; createdAt: string; folderId: string | null; objects: string }[];
     return rows.map(row => {
       const objects = JSON.parse(row.objects) as { id: string; kind: string; title: string | null }[];
       return { ...row, objects: objects.map(({ id, kind, title }) => ({
@@ -41,7 +43,8 @@ export class TemplateStore {
     return this.tree.workbench(sessionId).objects.filter(object => this.resources.template(object.kind))
       .map(({ id, kind, title }) => ({ id, kind, title }));
   }
-  save(sessionId: string, title: string, objectIds: readonly string[]): string {
+  save(sessionId: string, title: string, objectIds: readonly string[], folderId: string | null): string {
+    requireFolder(this.db, folderId);
     const state = this.tree.workbench(sessionId);
     const selected = new Set(objectIds);
     const objects = state.objects.filter(object => selected.has(object.id));
@@ -59,20 +62,21 @@ export class TemplateStore {
       views: this.workbench.layout(sessionId).views.filter(view => selected.has(view.objectId)),
     };
     const id = randomUUID();
-    this.db.prepare("INSERT INTO templates VALUES (?, ?, ?, ?)").run(id, title, new Date().toISOString(), JSON.stringify(value));
+    this.db.prepare("INSERT INTO templates (id, title, created_at, data_json, folder_id) VALUES (?, ?, ?, ?, ?)").run(id, title, new Date().toISOString(), JSON.stringify(value), folderId);
     const recordIds = new Set(this.tree.view(sessionId).timelineIds());
     for (const object of value.objects)
       this.content.bindTemplate(id, { sessionId, objectId: object.id, recordIds }, { data: object.data, current: object.current });
     return id;
   }
   instantiate(templateId: string, sessionId: string): void {
-    const row = this.db.prepare("SELECT title, data_json FROM templates WHERE id = ?").get(templateId) as
-      { title: string; data_json: string } | undefined;
+    const row = this.db.prepare("SELECT title, data_json, folder_id FROM templates WHERE id = ?").get(templateId) as
+      { title: string; data_json: string; folder_id: string | null } | undefined;
     if (!row) throw new SessionError("not_found", "Template not found.");
     const value = templateDataSchema.parse(JSON.parse(row.data_json));
     for (const object of value.objects) this.resources.validateTemplate(object.kind, object.data, object.current);
     const identities = new Map(value.objects.map(object => [object.id, createResourceId()]));
-    this.tree.create(row.title, sessionId);
+    // New sessions land in the template's folder; the foreign key keeps a deleted folder from lingering here.
+    this.tree.create(row.title, sessionId, row.folder_id);
     for (const object of value.objects) {
       const id = identities.get(object.id)!;
       const title = this.resources.template(object.kind)?.createTitle?.() ?? object.title;

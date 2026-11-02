@@ -10,25 +10,35 @@ import { useI18n } from "../shared/i18n";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { ListRowAction } from "@asterism-app/ui/ui/list-row";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { useFolders } from "../features/folders/context";
+import { FolderDialog } from "../features/folders/FolderDialog";
+import { MoveToFolderMenu } from "../features/folders/menus";
+import { toast } from "../shared/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 
-/** Session row menu: rename, save as template, and archive; actions are independent of session navigation. */
-export function SessionActions({ sessionId, title, disabled, renameDisabled, onRename, onArchive, onTemplateSaved }: {
-  sessionId: string; title: string; disabled: boolean; renameDisabled: boolean;
+/** Session row menu: rename, folder membership, save as template, and archive; actions are independent of session navigation. */
+export function SessionActions({ sessionId, title, folderId, disabled, renameDisabled, onRename, onArchive, onTemplateSaved }: {
+  sessionId: string; title: string; folderId: string | null; disabled: boolean; renameDisabled: boolean;
   onRename: (title: string) => Promise<SessionResult>;
   onArchive: () => Promise<SessionResult>;
   onTemplateSaved: () => void;
 }) {
   const i18n = useI18n();
+  const { run } = useFolders();
   const trigger = useRef<HTMLButtonElement>(null);
   const [renaming, setRenaming] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
+  const [creatingFolder, setCreatingFolder] = useState(false);
   /** Archiving always requires confirmation; resources with disposal notices are listed additionally, using the same content as exit confirmation. */
   const [confirming, setConfirming] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const warnings = useDisposalWarnings(sessionId, confirming ? "all" : null);
   const cannotRename = disabled || renameDisabled;
+  const move = async (target: string | null) => {
+    const failure = await run({ type: "session.move", sessionId, folderId: target });
+    if (failure) toast.error(i18n.text(failure));
+  };
   const archive = async () => {
     setArchiving(true);
     try { const result = await onArchive(); if (result.ok) setConfirming(false); }
@@ -42,10 +52,11 @@ export function SessionActions({ sessionId, title, disabled, renameDisabled, onR
           <MoreHorizontal />
         </ListRowAction>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onCloseAutoFocus={event => { if (renaming || confirming || savingTemplate) event.preventDefault(); }}>
+      <DropdownMenuContent align="end" onCloseAutoFocus={event => { if (renaming || confirming || savingTemplate || creatingFolder) event.preventDefault(); }}>
         <DropdownMenuItem disabled={cannotRename} onSelect={() => setRenaming(true)}>
           <Pencil />{i18n.text(appMessages.renameConversation)}…
         </DropdownMenuItem>
+        <MoveToFolderMenu value={folderId} disabled={disabled} onMove={target => { void move(target); }} onCreate={() => setCreatingFolder(true)} />
         <DropdownMenuItem disabled={disabled} onSelect={() => setSavingTemplate(true)}>
           <LayoutTemplate />{i18n.text(templateMessages.saveAs)}…
         </DropdownMenuItem>
@@ -57,8 +68,10 @@ export function SessionActions({ sessionId, title, disabled, renameDisabled, onR
     </DropdownMenu>
     {renaming && <RenameSession title={title} disabled={cannotRename} onSave={onRename}
       onClose={() => setRenaming(false)} onRestoreFocus={() => trigger.current?.focus({ preventScroll: true })} />}
-    {savingTemplate && <SaveTemplate sessionId={sessionId} title={title} disabled={disabled} onSaved={onTemplateSaved}
+    {savingTemplate && <SaveTemplate sessionId={sessionId} title={title} folderId={folderId} disabled={disabled} onSaved={onTemplateSaved}
       onClose={() => setSavingTemplate(false)} onRestoreFocus={() => trigger.current?.focus({ preventScroll: true })} />}
+    {creatingFolder && <FolderDialog onSaved={target => { void move(target); }} onClose={() => setCreatingFolder(false)}
+      onRestoreFocus={() => trigger.current?.focus({ preventScroll: true })} />}
     <AlertDialog open={confirming} onOpenChange={open => { if (!open && !archiving) { setConfirming(false); trigger.current?.focus({ preventScroll: true }); } }}>
       <AlertDialogContent>
         <AlertDialogHeader>

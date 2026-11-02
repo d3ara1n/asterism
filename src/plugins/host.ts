@@ -41,7 +41,7 @@ export interface SessionHost {
   initialize(owner: string, key: string, prepare: (context: SessionPreparation) => Promise<{
     title: string;
     initialize(sessionId: string, create: (prepared: PreparedCreation) => ResourceCreationResult, content: ContentLease): undefined;
-  }>, options: { signal: AbortSignal; content?: ContentReader }): Promise<string>;
+  }>, options: { signal: AbortSignal; content?: ContentReader; folderId: string | null }): Promise<string>;
   create(sessionId: string, contract: CreationContract<unknown>, input: Json, options: ResourceCreationOptions & { owner: string; check(): void }): Promise<ResourceCreationResult>;
   invoke(sessionId: string, contract: ActionContract<unknown>, target: ResourceRef, input: Json, options: ResourceActionOptions & { owner: string; check(): void }): Promise<void>;
   link(sessionId: string, receiver: ResourceRef, resource: ResourceRef, linked: boolean): void;

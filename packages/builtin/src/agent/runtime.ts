@@ -64,7 +64,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
             admission.acceptInitial(acceptedInput, session.object(Agent, resource.id));
             accepted = { ref: resource, input: acceptedInput };
           } };
-        }, { signal: context.signal, content: context.content });
+        }, { signal: context.signal, content: context.content, folderId: input.folderId });
         if (accepted) {
           const object = plugin.object(sessionId, Agent, accepted.ref.id);
           object.events.publish(AgentInputAccepted, { input: accepted.input, queued: false });

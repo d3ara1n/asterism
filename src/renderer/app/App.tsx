@@ -42,12 +42,13 @@ import { objectsMessages } from "../messages/objects";
 import { settingsMessages } from "../messages/settings";
 import { useI18n } from "../shared/i18n";
 import type { WorkbenchOperation } from "../features/session/controller";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type { ApplicationController } from "./controller";
 
 import { useCreationCoordinator } from "../features/creation/coordinator";
 import { sessionController } from "../features/session/registry";
+import { FolderServicesProvider, type FolderServices } from "../features/folders/context";
 
 import { islandTransition } from "../shared/weave/motion";
 
@@ -70,6 +71,14 @@ export function App({ controller }: { controller: ApplicationController }) {
   const pluginSettings = usePluginSettingsRegistry();
   const [view, setView] = useState<MainView>({ kind: "home" });
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  // Navigation memory kept across Home visits and sidebar hiding; it does not persist across restarts.
+  const [homeFolderId, setHomeFolderId] = useState<string | null>(null);
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleGroup = useCallback((key: string) => setCollapsedGroups(current => {
+    const next = new Set(current);
+    if (!next.delete(key)) next.add(key);
+    return next;
+  }), []);
   // Environment outlet for the current workbench: deeper islands on the right and the focus island on the left obtain the session environment through it.
   const [workbenchStore] = useState(() => new WorkbenchStore());
   // Increment on each navigation; when asynchronous creation completes, use this to determine whether the user has left, without taking over the current view.
@@ -81,6 +90,9 @@ export function App({ controller }: { controller: ApplicationController }) {
   const snapshot = state.snapshot;
   const session = sessionState?.data?.workbench ?? null;
   const ready = state.status === "ready";
+  const folderServices: FolderServices = useMemo(() => ({ folders: snapshot?.folders ?? [], run: controller.execute, ready }),
+    [snapshot?.folders, controller, ready]);
+  const homeFolder = useMemo(() => ({ id: homeFolderId, select: setHomeFolderId }), [homeFolderId]);
   const sessionBlocked = !!sessionState && (sessionState.navigating || sessionState.status !== "ready");
   const phase = workbenchPhase(state.status, sessionState);
   const writable = ready && !sessionBlocked && !!session;
@@ -223,7 +235,8 @@ export function App({ controller }: { controller: ApplicationController }) {
       onArchive={archiveSession}
       onTemplateSaved={() => { void controller.refresh({ quiet: true }); }}
       homeActive={view.kind === "home"}
-      onHome={goHome} onSession={openSession} onSettings={() => go("settings")} onHide={hideSidebar}
+      collapsed={collapsedGroups} onToggleGroup={toggleGroup}
+      onHome={goHome} onSession={openSession} onHide={hideSidebar}
       onRetry={() => { void controller.refresh(); }} />,
   };
   // Focus island: a controlled leading island between the sidebar and workbench; its content switches with the session, and it exits when returning home.
@@ -245,7 +258,7 @@ export function App({ controller }: { controller: ApplicationController }) {
             setSettingsTarget({ category: "general", sequence: ++navigation.current });
           }}
             templates={snapshot?.templates ?? []} onTemplateStart={startTemplate} onTemplatesChanged={() => { void controller.refresh({ quiet: true }); }}
-            ready={ready} onCreated={sessionCreated} /></motion.div>
+            ready={ready} onCreated={sessionCreated} folder={homeFolder} /></motion.div>
         : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
           {conversation}</motion.div>}
@@ -259,7 +272,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     onDismiss: controller.clearError,
   });
 
-  return <RendererCatalogProvider ready={ready}><UpdatesProvider><RendererSettingsNavigationProvider value={{ open(pluginId, pageId, location) {
+  return <RendererCatalogProvider ready={ready}><UpdatesProvider><FolderServicesProvider value={folderServices}><RendererSettingsNavigationProvider value={{ open(pluginId, pageId, location) {
     const settings = pluginSettings.pages.get(settingsPageKey(pluginId, pageId));
     if (!settings) throw new Error(`Plugin ${pluginId} has no available settings page ${pageId}.`);
     if (location !== undefined && !settings.locations?.includes(location)) throw new Error(`Unknown settings location: ${location}`);
@@ -282,5 +295,5 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}
       toastOptions={{ closeButtonAriaLabel: i18n.formatMessage(commonMessages.close) }} />
     {creation.element}
-  </RendererSettingsNavigationProvider></UpdatesProvider></RendererCatalogProvider>;
+  </RendererSettingsNavigationProvider></FolderServicesProvider></UpdatesProvider></RendererCatalogProvider>;
 }

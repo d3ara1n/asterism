@@ -4,7 +4,7 @@ import { ApplicationController } from "./controller.ts";
 import { ResourceStatusChanged, ResourcePresenceChanged, type EventHandler, type EventSubscriber, type ResourceStatus } from "@asterism-app/sdk/contracts";
 import { summarizeResourceStatus } from "./resource-status.ts";
 
-const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, sessions: [], templates: [], archivedSessions: [], plugins: [], restartRequired: false };
+const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, folders: [], sessions: [], templates: [], archivedSessions: [], plugins: [], restartRequired: false };
 describe("Application session list", () => {
   // Startup reading and the home page share one controller; a single read after subscribing can supply the initial screen.
   it("subscribes before reading during startup, and the home page reuses the snapshot while retaining the subscription to subsequent changes", async () => {
@@ -101,7 +101,7 @@ describe("Application session list", () => {
     void controller.refresh();
     requests[0]!({ ok: true, snapshot });
     await Promise.resolve();
-    requests[1]!({ ok: true, snapshot: { ...snapshot, sessions: [{ id: "new", title: "New", created_at: "" }] } });
+    requests[1]!({ ok: true, snapshot: { ...snapshot, sessions: [{ id: "new", title: "New", created_at: "", folder_id: null }] } });
     await first;
     expect(execute.mock.calls).toHaveLength(2);
     expect(controller.getSnapshot().snapshot?.sessions.map(session => session.id)).toEqual(["new"]);

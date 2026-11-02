@@ -481,7 +481,7 @@ export class SessionService {
     switch (command.type) {
       case "template.source": return { kind: "template.source", objects: this.templates.source(command.sessionId) };
       case "template.save": return { kind: "template.saved", templateId: this.transaction(() =>
-        this.templates.save(command.sessionId, command.title, command.objectIds)) };
+        this.templates.save(command.sessionId, command.title, command.objectIds, command.folderId)) };
       case "template.rename":
         this.transaction(() => this.templates.rename(command.templateId, command.title));
         return { kind: "template.renamed" };
@@ -648,7 +648,7 @@ export class SessionService {
       if (this.closed) throw new PluginApiError("unavailable", "The session service is closed.");
       const title = resourceTitleSchema.parse(initialization.title).trim();
       this.commit(sessionId, () => {
-        this.tree.create(title, sessionId);
+        this.tree.create(title, sessionId, options.folderId);
         initialization.initialize(sessionId, token => {
           const value = prepared.get(token);
           if (!value) throw new PluginApiError("invalid_argument", "The resource was not prepared in this session creation attempt.");

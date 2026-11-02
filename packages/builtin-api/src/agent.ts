@@ -14,7 +14,9 @@ export const agentInputModeSchema = z.enum(["steer", "follow"]);
 /** Submissions and drafts share a 16-character Nano ID identity. */
 export const submissionIdSchema = z.string().regex(/^[A-Za-z0-9_-]{16}$/u);
 export const StartAgentSession = defineCall(builtin.name("session.start"), {
-  scope: "plugin", input: z.strictObject({ submissionId: submissionIdSchema, selection: agentSelectionSchema, parts: agentInputPartsSchema }),
+  scope: "plugin", input: z.strictObject({ submissionId: submissionIdSchema, selection: agentSelectionSchema, parts: agentInputPartsSchema,
+    /** Host folder for the new session; null leaves it without a folder. */
+    folderId: z.string().uuid().nullable() }),
   output: z.strictObject({ sessionId: z.string().min(1) }),
 });
 /** title is optional; when omitted, the creation entry point generates a random display name. */

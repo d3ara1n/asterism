@@ -14,16 +14,27 @@ import { Field, FieldLabel } from "@asterism-app/ui/ui/field";
 import { Input } from "@asterism-app/ui/ui/input";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
+import { folderMessages } from "../../../shared/folder-messages";
+import { existingFolder, useFolders } from "../folders/context";
+import { sortFolders } from "../folders/grouping";
+import { FolderDot } from "../folders/marks";
 import { TemplateObjectLabel } from "./TemplateObjects";
 
-export function SaveTemplate({ sessionId, title, disabled, onSaved, onClose, onRestoreFocus }: {
-  sessionId: string; title: string; disabled: boolean;
+// Radix Select items need non-empty values; folder identities are UUIDs, so this cannot collide.
+const noFolder = "none";
+
+/** The template folder defaults to the source session's folder; sessions started from the template land there. */
+export function SaveTemplate({ sessionId, title, folderId, disabled, onSaved, onClose, onRestoreFocus }: {
+  sessionId: string; title: string; folderId: string | null; disabled: boolean;
   onSaved: () => void; onClose: () => void; onRestoreFocus: () => void;
 }) {
   const i18n = useI18n();
   const id = useId();
   const pending = useRef(false);
+  const { folders } = useFolders();
   const [name, setName] = useState(title);
+  const [folder, setFolder] = useState<string | null>(folderId);
   const [objects, setObjects] = useState<TemplateObjectSummary[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -46,7 +57,8 @@ export function SaveTemplate({ sessionId, title, disabled, onSaved, onClose, onR
     if (pending.current || disabled || !name.trim() || !selected.size) return;
     pending.current = true; setSaving(true); setError(null);
     try {
-      const result = await runtime.session.execute({ type: "template.save", sessionId, title: name, objectIds: [...selected] });
+      const result = await runtime.session.execute({ type: "template.save", sessionId, title: name, objectIds: [...selected],
+        folderId: existingFolder(folders, folder)?.id ?? null });
       if (!result.ok) { setError(errorDisplay(result.error)); return; }
       onSaved(); onClose();
     } catch { setError(commonMessages.connectionLost); }
@@ -66,6 +78,19 @@ export function SaveTemplate({ sessionId, title, disabled, onSaved, onClose, onR
             onKeyDown={event => {
               if (event.key === "Enter" && (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229)) event.preventDefault();
             }} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor={`${id}-folder`}>{i18n.text(folderMessages.folder)}</FieldLabel>
+          <Select value={existingFolder(folders, folder)?.id ?? noFolder} disabled={saving}
+            onValueChange={value => setFolder(value === noFolder ? null : value)}>
+            <SelectTrigger id={`${id}-folder`} className="w-full"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectGroup>
+              <SelectItem value={noFolder}>{i18n.text(folderMessages.noFolder)}</SelectItem>
+              {sortFolders(folders, i18n.locale).map(item => <SelectItem key={item.id} value={item.id}>
+                <FolderDot color={item.color} />{item.name}
+              </SelectItem>)}
+            </SelectGroup></SelectContent>
+          </Select>
         </Field>
         <fieldset className="min-w-0" disabled={saving}>
           <legend className="type-label mb-2">{i18n.text(templateMessages.objects)}</legend>

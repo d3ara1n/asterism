@@ -24,7 +24,7 @@ export async function prepareHomeEntry(context: RendererPrepareContext) {
   entry = current;
   context.signal.addEventListener("abort", () => { void current.draft.close(); if (entry === current) entry = undefined; }, { once: true });
 }
-export function ConversationEntry({ ready, open }: SessionEntryProps) {
+export function ConversationEntry({ ready, open, folder }: SessionEntryProps) {
   const i18n = useI18n(), calls = useRendererCalls(), settings = useRendererSettings();
   if (!entry) throw new Error("The conversation entry has not been prepared.");
   const { draft, identity } = entry;
@@ -45,7 +45,7 @@ export function ConversationEntry({ ready, open }: SessionEntryProps) {
   const submit = async () => {
     if (!canSend || pending.current) return;
     pending.current = true; setBusy(true); setError(null); draft.lock(true);
-    const value = { selection: { agent: agentId, model, thinking }, parts: draft.parts() };
+    const value = { selection: { agent: agentId, model, thinking }, parts: draft.parts(), folderId: folder.id };
     try {
       const result = await calls.invoke(StartAgentSession, { ...value, submissionId: identity.forInput(value) }, { content: draft.content() });
       identity.accepted(); draft.accepted(); open(result.sessionId);
@@ -70,6 +70,7 @@ export function ConversationEntry({ ready, open }: SessionEntryProps) {
         </InputGroupAddon>
       </InputGroup>
       <div className="flex min-w-0 flex-wrap items-center gap-0.5 px-1.5 py-1">
+        <folder.Picker disabled={busy} />
         <Choice icon={<Bot />} label={i18n.text(commonMessages.agent)} value={agent?.id ?? i18n.text(commonMessages.agent)}
           disabled={!snapshot || busy} selected={agent?.id ?? ""} onSelect={setAgentId}
           options={snapshot?.agents.filter(agent => agent.enabled).map(agent => ({ value: agent.id, label: agent.id })) ?? []} />

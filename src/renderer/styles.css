@@ -50,6 +50,9 @@
   --chart-1: #0090ff; --chart-2: #12a594; --chart-3: #ffc53d; --chart-4: #6e56cf;
   --chart-5: #e93d82; --chart-6: #f76b15; --chart-7: #00a2c7; --chart-8: #ab4aba;
   --chart-9: #3e63dd;
+  /* Folder theme colors: decorative identity marks, independent of status, accent, and chart colors. */
+  --folder-red: #e5484d; --folder-orange: #f76b15; --folder-amber: #e2a336; --folder-green: #30a46c;
+  --folder-teal: #12a594; --folder-blue: #0090ff; --folder-violet: #6e56cf; --folder-pink: #d6409f;
   /* Managed space padding: align island tops with page tops. */
   --space-inset: 0px;
   --motion-fast: 200ms;
@@ -77,6 +80,8 @@
     --success: #3dd68c; --warning: #ffca16;
     --destructive-foreground: #111111; --success-foreground: #111111; --warning-foreground: #111111;
     --canvas: #111111; --canvas-grid: #3a3a3a; --selection: #3a3a3a;
+    --folder-red: #ec5d5e; --folder-orange: #ff801f; --folder-amber: #ffca16; --folder-green: #3dd68c;
+    --folder-teal: #0bd8b6; --folder-blue: #3b9eff; --folder-violet: #9e8cfc; --folder-pink: #e66fb6;
   }
 }
 /* shadcn dark: classes bind to resolved light/dark mode; business code does not specify dark:. */
@@ -123,6 +128,14 @@
   --color-chart-7: var(--chart-7);
   --color-chart-8: var(--chart-8);
   --color-chart-9: var(--chart-9);
+  --color-folder-red: var(--folder-red);
+  --color-folder-orange: var(--folder-orange);
+  --color-folder-amber: var(--folder-amber);
+  --color-folder-green: var(--folder-green);
+  --color-folder-teal: var(--folder-teal);
+  --color-folder-blue: var(--folder-blue);
+  --color-folder-violet: var(--folder-violet);
+  --color-folder-pink: var(--folder-pink);
   /* Appearance settings write --app-font-sans / --app-font-mono to :root; these are pre-load fallbacks. */
   --font-sans: var(--app-font-sans, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif);
   --font-mono: var(--app-font-mono, ui-monospace, "SF Mono", Menlo, Consolas, "Cascadia Mono", "Noto Sans Mono CJK SC", monospace);

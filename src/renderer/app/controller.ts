@@ -1,6 +1,6 @@
 import { ResourceStatusChanged, ResourcePresenceChanged, SessionTitleChanged, type EventSubscriber, type UiText } from "@asterism-app/sdk/contracts";
 
-import type { AppSnapshot, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
+import type { AppSnapshot, Command, DesktopBridge, RuntimeStatus } from "../../shared/contracts";
 import type { RuntimeBridge } from "../../shared/connection";
 import { errorDisplay } from "../../shared/error-display";
 import { commonMessages } from "@asterism-app/ui/messages/common";
@@ -94,6 +94,15 @@ export class ApplicationController {
     };
   }
   clearError = (): void => this.update({ error: null });
+  /** Run an application command and adopt its returned snapshot; the failure display is returned to the command entry. */
+  execute = async (command: Command): Promise<UiText | null> => {
+    try {
+      const result = await this.bridge.execute(command);
+      if (!result.ok) return errorDisplay(result.error);
+      this.update({ snapshot: result.snapshot });
+      return null;
+    } catch { return commonMessages.connectionLost; }
+  };
   /** quiet is for background synchronization: it neither marks busy nor clears errors, preventing sidebar flicker and disabling as sessions run. */
   refresh = async ({ quiet = false }: { quiet?: boolean } = {}): Promise<void> => {
     if (this.reading) { this.dirty = true; return; }

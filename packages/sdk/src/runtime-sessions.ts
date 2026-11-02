@@ -32,5 +32,7 @@ export interface SessionCreation {
   (key: string, prepare: (context: SessionPreparation) => Promise<SessionInitialization>, options?: {
     signal?: AbortSignal;
     content?: ContentReader;
+    /** Host folder that receives the session; omitted or null leaves it without a folder. A named folder must still exist when the session commits. */
+    folderId?: string | null;
   }): Promise<string>;
 }

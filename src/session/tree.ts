@@ -8,6 +8,7 @@ import { selectNodes } from "./query.ts";
 import { foldWorkbench, workbenchRecordIds, type FoldedState } from "./fold.ts";
 import { SessionStructure, type StructuralNode } from "./structure.ts";
 import { deepFreeze } from "../shared/immutable.ts";
+import { requireFolder } from "./folders.ts";
 import { ResourceCreated, SessionTitleAssigned, type ResourceRef, type Json } from "@asterism-app/sdk/contracts";
 export { SessionError } from "../shared/session-timeline.ts";
 
@@ -68,8 +69,10 @@ export class SessionTree {
     return state;
   }
 
-  create(title: string, id: string = randomUUID()): string {
-    this.db.prepare("INSERT INTO sessions (id, title, initial_title, created_at, cursor) VALUES (?, ?, ?, ?, NULL)").run(id, title, title, new Date().toISOString());
+  /** A non-null folder must exist; the membership is part of the session row created in the caller's transaction. */
+  create(title: string, id: string = randomUUID(), folderId: string | null = null): string {
+    requireFolder(this.db, folderId);
+    this.db.prepare("INSERT INTO sessions (id, title, initial_title, created_at, cursor, folder_id) VALUES (?, ?, ?, ?, NULL, ?)").run(id, title, title, new Date().toISOString(), folderId);
     return id;
   }
   /** Active session catalog; archived sessions are read only through archived. */

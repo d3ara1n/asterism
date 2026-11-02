@@ -154,6 +154,8 @@ Content roots follow the actual encoded persistent JSON within the owning transa
 
 The renderer can contribute cards, tool phases, history records, creation entries, Home session entries, and independent settings pages. Frontend preparation can establish services independently of card mounting and binds them to a cancellation scope.
 
+A Home session entry receives the host's folder selection and folder control. The entry renders the control where it fits its interaction and passes the selected folder to session creation; folder catalog and creation remain host behavior.
+
 Frontend activation runs after backend publication. A stylesheet, import, or plugin preparation failure makes that frontend and its frontend dependents unavailable without deactivating accepted backend services. Module preparation failures retain the plugin's views and report partial initialization. Frontend outcomes belong to the current page and remain distinct from startup package outcomes; management presents both with stage-specific diagnostics.
 
 Imported styles are frontend build dependencies. The host preserves each entry's CSS association through compilation, artifact handoff, and startup projection, and loads styles in dependency and registration order before preparing the frontend. Initialization failures and frontend shutdown release the associated styles; individual view mounting does not own them.

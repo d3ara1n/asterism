@@ -115,7 +115,7 @@ Application identity and data layout are centralized. Development and installed 
 
 Global configuration survives replacement of the session database. Secrets are not stored as plaintext configuration or serialized into task history.
 
-SQLite has one runtime writer, WAL, and foreign keys. Session deletion cascades its history, cursor selections, current data, views, and content roots. Templates own separate content roots.
+SQLite has one runtime writer, WAL, and foreign keys. Session deletion cascades its history, cursor selections, current data, views, and content roots. Templates own separate content roots. Folder deletion clears the membership of its sessions and templates.
 
 Application metadata and historical records share synchronous transactions. Filesystem effects do not participate in a cross-medium transaction. Current local writes use processing order and last-write-wins semantics, without revision-based conflict protocols.
 

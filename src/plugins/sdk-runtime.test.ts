@@ -605,7 +605,7 @@ describe("Host implementation of the workbench SDK", () => {
     const before = service.sessions.tree.list();
     await expect(service.sessions.calls.invoke(StartAgentSession.id, { submissionId: nanoid(16),
       selection: { agent: "worker", model: `${target.provider}/${target.model}`, thinking: null },
-      parts: [{ kind: "text", text: "First" }] }, {}, null)).rejects.toMatchObject({ code: "invalid_argument" });
+      parts: [{ kind: "text", text: "First" }], folderId: null }, {}, null)).rejects.toMatchObject({ code: "invalid_argument" });
     expect(prepare).toHaveBeenCalledOnce();
     expect(service.sessions.tree.list()).toEqual(before);
     expect(service.sessions.running).toBe(false);
@@ -627,7 +627,7 @@ describe("Host implementation of the workbench SDK", () => {
     const target = await configureModel(service);
     const result = await service.sessions.calls.invoke(StartAgentSession.id, { submissionId: nanoid(16),
       selection: { agent: "worker", model: `${target.provider}/${target.model}`, thinking: null },
-      parts: [{ kind: "text", text: "Original" }] }, {}, null) as { sessionId: string };
+      parts: [{ kind: "text", text: "Original" }], folderId: null }, {}, null) as { sessionId: string };
     const view = service.sessions.current(result.sessionId);
     expect(service.sessions.tree.nodes(result.sessionId).find(node => node.contract === AgentInputMessage.id)?.data).toMatchObject({ parts: [{ kind: "text", text: "Prepared" }] });
     expect(view.title).toBe("Prepared");
@@ -693,7 +693,7 @@ describe("Host implementation of the workbench SDK", () => {
     const sourceRef = { sessionId: source.sessionId, id: source.id, kind: source.kind };
     const initial = {
       submissionId: nanoid(16), selection: { agent: "worker", model: `${target.provider}/${target.model}`, thinking: null },
-      parts: [{ kind: "text" as const, text: "Home" }],
+      parts: [{ kind: "text" as const, text: "Home" }], folderId: null,
     };
     await expect(service.sessions.calls.invoke(StartAgentSession.id, {
       ...initial, submissionId: nanoid(16), parts: [{ kind: "text", text: "Reject" }],
@@ -774,7 +774,7 @@ describe("Host implementation of the workbench SDK", () => {
     const target = await configureModel(service);
     const { sessionId } = await service.sessions.calls.invoke(StartAgentSession.id, {
       submissionId: nanoid(16), selection: { agent: "worker", model: `${target.provider}/${target.model}`, thinking: null },
-      parts: [{ kind: "text", text: "Work" }],
+      parts: [{ kind: "text", text: "Work" }], folderId: null,
     }, {}, null) as { sessionId: string };
     await entered.promise;
     const session = observer.session(sessionId);
