@@ -8,6 +8,7 @@ import { resolveRoleTarget } from "../configuration/runtime.ts";
 import type { createRequestAssembly } from "../agent/preparation.ts";
 import { runAgentLoop, type AgentLoopStatus } from "../agent/loop.ts";
 import { responseMessages } from "../agent/response-messages.ts";
+import { agentRequestRetries } from "../agent/retry.ts";
 import { ended, type DelegationInput, type FinishedStatus, type TaskCompletion, type TaskSnapshot, type ProcessBlock } from "./contract.ts";
 import type { AuditLog } from "./audit.ts";
 import { activityOf, type DeliveredSteer } from "./activity.ts";
@@ -127,12 +128,18 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
       let parent: string | null = null;
       let failure: { code: string; message: string } | null = null;
       const status = await runAgentLoop({
+        retry: {
+          maxRetries: agentRequestRetries,
+          requesting: () => { if (snapshot.status.phase === "running") snapshot.status.activity = "starting"; deps.changed(); },
+          waiting: () => { if (snapshot.status.phase === "running") snapshot.status.activity = "retrying"; deps.changed(); },
+        },
         requestLimit: () => agent.subagent.budget.maxRequests,
         completed: async () => { run.accepting = false; },
         consume,
         nextTurn: () => false,
         async request(index) {
           const blocks: ModelBlock[] = [];
+          const submitted = new Set<string>();
           const currentAgent = resolveAgent(deps.configuration(), snapshot.input.role);
           const prepare = deps.prepare({ ...currentAgent, systemPrompt: [
             currentAgent.systemPrompt,
@@ -150,7 +157,15 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
               }
             } else {
               run.audit.append({ type: "execution", event });
-              if (event.type === "block") { blocks.push(event.block); run.blocks.push(modelBlockSchema.parse(event.block)); }
+              if (event.type === "block" || event.type === "tool.begin" || event.type === "tool.complete") {
+                const replace = (items: ModelBlock[]) => {
+                  const at = items.findIndex(block => block.responseId === event.block.responseId && block.ordinal === event.block.ordinal);
+                  const block = modelBlockSchema.parse(event.block);
+                  if (at < 0) items.push(block); else items[at] = block;
+                };
+                replace(blocks); replace(run.blocks);
+                if (event.type === "tool.begin") submitted.add(event.block.callId);
+              }
               if (event.type === "diagnostic" && event.level === "error") failure = { code: event.code, message: event.message };
             }
             snapshot.output.usage.elapsedMs = Math.round(performance.now() - started);
@@ -168,14 +183,15 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
             },
           }, { content, output: content });
           parent = response.responseId;
-          messages.push(...responseMessages(blocks));
+          messages.push(...responseMessages(blocks, submitted));
           const last = [...blocks].sort((a, b) => a.ordinal - b.ordinal).findLast(block => block.kind === "text");
           if (last?.kind === "text") snapshot.output.result = last.text;
           Object.assign(snapshot.output.usage, accumulateUsage(snapshot.output.usage, response.completion?.usage ?? null, index === 0));
           if (response.response) deps.usage.consume(response.response);
           if (response.reason === "failed" && !failure)
             failure = { code: response.code, message: response.details?.message ?? "The model request failed." };
-          return { reason: response.reason, hasTools: response.tools.length > 0 };
+          return { reason: response.reason, hasTools: response.tools.length > 0,
+            ...(response.reason === "failed" ? { retryable: response.retryable, details: response.details } : {}) };
         },
       }, current);
       ending = { kind: "loop", status, failure };

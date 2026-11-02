@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { thinkingLevels } from "@asterism-app/sdk/contracts";
+import { thinkingLevels, modelToolCallBlockSchema, toolOutcomeSchema } from "@asterism-app/sdk/contracts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -133,7 +133,7 @@ describe("Host implementation of the workbench SDK", () => {
       },
     });
     expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded", data: 42 }] });
-    expect(events.find(event => event.type === "block")).toMatchObject({ block: { requestParentId: "temporary-position" } });
+    expect(events.find(event => event.type === "tool.complete")).toMatchObject({ block: { requestParentId: "temporary-position" } });
     expect(service.sessions.tree.workbench(sessionId).objects).toEqual([]);
     expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
   });
@@ -1084,10 +1084,11 @@ describe("Host implementation of the workbench SDK", () => {
     expect(c.context().session(other).title.get()).toBe("Other");
   });
 
-  it("public run delivers events and callers decide whether to save history under their own record contracts", async () => {
+  it("public run lets callers persist tool inputs before execution and fill results without moving the record", async () => {
     const c = counter();
     const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
-    const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });
+    const ToolOperation = defineOperationRecord(ns.name("tool-operation"), { input: modelToolCallBlockSchema, output: toolOutcomeSchema });
+    const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution, ToolOperation] }))] });
     const inputs: ModelInput[] = [];
     const { service, sessionId } = open([plugin], () => ({ validate() {}, version: "test-adapter", prepare(input) {
       inputs.push(structuredClone(input));
@@ -1101,13 +1102,28 @@ describe("Host implementation of the workbench SDK", () => {
     const id = await create(service, sessionId);
     const object = c.context().object(sessionId, Counter, id);
     const before = object.session.snapshot();
+    let operationId!: string;
+    let pending: SessionRecord | undefined;
     const result = await c.context().execution.run({ access: object.ref, interactive: true, requestParentId: before.position.nodeId,
       userAgent: "PluginAgent/1.0",
       target, system: { blocks: [] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "First projection" }] }], signal: new AbortController().signal,
-      observer: { event(event) { if (event.type !== "progress") object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); }); } },
+      observer: { event(event) {
+        if (event.type === "progress") return;
+        object.commit(writer => {
+          if (event.type === "tool.begin") operationId = writer.begin(ToolOperation, event.block);
+          else if (event.type === "tool.complete") writer.complete(ToolOperation, operationId, event.block.outcome!);
+          else writer.append(Execution, modelRunRecordSchema.parse(event));
+        });
+        if (event.type === "tool.begin") pending = object.session.snapshot().records.last(ToolOperation, { scope: "timeline" })!.record;
+      } },
     });
     expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded" }], source: { adapter: "test-adapter" } });
-    expect(object.session.snapshot().records.query(Execution, { scope: "timeline" }).map(record => record.status)).toEqual(["known"]);
+    expect(pending).toMatchObject({ id: operationId, pending: true, data: { output: null } });
+    const saved = object.session.snapshot();
+    expect(saved.position.nodeId).toBe(operationId);
+    expect(saved.records.query(ToolOperation, { scope: "timeline" })).toMatchObject([{
+      status: "known", record: { id: operationId, pending: false }, data: { input: { callId: "c", arguments: {} }, output: { kind: "succeeded" } },
+    }]);
     const count = service.sessions.tree.nodes(sessionId).map(flat).length;
     await c.context().execution.run({ access: object.ref, interactive: true, requestParentId: object.session.snapshot().position.nodeId,
       userAgent: "PluginAgent/1.0",

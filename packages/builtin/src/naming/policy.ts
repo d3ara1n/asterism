@@ -1,4 +1,4 @@
-import { inputSummary, Execution, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
+import { decodeExecution, inputSummary, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import type { SessionRecord, SessionSnapshot } from "@asterism-app/sdk/contracts";
 
 const windowEdge = 4;
@@ -38,7 +38,7 @@ export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
       agentInputs.push({ position, turn }); inputs.set(record.source?.resource?.id ?? "", agentInputs);
       continue;
     }
-    const output = Execution.decode(record);
+    const output = decodeExecution(record);
     if (output?.status !== "known" || output.data.type !== "block" || !record.source?.resource) continue;
     const block = output.data.block;
     if (block.kind !== "text" || !block.complete || !block.text.trim()) continue;

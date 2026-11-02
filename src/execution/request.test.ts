@@ -10,6 +10,7 @@ import { resolveInput } from "../model/input.ts";
 import { runModelRequest } from "./request.ts";
 import { bindModelTools } from "./core.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
+import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import type { ModelSettings } from "../shared/model.ts";
 
 const settings: ModelSettings = {
@@ -46,18 +47,84 @@ const write = defineImplementation({ ...defineData("example.resource/write", z.n
   targetSchema: z.null().describe("The whole item."), effect: "write", execution: "sequential" });
 
 describe("Stateless single model execution", () => {
+  it.each(["error", "eof"])("retains closed Anthropic text and reported input usage when the stream ends with %s", async ending => {
+    const frames: unknown[] = [
+      { type: "message_start", message: { id: "upstream-id", type: "message", role: "assistant", model: "test",
+        content: [], stop_reason: null, stop_sequence: null,
+        usage: { input_tokens: 123, cache_read_input_tokens: 9, cache_creation_input_tokens: 0, output_tokens: 0 } } },
+      { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+      { type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Closed content" } },
+      { type: "content_block_stop", index: 0 },
+    ];
+    if (ending === "error") frames.push({ type: "error", error: { type: "overloaded_error", message: "Upstream busy" } });
+    const transport: typeof fetch = async () => new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""),
+      { headers: { "content-type": "text/event-stream" } });
+    const events: ModelRunEvent[] = [], request = input(events);
+    const result = await runModelRequest(request, Promise.resolve({
+      adapter: new AiSdkAdapter(async () => "test-key", undefined, transport),
+      settings: { ...settings, provider: { ...settings.provider, protocol: "anthropic" as const } },
+      system: request.system, messages: await resolveInput(request.messages, undefined, request.signal),
+    }));
+    expect(result).toMatchObject({ reason: "failed", retryable: true, completion: {
+      providerResponseId: "upstream-id", termination: { reason: "failed", retryable: true },
+      usage: { input: 132, cacheRead: 9, output: null, total: null },
+    } });
+    expect(events.find(event => event.type === "block")).toMatchObject({ block: {
+      kind: "text", text: "Closed content", complete: true, completion: { termination: { reason: "failed" } },
+    } });
+  });
+
+  it("publishes every tool input before execution and matches reverse-order outcomes to the original calls", async () => {
+    const events: ModelRunEvent[] = [];
+    const request = input(events);
+    const tools = {
+      declarations: [{ name: "read", description: "Read", parameters: { type: "object" } }],
+      async execute(batch: readonly import("@asterism-app/sdk/contracts").ModelToolCall[], _signal: AbortSignal,
+        settle: (call: import("@asterism-app/sdk/contracts").ModelToolCall, result: import("@asterism-app/sdk/contracts").ToolOutcome) => void) {
+        expect(events.filter(event => event.type === "tool.begin").map(event => event.block.kind === "toolcall" && event.block.callId)).toEqual(["a", "b"]);
+        for (const call of [...batch].reverse()) settle(call, { kind: "succeeded", data: call.callId, model: [{ kind: "text", text: call.callId }] });
+      },
+    };
+    await runModelRequest(request, Promise.resolve({ adapter: model(calls(["a", "b"], "read")), settings, tools,
+      system: request.system, messages: await resolveInput(request.messages, undefined, request.signal) }));
+    expect(events.filter(event => event.type === "tool.complete").map(event => [event.block.callId, event.block.outcome?.data])).toEqual([["b", "b"], ["a", "a"]]);
+  });
+
+  it("does not make local preparation failures or explicit cancellation eligible for retry", async () => {
+    const signal = AbortSignal.abort();
+    const request = input([], { signal });
+    const cancelled = await runModelRequest(request, Promise.resolve({ adapter: model(text), settings, system: request.system, messages: [] }));
+    expect(cancelled.reason).toBe("cancelled");
+    const failed = await execute(input([]), model(text, () => { throw new Error("Local assembly failed"); }));
+    expect(failed).toMatchObject({ reason: "failed", retryable: false });
+  });
+
+  it("does not execute tools when their pending input cannot be saved", async () => {
+    let executed = false;
+    const request = input([], { observer: { event(event) {
+      if (event.type === "tool.begin") throw new Error("Input could not be saved");
+    } } });
+    const result = await runModelRequest(request, Promise.resolve({
+      adapter: model(calls(["a"])), settings, system: request.system, messages: [],
+      tools: { declarations: [], async execute() { executed = true; } },
+    }));
+    expect(executed).toBe(false);
+    expect(result).toMatchObject({ reason: "failed", code: "event_delivery", tools: [] });
+  });
+
   // Deliver existing blocks even if the stream breaks; original errors remain readable by the UI after event and record validation.
   it("partial response failure details remain in both the return value and persistable diagnostics", async () => {
     const details = { message: "Upstream overloaded", statusCode: 503, responseBody: '{"error":"busy"}' };
-    const failure = new ModelFailure("provider_error", details.message, details, "model");
+    const failure = new ModelFailure("provider_error", details.message, details, "model", true);
     const events: ModelRunEvent[] = [];
     const result = await execute(input(events), { validate() {}, version: "test", prepare() { return {
       async *stream() { yield* text.slice(0, -1); throw failure; },
     }; } });
-    expect(result).toMatchObject({ reason: "failed", code: "provider_error", details });
+    expect(result).toMatchObject({ reason: "failed", code: "provider_error", details, retryable: true });
     const records = events.filter(event => event.type !== "progress").map(event => modelRunRecordSchema.parse(event));
-    expect(records).toContainEqual({ type: "diagnostic", origin: "model", code: "provider_error", message: details.message, level: "error", details });
-    expect(records[0]).toMatchObject({ type: "block", block: { kind: "text", text: "Hello", complete: true } });
+    expect(records).toContainEqual(expect.objectContaining({ type: "diagnostic", origin: "model", code: "provider_error", message: details.message, level: "error", details }));
+    expect(records[0]).toMatchObject({ type: "block", block: { kind: "text", text: "Hello", complete: true,
+      completion: { termination: { reason: "failed", code: "provider_error", details } } } });
   });
   // Response metadata goes only to the initiator through the result, never to persistable blocks, diagnostics, or progress events.
   it.each(["completed", "failed"] as const)("%s results preserve HTTP metadata while observation events exclude headers", async outcome => {
@@ -85,8 +152,8 @@ describe("Stateless single model execution", () => {
     const first = await execute(input(events), adapter);
     expect(requests).toBe(1);
     expect(first).toMatchObject({ reason: "completed", tools: [{ kind: "succeeded", data: { resources: [] } }] });
-    expect(events.filter(event => event.type === "block")).toHaveLength(1);
-    expect(events.find(event => event.type === "block")).toMatchObject({ block: { ordinal: 0, requestParentId: "origin", completion: { finishReason: "tool-calls" } } });
+    expect(events.filter(event => event.type === "tool.begin")).toHaveLength(1);
+    expect(events.find(event => event.type === "tool.complete")).toMatchObject({ block: { ordinal: 0, requestParentId: "origin", completion: { finishReason: "tool-calls" } } });
     await execute(input([], { messages: [{ kind: "input", parts: [{ kind: "text", text: "New projection" }] }] }), adapter);
     expect(seen).toEqual([[{ kind: "input", parts: [{ kind: "text", text: "Input" }] }], [{ kind: "input", parts: [{ kind: "text", text: "New projection" }] }]]);
   });
@@ -136,7 +203,7 @@ describe("Stateless single model execution", () => {
     expect(result).toMatchObject({ reason: "completed", tools: [{ kind: "unknown" }, { kind: "unknown" }] });
     expect(result.tools[0]!.model).toEqual([{ kind: "text", text: "unknown: Effects require inspection." }]);
     expect(result.tools[1]!.model).toEqual([{ kind: "text", text: "unknown: The tool stopped with an unknown outcome." }]);
-    expect(events.filter(event => event.type === "block")).toHaveLength(2);
+    expect(events.filter(event => event.type === "tool.complete")).toHaveLength(2);
     expect(events.filter(event => event.type === "diagnostic")).toEqual([]);
   });
 

@@ -1,6 +1,6 @@
 import { completionData, type ModelInputPart, type ModelItem, type SessionSnapshot, type SessionRecord, type ModelBlock, type RecordInfo } from "@asterism-app/sdk/contracts";
 import { contextMessages, agentContextRead, agentSummaryRead, type AgentContext } from "../context-projection.ts";
-import { Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism-app/builtin-api/contracts";
+import { decodeExecution, executionRecordIds, AgentRequestContext, AgentInputMessage, type AgentRequestContextData } from "@asterism-app/builtin-api/contracts";
 import { readRecords, type RecordRead } from "../../shared/record-reading.ts";
 
 /** Fixed categories and display order for conversation composition. */
@@ -52,7 +52,7 @@ export function* agentMeasurementsRead(index: readonly RecordInfo[], agentId: st
 function* latestMeasurementRead(agentId: string, before?: string): RecordRead<ContextMeasurement | null> {
   let limit = 1;
   for (;;) {
-    const records = yield { scope: "timeline", contracts: [Execution.id], source: agentId, before, edge: "last", limit };
+    const records = yield { scope: "timeline", contracts: executionRecordIds, source: agentId, before, edge: "last", limit };
     const measurement = contextMeasurement(records, agentId);
     if (measurement || !records.length) return measurement;
     before = records[0]!.id;
@@ -64,7 +64,7 @@ function contextMeasurement(records: readonly SessionRecord[], agentId: string):
   for (let index = records.length - 1; index >= 0; index--) {
     const record = records[index]!;
     if (record.source?.resource?.id !== agentId) continue;
-    const execution = Execution.decode(record);
+    const execution = decodeExecution(record);
     if (execution?.status === "known" && execution.data.block.completion) return { record, block: execution.data.block };
   }
   return null;

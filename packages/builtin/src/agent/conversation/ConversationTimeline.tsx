@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "motion/react";
 import { Virtualizer, type VirtualizerHandle } from "virtua";
 
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
-import { Badge } from "@asterism-app/ui/ui/badge";
 import { cn } from "@asterism-app/ui/utils";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "./Markdown";
@@ -23,6 +22,7 @@ import { TurnProcess } from "./TurnProcess";
 import { CompressionMarker } from "./CompressionMarker";
 import type { useTimelinePresence } from "./timeline-presence";
 import { conversationTransition, immediateTransition } from "./motion";
+import { blockShell } from "./block-shell";
 
 /** Item view state survives remounts when supplied by the caller; otherwise it lives with this component. */
 export function ConversationTimeline({ items, viewState }: { items: readonly TimelineItem[]; viewState?: TimelineViewState }) {
@@ -88,9 +88,8 @@ const NodeView = memo(function NodeView({ node, entry }: { node: TimelineItem; e
 function NodeContent({ node }: { node: TimelineItem }) {
   const i18n = useI18n();
   const object = useRendererObject();
-  const incomplete = "complete" in node && !node.complete;
   const streaming = generating(node);
-  const tag = incomplete ? <Badge variant="outline">{i18n.formatMessage(conversationMessages.incomplete)}</Badge> : null;
+  const shell = blockShell(node);
   switch (node.kind) {
     case "message": return <article data-conversation-message={node.id}
       className={cn("flex min-w-0 max-w-[92%] flex-col gap-2", node.sender.kind === "user" ? "ml-auto" : "mr-auto")}>
@@ -98,7 +97,9 @@ function NodeContent({ node }: { node: TimelineItem }) {
       <div data-message-surface="" className={cn("flex flex-col gap-2 rounded-md px-3 py-2", messageAppearance[node.sender.kind].surface)}>{node.parts.map((part, index) =>
         part.kind === "text" ? <Markdown key={index}>{part.text}</Markdown>
           : <FilePreview key={index} part={part} content={object.content} />)}</div></article>;
-    case "text": return <article className="space-y-1">{tag}<Markdown streaming={streaming}>{node.text}</Markdown></article>;
+    case "text": return <article className={cn("rounded-md outline-1 outline-offset-4 outline-transparent",
+      shell.dashed && "outline-dashed outline-border", shell.failed && "outline-destructive")}>
+      <Markdown streaming={streaming}>{node.text}</Markdown></article>;
     case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
     case "toolcall": return <ToolCall node={node} />;
     case "summary": return <Summary text={node.text} />;

@@ -1,18 +1,6 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const toolsMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
-  toolWaiting: {
-    id: "toolWaiting",
-    defaultMessage: "Waiting",
-  },
-  toolIncomplete: {
-    id: "toolIncomplete",
-    defaultMessage: "Not executed",
-  },
-  toolIncompleteRequest: {
-    id: "toolIncompleteRequest",
-    defaultMessage: "Incomplete resource request",
-  },
   toolSucceeded: {
     id: "toolSucceeded",
     defaultMessage: "Completed",

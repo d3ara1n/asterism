@@ -19,7 +19,7 @@ const transportInput: ModelInput = { ...input, settings: { ...input.settings, th
 
 describe("AI SDK adaptation contract", () => {
   // Upstream status and original text support diagnosis; HTTP 429 and 500 must not collapse into the same configuration/network guess.
-  it.each([429, 500])("HTTP %s preserves original error bodies and response identities without request credentials", async status => {
+  it.each([401, 402, 429, 500])("HTTP %s preserves original error bodies and exposes upstream retryability without request credentials", async status => {
     const body = '{"type":"error","error":{"type":"upstream_error","message":"Original provider message","request_id":"req-1","extra":{"limit":12}}}';
     const response = new Response(body, {
       status, headers: { "content-type": "application/json", "X-Request-Id": "req-1" },
@@ -30,7 +30,7 @@ describe("AI SDK adaptation contract", () => {
     expect(failure).toBeInstanceOf(ModelFailure);
     expect(failure.response).toMatchObject({ connection: { id: "p" }, endpoint: input.settings.provider.baseUrl,
       model: "test", status, headers: { "x-request-id": "req-1" } });
-    expect(failure).toMatchObject({ origin: "model", message: "Original provider message", details: {
+    expect(failure).toMatchObject({ origin: "model", retryable: true, message: "Original provider message", details: {
       message: "Original provider message", statusCode: status, httpStatus: status, responseBody: body,
       responseHeaders: { "x-request-id": "req-1" },
     } });
@@ -46,14 +46,14 @@ describe("AI SDK adaptation contract", () => {
     await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
       .rejects.toMatchObject({ details: { statusCode: 502, httpStatus: 502, responseBody: body } });
   });
-  // Server rejection is a model outcome; SDK failure to parse response JSON or structure is a software processing failure.
-  it.each(["not JSON", '{"choices":"invalid"}'])("response parsing failures explicitly identify software origin: %s", async chunk => {
+  // Invalid bytes or structures delivered by an upstream server remain eligible for bounded recovery.
+  it.each(["not JSON", '{"choices":"invalid"}'])("invalid upstream response data is classified at the provider boundary: %s", async chunk => {
     const current = structuredClone(transportInput);
     current.settings.provider.protocol = "openai-chat";
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(
       `data: ${chunk}\n\n`, { headers: { "content-type": "text/event-stream" } }));
     await expect(consume(adapter.prepare(current).stream(new AbortController().signal)))
-      .rejects.toMatchObject({ origin: "software", code: "response_parsing", details: { httpStatus: 200 } });
+      .rejects.toMatchObject({ origin: "model", retryable: true, code: "response_parsing", details: { httpStatus: 200 } });
   });
   // The Anthropic SDK consumes the first error in doStream and trims fields; the transport prefix retains data actually received.
   it("preserves the original response when the first SSE event fails and distinguishes actual HTTP from SDK-inferred status", async () => {
@@ -450,16 +450,23 @@ describe("AI SDK adaptation contract", () => {
   // Network errors have no HTTP response; the original cause distinguishes DNS, connection, and other transport failures.
   it("transport failures preserve original messages and cause without automatic retries", async () => {
     const cause = Object.assign(new Error("getaddrinfo ENOTFOUND example.invalid"), { code: "ENOTFOUND" });
-    const model = new MockLanguageModelV4({ doStream: async () => { throw new Error("fetch failed", { cause }); } });
-    const adapter = new AiSdkAdapter(async () => "credential", () => model);
+    const transport = vi.fn<typeof fetch>(async () => { throw new Error("fetch failed", { cause }); });
+    const adapter = new AiSdkAdapter(async () => "credential", undefined, transport);
     let failure: unknown;
-    try { for await (const _event of adapter.prepare(input).stream(new AbortController().signal)) { /* Consume the stream. */ } }
+    try { for await (const _event of adapter.prepare(transportInput).stream(new AbortController().signal)) { /* Consume the stream. */ } }
     catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(Error);
-    expect(failure).toMatchObject({ message: "fetch failed", details: {
+    expect(failure).toMatchObject({ message: "fetch failed", retryable: true, origin: "model", details: {
       message: "fetch failed", causes: [{ message: "getaddrinfo ENOTFOUND example.invalid", code: "ENOTFOUND" }],
     } });
-    expect(model.doStreamCalls).toHaveLength(1);
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  it("SDK-local encoding exceptions are not classified as retryable upstream errors", async () => {
+    const model = new MockLanguageModelV4({ doStream: async () => { throw new Error("Unsupported local input"); } });
+    const adapter = new AiSdkAdapter(async () => "credential", () => model);
+    await expect(consume(adapter.prepare(input).stream(new AbortController().signal)))
+      .rejects.toMatchObject({ origin: "software", retryable: false, message: "Unsupported local input" });
   });
 
   it("model or adapter version changes do not block public text, and native data never crosses origins", () => {

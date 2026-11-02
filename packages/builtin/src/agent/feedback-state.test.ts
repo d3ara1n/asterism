@@ -26,7 +26,7 @@ it("Routes feedback by source, preserves its occurrence position, and cleans it 
   expect(publish).toHaveBeenCalledExactlyOnceWith(AgentSoftwareFeedback, software);
   expect(commit).not.toHaveBeenCalled();
   state.delete(object.ref.id);
-  expect(state.get(object)).toEqual({ inline: [], interruptions: [], compressions: [] });
+  expect(state.get(object)).toEqual({ inline: [], interruptions: [], compressions: [], activity: null });
 });
 
 // Error feedback may be appended during compression; finalizing the activity must preserve it, hand successful activity over to persistent records, and keep failures/cancellations at their original positions.

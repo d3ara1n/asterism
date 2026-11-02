@@ -3,7 +3,7 @@ import { sessionSnapshot } from "../../../../../src/plugins/records";
 import { nodeView } from "../../../../../src/session/view";
 import { node, text, thinking, message as input } from "../../../../../src/session/test-nodes";
 import type { ModelLiveBlock, SessionSnapshot } from "@asterism-app/sdk/contracts";
-import { displayedTimeline, generating, liveTimeline, mountedTimelineIndexes, savedTimeline, timelineKey, withLive } from "./timeline";
+import { displayedTimeline, generating, isModelBlock, liveTimeline, mountedTimelineIndexes, savedTimeline, timelineKey, withLive } from "./timeline";
 import type { InlineFeedback } from "../feedback";
 
 /** The same two-layer composition as the agent card: saved content plus live blocks. */
@@ -11,6 +11,24 @@ const conversationTimeline = (snapshot: SessionSnapshot, agentId: string, live: 
   withLive(savedTimeline(snapshot.records.all({ scope: "timeline" }), agentId, running), live);
 
 describe("Agent typed record views", () => {
+  it("restores one error notice and marks only partial context, preserving complete text in a failed response", () => {
+    const completion = { usage: null, finishReason: null, rawFinishReason: null, providerResponseId: null,
+      termination: { reason: "failed" as const, origin: "model" as const, code: "provider_error", message: "Disconnected", retryable: true } };
+    const path = [
+      node("u", null, input("a", "Question")),
+      node("text", "u", text("a", "r", 0, "Complete text", { requestParentId: "u" })),
+      node("thinking", "text", thinking("a", "r", 1, "Partial", { requestParentId: "u", complete: false, completion })),
+    ];
+    const snapshot = sessionSnapshot(nodeView("s", "", path, "thinking"));
+    const items = savedTimeline(snapshot.records.all({ scope: "timeline" }), "a", false, [{
+      id: "live-error", afterNodeId: "thinking", responseId: "r", origin: "model", level: "error", code: "provider_error", message: "Disconnected",
+    }]).items;
+    expect(items.find(item => item.kind === "text")).not.toHaveProperty("partialContext");
+    expect(items.find(item => item.kind === "text")).not.toHaveProperty("failed");
+    expect(items.find(item => item.kind === "thinking")).toMatchObject({ partialContext: true, failed: true });
+    expect(items.filter(item => item.kind === "notice")).toMatchObject([{ message: "Disconnected" }]);
+  });
+
   // A record update may precede its body read and the removal of its live block; preserve one item until the saved view catches up.
   it("retains live output through a pending history read and releases it when that read settles or resets", () => {
     const first: ModelLiveBlock = { id: "live", responseId: "r", ordinal: 0, kind: "text", text: "Partial", endedAt: null };
@@ -25,7 +43,7 @@ describe("Agent typed record views", () => {
     expect(liveTimeline(retained, removed, false).visible).toEqual([]);
     const saved = node("saved", null, text("a", "r", 0, "Complete"));
     const timeline = savedTimeline(sessionSnapshot(nodeView("s", "", [saved], saved.id)).records.all({ scope: "timeline" }), "a", false);
-    expect(withLive(timeline, retained.visible).filter(item => "responseId" in item)).toHaveLength(1);
+    expect(withLive(timeline, retained.visible).filter(isModelBlock)).toHaveLength(1);
   });
   // Displayed source comes from structured sender data; envelope text within the body does not determine attribution.
   it("Input views preserve agent source and original body text; user-written tags remain part of a user message", () => {

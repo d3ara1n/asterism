@@ -44,6 +44,8 @@ Resource holds do not block history movement. Use an object busy scope for work 
 
 Use `plugin.models.run` when supplying messages and executable tools directly. It needs no workbench resource or timeline. Both forms deliver execution records to the observer you provide. `plugin.execution.withProgress` supplies an optional workbench observer for the events you choose to display.
 
+Tool input events arrive in model order before the batch executes. A consumer can begin an operation record for each input, then fill that record when its tool completion event arrives. Progress remains transient. Response termination metadata describes model generation independently of tool outcomes, including available diagnostics after a failed stream. The caller owns retry policy and can use the returned failure's retryability without interpreting provider error strings.
+
 For a temporary conversation, use a content scope to retain generated attachments across requests. Pass it as the input reader and output owner for session-bound execution. Persistent records or a longer-lived scope must retain any surviving results before the temporary scope closes.
 
 ## Connect other interactions

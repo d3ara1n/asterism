@@ -97,6 +97,10 @@ Declare an Agent preparer to filter skills or remove, change, and append instruc
 
 ## Extend presentation
 
+Agent history includes immutable model blocks and tool operations. Complete tool inputs are published before execution and their results fill the same record once. Read both through the public execution decoder when building a history projection; operation completion updates the existing record rather than appending a new tool position.
+
+Response termination metadata may describe generation failure or cancellation as well as success. It belongs to the response's last model-ordinal block and does not invalidate all earlier content. Errors before any output remain transient. Retry activity belongs to current execution state, not historical notices.
+
 Register Agent UI extensions during frontend preparation and bind registration to its cancellation signal. Extensions can present controls, supplemental content, overlays, or modal interaction using the built-in presentation components. Message sources already share the built-in body renderer and source presentation.
 
 The plugin supplies business state for the associated Agent and callbacks for user actions. A component becoming invisible does not complete or cancel waiting backend work. Remounting should reread current state, and each submission entry owns its pending and error state.

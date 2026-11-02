@@ -1,5 +1,5 @@
 import { completionData, type ModelBlock, type ModelCompletion, type SessionRecord, type SessionView } from "@asterism-app/sdk/contracts";
-import { ContextSummary, Execution, AgentRequestContext, AgentInputMessage, type AgentRequestContextData, type AgentMessageSender, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
+import { decodeExecution, ContextSummary, AgentRequestContext, AgentInputMessage, type AgentRequestContextData, type AgentMessageSender, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 
 export type DiagnosticScope = "timeline" | "session";
 export interface DiagnosticRequest {
@@ -48,7 +48,7 @@ export function diagnosticRecords(records: readonly SessionRecord[], timelineIds
     if (record.source?.resource?.id !== agentId) { history.set(record.id, state); continue; }
     const input = AgentInputMessage.decode(record);
     const summary = ContextSummary.decode(record);
-    const execution = Execution.decode(record);
+    const execution = decodeExecution(record);
     if ([input, summary, execution].some(value => value?.status === "unknown")) {
       unreadable++; state = { input: null, lastFile: null };
     }

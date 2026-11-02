@@ -85,6 +85,8 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
     id: "agent_conversation_Conversation_4",
     defaultMessage: "The agent is working…",
   },
+  retryWaiting: { id: "agent.retryWaiting", defaultMessage: "Retrying in {seconds}s · {attempt}/{max}" },
+  retrying: { id: "agent.retrying", defaultMessage: "Retrying · {attempt}/{max}" },
   emptyHint: {
     id: "agent_conversation_Conversation_5",
     defaultMessage: "Send a message to begin.",

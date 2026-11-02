@@ -1,7 +1,7 @@
 /** Shared payloads for model execution; consuming plugins declare RecordContract identities, and the SDK does not create a separate history. */
 import { z } from "zod";
 import { jsonSchema, type Json } from "./json.ts";
-import { toolOutcomeSchema } from "./tool-result.ts";
+import { toolOutcomeSchema, toolInvocationSchema } from "./tool-result.ts";
 import { presentationSchema, type DataContract } from "./presentation.ts";
 import type { ModelCompletion } from "./models.ts";
 import { errorDetailsSchema } from "./error-details.ts";
@@ -27,9 +27,16 @@ export const requestTimingSchema = z.strictObject({
 export type RequestTiming = z.infer<typeof requestTimingSchema>;
 
 export const modelSourceSchema = z.strictObject({ model: z.string(), adapter: z.string(), scope: z.string() });
-export const modelCompletionSchema = z.strictObject({ usage: modelUsageSchema.nullable(), finishReason: z.string(),
+export const modelTerminationSchema = z.discriminatedUnion("reason", [
+  z.strictObject({ reason: z.literal("completed") }),
+  z.strictObject({ reason: z.literal("cancelled") }),
+  z.strictObject({ reason: z.literal("failed"), origin: z.enum(["model", "software"]), code: z.string(), message: z.string(),
+    retryable: z.boolean(), details: errorDetailsSchema.optional() }),
+]);
+/** finishReason is the provider-reported reason; it is null when generation ended before the provider reported one. */
+export const modelCompletionSchema = z.strictObject({ usage: modelUsageSchema.nullable(), finishReason: z.string().nullable(),
   rawFinishReason: z.string().nullable(), providerResponseId: z.string().nullable(), timing: requestTimingSchema.optional(),
-  extensions: z.array(presentationSchema).optional() });
+  termination: modelTerminationSchema.optional(), extensions: z.array(presentationSchema).optional() });
 /** Decode only domain extensions known to the caller; unknown or undecodable extensions do not affect the public terminal state. */
 export function completionData<T extends Json>(completion: ModelCompletion | null | undefined, contract: DataContract<T>): T | null {
   const extension = completion?.extensions?.find(value => value.contract.id === contract.id);
@@ -41,16 +48,19 @@ const block = { responseId: id, requestParentId: id.nullable(), ordinal: z.numbe
   complete: z.boolean(), continuation: jsonSchema, source: modelSourceSchema, completion: modelCompletionSchema.nullable().optional(),
   /** Block generation start and end times (millisecond timestamps); blocks finalized before generation ends have a null end time, and unrecorded times are omitted. See outcome for tool execution times. */
   startedAt: z.number().nonnegative().optional(), endedAt: z.number().nonnegative().nullable().optional() };
+/** Tool call block shape without the completion invariant, for contracts that store input and outcome separately. */
+export const modelToolCallBlockSchema = z.strictObject({ ...block, kind: z.literal("toolcall"), callId: id, name: id,
+  /** Original model text; retained only when parsed arguments are unavailable (the call is incomplete), otherwise arguments is authoritative. */
+  argumentsText: z.string().nullable(), arguments: jsonSchema, outcome: toolOutcomeSchema.nullable(), invocation: toolInvocationSchema.optional() });
 export const modelBlockSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...block, kind: z.literal("thinking"), text: z.string(), summary: z.string() }),
   z.strictObject({ ...block, kind: z.literal("text"), text: z.string() }),
-  z.strictObject({ ...block, kind: z.literal("toolcall"), callId: id, name: id,
-    /** Original model text; retained only when parsed arguments are unavailable (the call is incomplete), otherwise arguments is authoritative. */
-    argumentsText: z.string().nullable(), arguments: jsonSchema, outcome: toolOutcomeSchema.nullable() })
-    .refine(data => data.complete === (data.outcome !== null), "Complete tool calls must have an outcome."),
+  modelToolCallBlockSchema.refine(data => data.complete === (data.outcome !== null), "Complete tool calls must have an outcome."),
 ]);
-/** Terminal state is embedded in finalized blocks; execution notifications carry only feedback, not response identity or measurements. */
+/** Generation termination is embedded in blocks; tool publication and completion preserve a fixed input position. */
 export const modelRunRecordSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("block"), block: modelBlockSchema }),
-  z.strictObject({ type: z.literal("diagnostic"), origin: z.enum(["model", "software"]), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]), details: errorDetailsSchema.optional() }),
+  z.strictObject({ type: z.literal("tool.begin"), block: modelBlockSchema }),
+  z.strictObject({ type: z.literal("tool.complete"), block: modelBlockSchema }),
+  z.strictObject({ type: z.literal("diagnostic"), origin: z.enum(["model", "software"]), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]), details: errorDetailsSchema.optional(), responseId: id.optional() }),
 ]);

@@ -7,7 +7,7 @@ export interface ToolCallState {
   phase: "input" | "ready" | "executing" | "settled" | "incomplete";
   props: ToolRenderProps | null;
 }
-/** Input filling consumes only live previews; history uses only the identity and results saved for that call. */
+/** History without an outcome reuses the input renderer with captured identity, independently of active execution. */
 export function toolCallState(node: ToolCallNode): ToolCallState {
   if ("state" in node) {
     if (node.state === "input") return { phase: "input",
@@ -18,7 +18,10 @@ export function toolCallState(node: ToolCallNode): ToolCallState {
         invocation: node.invocation ?? {}, result: node.result },
     };
   }
-  if (!node.outcome) return { phase: "incomplete", props: null };
+  if (!node.outcome) return { phase: "incomplete", props: {
+    phase: "input", name: node.name, args: node.arguments, target: null, invocation: node.invocation ?? {}, result: null,
+    ...(node.argumentsText !== null ? { argumentsText: node.argumentsText } : {}),
+  } };
   const { implementation, resource, startedAt, finishedAt } = node.outcome;
   const invocation: ToolInvocationInfo = { implementation, resource, startedAt, finishedAt };
   return { phase: "settled",

@@ -6,7 +6,7 @@ import { defineModule, implementResource, implementCreation, implementAction, im
 import { registerAgentServices } from "@asterism-app/builtin-api/runtime";
 import {
   Agent, CreateAgent, SubmitAgentInput, ContinueAgent, ConfigureAgent, CancelAgent, StartAgentSession, inputSummary,
-  AgentInputMessage, AgentInputAccepted, AgentTurnEnded, Execution, ContextSummary, type SubmitAgentInputData,
+  AgentInputMessage, AgentInputAccepted, AgentTurnEnded, Execution, ToolExecution, ContextSummary, type SubmitAgentInputData,
 } from "@asterism-app/builtin-api/contracts";
 import { createSelection, selectionOf } from "./selection.ts";
 import { generateAgentName } from "./name.ts";
@@ -77,7 +77,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
       resources: [implementResource(Agent, AgentView, {
         card: agentCard,
         template: { current: [AgentSelection], createTitle: generateAgentName },
-        records: [AgentInputMessage, Execution, ContextSummary],
+        records: [AgentInputMessage, Execution, ToolExecution, ContextSummary],
         attach(_data, object, lifetime) {
           lifetime.defer(() => { feedback.delete(object.ref.id); turns.delete(object.ref.id); });
         },
@@ -95,7 +95,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
           const transient = feedback.get(object);
           if (controller.running(object))
             return { agentId: object.ref.id, selection: value?.selection ?? null, executionState: "running" as const, drafts,
-              feedback: [...transient.inline], compressions: [...transient.compressions] };
+              feedback: [...transient.inline], compressions: [...transient.compressions], activity: transient.activity };
           const history = object.session.snapshot();
           let turn = turns.get(object.ref.id);
           if (!turn || turn.nodeId !== history.position.nodeId || turn.interruptions !== transient.interruptions) {
@@ -105,7 +105,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
           }
           return { agentId: object.ref.id, selection: value?.selection ?? null,
             executionState: agentExecutionState(turn.state, false), drafts,
-            feedback: [...transient.inline], compressions: [...transient.compressions] };
+            feedback: [...transient.inline], compressions: [...transient.compressions], activity: null };
         },
         async inspect(_data, object) {
           return { type: Agent.kind, title: object.snapshot()?.title ?? "Agent" };

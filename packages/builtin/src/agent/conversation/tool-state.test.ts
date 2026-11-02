@@ -62,7 +62,9 @@ describe("Tool call display projection", () => {
     const view = resolveToolView(state.props!, new ViewRegistry([filesystem]));
     expect(isValidElement<ToolRenderProps>(view.body) && view.body.props.result?.kind).toBe("cancelled");
     expect(isValidElement<ToolRenderProps>(view.header) && view.header.props.invocation.resource?.title).toBe("Saved title");
-    expect(toolCallState({ ...node, complete: false, outcome: null })).toEqual({ phase: "incomplete", props: null });
+    expect(toolCallState({ ...node, complete: false, outcome: null, argumentsText: null, invocation })).toMatchObject({
+      phase: "incomplete", props: { phase: "input", args, invocation, result: null },
+    });
   });
 
   it("Partial write arguments reach the input view, while subsequent phases retain that call's target and arguments", () => {

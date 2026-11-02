@@ -8,7 +8,7 @@ import { projectPeekRecords } from "./peek/snapshot.ts";
 import { contextInsight } from "./context/insight.ts";
 import { serializeForSummary } from "./compression-prompt.ts";
 import { sessionSnapshot } from "../../../../src/plugins/records.ts";
-import { AgentInputMessage } from "@asterism-app/builtin-api/contracts";
+import { AgentInputMessage, Execution, ToolExecution } from "@asterism-app/builtin-api/contracts";
 
 function records(...values: NewNode[]): SessionNode[] {
   return values.map((value, index) => node(String(index), index ? String(index - 1) : null, value));
@@ -17,6 +17,42 @@ const project = (path: SessionNode[], agent = "a") => projectForAgent(sessionVie
 
 // Expectations follow the timeline projection contract; storage, path selection, and generic envelope conversion are protected at their own boundaries.
 describe("Agent model projection", () => {
+  it("pairs saved pending tool inputs with unavailable results without dropping preceding thinking", () => {
+    const pending = call("a", "r", 1, "read-1", { requestParentId: "0", arguments: { path: "notes.md" }, outcome: null });
+    const block = Execution.schema.parse(pending.data).block;
+    const operation: NewNode = { ...pending, contract: ToolExecution.id, pending: true, data: { input: block, output: null } };
+    const items = project(records(message("a", "go"), thinking("a", "r", 0, "Read the notes", { requestParentId: "0" }), operation));
+    expect(items.map(item => item.kind)).toEqual(["input", "output", "result"]);
+    expect(items[1]).toMatchObject({ parts: [
+      { kind: "thinking", text: "Read the notes" },
+      { kind: "toolcall", callId: "read-1", arguments: { path: "notes.md" } },
+    ] });
+    expect(items[2]).toMatchObject({ callId: "read-1", outcome: { kind: "unknown", model: [
+      { kind: "text", text: "This tool call was submitted for execution, but its result was not recorded. Its effects are unknown." },
+    ] } });
+  });
+
+  it("explains that a complete tool input from an unfinished response was never executed", () => {
+    const completion = { usage: null, finishReason: null, rawFinishReason: null, providerResponseId: null,
+      termination: { reason: "failed" as const, origin: "model" as const, code: "provider_error", message: "Disconnected", retryable: true } };
+    const items = project(records(message("a", "go"),
+      call("a", "r", 0, "write-1", { requestParentId: "0", arguments: { path: "notes.md" }, outcome: null, completion })));
+    expect(items[2]).toMatchObject({ callId: "write-1", outcome: { kind: "cancelled", model: [
+      { kind: "text", text: "This tool call was not executed because the response did not complete." },
+    ] } });
+  });
+
+  it("retains closed text from a failed response and trims thinking before subsequent user input", () => {
+    const completion = { usage: null, finishReason: null, rawFinishReason: null, providerResponseId: null,
+      termination: { reason: "failed" as const, origin: "model" as const, code: "provider_error", message: "Disconnected", retryable: true } };
+    const items = project(records(message("a", "go"),
+      text("a", "r", 0, "Saved text", { requestParentId: "0" }),
+      thinking("a", "r", 1, "Unfinished turn", { requestParentId: "0", completion }),
+      message("a", "Continue")));
+    expect(items.map(item => item.kind)).toEqual(["input", "output", "input"]);
+    expect(items[1]).toMatchObject({ parts: [{ kind: "text", text: "Saved text" }] });
+  });
+
   it("projects a file address as reusable JSON text without resolving it into a model file", () => {
     const part = { kind: "file-reference", filename: "report.zip", ref: {
       source: { sessionId: "another-session", id: "directory", kind: "example/directory" }, locator: { path: "report.zip" },

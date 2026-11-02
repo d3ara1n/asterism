@@ -1,4 +1,4 @@
-import { jsonSchema as sdkJsonSchema, streamText, tool, JSONParseError, TypeValidationError, InvalidResponseDataError,
+import { jsonSchema as sdkJsonSchema, streamText, tool, APICallError, StreamProviderError, JSONParseError, TypeValidationError, InvalidResponseDataError,
   type ModelMessage, type ToolResultPart, type ToolSet, type LanguageModel } from "ai";
 import { jsonSchema, unauthenticatedApiKey, type Json } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
@@ -13,13 +13,18 @@ import { describeError, type ModelResponse } from "@asterism-app/sdk/contracts";
 import { ZodError } from "zod";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
-/** SDK decoding failures are software processing errors; server rejection and transport failure are model request outcomes. */
-function providerFailure(error: unknown): ModelFailure {
+function responseParsingFailure(error: unknown): boolean {
+  return error instanceof SyntaxError || error instanceof ZodError
+    || JSONParseError.isInstance(error) || TypeValidationError.isInstance(error) || InvalidResponseDataError.isInstance(error);
+}
+/** Transport and provider decoding boundaries identify upstream failures independently of status-code retry hints. */
+function providerFailure(error: unknown, upstream = false): ModelFailure {
   if (error instanceof ModelFailure) return error;
   const details = describeError(error);
-  const parsing = error instanceof SyntaxError || error instanceof ZodError
-    || JSONParseError.isInstance(error) || TypeValidationError.isInstance(error) || InvalidResponseDataError.isInstance(error);
-  return new ModelFailure(parsing ? "response_parsing" : "provider_error", details.message, details, parsing ? "software" : "model");
+  const parsing = responseParsingFailure(error);
+  const remote = upstream || APICallError.isInstance(error) || StreamProviderError.isInstance(error);
+  return new ModelFailure(parsing ? "response_parsing" : remote ? "provider_error" : "processing_error",
+    details.message, details, remote ? "model" : "software", remote);
 }
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
@@ -103,19 +108,30 @@ export class AiSdkAdapter implements ModelAdapter {
     let capturePrefix = true, responsePrefix = "";
     const decoder = new TextDecoder();
     const transport: typeof fetch = async (url, init) => {
-      const response = await this.transport(url, init);
+      let response: Response;
+      try { response = await this.transport(url, init); }
+      catch (error) { throw providerFailure(error, true); }
       responseMetadata = {
         connection: { id: provider.id }, endpoint: provider.baseUrl, model: model.modelId,
         status: response.status, receivedAt: Date.now(), headers: Object.fromEntries(response.headers),
       };
       if (response.body && response.headers.get("content-type")?.includes("text/event-stream")) {
-        return new Response(response.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-          transform(chunk, output) {
-            if (capturePrefix) responsePrefix += decoder.decode(chunk, { stream: true });
-            output.enqueue(chunk);
+        const reader = response.body.getReader();
+        return new Response(new ReadableStream<Uint8Array>({
+          async pull(output) {
+            try {
+              const { done, value } = await reader.read();
+              if (done) {
+                if (capturePrefix) responsePrefix += decoder.decode();
+                output.close();
+              } else {
+                if (capturePrefix) responsePrefix += decoder.decode(value, { stream: true });
+                output.enqueue(value);
+              }
+            } catch (error) { output.error(providerFailure(error, true)); }
           },
-          flush() { if (capturePrefix) responsePrefix += decoder.decode(); },
-        })), { status: response.status, statusText: response.statusText, headers: response.headers });
+          cancel: reason => reader.cancel(reason),
+        }), { status: response.status, statusText: response.statusText, headers: response.headers });
       }
       return response;
     };
@@ -127,14 +143,14 @@ export class AiSdkAdapter implements ModelAdapter {
     const cancelled = () => { timing.end("cancelled"); };
     signal.addEventListener("abort", cancelled, { once: true });
     try {
-      for await (const event of this.decode(measured, messages, tools, options, provider.protocol, streamSignal)) {
+      for await (const event of this.decode(measured, messages, tools, options, provider.protocol, streamSignal, () => responseMetadata !== null)) {
         capturePrefix = false; responsePrefix = "";
         yield event.type === "finish" ? { ...event, response: responseMetadata } : event;
       }
     } catch (error) {
       // Model termination may precede connection close or user cancellation; acquired metering must still be delivered.
       if (measured.completion) yield { ...measured.completion, response: responseMetadata };
-      const failure = providerFailure(error);
+      const failure = providerFailure(error, responseMetadata !== null && responseParsingFailure(error));
       failure.details ??= describeError(error);
       if (responsePrefix) failure.details.rawResponse = responsePrefix;
       // An asynchronous transport callback assigns the response; narrow to the actual value obtained after the callback.
@@ -147,6 +163,8 @@ export class AiSdkAdapter implements ModelAdapter {
       }
       if (!failure.message) failure.message = received ? `HTTP ${received.status}` : failure.details.name ?? "Error";
       failure.response = responseMetadata;
+      failure.usage = measured.usage;
+      failure.providerResponseId = measured.responseId;
       if (!measured.completion) failure.timing = timing.end(signal.aborted ? "cancelled" : "failed");
       throw failure;
     } finally {
@@ -157,7 +175,7 @@ export class AiSdkAdapter implements ModelAdapter {
   }
   private async *decode(measured: ReturnType<typeof measureModel>, messages: ModelMessage[], tools: ToolSet,
     options: ReturnType<typeof requestOptions>, protocol: ModelInput["settings"]["provider"]["protocol"],
-    signal: AbortSignal): AsyncIterable<ModelEvent> {
+    signal: AbortSignal, receivedResponse: () => boolean): AsyncIterable<ModelEvent> {
     const result = streamText({ model: measured.model, messages, tools,
       ...options, abortSignal: signal,
       include: { rawChunks: true },
@@ -268,7 +286,7 @@ export class AiSdkAdapter implements ModelAdapter {
         case "error":
           // Server and transport errors retain original diagnostics; programmatic classification does not replace their messages or response bodies.
           {
-            const failure = providerFailure(event.error);
+            const failure = providerFailure(event.error, rawFailure !== undefined || (receivedResponse() && responseParsingFailure(event.error)));
             failure.details ??= describeError(event.error);
             if (rawFailure !== undefined) failure.details.rawEvent = rawFailure;
             throw failure;
@@ -287,7 +305,7 @@ export class AiSdkAdapter implements ModelAdapter {
       }
     }
     // Received terminal state must be delivered; ResponseBuffer retains metering before rejecting blocks that remain unclosed.
-    if (!measured.completion) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.", undefined, "model");
+    if (!measured.completion) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.", undefined, "model", true);
     yield measured.completion;
   }
 }

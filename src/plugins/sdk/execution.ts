@@ -77,7 +77,7 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
               ? host.content?.captureReader(inputReferences(values), options.content, owner)
               : host.content?.capture(inputReferences(values), contentAccess),
             observer: { event(event) {
-              if (event.type === "block" && event.block.kind === "toolcall" && event.block.outcome && options?.output && handover && host.content)
+              if ((event.type === "block" || event.type === "tool.complete") && event.block.kind === "toolcall" && event.block.outcome && options?.output && handover && host.content)
                 options.output.retain(event.block.outcome, host.content.reader({ ...contentAccess, scope: handover }));
               return request.observer.event(event);
             } },

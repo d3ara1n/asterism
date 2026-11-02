@@ -5,9 +5,10 @@ import { ResponseBuffer } from "./response.ts";
 
 function setup() {
   const nodes: ModelBlock[] = [];
-  return { nodes, response: new ResponseBuffer(
+  const events: string[] = [];
+  return { nodes, events, response: new ResponseBuffer(
     { responseId: "r", requestParentId: null, source: { model: "p/m", adapter: "test", scope: "s" } },
-    node => { nodes.push(node); },
+    (node, type) => { nodes.push(node); events.push(type); },
   ) };
 }
 const start: ModelEvent = { type: "part.start", part: { id: "t", kind: "text" } };
@@ -25,6 +26,7 @@ describe("Response block state machine", () => {
     expect(response.live()[0]).toMatchObject({ text: "Full thought" });
     response.accept({ type: "part.end", partId: "thought", continuation: { openai: { reasoningEncryptedContent: "cipher" } } });
     response.accept(finish);
+    response.seal(response.terminate({ reason: "completed" }));
     expect(modelBlockSchema.parse(nodes[0])).toMatchObject({
       kind: "thinking", text: "Full thought", summary: "Summary", continuation: { openai: { reasoningEncryptedContent: "cipher" } },
     });
@@ -60,25 +62,29 @@ describe("Response block state machine", () => {
     expect(response.calls()[0]!.arguments).toEqual({ path: "first.txt" });
   });
 
-  it("terminal state belongs to the highest-index block regardless of parallel tool completion order; close meters once", () => {
-    const { response, nodes } = setup();
+  it("tool inputs publish in model order before results arrive and terminal measurements remain on the last input", () => {
+    const { response, nodes, events } = setup();
     response.accept(call);
     response.accept({ type: "part.end", partId: "c", arguments: {} });
     response.accept({ type: "part.start", part: { id: "c2", kind: "toolcall", callId: "c2", name: "read" } });
     response.accept({ type: "part.end", partId: "c2", arguments: {} });
     const usage = { input: 5, output: 2, total: 7, reasoning: null, cacheRead: null, cacheWrite: null };
     response.accept({ type: "finish", reason: "tool-calls", usage, responseId: "remote", rawFinishReason: "tool_use" });
+    response.seal(response.terminate({ reason: "completed" }));
+    expect(nodes.map(node => node.ordinal)).toEqual([0, 1]);
+    expect(nodes.every(node => node.kind === "toolcall" && node.outcome === null)).toBe(true);
     const [first, last] = response.calls();
     response.settle(last!, { kind: "succeeded", model: [{ kind: "text", text: "null" }], data: null });
     response.settle(first!, { kind: "cancelled", message: "Cancelled.", data: null, model: [{ kind: "text", text: "cancelled: Cancelled." }] });
     response.close();
     response.close();
-    expect(nodes.map(node => "ordinal" in node && node.ordinal)).toEqual([1, 0]);
-    expect(nodes[0]!.completion).toEqual({
-      usage, finishReason: "tool-calls", rawFinishReason: "tool_use", providerResponseId: "remote",
+    expect(nodes.map(node => node.ordinal)).toEqual([0, 1, 1, 0]);
+    expect(events).toEqual(["tool.begin", "tool.begin", "tool.complete", "tool.complete"]);
+    expect(nodes[1]!.completion).toEqual({
+      usage, finishReason: "tool-calls", rawFinishReason: "tool_use", providerResponseId: "remote", termination: { reason: "completed" },
     });
-    expect(nodes[1]!.completion).toBeNull();
-    expect(nodes.reduce((sum, block) => sum + (block.completion?.usage?.total ?? 0), 0)).toBe(7);
+    expect(nodes[0]!.completion).toBeNull();
+    expect(nodes.slice(0, 2).reduce((sum, block) => sum + (block.completion?.usage?.total ?? 0), 0)).toBe(7);
   });
 
   it("reported usage survives abnormal streams and missing terminal state does not fabricate metering", () => {
@@ -106,7 +112,7 @@ describe("Response block state machine", () => {
     expect(nodes).toEqual([expect.objectContaining({ kind: "toolcall", argumentsText: "{\"path\":", complete: false, outcome: null })]);
   });
 
-  it("text waits for terminal state to persist together, tools persist after outcomes, and interruption does not append twice", () => {
+  it("text and pending tool inputs publish together, and later outcomes preserve the original tool input", () => {
     const { response, nodes } = setup();
     response.accept(start);
     response.accept({ type: "part.delta", partId: "t", delta: "hello" });
@@ -116,15 +122,20 @@ describe("Response block state machine", () => {
     response.accept(call);
     response.accept({ type: "part.end", partId: "c", arguments: {} });
     response.accept(finish);
-    expect(nodes).toEqual([expect.objectContaining({ kind: "text", text: "hello", complete: true, completion: null })]);
+    response.seal(response.terminate({ reason: "completed" }));
+    expect(nodes).toEqual([
+      expect.objectContaining({ kind: "text", text: "hello", complete: true, completion: null }),
+      expect.objectContaining({ kind: "toolcall", arguments: {}, outcome: null }),
+    ]);
     expect(response.live()).toEqual([expect.objectContaining({ kind: "toolcall", state: "ready" })]);
     response.start(response.calls()[0]!);
     expect(response.live()[0]).toMatchObject({ state: "executing" });
     response.settle(response.calls()[0]!, { kind: "cancelled", message: "Stopped.", data: null, model: [{ kind: "text", text: "cancelled: Stopped." }] });
     response.close();
     expect(response.live()).toEqual([]);
-    expect(nodes).toHaveLength(2);
-    expect(nodes[1]).toMatchObject({ kind: "toolcall", complete: true, outcome: { kind: "cancelled" } });
+    expect(nodes).toHaveLength(3);
+    expect(nodes[1]).toMatchObject({ kind: "toolcall", complete: false, outcome: null });
+    expect(nodes[2]).toMatchObject({ kind: "toolcall", complete: true, outcome: { kind: "cancelled" } });
   });
 
   it("rejects unknown blocks, duplicate blocks, deltas after completion, and repeated completion explicitly", () => {

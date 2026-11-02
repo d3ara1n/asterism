@@ -15,6 +15,8 @@ interface ToolCallProps<T, A> {
 export interface ToolInputRenderProps extends ToolCallProps<Json, Json> {
   phase: "input";
   result: null;
+  /** Original unfinished input; the host derives a display-only argument preview when resolving the view. */
+  argumentsText?: string;
 }
 /** Waiting for scheduling and execution share a view; complete arguments have passed contract validation. */
 export interface ToolExecutionRenderProps<D = Json, T = Json, A = Json> extends ToolCallProps<T, A> {

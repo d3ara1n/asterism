@@ -1,6 +1,6 @@
 import { thinkingLevels, describeError, formatModelExpression, type ModelItem, type ModelTarget, type ModelEvent } from "@asterism-app/sdk/contracts";
 import type { ModelServices, ObjectExecutor } from "@asterism-app/sdk/runtime";
-import { ContextSummary, Execution } from "@asterism-app/builtin-api/contracts";
+import { decodeExecution, ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { feedbackOrigin, type AgentFeedback } from "./feedback.ts";
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, projectAgentContext, type AgentContext } from "./projection.ts";
@@ -24,7 +24,7 @@ export function estimateContext(context: AgentContext, agentId: string, model: s
   for (let index = context.path.length - 1; index >= 0; index--) {
     const record = context.path[index]!;
     if (record.source?.resource?.id !== agentId) continue;
-    const decoded = Execution.decode(record);
+    const decoded = decodeExecution(record);
     if (decoded?.status !== "known") continue;
     const block = decoded.data.block, input = block.completion?.usage?.input;
     if (input == null || !(block.source.model === model || thinkingLevels.some(level => block.source.model === `${model}:${level}`))) continue;

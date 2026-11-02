@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import {
   presentationSchema, type ModelRunRequest, type ModelRunResult, type ModelRunEvent, type ModelSource,
-  type ModelCompletion, type ModelResponse, type SystemPrompt, type ModelRequestIdentity, type RequestTiming,
-  describeError, type ErrorDetails, type ModelTools,
+  type ModelCompletion, type ModelResponse, type SystemPrompt, type ModelRequestIdentity, type RequestTiming, type ModelTermination,
+  describeError, type ErrorDetails, type ModelTools, type Usage,
 } from "@asterism-app/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ResolvedModelItem } from "../model/contract.ts";
@@ -49,10 +49,16 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
   let responseId: string | null = null;
   let completion: ModelCompletion | null = null;
   let timing: RequestTiming | null = null;
+  let usage: Usage | null = null;
+  let providerResponseId: string | undefined;
+  let response: ResponseBuffer | undefined;
+  let generationCompleted = false;
+  let generation: ModelTermination = { reason: "completed" };
+  let failureDiagnostic: Extract<ModelRunEvent, { type: "diagnostic" }> | undefined;
   let responseMetadata: ModelResponse | null = null;
   const outcomes = new Map<string, ToolOutcome>();
   let callIds: string[] = [];
-  let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string; details?: ErrorDetails } = { reason: "completed" };
+  let termination: { reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string; details?: ErrorDetails; retryable?: boolean } = { reason: "completed" };
   try {
     // Consume preparation Promise rejections even after cancellation to avoid unhandled exceptions.
     const { adapter, settings, system, messages, userAgent, sessionId, tools: suppliedTools } = await environment;
@@ -66,10 +72,11 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
     const extensions = presentationSchema.array().parse(extendCompletion
       ? synchronous(() => extendCompletion(structuredClone({ system, tools }))) : []);
     // The platform delivers only fully prepared blocks, saving terminal state with the highest-index block; the executor owns grouping and projection.
-    const response = new ResponseBuffer({ responseId, requestParentId: request.requestParentId, source }, block => {
-      emit({ type: "block", block });
+    const buffer = response = new ResponseBuffer({ responseId, requestParentId: request.requestParentId, source }, (block, type) => {
+      if (type !== "block" && block.kind === "toolcall") emit({ type, block });
+      else emit({ type: "block", block });
     }, extensions);
-    const progress = () => emit({ type: "progress", blocks: response.live() });
+    const progress = () => emit({ type: "progress", blocks: buffer.live() });
     // Materialize progress once per display batch; terminal events flush before finalization.
     let progressTimer: ReturnType<typeof setTimeout> | undefined;
     let pendingProgress = Promise.resolve();
@@ -77,7 +84,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
       clearTimeout(progressTimer);
       progressTimer = undefined;
       pendingProgress = pendingProgress.then(async () => {
-        await response.preview((name, args) => execution.preview?.(name, args) ?? {});
+        await buffer.preview((name, args) => execution.preview?.(name, args) ?? {});
         progress();
       });
       return pendingProgress;
@@ -86,7 +93,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
       for await (const event of prepared.stream(signal)) {
         if (event.type === "finish") responseMetadata = event.response ?? null;
         // The adapter handles aborts and delivers previously acquired terminal state; check cancellation again before the tool batch starts.
-        response.accept(event);
+        buffer.accept(event);
         if (event.type === "part.delta") {
           progressTimer ??= setTimeout(() => {
             void flushProgress().catch(error => controller.abort(error));
@@ -94,46 +101,66 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
         } else await flushProgress();
       }
       signal.throwIfAborted();
-      const finish = response.finish;
-      if (!finish) throw new ModelFailure("interrupted", "The model stream ended without a terminal response.", undefined, "model");
-      if (response.empty) throw new ModelFailure("empty_response", "The model response ended without any content blocks.", undefined, "model");
+      const finish = buffer.finish;
+      if (!finish) throw new ModelFailure("interrupted", "The model stream ended without a terminal response.", undefined, "model", true);
+      if (buffer.empty) throw new ModelFailure("empty_response", "The model response ended without any content blocks.", undefined, "model", true);
       if (!["stop", "tool-calls"].includes(finish.reason)) throw new ModelFailure("incomplete",
         `The model response ended with finish reason "${finish.reason}"${finish.rawFinishReason ? ` (${finish.rawFinishReason})` : ""}. No tools were executed.`,
-        undefined, "model");
-      const calls = response.calls();
+        undefined, "model", finish.reason === "error" || finish.reason === "interrupted");
+      await flushProgress();
+      // Cancellation before publication leaves no tool input that looks submitted for execution.
+      signal.throwIfAborted();
+      generationCompleted = true;
+      completion = buffer.terminate(generation);
+      buffer.seal(completion);
+      // A failed tool.begin write aborts through the delivery controller; never execute an input that was not saved.
+      signal.throwIfAborted();
+      const calls = buffer.calls();
       callIds = calls.map(call => call.part.callId);
       const byCall = new Map(calls.map(call => [call.part.callId, call]));
       await execution.execute(calls.map(call => ({ callId: call.part.callId, name: call.part.name, arguments: call.arguments })),
         signal, (call, outcome) => {
           outcomes.set(call.callId, outcome);
-          response.settle(byCall.get(call.callId)!, outcome); progress();
+          buffer.settle(byCall.get(call.callId)!, outcome); progress();
         }, {
-          prepared(call, info) { response.prepare(byCall.get(call.callId)!, info); progress(); },
-          started(call, info) { response.start(byCall.get(call.callId)!, info); progress(); },
-          published(call, data) { response.publish(byCall.get(call.callId)!, data); progress(); },
+          prepared(call, info) { buffer.prepare(byCall.get(call.callId)!, info); progress(); },
+          started(call, info) { buffer.start(byCall.get(call.callId)!, info); progress(); },
+          published(call, data) { buffer.publish(byCall.get(call.callId)!, data); progress(); },
         });
       if (request.cache?.expectHit && finish.usage?.cacheRead === 0 && (finish.usage.input ?? 0) > 2048)
         diagnostic("cache_miss", "The provider reported no cached input for this request.", "warning");
       // Deliver tool outcomes as feedback for the next request; the outer cancellation signal and controller manage the agent lifetime.
       signal.throwIfAborted();
     } finally {
-      try { await flushProgress(); }
-      finally { response.close(); completion = response.completion; }
+      await flushProgress();
     }
   } catch (error) {
     if (error instanceof ModelFailure && error.response) responseMetadata = error.response;
     if (error instanceof ModelFailure && error.timing) timing = error.timing;
+    if (error instanceof ModelFailure) { usage = error.usage ?? null; providerResponseId = error.providerResponseId; }
     if (deliveryFailed) termination = { reason: "failed", code: "event_delivery" };
     else if (request.signal.aborted) {
-      diagnostic("cancelled", "Execution was cancelled.", "warning"); termination = { reason: "cancelled" };
+      failureDiagnostic = { type: "diagnostic", origin: "model", code: "cancelled", message: "Execution was cancelled.", level: "warning" };
+      termination = { reason: "cancelled" };
+      if (!generationCompleted) generation = { reason: "cancelled" };
     } else {
       const code = error instanceof ModelFailure ? error.code : "execution_failed";
       const details = describeError(error);
-      emit({ type: "diagnostic", origin: error instanceof ModelFailure ? error.origin : "software",
-        code, message: error instanceof Error ? error.message : details.message, level: "error", details });
-      termination = { reason: "failed", code, details };
+      const origin = error instanceof ModelFailure ? error.origin : "software";
+      const message = error instanceof Error ? error.message : details.message;
+      const retryable = !generationCompleted && error instanceof ModelFailure && error.retryable;
+      failureDiagnostic = { type: "diagnostic", origin, code, message, level: "error", details };
+      termination = { reason: "failed", code, details, retryable };
+      if (!generationCompleted) generation = { reason: "failed", origin, code, message, details, retryable };
     }
-  } finally { emit({ type: "progress", blocks: [] }); }
+  } finally {
+    if (response) {
+      completion ??= response.terminate(generation, { timing, usage, providerResponseId });
+      response.close(completion);
+    }
+    if (failureDiagnostic) emit({ ...failureDiagnostic, ...(responseId ? { responseId } : {}) });
+    emit({ type: "progress", blocks: [] });
+  }
   if (deliveryFailed) termination = { reason: "failed", code: "event_delivery", details: deliveryError };
   return { ...termination, responseId, source, completion, timing: completion?.timing ?? timing, response: responseMetadata,
     tools: callIds.flatMap(id => outcomes.has(id) ? [structuredClone(outcomes.get(id)!)] : []) };

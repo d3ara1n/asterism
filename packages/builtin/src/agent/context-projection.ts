@@ -1,8 +1,8 @@
 import type { SessionRecord, SessionSnapshot, ModelBlock, ModelItem, RecordInfo, Decoded } from "@asterism-app/sdk/contracts";
 import type { z } from "zod";
-import { ContextSummary, Execution, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
+import { decodeExecution, ContextSummary, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { projectInputMessage } from "./input-message.ts";
-import { responseMessages } from "./response-messages.ts";
+import { responseMessages, hasModelContent } from "./response-messages.ts";
 import { readRecords, type RecordRead } from "../shared/record-reading.ts";
 
 /** Projection depends only on pure contracts; background requests and the frontend context panel share the same rules, and the background entry point converts failures to plugin errors. */
@@ -64,8 +64,8 @@ function boundaryPrelude(index: readonly RecordInfo[], path: readonly SessionRec
   let start = boundary;
   for (const record of path) {
     if (record.source?.resource?.id !== agentId) continue;
-    const execution = Execution.decode(record);
-    if (execution?.status !== "known" || !execution.data.block.complete) continue;
+    const execution = decodeExecution(record);
+    if (execution?.status !== "known" || !hasModelContent(execution.data.block)) continue;
     const origin = execution.data.block.requestParentId;
     const position = origin === null ? -1 : positions.get(origin);
     if (position !== undefined) start = Math.min(start, position + 1);
@@ -79,11 +79,13 @@ function projectContextRecords(path: readonly SessionRecord[], agentId: string, 
   const positions = new Map(index.map((record, position) => [record.id, position]));
   const local = new Map(path.map((record, position) => [record.id, position]));
   const responses = new Map<string, { record: SessionRecord; block: ModelBlock }[]>();
+  const submitted = new Set<string>();
   for (const record of path) {
     if (record.source?.resource?.id !== agentId) continue;
-    const decoded = Execution.decode(record);
-    if (decoded?.status !== "known" || !decoded.data.block.complete) continue;
+    const decoded = decodeExecution(record);
+    if (decoded?.status !== "known") continue;
     const block = decoded.data.block;
+    if (decoded.data.submitted && block.kind === "toolcall") submitted.add(block.callId);
     const blocks = responses.get(block.responseId) ?? [];
     blocks.push({ record, block }); responses.set(block.responseId, blocks);
   }
@@ -100,7 +102,7 @@ function projectContextRecords(path: readonly SessionRecord[], agentId: string, 
   const groups: ContextGroup[] = [];
   const emit = (origin: string | null) => {
     for (const blocks of after.get(origin) ?? []) {
-      const items = responseMessages(blocks.map(({ block }) => block));
+      const items = responseMessages(blocks.map(({ block }) => block), submitted);
       const indices = blocks.map(({ record }) => local.get(record.id)!);
       if (items.length) groups.push({ items, first: Math.min(...indices), last: Math.max(...indices) });
     }

@@ -1,5 +1,5 @@
 import type { ModelBlock, SessionRecord, SessionSnapshot } from "@asterism-app/sdk/contracts";
-import { Execution, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
+import { decodeExecution, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import type { AgentTurnState } from "./state.ts";
 
 /** Overlays this runtime's interruption position on the current path; context projection generates model input independently. */
@@ -31,7 +31,7 @@ export function projectTurnState(records: readonly SessionRecord[], agentId: str
       continue;
     }
     if (!hasInput) continue;
-    const execution = Execution.decode(record);
+    const execution = decodeExecution(record);
     if (execution?.status === "known") {
       const block = execution.data.block;
       if (block.responseId !== responseId) {
@@ -49,6 +49,7 @@ export function projectTurnState(records: readonly SessionRecord[], agentId: str
   const terminal = response.find(block => block.completion);
   // Terminal state is saved with the highest-ordinal block; history may stop before all tool results are persisted.
   const completed = terminal?.completion?.finishReason === "stop"
+    && (!terminal.completion.termination || terminal.completion.termination.reason === "completed")
     && terminal.ordinal + 1 === blocks.size
     && response.every(block => block.ordinal < blocks.size && block.complete && block.kind !== "toolcall");
   return completed ? "completed" : "incomplete";

@@ -18,11 +18,11 @@ Session writes use synchronous transactions with a single writer. A commit does 
 
 Inputs commit before model execution. Batched inputs remain separate records, including ordered text and file parts.
 
-Streaming deltas stay in memory. An Agent output block commits once its final data is known: text and thinking await response termination; a tool call also awaits its outcome.
+Streaming deltas stay in memory. Text and thinking commit after model generation ends. Before executing a successful response's tool batch, the Agent publishes the complete tool inputs in model order as pending operations. Each outcome fills its original operation once, preserving the input and historical position independently of execution completion order.
 
-The response’s highest-ordinal actual block owns its completion metadata, including reported usage, timing, and domain extensions. Other blocks carry no duplicate completion. There is no later patch, separate completion node, or invented node for an empty response.
+The response's highest-ordinal actual block owns its termination metadata, including generation success, failure or cancellation, reported usage, timing, and domain extensions. Other blocks carry no duplicate termination. Tool outcomes do not change the model generation outcome. Empty responses create no invented history block; their errors remain transient feedback.
 
-Concurrent agents append finalized output blocks in actual completion order. Those blocks remain unchanged after commit.
+Concurrent agents append at processing time. Completed records remain unchanged; pending tool operations fill only their result.
 
 ## Publish operations before completion
 
@@ -40,11 +40,11 @@ Publication and completion have distinct notifications. Observers receive a comp
 
 ## Preserve partial output
 
-Cancelled or interrupted generation can save incomplete blocks. They advance the cursor and remain visible in history. Agent model projection excludes incomplete blocks.
+Cancelled or interrupted generation can save incomplete blocks. They advance the cursor and remain visible in history. Agent model projection excludes unfinished text, thinking, and tool arguments while retaining usable completed content from the same response. Complete tool arguments without an outcome project with an explicit explanation: a call never handed to execution is reported as not executed, and a call handed to execution without a recorded result is reported as having unknown effects. Projection does not execute the call or rewrite history.
 
 A tool that started execution obtains an outcome. Confirmed cancellation differs from an unknown write effect. Neither outcome implies rollback.
 
-Execution diagnostics and error details are transient feedback, not synthetic assistant output. Preserve reported metadata when available and leave missing usage unknown. A process crash does not trigger automatic replay.
+Generation errors with output remain in response termination metadata and produce a historical notice. Errors without output remain transient feedback. Neither is synthetic assistant output. Preserve reported metadata when available and leave missing usage unknown. A process crash does not trigger automatic replay.
 
 ## Select a path
 
@@ -66,7 +66,7 @@ Views read current layout and current domain data separately. Agent UI displays 
 
 Each Agent response records the path endpoint captured when its request began. That request parent differs from the actual append parent. Model projection groups response blocks and tool outcomes at the captured request position, then places intervening visible events after the complete response. Their relative order remains intact.
 
-Context projection may reorganize model input without changing recorded history.
+Context projection may reorganize model input without changing recorded history. Trailing thinking exposed by interruption or rewind is removed at assistant boundaries, including before subsequent user input. Conversation shells share these participation rules: dashed outlines identify content that does not fully participate, and error color identifies content left unfinished by a failed request. A tool's own execution failure is an outcome reported by the tool view, not a request failure. The original content and plugin renderers remain available for inspection.
 
 ## Coordinate cursor changes
 

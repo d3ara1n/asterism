@@ -1,4 +1,4 @@
-import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult, Presentation } from "@asterism-app/sdk/contracts";
+import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult, Presentation, ModelTermination, RequestTiming, Usage } from "@asterism-app/sdk/contracts";
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import { previewArguments } from "../shared/partial-arguments.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
@@ -15,6 +15,7 @@ type BufferedBlock = {
   previewText: string;
   continuation: Json;
   emitted: boolean;
+  published: boolean;
   executing: boolean;
   invocation: ToolInvocationInfo | null;
   result: Extract<ToolResult, { kind: "running" }> | null;
@@ -27,21 +28,22 @@ export class ResponseBuffer {
   private readonly callIds = new Set<string>();
   finish: Extract<ModelEvent, { type: "finish" }> | null = null;
   private finalized = false;
+  private termination: ModelCompletion | null = null;
 
   constructor(
     private readonly identity: { responseId: string; requestParentId: string | null; source: ModelSource },
-    private readonly onBlock: (block: ModelBlock) => void,
+    private readonly onBlock: (block: ModelBlock, type: "block" | "tool.begin" | "tool.complete") => void,
     private readonly extensions: Presentation[] = [],
   ) {}
 
   get empty(): boolean { return this.blocks.size === 0; }
   get completion(): ModelCompletion | null {
-    return this.finish ? {
+    return this.termination ?? (this.finish ? {
       usage: this.finish.usage, finishReason: this.finish.reason,
       rawFinishReason: this.finish.rawFinishReason ?? null, providerResponseId: this.finish.responseId ?? null,
       ...(this.finish.timing ? { timing: this.finish.timing } : {}),
       ...(this.extensions.length ? { extensions: this.extensions } : {}),
-    } : null;
+    } : null);
   }
 
   accept(event: ModelEvent): void {
@@ -53,16 +55,14 @@ export class ResponseBuffer {
       }
       if (event.part.kind === "toolcall") this.callIds.add(event.part.callId);
       this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", summary: "", startedAt: Date.now(), arguments: null, previewArguments: null, previewText: "", continuation: null,
-        endedAt: null, emitted: false, executing: false, invocation: null, result: null });
+        endedAt: null, emitted: false, published: false, executing: false, invocation: null, result: null });
       return;
     }
     if (event.type === "finish") {
       this.finish = event;
       if ([...this.blocks.values()].some(block => block.endedAt === null)) {
-        throw new ModelFailure("incomplete", "The model response ended with incomplete blocks. No tools were executed.", undefined, "model");
+        throw new ModelFailure("incomplete", "The model response ended with incomplete blocks. No tools were executed.", undefined, "model", true);
       }
-      // Commit text and metering together after terminal state arrives; tool blocks keep waiting for their outcomes.
-      for (const block of this.blocks.values()) if (block.part.kind !== "toolcall") this.emitBlock(block, true);
       return;
     }
     const block = this.blocks.get(event.partId);
@@ -81,6 +81,26 @@ export class ResponseBuffer {
 
   calls(): LiveCall[] {
     return [...this.blocks.values()].filter((block): block is LiveCall => block.part.kind === "toolcall");
+  }
+
+  terminate(termination: ModelTermination, measured: { timing?: RequestTiming | null; usage?: Usage | null; providerResponseId?: string } = {}): ModelCompletion {
+    return this.termination = {
+      usage: this.finish?.usage ?? measured.usage ?? null, finishReason: this.finish?.reason ?? null,
+      rawFinishReason: this.finish?.rawFinishReason ?? null, providerResponseId: this.finish?.responseId ?? measured.providerResponseId ?? null,
+      ...(this.finish?.timing ?? measured.timing ? { timing: (this.finish?.timing ?? measured.timing)! } : {}),
+      ...(this.extensions.length ? { extensions: this.extensions } : {}), termination,
+    };
+  }
+
+  /** Preserve model order before any tool runs; pending inputs keep their original position when results arrive. */
+  seal(completion: ModelCompletion): void {
+    this.termination = completion;
+    for (const block of this.blocks.values()) {
+      if (block.part.kind === "toolcall") {
+        block.published = true;
+        this.emitBlock(block, false, null, "tool.begin");
+      } else this.emitBlock(block, true);
+    }
   }
 
   /** Tolerant parsing serves live display only; it cannot replace execution arguments or arguments in incomplete history. */
@@ -108,7 +128,7 @@ export class ResponseBuffer {
   }
 
   settle(call: LiveCall, outcome: ToolOutcome): void {
-    this.emitBlock(call, true, outcome);
+    this.emitBlock(call, true, outcome, call.published ? "tool.complete" : "block");
   }
 
   prepare(call: LiveCall, info: ToolInvocationInfo): void {
@@ -127,23 +147,27 @@ export class ResponseBuffer {
   }
 
   /** Finalize remaining blocks; mark unfinished text and unexecuted calls incomplete within blocks without a separate terminal record. */
-  close(): void {
+  close(completion?: ModelCompletion | null): void {
     if (this.finalized) return;
+    if (completion) this.termination = completion;
     for (const block of this.blocks.values()) {
-      if (!block.emitted) this.emitBlock(block, block.part.kind !== "toolcall" && block.endedAt !== null);
+      if (!block.emitted && !block.published) this.emitBlock(block, block.part.kind !== "toolcall" && block.endedAt !== null);
     }
     this.finalized = true;
   }
 
-  private emitBlock(block: BufferedBlock, complete: boolean, outcome: ToolOutcome | null = null): void {
+  private emitBlock(block: BufferedBlock, complete: boolean, outcome: ToolOutcome | null = null,
+    type: "block" | "tool.begin" | "tool.complete" = "block"): void {
     if (block.emitted) throw new ModelFailure("protocol", "The response block has already been emitted.");
     const common = { ...this.identity, ordinal: block.ordinal, complete, continuation: block.continuation,
       completion: block.ordinal === this.blocks.size - 1 ? this.completion : null,
       startedAt: block.startedAt, endedAt: block.endedAt };
     this.onBlock(block.part.kind === "toolcall"
-      ? { ...common, kind: "toolcall" as const, callId: block.part.callId, name: block.part.name, argumentsText: block.arguments === null ? block.text : null, arguments: block.arguments, outcome }
+      ? { ...common, kind: "toolcall" as const, callId: block.part.callId, name: block.part.name,
+          argumentsText: block.endedAt === null ? block.text : null, arguments: block.arguments, outcome,
+          ...(block.invocation ? { invocation: block.invocation } : {}) }
       : block.part.kind === "thinking" ? { ...common, kind: "thinking", text: block.text, summary: block.summary }
-        : { ...common, kind: "text", text: block.text });
-    block.emitted = true;
+        : { ...common, kind: "text", text: block.text }, type);
+    if (type !== "tool.begin") block.emitted = true;
   }
 }

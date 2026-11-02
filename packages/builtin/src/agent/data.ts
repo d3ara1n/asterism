@@ -2,7 +2,7 @@ import { z } from "zod";
 import { builtin, agentSelectionSchema } from "@asterism-app/builtin-api/contracts";
 import { agentExecutionStateSchema } from "./state.ts";
 import { agentDraftSchema } from "./drafts-contract.ts";
-import { inlineFeedbackSchema, compressionActivitySchema } from "./feedback.ts";
+import { inlineFeedbackSchema, compressionActivitySchema, agentActivitySchema } from "./feedback.ts";
 
 export const AgentSelection = builtin.data("agent.selection", z.object({
   selection: agentSelectionSchema,
@@ -16,4 +16,5 @@ export const AgentView = builtin.data("agent.card", z.strictObject({
   drafts: z.array(agentDraftSchema),
   feedback: z.array(inlineFeedbackSchema),
   compressions: z.array(compressionActivitySchema),
+  activity: agentActivitySchema.nullable().default(null),
 }));

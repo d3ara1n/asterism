@@ -32,7 +32,8 @@ function requestState(request: PricedRequest): { label: UiMessage; tone: StatusT
   if (outcome === "cancelled") return { label: messages.cancelled, tone: "neutral" };
   if (outcome === "failed") return { label: messages.failed, tone: "error" };
   if (!request.completion) return { label: messages.noCompletion, tone: "neutral" };
-  const complete = ["stop", "tool-calls"].includes(request.completion.finishReason)
+  const { finishReason } = request.completion;
+  const complete = finishReason !== null && ["stop", "tool-calls"].includes(finishReason)
     && request.blocks.every(({ block }) => block.complete)
     && (!request.blocks.length || request.blocks.at(-1)!.block.ordinal + 1 === request.blocks.length);
   return complete ? { label: messages.finished, tone: "success" } : { label: messages.incomplete, tone: "warning" };

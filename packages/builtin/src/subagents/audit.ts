@@ -24,7 +24,8 @@ function attachments(value: unknown, found = new Map<string, ContentRef>()): Map
 }
 // Tool arguments can contain rejected or invented references; only delivered outcomes entered the conversation's content scope.
 function delivered(entry: AuditEntry): ContentRef[] {
-  if (entry.type !== "execution" || entry.event.type !== "block" || entry.event.block.kind !== "toolcall" || !entry.event.block.outcome) return [];
+  if (entry.type !== "execution" || (entry.event.type !== "block" && entry.event.type !== "tool.complete")
+    || entry.event.block.kind !== "toolcall" || !entry.event.block.outcome) return [];
   return [...attachments(entry.event.block.outcome).values()];
 }
 

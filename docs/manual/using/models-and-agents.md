@@ -30,6 +30,10 @@ Thinking levels depend on the selected model. Asterism translates its shared lev
 
 Configuration changes apply at request boundaries. An in-progress response continues with the connection, credentials, and settings it captured.
 
+Agents retry upstream model failures up to three times before stopping. The live status shows retry progress, and Stop also cancels a retry wait. Each new attempt uses the current configuration and usable conversation history. Errors reported as authentication or insufficient balance can also be retried because relay services do not always classify failures accurately.
+
+Interrupted content remains inspectable. A dashed outline means the content does not fully participate in later model context; an error outline marks content left unfinished by a failed request. A tool that ran and failed shows that in its own status rather than an error outline. Complete usable content can remain in context even when the same response later fails. Request errors appear in notices, while tool inputs retain their original preview. A historical tool input without a result does not resume execution automatically.
+
 ## Configure an agent
 
 Use an agent configuration to describe its purpose, shared role instructions, and model role. The role prompt applies both to workbench agents and to subagents. Keep the role's expertise and standards there.

@@ -1,7 +1,8 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices, type ExecutionServices, type ProviderUsage } from "@asterism-app/sdk/runtime";
 import { ResourceStatusChanged, describeError, type ResourceStatus, type ModelRunObserver, type ModelRunResult } from "@asterism-app/sdk/contracts";
-import { Execution, AgentTurnEnded, type AgentTurnEndReason } from "@asterism-app/builtin-api/contracts";
+import { Execution, ToolExecution, AgentTurnEnded, type AgentTurnEndReason } from "@asterism-app/builtin-api/contracts";
 import { runAgentLoop } from "./loop.ts";
+import { agentRequestRetries } from "./retry.ts";
 import { agentRequestExtensions } from "./request-context.ts";
 import { feedbackOrigin } from "./feedback.ts";
 import type { createAgentFeedback } from "./feedback-state.ts";
@@ -77,6 +78,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
       const run = {
         key: `agent:${object.ref.id}:${++execution}`, entered: false,
         end(reason: AgentTurnEndReason) {
+          deps.feedback.activity(object, null);
           const ended = boundary();
           // The event describes this stopped loop even if a subscriber subsequently starts another one.
           finish(object.ref.id);
@@ -113,6 +115,11 @@ export function createAgentController(deps: AgentControllerDependencies) {
         try {
           publish("running");
           reason = await runAgentLoop({
+            retry: {
+              maxRetries: agentRequestRetries,
+              requesting: attempt => deps.feedback.activity(object, attempt ? { attempt, max: agentRequestRetries, resumeAt: null } : null),
+              waiting: (attempt, resumeAt) => deps.feedback.activity(object, { attempt, max: agentRequestRetries, resumeAt }),
+            },
             consume: () => deliverDrafts(object, "request"),
             nextTurn(reason) {
               const ended = boundary();
@@ -126,15 +133,21 @@ export function createAgentController(deps: AgentControllerDependencies) {
               const compressed = await compress(current);
               const selection = selectionOf(object).selection, agent = deps.selection.agent(selection);
               const snapshot = object.session.snapshot();
+              const toolRecords = new Map<string, string>();
               const observer: ModelRunObserver = {
                 event(event) {
                   if (event.type === "progress") return;
                   if (event.type === "diagnostic") {
                     deps.feedback.report(object, { origin: event.origin, code: event.code, message: event.message, level: event.level,
-                      ...(event.details ? { details: event.details } : {}) }, event.level === "error" || event.code === "cancelled");
+                      ...(event.details ? { details: event.details } : {}),
+                      ...(event.responseId ? { responseId: event.responseId } : {}) }, event.level === "error" || event.code === "cancelled");
                     return;
                   }
-                  object.commit(writer => { writer.append(Execution, event); });
+                  object.commit(writer => {
+                    if (event.type === "tool.begin") toolRecords.set(event.block.callId, writer.begin(ToolExecution, event.block));
+                    else if (event.type === "tool.complete") writer.complete(ToolExecution, toolRecords.get(event.block.callId)!, event.block.outcome!);
+                    else writer.append(Execution, event);
+                  });
                 },
               };
               let result: ModelRunResult;
@@ -159,7 +172,8 @@ export function createAgentController(deps: AgentControllerDependencies) {
                   ...(result.details ? { details: result.details } : {}) }, true);
                 return { reason: "failed", hasTools: false, halt: true };
               }
-              return { reason: result.reason, hasTools: result.tools.length > 0 };
+              return { reason: result.reason, hasTools: result.tools.length > 0,
+                ...(result.reason === "failed" ? { retryable: result.retryable, details: result.details } : {}) };
             },
           }, signal);
         } catch (error) {

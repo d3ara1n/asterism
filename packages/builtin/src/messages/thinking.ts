@@ -9,10 +9,6 @@ export const thinkingMessages = pluginNamespace("asterism.builtin").messages("en
     id: "thinkingActive",
     defaultMessage: "Thinking…",
   },
-  thinkingInterrupted: {
-    id: "thinkingInterrupted",
-    defaultMessage: "Interrupted",
-  },
   thinkingElapsed: {
     id: "thinkingElapsed",
     defaultMessage: "Elapsed {duration}",

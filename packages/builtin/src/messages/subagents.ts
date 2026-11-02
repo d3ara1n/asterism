@@ -27,7 +27,7 @@ export const subagentMessages = builtin.messages("en", defineMessages({
   keepRunning: { id: "subagent.keepRunning", defaultMessage: "Keep running" },
   submittedBy: { id: "subagent.submittedBy", defaultMessage: "From {title}" },
   usage: { id: "subagent.usage", defaultMessage: "{requests} requests · {seconds}s" },
-  activity: { id: "subagent.activity", defaultMessage: "{activity, select, starting {Starting} thinking {Thinking} text {Writing} finalizing {Saving result} tool {Using {tool}} other {Working}}" },
+  activity: { id: "subagent.activity", defaultMessage: "{activity, select, starting {Starting} thinking {Thinking} text {Writing} retrying {Waiting to retry} finalizing {Saving result} tool {Using {tool}} other {Working}}" },
   finished: { id: "subagent.finished", defaultMessage: "{finished}/{total} finished" },
   earlierSteps: { id: "subagent.earlierSteps", defaultMessage: "{count, plural, one {# earlier step} other {# earlier steps}}" },
   toolState: { id: "subagent.toolState", defaultMessage: "{state, select, running {running} succeeded {succeeded} partial {partially succeeded} rejected {rejected} failed {failed} cancelled {cancelled} other {unknown result}}" },

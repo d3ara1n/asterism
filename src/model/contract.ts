@@ -1,11 +1,13 @@
 import type { Json, ModelSettings } from "../shared/model.ts";
-import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming, ErrorDetails } from "@asterism-app/sdk/contracts";
+import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming, ErrorDetails, Usage } from "@asterism-app/sdk/contracts";
 
 export class ModelFailure extends Error {
   timing?: RequestTiming;
   response?: ModelResponse | null;
+  usage?: Usage | null;
+  providerResponseId?: string;
   constructor(readonly code: string, message: string, public details?: ErrorDetails,
-    readonly origin: "model" | "software" = "software") { super(message); }
+    readonly origin: "model" | "software" = "software", readonly retryable = false) { super(message); }
 }
 export interface ToolDeclaration { name: string; description: string; parameters: Json }
 export type { ModelEvent, StreamPart } from "@asterism-app/sdk/contracts";

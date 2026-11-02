@@ -9,7 +9,7 @@ import { conversationMessages } from "../../messages/conversation";
 import { useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk/renderer";
 
 import { useOutputFollow } from "./output-follow";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useConversationHistory } from "./use-conversation-history";
 import { commonMessages } from "@asterism-app/ui/messages/common";
@@ -19,7 +19,7 @@ import { useConversationInteraction } from "./interaction";
 import { AgentToolbar, AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
 import { AgentDraftsPanel } from "./Drafts";
 import type { AgentExecutionState } from "../state";
-import type { CompressionActivity, InlineFeedback } from "../feedback";
+import type { AgentActivity, CompressionActivity, InlineFeedback } from "../feedback";
 import { useTurnProcesses } from "./use-turn-processes";
 import { useReducedMotion } from "motion/react";
 import { useTimelinePresence } from "./timeline-presence";
@@ -40,7 +40,9 @@ export function ConversationActions({ data }: { data: { executionState: AgentExe
 const viewStateKey = "asterism.builtin/agent.timeline-view";
 
 /** Agent card content: the final view of the current path and the input area; branches are not exposed here, and rewinding takes place in session history. */
-export function Conversation({ feedback, compressions }: { feedback: readonly InlineFeedback[]; compressions: readonly CompressionActivity[] }) {
+export function Conversation({ feedback, compressions, activity = null }: {
+  feedback: readonly InlineFeedback[]; compressions: readonly CompressionActivity[]; activity?: AgentActivity | null;
+}) {
   const i18n = useI18n();
   const object = useRendererObject();
   const { view: state, session } = object;
@@ -93,7 +95,7 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
           onToggleProcess={id => { preserveItem(id); toggle(id); }} />
         <div className="px-4 pb-4">
           {running && !timeline.some(item => item.kind === "compression" && item.status === "running") &&
-            <p role="status" className="type-caption flex items-center gap-2 pt-4"><StatusIcon tone="progress" className="size-3" />{i18n.formatMessage(conversationMessages.workingHint)}</p>}
+            <ExecutionStatus activity={activity} />}
           {read.status === "ready" && !timeline.length && !running && <p className="type-caption pt-4">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>
@@ -112,4 +114,24 @@ export function Conversation({ feedback, compressions }: { feedback: readonly In
         onSave={() => interaction.save()} onCancel={interaction.cancel} onContinue={resume} />
     </footer>}
   </>;
+}
+
+/** Retry countdown belongs to live activity; persisted notices never imply a scheduled action after restart. */
+function ExecutionStatus({ activity }: { activity: AgentActivity | null }) {
+  const i18n = useI18n();
+  const [now, setNow] = useState(Date.now);
+  const resumeAt = activity?.resumeAt ?? null;
+  useEffect(() => {
+    if (resumeAt === null) return;
+    setNow(Date.now());
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [resumeAt]);
+  const label = !activity ? i18n.formatMessage(conversationMessages.workingHint)
+    : resumeAt !== null
+      ? i18n.formatMessage(conversationMessages.retryWaiting, { attempt: activity.attempt, max: activity.max, seconds: Math.max(0, Math.ceil((resumeAt - now) / 1000)) })
+      : i18n.formatMessage(conversationMessages.retrying, { attempt: activity.attempt, max: activity.max });
+  return <p role="status" className="type-caption flex items-center gap-2 pt-4">
+    <StatusIcon tone="progress" className="size-3" />{label}
+  </p>;
 }

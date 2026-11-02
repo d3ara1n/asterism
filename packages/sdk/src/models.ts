@@ -39,13 +39,21 @@ export type ModelEvent =
   | { type: "part.end"; partId: string; arguments?: Json; continuation?: Json }
   | { type: "finish"; reason: string; usage: Usage | null; responseId?: string; rawFinishReason?: string; source?: ModelSource; timing?: RequestTiming; response?: ModelResponse | null };
 export type ModelSource = { model: string; adapter: string; scope: string };
+export type ModelTermination =
+  | { reason: "completed" }
+  | { reason: "cancelled" }
+  | { reason: "failed"; origin: "model" | "software"; code: string; message: string; retryable: boolean; details?: ErrorDetails };
 export type ModelCompletion = {
-  usage: Usage | null; finishReason: string; rawFinishReason: string | null; providerResponseId: string | null;
+  usage: Usage | null;
+  /** Provider-reported finish reason; null when generation ended before the provider reported one. */
+  finishReason: string | null; rawFinishReason: string | null; providerResponseId: string | null;
   timing?: RequestTiming;
+  /** How model generation ended, independently of subsequent tool execution. Omitted in older history. */
+  termination?: ModelTermination;
   /** Typed data declared and consumed by the domain; the public layer preserves unknown contracts. */
   extensions?: Presentation[];
 };
-/** Finalized response blocks; these are not session nodes, and the consumer provides timeline identity and persistence. */
+/** Response blocks, including published tool inputs; consumers own timeline identity and one-time outcome persistence. */
 export type ModelBlock = {
   responseId: string; requestParentId: string | null; ordinal: number; complete: boolean; continuation: Json; source: ModelSource;
   /** Terminal state is delivered once with the actual response block having the highest ordinal; null for all other blocks. */
@@ -55,7 +63,9 @@ export type ModelBlock = {
 } & (
   | { kind: "thinking"; text: string; summary: string }
   | { kind: "text"; text: string }
-  | { kind: "toolcall"; callId: string; name: string; argumentsText: string | null; arguments: Json; outcome: ToolOutcome | null }
+  | { kind: "toolcall"; callId: string; name: string; argumentsText: string | null; arguments: Json; outcome: ToolOutcome | null;
+      /** Original input preview identity; available even when execution never produced an outcome. */
+      invocation?: ToolInvocationInfo }
 );
 export type ModelLiveBlock = { id: string; responseId: string; ordinal: number } & (
   | { kind: "text"; text: string; endedAt: number | null }
@@ -66,8 +76,10 @@ export type ModelLiveBlock = { id: string; responseId: string; ordinal: number }
 );
 export type ModelRunEvent =
   | { type: "block"; block: ModelBlock }
+  | { type: "tool.begin"; block: Extract<ModelBlock, { kind: "toolcall" }> }
+  | { type: "tool.complete"; block: Extract<ModelBlock, { kind: "toolcall" }> }
   | { type: "progress"; blocks: readonly ModelLiveBlock[] }
-  | { type: "diagnostic"; origin: "model" | "software"; code: string; message: string; level: "error" | "warning"; details?: ErrorDetails };
+  | { type: "diagnostic"; origin: "model" | "software"; code: string; message: string; level: "error" | "warning"; details?: ErrorDetails; responseId?: string };
 /** Deliver execution events synchronously; consumers save finalized records, exceptions stop execution, and no further events are delivered after returning. */
 export interface ModelRunObserver { event(event: ModelRunEvent): undefined }
 /** Used only for HTTP request identity; does not enter model messages, history, or resource authorization. */
@@ -117,7 +129,7 @@ export type ModelRunResult = {
   response: ModelResponse | null;
   /** Measured timing for this call; still available for transient feedback when no terminal state was obtained. */
   timing: RequestTiming | null;
-} & ({ reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string; details?: ErrorDetails });
+} & ({ reason: "completed" } | { reason: "cancelled" } | { reason: "failed"; code: string; details?: ErrorDetails; retryable?: boolean });
 /** The final request's input context; an independent copy for domain extension producers to read. */
 export interface ModelRequestContext {
   system: SystemPrompt;

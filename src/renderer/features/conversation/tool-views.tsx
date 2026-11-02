@@ -1,4 +1,5 @@
 import { Boxes, ScanSearch, Wrench } from "lucide-react";
+import { previewArguments } from "../../../shared/partial-arguments";
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
@@ -128,6 +129,8 @@ export function toolLabel(name: string, implementation: string | null, registry:
   return label ? getI18n().text(label) : null;
 }
 export function resolveToolView(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView {
+  if (props.phase === "input" && props.argumentsText !== undefined)
+    props = { ...props, args: previewArguments(props.argumentsText) };
   return builtinViews.get(props.name)?.render(props, registry)
     ?? { props, icon: <Wrench className="size-3.5" />, ...registry.tool(props.invocation.implementation, props) };
 }

@@ -2,7 +2,6 @@ import { useI18n, useRendererConfig } from "@asterism-app/sdk/renderer";
 import { Brain } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 
-import { Badge } from "@asterism-app/ui/ui/badge";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { thinkingMessages } from "../../messages/thinking";
@@ -13,6 +12,7 @@ import { thinkingDuration } from "./thinking-state";
 import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { generating, type TimelineItem } from "./timeline";
 import { viewStateKeys } from "./view-state";
+import { blockShell } from "./block-shell";
 
 type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
 
@@ -24,17 +24,15 @@ export function ThinkingBlock({ node }: { node: ThinkingNode }) {
   // Both live and formed blocks carry generation start and end times; no duration is fabricated when history has no timing.
   const startedAt = node.startedAt ?? null;
   const endedAt = node.endedAt ?? null;
-  const interrupted = "complete" in node && !node.complete;
-
-  return <Disclosure {...disclosure}
-    header={<ThinkingHeader streaming={streaming} startedAt={startedAt} endedAt={endedAt} interrupted={interrupted} />}>
+  return <Disclosure {...disclosure} {...blockShell(node)}
+    header={<ThinkingHeader streaming={streaming} startedAt={startedAt} endedAt={endedAt} />}>
     <ThinkingBody streaming={streaming} text={node.text} />
   </Disclosure>;
 }
 
 /** Timing refreshes are confined to the header so Markdown does not rerender every second. */
-function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
-  streaming: boolean; startedAt: number | null; endedAt: number | null; interrupted: boolean;
+function ThinkingHeader({ streaming, startedAt, endedAt }: {
+  streaming: boolean; startedAt: number | null; endedAt: number | null;
 }) {
   const i18n = useI18n();
   const [now, setNow] = useState(Date.now);
@@ -53,7 +51,6 @@ function ThinkingHeader({ streaming, startedAt, endedAt, interrupted }: {
     </span>
     <span className="min-w-0 flex-1 truncate text-left">{streaming ? i18n.formatMessage(thinkingMessages.thinkingActive) : i18n.formatMessage(thinkingMessages.thinkingTitle)}</span>
     {duration && <span role="timer" aria-live="off" aria-label={i18n.formatMessage(thinkingMessages.thinkingElapsed, { duration: duration })} className="shrink-0 whitespace-nowrap type-caption tabular-nums">{duration}</span>}
-    {interrupted && <Badge variant="outline">{i18n.formatMessage(thinkingMessages.thinkingInterrupted)}</Badge>}
   </>;
 }
 

@@ -1,5 +1,5 @@
 import type { ModelInputPart, SessionSnapshot } from "@asterism-app/sdk/contracts";
-import { ContextSummary, Execution, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
+import { decodeExecution, ContextSummary, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { projectInputMessage } from "../input-message.ts";
 
 export interface PeekRecord {
@@ -20,7 +20,7 @@ export function projectPeekRecords(snapshot: Pick<SessionSnapshot, "records">, a
       result.push({ id: record.id, at: record.createdAt, kind, status, text });
     if (record.source?.resource?.id === agentId) {
       const message = AgentInputMessage.decode(record);
-      const execution = Execution.decode(record);
+      const execution = decodeExecution(record);
       const summary = ContextSummary.decode(record);
       if ([message, execution, summary].some(value => value?.status === "unknown")) {
         add("notice", `Saved record ${record.contract.id} could not be decoded.`, "unreadable");

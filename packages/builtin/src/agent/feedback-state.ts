@@ -1,8 +1,8 @@
 import type { ObjectExecutor, ObjectReader } from "@asterism-app/sdk/runtime";
-import { AgentSoftwareFeedback, type AgentFeedback, type InlineFeedback, type CompressionActivity } from "./feedback.ts";
+import { AgentSoftwareFeedback, type AgentFeedback, type InlineFeedback, type CompressionActivity, type AgentActivity } from "./feedback.ts";
 
-type FeedbackState = { inline: readonly InlineFeedback[]; interruptions: readonly (string | null)[]; compressions: readonly CompressionActivity[] };
-const empty: FeedbackState = { inline: [], interruptions: [], compressions: [] };
+type FeedbackState = { inline: readonly InlineFeedback[]; interruptions: readonly (string | null)[]; compressions: readonly CompressionActivity[]; activity: AgentActivity | null };
+const empty: FeedbackState = { inline: [], interruptions: [], compressions: [], activity: null };
 
 /** Feedback within the resource lifecycle; positions reference only existing nodes, and neither saving nor rewinding creates history records. */
 export function createAgentFeedback() {
@@ -10,6 +10,14 @@ export function createAgentFeedback() {
   let nextId = 0;
   return {
     get: (object: ObjectReader): FeedbackState => states.get(object.ref.id) ?? empty,
+    activity(object: ObjectExecutor, activity: AgentActivity | null): void {
+      const previous = states.get(object.ref.id) ?? empty;
+      const before = previous.activity;
+      if (before === activity || (before && activity && before.attempt === activity.attempt
+        && before.max === activity.max && before.resumeAt === activity.resumeAt)) return;
+      states.set(object.ref.id, { ...previous, activity });
+      object.invalidate();
+    },
     report(object: ObjectExecutor, value: AgentFeedback, interrupted = false): void {
       const afterNodeId = object.session.snapshot().position.nodeId;
       const previous = states.get(object.ref.id) ?? empty;

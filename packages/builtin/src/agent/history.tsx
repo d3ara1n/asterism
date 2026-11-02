@@ -1,7 +1,7 @@
 import { recordRenderer, useI18n, type RecordRenderer } from "@asterism-app/sdk/renderer";
 import { Brain, MessageSquareText, Wrench, Info } from "lucide-react";
 
-import { inputSummary, Execution, AgentInputMessage, ContextSummary } from "@asterism-app/builtin-api/contracts";
+import { inputSummary, Execution, ToolExecution, AgentInputMessage, ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { conversationMessages } from "../messages/conversation";
 import { messageAppearance, messageSenderLabel } from "./message-presentation";
@@ -11,6 +11,16 @@ const RowText = ({ label, className }: { label: string; className?: string }) =>
 const record = (value: unknown): Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
 export const agentRecordViews: RecordRenderer[] = [
+  recordRenderer(ToolExecution, {
+    icon: <Wrench className="size-4" />,
+    label: data => {
+      const block = data.input;
+      if (block.kind !== "toolcall") return "";
+      const args = record(block.arguments), target = record(args.target);
+      const tool = block.name === "resource_call" && typeof args.tool === "string" ? args.tool : block.name;
+      return typeof target.path === "string" ? `${tool} · ${target.path}` : tool;
+    },
+  }),
   recordRenderer(ContextSummary, {
     icon: <Info className="size-4" />,
     label: (data, context) => `${context.text(conversationMessages.contextSummary)} · ${data.summary}`,

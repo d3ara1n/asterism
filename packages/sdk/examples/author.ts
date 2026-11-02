@@ -1,7 +1,8 @@
 import { sample, Counter, Count, CounterView, CountChanged, CreateCounter, ChangeCount, CounterUpdates, counterCard } from "./counter-contract.ts";
 /** Independent examples of session records, resource behavior, and model execution. */
 import { z } from "zod";
-import { pluginNamespace, defineAction, resourceCall, defineRecord, defineTool, defineImplementation, modelRunRecordSchema, type ModelItem } from "@asterism-app/sdk/contracts";
+import { pluginNamespace, defineAction, resourceCall, defineRecord, defineOperationRecord, defineTool, defineImplementation,
+  modelRunRecordSchema, modelBlockSchema, toolOutcomeSchema, type ModelItem } from "@asterism-app/sdk/contracts";
 import {
   defineModule, definePlugin, implementCreation, implementAction, implementPreparer, implementResource, implementTool, implementChannel,
   type PluginContext, type ObjectReader, type ObjectExecutor, type SessionObserver, type SessionSnapshot, type ResourceRef,
@@ -121,19 +122,25 @@ export const counterPlugin = definePlugin({
 /** Scenario three: the plugin's own Agent drives the loop, with context projected from the timeline each time. */
 const research = pluginNamespace("example.research");
 const Execution = defineRecord(research.name("execution"), { schema: modelRunRecordSchema });
-export const modelRecordsModule = defineModule(() => ({ records: [Execution] }));
+const ToolExecution = defineOperationRecord(research.name("tool-execution"), { input: modelBlockSchema, output: toolOutcomeSchema });
+export const modelRecordsModule = defineModule(() => ({ records: [Execution, ToolExecution] }));
 /** The domain plugin constructs the projection from its own input/execution events; it is not stored in Agent or run. */
 export async function modelWork(plugin: PluginContext, object: ObjectExecutor, signal: AbortSignal,
   projectOwnContext: (snapshot: SessionSnapshot, object: ResourceRef) => ModelItem[]) {
   for (let request = 0; request < 8; request++) {
     const snapshot = object.session.snapshot();
+    const calls = new Map<string, string>();
     const result = await plugin.execution.run({
       access: object.ref, interactive: false, requestParentId: snapshot.position.nodeId, target: { provider: "configured-provider", model: "configured-model" },
       system: { blocks: [{ id: research.name("instruction"), text: "Inspect linked materials and report findings." }] },
       messages: projectOwnContext(snapshot, object.ref), cache: { expectHit: request > 0 }, signal,
       observer: { event(event) {
         if (event.type === "progress") return;
-        object.commit(writer => { writer.append(Execution, modelRunRecordSchema.parse(event)); });
+        object.commit(writer => {
+          if (event.type === "tool.begin") calls.set(event.block.callId, writer.begin(ToolExecution, event.block));
+          else if (event.type === "tool.complete") writer.complete(ToolExecution, calls.get(event.block.callId)!, event.block.outcome!);
+          else writer.append(Execution, modelRunRecordSchema.parse(event));
+        });
       } },
     });
     if (result.reason !== "completed" || result.tools.length === 0) return result;

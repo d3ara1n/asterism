@@ -1,6 +1,7 @@
-import type { RequestTiming } from "@asterism-app/sdk/contracts";
+import type { RequestTiming, Usage } from "@asterism-app/sdk/contracts";
 import { wrapLanguageModel, type LanguageModel } from "ai";
 import type { ModelEvent } from "./contract.ts";
+import { anthropicUsage } from "./anthropic-usage.ts";
 
 type ProviderPart = Awaited<ReturnType<ReturnType<typeof wrapLanguageModel>["doStream"]>>["stream"] extends ReadableStream<infer Part> ? Part : never;
 
@@ -40,6 +41,8 @@ export class RequestTimer {
 export function measureModel(model: Exclude<LanguageModel, string>, protocol: string, timer: RequestTimer) {
   let completion: Extract<ModelEvent, { type: "finish" }> | undefined;
   let responseId: string | undefined;
+  let usage: Usage | null = null;
+  const anthropic = anthropicUsage();
   const callsWithInput = new Set<string>();
   const measured = wrapLanguageModel({ model, middleware: {
     specificationVersion: "v4",
@@ -60,20 +63,30 @@ export function measureModel(model: Exclude<LanguageModel, string>, protocol: st
           }
           if (part.type === "tool-call" && !callsWithInput.has(part.toolCallId)) timer.output("toolcall", part.input);
           if (part.type === "response-metadata") responseId = part.id ?? responseId;
+          if (protocol === "anthropic" && part.type === "custom" && part.kind === "anthropic.message_start")
+            usage = anthropic.observe(usage, part.providerMetadata?.anthropic?.usage, false);
+          if (protocol === "anthropic" && part.type === "raw" && part.rawValue && typeof part.rawValue === "object") {
+            const raw = part.rawValue as Record<string, unknown>;
+            if (raw.type === "message_delta") usage = anthropic.observe(usage, raw.usage, true);
+          }
           if (part.type === "error") timer.end("failed");
           if (part.type === "finish") {
             const u = part.usage;
+            const input = u.inputTokens.total ?? usage?.input ?? null;
+            const output = u.outputTokens.total ?? usage?.output ?? null;
+            usage = {
+              input, output, total: input === null || output === null ? null : input + output,
+              reasoning: u.outputTokens.reasoning ?? usage?.reasoning ?? null,
+              cacheRead: u.inputTokens.cacheRead ?? usage?.cacheRead ?? null,
+              cacheWrite: u.inputTokens.cacheWrite ?? usage?.cacheWrite ?? null,
+            };
             completion = { type: "finish", reason: part.finishReason.unified, rawFinishReason: part.finishReason.raw,
-              responseId, timing: timer.end("completed"), usage: {
-                input: u.inputTokens.total ?? null, output: u.outputTokens.total ?? null,
-                total: u.inputTokens.total == null && u.outputTokens.total == null ? null : (u.inputTokens.total ?? 0) + (u.outputTokens.total ?? 0),
-                reasoning: u.outputTokens.reasoning ?? null, cacheRead: u.inputTokens.cacheRead ?? null, cacheWrite: u.inputTokens.cacheWrite ?? null,
-              } };
+              responseId, timing: timer.end(["error", "interrupted"].includes(part.finishReason.unified) ? "failed" : "completed"), usage };
           }
           controller.enqueue(part);
         },
       })) };
     },
   } });
-  return { model: measured, get completion() { return completion; } };
+  return { model: measured, get completion() { return completion; }, get usage() { return usage; }, get responseId() { return responseId; } };
 }

@@ -1,8 +1,28 @@
-import type { ModelBlock, ModelItem, ModelPart } from "@asterism-app/sdk/contracts";
+import type { ModelBlock, ModelItem, ModelPart, ToolOutcome } from "@asterism-app/sdk/contracts";
 
-/** One response and its tool outcomes project together, independent of timeline or temporary conversation storage. */
-export function responseMessages(blocks: readonly ModelBlock[]): ModelItem[] {
-  const ordered = blocks.filter(block => block.complete).sort((a, b) => a.ordinal - b.ordinal);
+/** Complete arguments can be paired with an unavailable result; unfinished JSON never becomes executable input. */
+export function hasModelContent(block: ModelBlock): boolean {
+  return block.kind === "toolcall" ? block.argumentsText === null : block.complete;
+}
+
+/** Shared by model input and history shells. Each response precedes its following user/context boundary. */
+export function participatingBlocks(blocks: readonly ModelBlock[]): ModelBlock[] {
+  const ordered = blocks.filter(hasModelContent).sort((a, b) => a.ordinal - b.ordinal);
+  while (ordered.at(-1)?.kind === "thinking") ordered.pop();
+  return ordered;
+}
+
+const missingResult = (kind: "cancelled" | "unknown", message: string): ToolOutcome =>
+  ({ kind, message, data: null, model: [{ kind: "text", text: message }] });
+/** Generation ended before the tool batch, so the call never ran. */
+const notExecuted = missingResult("cancelled", "This tool call was not executed because the response did not complete.");
+/** The call was handed to execution, but no result was recorded; its effects are unknown. */
+const unrecorded = missingResult("unknown", "This tool call was submitted for execution, but its result was not recorded. Its effects are unknown.");
+
+/** One response and its tool outcomes project together, independent of timeline or temporary conversation storage.
+ * submitted lists call IDs handed to execution; other calls without an outcome never ran. */
+export function responseMessages(blocks: readonly ModelBlock[], submitted: ReadonlySet<string> = new Set()): ModelItem[] {
+  const ordered = participatingBlocks(blocks);
   const first = ordered[0];
   if (!first) return [];
   const parts: ModelPart[] = ordered.map(block => block.kind === "toolcall"
@@ -10,9 +30,8 @@ export function responseMessages(blocks: readonly ModelBlock[]): ModelItem[] {
     : block.kind === "thinking"
       ? { kind: "thinking", text: block.text, summary: block.summary, continuation: block.continuation }
       : { kind: "text", text: block.text, continuation: block.continuation });
-  while (parts.at(-1)?.kind === "thinking") parts.pop();
   const items: ModelItem[] = parts.length ? [{ kind: "output", scope: first.source.scope, adapter: first.source.adapter, parts }] : [];
-  for (const block of ordered) if (block.kind === "toolcall" && block.outcome)
-    items.push({ kind: "result", callId: block.callId, name: block.name, outcome: block.outcome });
+  for (const block of ordered) if (block.kind === "toolcall")
+    items.push({ kind: "result", callId: block.callId, name: block.name, outcome: block.outcome ?? (submitted.has(block.callId) ? unrecorded : notExecuted) });
   return items;
 }
