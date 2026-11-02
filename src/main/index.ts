@@ -17,6 +17,7 @@ import { initialWindowState, trackWindowState } from "./window-state.ts";
 import { initialTitleBar, serveDesktopWindow, titleBarMode } from "./window-titlebar.ts";
 import { servePreferences } from "./ui-state.ts";
 import { serveFileSaves } from "./file-save.ts";
+import { dismissWindow, restoreWindow } from "./window-exit.ts";
 import { serveLanguage, readLanguage } from "./language.ts";
 import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
@@ -65,9 +66,12 @@ function unsavedPrompt(): Electron.MessageBoxOptions {
   };
 }
 
-/** Confirm unsaved views and live resources before stopping the runtime. */
+/** Confirm unsaved views and live resources while the window is shown, then dismiss it and stop the runtime. */
 function requestQuit(restart = false, installUpdate = false): Promise<boolean> {
   if (quitting || quitRequest) return Promise.resolve(false);
+  // The window dismissed for shutdown; a shutdown that does not complete brings it back.
+  let dismissed: BrowserWindow | null = null;
+  const bringBack = () => { if (dismissed) restoreWindow(dismissed); dismissed = null; };
   quitRequest = (async () => {
     if (unsavedTitles.length && window && !window.isDestroyed()) {
       if ((await dialog.showMessageBox(window, unsavedPrompt())).response !== 1) return false;
@@ -87,10 +91,13 @@ function requestQuit(restart = false, installUpdate = false): Promise<boolean> {
       if (answer.response !== 1) return false;
     }
     quitting = true;
+    // All confirmations are answered; nothing after this point opens a window-attached dialog.
+    if (window && await dismissWindow(window)) dismissed = window;
     await Promise.all([startup.stop(), runtime.stop()]);
     if (installUpdate && updates) {
       updates.install(error => {
         quitting = false;
+        bringBack();
         startup.publish({ status: "failed", reason: "runtime", detail: error.message });
         // The workbench has ended its startup subscription; re-enter startup to present failure and restart actions.
         if (window && !window.isDestroyed()) window.webContents.reload();
@@ -103,7 +110,10 @@ function requestQuit(restart = false, installUpdate = false): Promise<boolean> {
   })().catch(error => {
     quitting = false;
     console.error("Application shutdown failed.", error);
-    if (installUpdate) throw error;
+    // Update installation reports its failure through the caller's interface.
+    if (installUpdate) { bringBack(); throw error; }
+    if (dismissed) dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.quitFailed, () => readLanguage().locale));
+    bringBack();
     return false;
   }).finally(() => { quitRequest = null; });
   return quitRequest;
