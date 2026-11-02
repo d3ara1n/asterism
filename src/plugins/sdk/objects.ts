@@ -315,6 +315,14 @@ export function bindObjects(owner: string, host: PluginHostServices, sessionRuns
           if (options.exposeSelf === true) resources.push(ref);
           return source.create(contract, input, { signal, linkTo: ref, resources });
         }) as ToolSession["create"],
+        link(receiverId: string) {
+          check();
+          source.link(authorized(receiverId), ref);
+        },
+        unlink(receiverId: string) {
+          check();
+          source.unlink(authorized(receiverId), ref);
+        },
         remove(resourceId: string) {
           check();
           source.remove(authorized(resourceId));

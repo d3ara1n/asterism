@@ -72,6 +72,8 @@ MCP Host resources share the configured servers. External server state can there
 
 Create or select another agent, establish the required links, and send it the task and relevant context. Access is directional: linking an agent as a resource does not automatically share all of the caller’s resources.
 
+An agent can expose itself to an already linked resource with `resource_expose`, passing the recipient's `resource_id` and `exposed: true`. Passing `exposed: false` withdraws that exposure while preserving the agent's access to the recipient, so exposure can be enabled again later. The recipient must support receiving links. This also applies to Mesh membership and Chat notification delivery. Creation entries that accept `expose_self` can establish the initial exposure during creation. Active requests retain their captured access; subsequent requests use the updated links.
+
 Inspect the available agent tools for sending, waiting, or reading its records. Sending an input and completing the resulting work are separate events.
 
 ## Share a Mesh channel

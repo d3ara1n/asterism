@@ -6,4 +6,6 @@ Declare creation once and pass that original contract to the integration. A stra
 
 Creation participates in the host's resource and history operations. The created object links to the invoking agent. Optional initial resources remain within the request's captured resource scope. Explicit self-exposure supplies the reverse relationship; a new resource does not inherit every link or capability of its creator.
 
+Initial self-exposure is optional. After creation, the agent can use `resource_expose` to enable or withdraw its exposure to a resource in its captured request scope. The recipient must support receiving links; the agent's access to that recipient remains independent.
+
 Use descriptions and schemas that explain what the resulting resource means and what inputs the model should supply. Creating another agent is also an explicit domain operation with its own configuration and initial links.

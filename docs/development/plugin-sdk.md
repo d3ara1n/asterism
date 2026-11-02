@@ -74,6 +74,8 @@ Frontend and backend operations use the same host mechanisms. A backend action c
 
 Creation can establish initial links and return the new identity plus its creation-time title. Tool creation automatically links the new object to the caller; optional initial resources stay within captured request access. Exposing the caller creates only that explicit reverse relationship.
 
+Tool-scoped link changes manage the caller's exposure to a recipient within captured request access. The host binds the caller as the resource being shared; these operations grant no new access to the caller and leave the reverse relationship independent. Exposure can be established or withdrawn after creation. Existing requests retain their captured authorization, while later requests observe the updated relationships.
+
 Renaming, removal, and link operations use shared host mechanisms for resource identity, presence, and lifecycle. Renaming appends a title event; existing snapshots retain the title at their captured timeline endpoint. Tool renaming and removal resolve targets within captured request links. Caller knowledge of an ID does not establish scope.
 
 ## Lifetimes and busy work

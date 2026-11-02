@@ -4,7 +4,7 @@ import { defineModule, defineTopLevelTool, implementCall, PluginApiError, type C
 import { agentCreations } from "@asterism-app/builtin-api/runtime";
 import { ReadAgentCreations } from "@asterism-app/builtin-api/contracts";
 import { builtinConfiguration } from "../configuration/runtime.ts";
-import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult } from "./contract.ts";
+import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult, ResourceExposeResult } from "./contract.ts";
 
 /** Known rejection is not represented as an unknown write; resource initialization exceptions still use the tool executor's unknown outcome. */
 async function attempt<T extends Json>(signal: AbortSignal, work: () => T | Promise<T>): Promise<CallResult<T>> {
@@ -70,6 +70,27 @@ export default defineModule(plugin => ({
         const resource = await agentCreations.create(plugin, args.creation_id, args.input, context);
         return { resource_id: resource.id, type: resource.kind, title: resource.title };
       }); },
+    }),
+    defineTopLevelTool({
+      id: ResourceExposeResult.id, name: "resource_expose",
+      description: "Expose yourself to a linked resource, or withdraw your exposure.",
+      guidelines: [
+        "The resource receives a directed link to you. The host supplies your identity, and the recipient must support receiving links.",
+        "Your access to the recipient remains independent. Exposure changes are recorded in session history; requests already in progress retain their captured access.",
+      ],
+      argsSchema: z.strictObject({
+        resource_id: z.string().min(1).describe("Recipient resource ID linked to you at the start of this request."),
+        exposed: z.boolean().describe("True exposes you to the recipient; false withdraws that exposure."),
+      }).describe("The recipient and your desired exposure state."),
+      resultSchema: ResourceExposeResult.schema,
+      effect: "write", execution: "sequential",
+      execute(args, { session, signal }) {
+        return attempt(signal, () => {
+          if (args.exposed) session.link(args.resource_id);
+          else session.unlink(args.resource_id);
+          return args;
+        });
+      },
     }),
     defineTopLevelTool({
       id: ResourceRenameResult.id, name: "resource_rename",

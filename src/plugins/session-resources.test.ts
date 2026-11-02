@@ -666,6 +666,66 @@ describe("SDK session resource lifetimes", () => {
 });
 
 describe("Agent resource operation entries", () => {
+  // Self-exposure changes only the caller-to-recipient direction and can be withdrawn and restored after creation.
+  it("resource_expose toggles the bound caller's exposure while preserving its own access", async () => {
+    let calls: { name: string; args: Json }[] = [];
+    const f = open({ adapter: adapter(() => calls) }), target = await model(f.app);
+    const actor = await f.session.create(Create, 0), recipient = await f.session.create(Create, 1);
+    f.session.link(actor, recipient);
+    const run = runner(f, actor, target), receive = runner(f, recipient, target);
+    for (const exposed of [true, false, true]) {
+      calls = [{ name: "resource_expose", args: { resource_id: recipient.id, exposed } }];
+      expect((await run()).tools[0]).toMatchObject({ kind: "succeeded", data: { resource_id: recipient.id, exposed } });
+      expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([
+        { receiverId: actor.id, resourceId: recipient.id },
+        ...(exposed ? [{ receiverId: recipient.id, resourceId: actor.id }] : []),
+      ]);
+      calls = [{ name: "resource_list", args: {} }];
+      expect((await receive()).tools[0]?.data).toMatchObject({
+        resources: exposed ? [{ resource_id: actor.id }] : [],
+      });
+    }
+  });
+
+  // Both exposure operations must resolve the recipient from captured access, even when a link is added or removed mid-request.
+  it.each([true, false])("self-exposure %s uses the request's captured recipient authorization", async exposed => {
+    let recipientId = "", mutate: (() => void) | undefined;
+    const f = open({ adapter: adapter(() => {
+      mutate?.();
+      return [{ name: "resource_expose", args: { resource_id: recipientId, exposed } }];
+    }) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0), recipient = await f.session.create(Create, 1);
+    recipientId = recipient.id;
+    if (!exposed) f.session.link(recipient, actor);
+    const run = runner(f, actor, target), before = f.session.snapshot().position.nodeId;
+    expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+    expect(f.session.snapshot().position.nodeId).toBe(before);
+    mutate = () => f.session.link(actor, recipient);
+    expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+    expect(f.app.sessions.current(f.sessionId).workbench.links).toContainEqual({ receiverId: actor.id, resourceId: recipient.id });
+    mutate = () => f.session.unlink(actor, recipient);
+    expect((await run()).tools[0]).toMatchObject({ kind: "succeeded" });
+    expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual(
+      exposed ? [{ receiverId: recipient.id, resourceId: actor.id }] : [],
+    );
+    mutate = undefined;
+    expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
+  });
+
+  // A visible resource is not necessarily a valid recipient; rejection must preserve its existing access link and history.
+  it("self-exposure rejects resources without link reception", async () => {
+    let recipientId = "";
+    const f = open({ adapter: adapter(() => [{ name: "resource_expose", args: { resource_id: recipientId, exposed: true } }]) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    const note = await f.session.create(CreateNote, { title: "Note", content: "" }, { linkTo: actor });
+    recipientId = note.id;
+    const before = f.app.sessions.current(f.sessionId);
+    expect((await runner(f, actor, target)()).tools[0]?.kind).toBe("rejected");
+    const after = f.app.sessions.current(f.sessionId);
+    expect(after.nodes).toEqual(before.nodes);
+    expect(after.workbench).toEqual(before.workbench);
+  });
+
   // Top-level renaming uses request-captured links; new links within the batch do not authorize access, and later requests read new names.
   it("resource_rename reuses request authorization and returns the actual saved title", async () => {
     let mutate: (() => void) | undefined;
@@ -873,7 +933,7 @@ describe("Agent resource operation entries", () => {
     expect((await run()).tools[0]?.kind).toBe("succeeded");
   });
 
-  // Execution scope contract: saved tool operation handles cannot create or remove resources after call completion.
+  // Execution scope contract: saved tool operation handles cannot mutate resources or links after call completion.
   it("tool session handles expire after execution", async () => {
     let saved!: ToolSession;
     const tool = defineTopLevelTool({ id: ns.name("save"), name: "save_session", description: "Save context.", guidelines: [],
@@ -887,6 +947,8 @@ describe("Agent resource operation entries", () => {
     expect(() => saved.create(Create, 1)).toThrow("scope is closed");
     expect(() => saved.remove(actor.id)).toThrow("scope is closed");
     expect(() => saved.rename(actor.id, "New")).toThrow("scope is closed");
+    expect(() => saved.link(actor.id)).toThrow("scope is closed");
+    expect(() => saved.unlink(actor.id)).toThrow("scope is closed");
   });
 
   // Plugin lifetime and public service scope contract: failed contributions disappear immediately without leaking into another host instance.

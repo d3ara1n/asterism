@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { z } from "zod";
-import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText, PenLine } from "lucide-react";
+import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText, PenLine, Link } from "lucide-react";
 import { toolRenderer, useI18n, useRendererResources, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { ToolDetails } from "@asterism-app/ui/tool-content";
@@ -10,9 +10,9 @@ import { Separator } from "@asterism-app/ui/ui/separator";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { resourceMessages as messages } from "../messages/resources";
 import { agentsMessages } from "../messages/agents";
-import { inputText } from "../shared/tool-preview";
+import { inputField, inputText } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
-import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult } from "./contract";
+import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult, ResourceExposeResult } from "./contract";
 import { useCreationDirectory, prepareCreationDirectory } from "./directory";
 
 function ResourceType({ kind }: { kind: string }) {
@@ -173,6 +173,13 @@ function RenameHeader({ args, result }: ToolRenderProps<z.infer<typeof ResourceR
     meta={result?.data?.resource_id ?? inputText(args, "resource_id")} />;
 }
 const renameView = { headerRenderer: RenameHeader };
+function ExposureHeader({ args, result }: ToolRenderProps<z.infer<typeof ResourceExposeResult.schema>>) {
+  const exposed = result?.data?.exposed ?? inputField(args, "exposed");
+  const label = exposed === true ? messages.expose : exposed === false ? messages.unexpose : messages.exposure;
+  return <ToolHeader label={useI18n().text(label)} monospace
+    subject={result?.data?.resource_id ?? inputText(args, "resource_id")} />;
+}
+const exposureView = { headerRenderer: ExposureHeader };
 const listView = { headerRenderer: ListHeader, bodyRenderer: ListBody };
 const agentListView = { headerRenderer: AgentListHeader, bodyRenderer: AgentListBody };
 const inspectView = { headerRenderer: InspectHeader, bodyRenderer: InspectBody };
@@ -206,6 +213,10 @@ export default {
     toolRenderer(ResourceRenameResult, {
       label: messages.rename, icon: <PenLine className="size-3.5" />,
       input: renameView, execution: renameView, result: renameView,
+    }),
+    toolRenderer(ResourceExposeResult, {
+      label: messages.exposure, icon: <Link className="size-3.5" />,
+      input: exposureView, execution: exposureView, result: exposureView,
     }),
   ],
 } satisfies RendererModule;

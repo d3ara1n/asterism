@@ -60,6 +60,7 @@ export interface SessionExecutor extends SessionReader {
  * An operation facade for the same session from the perspective of the tool caller and this request.
  * The host binds the originating resource, the effective link scope at request start, and the tool execution scope, handling identity and execution validation consistently.
  * Operations originate from the initiating resource: newly created resources link to it, while removal and rename targets resolve within this request's effective link scope.
+ * Link operations expose the initiator to a recipient within that same scope; the initiator is always the resource being shared.
  * New operations use this perspective, explicitly defining implicitly bound endpoints, the operable resource scope, and the execution scope.
  */
 export interface ToolSession extends SessionReader {
@@ -68,6 +69,10 @@ export interface ToolSession extends SessionReader {
     /** Link the bound initiator to the new resource, committed atomically with creation; defaults to false when omitted. */
     exposeSelf?: boolean;
   }): Promise<ResourceCreationResult>;
+  /** Expose the bound initiator to a recipient in this request's effective link scope. The recipient must support receiving links. */
+  link(receiverId: string): void;
+  /** Withdraw the bound initiator's exposure to a recipient in this request's effective link scope; preserve the reverse link. */
+  unlink(receiverId: string): void;
   remove(resourceId: string): void;
   rename(resourceId: string, title: string): string;
 }

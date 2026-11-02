@@ -26,3 +26,5 @@ export const ResourceRemoveResult = builtin.data("resource.remove",
   z.strictObject({ resource_id: z.string() }).describe("Identity of the removed resource."));
 export const ResourceRenameResult = builtin.data("resource.rename",
   z.strictObject({ resource_id: z.string(), title: z.string() }).describe("Resource identity and committed title."));
+export const ResourceExposeResult = builtin.data("resource.expose",
+  z.strictObject({ resource_id: z.string(), exposed: z.boolean() }).describe("Recipient resource identity and the caller's committed exposure state."));
