@@ -21,6 +21,7 @@
     "@codemirror/view": "^6.43.15",
     "@lezer/highlight": "^1.2.5",
     "@lobehub/streamdown": "1.4.4",
+    "@perplexity-ai/perplexity_ai": "0.41.0",
     "@pierre/diffs": "1.6.2",
     "@vscode/ripgrep": "1.18.0",
     "@xterm/addon-fit": "0.11.0",

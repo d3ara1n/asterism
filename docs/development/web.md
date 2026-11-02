@@ -1,6 +1,6 @@
 # Web providers and resources
 
-Web resources expose application-wide search and URL-fetch providers. Provider adapters own upstream protocols; the host service owns selection, lifecycle, and common result validation.
+Web resources expose application-wide search and URL-fetch providers. Provider adapters own upstream protocols; the host service owns selection, lifecycle, and common result validation. Single-page scraping is URL retrieval even when the upstream service renders a page or calls its endpoint scrape or extract.
 
 ## Provider identity and routing
 
@@ -44,6 +44,10 @@ Scores retain their provider meaning and do not establish cross-provider ranking
 
 ## Built-in adapters
 
-Exa and Parallel use their official SDKs for search and URL content retrieval. Each declares an API key and a search choice that applies only to web search: Exa's search type and Parallel's search mode. Both preserve supported filters, source metadata, provider warnings, and reported usage. Exa distinguishes text, highlights, and summaries; its API failures retain available upstream error codes, details, and request identifiers. Parallel distinguishes Markdown excerpts from page bodies and reports SKU counts without estimating currency costs.
+Adapters use official SDKs when their request interfaces support cancellation, or the provider's official HTTP API with a native cancellation signal. Both paths use the same provider lifecycle. Cancellation stops local transport and result consumption; it does not establish that the upstream service stopped processing or reversed a charge. Stopping only the caller's wait while leaving an unowned request running does not satisfy this contract.
 
-Unsupported filters and parameter adjustments become hints. Provider-specific limits and filter precedence stay in the adapter. Empty search is valid; failed content retrieval remains an error. Cancellation passes to each SDK.
+Provider capabilities are independent. Exa, Parallel, Tavily, Firecrawl, and DeepSeek support search and URL retrieval; Perplexity exposes its standalone Search API. Search-only providers do not participate in URL retrieval. Each provider declares its own credentials and any search or extraction choices.
+
+Unsupported filters and parameter adjustments become hints. Provider-specific limits, domain-filter precedence, localization, and date precision stay in the adapter. A date that could represent either publication or update retains an unknown kind. Upstream summaries remain summaries, and excerpts remain distinct from page bodies. Tavily focused extraction requires a second request alongside the full-body request; their identifiers and reported usage remain available in the combined result. Providers without focused excerpts report that limitation while returning the body.
+
+Empty search is valid; failed content retrieval remains an error, including upstream success envelopes that contain page failures or no usable body. HTTP errors retain upstream details. Credit and SKU counts remain reported quantities; adapters do not infer prices or charges from a pricing table.

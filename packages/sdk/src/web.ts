@@ -4,8 +4,8 @@ import { uiTextSchema } from "./i18n.ts";
 import { providerSettingsSchema } from "./provider-settings.ts";
 
 export const webUrlSchema = z.string().url().refine(value => {
-  const url = new URL(value);
-  return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password;
+  const url = URL.parse(value);
+  return url !== null && ["http:", "https:"].includes(url.protocol) && !url.username && !url.password;
 }, "An HTTP or HTTPS URL without embedded credentials is required.");
 export const webHintSchema = z.object({ code: z.string(), message: z.string(), parameter: z.string().optional() });
 export const webContentPartSchema = z.object({

@@ -4,6 +4,10 @@ import type { Json, ResourceRef, WebFetchResult, WebSearchResult } from "@asteri
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract.ts";
 import { exaWebProvider } from "./exa.ts";
 import { parallelWebProvider } from "./parallel.ts";
+import { perplexityWebProvider } from "./perplexity.ts";
+import { tavilyWebProvider } from "./tavily.ts";
+import { firecrawlWebProvider } from "./firecrawl.ts";
+import { deepseekWebProvider } from "./deepseek.ts";
 import { costOf, emptyWebStats, finishRequest, projectStats, startRequest, type WebRequestKind, type WebSessionStats } from "./stats.ts";
 
 async function result<T extends Json>(work: () => Promise<T>, signal: AbortSignal): Promise<CallResult<T>> {
@@ -38,7 +42,7 @@ export default defineModule(plugin => {
     return outcome;
   }
   return {
-    webProviders: [exaWebProvider, parallelWebProvider],
+    webProviders: [exaWebProvider, parallelWebProvider, perplexityWebProvider, tavilyWebProvider, firecrawlWebProvider, deepseekWebProvider],
     resources: [implementResource(WebResource, WebView, {
       card: webCard,
       template: { current: [] },
