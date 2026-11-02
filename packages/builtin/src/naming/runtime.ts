@@ -3,7 +3,7 @@ import { defineModule, defineTopLevelTool, type ModelServices } from "@asterism-
 import { inputSummary, builtin, AutomaticSessionName } from "@asterism-app/builtin-api/contracts";
 import { SessionTitleAssigned, present, type SessionSnapshot, type ModelTarget } from "@asterism-app/sdk/contracts";
 import { builtinConfiguration, resolveRoleTarget } from "../configuration/runtime.ts";
-import { cleanTitle, collectTurns, namingInstruction, namingPrompt, userMessages } from "./policy.ts";
+import { cleanTitle, collectTurns, namingInstruction, namingPrompt, namingRules, userMessages } from "./policy.ts";
 import { SessionNameResult, SessionRenameResult } from "./contract.ts";
 
 const timeoutMs = 10_000;
@@ -68,6 +68,7 @@ export function createNamingModule(userAgent?: string) {
           description: "Set the current session's title to the name you choose.",
           guidelines: [
             "A concise title in the user's language helps identify the work; the conversation and the user's naming preferences guide the choice.",
+            ...namingRules,
             "The title is recorded in the timeline as an agent choice and takes precedence over automatic naming. Later user or agent choices can replace it.",
           ],
           argsSchema: z.strictObject({

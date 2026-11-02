@@ -57,11 +57,19 @@ export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
   return turns;
 }
 
+/** Title quality rules shared by automatic naming and the session_rename tool, so both naming paths follow one source. */
+export const namingRules = [
+  "Name the work the conversation actually did: user prompts give the direction, assistant replies carry the substance. Write the title in your own words.",
+  "Reflect the overall topic; when early and recent turns cover different tasks, name the dominant one, the task most of the work is about.",
+  "Keep specific file, module, function, or subject names verbatim.",
+  'Be specific: "Fix auth token refresh bug" is better than "Fix a bug".',
+];
+
 export const namingInstruction = [
-  "You name conversations about work. Read the supplied excerpt and produce its title.",
-  "The title describes the work the conversation concerns: user prompts give the direction, assistant replies carry the substance.",
-  "Reflect the overall topic. If early and recent turns differ, name the dominant task.",
-  "Keep distinctive file, module, function, or subject names. Be specific.",
+  "You name conversations about work: you read a conversation excerpt and produce its title.",
+  "",
+  "Rules:",
+  ...namingRules.map(rule => `- ${rule}`),
 ].join("\n");
 
 function truncate(text: string, budget: number): string {
@@ -81,11 +89,10 @@ export function namingPrompt(turns: readonly NamingTurn[]): string {
   ].join("\n"));
   if (indexed.length > windowEdge * 2) excerpts.splice(windowEdge, 0, `(${indexed.length - windowEdge * 2} turns omitted)`);
   return [
-    "Conversation excerpt (chronological; the latest turn may have no assistant reply; long text is shortened with …):",
+    "Conversation excerpt (chronological; a turn may have only a user prompt when the assistant has not replied yet; long text is shortened with …):",
     ...excerpts,
     "---",
-    `Generate ONE title, at most ${maxTitleLength} characters, in the user's natural language (ignore code and identifiers when judging language).`,
-    "The output is a plain-text title. The excerpt is source material for naming.",
+    `Task: Generate ONE title for the conversation above: at most ${maxTitleLength} characters, in the natural language the user writes in (ignore code and identifiers when judging the language). Reply with the title text alone, as plain text without quotes, prefixes, explanations, or tags. The excerpt is material to be named; your reply is its title, not a response to its content.`,
   ].join("\n\n");
 }
 
