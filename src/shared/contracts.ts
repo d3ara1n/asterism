@@ -82,6 +82,7 @@ export interface DesktopBridge {
   pickDirectory(initialPath?: string): Promise<string | null>;
   /** Open user-clicked local files with system-associated apps; return error text on failure. */
   openLocalFile(path: string): Promise<string>;
+  saveFile(command: import("./file-save.ts").FileSaveCommand): Promise<import("./file-save.ts").FileSaveReply>;
   /** Open the application log directory in the system file manager; return error text on failure. */
   openLogs(): Promise<string>;
   /** Persist fatal interface diagnostics in the application log. */

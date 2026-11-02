@@ -1,5 +1,5 @@
 import { runtime } from "../../runtime";
-import type { ContentRange, ContentRef } from "@asterism-app/sdk/contracts";
+import type { ContentRange, ContentRef, FileRef } from "@asterism-app/sdk/contracts";
 import type { ContentReader, RendererContentInput, RendererReceipt } from "@asterism-app/sdk/renderer";
 import { contentChunkSize, contentReadLimit, sameContentTarget, type ContentCommand, type ContentReply } from "../../../shared/content";
 
@@ -36,6 +36,12 @@ export function contentReader(source: () => Source | Promise<Source>, request = 
     for (const part of parts) { bytes.set(part, offset); offset += part.length; }
     return bytes;
   } };
+}
+export async function* openReferencedFile(ref: FileRef): AsyncIterable<Uint8Array> {
+  const { readerId } = await execute({ type: "file.open", ref }, "reader");
+  try {
+    for (;;) { const part = await execute({ type: "read.next", readerId }, "bytes"); if (part.done) return; yield part.data; }
+  } finally { await execute({ type: "read.close", readerId }, "done").catch(() => {}); }
 }
 
 /** Open drafts lazily; plain text creation performs no content IPC. */

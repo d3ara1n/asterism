@@ -11,7 +11,7 @@ import { Markdown } from "./Markdown";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { generating, mountedTimelineIndexes, timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";
-import { FilePreview } from "./Files";
+import { FilePreview } from "../../shared/attachments";
 import { Disclosure } from "./Disclosure";
 import { TurnFooter } from "./TurnFooter";
 import { MessageSender } from "./MessageSender";

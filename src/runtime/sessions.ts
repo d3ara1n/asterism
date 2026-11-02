@@ -1,5 +1,5 @@
 import { createSharedServices } from "./shared-services.ts";
-import { SessionTitleAssigned, type Presentation, type Source, resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, ResourceStatusChanged, SessionTitleChanged } from "@asterism-app/sdk/contracts";
+import { SessionTitleAssigned, type Presentation, type Source, resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, type FileRef, ResourceStatusChanged, SessionTitleChanged } from "@asterism-app/sdk/contracts";
 import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, type ManualSource, type PreparedCreation, PluginApiError } from "@asterism-app/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -468,6 +468,10 @@ export class SessionService {
       this.content.retain(lease, value, options.content, options.owner);
       return await this.createResource(sessionId, contract.resource.kind, { id: contract.id, input: value }, lease, options);
     } finally { await lease.close(); }
+  }
+  /** Renderer file consumption resolves through the same FileRef rules as plugin consumers. */
+  openFile(ref: FileRef, signal: AbortSignal): AsyncIterable<Uint8Array> {
+    return this.resources.openFile(ref, { refOf: id => this.tree.resourceRef(id), workbench: id => this.tree.workbench(id) }, signal);
   }
   async execute(raw: unknown): Promise<SessionReply> {
     if (this.closed) throw new SessionError("unavailable", "The session service is closed.");

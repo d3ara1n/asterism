@@ -189,7 +189,13 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
         scope.active = true;
         scope.content = host.content?.scope();
         sdk.linkAbort(scope.content, signal);
-        try { return await prepared.execute(signal, publish); }
+        try {
+          const result = await prepared.execute(signal, publish);
+          // A result can expose content already owned by the resource, not only bytes staged in this call.
+          if (scope.content && host.content)
+            host.content.retain(scope.content, result.data ?? null, sdk.reader(captured.ref, scope, captured).content, sdk.context.id);
+          return result;
+        }
         finally {
           scope.active = false;
           // Staged content passes to request holds until result records register roots in the same transaction; uncommitted content is reclaimed with the request.

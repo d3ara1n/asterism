@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, defineOperationRecord, pluginNamespace, resourceCall, type ContentRef } from "@asterism-app/sdk/contracts";
-import { implementCall, defineModule, definePlugin, defineTopLevelTool, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext, type TopLevelTool } from "@asterism-app/sdk/runtime";
+import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, defineOperationRecord, defineImplementation, defineTool, pluginNamespace, resourceCall, type ContentRef } from "@asterism-app/sdk/contracts";
+import { implementCall, implementTool, defineModule, definePlugin, defineTopLevelTool, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext, type TopLevelTool } from "@asterism-app/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
 import { contentLimits } from "../runtime/content-store.ts";
 import { serveContent } from "../runtime/dispatch.ts";
@@ -26,6 +26,11 @@ const Operation = defineOperationRecord(ns.name("operation"), {
 const Create = defineCreation(Document, { id: ns.name("create"), schema: z.object({ file: contentRefSchema, history: z.boolean().default(false), fail: z.boolean().default(false) }) });
 const Replace = defineAction(Document, { id: ns.name("replace"), schema: z.object({ file: contentRefSchema.nullable(), history: z.boolean().default(false), fail: z.boolean().default(false) }) });
 const Generate = defineAction(Document, { id: ns.name("generate"), schema: z.string() });
+const ExistingFile = defineImplementation({
+  ...ns.data("existing-file", contentRefSchema.describe("Existing content.")),
+  resource: Document, targetSchema: z.null().describe("Current file."), effect: "read", execution: "parallel",
+  tool: defineTool({ id: ns.name("file"), name: "file", description: "Read the current file.", guidelines: [], argsSchema: z.object({}).describe("No parameters.") }),
+});
 const roots: string[] = [], services: ApplicationService[] = [];
 afterEach(async () => {
   for (const service of services.splice(0)) await service.close();
@@ -36,7 +41,10 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
   let context!: PluginContext;
   const plugin = definePlugin({ namespace: ns, modules: [defineModule(value => {
     context = value;
-    return { topLevelTools: options.topLevelTools, resources: [implementResource(Document, View, {
+    return { topLevelTools: options.topLevelTools,
+      tools: [implementTool(ExistingFile, { async call(_data, _target, _args, { object }) { return { kind: "succeeded", data: object.get(Current)!.file! }; } })],
+      resources: [implementResource(Document, View, {
+      links: { receive: true },
       records: [Saved, Operation],
       creation: implementCreation(Create, {
         async prepare(input, { signal, content }) { await content.read(input.file); await options.prepare?.(content, signal); return { action: "accept" }; },
@@ -337,7 +345,8 @@ describe("Host immutable content", () => {
     await f.replace(id, { file: null }); f.store.collect();
     const chunks = [first];
     for (let next = await stream.next(); !next.done; next = await stream.next()) chunks.push(next.value);
-    expect(Buffer.concat(chunks.map(chunk => Buffer.from(chunk)))).toEqual(Buffer.from(payload));
+    // Buffer.equals compares natively; toEqual walks a megabyte element by element.
+    expect(Buffer.concat(chunks.map(chunk => Buffer.from(chunk))).equals(Buffer.from(payload))).toBe(true);
     f.store.collect();
     expect(() => f.object(id).content.read(ref)).toThrow();
   });
@@ -441,6 +450,32 @@ describe("Host immutable content", () => {
 
 /** Expectations follow content authorization and request boundaries: files must be readable, and temporary input and requests retain separate holds. */
 describe("Models consuming immutable content", () => {
+  it("hands a resource tool's existing content to its caller without restaging the bytes", async () => {
+    let sourceId = "";
+    const f = fixture({ adapter: { version: "resource-file", validate() {}, prepare() { return { async *stream() {
+      yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "resource_call" } };
+      yield { type: "part.end", partId: "call", arguments: { resource_id: sourceId, tool: "file", target: null, args: {} } };
+      yield { type: "finish", reason: "tool-calls", usage: null };
+    } }; } } });
+    await configure(f, true);
+    const sourceInput = f.input(), callerInput = f.input();
+    const file = await f.store.writer({ scope: sourceInput }).stage(bytes("resource content"));
+    sourceId = await f.create(file, sourceInput.id);
+    const callerFile = await f.store.writer({ scope: callerInput }).stage(bytes("caller content"));
+    const callerId = await f.create(callerFile, callerInput.id);
+    await Promise.all([sourceInput.close(), callerInput.close()]);
+    f.context.session(f.sessionId).link(f.object(callerId).ref, f.object(sourceId).ref);
+    await f.context.content.withScope(async output => {
+      const result = await f.context.execution.run({ access: f.object(callerId).ref, interactive: false,
+        target: { provider: "media", model: "model" }, requestParentId: null, system: { blocks: [] }, messages: [],
+        signal: new AbortController().signal, observer: { event() {} } }, { output });
+      expect(result.reason).toBe("completed");
+      expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: file });
+      await f.replace(sourceId, { file: null });
+      f.store.collect();
+      expect(text(await output.read(file))).toBe("resource content");
+    });
+  });
   it("retains a top-level result from the caller's existing content roots", async () => {
     let file!: ContentRef;
     const f = fixture({ topLevelTools: [defineTopLevelTool({

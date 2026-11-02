@@ -1,13 +1,30 @@
 import { z } from "zod";
 import { defineAction, defineCall, defineCreation, defineImplementation, defineRecord, defineTool,
   conversationAddressSchema, conversationListSchema, messageListSchema, messagingConnectionInfoSchema,
-  messageSchema, uiTextSchema } from "@asterism-app/sdk/contracts";
-import { builtin, List, Read, Send } from "@asterism-app/builtin-api/contracts";
+  messageSchema, uiTextSchema, messagingFilePartSchema, messagingTextPartSchema, contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
+import { builtin, List, Read, Send, See } from "@asterism-app/builtin-api/contracts";
 
 export const Conversations = builtin.resource("conversations", z.strictObject({}));
 export const chatBindingSchema = conversationAddressSchema.extend({ connectionId: z.string().min(1) });
 export const Chat = builtin.resource("chat", chatBindingSchema);
-export const ChatMessageSent = defineRecord(builtin.name("chat.message-sent"), { schema: messageSchema });
+/** A platform attachment addressed through this Chat; the Chat's file provider fetches it when consumed. */
+export const chatFilePartSchema = messagingFilePartSchema.extend({ ref: fileRefSchema });
+export const chatMessageSchema = messageSchema.extend({ parts: z.array(z.discriminatedUnion("kind", [messagingTextPartSchema, chatFilePartSchema])) });
+export type ChatMessage = z.infer<typeof chatMessageSchema>;
+export type ChatFilePart = z.infer<typeof chatFilePartSchema>;
+export const chatMessageListSchema = messageListSchema.extend({ messages: z.array(chatMessageSchema) });
+export const chatFileLocatorSchema = z.strictObject({ messageId: z.string().min(1), fileId: z.string().min(1) });
+/** Image bytes fetched for one operation, with the attachment's reusable reference. */
+export const chatImageSchema = chatFileLocatorSchema.extend({
+  file: contentRefSchema, ref: fileRefSchema, mediaType: z.string(), filename: z.string().optional(), size: z.number().int().nonnegative(),
+});
+export type ChatImage = z.infer<typeof chatImageSchema>;
+export const ChatMessageSent = defineRecord(builtin.name("chat.message-sent"), { schema: z.codec(
+  z.union([chatMessageSchema, messageSchema.omit({ parts: true }).extend({ text: z.string() })]), chatMessageSchema, {
+    decode: value => "parts" in value ? value : (({ text, ...rest }) => ({ ...rest, parts: [{ kind: "text" as const, text }] }))(value),
+    encode: value => chatMessageSchema.parse(value),
+  }),
+});
 export const CreateConversations = defineCreation(Conversations, {
   id: builtin.name("conversations.create"), schema: z.strictObject({}).describe("Create a list of configured messaging connections and their conversations."),
 });
@@ -50,15 +67,20 @@ export const chatReadTargetSchema = z.strictObject({
   since: z.string().min(1).optional(), limit: z.number().int().positive().optional(),
 }).nullable();
 export const ChatRead = defineImplementation({
-  ...builtin.data("chat.read", messageListSchema.describe("Messages available to this provider. The cursor is a reusable query position, not a read receipt.")),
+  ...builtin.data("chat.read", chatMessageListSchema.describe("Messages with attachment file references. The cursor is a reusable query position, not a read receipt.")),
   resource: Chat, tool: Read, targetSchema: chatReadTargetSchema.describe("Null reads recent messages; since continues from a returned cursor."),
   effect: "read", execution: "parallel",
 });
 export const ChatSend = defineImplementation({
-  ...builtin.data("chat.send", messageSchema.describe("The message accepted by the external messaging service.")),
+  ...builtin.data("chat.send", chatMessageSchema.describe("The message accepted by the external messaging service.")),
   resource: Chat, tool: Send,
   targetSchema: z.strictObject({ replyTo: z.string().min(1).optional() }).nullable().describe("Send text parts to this conversation. Null sends a message; replyTo quotes a message ID."),
   effect: "write", execution: "sequential",
+});
+export const ChatSee = defineImplementation({
+  ...builtin.data("chat.see", chatImageSchema.describe("The attachment's image content and its reusable file reference.")),
+  resource: Chat, tool: See, targetSchema: chatFileLocatorSchema.describe("Select an attachment by messageId and fileId."),
+  effect: "read", execution: "parallel",
 });
 /** latest identifies the most recent observed event while the application runs; views reload their queries when it changes. */
 export const viewConnectionSchema = messagingConnectionInfoSchema.extend({
@@ -74,7 +96,7 @@ export const BrowseConversations = defineCall(builtin.name("messaging.browse"), 
   scope: "plugin", input: listTargetSchema, output: listResultSchema,
 });
 export const ReadChat = defineCall(builtin.name("chat.read"), {
-  scope: "object", input: chatReadTargetSchema, output: messageListSchema,
+  scope: "object", input: chatReadTargetSchema, output: chatMessageListSchema,
 });
 export const SendChat = defineAction(Chat, {
   id: builtin.name("chat.send"), schema: z.strictObject({ text: z.string().min(1), replyTo: z.string().min(1).optional() }),

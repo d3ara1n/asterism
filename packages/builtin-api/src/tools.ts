@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineTool } from "@asterism-app/sdk/contracts";
+import { defineTool, fileRefSchema } from "@asterism-app/sdk/contracts";
 import { builtin } from "./identity.ts";
 import { editOperationSchema } from "./text.ts";
 
@@ -63,6 +63,12 @@ export const Write = defineTool({
   argsSchema: z.strictObject({
     content: z.string().describe("The complete new UTF-8 text. Empty content clears the target."),
   }).describe("Full replacement text. The implementation specifies its content size limit."),
+});
+export const Save = defineTool({
+  id: builtin.name("tool.save"), name: "save",
+  description: "Save the bytes of a referenced file to a target.",
+  guidelines: ["The resource implementation defines destination paths and replacement behavior."],
+  argsSchema: z.strictObject({ ref: fileRefSchema }).describe("The source file reference. The target selects the destination."),
 });
 
 export const Replace = defineTool({

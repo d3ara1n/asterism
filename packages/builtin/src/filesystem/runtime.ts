@@ -6,7 +6,8 @@ import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
 import { TextError, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
-import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectoryReplace, DirectorySee, DirectoryTree } from "./contract.ts";
+import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryTree } from "./contract.ts";
+import { saveFileContent } from "./save.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
@@ -65,7 +66,7 @@ async function readGitStatus(rootPath: string): Promise<{ entries: Array<{ path:
   return { entries, hasGit: true };
 }
 
-export function createFilesystemModule(shell: ShellExecution) { return defineModule(() => ({
+export function createFilesystemModule(shell: ShellExecution) { return defineModule(plugin => ({
   resources: [implementResource(Directory, DirectoryView, {
     card: directoryCard,
     async *openFile(directory, locator, { signal }) {
@@ -184,6 +185,15 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
         } catch (error) { return textFailure(error, signal, "Write target file"); }
       },
       toModel: data => `${data.path}${data.created ? " (created)" : ""}: ${writeToModel(data)}`,
+    }),
+    implementTool(DirectorySave, {
+      async call(directory, target, { ref }, { object, signal }) {
+        try {
+          const selected = await writableTarget(directory.path, target.path);
+          const size = await saveFileContent(selected.path, plugin.files.open(ref, { signal }), signal);
+          return { kind: "succeeded", data: { path: target.path, size, ref: { source: { ...object.ref }, locator: { path: target.path } } } };
+        } catch (error) { return textFailure(error, signal, "Save referenced file"); }
+      },
     }),
     implementTool(DirectorySee, {
       async call(directory, target, _args, { object, signal }) {

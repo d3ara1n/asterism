@@ -1,6 +1,6 @@
-import { jsonSchema, missingResourceContract, pluginOf, type Json, type Presentation } from "@asterism-app/sdk/contracts";
-import type { ContextFile } from "@asterism-app/sdk/runtime";
-import type { FoldedObject } from "../session/fold.ts";
+import { fileRefSchema, jsonSchema, missingResourceContract, pluginOf, type Json, type Presentation, type ResourceRef } from "@asterism-app/sdk/contracts";
+import { PluginApiError, type ContextFile } from "@asterism-app/sdk/runtime";
+import type { FoldedObject, FoldedState } from "../session/fold.ts";
 import type { ResourceBackend, ResourceController } from "./contract.ts";
 import { SessionError } from "../session/tree.ts";
 import { templateMessages } from "../shared/template-messages.ts";
@@ -43,7 +43,24 @@ export class ResourceRegistry {
   disposalWarning(resource: FoldedObject) { return this.backends.get(resource.kind)?.disposalWarning?.(resource) ?? null; }
   receivesLinks(kind: string): boolean { return this.backends.get(kind)?.receivesLinks === true; }
   controller(kind: string): ResourceController | undefined { return this.backends.get(kind)?.controller; }
-  fileProvider(kind: string) { return this.backends.get(kind)?.openFile; }
+  /**
+   * Resolve a FileRef at consumption time: its source must still exist with the recorded identity on the current session path.
+   * The lookups describe the current resource tree; the provider owns acquisition and cleanup of the stream.
+   */
+  async *openFile(ref: unknown, lookup: { refOf(id: string): ResourceRef | null; workbench(sessionId: string): FoldedState },
+    signal: AbortSignal): AsyncIterable<Uint8Array> {
+    const parsed = fileRefSchema.safeParse(ref);
+    if (!parsed.success) throw new PluginApiError("invalid_argument", `Invalid file reference: ${parsed.error.message}`);
+    const { source, locator } = parsed.data;
+    signal.throwIfAborted();
+    const actual = lookup.refOf(source.id);
+    const resource = actual && actual.sessionId === source.sessionId && actual.kind === source.kind
+      ? lookup.workbench(source.sessionId).objects.find(item => item.id === source.id) : undefined;
+    if (!resource) throw new PluginApiError("not_found", "The file source resource does not exist.", "file_source_not_found");
+    const provider = this.backends.get(source.kind)?.openFile;
+    if (!provider) throw new PluginApiError("unavailable", "The source resource has no available file provider.", "file_provider_unavailable");
+    yield* provider(resource, locator, signal);
+  }
   controllers(): ResourceController[] { return [...this.backends.values()].flatMap(backend => backend.controller ? [backend.controller] : []); }
 
   inspect(resource: FoldedObject): Promise<Json> {

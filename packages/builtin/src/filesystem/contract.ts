@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineImplementation, defineCreation, defineCall, contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
-import { builtin, List, Read, Edit, Write, Replace, See, textReadSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
+import { builtin, List, Read, Edit, Write, Save, Replace, See, textReadSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
 export const CreateDirectory = defineCreation(Directory, { id: builtin.name("directory.create"),
@@ -55,6 +55,13 @@ export const DirectoryWrite = defineImplementation({
     created: z.boolean().describe("True when this call created the target file; false when it already existed."),
   }).describe("The written file's actual diff and creation status, with an empty anchors array. Full content is limited to 8 MiB.")),
   resource: Directory, tool: Write, targetSchema: fileTarget, effect: "write", execution: "sequential",
+});
+export const DirectorySave = defineImplementation({
+  ...builtin.data("directory.save", z.strictObject({ path: filePath, size: z.number().int().nonnegative(), ref: fileRefSchema })
+    .describe("The saved path, byte count, and a FileRef provided by this directory.")),
+  resource: Directory, tool: Save,
+  targetSchema: z.strictObject({ path: filePath }).describe("Destination file. Missing parent directories are created; an existing file is replaced after the source is fully read."),
+  effect: "write", execution: "sequential",
 });
 export const DirectoryReplace = defineImplementation({
   ...builtin.data("directory.replace", textReplaceSchema.extend({ path: filePath })

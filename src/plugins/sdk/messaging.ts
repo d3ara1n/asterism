@@ -28,6 +28,10 @@ export function bindMessaging(registry: MessagingRegistry, runs: RunGroup, lifet
         listConversations: (query, { signal }) => run(signal, scope => instance.listConversations(query, { signal: scope })),
         readMessages: (query, { signal }) => run(signal, scope => instance.readMessages(query, { signal: scope })),
         sendMessage: (input, { signal }) => run(signal, scope => instance.sendMessage(input, { signal: scope })),
+        openFile: (query, { signal }) => runs.iterate(async function* (signal) {
+          scope.checkAvailable();
+          yield* instance.openFile(query, { signal });
+        }, signal, { rejectOnAbort: true }),
       } satisfies MessagingHandle;
     },
   };

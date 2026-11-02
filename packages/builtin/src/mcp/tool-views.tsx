@@ -11,7 +11,7 @@ import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
 import { textMessages } from "../messages/text";
 import { inputField, inputText, characterCount } from "../shared/tool-preview";
 import { settledBodyViews } from "../shared/tool-views";
-import { FilePreview } from "../agent/conversation/Files";
+import { FilePreview } from "../shared/attachments";
 import { extraStructured, displayText } from "./content";
 import { Instructions, PageNote, ServerLine, ToolList, type ServerSummaryData, type ToolEntryData } from "./views";
 

@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import type { MessagingMessage } from "@asterism-app/sdk/contracts";
+import { messagingText, type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { TelegramStore, forgetTelegramConnection, telegramAccount } from "./telegram-store.ts";
 
 const databases: DatabaseSync[] = [];
@@ -11,7 +11,7 @@ function setup() {
   return { db, store: new TelegramStore(db, "connection/bot") };
 }
 const message = (id: string, text = id, threadId?: string): MessagingMessage => ({
-  id, text, sender: { id: "person", name: "Person", role: "participant" }, sentAt: "2026-01-01T00:00:00Z",
+  id, parts: [{ kind: "text", text }], sender: { id: "person", name: "Person", role: "participant" }, sentAt: "2026-01-01T00:00:00Z",
   ...(threadId ? { threadId } : {}),
 });
 
@@ -38,10 +38,10 @@ describe("Telegram observed history", () => {
     store.record({ ...chat, threadId: "20" }, message("2", "other topic", "20"));
     store.record({ ...chat, threadId: "10" }, message("3", "three", "10"));
     const page = store.read({ conversationId: "group", threadId: "10", since: baseline, limit: 1 });
-    expect(page.messages.map(message => message.text)).toEqual(["one"]);
+    expect(page.messages.map(messagingText)).toEqual(["one"]);
     expect(page.truncated).toBe(true);
     const next = store.read({ conversationId: "group", threadId: "10", since: page.cursor, limit: 1 });
-    expect(next.messages.map(message => message.text)).toEqual(["three"]);
+    expect(next.messages.map(messagingText)).toEqual(["three"]);
     expect(next.truncated).toBe(false);
     expect(() => store.read({ conversationId: "group", threadId: "20", since: page.cursor })).toThrow("cursor");
   });
@@ -63,8 +63,8 @@ describe("Telegram observed history", () => {
     const { store } = setup(), chat = { conversationId: "a", title: "A", kind: "private" };
     store.record(chat, message("1", "before"));
     const before = store.read({ conversationId: "a" }).cursor;
-    expect(store.record(chat, message("1", "after"))).toBe(false);
-    expect(store.read({ conversationId: "a", since: before }).messages.map(message => message.text)).toEqual(["after"]);
+    expect(store.record(chat, message("1", "after"))).toMatchObject({ discovered: false, inserted: false });
+    expect(store.read({ conversationId: "a", since: before }).messages.map(messagingText)).toEqual(["after"]);
     expect(store.read({ conversationId: "a" }).messages).toHaveLength(1);
   });
   // Connection IDs that share a prefix must not lose each other's history when one is removed.
@@ -81,5 +81,36 @@ describe("Telegram observed history", () => {
     }
     expect(kept.offset()).toBe(7);
     expect(kept.read({ conversationId: "a" }).messages.map(message => message.id)).toEqual(["1"]);
+  });
+});
+
+describe("Telegram albums", () => {
+  const chat = { conversationId: "a", title: "A", kind: "group" };
+  const item = (id: string, file: string, caption?: string): MessagingMessage => ({ ...message(id), parts: [
+    ...(caption ? [{ kind: "text" as const, text: caption }] : []), { kind: "file", id: file, mediaType: "image/jpeg" }] });
+  // Bot API delivers one update per album item; readers must see one message carrying every file.
+  it("observes an album as one message identified by its first item, with the caption before the files", () => {
+    const { store } = setup();
+    expect(store.record(chat, item("10", "f1", "Trip"), "g")).toMatchObject({ discovered: true, inserted: true });
+    expect(store.record(chat, item("11", "f2"), "g")).toMatchObject({ discovered: false, inserted: true });
+    expect(store.record(chat, item("11", "f2"), "g").inserted).toBe(false);
+    expect(store.read({ conversationId: "a" }).messages).toEqual([{ ...message("10"), parts: [
+      { kind: "text", text: "Trip" }, { kind: "file", id: "f1", mediaType: "image/jpeg" }, { kind: "file", id: "f2", mediaType: "image/jpeg" }] }]);
+    expect(store.album("a", "g")?.id).toBe("10");
+  });
+  it("lets a late lower-numbered item take the album identity and resolves replies to any item", () => {
+    const { store } = setup();
+    store.record(chat, item("11", "f2"), "g");
+    store.record(chat, item("10", "f1"), "g");
+    expect(store.read({ conversationId: "a" }).messages.map(value => [value.id, value.parts.length])).toEqual([["10", 2]]);
+    const reply = store.record(chat, { ...message("12"), replyTo: "11" });
+    expect(reply.message.replyTo).toBe("10");
+  });
+  it("forgets album items with their connection", () => {
+    const { db } = setup(), store = new TelegramStore(db, telegramAccount("c", 1));
+    store.record(chat, item("10", "f1"), "g");
+    forgetTelegramConnection(db, "c");
+    const reopened = new TelegramStore(db, telegramAccount("c", 1));
+    expect(reopened.record(chat, item("10", "f1"), "g").inserted).toBe(true);
   });
 });

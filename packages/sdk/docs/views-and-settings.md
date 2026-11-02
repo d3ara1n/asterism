@@ -2,6 +2,8 @@
 
 Views present state and accept input. Backend services own the work, results, and resource lifetime.
 
+Application file services let views open resource FileRefs as byte streams and save a stream through the native Save As dialog. Pass a suggested filename and a lazy stream from the object's content reader or a file reference. Cancelling the dialog returns without reading the stream; ending the stream early abandons the transfer. Transfer failures preserve the old destination and surface as errors; views own their pending indicator and feedback. Previews and exports of captured content read the same immutable bytes.
+
 ## Present objects and operations
 
 A resource card shows the object's content. A tool view shows one operation, including generated input, execution progress, and the final outcome.

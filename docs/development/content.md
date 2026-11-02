@@ -55,4 +55,4 @@ Startup collection runs explicitly after successful data preparation. Store cons
 
 Sealed files are never modified in place. Recovery points may therefore hard-link their bytes. Complete reads verify integrity; ranged reads verify the stored length.
 
-Model input and tool-result files use the same ownership mechanism. Tool output transfers its execution lease to the request, and the saved outcome establishes its persistent roots atomically.
+Model input and tool-result files use the same ownership mechanism. Tool output retains returned references from the resource's existing content roots as well as newly staged bytes, transfers its execution lease to the request, and establishes persistent roots with the saved outcome atomically.

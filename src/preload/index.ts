@@ -4,6 +4,7 @@ import { desktopBridgeKey } from "../shared/core.ts";
 import { desktopWindowChangedChannel, desktopWindowGetChannel, desktopWindowStateSchema, desktopUnsavedChangesChannel, unsavedChangesSchema } from "../shared/desktop.ts";
 import { pickDirectoryChannel, openLocalFileChannel, openLogsChannel, localFilePathSchema, statusChannel, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { connectionPortMessage, connectionRequestChannel } from "../shared/connection.ts";
+import { fileSaveChannel, fileSaveCommandSchema, fileSaveReplySchema } from "../shared/file-save.ts";
 import { appearanceChangedChannel, appearanceGetChannel, appearancePatchSchema, appearanceSetChannel, parseAppearance } from "../shared/theme.ts";
 import { preferencesGetChannel, preferencesSetChannel, preferenceWriteSchema, uiStateSchemas } from "../shared/ui-state.ts";
 import { startupGetChannel, startupChangedChannel, startupRestartChannel, startupDataDirectoryChannel, startupStateSchema, startupRecoveryChannel, startupRecoveryPointChannel, startupInitializedChannel, startupNotificationsSchema, startupAcknowledgeMigrationChannel } from "../shared/startup.ts";
@@ -111,6 +112,9 @@ const bridge: DesktopBridge = {
   async openLocalFile(path) {
     const result: unknown = await ipcRenderer.invoke(openLocalFileChannel, localFilePathSchema.parse(path));
     return typeof result === "string" ? result : "The local file could not be opened.";
+  },
+  async saveFile(command) {
+    return fileSaveReplySchema.parse(await ipcRenderer.invoke(fileSaveChannel, fileSaveCommandSchema.parse(command)));
   },
   async openLogs() {
     const result: unknown = await ipcRenderer.invoke(openLogsChannel);

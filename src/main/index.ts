@@ -16,6 +16,7 @@ import { applyThemeSource, readAppearance, serveAppearance } from "./appearance.
 import { initialWindowState, trackWindowState } from "./window-state.ts";
 import { initialTitleBar, serveDesktopWindow, titleBarMode } from "./window-titlebar.ts";
 import { servePreferences } from "./ui-state.ts";
+import { serveFileSaves } from "./file-save.ts";
 import { serveLanguage, readLanguage } from "./language.ts";
 import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
@@ -274,6 +275,7 @@ function createWindow(): void {
     unsavedTitles = [];
     current.setDocumentEdited(false);
   });
+  const stopFileSaves = serveFileSaves(current, trusted);
   // Return only paths selected in the system dialog; the renderer cannot use this to read files.
   ipcMain.handle(pickDirectoryChannel, async (event, raw: unknown) => {
     if (!trusted(event)) return null;
@@ -299,6 +301,7 @@ function createWindow(): void {
     return shell.openPath(directory);
   });
   current.on("closed", () => {
+    stopFileSaves();
     unsavedTitles = [];
     ipcMain.removeListener(desktopUnsavedChangesChannel, updateUnsaved);
     stopDesktopWindow();

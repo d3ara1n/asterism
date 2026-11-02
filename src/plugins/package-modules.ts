@@ -165,7 +165,8 @@ export async function compileModules(packages: readonly PackageModule[], enabled
           const resolved = await build.resolve(args.path, { kind: args.kind, resolveDir: args.resolveDir, pluginData: { publicResolution: true } });
           if (resolved.errors.length) return resolved;
           const path = unpackedArchivePath(resolved.path) ?? resolved.path;
-          return { path: pathToFileURL(path).href, external: true };
+          // Node require accepts filesystem paths, while ESM imports also need portable Windows file URLs.
+          return { path: args.kind === "require-call" || args.kind === "require-resolve" ? path : pathToFileURL(path).href, external: true };
         }
         if (source?.name === name && subpath !== "/public") return;
         const candidate = providers.get(name) ?? packages.find(pkg => pkg.name === name && pkg.public);

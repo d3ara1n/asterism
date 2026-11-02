@@ -15,5 +15,6 @@ export const fileReferencePartSchema = z.strictObject({
   ref: fileRefSchema,
   filename: z.string().min(1).max(255).optional().describe("Name used for delivery."),
   mediaType: z.string().optional().describe("Descriptive MIME type; the reference does not freeze the source content."),
+  size: z.number().int().nonnegative().optional().describe("Byte size observed when the reference was described."),
 }).describe("A FileRef with optional delivery metadata.");
 export type FileReferencePart = z.infer<typeof fileReferencePartSchema>;

@@ -2,6 +2,7 @@ import type { ModelInputPart, SessionRecord } from "@asterism-app/sdk/contracts"
 import type { AgentMessageSender, AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import type { RecordRead } from "../shared/record-reading.ts";
+import { inputPartsToModel } from "../shared/file-parts.ts";
 
 /** Locate the turn containing a position, or the latest turn when no position is supplied. */
 export function* turnStartRead(agentId: string, at?: string): RecordRead<SessionRecord | null> {
@@ -34,8 +35,7 @@ const escape = (text: string) => text.replace(/[&<>"']/g, char =>
 /** The envelope participates only in model projection; persisted body text, attachments, and the editor remain unchanged. */
 export function projectInputMessage(message: { sender: AgentMessageSender; parts: readonly AgentInputPart[] }): { kind: "input"; parts: ModelInputPart[] } {
   const { sender } = message;
-  const parts: ModelInputPart[] = message.parts.map(part => part.kind === "file-reference"
-    ? { kind: "text", text: JSON.stringify(part) } : part);
+  const parts = inputPartsToModel(message.parts);
   if (sender.kind === "user") return { kind: "input", parts: [...parts] };
   const tag = sender.kind === "event" ? "resource-event" : "agent-message";
   let attributes: string;

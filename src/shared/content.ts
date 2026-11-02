@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { contentRefSchema } from "@asterism-app/sdk/contracts";
+import { contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
 
 /** Per-chunk transfer limit; chunk acknowledgments provide backpressure. */
 export const contentChunkSize = 1024 * 1024;
@@ -31,6 +31,7 @@ export const contentCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("upload.abort"), scopeId: id, uploadId: id }),
   z.strictObject({ type: z.literal("read.open"), source, ref: contentRefSchema,
     range: z.strictObject({ offset: z.number().int().nonnegative().optional(), length: z.number().int().nonnegative().optional() }).optional() }),
+  z.strictObject({ type: z.literal("file.open"), ref: fileRefSchema }),
   z.strictObject({ type: z.literal("read.next"), readerId: id }),
   z.strictObject({ type: z.literal("read.close"), readerId: id }),
   z.strictObject({ type: z.literal("reset") }),

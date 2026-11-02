@@ -30,6 +30,8 @@ Directory commands start a fresh noninteractive shell using the application's de
 
 Directory listings expose references for regular files. A reference identifies a source resource and a location within it. Pass it to an operation that accepts file references, or forward it to another Agent through Send or Mesh. Passing a reference transfers the address; it does not read the file or supply its contents to the receiving model. A consuming operation fetches the file when needed, so later changes are visible and missing files fail at consumption.
 
+The Directory `save` tool consumes a FileRef and writes its bytes to `target.path`, relative to the linked directory. It supports binary files, creates missing parent directories, and replaces an existing destination only after the source is fully read. A failed or cancelled transfer preserves the previous file. Its result includes the saved byte count and a new FileRef from the directory. User-facing attachment **Save as…** controls instead open the system dialog and allow any user-selected destination.
+
 Notes retain current text. Their earlier tool results may appear in history, but browsing that history does not restore note contents.
 
 Files and notes support anchored edits, full-content writes, and bulk replacement. `edit` changes selected lines using anchors returned by reading, searching, or a previous edit or replacement. `write` supplies complete content. `replace` applies literal text or a JavaScript regular expression to the entire selected target and returns the match count, actual diff, and fresh anchors. Literal replacement text is inserted verbatim; regular-expression replacements support capture groups. A replacement with no matches reports an error and leaves the target unchanged.

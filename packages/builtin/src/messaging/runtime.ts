@@ -2,15 +2,19 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { defineModule, implementResource, implementCreation, implementTool, implementAction, implementCall,
   MessagingError, type Lifetime, type ObjectExecutor, type ObjectReader, type ToolContribution, type MessagingHandle } from "@asterism-app/sdk/runtime";
-import type { ConnectionEvent, ConversationAddress, Json, MessagingConnectionInfo, MessagingMessage, ResourceRef } from "@asterism-app/sdk/contracts";
-import { Agent, SubmitAgentInput } from "@asterism-app/builtin-api/contracts";
+import { modelInputLimits, type ConnectionEvent, type ConversationAddress, type Json, type MessagingConnectionInfo, type MessagingMessage, type ResourceRef } from "@asterism-app/sdk/contracts";
+import { Agent, SubmitAgentInput, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema, ConversationsView, ChatView,
   ConversationsList, ConversationsSubscribe, ConfigureSubscription, SubscriptionChanged, ChatRead, ChatSend,
   BrowseConversations, listResultSchema, ReadChat, SendChat, ChatMessageSent,
-  type SubscriptionTarget, type ViewConnection } from "./contract.ts";
+  ChatSee, type SubscriptionTarget, type ViewConnection } from "./contract.ts";
+import { captureImage, chatFileRef, chatMessage, chatMessagesToModel, messageInputParts, openChatFile } from "./content.ts";
+import { inputPartsToModel } from "../shared/file-parts.ts";
 import { coversAddress, foldSubscriptions, matchesSubscription, selectDeliveries, type DeliveryCandidate } from "./subscriptions.ts";
 import { telegramProvider } from "./telegram.ts";
+import { discordProvider } from "./discord.ts";
+import { slackProvider } from "./slack.ts";
 import { messagingOutcome } from "./outcome.ts";
 import { conversationsCard, chatCard } from "../shared/card-appearance.ts";
 
@@ -24,12 +28,11 @@ const messageLines = (message: MessagingMessage) => [
   `messageId: ${message.id}`, `sender: ${message.sender.name} (${message.sender.id}, ${message.sender.role})`, `sentAt: ${message.sentAt}`,
   ...(message.replyTo ? [`replyTo: ${message.replyTo}`] : []),
 ];
-/** Event facts for the Agent input contract: addresses usable by tools, and the message itself only for Chats. */
-export function eventText({ connectionId, event }: ConnectionEvent, full: boolean): string {
+/** Event metadata with addresses usable by tools; a Chat follows it with the message parts. */
+function eventText({ connectionId, event }: ConnectionEvent): string {
   const location = [...addressLines(connectionId, event.conversation), `title: ${event.conversation.title}`, `kind: ${event.conversation.kind}`];
   if (event.kind === "conversation.discovered") return ["Conversation discovered", ...location].join("\n");
-  return [full ? "Message received" : "New message", ...location, ...messageLines(event.message),
-    ...(full ? ["", event.message.text] : [])].join("\n");
+  return ["New message", ...location, ...messageLines(event.message)].join("\n");
 }
 
 export default defineModule(plugin => {
@@ -101,13 +104,18 @@ export default defineModule(plugin => {
     }
     for (const candidates of bySession.values()) for (const delivery of selectDeliveries(candidates)) {
       const source = { ...delivery.source };
-      plugin.tasks.start(`messaging/${nanoid()}`, async signal => {
+      plugin.tasks.start(`messaging/${nanoid()}`, signal => plugin.content.withScope(async content => {
+        const binding = source.kind === Chat.kind ? chatBinding(source) : null;
+        const parts: AgentInputPart[] = [{ kind: "text", text: eventText(event) }];
+        // Captured images are staged for this input only; its record retains them.
+        if (binding && event.event.kind === "message.received") parts.push(...await messageInputParts(chatMessage(source, event.event.message),
+          async function* (part) { yield* openChatFile(await plugin.messaging.resolve(binding.connectionId, { signal }), binding, part.ref.locator, signal); },
+          content, signal));
         await plugin.session(source.sessionId).invoke(SubmitAgentInput, delivery.recipient, {
-          submissionId: nanoid(16), mode: "follow",
-          parts: [{ kind: "text", text: eventText(event, source.kind === Chat.kind) }],
+          submissionId: nanoid(16), mode: "follow", parts,
           sender: { kind: "event", resource: source, name: delivery.title },
-        }, { signal });
-      }, { object: source, affectsHistory: false });
+        }, { signal, content });
+      }), { object: source, affectsHistory: false });
     }
   }));
 
@@ -148,13 +156,14 @@ export default defineModule(plugin => {
   const binding = (object: ObjectReader) => Chat.stateSchema.parse(object.snapshot()!.data);
 
   return {
-    messagingProviders: [telegramProvider(plugin)],
+    messagingProviders: [telegramProvider(plugin), discordProvider(plugin), slackProvider(plugin)],
     observers: [{ id: "messaging.subscriptions", cursorChanged: invalidateAll }],
     calls: [
       implementCall(BrowseConversations, (input, { signal }) => list(capture(), input, signal)),
       implementCall(ReadChat, async (input, { object, signal }) => {
         const { connectionId, ...address } = binding(object);
-        return (await capture().get(connectionId)).readMessages({ ...address, ...input }, { signal });
+        const result = await (await capture().get(connectionId)).readMessages({ ...address, ...input }, { signal });
+        return { ...result, messages: result.messages.map(message => chatMessage(object.ref, message)) };
       }),
     ],
     resources: [
@@ -169,12 +178,16 @@ export default defineModule(plugin => {
       }),
       implementResource(Chat, ChatView, {
         card: chatCard, links: { receive: true }, records: [ChatMessageSent], attach,
+        async *openFile(data, locator, { signal }) {
+          yield* openChatFile(await plugin.messaging.resolve(data.connectionId, { signal }), data, locator, signal);
+        },
         creation: implementCreation(CreateChat, { create: ({ title, ...data }) => ({ title, data }) }),
         project: (data, object) => chatView(data, object.ref),
         inspect: async (data, object) => chatView(data, object.ref),
         actions: [implementAction(SendChat, { async execute({ text, replyTo }, object, signal) {
           const { connectionId, ...address } = binding(object);
-          const message = await (await capture().get(connectionId)).sendMessage({ ...address, text, ...(replyTo ? { replyTo } : {}) }, { signal });
+          const message = chatMessage(object.ref, await (await capture().get(connectionId)).sendMessage(
+            { ...address, parts: [{ kind: "text", text }], ...(replyTo ? { replyTo } : {}) }, { signal }));
           object.commit(writer => { writer.append(ChatMessageSent, message); });
           sent(connectionId, address, message);
         } })],
@@ -191,24 +204,35 @@ export default defineModule(plugin => {
         },
       }),
       capturedTool(captured => implementTool(ChatRead, {
-        call(data, target, _args, { signal }) {
+        call(data, target, _args, { signal, object }) {
           const { connectionId, ...address } = data;
-          return messagingOutcome("read", signal, async () => (await captured().get(connectionId)).readMessages({ ...address, ...target }, { signal }));
+          return messagingOutcome("read", signal, async () => {
+            const result = await (await captured().get(connectionId)).readMessages({ ...address, ...target }, { signal });
+            return { ...result, messages: result.messages.map(message => chatMessage(object.ref, message)) };
+          });
         },
+        toModel: data => [{ kind: "text", text: JSON.stringify({ cursor: data.cursor, truncated: data.truncated }) }, ...chatMessagesToModel(data.messages)],
+      })),
+      capturedTool(captured => implementTool(ChatSee, {
+        call(data, target, _args, { object, signal }) {
+          return messagingOutcome("read", signal, async () => {
+            const source = openChatFile(await captured().get(data.connectionId), data, target, signal);
+            const image = await captureImage(object.content, source, modelInputLimits.file, signal);
+            return { ...target, ...image, ref: chatFileRef(object.ref, target.messageId, target.fileId) };
+          });
+        },
+        toModel: image => inputPartsToModel([{ kind: "file", file: image.file, ref: image.ref, mediaType: image.mediaType, size: image.size }]),
       })),
       capturedTool(captured => implementTool(ChatSend, {
-        call(data, target, { parts }, { signal }) {
-          // Text parts form the message or caption; file references are resolved by the provider when it sends.
-          const text = parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
-          const files = parts.flatMap(part => part.kind === "file-reference" ? [part] : []);
+        call(data, target, { parts }, { signal, object }) {
           const { connectionId, ...address } = data;
           return messagingOutcome("write", signal, async () => {
-            const message = await (await captured().get(connectionId)).sendMessage(
-              { ...address, ...target, text, ...(files.length ? { files } : {}) }, { signal });
+            const message = chatMessage(object.ref, await (await captured().get(connectionId)).sendMessage({ ...address, ...target, parts }, { signal }));
             sent(connectionId, address, message);
             return message;
           });
         },
+        toModel: data => chatMessagesToModel([data]),
       })),
     ],
   };

@@ -1,4 +1,5 @@
 import { StrictMode, useEffect } from "react";
+import { rendererFiles } from "./files";
 import { RendererEventsProvider, RendererCallsProvider, RendererApplicationProvider } from "@asterism-app/sdk/renderer";
 import { EventClient } from "../shared/event-client";
 import { CallClient } from "../shared/call-client";
@@ -108,7 +109,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
       return prepared.diagnostics;
     } });
   const moduleViews = new ViewRegistry(accepted);
-  const applicationServices = { platform: window.host.platform, preferences: pluginPreferences,
+  const applicationServices = { platform: window.host.platform, preferences: pluginPreferences, files: rendererFiles,
     pickDirectory: (initialPath?: string) => window.host.pickDirectory(initialPath), async openLocalFile(path: string) {
     const error = await window.host.openLocalFile(path);
     if (error) throw new Error(error);

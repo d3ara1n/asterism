@@ -1,6 +1,6 @@
 import type { MessagingMessage } from "@asterism-app/sdk/contracts";
 
-export interface TimelineGroup { day: string; sender: MessagingMessage["sender"]; messages: MessagingMessage[] }
+export interface TimelineGroup<T extends MessagingMessage = MessagingMessage> { day: string; sender: MessagingMessage["sender"]; messages: T[] }
 
 /** Local calendar day of an ISO timestamp, used to separate days in a timeline. */
 export function localDay(iso: string): string {
@@ -9,8 +9,8 @@ export function localDay(iso: string): string {
 }
 
 /** Consecutive messages from one sender on one local day form a group; a day change or another sender starts a new one. */
-export function groupTimeline(messages: readonly MessagingMessage[]): TimelineGroup[] {
-  const groups: TimelineGroup[] = [];
+export function groupTimeline<T extends MessagingMessage>(messages: readonly T[]): TimelineGroup<T>[] {
+  const groups: TimelineGroup<T>[] = [];
   for (const message of messages) {
     const day = localDay(message.sentAt), last = groups.at(-1);
     if (last && last.day === day && last.sender.id === message.sender.id && last.sender.role === message.sender.role) last.messages.push(message);

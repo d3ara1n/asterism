@@ -22,6 +22,8 @@ History preserves reference data without retaining or restoring the external con
 
 A file-reference message part presents the address and descriptive metadata to the model as text. It does not become a binary model input. Direct Agent and Mesh sends preserve these parts without opening them.
 
+A captured model file can also carry the FileRef it was fetched from. Projection supplies both the immutable file content and an operable address; interface rendering presents one attachment. Resource tool results retain content already owned by the resource as well as newly staged content through the same tool-result hold. User exports consume either captured content or a resource reference through a stream and replace the selected destination only after the transfer completes.
+
 Each operation decides whether it accepts file references and how it consumes them. Reference support does not imply automatic adaptation of text writes, file previews, or other operations. Models select and pass addresses; plugin code can transfer them through the same typed data contracts without involving a model.
 
 The shared reference schema describes source identity and locator semantics. Producers identify their returned values as FileRef; consumers identify the parameters accepting FileRef. Operation descriptions depend on this shared contract without introducing particular producers, discovery routes, or consumers.

@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { PluginApiError } from "@asterism-app/sdk/runtime";
-import { contentCommandSchema, type ContentCommand, type ContentReply } from "../shared/content.ts";
+import { contentCommandSchema, contentChunkSize, type ContentCommand, type ContentReply } from "../shared/content.ts";
 import type { SessionService } from "./sessions.ts";
 import type { ContentLease, ContentAccess } from "./content-store.ts";
 
-interface Reader { iterator: AsyncIterator<Uint8Array>; first?: IteratorResult<Uint8Array>; tail: Promise<unknown> }
+interface Reader { iterator: AsyncIterator<Uint8Array>; first?: IteratorResult<Uint8Array>; tail: Promise<unknown>; controller?: AbortController }
 /** Desktop content transfer manages frontend drafts only; backend commits capture independent holds that reset does not revoke. */
 export class ContentTransferService {
   private readonly inputs = new Map<string, ContentLease>();
@@ -47,10 +47,17 @@ export class ContentTransferService {
         return { kind: "content", ref: await store.seal(this.scope(command.scopeId), command.uploadId) };
       case "upload.abort":
         await store.abort(this.scope(command.scopeId), command.uploadId); return { kind: "done" };
-      case "read.open": {
+      case "read.open": case "file.open": {
         if (this.readers.size >= 32) throw new PluginApiError("unavailable", "Too many content readers.");
-        const iterator = store.reader(this.access(command.source)).open(command.ref, command.range)[Symbol.asyncIterator]();
-        const reader: Reader = { iterator, tail: Promise.resolve() }, readerId = randomUUID();
+        const controller = new AbortController();
+        const source = command.type === "read.open" ? store.reader(this.access(command.source)).open(command.ref, command.range)
+          : this.sessions.openFile(command.ref, controller.signal);
+        async function* chunks() {
+          for await (const chunk of source) for (let offset = 0; offset < chunk.length; offset += contentChunkSize)
+            yield chunk.subarray(offset, offset + contentChunkSize);
+        }
+        const iterator = chunks()[Symbol.asyncIterator]();
+        const reader: Reader = { iterator, tail: Promise.resolve(), controller }, readerId = randomUUID();
         this.readers.set(readerId, reader);
         const first = iterator.next(); reader.tail = first;
         try { reader.first = await first; return { kind: "reader", readerId }; }
@@ -74,6 +81,7 @@ export class ContentTransferService {
   }
   private async closeReader(id: string): Promise<void> {
     const reader = this.readers.get(id); this.readers.delete(id);
+    reader?.controller?.abort();
     if (reader) { await reader.tail.catch(() => {}); await reader.iterator.return?.(); }
   }
   private async reset(): Promise<void> {

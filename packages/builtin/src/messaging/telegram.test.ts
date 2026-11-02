@@ -17,13 +17,17 @@ describe("Telegram message normalization", () => {
     expect(telegramMessage(base({ from: person, text: "hi" }), botId).message.sender.role).toBe("participant");
     const joined = telegramMessage(base({ from: person, new_chat_members: [person] }), botId).message;
     expect(joined.sender.role).toBe("system");
-    expect(joined.text).toBe("[Service message]");
+    expect(joined.parts).toEqual([{ kind: "text", text: "[Service message]" }]);
   });
   // Captioned media and topics must stay addressable and readable.
-  it("labels captioned media and preserves topic and reply addresses", () => {
-    const normalized = telegramMessage(base({ from: { id: 7, is_bot: false, first_name: "Ada" }, photo: [], caption: "Look",
+  it("selects the largest photo variant and preserves its caption, topic and reply addresses", () => {
+    const normalized = telegramMessage(base({ from: { id: 7, is_bot: false, first_name: "Ada" }, photo: [
+      { file_id: "large", file_unique_id: "u1", width: 800, height: 600 },
+      { file_id: "small", file_unique_id: "u2", width: 80, height: 60 },
+    ], caption: "Look",
       message_thread_id: 12, reply_to_message: base({ message_id: 0, text: "earlier" }) as Message["reply_to_message"] }), botId);
-    expect(normalized.message).toMatchObject({ text: "[Photo]\nLook", threadId: "12", replyTo: "0", sender: { role: "participant" } });
+    expect(normalized.message).toMatchObject({ parts: [{ kind: "text", text: "Look" },
+      { kind: "file", id: "large", mediaType: "image/jpeg" }], threadId: "12", replyTo: "0", sender: { role: "participant" } });
     expect(normalized.conversation).toMatchObject({ conversationId: "-5", threadId: "12" });
   });
 });

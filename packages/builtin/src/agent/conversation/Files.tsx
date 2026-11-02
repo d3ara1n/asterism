@@ -1,57 +1,18 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type ClipboardEvent, type DragEvent } from "react";
+import { useRef, useSyncExternalStore, type ClipboardEvent, type DragEvent } from "react";
 import { useI18n, type ContentReader } from "@asterism-app/sdk/renderer";
 import { type ModelFilePart, previewsAsImage } from "@asterism-app/sdk/contracts";
 import { inputFileName, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { File as FileIcon, Image as ImageIcon, Paperclip, X } from "lucide-react";
 import { Button } from "@asterism-app/ui/ui/button";
-import { Attachment, AttachmentGroup, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@asterism-app/ui/ui/attachment";
+import { Attachment, AttachmentGroup, AttachmentContent, AttachmentTitle, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@asterism-app/ui/ui/attachment";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism-app/ui/ui/tooltip";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { cn } from "@asterism-app/ui/utils";
 import { mediaMessages } from "../../messages/media";
 import type { MessageDraft } from "./draft";
-
-function useFileImage(part: ModelFilePart, content: ContentReader) {
-  const [preview, setPreview] = useState<{ url?: string; failed?: boolean }>({});
-  const id = part.file["$asterism.content"];
-  useEffect(() => {
-    setPreview({});
-    let active = true, url: string | undefined;
-    if (previewsAsImage(part.mediaType)) void content.read({ "$asterism.content": id }).then(bytes => {
-      if (!active) return;
-      url = URL.createObjectURL(new Blob([Uint8Array.from(bytes).buffer], { type: part.mediaType }));
-      setPreview({ url });
-    }).catch(() => { if (active) setPreview({ failed: true }); });
-    return () => { active = false; if (url) URL.revokeObjectURL(url); };
-  }, [id, part.mediaType, content]);
-  return { ...preview, fail: () => setPreview({ failed: true }) };
-}
+import { useFileImage } from "../../shared/attachments";
 
 type InputFile = Exclude<AgentInputPart, { kind: "text" }>;
-
-export function FilePreview({ part, content }: { part: InputFile; content: ContentReader }) {
-  if (part.kind === "file") return <StoredFilePreview part={part} content={content} />;
-  const name = inputFileName(part);
-  return <Attachment className="max-w-48">
-    <AttachmentMedia><FileIcon /></AttachmentMedia>
-    <AttachmentContent><AttachmentTitle title={name}>{name}</AttachmentTitle></AttachmentContent>
-  </Attachment>;
-}
-
-function StoredFilePreview({ part, content }: { part: ModelFilePart; content: ContentReader }) {
-  const i18n = useI18n();
-  const preview = useFileImage(part, content);
-  return <Attachment state={preview.failed ? "error" : "done"} orientation={previewsAsImage(part.mediaType) ? "vertical" : "horizontal"} className="max-w-48">
-    <AttachmentMedia variant={preview.url ? "image" : "icon"}>
-      {preview.url ? <img src={preview.url} alt={part.filename ?? part.mediaType}
-        onError={preview.fail} /> : <FileIcon />}
-    </AttachmentMedia>
-    <AttachmentContent>
-      <AttachmentTitle title={part.filename ?? part.mediaType}>{part.filename ?? part.mediaType}</AttachmentTitle>
-      {preview.failed && <AttachmentDescription>{i18n.text(mediaMessages.unavailable)}</AttachmentDescription>}
-    </AttachmentContent>
-  </Attachment>;
-}
 
 /** Mounts with the tooltip overlay; releases image read results and temporary URLs when closed. */
 function DraftFileDetails({ part, content }: { part: ModelFilePart; content: ContentReader }) {

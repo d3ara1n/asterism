@@ -88,17 +88,22 @@ describe("Plugin-owned public packages", () => {
     const data = directory(), root = directory(), list = new PackageList(join(data, "plugins.json"));
     file(root, "package.json", JSON.stringify({ name: "@example/native-consumer", type: "module",
       asterism: { displayName: "Test plugin", id: "example.native", runtime: "runtime.ts", runtimeExternals: ["native-library"] } }));
-    file(root, "node_modules/native-library/package.json", JSON.stringify({ name: "native-library", type: "module", exports: "./index.js" }));
+    file(root, "node_modules/native-library/package.json", JSON.stringify({ name: "native-library", type: "module",
+      exports: { import: "./index.js", require: "./index.cjs" } }));
     file(root, "node_modules/native-library/data.txt", "package asset");
     file(root, "node_modules/native-library/index.js", 'import { readFileSync } from "node:fs"; export const value = readFileSync(new URL("./data.txt", import.meta.url), "utf8");');
+    file(root, "node_modules/native-library/index.cjs",
+      'exports.value = require("node:fs").readFileSync(require("node:path").join(__dirname, "data.txt"), "utf8");');
+    file(root, "wrapper.cjs", 'module.exports = require("native-library");');
     file(root, "runtime.ts", `
       import { pluginNamespace } from "@asterism-app/sdk/contracts";
       import { value } from "native-library";
-      export default { namespace: pluginNamespace("example.native"), probe: value };
+      import commonjs from "./wrapper.cjs";
+      export default { namespace: pluginNamespace("example.native"), probe: [value, commonjs.value] };
     `);
     list.add({ source: { kind: "path", path: root } }, data);
     const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
     expect(loaded?.diagnostic?.message).toBeUndefined();
-    expect((loaded!.definition as PluginDefinition & { probe: string }).probe).toBe("package asset");
+    expect((loaded!.definition as PluginDefinition & { probe: string[] }).probe).toEqual(["package asset", "package asset"]);
   });
 });

@@ -6,6 +6,8 @@ import { z } from "zod";
 import { defineCreation, defineEvent, fileRefSchema, pluginNamespace, type FileRef } from "@asterism-app/sdk/contracts";
 import { definePlugin, implementCreation, implementResource, type PluginContext } from "@asterism-app/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
+import { ContentTransferService } from "../runtime/content-transfer.ts";
+import { contentChunkSize } from "../shared/content.ts";
 
 const ns = pluginNamespace("test.files");
 const Source = ns.resource("source", z.object({ prefix: z.string() }));
@@ -58,6 +60,19 @@ async function collect(stream: AsyncIterable<Uint8Array>) {
 }
 
 describe("Resource file references", () => {
+  it("streams a resource file to the renderer in bounded chunks and closes an interrupted read", async () => {
+    const f = fixture(), source = await f.create(), transfer = new ContentTransferService(f.app.sessions);
+    try {
+      const opened = await transfer.execute({ type: "file.open", ref: { source, locator: "x".repeat(contentChunkSize + 17) } });
+      if (opened.kind !== "reader") throw new Error("Expected a file reader");
+      expect(await transfer.execute({ type: "read.next", readerId: opened.readerId })).toMatchObject({ kind: "bytes", done: false, data: new TextEncoder().encode("source:") });
+      const chunk = await transfer.execute({ type: "read.next", readerId: opened.readerId });
+      if (chunk.kind !== "bytes") throw new Error("Expected bytes");
+      expect(chunk.data.length).toBe(contentChunkSize);
+      await transfer.execute({ type: "read.close", readerId: opened.readerId });
+      expect(f.counts()).toEqual({ opened: 1, closed: 1 });
+    } finally { await transfer.close(); }
+  });
   it("passes addresses through events and stored data across sessions without registering or reading them", async () => {
     const f = fixture(), source = await f.create();
     const ref: FileRef = { source: { sessionId: source.sessionId, id: source.id, kind: source.kind }, locator: "original" };

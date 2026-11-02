@@ -1,11 +1,14 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
-import { ArrowLeft, Bell, BellOff, CornerUpLeft, Hash, List, Megaphone, MessageSquare, RefreshCw, Send, Settings, User, Users, X,
+import { ArrowLeft, Bell, BellOff, CornerUpLeft, Eye, Hash, List, Megaphone, MessageSquare, RefreshCw, Send, Settings, User, Users, X,
   type LucideIcon } from "lucide-react";
 import { cardRenderer, creationEntry, recordRenderer, toolRenderer, useI18n, useRendererCalls, useRendererObject, useRendererSettings,
-  type CreationInputProps, type I18n, type RendererModule, type RendererReceipt } from "@asterism-app/sdk/renderer";
-import type { MessagingConversation, MessagingConnectionInfo, MessagingConnectionStatus, MessagingMessage } from "@asterism-app/sdk/contracts";
+  type CreationInputProps, type I18n, type RendererModule, type RendererReceipt, type ContentReader, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { messagingText, type MessagingConversation, type MessagingConnectionInfo, type MessagingConnectionStatus, type MessagingMessage } from "@asterism-app/sdk/contracts";
+import { AttachmentGroup } from "@asterism-app/ui/ui/attachment";
+import { FilePreview } from "../shared/attachments";
+import { mediaMessages } from "../messages/media";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Toggle } from "@asterism-app/ui/ui/toggle";
@@ -23,7 +26,7 @@ import { conversationsCard, chatCard } from "../shared/card-appearance";
 import { messagingMessages as messages } from "../messages/messaging";
 import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema, ConversationsView, ChatView,
   BrowseConversations, ReadChat, SendChat, ChatMessageSent, ConfigureSubscription, SubscriptionChanged,
-  ConversationsList, ConversationsSubscribe, ChatRead, ChatSend, type SubscriptionTarget, type ViewConnection } from "./contract";
+  ConversationsList, ConversationsSubscribe, ChatRead, ChatSend, ChatSee, type SubscriptionTarget, type ViewConnection, type ChatMessage } from "./contract";
 import { subscriptionKey } from "./subscriptions";
 import { groupTimeline, relativeUnit } from "./timeline";
 
@@ -207,9 +210,41 @@ function ConnectionConversations({ connection, back, notify, error }: {
 
 /* ---------- Chat: message timeline and composer ---------- */
 
+type ChatPart = ChatMessage["parts"][number];
+type ChatFile = Extract<ChatPart, { kind: "file" }>;
+/** Consecutive attachments share one group; text parts keep their position between them. */
+function MessageParts({ message, content }: { message: ChatMessage; content: ContentReader }) {
+  const segments: (Exclude<ChatPart, ChatFile> | ChatFile[])[] = [];
+  for (const part of message.parts) {
+    const last = segments.at(-1);
+    if (part.kind === "text") segments.push(part);
+    else if (Array.isArray(last)) last.push(part);
+    else segments.push([part]);
+  }
+  return <div className="flex min-w-0 flex-col gap-2">{segments.map((segment, index) => Array.isArray(segment)
+    ? <AttachmentGroup key={index}>{segment.map(part => <FilePreview key={part.id} content={content} part={{ kind: "file-reference", ref: part.ref,
+      mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}), ...(part.size === undefined ? {} : { size: part.size }) }} />)}</AttachmentGroup>
+    : <p key={index} className="type-body whitespace-pre-wrap break-words">{segment.text}</p>)}</div>;
+}
+function MessagesResult({ result }: ToolRenderProps<z.infer<typeof ChatRead.schema>>) {
+  const object = useRendererObject(), i18n = useI18n();
+  return <div className="flex flex-col gap-3">{result?.data?.messages.map(message => <div key={message.id} className="flex flex-col gap-1">
+    <span className="type-caption text-muted-foreground">{message.sender.name} · {i18n.formatDate(Date.parse(message.sentAt), { dateStyle: "medium", timeStyle: "short" })}</span>
+    <MessageParts message={message} content={object.content} />
+  </div>)}</div>;
+}
+function SentResult({ result }: ToolRenderProps<z.infer<typeof ChatSend.schema>>) {
+  const object = useRendererObject();
+  return result?.data ? <MessageParts message={result.data} content={object.content} /> : null;
+}
+function SeenResult({ result }: ToolRenderProps<z.infer<typeof ChatSee.schema>>) {
+  const object = useRendererObject(), image = result?.data;
+  return image ? <FilePreview content={object.content} part={{ kind: "file", file: image.file, ref: image.ref,
+    mediaType: image.mediaType, size: image.size, ...(image.filename ? { filename: image.filename } : {}) }} /> : null;
+}
 function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
   const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n(), operations = useOperations();
-  const [items, setItems] = useState<MessagingMessage[] | null>(null), [loadError, setLoadError] = useState<string | null>(null);
+  const [items, setItems] = useState<ChatMessage[] | null>(null), [loadError, setLoadError] = useState<string | null>(null);
   const [text, setText] = useState(""), [replyTo, setReplyTo] = useState<MessagingMessage | null>(null);
   const log = useRef<HTMLOListElement>(null), pinned = useRef(true);
   const status = data.connection?.status ?? "unavailable";
@@ -257,7 +292,7 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
           {i18n.formatDate(Date.parse(first.sentAt), { dateStyle: "medium" })}
         </li>;
         if (group.sender.role === "system") return <Group key={first.id} day={day}>{group.messages.map(message =>
-          <li key={message.id} className="type-caption self-center text-center">{message.text}</li>)}</Group>;
+          <li key={message.id} className="type-caption self-center text-center">{messagingText(message)}</li>)}</Group>;
         const self = group.sender.role === "self";
         return <Group key={first.id} day={day}>
           <li className={cn("flex min-w-0 flex-col gap-0.5", self ? "items-end" : "items-start")}>
@@ -268,9 +303,9 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
                 return <li key={message.id} className={cn("group/message flex min-w-0 items-end gap-1", self && "flex-row-reverse")}>
                   <div className={cn("min-w-0 rounded-lg px-2.5 py-1.5", self ? "bg-primary text-primary-foreground" : "bg-muted")}>
                     {message.replyTo && <p className={cn("type-caption mb-1 truncate border-l-2 pl-1.5", self ? "border-primary-foreground/50 text-primary-foreground/80" : "border-border")}>
-                      {i18n.formatMessage(messages.inReplyTo, { name: quoted ? nameOf(quoted) : message.replyTo })}{quoted ? ` · ${quoted.text}` : ""}
+                      {i18n.formatMessage(messages.inReplyTo, { name: quoted ? nameOf(quoted) : message.replyTo })}{quoted ? ` · ${messagingText(quoted)}` : ""}
                     </p>}
-                    <p className="type-body whitespace-pre-wrap break-words">{message.text}</p>
+                    <MessageParts message={message} content={object.content} />
                   </div>
                   <span className="type-caption shrink-0 tabular-nums opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">
                     {i18n.formatDate(Date.parse(message.sentAt), { hour: "2-digit", minute: "2-digit" })}
@@ -291,7 +326,7 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
     <form className="flex flex-col gap-1.5 border-t p-2" onSubmit={event => { event.preventDefault(); send(); }}>
       {replyTo && <div className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1">
         <CornerUpLeft className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="type-caption min-w-0 flex-1 truncate">{i18n.formatMessage(messages.replyingTo, { name: nameOf(replyTo) })} · {replyTo.text}</span>
+        <span className="type-caption min-w-0 flex-1 truncate">{i18n.formatMessage(messages.replyingTo, { name: nameOf(replyTo) })} · {messagingText(replyTo)}</span>
         <IconButton size="icon-xs" label={i18n.text(messages.cancelReply)} onClick={() => setReplyTo(null)}><X /></IconButton>
       </div>}
       <div className="flex items-end gap-1.5">
@@ -386,7 +421,7 @@ export default {
       group: "resources", triggers: { menu: {} }, InputView: ChatInput }),
   ],
   records: [recordRenderer(ChatMessageSent, {
-    icon: <Send className="size-4" />, label: data => ({ ...messages.sentRecord, values: { text: data.text } }),
+    icon: <Send className="size-4" />, label: data => ({ ...messages.sentRecord, values: { text: messagingText(data) } }),
   }), recordRenderer(SubscriptionChanged, {
     icon: data => data.enabled ? <Bell className="size-4" /> : <BellOff className="size-4" />,
     label: data => ({ ...(data.enabled ? messages.notificationOn : messages.notificationOff),
@@ -395,7 +430,8 @@ export default {
   tools: [
     toolRenderer(ConversationsList, { label: messages.conversations, icon: <List className="size-4" /> }),
     toolRenderer(ConversationsSubscribe, { label: messages.notification, icon: <Bell className="size-4" /> }),
-    toolRenderer(ChatRead, { label: messages.read, icon: <MessageSquare className="size-4" /> }),
-    toolRenderer(ChatSend, { label: messages.send, icon: <Send className="size-4" /> }),
+    toolRenderer(ChatRead, { label: messages.read, icon: <MessageSquare className="size-4" />, result: { bodyRenderer: MessagesResult } }),
+    toolRenderer(ChatSee, { label: mediaMessages.preview, icon: <Eye />, result: { bodyRenderer: SeenResult } }),
+    toolRenderer(ChatSend, { label: messages.send, icon: <Send className="size-4" />, result: { bodyRenderer: SentResult } }),
   ],
 } satisfies RendererModule;

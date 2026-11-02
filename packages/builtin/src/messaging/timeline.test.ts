@@ -4,7 +4,7 @@ import { groupTimeline, relativeUnit } from "./timeline.ts";
 
 const local = (day: number, hour: number) => new Date(2026, 0, day, hour).toISOString();
 const message = (id: string, sender: string, sentAt: string, role: MessagingMessage["sender"]["role"] = "participant"): MessagingMessage =>
-  ({ id, text: id, sentAt, sender: { id: sender, name: sender, role } });
+  ({ id, parts: [{ kind: "text", text: id }], sentAt, sender: { id: sender, name: sender, role } });
 
 describe("Chat timeline", () => {
   // Grouping must break on a sender change, a later return of the same sender, and a local day boundary.

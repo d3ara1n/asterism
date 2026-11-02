@@ -1,6 +1,6 @@
 import {
   messagingProviderTypeSchema, messagingEventSchema, conversationQuerySchema, conversationListSchema,
-  messageQuerySchema, messageListSchema, sendMessageSchema, messageSchema,
+  messageQuerySchema, messageListSchema, sendMessageSchema, messageSchema, messagingFileQuerySchema,
   type MessagingConnection, type MessagingConnectionInfo, type MessagingProviderType, type ConnectionEvent,
 } from "@asterism-app/sdk/contracts";
 import { MessagingError, type MessagingProviderDefinition, type MessagingInstance, type MessagingServices,
@@ -224,6 +224,11 @@ export class MessagingRegistry implements MessagingServices {
         messageListSchema.parse(await instance.readMessages(messageQuerySchema.parse(query), { signal: scope }))),
       sendMessage: (input, { signal }) => run(signal, async (instance, scope) =>
         messageSchema.parse(await instance.sendMessage(sendMessageSchema.parse(input), { signal: scope }))),
+      openFile: (query, { signal }) => generation.entry.runs.iterate(async function* (scope) {
+        const instance = await waitFor(generation.attempt, scope);
+        if (!instance.openFile) throw new MessagingError("unsupported", "This messaging provider does not expose attachments.");
+        yield* instance.openFile(messagingFileQuerySchema.parse(query), { signal: scope });
+      }, signal, { rejectOnAbort: true }),
     };
   }
   close() {

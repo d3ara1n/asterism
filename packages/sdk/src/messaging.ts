@@ -34,10 +34,18 @@ export const conversationSchema = conversationAddressSchema.extend({
  */
 export const messageSenderRoleSchema = z.enum(["self", "participant", "system"]);
 export const messageSenderSchema = z.strictObject({ id, name: z.string(), role: messageSenderRoleSchema });
+export const messagingFilePartSchema = z.strictObject({
+  kind: z.literal("file"), id,
+  filename: z.string().optional(), mediaType: z.string(),
+  size: z.number().int().nonnegative().optional(),
+});
+export const messagingTextPartSchema = z.strictObject({ kind: z.literal("text"), text: z.string() });
+export const messagingPartSchema = z.discriminatedUnion("kind", [messagingTextPartSchema, messagingFilePartSchema]);
 export const messageSchema = z.strictObject({
-  id, sender: messageSenderSchema, text: z.string(),
+  id, sender: messageSenderSchema, parts: z.array(messagingPartSchema),
   sentAt: z.string(), replyTo: id.optional(), threadId: id.optional(),
 });
+export const messagingFileQuerySchema = conversationAddressSchema.extend({ messageId: id, fileId: id });
 export const conversationQuerySchema = z.strictObject({ since: id.optional() });
 export const conversationListSchema = z.strictObject({
   conversations: z.array(conversationSchema), cursor: id.optional(), truncated: z.boolean(),
@@ -50,8 +58,9 @@ export const messageListSchema = z.strictObject({
 });
 /** Files are references resolved by the provider when sending; text accompanies them as a caption. */
 export const sendMessageSchema = conversationAddressSchema.extend({
-  text: z.string(), replyTo: id.optional(), files: z.array(fileReferencePartSchema).optional(),
-}).refine(value => !!value.text.trim() || !!value.files?.length, "A message requires text or a file.");
+  parts: z.array(z.union([messagingTextPartSchema, fileReferencePartSchema])).min(1),
+  replyTo: id.optional(),
+}).refine(value => value.parts.some(part => part.kind === "file-reference" || part.text.trim()), "A message requires text or a file.");
 export const messagingEventSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("conversation.discovered"), conversation: conversationSchema }),
   z.strictObject({ kind: z.literal("message.received"), conversation: conversationSchema, message: messageSchema }),
@@ -64,6 +73,12 @@ export type ConversationAddress = z.infer<typeof conversationAddressSchema>;
 export type MessagingConversation = z.infer<typeof conversationSchema>;
 export type MessageSenderRole = z.infer<typeof messageSenderRoleSchema>;
 export type MessagingMessage = z.infer<typeof messageSchema>;
+export type MessagingFilePart = z.infer<typeof messagingFilePartSchema>;
+export type MessagingPart = z.infer<typeof messagingPartSchema>;
+export type MessagingFileQuery = z.infer<typeof messagingFileQuerySchema>;
+export function messagingText(message: { parts: readonly MessagingPart[] }): string {
+  return message.parts.map(part => part.kind === "text" ? part.text : `[File: ${part.filename ?? part.id}]`).join("\n");
+}
 export type ConversationQuery = z.infer<typeof conversationQuerySchema>;
 export type ConversationList = z.infer<typeof conversationListSchema>;
 export type MessageQuery = z.infer<typeof messageQuerySchema>;

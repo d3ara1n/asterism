@@ -14,10 +14,38 @@ The list tool accepts a null target for connections and a connection target for 
 
 Agents send external messages with the Chat's send tool. Their ordinary responses appear in Asterism. Define communication responsibilities in Agent instructions or linked notes.
 
+## Images and files
+
+Messages contain ordered text and file parts, and each attachment carries a FileRef. A new-message input attaches its images to model input within the application's file limits, so an Agent can inspect them directly while retaining the reference for saving or forwarding. An image that exceeds the limits or cannot be fetched stays a reference with a note explaining why. Chat reads and sends return references only; the Chat's `see` tool fetches an image by message ID and file ID when an Agent wants to look at it.
+
+Chat cards, Agent inputs, and message tool results show attachments, with consecutive files grouped together. Images within the model file size limit show a preview; click one to open it. **Save as…** opens the system file dialog for any attachment and saves to the location you choose. An Agent can instead use a linked Directory's `save` tool with a destination path and the attachment's FileRef.
+
+Images attached to an Agent input remain available with that input. References fetch the current platform content when consumed, so they require the Chat to exist on the current session path, its connection to be available, and the remote file to remain downloadable. Older text-only observations retain their original descriptions and do not acquire attachment identities retroactively.
+
 ## Telegram Bot
 
 Create a bot with Telegram's BotFather and enter its token in a Telegram Bot connection. The connection uses long polling while Asterism is running. An existing webhook or another active polling client prevents polling; the connection reports the failure, and reconnecting resumes once the other receiver is gone. Rate limits are retried after the delay Telegram requests.
 
 Telegram Bot API does not provide a general conversation list or arbitrary chat-history retrieval. This provider lists conversations observed by the connection and reads messages it has retained locally. Group privacy settings determine which messages Telegram delivers. A newly configured bot does not gain access to earlier group history.
 
-The integration reads text and media captions or labels, sends text and referenced files, supports replies by message ID, and preserves topic addresses. A single still image within Telegram's photo limit is sent as a photo and other files as documents; several files are sent as one album with the text as its caption, as documents unless all are photos. Telegram accepts at most 10 files per message and 50 MB per file. Received attachments are shown as labels and are not downloaded. Incoming edits update the retained message without emitting a new-message notification. Provider observations survive connection restarts and are shared across resources.
+The integration preserves captions and attachment metadata, sends text and referenced files, supports replies by message ID, and preserves topic addresses. A single still image within Telegram's photo limit is sent as a photo and other files as documents; several files are sent as one album with the text as its caption, as documents unless all are photos. Telegram accepts at most 10 files per send and 50 MB per uploaded file. Telegram delivers an album as one update per item; the connection records it as one message identified by its first item, waits briefly for the remaining items, and then delivers a single new-message input. Replies to any album item refer to that message. Received photos select the largest available variant; downloads through Telegram's hosted Bot API are limited to 20 MB. Incoming edits update retained messages without emitting a new-message notification. Provider observations survive connection restarts and are shared across resources.
+
+## Discord Bot
+
+Create an application in the Discord Developer Portal, enable its bot, and copy its bot token into a Discord Bot connection. Enable **Message Content Intent** on the Bot page. Install the bot in the server with the `bot` scope and channel permissions to view channels, read message history, send messages, send messages in threads, and attach files. The channel's permission overrides still apply. Private messages use the bot's Discord identity.
+
+Receiving uses the Discord Gateway; the SDK resumes and reconnects interrupted sessions itself, and the connection reports a failure when the Gateway closes the session. A thread is addressed by its parent channel ID plus the thread channel ID as the topic. A direct chat or ordinary channel uses its channel ID alone; direct chats are titled by the other participant. Text messages are limited to 2,000 characters and a send accepts at most ten files; file size limits are enforced by Discord. Downloading an attachment fetches its message to refresh the signed download URL, so the bot still needs access to that message and channel.
+
+## Slack Bot
+
+Create and install a Slack application in the workspace. Enable Socket Mode and create an app-level token with `connections:write`. Enter this `xapp` token and the installed application's `xoxb` Bot User OAuth Token in the Slack Bot connection.
+
+Enable the bot message event subscriptions needed for its conversations: `message.im`, `message.mpim`, `message.channels`, and `message.groups`. Grant their corresponding history scopes: `im:history`, `mpim:history`, `channels:history`, and `groups:history`. The connection uses `users:read` to identify the bot's application and `chat:write` to send messages. File sends also use `files:write` and `files:read` to upload files and obtain the shared message's identity. Reinstall the app after changing scopes. Invite the bot into the channels it should participate in; enable the App Home Messages tab for direct messages.
+
+A Chat uses the Slack conversation ID. Its optional topic is the root message's timestamp, preserved as a string. Replying to an observed child message uses that child's root thread. Only events for the bot token's workspace are retained; events from a different application report mismatched tokens. Files and their accompanying text are shared together. Receiving file content uses `files:read` and authenticated downloads of Slack-hosted files; external remote files are not downloaded with bot credentials. If Slack accepts an upload but its message identity cannot be retrieved, the operation reports an uncertain outcome rather than declaring that nothing was sent.
+
+## Observed conversations and connectivity
+
+Discord and Slack connections list conversations in which they have observed incoming or outgoing messages. Their reads return retained local observations, including messages sent through Asterism; they do not backfill earlier platform history. Names absent from an event appear as platform IDs. Thread reads include an observed root message. Identical redeliveries do not trigger another Agent input. Discord edits update messages available in the SDK cache, and Slack edit events update retained messages without triggering a new input. Deletions and reactions are not synchronized.
+
+These integrations use official bot accounts and need no public callback URL. Receiving requires Asterism to be running and the platform to be reachable. HTTP requests use the application's fetch transport. The Discord Gateway and Slack Socket Mode WebSocket connections are managed by their SDKs and do not take the application's HTTP proxy setting; networks that require a proxy for these connections need routing outside the application.

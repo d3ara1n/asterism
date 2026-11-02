@@ -14,7 +14,7 @@ function instance(name: string, overrides: Partial<MessagingInstance> = {}): Mes
     async receive({ ready }) { ready(); },
     async listConversations() { return { conversations: [{ conversationId: "chat", title: name, kind: "private" }], truncated: false }; },
     async readMessages() { return { messages: [], truncated: false }; },
-    async sendMessage(input) { return { id: "sent", text: input.text, sender: { id: "bot", name, role: "self" }, sentAt: "2026-01-01T00:00:00Z" }; },
+    async sendMessage(input) { return { id: "sent", parts: input.parts.filter(part => part.kind === "text"), sender: { id: "bot", name, role: "self" }, sentAt: "2026-01-01T00:00:00Z" }; },
     ...overrides,
   };
 }

@@ -1,7 +1,7 @@
 import type { UiText } from "./i18n.ts";
 import type { ProviderSetting, ProviderSettingValues } from "./provider-settings.ts";
 import type { MessagingProviderType, MessagingConnectionInfo, ConversationQuery, ConversationList,
-  MessageQuery, MessageList, SendMessage, MessagingMessage, MessagingEvent, ConnectionEvent } from "./messaging.ts";
+  MessageQuery, MessageList, SendMessage, MessagingMessage, MessagingEvent, ConnectionEvent, MessagingFileQuery } from "./messaging.ts";
 
 export interface MessagingInstance {
   readonly identity: string;
@@ -14,6 +14,7 @@ export interface MessagingInstance {
   listConversations(query: ConversationQuery, options: { signal: AbortSignal }): Promise<ConversationList>;
   readMessages(query: MessageQuery, options: { signal: AbortSignal }): Promise<MessageList>;
   sendMessage(input: SendMessage, options: { signal: AbortSignal }): Promise<MessagingMessage>;
+  openFile?(query: MessagingFileQuery, options: { signal: AbortSignal }): AsyncIterable<Uint8Array>;
 }
 export interface MessagingProviderDefinition {
   id: string;
@@ -35,6 +36,7 @@ export interface MessagingHandle {
   listConversations(query: ConversationQuery, options: { signal: AbortSignal }): Promise<ConversationList>;
   readMessages(query: MessageQuery, options: { signal: AbortSignal }): Promise<MessageList>;
   sendMessage(input: SendMessage, options: { signal: AbortSignal }): Promise<MessagingMessage>;
+  openFile(query: MessagingFileQuery, options: { signal: AbortSignal }): AsyncIterable<Uint8Array>;
 }
 export interface MessagingServices {
   types(): readonly MessagingProviderType[];
