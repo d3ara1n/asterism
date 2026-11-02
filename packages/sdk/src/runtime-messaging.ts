@@ -7,10 +7,11 @@ export interface MessagingInstance {
   readonly identity: string;
   /**
    * Runs until the receiving signal ends. Call ready once the platform has accepted this receiver; the connection then
-   * reports connected and its retry backoff resets. A rejection is a connection failure: the host calls receive again on
-   * the same instance after a backoff unless the error is a terminal MessagingError. Queries and sends have independent request signals.
+   * reports connected and its retry backoff resets. A transport that restores its own protocol session reports
+   * reconnecting(error), then ready() after recovery. A rejection is a connection failure: the host calls receive again
+   * on the same instance after a backoff unless the error is terminal. Queries and sends have independent request signals.
    */
-  receive(options: { signal: AbortSignal; ready(): void }): Promise<void>;
+  receive(options: { signal: AbortSignal; ready(): void; reconnecting(error: unknown): void }): Promise<void>;
   listConversations(query: ConversationQuery, options: { signal: AbortSignal }): Promise<ConversationList>;
   readMessages(query: MessageQuery, options: { signal: AbortSignal }): Promise<MessageList>;
   sendMessage(input: SendMessage, options: { signal: AbortSignal }): Promise<MessagingMessage>;

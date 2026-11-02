@@ -3,6 +3,13 @@ import { fileMediaType, type FileReferencePart, type MessagingConversation, type
 import { ObservedMessages } from "./observed-store.ts";
 
 export interface ObservedMessage { conversation: MessagingConversation; message: MessagingMessage }
+/** Apply one provider's SDK error mapping while preserving operation cancellation. */
+export const providerCall = (mapError: (error: unknown) => unknown) => async <T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> => {
+  signal.throwIfAborted();
+  try { return await work(); }
+  catch (error) { signal.throwIfAborted(); throw mapError(error); }
+};
+
 /** Platforms with one caption field combine text parts and send the referenced attachments in their original order. */
 export function outgoingMessage({ parts, ...address }: SendMessage) {
   return { ...address, text: parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n"),
@@ -34,15 +41,22 @@ export function messageObserver(store: ObservedMessages, publish: (event: Messag
 }
 
 /** Resolve every file before any message is sent. File references remain owned by their original resource. */
-export async function messagingFiles(plugin: PluginContext, files: readonly FileReferencePart[], signal: AbortSignal) {
+export async function messagingFiles(plugin: Pick<PluginContext, "files">, files: readonly FileReferencePart[], signal: AbortSignal,
+  limit?: { bytes: number; label: string }) {
   return Promise.all(files.map(async file => {
     try {
       const chunks: Uint8Array[] = [];
-      for await (const chunk of plugin.files.open(file.ref, { signal })) chunks.push(chunk);
+      let size = 0;
+      for await (const chunk of plugin.files.open(file.ref, { signal })) {
+        size += chunk.byteLength;
+        if (limit && size > limit.bytes) throw new MessagingError("invalid_input", `File '${file.filename ?? "file"}' exceeds ${limit.label}.`);
+        chunks.push(chunk);
+      }
       signal.throwIfAborted();
-      return { name: file.filename ?? "file", mediaType: fileMediaType({ name: file.filename ?? "", type: file.mediaType ?? "" }), bytes: Buffer.concat(chunks) };
+      return { name: file.filename ?? "file", mediaType: fileMediaType({ name: file.filename ?? "", type: file.mediaType ?? "" }), bytes: Buffer.concat(chunks, size) };
     } catch (error) {
       signal.throwIfAborted();
+      if (error instanceof MessagingError && error.code === "invalid_input") throw error;
       throw new MessagingError("invalid_input", `File '${file.filename ?? "file"}' could not be read: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
     }
   }));
@@ -57,7 +71,7 @@ export const scopedFetch = (signal: AbortSignal): typeof fetch => (input, init) 
 /** End receiving on cancellation or SDK failure, then stop the transport before the host retries it. */
 export async function receiveConnection(signal: AbortSignal, configure: (scope: {
   signal: AbortSignal; fail(error: unknown): void;
-}) => { start(): Promise<unknown>; stop(): void | Promise<void> }): Promise<void> {
+}) => { start(): Promise<unknown>; stop?(): void | Promise<void> }): Promise<void> {
   signal.throwIfAborted();
   const controller = new AbortController();
   let fail!: (error: unknown) => void;
@@ -70,7 +84,7 @@ export async function receiveConnection(signal: AbortSignal, configure: (scope: 
   finally {
     signal.removeEventListener("abort", abort);
     controller.abort();
-    await transport.stop();
+    await transport.stop?.();
     await starting;
   }
 }

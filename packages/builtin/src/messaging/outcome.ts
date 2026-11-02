@@ -3,12 +3,31 @@ import type { Json } from "@asterism-app/sdk/contracts";
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 
+/** Preparation has not contacted the platform's message-delivery endpoint. Keep its original error classification. */
+class UnsentMessageError extends MessagingError {
+  constructor(cause: unknown) {
+    super(cause instanceof MessagingError ? cause.code : "request_failed", message(cause), {
+      cause, ...(cause instanceof MessagingError && cause.retryAfterMs !== undefined ? { retryAfterMs: cause.retryAfterMs } : {}),
+    });
+  }
+}
+
+export async function prepareSend<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
+  signal.throwIfAborted();
+  try { return await work(); }
+  catch (error) {
+    signal.throwIfAborted();
+    throw definitelyNotSent(error) ? error : new UnsentMessageError(error);
+  }
+}
+
 /**
- * A write definitely did not happen when the provider rejected it or failed before sending: any MessagingError except
- * request_failed, or a request_failed carrying a retry delay, which the platform returns only for refused requests.
+ * Preparation failures are explicitly unsent. Other MessagingErrors describe refusals except request_failed without a
+ * retry delay, which may have occurred after delivery. Rate-limit delays accompany refused requests.
  */
 export function definitelyNotSent(error: unknown): boolean {
-  return error instanceof MessagingError && (error.code !== "request_failed" || error.retryAfterMs !== undefined);
+  return error instanceof UnsentMessageError ||
+    error instanceof MessagingError && (error.code !== "request_failed" || error.retryAfterMs !== undefined);
 }
 
 /**

@@ -190,9 +190,10 @@ export class MessagingRegistry implements MessagingServices {
           failures = 0;
           if (generation.status !== "connected") update({ status: "connected", error: undefined });
         };
+        const reconnecting = (error: unknown) => update({ status: "reconnecting", error: message(error) });
         try {
           const receiver = instance;
-          await entry.runs.start(signal => receiver.receive({ signal, ready }), { signal: abort.signal, affectsHistory: false }).done;
+          await entry.runs.start(signal => receiver.receive({ signal, ready, reconnecting }), { signal: abort.signal, affectsHistory: false }).done;
           return;
         } catch (error) {
           if (abort.signal.aborted || entry.runs.closed || !await backoff(error, ++failures)) return;

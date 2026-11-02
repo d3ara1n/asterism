@@ -4,7 +4,8 @@ import { MessagingError, type MessagingProviderDefinition, type PluginContext } 
 import { fileMediaType } from "@asterism-app/sdk/contracts";
 import { messagingMessages as messages } from "../messages/messaging.ts";
 import { ObservedMessages, forgetObservedConnection } from "./observed-store.ts";
-import { messageObserver, messagingFiles, receiveConnection, scopedFetch, downloadFile, outgoingMessage, observedFile, type ObservedMessage } from "./provider-shared.ts";
+import { messageObserver, messagingFiles, receiveConnection, scopedFetch, downloadFile, outgoingMessage, observedFile, providerCall, type ObservedMessage } from "./provider-shared.ts";
+import { prepareSend } from "./outcome.ts";
 
 /** The message facts used by normalization; REST and Gateway payloads each convert into this shape. */
 export interface DiscordMessage {
@@ -73,10 +74,7 @@ export function discordError(error: unknown): unknown {
   }
   return error;
 }
-async function call<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
-  signal.throwIfAborted();
-  try { return await work(); } catch (error) { signal.throwIfAborted(); throw discordError(error); }
-}
+const call = providerCall(discordError);
 // REST instances have no background sweepers; requests remain usable after a receiver has stopped.
 const restOptions = { retries: 0, rejectOnRateLimit: () => true, hashSweepInterval: 0, handlerSweepInterval: 0 };
 // Node's fetch supports the Undici bodies used by discord.js; its bundled DOM types do not describe all of them.
@@ -96,7 +94,7 @@ export function discordProvider(plugin: PluginContext): MessagingProviderDefinit
       const observe = messageObserver(store, publish);
       return {
         identity: me.username,
-        async receive({ signal, ready }) {
+        async receive({ signal, ready, reconnecting }) {
           await receiveConnection(signal, scope => {
             const client = new Client({
               intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.DirectMessages, GatewayIntentBits.MessageContent],
@@ -107,11 +105,23 @@ export function discordProvider(plugin: PluginContext): MessagingProviderDefinit
               try { observe(discordMessage(gatewayMessage(message), me.id, gatewayChannel(message, me.id)), notify); }
               catch (error) { scope.fail(error); }
             };
-            client.on(Events.ClientReady, ready);
+            const recovering = new Set<number>();
+            const recovered = (shardId: number) => {
+              recovering.delete(shardId);
+              if (!recovering.size && client.isReady()) ready();
+            };
+            client.on(Events.ClientReady, () => { recovering.clear(); ready(); });
+            client.on(Events.ShardReconnecting, shardId => {
+              recovering.add(shardId);
+              reconnecting(new Error(`Discord Gateway shard ${shardId} is reconnecting.`));
+            });
+            client.on(Events.ShardError, (error, shardId) => { recovering.add(shardId); reconnecting(error); });
+            client.on(Events.ShardReady, recovered);
+            client.on(Events.ShardResume, recovered);
             client.on(Events.MessageCreate, message => record(message, true));
             client.on(Events.MessageUpdate, (_old, message) => { if (!message.partial) record(message, false); });
             client.on(Events.Error, error => scope.fail(discordError(error)));
-            // The SDK resumes and reconnects sessions itself; a disconnect is reported only when it stops reconnecting.
+            // Keep the SDK's session recovery and cache; terminal disconnects end this receiver.
             client.on(Events.ShardDisconnect, event => scope.fail(new MessagingError("unavailable", `Discord Gateway closed (${event.code}). Check the bot token and enabled intents.`)));
             return {
               async start() {
@@ -138,10 +148,12 @@ export function discordProvider(plugin: PluginContext): MessagingProviderDefinit
           if (input.files.length > 10) throw new MessagingError("invalid_input", "Discord sends at most 10 files in one message.");
           if (input.text.length > 2000) throw new MessagingError("invalid_input", "Discord messages contain at most 2,000 characters.");
           const channelId = input.threadId ?? input.conversationId;
-          const channel = restChannel(await call(signal, () => rest.get(Routes.channel(channelId), { signal }) as Promise<RestChannel>));
-          if (input.threadId && channel.parentId !== input.conversationId)
-            throw new MessagingError("invalid_input", "The Discord thread does not belong to this conversation.");
-          const files = await messagingFiles(plugin, input.files, signal);
+          const { channel, files } = await prepareSend(signal, async () => {
+            const channel = restChannel(await call(signal, () => rest.get(Routes.channel(channelId), { signal }) as Promise<RestChannel>));
+            if (input.threadId && channel.parentId !== input.conversationId)
+              throw new MessagingError("invalid_input", "The Discord thread does not belong to this conversation.");
+            return { channel, files: await messagingFiles(plugin, input.files, signal) };
+          });
           const sent = await call(signal, () => rest.post(Routes.channelMessages(channelId), {
             signal, body: { content: input.text, ...(input.replyTo ? { message_reference: { message_id: input.replyTo, fail_if_not_exists: true } } : {}) },
             ...(files.length ? { files: files.map(file => ({ data: file.bytes, name: file.name })) } : {}),

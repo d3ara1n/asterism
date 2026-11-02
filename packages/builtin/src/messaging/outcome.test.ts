@@ -1,8 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { MessagingError } from "@asterism-app/sdk/runtime";
-import { messagingFailure } from "./outcome.ts";
+import { messagingFailure, prepareSend } from "./outcome.ts";
 
 describe("Messaging tool outcomes", () => {
+  it("reports a preparation failure as unsent without changing its transient classification", async () => {
+    const failure = new MessagingError("request_failed", "Metadata lookup failed.");
+    const prepared = await prepareSend(new AbortController().signal, async () => { throw failure; }).catch(error => error);
+    expect(prepared.cause).toBe(failure);
+    expect(messagingFailure(prepared, "write", false))
+      .toEqual({ kind: "failed", error: { code: "request_failed", message: "Metadata lookup failed." } });
+    expect(messagingFailure(failure, "write", false)).toMatchObject({ kind: "unknown" });
+  });
+
   // A send that may have reached the platform must not be reported as a plain failure, or the model would resend it.
   it("fails writes only when nothing was sent and reports other write failures as unknown with their cause", () => {
     expect(messagingFailure(new MessagingError("invalid_input", "File 'a.png' could not be read."), "write", false))

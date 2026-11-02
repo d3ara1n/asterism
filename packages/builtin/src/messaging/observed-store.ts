@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { MessagingError } from "@asterism-app/sdk/runtime";
-import { messageSchema, type ConversationList, type ConversationQuery, type MessageList, type MessageQuery, type MessagingConversation, type MessagingMessage } from "@asterism-app/sdk/contracts";
+import { messageSchema, type ConversationAddress, type ConversationList, type ConversationQuery, type MessageList, type MessageQuery, type MessagingConversation, type MessagingMessage } from "@asterism-app/sdk/contracts";
 
 /** Decode retained text-only observations without changing their identity or polling position. */
 function storedMessage(data: string): MessagingMessage {
@@ -71,6 +71,11 @@ export class ObservedMessages {
     const row = this.db.prepare(`SELECT data FROM ${this.namespace}_messages WHERE account = ? AND chat = ? AND id = ?`)
       .get(this.account, chat, id) as { data: string } | undefined;
     return row ? storedMessage(row.data) : undefined;
+  }
+  conversation({ conversationId, threadId }: ConversationAddress): MessagingConversation | undefined {
+    const row = this.db.prepare(`SELECT data FROM ${this.namespace}_dialogs WHERE account = ? AND chat = ? AND thread = ?`)
+      .get(this.account, conversationId, threadId ?? "") as { data: string } | undefined;
+    return row ? JSON.parse(row.data) as MessagingConversation : undefined;
   }
   observe(conversation: MessagingConversation, message: MessagingMessage): { discovered: boolean; inserted: boolean } {
     const thread = conversation.threadId ?? "", ns = this.namespace;

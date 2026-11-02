@@ -122,6 +122,29 @@ describe("Messaging connections", () => {
     expect(registry.connections()[0]).toMatchObject({ identity: "bot", error: "token revoked" });
   });
 
+  it("reflects transport session recovery without starting a second receiver", async () => {
+    const { registry, life } = setup({ id: "connection", providerId: "provider", name: "Bot", enabled: true, settings: {} });
+    let receiving!: Parameters<MessagingInstance["receive"]>[0], receives = 0;
+    registry.declare("test.provider", [{
+      id: "provider", label: "Provider", settings: [],
+      async create() {
+        return instance("bot", { async receive(options) {
+          receiving = options;
+          receives++;
+          options.ready();
+          await new Promise<void>(resolve => options.signal.addEventListener("abort", () => resolve(), { once: true }));
+        } });
+      },
+    }], life.group("call"));
+    await status(registry, "connection", "connected");
+    receiving.reconnecting(new Error("Gateway connection lost."));
+    expect(registry.connections()[0]).toMatchObject({ status: "reconnecting", error: "Gateway connection lost." });
+    receiving.ready();
+    expect(registry.connections()[0]).toMatchObject({ status: "connected" });
+    expect(registry.connections()[0]?.error).toBeUndefined();
+    expect(receives).toBe(1);
+  });
+
   it("isolates a failing event listener from other consumers and from the provider's receiver", async () => {
     const { registry, life } = setup({ id: "connection", providerId: "provider", name: "Bot", enabled: true, settings: {} });
     const received: string[] = [];

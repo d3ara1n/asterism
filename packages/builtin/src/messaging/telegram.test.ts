@@ -14,6 +14,7 @@ describe("Telegram message normalization", () => {
     const person = { id: 7, is_bot: false, first_name: "Ada" };
     const bot = { id: botId, is_bot: true, first_name: "Helper" };
     expect(telegramMessage(base({ from: bot, text: "hi" }), botId).message.sender.role).toBe("self");
+    expect(telegramMessage(base({ from: bot, pinned_message: base({ text: "Pinned" }) }), botId).message.sender.role).toBe("self");
     expect(telegramMessage(base({ from: person, text: "hi" }), botId).message.sender.role).toBe("participant");
     const joined = telegramMessage(base({ from: person, new_chat_members: [person] }), botId).message;
     expect(joined.sender.role).toBe("system");

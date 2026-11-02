@@ -15,6 +15,7 @@ import { coversAddress, foldSubscriptions, matchesSubscription, selectDeliveries
 import { telegramProvider } from "./telegram.ts";
 import { discordProvider } from "./discord.ts";
 import { slackProvider } from "./slack.ts";
+import { qqProvider } from "./qq.ts";
 import { messagingOutcome } from "./outcome.ts";
 import { conversationsCard, chatCard } from "../shared/card-appearance.ts";
 
@@ -156,7 +157,7 @@ export default defineModule(plugin => {
   const binding = (object: ObjectReader) => Chat.stateSchema.parse(object.snapshot()!.data);
 
   return {
-    messagingProviders: [telegramProvider(plugin), discordProvider(plugin), slackProvider(plugin)],
+    messagingProviders: [telegramProvider(plugin), discordProvider(plugin), slackProvider(plugin), qqProvider(plugin)],
     observers: [{ id: "messaging.subscriptions", cursorChanged: invalidateAll }],
     calls: [
       implementCall(BrowseConversations, (input, { signal }) => list(capture(), input, signal)),

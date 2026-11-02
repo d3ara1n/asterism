@@ -1,10 +1,10 @@
 import { Api, GrammyError, HttpError, InputFile, type ApiClientOptions } from "grammy";
 import type { Message } from "grammy/types";
 import { MessagingError, type PluginContext, type MessagingProviderDefinition } from "@asterism-app/sdk/runtime";
-import type { FileReferencePart, MessageSenderRole, MessagingConversation, MessagingMessage, MessagingFilePart } from "@asterism-app/sdk/contracts";
+import type { MessageSenderRole, MessagingConversation, MessagingMessage, MessagingFilePart } from "@asterism-app/sdk/contracts";
 import { TelegramStore, forgetTelegramConnection, telegramAccount } from "./telegram-store.ts";
 import { messagingMessages as messages } from "../messages/messaging.ts";
-import { downloadFile, outgoingMessage, observedFile } from "./provider-shared.ts";
+import { downloadFile, messagingFiles, outgoingMessage, observedFile, providerCall } from "./provider-shared.ts";
 
 // grammY's Node API accepts native signals at its boundary; the adapter below handles the signal it passes on to fetch.
 const apiSignal = (signal: AbortSignal) => signal as unknown as NonNullable<Parameters<Api["getMe"]>[0]>;
@@ -53,7 +53,7 @@ export function telegramMessage(message: Message, selfId: number): { conversatio
     : mediaLabels.find(([key]) => key in message && message[key] !== undefined)?.[1];
   // Messages without authored text or content are platform service messages, such as joins and pins.
   const service = message.text === undefined && message.caption === undefined && media === undefined;
-  const role: MessageSenderRole = service ? "system" : message.from?.id === selfId ? "self" : "participant";
+  const role: MessageSenderRole = message.from?.id === selfId ? "self" : service ? "system" : "participant";
   const sender = message.sender_chat ? { id: String(message.sender_chat.id),
     name: ("title" in message.sender_chat ? message.sender_chat.title : message.sender_chat.first_name) ?? String(message.sender_chat.id), role }
     : message.from ? { id: String(message.from.id), name: [message.from.first_name, message.from.last_name].filter(Boolean).join(" "), role }
@@ -93,11 +93,7 @@ export function telegramError(error: unknown): unknown {
   }
   return error;
 }
-async function call<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
-  signal.throwIfAborted();
-  try { return await work(); }
-  catch (error) { signal.throwIfAborted(); throw telegramError(error); }
-}
+const call = providerCall(telegramError);
 
 const mediaGroupLimit = 10;
 /** Bot API upload limits: photos up to 10 MB, other files up to 50 MB. */
@@ -109,26 +105,6 @@ export function telegramSendsPhoto(file: { filename?: string; mediaType?: string
   const extension = file.filename?.split(".").at(-1)?.toLowerCase();
   const type = file.mediaType?.toLowerCase() ?? (extension ? extensionTypes[extension] : undefined);
   return !!type && photoTypes.has(type) && size <= photoLimit;
-}
-/** Read a referenced file completely; a source that cannot be read is invalid input, so nothing has been sent. */
-async function telegramUpload(plugin: PluginContext, file: FileReferencePart, signal: AbortSignal) {
-  const name = file.filename ?? "file", chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    for await (const chunk of plugin.files.open(file.ref, { signal })) {
-      size += chunk.byteLength;
-      if (size > fileLimit) throw new MessagingError("invalid_input", `File '${name}' exceeds Telegram's 50 MB upload limit.`);
-      chunks.push(chunk);
-    }
-  } catch (error) {
-    signal.throwIfAborted();
-    if (error instanceof MessagingError) throw error;
-    throw new MessagingError("invalid_input", `File '${name}' could not be read: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return { file: new InputFile(bytes, name), photo: telegramSendsPhoto(file, size) };
 }
 
 export function telegramProvider(plugin: PluginContext): MessagingProviderDefinition {
@@ -197,10 +173,14 @@ export function telegramProvider(plugin: PluginContext): MessagingProviderDefini
             ...(input.replyTo ? { reply_parameters: { message_id: Number(input.replyTo) } } : {}),
           };
           const caption = input.text.trim() ? { caption: input.text } : {};
-          const files = input.files ?? [];
+          const files = input.files;
           if (files.length > mediaGroupLimit) throw new MessagingError("invalid_input", `Telegram sends at most ${mediaGroupLimit} files in one message.`);
           // Files are read before the request, so a missing source fails without sending anything.
-          const uploads = await Promise.all(files.map(file => telegramUpload(plugin, file, signal)));
+          const resolved = await messagingFiles(plugin, files, signal, { bytes: fileLimit, label: "Telegram's 50 MB upload limit" });
+          const uploads = resolved.map(file => ({
+            file: new InputFile(file.bytes, file.name),
+            photo: telegramSendsPhoto({ filename: file.name, mediaType: file.mediaType }, file.bytes.length),
+          }));
           const [first] = uploads;
           const sent = await call(signal, async () => {
             if (!first) return api.sendMessage(input.conversationId, input.text, options, apiSignal(signal));

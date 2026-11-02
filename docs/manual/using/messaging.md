@@ -34,7 +34,7 @@ The integration preserves captions and attachment metadata, sends text and refer
 
 Create an application in the Discord Developer Portal, enable its bot, and copy its bot token into a Discord Bot connection. Enable **Message Content Intent** on the Bot page. Install the bot in the server with the `bot` scope and channel permissions to view channels, read message history, send messages, send messages in threads, and attach files. The channel's permission overrides still apply. Private messages use the bot's Discord identity.
 
-Receiving uses the Discord Gateway; the SDK resumes and reconnects interrupted sessions itself, and the connection reports a failure when the Gateway closes the session. A thread is addressed by its parent channel ID plus the thread channel ID as the topic. A direct chat or ordinary channel uses its channel ID alone; direct chats are titled by the other participant. Text messages are limited to 2,000 characters and a send accepts at most ten files; file size limits are enforced by Discord. Downloading an attachment fetches its message to refresh the signed download URL, so the bot still needs access to that message and channel.
+Receiving uses the Discord Gateway. The connection reports reconnecting while the SDK restores an interrupted session, connected after recovery, and failed when the Gateway rejects the session. A thread is addressed by its parent channel ID plus the thread channel ID as the topic. A direct chat or ordinary channel uses its channel ID alone; direct chats are titled by the other participant. Text messages are limited to 2,000 characters and a send accepts at most ten files; file size limits are enforced by Discord. Downloading an attachment fetches its message to refresh the signed download URL, so the bot still needs access to that message and channel.
 
 ## Slack Bot
 
@@ -44,8 +44,16 @@ Enable the bot message event subscriptions needed for its conversations: `messag
 
 A Chat uses the Slack conversation ID. Its optional topic is the root message's timestamp, preserved as a string. Replying to an observed child message uses that child's root thread. Only events for the bot token's workspace are retained; events from a different application report mismatched tokens. Files and their accompanying text are shared together. Receiving file content uses `files:read` and authenticated downloads of Slack-hosted files; external remote files are not downloaded with bot credentials. If Slack accepts an upload but its message identity cannot be retrieved, the operation reports an uncertain outcome rather than declaring that nothing was sent.
 
+## QQ Bot
+
+Create a robot in the QQ Bot Open Platform and enter its AppID and AppSecret in a QQ Bot connection. Enable the private and group message permissions needed in the platform console and configure sandbox members and groups for testing. Receiving uses the official SDK's WebSocket Gateway while Asterism is running.
+
+A conversation ID is `c2c:<user_openid>` for private chats or `group:<group_openid>` for groups. These platform identities are distinct from QQ account numbers. The provider retains received and sent messages locally; QQ does not provide earlier conversation history. Group messages delivered by the platform are observed whether or not they mention the bot. Platform permissions determine which events are delivered.
+
+The provider sends text. A reply uses the selected incoming message ID; sending without a reply target requests a proactive message. QQ controls reply validity, message quotas, and sending permissions, and its refusals appear as operation errors. Received attachments retain file references and can be opened while their platform URLs remain available. File sending and topics are unsupported by this provider.
+
 ## Observed conversations and connectivity
 
 Discord and Slack connections list conversations in which they have observed incoming or outgoing messages. Their reads return retained local observations, including messages sent through Asterism; they do not backfill earlier platform history. Names absent from an event appear as platform IDs. Thread reads include an observed root message. Identical redeliveries do not trigger another Agent input. Discord edits update messages available in the SDK cache, and Slack edit events update retained messages without triggering a new input. Deletions and reactions are not synchronized.
 
-These integrations use official bot accounts and need no public callback URL. Receiving requires Asterism to be running and the platform to be reachable. HTTP requests use the application's fetch transport. The Discord Gateway and Slack Socket Mode WebSocket connections are managed by their SDKs and do not take the application's HTTP proxy setting; networks that require a proxy for these connections need routing outside the application.
+These integrations use official bot accounts and need no public callback URL. Receiving requires Asterism to be running and the platform to be reachable. HTTP requests use the application's fetch transport. The Discord Gateway, Slack Socket Mode, and QQ Gateway WebSocket connections are managed by their SDKs and do not take the application's HTTP proxy setting; networks that require a proxy for these connections need routing outside the application.

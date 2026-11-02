@@ -4,7 +4,8 @@ import { MessagingError, type MessagingProviderDefinition, type PluginContext } 
 import { fileMediaType, type SendMessage } from "@asterism-app/sdk/contracts";
 import { messagingMessages as messages } from "../messages/messaging.ts";
 import { ObservedMessages, forgetObservedConnection } from "./observed-store.ts";
-import { messageObserver, messagingFiles, receiveConnection, scopedFetch, outgoingMessage, observedFile, downloadFile, type ObservedMessage } from "./provider-shared.ts";
+import { messageObserver, messagingFiles, receiveConnection, scopedFetch, outgoingMessage, observedFile, downloadFile, providerCall, type ObservedMessage } from "./provider-shared.ts";
+import { prepareSend } from "./outcome.ts";
 
 interface SlackMessage {
   type?: string; subtype?: string; channel: string; channel_type?: string; ts: string; text?: string;
@@ -49,10 +50,7 @@ export function slackError(error: unknown): unknown {
   if (error instanceof WebAPIRequestError) return new MessagingError("request_failed", error.original.message, { cause: error });
   return error;
 }
-async function call<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
-  signal.throwIfAborted();
-  try { return await work(); } catch (error) { signal.throwIfAborted(); throw slackError(error); }
-}
+const call = providerCall(slackError);
 const options = { retryConfig: { retries: 0 }, rejectRateLimitedCalls: true, logLevel: LogLevel.ERROR };
 export function slackReplyThread(input: Pick<SendMessage, "threadId" | "replyTo">, replyThread?: string): string | undefined {
   const root = replyThread ?? input.replyTo;
@@ -123,25 +121,30 @@ export function slackProvider(plugin: PluginContext): MessagingProviderDefinitio
           const input = outgoingMessage(message);
           const web = api(signal);
           const thread = slackReplyThread(input, input.replyTo ? store.message(input.conversationId, input.replyTo)?.threadId : undefined);
-          const files = await messagingFiles(plugin, input.files ?? [], signal);
+          const conversation = store.conversation({ conversationId: input.conversationId, threadId: thread })
+            ?? store.conversation({ conversationId: input.conversationId });
+          const files = await messagingFiles(plugin, input.files, signal);
           if (!files.length) {
             const sent = await call(signal, () => web.chat.postMessage({ channel: input.conversationId, text: input.text, ...(thread ? { thread_ts: thread } : {}) }));
             if (!sent.ts) throw new Error("Slack accepted the message without returning its timestamp.");
-            return observe(slackMessage({ channel: sent.channel ?? input.conversationId, ts: sent.ts,
+            return observe(slackMessage({ channel: sent.channel ?? input.conversationId, channel_type: conversation?.kind, ts: sent.ts,
               text: sent.message?.text ?? input.text, user: self.user, thread_ts: thread }, self)!, false);
           }
           // Uploads remain private until the single completion request shares them with the conversation.
-          const uploaded: { id: string; title: string }[] = [];
-          for (const file of files) {
-            const target = await call(signal, () => web.files.getUploadURLExternal({ filename: file.name, length: file.bytes.length }));
-            if (!target.upload_url || !target.file_id) throw new MessagingError("request_failed", "Slack did not return a file upload URL.");
-            await call(signal, async () => {
-              const response = await fetch(target.upload_url!, { method: "POST", body: file.bytes, signal });
-              if (!response.ok) throw new MessagingError("invalid_input", `Slack file upload failed (${response.status}).`);
-              await response.arrayBuffer();
-            });
-            uploaded.push({ id: target.file_id, title: file.name });
-          }
+          const uploaded = await prepareSend(signal, async () => {
+            const uploaded: { id: string; title: string }[] = [];
+            for (const file of files) {
+              const target = await call(signal, () => web.files.getUploadURLExternal({ filename: file.name, length: file.bytes.length }));
+              if (!target.upload_url || !target.file_id) throw new MessagingError("request_failed", "Slack did not return a file upload URL.");
+              await call(signal, async () => {
+                const response = await fetch(target.upload_url!, { method: "POST", body: file.bytes, signal });
+                if (!response.ok) throw new MessagingError(response.status >= 500 ? "request_failed" : "invalid_input", `Slack file upload failed (${response.status}).`);
+                await response.arrayBuffer();
+              });
+              uploaded.push({ id: target.file_id, title: file.name });
+            }
+            return uploaded;
+          });
           const completed = await call(signal, () => web.files.completeUploadExternal({ files: [uploaded[0]!, ...uploaded.slice(1)], channel_id: input.conversationId,
             ...(input.text ? { initial_comment: input.text } : {}), ...(thread ? { thread_ts: thread } : {}) }));
           // Slack's upload completion returns files; their shares carry the actual chat message ID.
@@ -151,7 +154,7 @@ export function slackProvider(plugin: PluginContext): MessagingProviderDefinitio
             const shares = info.file?.shares as Record<string, Record<string, { ts?: string }[]>> | undefined;
             const ts = Object.values(shares ?? {}).flatMap(group => group[input.conversationId] ?? []).find(share => share.ts)?.ts;
             if (!ts) throw new Error("Slack shared the files without returning a message timestamp.");
-            return observe(slackMessage({ channel: input.conversationId, ts, text: input.text, user: self.user, thread_ts: thread,
+            return observe(slackMessage({ channel: input.conversationId, channel_type: conversation?.kind, ts, text: input.text, user: self.user, thread_ts: thread,
               files: files.map((file, index) => ({ id: uploaded[index]!.id, name: file.name, mimetype: file.mediaType, size: file.bytes.length })) }, self)!, false);
           } catch (error) {
             // Completion has already shared the files: a later lookup failure cannot mean the send was refused.
