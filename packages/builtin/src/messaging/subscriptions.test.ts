@@ -42,50 +42,9 @@ describe("Messaging subscription projection", () => {
     ]);
     expect(deliveries.map(item => [item.recipient.id, item.source.id])).toEqual([["agent", "chat"], ["other", "list"]]);
   });
-  // An Agent exposed to both a Chat and a Conversations subscription for the same conversation must not receive the event twice.
-  it("delivers one event to each recipient once, preferring a Chat over a Conversations summary", () => {
-    const ref = (id: string, kind: string) => ({ sessionId: "session", id, kind });
-    const agent = ref("agent", "agent"), other = ref("other", "agent");
-    const list = ref("list", Conversations.kind), chat = ref("chat", Chat.kind), second = ref("chat-2", Chat.kind);
-    const deliveries = selectDeliveries([
-      { source: list, title: "List", recipient: agent },
-      { source: chat, title: "Chat", recipient: agent },
-      { source: second, title: "Second", recipient: agent },
-      { source: list, title: "List", recipient: other },
-    ]);
-    expect(deliveries.map(item => [item.recipient.id, item.source.id])).toEqual([["agent", "chat"], ["other", "list"]]);
-  });
-});
-
-describe("Messaging delivery selection", () => {
-  const agent = { sessionId: "s", id: "agent", kind: "agent" };
-  const list = { sessionId: "s", id: "list", kind: Conversations.kind };
-  const chatA = { sessionId: "s", id: "chat-a", kind: Chat.kind }, chatB = { sessionId: "s", id: "chat-b", kind: Chat.kind };
-  it("delivers one event once per recipient and prefers a Chat's full message over a list summary", () => {
-    const selected = selectDeliveries([
-      { source: list, title: "List", recipient: agent },
-      { source: chatA, title: "A", recipient: agent },
-      { source: chatB, title: "B", recipient: agent },
-    ]);
-    expect(selected.map(delivery => delivery.source.id)).toEqual(["chat-a"]);
-  });
   it("keeps separate recipients, including same-named Agents in different sessions", () => {
+    const agent = { sessionId: "s", id: "agent", kind: "agent" }, list = { sessionId: "s", id: "list", kind: Conversations.kind };
     const other = { ...agent, sessionId: "t" };
     expect(selectDeliveries([{ source: list, title: "List", recipient: agent }, { source: list, title: "List", recipient: other }])).toHaveLength(2);
-  });
-});
-
-describe("Messaging event delivery", () => {
-  const agent = { sessionId: "s", id: "agent", kind: "agent" };
-  const chat = (id: string) => ({ sessionId: "s", id, kind: Chat.kind });
-  const list = { sessionId: "s", id: "list", kind: Conversations.kind };
-  it("delivers one event once per recipient and prefers a Chat's full message over a list summary", () => {
-    const deliveries = selectDeliveries([
-      { source: list, title: "List", recipient: agent },
-      { source: chat("a"), title: "A", recipient: agent },
-      { source: chat("b"), title: "B", recipient: agent },
-      { source: list, title: "List", recipient: { ...agent, id: "other" } },
-    ]);
-    expect(deliveries.map(item => [item.recipient.id, item.source.id])).toEqual([["agent", "a"], ["other", "list"]]);
   });
 });

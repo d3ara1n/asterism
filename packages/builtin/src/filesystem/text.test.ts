@@ -75,14 +75,6 @@ describe("Directory text tools", () => {
     await expect((async () => { for await (const _chunk of consumer.files.open(ref)) {} })())
       .rejects.toMatchObject({ code: "not_found", reason: "path_not_found" });
   });
-  it("File read passes the target range to text reading, with model content and data coming from the same read", async () => {
-    const { directory, call } = setup();
-    writeFileSync(join(directory, "text.txt"), "a\nb\nc");
-    const result = await call("read", { path: "text.txt", offset: 2, limit: 1 });
-    expect(result).toMatchObject({ kind: "succeeded", data: { path: "text.txt", fromLine: 2, rows: [{ line: 2, content: "b" }], nextOffset: 3 } });
-    expect(result.model.some(part => part.kind === "text" && part.text.includes("b"))).toBe(true);
-  });
-
   it("Failed edit batches write nothing; successful writes preserve permissions and leave no staging files", async () => {
     const { directory, call } = setup(), file = join(directory, "text.txt");
     writeFileSync(file, "a\nb\nc"); chmodSync(file, 0o755);

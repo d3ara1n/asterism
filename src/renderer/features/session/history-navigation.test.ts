@@ -83,7 +83,7 @@ describe("History navigation contract", () => {
     expect(entries[3].resource?.title).toBe("Beta");
     expect(entries[4].resource?.title).toBe("Alpha");
   });
-  it("keeps incomplete records and separate fork positions when filtering history", () => {
+  it("keeps incomplete records and separate fork positions", () => {
     const nodes = [
       node("1", null, created("a", "A")),
       node("2", "1", thinking("a", "r", 0, "Reasoning")),
@@ -93,7 +93,5 @@ describe("History navigation contract", () => {
       node("6", "1", message("a", "Another branch")),
     ];
     expect(historyEntries(nodes, label).map(entry => entry.node.id)).toEqual(["1", "2", "3", "4", "5", "6"]);
-    const filtered = historyEntries(nodes, label).filter(entry => entry.node.id === "3" || entry.node.id === "5");
-    expect(filtered.map(entry => entry.node.id)).toEqual(["3", "5"]);
   });
 });

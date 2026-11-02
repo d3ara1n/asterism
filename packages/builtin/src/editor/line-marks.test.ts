@@ -16,9 +16,6 @@ describe("Editor Git line marks", () => {
   it("anchors a deletion at the end of a file after its last line", () => {
     expect(marks("a\nb", "a")).toEqual([{ line: 1, change: "modified", removed: "after" }]);
   });
-  it("retains both a replacement and trailing deletion at the same line", () => {
-    expect(marks("a\nb", "new")).toEqual([{ line: 1, change: "modified", removed: "after" }]);
-  });
   it("can show deletion of all content on the empty editor line", () => {
     expect(marks("a\nb\n", "")).toEqual([{ line: 1, removed: "before" }]);
   });

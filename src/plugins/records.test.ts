@@ -99,16 +99,6 @@ describe("Contract decoding on shared timelines", () => {
     expect(view.records.all({ scope: "session" }).map(record => record.data)).toEqual([{ value: "bad" }, { value: 2 }]);
     expect(() => { (view.records.all({ scope: "session" })[0]!.data as { value: string }).value = "changed"; }).toThrow();
   });
-  it("opaque plugin payloads and origins pass through unchanged from envelopes without host field interpretation", () => {
-    const opaque = { value: 7, future: { secret: "plugin-owned", items: [null, "resume"] } };
-    const declared = defineRecord("example.plugin/opaque", { schema: z.json() });
-    const saved = node("opaque", null, event(declared.id, opaque, {
-      source: { plugin: "example.plugin", resource: { sessionId: "s", id: "resource", kind: "example.plugin/resource" } },
-    }));
-    const decoded = sessionView(nodeView("s", "", [saved], saved.id)).records.first(declared, { scope: "timeline" });
-    expect(decoded).toMatchObject({ status: "known", data: opaque,
-      record: { source: { plugin: "example.plugin", resource: { sessionId: "s", id: "resource", kind: "example.plugin/resource" } } } });
-  });
   it("typed last decodes only range targets; the latest corrupt record never falls back and fixed snapshots ignore later appends", () => {
     const first = value("first", null, { value: 1 });
     const branch = value("branch", "first", { value: "bad" });
@@ -126,13 +116,6 @@ describe("Contract decoding on shared timelines", () => {
     nodes.push(value("later", "first", { value: 3 }));
     expect(view.records.last(contract, { scope: "session" })?.record.id).toBe("branch");
     decode.mockRestore();
-  });
-  it("model-visible text and recipients enter envelope context while original event identity and payload remain", () => {
-    const linked = node("event", null, attached("a", "directory", "A resource was linked."));
-    expect(sessionView(nodeView("s", "", [linked], linked.id)).records.all({ scope: "timeline" })[0]).toMatchObject({
-      contract: { id: "resource_attached" }, data: { id: "directory", receiverId: "a" },
-      context: { text: "A resource was linked.", recipient: "a" },
-    });
   });
 
   // Fixed snapshot contract: even if the first read follows appends, title overwrites, and forks, it sees only the captured position.

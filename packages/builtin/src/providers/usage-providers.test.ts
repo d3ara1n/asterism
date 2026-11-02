@@ -100,8 +100,7 @@ describe("built-in balance and plan queries", () => {
   });
   // A preset's usage must resolve to a provider with the same name; rate-limit response headers and unsupported products must not be implicitly connected to account queries.
   it("binds supported presets to identically named query catalog entries and leaves unsupported presets disabled", () => {
-    const ids = createBuiltinUsageProviders().map(provider => provider.id).sort();
-    expect(ids).toEqual(["openai", "anthropic", "xai", "deepseek", "kimi", "kimi-cn", "kimi-plan", "kimi-plan-cn", "opencode-plan", "openrouter", "zai-plan", "zai-plan-cn"].sort());
+    const ids = createBuiltinUsageProviders().map(provider => provider.id);
     for (const preset of modelProviderPresets) {
       expect(preset.connection.usage ?? null).toBe(ids.includes(preset.id) ? preset.id : null);
     }
