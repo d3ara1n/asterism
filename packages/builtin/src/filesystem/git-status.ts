@@ -1,0 +1,60 @@
+import type { z } from "zod";
+import type { DirectoryStatus, gitStatusValue } from "./contract.ts";
+import { git, GitExit, insideWorkTree } from "./git.ts";
+
+type Status = z.infer<typeof gitStatusValue>;
+type Summary = NonNullable<z.infer<typeof DirectoryStatus.output>>;
+
+function classify(x: string, y: string): Status | null {
+  if (x === "?" && y === "?") return "untracked";
+  if (x === "!") return null;
+  if (x === "D" || y === "D") return "deleted";
+  if (x === "R" || y === "R") return "renamed";
+  if (x === "A" || x === "C" || y === "A" || y === "C") return "added";
+  return "modified";
+}
+
+/** Parse `git status --porcelain=v1 -z`; paths are repository-relative and re-rooted at `prefix` (ending in '/' or empty). */
+export function parseStatus(output: string, prefix: string): Array<{ path: string; status: Status }> {
+  const records = output.split("\0");
+  const files: Array<{ path: string; status: Status }> = [];
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i]!;
+    if (record.length < 4) continue;
+    const x = record[0]!, y = record[1]!, path = record.slice(3);
+    // Rename and copy records carry the original path in the following NUL-separated field.
+    if ("RC".includes(x) || "RC".includes(y)) i++;
+    const status = classify(x, y);
+    if (status && path.startsWith(prefix) && path.length > prefix.length) files.push({ path: path.slice(prefix.length), status });
+  }
+  return files;
+}
+
+/** Sum `git diff --numstat -z --no-renames`; binary files report '-' and contribute no lines. */
+export function sumNumstat(output: string): { added: number; removed: number } {
+  let added = 0, removed = 0;
+  for (const record of output.split("\0")) {
+    const [a, r] = record.split("\t");
+    if (r === undefined) continue;
+    if (a !== "-") added += Number(a);
+    if (r !== "-") removed += Number(r);
+  }
+  return { added, removed };
+}
+
+/** Staged and unstaged changes against HEAD within `root`; null when `root` is outside a work tree or git is unavailable. */
+export async function readDirectoryStatus(root: string, signal: AbortSignal): Promise<Summary | null> {
+  if (!await insideWorkTree(root, signal)) return null;
+  const prefix = (await git(root, ["rev-parse", "--show-prefix"], signal)).replace(/\r?\n$/u, "");
+  const head = await git(root, ["rev-parse", "--verify", "--quiet", "HEAD"], signal).then(out => out.trim(), error => {
+    if (error instanceof GitExit && error.exitCode === 1) return null;
+    throw error;
+  });
+  // An unborn branch compares against the empty tree of the repository's object format.
+  const base = head ?? (await git(root, ["hash-object", "-t", "tree", "--stdin"], signal)).trim();
+  const [status, numstat] = await Promise.all([
+    git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=normal", "--", "."], signal),
+    git(root, ["diff", base, "--numstat", "-z", "--no-renames", "--", "."], signal),
+  ]);
+  return { files: parseStatus(status, prefix), ...sumNumstat(numstat) };
+}

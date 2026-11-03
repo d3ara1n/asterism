@@ -7,6 +7,18 @@ import { withinDirectory } from "./paths.ts";
 import { filesystemFailure } from "./errors.ts";
 import { readTextFile } from "./text-io.ts";
 
+/** Entry names hidden from card trees: `.git` (including submodule and worktree .git files) and macOS Finder metadata. */
+const TREE_EXCLUDED = new Set([".git", ".DS_Store"]);
+
+/** One level of a card tree; symbolic links are reported as non-directories and are not followed. */
+export async function readChildren(root: string, path: string, signal: AbortSignal): Promise<{ entries: Array<{ name: string; directory: boolean }> }> {
+  const resolved = await withinDirectory(root, path);
+  signal.throwIfAborted();
+  const entries = await readdir(resolved, { withFileTypes: true });
+  return { entries: entries.filter(entry => !TREE_EXCLUDED.has(entry.name))
+    .map(entry => ({ name: entry.name, directory: entry.isDirectory() })) };
+}
+
 /** Directories and static manuals share the read mechanism; resource implementations provide the root path. */
 export async function listFiles(root: string, target: z.infer<typeof DirectoryList.targetSchema>, signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryList.schema>>> {
   const path = target?.path ?? ".";

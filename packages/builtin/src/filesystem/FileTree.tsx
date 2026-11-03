@@ -1,21 +1,29 @@
-import { Suspense, useEffect, useState, type ComponentType, type CSSProperties } from "react";
+import { Suspense, type ComponentType, type CSSProperties } from "react";
 import { IslandPanel, useI18n, useRendererIsland, useRendererObject } from "@asterism-app/sdk/renderer";
 import type { ResourceRef } from "@asterism-app/sdk/contracts";
-import { FileTree, useFileTree, useFileTreeSearch } from "@pierre/trees/react";
-import type { GitStatus } from "@pierre/trees";
+import { FileTree } from "@pierre/trees/react";
 import { RefreshCw } from "lucide-react";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { cn } from "@asterism-app/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
-import type { TreeLinkState } from "./tree-link";
+import type { TreeState, TreeStore } from "./tree-store";
 
-export function FileTreeRefresh({ loading, reload }: { loading: boolean; reload(): void }) {
+/** Header actions: working-tree line changes against HEAD, when any, and a refresh of loaded directories. */
+export function FileTreeActions({ store, state }: { store: TreeStore; state: TreeState }) {
   const i18n = useI18n();
-  return <IconButton size="icon-xs" label={i18n.text(filesystemMessages.directoryRefresh)} disabled={loading} onClick={reload}>
-    <RefreshCw className={cn(loading && "animate-spin")} />
-  </IconButton>;
+  const busy = state.loading || state.refreshing;
+  return <>
+    {state.changes && <span className="type-caption flex items-center gap-1 tabular-nums">
+      <span className="sr-only">{i18n.formatMessage(filesystemMessages.directoryChanges, state.changes)}</span>
+      <span aria-hidden className="text-success">+{state.changes.added}</span>
+      <span aria-hidden className="text-destructive">−{state.changes.removed}</span>
+    </span>}
+    <IconButton size="icon-xs" label={i18n.text(filesystemMessages.directoryRefresh)} disabled={busy} onClick={() => void store.refresh()}>
+      <RefreshCw className={cn(busy && "animate-spin")} />
+    </IconButton>
+  </>;
 }
 
 /**
@@ -41,18 +49,16 @@ const treeStyle = {
   "--trees-item-row-gap-override": "8px",
 } as CSSProperties;
 
-/** Card body: edge-aligned filter bar + file tree; explanatory text fills empty-directory, no-match, and read-failure states. */
-export function FileTreeBody({ state, FileView }: {
-  state: TreeLinkState;
+/** Card body: edge-aligned filter bar + file tree; explanatory text fills empty-directory, no-match, and root-failure states. */
+export function FileTreeBody({ store, state, FileView }: {
+  store: TreeStore;
+  state: TreeState;
   FileView: ComponentType<{ resource: ResourceRef; path: string }>;
 }) {
   const i18n = useI18n();
   const island = useRendererIsland();
   const object = useRendererObject();
-  const { model } = useFileTree({ paths: [], initialExpansion: "closed", itemHeight: 28, icons: { set: "complete", colored: false } });
-  const search = useFileTreeSearch(model);
-  // The input preserves exactly what the user typed; the model trims and lowercases internally for matching without writing it back to the input.
-  const [query, setQuery] = useState("");
+  const { model } = store;
   const openFile = (path: string, origin: HTMLElement) => {
     if (model.getItem(path)?.isDirectory() !== false) return;
     const resource = object.ref;
@@ -63,23 +69,16 @@ export function FileTreeBody({ state, FileView }: {
       </Suspense>,
     });
   };
-
-  useEffect(() => {
-    if (!state.data) return;
-    model.resetPaths(state.data.paths);
-    model.setGitStatus((state.data.gitStatus ?? []).map(e => ({ path: e.path, status: e.status as GitStatus })));
-  }, [model, state.data]);
-
-  const empty = state.data?.paths.length === 0;
-  const noMatches = !empty && query.trim() !== "" && search.matchingPaths.length === 0;
-  const notice = state.error ?? (empty ? i18n.formatMessage(filesystemMessages.toolDirectoryEmpty)
-    : noMatches ? i18n.formatMessage(filesystemMessages.directoryNoMatches) : null);
+  const notice = state.error ? i18n.text(state.error)
+    : state.empty ? i18n.formatMessage(filesystemMessages.toolDirectoryEmpty)
+    : state.noMatches ? i18n.formatMessage(filesystemMessages.directoryNoMatches) : null;
 
   return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
     <div className="shrink-0 border-b">
-      <SearchInput variant="inline" value={query} onChange={value => { setQuery(value); search.setValue(value === "" ? null : value); }}
+      <SearchInput variant="inline" value={state.query} onChange={value => store.setFilter(value)}
         label={i18n.formatMessage(filesystemMessages.directorySearch)} />
     </div>
+    {state.failure && !state.error && <p className="type-caption shrink-0 px-2 pt-1 text-destructive">{i18n.text(state.failure)}</p>}
     <div className="relative min-h-0 flex-1 pt-1">
       <div className={cn("h-full", notice && "invisible")}><FileTree model={model} style={treeStyle}
         onClick={event => {

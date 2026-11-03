@@ -78,12 +78,21 @@ export const DirectorySee = defineImplementation({
   effect: "read", execution: "parallel",
 });
 
-export const DirectoryTree = defineCall(builtin.name("directory.tree"), {
-  scope: "object",
-  input: z.strictObject({}),
+/** Card browsing reads one directory level at a time; `path` is relative to the resource root with '.' for the root. */
+export const treeChildrenInput = z.strictObject({ path: z.string().min(1).max(4096) });
+export const treeChildrenOutput = z.strictObject({
+  entries: z.array(z.strictObject({ name: z.string(), directory: z.boolean() })),
+});
+export const DirectoryChildren = defineCall(builtin.name("directory.children"), {
+  scope: "object", input: treeChildrenInput, output: treeChildrenOutput,
+});
+export const gitStatusValue = z.enum(["added", "deleted", "modified", "renamed", "untracked"]);
+/** Git state within the resource root; null outside a repository. Paths are root-relative, untracked directories end in '/'. */
+export const DirectoryStatus = defineCall(builtin.name("directory.status"), {
+  scope: "object", input: z.strictObject({}),
   output: z.strictObject({
-    paths: z.array(z.string()),
-    gitStatus: z.array(z.strictObject({ path: z.string(), status: z.string() })),
-    hasGit: z.boolean(),
-  }),
+    files: z.array(z.strictObject({ path: z.string(), status: gitStatusValue })),
+    added: z.number().int().nonnegative(),
+    removed: z.number().int().nonnegative(),
+  }).nullable(),
 });

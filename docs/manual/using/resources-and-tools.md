@@ -40,6 +40,14 @@ Directory and note reads include edit anchors by default. Select a line range wi
 
 Use `grep` to locate a pattern in a note's current body or in directory and manual files. Its arguments select the pattern, literal or regular-expression matching, case and word matching, surrounding context, and result limit. Directory and manual targets additionally select file globs, hidden and ignore-file filtering, and the output view: matching content, matching paths, or matching-line counts per file.
 
+## Browse a directory
+
+A Directory card shows the directory as a file tree. Each directory is read when it is first expanded, so the card's cost follows what is open, not the size of the directory. `.git` and `.DS_Store` entries are hidden. Refresh re-reads every directory read so far and keeps expansion, selection, and scroll position; directories that no longer exist drop out. The tree does not watch the filesystem, so changes made elsewhere appear after Refresh.
+
+The filter field hides loaded paths that do not contain the text, ignoring case, while keeping the folders that lead to a match. A matching folder keeps its loaded contents visible. Filtering reads nothing new: a directory expanded while filtering is read normally and then filtered.
+
+In a Git working tree, rows show their Git state and the card header shows the staged and unstaged line changes against HEAD within the directory, such as `+114 −514`. Untracked files and binary files add no lines. The header shows nothing when there are no changes, the directory is outside Git, or Git is not installed. Git state is read with the tree and on Refresh. A failed subdirectory or Git read is reported above the tree and leaves the rest of the tree in place.
+
 ## Open a directory file
 
 Click a file in a Directory card's tree, or focus the file and press Enter, to open it on the workbench's right. This also works when the Directory card is focused on the left. PNG, JPEG, GIF, and WebP files open in an image viewer with fit-to-window, original-size, and zoom controls. Other files open in the text editor when they contain supported UTF-8 text.
@@ -56,7 +64,7 @@ In a Git working tree, gutter marks compare the editing buffer with HEAD: green 
 
 Add a Manual resource and link it to an agent, or let the agent create one through the resource creation tools. Creation takes no parameters. The resource provides access to application guides, public-package development material, and documentation directories declared by loaded plugins.
 
-The card displays a file tree grouped by source. Expand directories, filter paths with the search field, and use Refresh to reload the tree. Click a file, or focus it and press Enter, to open a read-only view on the workbench's right. Text supports selection, copying, syntax highlighting, and search with **Cmd+F / Ctrl+F**. Supported images open in the image viewer. Manual views have no editing or saving controls; files are read when opened.
+The card displays a file tree grouped by source and reads each directory when it is first expanded. Filter loaded paths with the filter field, and use Refresh to re-read the directories opened so far. Click a file, or focus it and press Enter, to open a read-only view on the workbench's right. Text supports selection, copying, syntax highlighting, and search with **Cmd+F / Ctrl+F**. Supported images open in the image viewer. Manual views have no editing or saving controls; files are read when opened.
 
 The agent can list a directory, find files by path pattern, search their contents, and read selected lines. Root entries identify sources: `app`, `sdk`, `builtin-api`, and, when available, `plugins`. Searches at the root cover all sources; a narrower target selects one source or subdirectory. Search globs apply within each selected source directory, and returned paths include their source prefix.
 

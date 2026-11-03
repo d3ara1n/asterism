@@ -1,12 +1,12 @@
 import { directoryCard } from "../shared/card-appearance.ts";
 import { createReadStream } from "node:fs";
 import { z } from "zod";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
-import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { TextError, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
-import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryTree } from "./contract.ts";
+import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryStatus } from "./contract.ts";
 import { saveFileContent } from "./save.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { readImageFile } from "./image-io.ts";
@@ -16,9 +16,10 @@ import { readTextFile, commitTextFile, validateTextSize } from "./text-io.ts";
 import { DirectoryExec } from "./exec-contract.ts";
 import { execToModel } from "../shell/contract.ts";
 import type { ShellExecution } from "@asterism-app/sdk/runtime";
-import { simpleGit } from "simple-git";
 import { searchTools } from "./search.ts";
-import { listFiles, readFileContent } from "./read.ts";
+import { listFiles, readFileContent, readChildren } from "./read.ts";
+import { readDirectoryStatus } from "./git-status.ts";
+import { fileFailure } from "./file-io.ts";
 import { editorCalls } from "./editor-runtime.ts";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
@@ -26,44 +27,10 @@ function textFailure(error: unknown, signal: AbortSignal, operation: string): Ca
   return error instanceof TextError ? error.outcome() : filesystemFailure(error, operation);
 }
 
-/** Entry names excluded from the directory tree at every depth: `.git` (including submodule and worktree .git files) and macOS Finder metadata `.DS_Store`. */
-const TREE_EXCLUDED = new Set([".git", ".DS_Store"]);
-
-/** Recursively reads directory-tree paths; directory paths end in '/'. Maximum depth is 5. */
-async function readTreePaths(rootPath: string, relPath: string, depth: number, signal: AbortSignal): Promise<string[]> {
-  if (depth > 5) return [];
-  signal.throwIfAborted();
-  const absPath = relPath === "." ? rootPath : join(rootPath, ...relPath.split("/"));
-  let entries: import("node:fs").Dirent[];
-  try { entries = await readdir(absPath, { withFileTypes: true }); }
-  catch { return []; }
-  const paths: string[] = [];
-  for (const entry of entries) {
-    signal.throwIfAborted();
-    if (TREE_EXCLUDED.has(entry.name)) continue;
-    const rel = relPath === "." ? entry.name : `${relPath}/${entry.name}`;
-    if (entry.isDirectory()) {
-      paths.push(`${rel}/`);
-      paths.push(...await readTreePaths(rootPath, rel, depth + 1, signal));
-    } else paths.push(rel);
-  }
-  return paths;
-}
-
-/** Reads git status and maps it to the pierre trees GitStatusEntry format. Returns an empty result outside git repositories. */
-async function readGitStatus(rootPath: string): Promise<{ entries: Array<{ path: string; status: string }>; hasGit: boolean }> {
-  const git = simpleGit(rootPath);
-  const hasGit = await git.checkIsRepo().catch(() => false);
-  if (!hasGit) return { entries: [], hasGit: false };
-  const status = await git.status();
-  const entries: Array<{ path: string; status: string }> = [
-    ...status.modified.map(path => ({ path, status: "modified" })),
-    ...status.not_added.map(path => ({ path, status: "untracked" })),
-    ...status.created.map(path => ({ path, status: "added" })),
-    ...status.deleted.map(path => ({ path, status: "deleted" })),
-    ...status.renamed.map(({ to }) => ({ path: to, status: "renamed" })),
-  ];
-  return { entries, hasGit: true };
+function rootOf(object: ObjectReader): string {
+  const snapshot = object.snapshot();
+  if (!snapshot) throw new PluginApiError("unavailable", "The directory is not available on this session path.");
+  return Directory.stateSchema.parse(snapshot.data).path;
 }
 
 export function createFilesystemModule(shell: ShellExecution) { return defineModule(plugin => ({
@@ -210,21 +177,10 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
   calls: [
     ...editorCalls,
     implementCall(ReadDirectoryDefaults, async () => ({ path: homedir() })),
-    implementCall(DirectoryTree, async (_input, { object, signal }) => {
-      const snapshot = object.snapshot();
-      if (!snapshot) throw new PluginApiError("unavailable", "The directory is not available on this session path.");
-      const rootPath = Directory.stateSchema.parse(snapshot.data).path;
-      signal.throwIfAborted();
-      const [pathsResult, gitResult] = await Promise.allSettled([
-        readTreePaths(rootPath, ".", 0, signal),
-        readGitStatus(rootPath),
-      ]);
-      signal.throwIfAborted();
-      return {
-        paths: pathsResult.status === "fulfilled" ? pathsResult.value : [],
-        gitStatus: gitResult.status === "fulfilled" ? gitResult.value.entries : [],
-        hasGit: gitResult.status === "fulfilled" ? gitResult.value.hasGit : false,
-      };
+    implementCall(DirectoryChildren, async ({ path }, { object, signal }) => {
+      try { return await readChildren(rootOf(object), path, signal); }
+      catch (error) { signal.throwIfAborted(); return fileFailure(error); }
     }),
+    implementCall(DirectoryStatus, async (_input, { object, signal }) => readDirectoryStatus(rootOf(object), signal)),
   ],
 })); }

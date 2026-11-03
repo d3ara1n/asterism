@@ -9,13 +9,13 @@ import { textMessages } from "../messages/text";
 import { prepareCodeView } from "../shared/code-view";
 import { textReadViews, textWriteViews, textEditViews, textReplaceViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
-import { Directory, CreateDirectory, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee } from "./contract";
+import { Directory, CreateDirectory, DirectoryView, DirectoryChildren, DirectoryStatus, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee } from "./contract";
 import { FilePreview } from "../shared/attachments";
 import { mediaMessages } from "../messages/media";
 import { DirectoryInput } from "./creation";
 import { execToolRenderer } from "./exec-view";
-import { useDirectoryTreeLink } from "./tree-link";
-import { FileTreeBody, FileTreeRefresh } from "./FileTree";
+import { useTreeStore } from "./tree-store";
+import { FileTreeBody, FileTreeActions } from "./FileTree";
 import { searchToolRenderers } from "./search-view";
 import { listViews } from "./list-view";
 
@@ -35,14 +35,19 @@ function SeeBody({ result }: SeeProps) {
 }
 const seeView = { headerRenderer: SeeHeader, bodyRenderer: SeeBody };
 
+const useDirectoryTree = () => useTreeStore("asterism.builtin/directory-tree", (calls, ref) => ({
+  children: (path, signal) => calls.invoke(DirectoryChildren, { path }, { object: ref, signal }),
+  status: signal => calls.invoke(DirectoryStatus, {}, { object: ref, signal }),
+}));
+
 function DirectoryTreeActions() {
-  const { link, state } = useDirectoryTreeLink();
-  return <FileTreeRefresh loading={state.loading} reload={() => link.reload()} />;
+  const { store, state } = useDirectoryTree();
+  return <FileTreeActions store={store} state={state} />;
 }
 
 function DirectoryTreeBody() {
-  const { state } = useDirectoryTreeLink();
-  return <FileTreeBody state={state} FileView={DirectoryFile} />;
+  const { store, state } = useDirectoryTree();
+  return <FileTreeBody store={store} state={state} FileView={DirectoryFile} />;
 }
 
 export default {

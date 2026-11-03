@@ -1,7 +1,7 @@
 import { lazy } from "react";
 import { BookOpen, FileSearch, ListTree, Search } from "lucide-react";
 import { cardRenderer, creationEntry, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
-import { Manual, CreateManual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep, ManualTree } from "./contract";
+import { Manual, CreateManual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep, ManualChildren } from "./contract";
 import { manualMessages as messages } from "../messages/manual";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
@@ -10,20 +10,22 @@ import { prepareCodeView } from "../shared/code-view";
 import { textReadViews } from "../text-view";
 import { listViews } from "../filesystem/list-view";
 import { findViews, grepViews } from "../filesystem/search-view";
-import { FileTreeBody, FileTreeRefresh } from "../filesystem/FileTree";
-import { createTreeLink } from "../filesystem/tree-link";
+import { FileTreeBody, FileTreeActions } from "../filesystem/FileTree";
+import { useTreeStore } from "../filesystem/tree-store";
 
 const ManualFile = lazy(() => import("./ManualFile"));
-const useManualTreeLink = createTreeLink((calls, ref, signal) => calls.invoke(ManualTree, {}, { object: ref, signal }));
+const useManualTree = () => useTreeStore("asterism.builtin/manual-tree", (calls, ref) => ({
+  children: (path, signal) => calls.invoke(ManualChildren, { path }, { object: ref, signal }),
+}));
 
 function ManualBody() {
-  const { state } = useManualTreeLink();
-  return <FileTreeBody state={state} FileView={ManualFile} />;
+  const { store, state } = useManualTree();
+  return <FileTreeBody store={store} state={state} FileView={ManualFile} />;
 }
 
 function ManualActions() {
-  const { link, state } = useManualTreeLink();
-  return <FileTreeRefresh loading={state.loading} reload={() => link.reload()} />;
+  const { store, state } = useManualTree();
+  return <FileTreeActions store={store} state={state} />;
 }
 
 export default {

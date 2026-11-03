@@ -13,6 +13,18 @@ export const filesystemMessages = pluginNamespace("asterism.builtin").messages("
     id: "directoryNoMatches",
     defaultMessage: "No matching files.",
   },
+  directoryReadFailed: {
+    id: "directoryReadFailed",
+    defaultMessage: "The directory could not be read.",
+  },
+  directoryStatusFailed: {
+    id: "directoryStatusFailed",
+    defaultMessage: "Git status could not be read.",
+  },
+  directoryChanges: {
+    id: "directoryChanges",
+    defaultMessage: "{added, plural, one {# line added} other {# lines added}}, {removed, plural, one {# line removed} other {# lines removed}}",
+  },
   directoryBrowseFailed: {
     id: "directoryBrowseFailed",
     defaultMessage: "The directory picker could not be opened. Try again or enter a path.",

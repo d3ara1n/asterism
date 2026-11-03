@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
-import { readManualFile, readManualTree } from "./browser.ts";
+import { readManualFile, readManualChildren } from "./browser.ts";
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -18,7 +18,7 @@ function fixture() {
   return { sources, signal: new AbortController().signal };
 }
 
-it("keeps source prefixes and empty folders in the tree without following directory symlinks", async () => {
+it("lists virtual prefixes and one physical level without metadata or following directory symlinks", async () => {
   const { sources, signal } = fixture();
   mkdirSync(join(sources[0].directory, "empty"));
   mkdirSync(join(sources[0].directory, "guides"));
@@ -27,14 +27,16 @@ it("keeps source prefixes and empty folders in the tree without following direct
   writeFileSync(join(sources[0].directory, ".DS_Store"), "metadata");
   writeFileSync(join(sources[0].directory, "guides", "usage.md"), "Guide");
   symlinkSync(sources[0].directory, join(sources[0].directory, "loop"), "junction");
-  expect((await readManualTree(sources, signal)).paths.sort()).toEqual([
-    "plugins/example.first/docs/",
-    "plugins/example.first/docs/empty/",
-    "plugins/example.first/docs/guides/",
-    "plugins/example.first/docs/guides/usage.md",
-    "plugins/example.first/docs/loop",
-    "plugins/example.second/docs/",
+  expect(await readManualChildren(sources, ".", signal)).toEqual({ entries: [{ name: "plugins", directory: true }] });
+  expect(await readManualChildren(sources, "plugins", signal)).toEqual({ entries: [
+    { name: "example.first", directory: true }, { name: "example.second", directory: true },
+  ] });
+  const docs = await readManualChildren(sources, "plugins/example.first/docs", signal);
+  expect(docs.entries.sort((a, b) => a.name.localeCompare(b.name))).toEqual([
+    { name: "empty", directory: true }, { name: "guides", directory: true }, { name: "loop", directory: false },
   ]);
+  expect(await readManualChildren(sources, "plugins/example.first/docs/guides", signal))
+    .toEqual({ entries: [{ name: "usage.md", directory: false }] });
 });
 
 it("opens complete current text from the selected source without model read excerpts or line limits", async () => {
@@ -52,5 +54,6 @@ it("opens complete current text from the selected source without model read exce
 it("reports an unavailable source instead of presenting an empty tree", async () => {
   const { sources, signal } = fixture();
   rmSync(sources[1].directory, { recursive: true });
-  await expect(readManualTree(sources, signal)).rejects.toMatchObject({ code: "ENOENT" });
+  await expect(readManualChildren(sources, "plugins/example.second/docs", signal))
+    .rejects.toMatchObject({ outcome: { error: { code: "resource_not_found" } } });
 });
