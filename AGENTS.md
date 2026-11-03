@@ -24,6 +24,8 @@ Keep fixed application identity, data layout, and internal channel identities ce
 
 Current example resources validate foundations and do not define the final product catalog. Workbench cards and auxiliary surfaces reuse the shared object and island presentation. Overall visual changes require user confirmation.
 
+Interface copy states only what visuals cannot. Encode state with bars, rings, icons, tones, and labeled values rather than explanatory sentences. Omit text that restates the domain's inherent semantics, describes implementation, or reassures the user; mark exceptional states with a short label. Explanations for developers belong in code comments.
+
 Reuse maintained libraries for general controls, animation, layout, drag, and virtualization. Confirm new dependencies separately with rationale and alternatives. For a missing shadcn control, check the registry and use `npx shadcn@latest add <name>`; official controls do not count as new dependencies.
 
 ### Vendored shadcn components
