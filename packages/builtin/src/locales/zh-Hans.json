@@ -245,6 +245,8 @@
   "agent_conversation_compressionCancelled": "已取消上下文压缩",
   "agent_conversation_executionProcess": "执行过程",
   "agent_conversation_processToolCount": "{count} 次工具调用",
+  "agent_conversation_processFailedCount": "{count} 个失败",
+  "agent_conversation_processPartialCount": "{count} 个部分完成",
   "agent_conversation_outline": "对话大纲",
   "agent_conversation_outlinePosition": "第 {current} 条输入，共 {total} 条",
   "agent_conversation_outlineSearch": "搜索输入",

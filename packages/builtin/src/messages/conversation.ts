@@ -10,6 +10,8 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
   compressionFailed: { id: "agent_conversation_compressionFailed", defaultMessage: "Context compaction failed" },
   compressionCancelled: { id: "agent_conversation_compressionCancelled", defaultMessage: "Context compaction cancelled" },
   processToolCount: { id: "agent_conversation_processToolCount", defaultMessage: "{count, plural, one {# tool call} other {# tool calls}}" },
+  processFailedCount: { id: "agent_conversation_processFailedCount", defaultMessage: "{count} failed" },
+  processPartialCount: { id: "agent_conversation_processPartialCount", defaultMessage: "{count} partial" },
   drafts: { id: "agent_drafts_title", defaultMessage: "Drafts" },
   draftMoreActions: { id: "agent_drafts_moreActions", defaultMessage: "More actions" },
   saveDraft: { id: "agent_drafts_save", defaultMessage: "Save draft" },

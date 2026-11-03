@@ -32,7 +32,7 @@ describe("Execution process folding for settled turns", () => {
     expect(ids(grouped)).toEqual(["u", "turn-process:u", "part1", "part2", "turn-metrics:u"]);
     expect(ids(grouped, [...grouped.processIds]))
       .toEqual(["u", "progress", "tool", "thinking", "turn-process:u", "part1", "part2", "turn-metrics:u"]);
-    expect(grouped.items.find(item => item.kind === "turn-process")).toMatchObject({ toolCount: 1, incomplete: false });
+    expect(grouped.items.find(item => item.kind === "turn-process")).toMatchObject({ tools: [{ name: "read" }], incomplete: false });
     expect(grouped.owners.get(JSON.stringify(["work", 1]))).toBe("turn-process:u");
     expect(grouped.owners.has(JSON.stringify(["final", 1]))).toBe(false);
   });

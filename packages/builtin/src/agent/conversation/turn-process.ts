@@ -28,7 +28,7 @@ export function groupTurnProcesses(items: readonly TimelineItem[], running: bool
     const body: TimelineItem[] = [];
     let lastProcess = -1;
     let finalPosition = -1;
-    let toolCount = 0;
+    const tools: Extract<TimelineItem, { kind: "toolcall" }>[] = [];
     for (const entry of pending) {
       if (entry.kind === "turn-metrics") continue;
       if (entry.kind === "text" && entry.responseId === footer?.finalResponseId) {
@@ -40,7 +40,7 @@ export function groupTurnProcesses(items: readonly TimelineItem[], running: bool
       if (entry.kind === "text" || entry.kind === "thinking" || entry.kind === "toolcall") {
         owners.set(timelineKey(entry), id);
         lastProcess = body.length - 1;
-        if (entry.kind === "toolcall") toolCount++;
+        if (entry.kind === "toolcall") tools.push(entry);
       }
     }
     // Compression can follow the final reply; body text stays on its original side of the marker, and compression markers remain independently visible.
@@ -48,7 +48,7 @@ export function groupTurnProcesses(items: readonly TimelineItem[], running: bool
     if (final.length) body.splice(Math.max(finalPosition, lastProcess + 1), 0, ...final);
     if (lastProcess >= 0) {
       processIds.add(id);
-      body.splice(lastProcess + 1, 0, { kind: "turn-process", id, toolCount, incomplete: footer?.incomplete ?? true, open: false });
+      body.splice(lastProcess + 1, 0, { kind: "turn-process", id, tools, incomplete: footer?.incomplete ?? true, open: false });
     }
     result.push(...body, ...(footer ? [footer] : []));
     pending = [];
