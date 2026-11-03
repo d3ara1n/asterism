@@ -58,7 +58,7 @@ Choose **Save** or press **Cmd+S** on macOS or **Ctrl+S** on Windows and Linux. 
 
 Opening another file replaces the editor. Unsaved changes require confirmation before discarding them when switching files, closing, changing sessions, quitting, or reloading the window. Save failures keep the editing buffer available for retry. Files are read when opened; changes made by an agent or another application do not automatically reload the buffer. A later save replaces the file's current text.
 
-In a Git working tree, gutter marks compare the editing buffer with HEAD: green marks show additions, the accent color shows modifications, and small red markers locate deleted lines. Saving retains uncommitted marks. The baseline is read when the editor opens and after saving; external Git operations do not automatically refresh it. Untracked files show additions. Ignored files and files outside Git have no marks. A Git read failure leaves editing available and is indicated in the status bar.
+In a Git working tree, gutter marks compare the editing buffer with HEAD: green marks show additions, the accent color shows modifications, and small red markers locate deleted lines. Saving retains uncommitted marks. The baseline is read when the editor opens and after saving; external Git operations do not automatically refresh it. Untracked files show additions. Ignored files, files outside Git, and files opened without an installed Git have no marks. A Git read failure leaves editing available and is indicated in the status bar.
 
 ## Consult the manual
 
