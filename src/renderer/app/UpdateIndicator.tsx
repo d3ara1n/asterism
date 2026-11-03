@@ -36,7 +36,7 @@ export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
                   {status === "downloading" ? <ProgressRing value={state.progress > 0 ? state.progress / 100 : "indeterminate"} className="text-primary-text" />
                     : status === "checking" || status === "restarting" ? <StatusIcon tone="progress" className="size-4" />
-                    : status === "ready" ? <CircleArrowUp className="size-4 text-primary-text" />
+                    : status === "ready" ? <CircleArrowUp className="size-4 text-success" />
                     : <StatusIcon tone={status === "error" ? "error" : "neutral"} className="size-4" />}
                 </motion.span>
               </AnimatePresence>
