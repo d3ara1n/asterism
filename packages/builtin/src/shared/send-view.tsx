@@ -14,7 +14,8 @@ function Header({ invocation, result, phase, target }: Props) {
   return <ToolHeader label={i18n.text(messages.title)} subject={messageTarget(target) ?? invocation.resource?.title}
     meta={phase === "settled" && result.kind === "succeeded" ? i18n.text(messages.accepted) : undefined} />;
 }
-function partsOf(args: Json) {
+/** Message parts of send input; display-only, so unfinished input yields the parts it already has. */
+export function partsOf(args: Json): Json[] {
   const parts = inputField(args, "parts");
   if (Array.isArray(parts)) return parts;
   // Historical calls retain the original text-only argument.

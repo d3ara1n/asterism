@@ -61,9 +61,11 @@ function usePartImage(part: InputFile, content: ContentReader): Preview | undefi
 function partKey(part: InputFile, index: number) {
   return `${part.kind === "file" ? part.file["$asterism.content"] : JSON.stringify(part.ref)}:${index}`;
 }
+export function formatFileSize(i18n: I18n, size: number) {
+  return i18n.formatNumber(size, { style: "unit", unit: "byte", notation: "compact", maximumFractionDigits: 1 });
+}
 function fileDetails(i18n: I18n, part: InputFile) {
-  return [part.mediaType, part.size === undefined ? undefined
-    : i18n.formatNumber(part.size, { style: "unit", unit: "byte", notation: "compact", maximumFractionDigits: 1 })].filter(Boolean).join(" · ");
+  return [part.mediaType, part.size === undefined ? undefined : formatFileSize(i18n, part.size)].filter(Boolean).join(" · ");
 }
 function FileTypeIcon({ mediaType }: { mediaType?: string }) {
   const type = mediaType ?? "";

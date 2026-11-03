@@ -1,18 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
-import { ArrowLeft, Bell, BellOff, CornerUpLeft, Eye, Hash, List, Megaphone, MessageSquare, RefreshCw, Send, Settings, User, Users, X,
-  type LucideIcon } from "lucide-react";
-import { cardRenderer, creationEntry, recordRenderer, toolRenderer, useI18n, useRendererCalls, useRendererObject, useRendererSettings,
-  type CreationInputProps, type I18n, type RendererModule, type RendererReceipt, type ContentReader, type ToolRenderProps } from "@asterism-app/sdk/renderer";
-import { messagingText, type MessagingConversation, type MessagingConnectionInfo, type MessagingConnectionStatus, type MessagingMessage } from "@asterism-app/sdk/contracts";
-import { FilePreview, MessageAttachments, type InputFile } from "../shared/attachments";
+import { ArrowLeft, Bell, BellOff, CornerUpLeft, Hash, List, MessageSquare, RefreshCw, Send, Settings, X } from "lucide-react";
+import { cardRenderer, creationEntry, recordRenderer, useI18n, useRendererCalls, useRendererObject, useRendererSettings,
+  type CreationInputProps, type I18n, type RendererModule, type RendererReceipt } from "@asterism-app/sdk/renderer";
+import { messagingText, type MessagingConversation, type MessagingConnectionInfo, type MessagingMessage } from "@asterism-app/sdk/contracts";
+import { MessageAttachments } from "../shared/attachments";
 import { Message, MessageContent, MessageHeader } from "@asterism-app/ui/ui/message";
 import { Bubble, BubbleContent } from "@asterism-app/ui/ui/bubble";
 import { Marker, MarkerContent } from "@asterism-app/ui/ui/marker";
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport,
   useMessageScroller } from "@asterism-app/ui/ui/message-scroller";
-import { mediaMessages } from "../messages/media";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Toggle } from "@asterism-app/ui/ui/toggle";
@@ -22,7 +20,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, 
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "@asterism-app/ui/ui/empty";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
-import { StatusIcon, StatusText, type StatusTone } from "@asterism-app/ui/ui/status";
+import { StatusIcon, StatusText } from "@asterism-app/ui/ui/status";
 import { ChoiceField, TextField } from "@asterism-app/ui/configuration-forms";
 import { cn } from "@asterism-app/ui/utils";
 import { CreationForm } from "../shared/creation-form";
@@ -30,25 +28,15 @@ import { conversationsCard, chatCard } from "../shared/card-appearance";
 import { messagingMessages as messages } from "../messages/messaging";
 import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema, ConversationsView, ChatView,
   BrowseConversations, ReadChat, SendChat, ChatMessageSent, ConfigureSubscription, SubscriptionChanged,
-  ConversationsList, ConversationsSubscribe, ChatRead, ChatSend, ChatSee, type SubscriptionTarget, type ViewConnection, type ChatMessage } from "./contract";
+  type SubscriptionTarget, type ViewConnection, type ChatMessage } from "./contract";
 import { subscriptionKey } from "./subscriptions";
-import { groupTimeline, relativeUnit } from "./timeline";
+import { groupTimeline } from "./timeline";
+import { chatFiles, chatTexts, kindIcon, relativeTime, statusLabel, statusTone } from "./presentation";
+import { messagingToolRenderers } from "./tool-views";
 
-const statusTone: Record<MessagingConnectionStatus, StatusTone> = {
-  connected: "success", connecting: "progress", reconnecting: "warning", failed: "error", disabled: "neutral", unavailable: "neutral",
-};
-const statusLabel = {
-  connected: messages.connected, connecting: messages.connecting, reconnecting: messages.reconnecting,
-  failed: messages.disconnected, disabled: messages.disabled, unavailable: messages.unavailable,
-} satisfies Record<MessagingConnectionStatus, unknown>;
-const kindIcon: Record<string, LucideIcon> = { private: User, group: Users, supergroup: Users, channel: Megaphone };
 const addressTarget = (connectionId: string, address: { conversationId: string; threadId?: string }): SubscriptionTarget =>
   ({ connectionId, conversationId: address.conversationId, ...(address.threadId ? { threadId: address.threadId } : {}) });
 
-function relativeTime(i18n: I18n, iso: string) {
-  const { value, unit } = relativeUnit(Date.parse(iso), Date.now());
-  return new Intl.RelativeTimeFormat(i18n.locale, { numeric: "auto", style: "short" }).format(value, unit);
-}
 function receiptError(i18n: I18n, receipt: RendererReceipt) {
   return receipt.ok ? null : receipt.error.display ? i18n.text(receipt.error.display) : receipt.error.message;
 }
@@ -216,37 +204,6 @@ function ConnectionConversations({ connection, back, notify, error }: {
 }
 
 /* ---------- Chat: message timeline and composer ---------- */
-
-function chatFiles(message: ChatMessage): InputFile[] {
-  return message.parts.flatMap(part => part.kind === "file" ? [{ kind: "file-reference" as const, ref: part.ref, mediaType: part.mediaType,
-    ...(part.filename ? { filename: part.filename } : {}), ...(part.size === undefined ? {} : { size: part.size }) }] : []);
-}
-function chatTexts(message: ChatMessage): string[] {
-  return message.parts.flatMap(part => part.kind === "text" && part.text ? [part.text] : []);
-}
-/** Tool results show a message without a bubble: attachments first, then its text. */
-function MessageBody({ message, content }: { message: ChatMessage; content: ContentReader }) {
-  return <div className="flex min-w-0 flex-col gap-1.5">
-    <MessageAttachments parts={chatFiles(message)} content={content} />
-    {chatTexts(message).map((text, index) => <p key={index} className="type-body whitespace-pre-wrap wrap-anywhere">{text}</p>)}
-  </div>;
-}
-function MessagesResult({ result }: ToolRenderProps<z.infer<typeof ChatRead.schema>>) {
-  const object = useRendererObject(), i18n = useI18n();
-  return <div className="flex flex-col gap-3">{result?.data?.messages.map(message => <div key={message.id} className="flex flex-col gap-1">
-    <span className="type-caption text-muted-foreground">{message.sender.name} · {i18n.formatDate(Date.parse(message.sentAt), { dateStyle: "medium", timeStyle: "short" })}</span>
-    <MessageBody message={message} content={object.content} />
-  </div>)}</div>;
-}
-function SentResult({ result }: ToolRenderProps<z.infer<typeof ChatSend.schema>>) {
-  const object = useRendererObject();
-  return result?.data ? <MessageBody message={result.data} content={object.content} /> : null;
-}
-function SeenResult({ result }: ToolRenderProps<z.infer<typeof ChatSee.schema>>) {
-  const object = useRendererObject(), image = result?.data;
-  return image ? <FilePreview content={object.content} part={{ kind: "file", file: image.file, ref: image.ref,
-    mediaType: image.mediaType, size: image.size, ...(image.filename ? { filename: image.filename } : {}) }} /> : null;
-}
 
 type ChatEntry = { kind: "day"; key: string; sentAt: string } | { kind: "system"; message: ChatMessage } | { kind: "message"; message: ChatMessage; first: boolean };
 /** Timeline rows in display order: a day marker opens each local day, and the first message of a sender group carries its name. */
@@ -522,11 +479,5 @@ export default {
     label: data => ({ ...(data.enabled ? messages.notificationOn : messages.notificationOff),
       values: { target: data.title ?? data.target.conversationId ?? data.target.connectionId } }),
   })],
-  tools: [
-    toolRenderer(ConversationsList, { label: messages.conversations, icon: <List className="size-4" /> }),
-    toolRenderer(ConversationsSubscribe, { label: messages.notification, icon: <Bell className="size-4" /> }),
-    toolRenderer(ChatRead, { label: messages.read, icon: <MessageSquare className="size-4" />, result: { bodyRenderer: MessagesResult } }),
-    toolRenderer(ChatSee, { label: mediaMessages.preview, icon: <Eye />, result: { bodyRenderer: SeenResult } }),
-    toolRenderer(ChatSend, { label: messages.send, icon: <Send className="size-4" />, result: { bodyRenderer: SentResult } }),
-  ],
+  tools: messagingToolRenderers,
 } satisfies RendererModule;

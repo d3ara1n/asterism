@@ -761,5 +761,20 @@
   "messaging.reconnecting": "重新连接中",
   "messaging.disconnected": "连接失败",
   "messaging.disabled": "已停用",
-  "messaging.unavailable": "不可用"
+  "messaging.unavailable": "不可用",
+  "messaging.connectionCount": "{count}{truncated, select, true {+} other {}} 个连接",
+  "messaging.conversationCount": "{count}{truncated, select, true {+} other {}} 个对话",
+  "messaging.messageCount": "{count}{truncated, select, true {+} other {}} 条消息",
+  "messaging.changes": "变化",
+  "messaging.newConversation": "新对话",
+  "messaging.newMessages": "新消息",
+  "messaging.noChanges": "没有变化。",
+  "messaging.noConversations": "暂无对话。",
+  "messaging.noNewMessages": "没有新消息。",
+  "messaging.truncated": "结果已截断。",
+  "messaging.omitted": "另有 {count} 项未显示。",
+  "messaging.sent": "已发送",
+  "messaging.replyToId": "回复 {id}",
+  "messaging.on": "已开启",
+  "messaging.off": "已关闭"
 }
