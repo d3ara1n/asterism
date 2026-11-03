@@ -276,7 +276,7 @@ describe("Real configuration and consumption boundaries", () => {
     const result = await service.execute({ type: "model.parameters", modelId: "route/test-model" });
     expect(result.parameterUpdate).toEqual({
       parameters: { contextWindow: 128000, capabilities: { reasoning: true, tools: false }, generation: { maxOutputTokens: 16000 } },
-      source: "lab/test-model", unfilled: ["thinkingLevels", "cost"],
+      model: { id: "lab/test-model", name: "Test", inputModalities: [] }, unfilled: ["thinkingLevels", "cost"],
     });
     expect(result.savedId).toBeNull();
     expect(service.current()).toEqual(initial);

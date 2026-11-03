@@ -134,10 +134,19 @@ export function applyModelParameters(draft: ProviderModel, parameters: ModelPara
     generation: { ...draft.generation, ...parameters.generation },
   };
 }
+export const modelParameterFields = ["contextWindow", "maxOutputTokens", "reasoning", "tools", "thinkingLevels", "cost"] as const;
+export type ModelParameterField = typeof modelParameterFields[number];
+export const catalogInputModalities = ["text", "image", "audio", "video", "pdf"] as const;
+/** The catalog model whose parameters were applied, identified by its catalog ID rather than the user's server model ID. */
+export const catalogModelInfoSchema = z.strictObject({
+  id: z.string(), name: z.string(), releaseDate: z.string().optional(),
+  inputModalities: z.array(z.enum(catalogInputModalities)), openWeights: z.boolean().optional(),
+});
+export type CatalogModelInfo = z.infer<typeof catalogModelInfoSchema>;
 export const modelParameterUpdateSchema = z.strictObject({
   parameters: modelParametersSchema,
-  source: z.string(),
-  unfilled: z.array(z.enum(["contextWindow", "maxOutputTokens", "reasoning", "tools", "thinkingLevels", "cost"])),
+  model: catalogModelInfoSchema,
+  unfilled: z.array(z.enum(modelParameterFields)),
 });
 export type ModelParameterUpdate = z.infer<typeof modelParameterUpdateSchema>;
 export const configurationErrorSchema = z.strictObject({

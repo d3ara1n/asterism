@@ -1,6 +1,9 @@
 import { Models, type Catalog, type Model, type ModelMetadata } from "@opencode-ai/models";
 import { z } from "zod";
-import { modelParametersSchema, thinkingSchema, type ModelParameters, type ModelParameterUpdate } from "../shared/configuration.ts";
+import {
+  catalogInputModalities, modelParameterFields, modelParametersSchema, thinkingSchema,
+  type CatalogModelInfo, type ModelParameterField, type ModelParameters, type ModelParameterUpdate,
+} from "../shared/configuration.ts";
 import { modelCatalogMessages as messages } from "../shared/model-catalog-messages.ts";
 import { emptyModelRates, modelCostSchema, withValues, type ModelCost, type ModelRates, type UnitPrice } from "@asterism-app/sdk/contracts";
 import { parameterModelId } from "../shared/model-catalog-id.ts";
@@ -11,29 +14,33 @@ const client = Models.make({ fetch: (url, init) => fetch(url, { ...init, redirec
 /** The official client owns catalog types and transport; no provider credentials are sent to the catalog and stale snapshots are not silently reused. */
 export const loadModelCatalog: LoadModelCatalog = signal => client.catalog({ signal });
 
-type Match = { source: string; model: Model | ModelMetadata };
+/** A catalog key (`<lab>/<model>`) and its entry, preferring the lab's own provider record for pricing and limits. */
+type Match = { id: string; model: Model | ModelMetadata };
 
 function selectModel(catalog: Catalog, modelId: string): Match {
   const lookupId = parameterModelId(modelId);
-  if (!lookupId) throw new ConfigurationError("not_found", "No exact model catalog match was found.", withValues(messages.notFound, { modelId: lookupId }));
+  const notFound = () => new ConfigurationError("not_found", "No exact model catalog match was found.", withValues(messages.notFound, { modelId: lookupId }));
+  if (!lookupId) throw notFound();
   const matches: Match[] = [];
-  for (const [key, metadata] of Object.entries(catalog.models)) {
+  for (const [id, metadata] of Object.entries(catalog.models)) {
     // The first catalog key segment is the models.dev vendor group, not another form of the user's model ID.
-    const slash = key.indexOf("/");
+    const slash = id.indexOf("/");
     if (slash < 1) continue;
-    const lab = key.slice(0, slash);
-    const entryId = key.slice(slash + 1);
-    const native = catalog.providers[lab]?.models[entryId];
-    if (parameterModelId(native?.id ?? entryId) === lookupId) matches.push({ source: key, model: native ?? metadata });
+    const entryId = id.slice(slash + 1);
+    const native = catalog.providers[id.slice(0, slash)]?.models[entryId];
+    if (parameterModelId(native?.id ?? entryId) === lookupId) matches.push({ id, model: native ?? metadata });
   }
   if (matches.length > 1) throw new ConfigurationError("conflict", "Multiple catalog models match this ID.", withValues(messages.ambiguous, { modelId: lookupId }));
-  const match = matches[0];
-  if (!match) throw new ConfigurationError("not_found", "No exact model catalog match was found.", withValues(messages.notFound, { modelId: lookupId }));
-  return match;
+  if (!matches[0]) throw notFound();
+  return matches[0];
 }
 
 // Validate only consumed fields rather than copying the SDK's complete catalog schema.
 const entrySchema = z.object({
+  name: z.string(),
+  release_date: z.string().optional(),
+  open_weights: z.boolean().optional(),
+  modalities: z.object({ input: z.array(z.string()) }).optional(),
   cost: z.unknown().optional(),
   reasoning: z.boolean().optional(),
   tool_call: z.boolean().optional(),
@@ -44,6 +51,7 @@ const entrySchema = z.object({
     z.object({ type: z.literal("budget_tokens") }),
   ])).optional(),
 });
+type Entry = z.infer<typeof entrySchema>;
 
 // External catalog shapes exist only at the conversion boundary; configuration and consumers use Asterism's pricing contract.
 const catalogPrice = z.number().nonnegative();
@@ -87,39 +95,46 @@ function modelCost(raw: unknown): ModelCost | null {
   return result.success ? result.data : null;
 }
 
+const isInputModality = (value: string): value is CatalogModelInfo["inputModalities"][number] =>
+  (catalogInputModalities as readonly string[]).includes(value);
+
+/** Map effort options to Asterism levels; toggles, budgets, and `default` cannot determine a fixed level list. */
+function thinkingLevels(entry: Entry): ModelParameters["capabilities"]["thinkingLevels"] {
+  if (entry.reasoning === false) return [];
+  const values = entry.reasoning_options?.flatMap(option => option.type === "effort" ? option.values : []) ?? [];
+  const levels = new Set(values.map(level => level === null || level === "none" ? "off" : level));
+  const mapped = thinkingSchema.options.filter(level => levels.has(level));
+  return mapped.length && mapped.length === levels.size ? mapped : undefined;
+}
+
+/** Drop absent values so that applying the result leaves the corresponding draft fields unchanged. */
+const present = <T extends object>(value: T) =>
+  Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as { [K in keyof T]?: Exclude<T[K], undefined> };
+
+function modelInfo(id: string, entry: Entry): CatalogModelInfo {
+  return {
+    id, name: entry.name, ...present({ releaseDate: entry.release_date, openWeights: entry.open_weights }),
+    inputModalities: entry.modalities?.input.filter(isInputModality) ?? [],
+  };
+}
+
 /** Return mappable fields for draft editing; omitted fields remain absent and pricing is supplied as a whole. */
 export function modelParameters(catalog: Catalog, modelId: string): ModelParameterUpdate {
-  try {
-    const match = selectModel(catalog, modelId);
-    const entry = entrySchema.parse(match.model);
-    const value: ModelParameters = { capabilities: {}, generation: {} };
-    const unfilled: ModelParameterUpdate["unfilled"] = [];
-    if (entry.limit?.context) value.contextWindow = entry.limit.context;
-    else unfilled.push("contextWindow");
-    if (entry.limit?.output) value.generation.maxOutputTokens = entry.limit.output;
-    else unfilled.push("maxOutputTokens");
-    if (entry.reasoning !== undefined) value.capabilities.reasoning = entry.reasoning;
-    else unfilled.push("reasoning");
-    if (entry.tool_call !== undefined) value.capabilities.tools = entry.tool_call;
-    else unfilled.push("tools");
-
-    if (entry.reasoning === false) value.capabilities.thinkingLevels = [];
-    else {
-      const efforts = entry.reasoning_options?.filter(option => option.type === "effort");
-      const values = efforts?.flatMap(option => option.values);
-      const levels = new Set(values?.map(level => level === null || level === "none" ? "off" : level));
-      const mapped = thinkingSchema.options.filter(level => levels.has(level));
-      // toggle/budget cannot directly determine Asterism levels; default does not imply any fixed level either.
-      if (!mapped.length || [...levels].some(level => !thinkingSchema.safeParse(level).success)) unfilled.push("thinkingLevels");
-      else value.capabilities.thinkingLevels = mapped;
-    }
-    const cost = modelCost(entry.cost);
-    if (cost) value.cost = cost;
-    else unfilled.push("cost");
-    if (unfilled.length === 6) throw new ConfigurationError("unavailable", "No usable catalog parameters were found.", messages.invalid);
-    return { parameters: modelParametersSchema.parse(value), source: match.source, unfilled };
-  } catch (error) {
-    if (error instanceof ConfigurationError) throw error;
-    throw new ConfigurationError("unavailable", "Invalid model catalog data.", messages.invalid);
-  }
+  const match = selectModel(catalog, modelId);
+  const parsed = entrySchema.safeParse(match.model);
+  if (!parsed.success) throw new ConfigurationError("unavailable", "Invalid model catalog data.", messages.invalid);
+  const entry = parsed.data;
+  const fields = {
+    contextWindow: entry.limit?.context || undefined, maxOutputTokens: entry.limit?.output || undefined,
+    reasoning: entry.reasoning, tools: entry.tool_call, thinkingLevels: thinkingLevels(entry), cost: modelCost(entry.cost) ?? undefined,
+  } satisfies Record<ModelParameterField, unknown>;
+  const unfilled = modelParameterFields.filter(field => fields[field] === undefined);
+  if (unfilled.length === modelParameterFields.length) throw new ConfigurationError("unavailable", "No usable catalog parameters were found.", messages.invalid);
+  const parameters = modelParametersSchema.safeParse({
+    ...present({ contextWindow: fields.contextWindow, cost: fields.cost }),
+    capabilities: present({ reasoning: fields.reasoning, tools: fields.tools, thinkingLevels: fields.thinkingLevels }),
+    generation: present({ maxOutputTokens: fields.maxOutputTokens }),
+  });
+  if (!parameters.success) throw new ConfigurationError("unavailable", "Invalid model catalog data.", messages.invalid);
+  return { parameters: parameters.data, model: modelInfo(match.id, entry), unfilled };
 }

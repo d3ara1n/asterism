@@ -28,7 +28,10 @@ describe("models.dev parameter lookup", () => {
       contextWindow: 200000, capabilities: { reasoning: true, tools: true, thinkingLevels: ["off", "low", "high"] },
       generation: { maxOutputTokens: 32000 },
     });
-    expect(report).toEqual({ source: "lab/test-model", unfilled: [] });
+    expect(report).toEqual({
+      model: { id: "lab/test-model", name: "Upstream name", releaseDate: "2026-01-01", openWeights: false, inputModalities: ["text"] },
+      unfilled: [],
+    });
     const disabled = modelParameters(catalog({ ...entry, reasoning: false, tool_call: false, reasoning_options: undefined }), "test-model");
     expect(disabled.parameters.capabilities).toEqual({ reasoning: false, tools: false, thinkingLevels: [] });
   });
@@ -39,10 +42,10 @@ describe("models.dev parameter lookup", () => {
     data.providers.relay = { ...data.providers.lab!, id: "relay", api: "https://relay.test/v1",
       models: { "test-model": { ...entry, limit: { context: 100, output: 10 }, reasoning_options: [{ type: "effort", values: ["high"] }] } } };
     const result = modelParameters(data, "test-model");
-    expect(result.source).toBe("lab/test-model");
+    expect(result.model.id).toBe("lab/test-model");
     expect(result.parameters.contextWindow).toBe(200000);
     expect(result.parameters.capabilities.thinkingLevels).toEqual(["off", "low", "high"]);
-    expect(modelParameters(data, "lab/test-model").source).toBe("lab/test-model");
+    expect(modelParameters(data, "lab/test-model").model.id).toBe("lab/test-model");
     expect(() => modelParameters(data, "test-model-thinking-latest")).toThrow(expect.objectContaining({ code: "not_found" }));
     data.models["other/test-model"] = { ...data.models["lab/test-model"]!, id: "other/test-model" };
     expect(() => modelParameters(data, "test-model")).toThrow(expect.objectContaining({ code: "conflict" }));
@@ -56,7 +59,7 @@ describe("models.dev parameter lookup", () => {
       "lab/vendor/model": { id: "lab/vendor/model", name: "Model", description: "", reasoning: true, tool_call: true },
     } };
     for (const modelId of ["model", "vendor/model", "route/vendor/model"]) {
-      expect(modelParameters(data, modelId).source).toBe("lab/vendor/model");
+      expect(modelParameters(data, modelId).model.id).toBe("lab/vendor/model");
     }
     for (const modelId of ["vendor/", "vendor/model-thinking", "vendor/MODEL"])
       expect(() => modelParameters(data, modelId)).toThrow(expect.objectContaining({
