@@ -32,6 +32,7 @@ import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
 import { useModelParameters } from "./ModelParameters";
 import { ConnectionAuthentication, credentialChanged as draftChanged, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
 import { ProviderKeyLink } from "./ProviderKeyLink";
+import { ProviderUsageButton } from "./ProviderUsageButton";
 
 const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({ value, label }));
 const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
@@ -124,6 +125,7 @@ function ProviderRow({ provider, snapshot, selected, onOpen }: {
     title={provider.name} selected={selected} onOpen={onOpen}
     description={<>{canEditModelProviderField(provider, "protocol") && <>{protocolLabel(provider.protocol)} · </>}{i18n.formatMessage(providersMessages.modelCount, { count })}</>}
     actions={<>
+      {provider.enabled && provider.usage && <ProviderUsageButton key={provider.usage} providerId={provider.id} />}
       <StatusBadge tone={health.tone}>{health.label}</StatusBadge>
       <Switch aria-label={i18n.formatMessage(providersMessages.enableProvider, { provider_name: provider.name })} checked={provider.enabled} disabled={quick.busy}
         onCheckedChange={next => void quick.setProviderEnabled(provider, next)} />
