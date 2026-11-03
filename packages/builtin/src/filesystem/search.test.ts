@@ -152,7 +152,7 @@ describe("Search output protocol", () => {
 
   // rg outputs base64 for non-UTF-8 data; replacement characters would change file identity or fabricate edit anchors.
   it("Decodes valid base64 body text and rejects unrepresentable paths or text", () => {
-    const output = grepOutput(".", "", { pattern: ".", anchored: false });
+    const output = grepOutput(".", "", { pattern: "." }, false);
     const encode = (bytes: Buffer) => Buffer.from(`${JSON.stringify({
       type: "match", data: { path: { text: "a" }, lines: { bytes: bytes.toString("base64") }, line_number: 1 },
     })}\n`);

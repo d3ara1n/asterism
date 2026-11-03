@@ -2,7 +2,7 @@ import { posix } from "node:path";
 import type { z } from "zod";
 import type { ManualSource } from "@asterism-app/sdk/runtime";
 import type { CallResult } from "@asterism-app/sdk/runtime";
-import { DirectoryList, DirectoryRead } from "../filesystem/contract.ts";
+import { DirectoryList } from "../filesystem/contract.ts";
 import { DirectoryFind, DirectoryGrep } from "../filesystem/search-contract.ts";
 import { filesystemFailure, failed } from "../filesystem/errors.ts";
 import { listFiles, readFileContent } from "../filesystem/read.ts";
@@ -10,6 +10,7 @@ import { searchScope } from "../filesystem/search.ts";
 import { findOutput, grepOutput } from "../filesystem/search-output.ts";
 import { runSearch, searchArguments } from "../filesystem/search-process.ts";
 import { manualPath } from "./paths.ts";
+import type { ManualRead, ManualGrep } from "./contract.ts";
 
 function failure(error: unknown, signal: AbortSignal): CallResult<never> {
   return signal.aborted ? { kind: "cancelled", message: "The manual operation was cancelled." }
@@ -30,13 +31,13 @@ export async function listManual(sources: readonly ManualSource[], target: z.inf
   } catch (error) { return failure(error, signal); }
 }
 
-export async function readManual(sources: readonly ManualSource[], target: z.infer<typeof DirectoryRead.targetSchema>,
-  args: z.infer<typeof DirectoryRead.tool.argsSchema>, signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryRead.schema>>> {
+export async function readManual(sources: readonly ManualSource[], target: z.infer<typeof ManualRead.targetSchema>,
+  signal: AbortSignal): Promise<CallResult<z.infer<typeof ManualRead.schema>>> {
   try {
     signal.throwIfAborted();
     const selected = manualPath(sources, target.path);
     if (selected.kind === "directory") return failed("not_file", "The manual path selects a directory, not a file.");
-    const result = await readFileContent(selected.scope.source.directory, { ...target, path: selected.scope.path }, args, signal);
+    const result = await readFileContent(selected.scope.source.directory, { ...target, path: selected.scope.path, anchored: false }, signal);
     return result.kind === "succeeded" ? { ...result, data: { ...result.data, path: selected.path } } : result;
   } catch (error) { return failure(error, signal); }
 }
@@ -58,13 +59,13 @@ export async function findManual(sources: readonly ManualSource[], target: z.inf
   } catch (error) { return failure(error, signal); }
 }
 
-export async function grepManual(sources: readonly ManualSource[], target: z.infer<typeof DirectoryGrep.targetSchema>,
+export async function grepManual(sources: readonly ManualSource[], target: z.infer<typeof ManualGrep.targetSchema>,
   args: z.infer<typeof DirectoryGrep.tool.argsSchema>, signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryGrep.schema>>> {
   try {
     signal.throwIfAborted();
     const selected = manualPath(sources, target?.path ?? ".");
     let prefix = "";
-    const output = grepOutput(selected.path, () => prefix, args);
+    const output = grepOutput(selected.path, () => prefix, args, false);
     for (const scope of selected.kind === "source" ? [selected.scope] : selected.scopes) {
       const search = await searchScope(scope.source.directory, scope.path, false);
       prefix = posix.join(scope.source.path, search.prefix);

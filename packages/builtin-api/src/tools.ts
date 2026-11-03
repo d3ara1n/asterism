@@ -23,13 +23,10 @@ export const Read = defineTool({
   name: "read",
   description: "Read the selected content as text.",
   guidelines: [
-    "target selects the content and its range according to the resource implementation's schema.",
-    "Editable text includes LINE#HASH edit anchors by default; args:{\"anchored\":false} omits them. Content that cannot be edited has no anchors.",
+    "target selects the content, range, and reading view according to the resource implementation's schema.",
     "The result reports positions and a continuation point where the implementation supports ranges.",
   ],
-  argsSchema: z.strictObject({
-    anchored: z.boolean().optional().describe("Include edit anchors for editable text; defaults to true."),
-  }).describe("Reading behavior. Content selection and range belong to target."),
+  argsSchema: z.strictObject({}).describe("Empty parameter object. Content selection, range, and reading view belong to target."),
 });
 
 export const Edit = defineTool({

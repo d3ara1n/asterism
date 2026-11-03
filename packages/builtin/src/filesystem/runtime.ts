@@ -135,7 +135,7 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
       },
     }),
     implementTool(DirectoryRead, {
-      call: (directory, target, args, { signal }) => readFileContent(directory.path, target, args, signal),
+      call: (directory, target, _args, { signal }) => readFileContent(directory.path, target, signal),
       toModel: data => `${data.path}\n${readToModel(data)}`,
     }),
     implementTool(DirectoryEdit, {

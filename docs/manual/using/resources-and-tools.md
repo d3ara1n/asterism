@@ -6,7 +6,7 @@ Add a resource to the workbench, then link it to the agent that needs it. On the
 
 Link and detach notifications identify the affected resource. Models can list linked resources with `resource_list`, inspect a selected resource with `resource_inspect`, and invoke its tools through `resource_call`. Listing includes each resource's own current state without tool definitions. Inspection supplies that state and the tools and schemas available for the selected resource.
 
-Use current descriptions for arguments, internal targets, and result formats. Two resource types can support the same operation with different target shapes.
+Use current descriptions for arguments, internal targets, and result formats. Targets select content, scope, or a resource-specific view. Two resource types can support the same operation with different target shapes.
 
 Resource creation has its own discovery and inspection tools. The available creation entries determine which resources an agent can create. New links become available at the next model request.
 
@@ -35,6 +35,8 @@ The Directory `save` tool consumes a FileRef and writes its bytes to `target.pat
 Notes retain current text. Their earlier tool results may appear in history, but browsing that history does not restore note contents.
 
 Files and notes support anchored edits, full-content writes, and bulk replacement. `edit` changes selected lines using anchors returned by reading, searching, or a previous edit or replacement. `write` supplies complete content. `replace` applies literal text or a JavaScript regular expression to the entire selected target and returns the match count, actual diff, and fresh anchors. Literal replacement text is inserted verbatim; regular-expression replacements support capture groups. A replacement with no matches reports an error and leaves the target unchanged.
+
+Directory and note reads include edit anchors by default. Set `target.anchored` to `false` for a view with line numbers only; `read` takes empty operation arguments. Directory content searches support the same target option. Manual reads and searches return line numbers without edit anchors.
 
 ## Open a directory file
 

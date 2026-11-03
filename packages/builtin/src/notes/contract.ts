@@ -15,7 +15,11 @@ export const NoteView = builtin.data("note.card", z.strictObject({ text: z.strin
 const targetSchema = z.null().describe("Pass null to select this note's complete current text. Notes have no internal path or read range. Content is limited to 100,000 UTF-16 code units; edits must keep the final text within that limit.");
 export const NoteRead = defineImplementation({
   ...builtin.data("note.read", textReadSchema),
-  resource: Note, tool: Read, targetSchema, effect: "read", execution: "parallel",
+  resource: Note, tool: Read,
+  targetSchema: z.strictObject({
+    anchored: z.boolean().optional().describe("Include LINE#HASH edit anchors; defaults to true. False returns text with line numbers only."),
+  }).nullable().describe("Read this note's complete current text. Null uses the default reading view. Notes have no internal path or read range."),
+  effect: "read", execution: "parallel",
 });
 export const NoteEdit = defineImplementation({
   ...builtin.data("note.edit", textChangeSchema),

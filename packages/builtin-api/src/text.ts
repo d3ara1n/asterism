@@ -20,7 +20,7 @@ export const editOperationSchema = z.discriminatedUnion("op", [
 export const textRowSchema = z.strictObject({
   line: z.number().int().positive().describe("The absolute 1-based line number in the complete text."),
   content: z.string().describe("The line content without its terminator; for an excerpt, only the excerpt window."),
-  hash: z.string().nullable().describe("LINE#HASH content hash of the complete line, also for an excerpt; null when anchors were not requested."),
+  hash: z.string().nullable().describe("LINE#HASH content hash of the complete line, also for an excerpt; null when the selected view has no edit anchors."),
   excerpt: z.strictObject({
     start: z.number().int().nonnegative().describe("UTF-16 offset of content within the complete line."),
     length: z.number().int().positive().describe("UTF-16 length of the complete line."),
@@ -33,7 +33,7 @@ export const textReadSchema = z.strictObject({
   rows: z.array(textRowSchema).describe("Selected lines and their available edit anchors; long lines are returned as excerpts."),
   noFinalNewline: z.boolean().describe("Whether non-empty text lacks a final newline."),
   nextOffset: z.number().int().positive().nullable().describe("First unread line after the returned range, or null at end of text. Use as target.offset only when this implementation supports line selection."),
-}).describe("Selected text lines and edit anchors, final-newline information and a continuation position.");
+}).describe("Selected text lines with available edit anchors, final-newline information and a continuation position.");
 
 export const textChangeSchema = z.strictObject({
   changed: z.boolean().describe("Whether the target was created or its content changed."),

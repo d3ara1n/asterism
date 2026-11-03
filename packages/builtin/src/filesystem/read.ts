@@ -25,10 +25,10 @@ export async function listFiles(root: string, target: z.infer<typeof DirectoryLi
 }
 
 export async function readFileContent(root: string, target: z.infer<typeof DirectoryRead.targetSchema>,
-  args: z.infer<typeof DirectoryRead.tool.argsSchema>, signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryRead.schema>>> {
+  signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryRead.schema>>> {
   try {
     const file = await readTextFile(await withinDirectory(root, target.path), signal);
-    const data = readText(file.text, args.anchored !== false, {
+    const data = readText(file.text, target.anchored !== false, {
       offset: target.offset, limit: target.limit ?? 1000, maxBytes: 64 * 1024,
     });
     return { kind: "succeeded", data: { path: target.path, ...data } };

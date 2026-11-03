@@ -6,7 +6,7 @@ Filesystem, manual, note, shell, and terminal operations share resource dispatch
 
 Directories and notes share public read, edit, and write contracts. Implementations supply their own targets and result data.
 
-Read uses absolute source line numbers. Anchored output hashes the complete line before any display shortening. A long-line excerpt identifies its actual range and full length; the anchor still refers to the full line.
+Text reads use absolute source line numbers. Directory and note reading targets select whether to include edit anchors, enabled by default. The shared read contract has empty operation arguments; resource implementations own content, range, and view selection. Anchored output hashes the complete line before any display shortening. A long-line excerpt identifies its actual range and full length; the anchor still refers to the full line.
 
 Edit validates a batch against one current text value. Replace and delete ranges include both endpoints; insertion retains the anchor line. Append and prepend need no anchor. A stale anchor or overlapping range rejects the batch without writing. Suggested moved-line matches remain retry information rather than silently retargeting an edit.
 
@@ -32,7 +32,7 @@ Find consumes NUL-delimited file paths. Grep consumes ripgrep’s native result 
 
 Hidden and ignore-file controls are independent. Positive globs follow ripgrep precedence; excluded directories prevent traversal into their children. Git internals are excluded. The invocation disables user ripgrep configuration so explicit tool arguments determine behavior.
 
-Content results preserve line identity and compatible edit anchors. Long matching lines show a window around a match; context lines show their beginning. UTF-8 byte offsets convert to text offsets without splitting characters. Invalid UTF-8 is an error, not a substituted identity.
+Content results preserve line identity. Directory grep targets select whether content includes edit anchors compatible with read and edit, enabled by default. Manual reading and search return line numbers without edit anchors. Long matching lines show a window around a match; context lines show their beginning. UTF-8 byte offsets convert to text offsets without splitting characters. Invalid UTF-8 is an error, not a substituted identity.
 
 Result limits distinguish matching lines or files from surrounding context. Byte and pipeline-record budgets report distinct stop reasons. Trim context belonging only to an unreturned next match, while retaining context for returned matches.
 

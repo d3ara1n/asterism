@@ -21,14 +21,14 @@ it("lists mounted sources and reads current file contents without a copied manua
     kind: "succeeded", data: { entries: [{ name: "example.first", type: "directory" }, { name: "example.second", type: "directory" }] },
   });
   const target = { path: "plugins/example.first/docs/usage.md" };
-  expect(await readManual(sources, target, { anchored: false }, signal)).toMatchObject({
-    kind: "succeeded", data: { path: target.path, rows: [{ content: "first" }] },
+  expect(await readManual(sources, target, signal)).toMatchObject({
+    kind: "succeeded", data: { path: target.path, rows: [{ content: "first", hash: null }] },
   });
   writeFileSync(join(sources[0].directory, "usage.md"), "Updated in place\n");
-  expect(await readManual(sources, target, { anchored: false }, signal)).toMatchObject({
+  expect(await readManual(sources, target, signal)).toMatchObject({
     kind: "succeeded", data: { path: target.path, rows: [{ content: "Updated in place" }] },
   });
-  expect(await readManual(sources.slice(1), target, {}, signal)).toMatchObject({
+  expect(await readManual(sources.slice(1), target, signal)).toMatchObject({
     kind: "failed", error: { code: "path_not_found" },
   });
 });

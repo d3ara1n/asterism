@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defineCall, defineCreation, defineImplementation } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
-import { DirectoryList, DirectoryRead } from "../filesystem/contract.ts";
+import { DirectoryList, DirectoryRead, directoryReadTargetSchema } from "../filesystem/contract.ts";
 import { DirectoryFind, DirectoryGrep } from "../filesystem/search-contract.ts";
 import { ReadDirectoryFile } from "../filesystem/editor-contract.ts";
 
@@ -26,14 +26,15 @@ export const ManualList = defineImplementation({
   targetSchema: directoryTarget,
 });
 export const ManualRead = defineImplementation({
-  ...DirectoryRead, ...builtin.data("manual.read", DirectoryRead.schema), resource: Manual,
-  targetSchema: DirectoryRead.targetSchema.describe("Read one UTF-8 file using its source-qualified manual path, for example 'sdk/docs/getting-started.md'. offset and limit select lines. Selected symlinks remain within their declared source directory."),
+  ...DirectoryRead, ...builtin.data("manual.read", DirectoryRead.schema.describe("Selected manual file lines with line numbers, final-newline state, and the next unread line. Content has no edit anchors.")), resource: Manual,
+  targetSchema: directoryReadTargetSchema.omit({ anchored: true }).extend({ path })
+    .describe("Read one UTF-8 file using its source-qualified manual path, for example 'sdk/docs/getting-started.md'. offset and limit select lines. Selected symlinks remain within their declared source directory."),
 });
 export const ManualFind = defineImplementation({
   ...DirectoryFind, ...builtin.data("manual.find", DirectoryFind.schema), resource: Manual,
   targetSchema: directoryTarget,
 });
 export const ManualGrep = defineImplementation({
-  ...DirectoryGrep, ...builtin.data("manual.grep", DirectoryGrep.schema), resource: Manual,
+  ...DirectoryGrep, ...builtin.data("manual.grep", DirectoryGrep.schema.describe("A bounded search of manual sources. Content rows include source-qualified paths and line numbers without edit anchors; files and count modes describe matching files.")), resource: Manual,
   targetSchema: directoryTarget,
 });

@@ -53,10 +53,10 @@ export default defineModule(() => ({
   })],
   tools: [
     implementTool(NoteRead, {
-      async call(_data, _target, args, { object, signal }) {
+      async call(_data, target, _args, { object, signal }) {
         try {
           signal.throwIfAborted();
-          return { kind: "succeeded", data: readText(requireText(object), args.anchored !== false) };
+          return { kind: "succeeded", data: readText(requireText(object), target?.anchored !== false) };
         } catch (error) { if (error instanceof TextError) return error.outcome(); throw error; }
       },
       toModel: readToModel,

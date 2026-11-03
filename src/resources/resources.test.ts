@@ -97,8 +97,8 @@ describe("Tool/resource matching and authorization", () => {
     });
     expect(await invoke(captured, "resource_call", { resource_id: note.id, tool: "write", args: { content: "after" } }))
       .toMatchObject({ kind: "succeeded", data: { changed: true } });
-    expect(await invoke(captured, "resource_call", { resource_id: note.id, tool: "read", args: { anchored: false } }))
-      .toMatchObject({ kind: "succeeded", data: { rows: [{ content: "after" }] } });
+    expect(await invoke(captured, "resource_call", { resource_id: note.id, tool: "read", target: { anchored: false }, args: {} }))
+      .toMatchObject({ kind: "succeeded", data: { rows: [{ content: "after", hash: null }] } });
     expect(await invoke(scope([]), "resource_call", { resource_id: note.id, tool: "read", args: {} }))
       .toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
   });

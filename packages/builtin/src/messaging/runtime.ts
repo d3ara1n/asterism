@@ -241,14 +241,21 @@ export default defineModule(plugin => {
 
 export const messagingCreations = [
   defineAgentCreation({ id: CreateConversations.id, creation: CreateConversations,
-    description: "Create a Conversations resource. It lists messaging connections and their conversations and manages notification subscriptions.",
-    inputSchema: z.strictObject({ expose_self: z.boolean().optional().describe("Expose yourself to this resource to receive subscribed notifications.") }),
+    description: "Create a Conversations resource for browsing configured messaging connections and their conversations and managing notification subscriptions.",
+    inputSchema: z.strictObject({ expose_self: z.boolean().optional().describe("Expose yourself to this resource to receive subscribed notifications. Defaults to false.") }),
     toInput: () => ({}), toOptions: ({ expose_self }) => ({ exposeSelf: expose_self }),
-    guidelines: ["A connection subscription reports new conversations; a conversation subscription reports incoming messages. Notifications are delivered to Agents exposed to the resource."] }),
+    guidelines: [
+      "expose_self defaults to false. Setting it to true exposes you to the new resource so it can deliver subscribed notifications to you.",
+      "The resource starts with no subscriptions. The subscribe tool configures notification targets after creation.",
+      "A connection subscription reports newly discovered conversations; a conversation subscription reports incoming message metadata, optionally scoped to a thread.",
+    ] }),
   defineAgentCreation({ id: CreateChat.id, creation: CreateChat,
-    description: "Create a Chat resource bound to an external conversation. It provides read and send tools and delivers incoming message events to exposed Agents.",
-    inputSchema: chatCreateSchema.extend({ expose_self: z.boolean().optional().describe("Expose yourself to this Chat to receive incoming message events.") }),
+    description: "Create a Chat resource bound to an external conversation, optionally scoped to a thread.",
+    inputSchema: chatCreateSchema.extend({ expose_self: z.boolean().optional().describe("Expose yourself to this Chat to receive incoming messages. Defaults to false.") }),
     toInput: ({ expose_self: _expose, ...input }) => input,
     toOptions: ({ expose_self }) => ({ exposeSelf: expose_self }),
-    guidelines: ["The new resource is linked to its creator. Connection and conversation IDs come from list results, external events, or explicit user input."] }),
+    guidelines: [
+      "connectionId and conversationId identify the external conversation; threadId optionally narrows it to a thread. These IDs can come from list results, external events, or explicit user input.",
+      "expose_self defaults to false. Setting it to true exposes you to the new Chat so it can deliver incoming messages and their content to you. The Chat's binding determines which messages it delivers.",
+    ] }),
 ];

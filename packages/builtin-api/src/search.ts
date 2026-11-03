@@ -29,7 +29,7 @@ export const Grep = defineTool({
   guidelines: [
     "content mode groups matching and context lines under a per-file heading; when context lines are present, the heading lists the matching line numbers. files mode returns matching paths; count mode returns the number of matching lines per file.",
     "Regular expressions use ripgrep's default Rust regex syntax. Matching is line-oriented.",
-    "Complete UTF-8 content rows include LINE#HASH edit anchors by default, shared with read and edit.",
+    "target selects the search scope and resource-specific content view according to the resource implementation's schema.",
     ...globGuidelines,
   ],
   argsSchema: z.strictObject({
@@ -40,7 +40,6 @@ export const Grep = defineTool({
     glob: z.array(pattern).optional().describe("File globs relative to the search directory. Prefix exclusions with '!'; later globs take precedence."),
     context: z.number().int().min(0).max(20).optional().describe("Lines before and after each match in content mode; defaults to 0."),
     outputMode: z.enum(["content", "files", "count"]).optional().describe("Result format; defaults to content. Count means matching lines, rather than regex occurrences."),
-    anchored: z.boolean().optional().describe("Include edit anchors in content mode; defaults to true."),
     ...selection,
   }).describe("Content pattern, file selection and output options."),
 });

@@ -40,7 +40,7 @@ export function createManualModule(sources: () => readonly ManualSource[], appli
     tools: [
       implementTool(ManualList, { call: (_data, target, _args, { signal }) => listManual(sources(), target, signal) }),
       implementTool(ManualRead, {
-        call: (_data, target, args, { signal }) => readManual(sources(), target, args, signal),
+        call: (_data, target, _args, { signal }) => readManual(sources(), target, signal),
         toModel: data => `${data.path}\n${readToModel(data)}`,
       }),
       implementTool(ManualFind, {

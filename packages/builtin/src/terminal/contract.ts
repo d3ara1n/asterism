@@ -45,7 +45,7 @@ export const terminalReadTargetSchema = z.union([
     offset: z.number().int().nonnegative().optional().describe("Zero-based row for history, or stream character offset (UTF-16 code units) for raw. Raw offsets inside a surrogate pair align to its start. Omitted selects the most recent content."),
     limit: z.number().int().positive().max(65536).optional().describe("Maximum rows (history, default 100, maximum 2000) or UTF-16 code units (raw, default 16384). Raw reads may include one extra code unit to complete a surrogate pair; nextOffset continues after the returned text."),
   }),
-]).describe("Pass null for the current screen, or {\"source\":\"history\"} / {\"source\":\"raw\"} with an optional range. Reads observe the current shell instance, including the final screen of an exited shell; buffers are retained only during this application run. Terminal reads return content without edit anchors. The anchored option has no effect.");
+]).describe("Pass null for the current screen, or {\"source\":\"history\"} / {\"source\":\"raw\"} with an optional range. Reads observe the current shell instance, including the final screen of an exited shell; buffers are retained only during this application run.");
 export const terminalReadResultSchema = terminalStatusSchema.extend({
   source: z.enum(["screen", "history", "raw"]), text: z.string(), cols: z.number(), rows: z.number(),
   cursor: z.strictObject({ x: z.number(), y: z.number() }), offset: z.number(), nextOffset: z.number(), truncated: z.boolean(),

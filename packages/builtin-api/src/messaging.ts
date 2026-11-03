@@ -29,8 +29,8 @@ export const Send = defineTool({
   id: builtin.name("tool.send"), name: "send",
   description: "Send text and file references through a linked resource.",
   guidelines: [
-    "resource_id selects the messaging resource. Its target schema describes recipient selection.",
-    "The runtime supplies the sender's resource address and Agent name.",
+    "resource_id selects the messaging resource. Its target schema defines the destination and any reply options.",
+    "The resource implementation determines the sending identity and delivery behavior.",
     "A file-reference part carries a FileRef in its ref field. The optional filename specifies the name used for delivery.",
     "Referenced content is resolved by the consuming implementation.",
   ],

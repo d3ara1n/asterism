@@ -92,7 +92,7 @@ Requests hold each captured relationship until their work finishes. A disconnect
 
 ## Tools and saved results
 
-A tool contract owns its identity, meaning, argument schema, description, and usage guidance. Resource implementations own target and result schemas and execution behavior. Top-level tools declare their operation directly.
+A tool contract owns its identity, meaning, shared argument schema, description, and usage guidance. Resource implementations own target and result schemas and execution behavior. Targets select content, scope, or a resource-specific view, including supported reading ranges and edit-anchor presentation. Top-level tools declare their operation directly.
 
 Resource tool names express operation semantics. Across resources that expose the same tool, its meaning and operation arguments remain consistent; available operations, target selection, and results can vary by resource. Distinct operation contracts use distinct names. Domain qualifiers describe the scope of an operation and can remain appropriate when several resource types support it. Naming follows observable behavior independently of declaration visibility or code organization.
 

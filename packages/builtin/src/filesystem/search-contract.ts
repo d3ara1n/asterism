@@ -4,9 +4,11 @@ import { builtin, Find, Grep, textRowSchema } from "@asterism-app/builtin-api/co
 import { Directory } from "./contract.ts";
 
 const path = z.string().describe("File path relative to the directory resource root, with '/' separators.");
-const target = z.union([z.null(), z.strictObject({
+const searchTargetSchema = z.strictObject({
   path: z.string().min(1).max(4096).describe("Relative directory or file path within the directory resource; '.' selects its root."),
-})]).describe("Null selects the resource root. find selects a directory; grep selects a directory or one file. Selected symbolic links resolve inside the resource root; recursive traversal skips symbolic links. Git metadata entries are excluded from search targets.");
+});
+const target = searchTargetSchema.nullable()
+  .describe("Null selects the resource root. find selects a directory; grep selects a directory or one file. Selected symbolic links resolve inside the resource root; recursive traversal skips symbolic links. Git metadata entries are excluded from search targets.");
 const stopReasonSchema = z.enum(["limit", "output_bytes", "record_bytes"]).nullable()
   .describe("Null means the search completed. Otherwise it stopped at the requested limit of matching lines or files, the 64 KiB result budget, or the 1 MiB process-record limit. Total matching rows or files are unknown after an early stop.");
 const common = {
@@ -19,7 +21,7 @@ const rowIdentity = {
 };
 const searchRowSchema = textRowSchema.extend({
   ...rowIdentity,
-}).describe("A matching or context row. Lines longer than 1000 UTF-16 code units are excerpts around the first match (or the line start for context); their anchor still refers to the complete line.");
+}).describe("A matching or context row. Lines longer than 1000 UTF-16 code units are excerpts around the first match (or the line start for context); an included anchor refers to the complete line.");
 
 export const DirectoryFind = defineImplementation({
   ...builtin.data("directory.find", z.strictObject({
@@ -37,7 +39,11 @@ export const DirectoryGrep = defineImplementation({
       count: z.number().int().nonnegative().nullable().describe("Number of matching lines in count mode; null in files mode."),
     })).describe("Returned matching files in files or count mode; empty in content mode. Order is unspecified; the array length is the returned count."),
   }).describe("A bounded ripgrep search result. Content uses UTF-8 bytes without transcoding. Binary, hidden and ignore-file filtering follows ripgrep; explicit positive globs override hidden and ignore rules.")),
-  resource: Directory, tool: Grep, targetSchema: target, effect: "read", execution: "parallel",
+  resource: Directory, tool: Grep,
+  targetSchema: searchTargetSchema.extend({
+    anchored: z.boolean().optional().describe("Include LINE#HASH edit anchors in content mode; defaults to true. Anchors identify complete lines and are shared with read and edit. False returns text with line numbers only."),
+  }).nullable().describe(target.description!),
+  effect: "read", execution: "parallel",
 });
 export type FindResult = z.infer<typeof DirectoryFind.schema>;
 export type GrepResult = z.infer<typeof DirectoryGrep.schema>;
