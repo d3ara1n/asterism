@@ -143,7 +143,7 @@ Commands validate at their owning boundary. Trusted runtime push frames use stru
 
 A connection multiplexes commands, configuration, content transfer, events, calls, and object channels. Disconnection cancels its subscriptions and communication work and releases transfer state.
 
-Requests are sent once and are not automatically replayed. Long-running business operations have no blanket transport deadline. Main supervises a ready runtime through heartbeat rather than timing out legitimate user interaction.
+Requests are sent once and are not automatically replayed. Requests have no transport deadline, and main does not probe runtime liveness. The runtime becomes unavailable only when its process exits or reports a fatal error.
 
 ## Current state and streaming
 

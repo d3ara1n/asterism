@@ -53,7 +53,7 @@ const runtime = new RuntimeHost(status => {
   if (status === "ready") startup.publish({ status: "ready" });
   else if (status === "unavailable" && startup.state.status === "ready")
     startup.publish({ status: "failed", reason: "runtime", detail: "The task runtime has stopped." });
-}, undefined, (stage, detail) => startup.stage(stage, detail));
+}, (stage, detail) => startup.stage(stage, detail));
 
 function unsavedPrompt(): Electron.MessageBoxOptions {
   const locale = () => readLanguage().locale;

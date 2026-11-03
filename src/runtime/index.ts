@@ -68,7 +68,6 @@ try {
       });
       return;
     }
-    if (data?.kind === "ping") { port.postMessage({ kind: "pong" }); return; }
     if (secrets.receive(data)) return;
     if (data?.kind === "connection.open" && typeof data.id === "string" && ports[0]) {
       disconnect(data.id);

@@ -9,20 +9,15 @@ import type { StartupStage } from "../shared/startup.ts";
 import type { PluginStorageFailure } from "../shared/recovery.ts";
 
 /**
- * Task process supervision and control: startup, liveness, shutdown, and credential decryption stay in the main process.
+ * Task process supervision and control: startup, exit reporting, shutdown, and credential decryption stay in the main process.
  * Renderer business traffic enters the task process over direct ports without forwarding here.
+ * Requests have no deadline; the task process becomes unavailable only when it exits or fails as a process.
  */
 export class RuntimeHost {
   private child: UtilityProcess | null = null;
   private requests: RuntimeRequests | null = null;
   private status: RuntimeStatus = "starting";
-  private heartbeat: ReturnType<typeof setInterval> | null = null;
-  /**
-   * Liveness detection: ping periodically after readiness; terminate as hung if no pong arrives before the deadline.
-   * Direct renderer requests have no wait deadline; loss of the task process becomes an unavailable notification here.
-   */
   constructor(private readonly onStatus: (status: RuntimeStatus) => void,
-    private readonly liveness = { intervalMs: 5_000, timeoutMs: 15_000 },
     private readonly onStage: (stage: StartupStage, detail?: string) => void = () => {}) {}
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
   get ready(): boolean { return this.status === "ready" && this.child !== null; }
@@ -38,10 +33,7 @@ export class RuntimeHost {
     }
     this.child = child;
     observeProcess(child, "runtime");
-    const requests = this.requests = new RuntimeRequests(message => child.postMessage(message), () => {
-      this.setStatus("unavailable");
-      child.kill();
-    });
+    const requests = this.requests = new RuntimeRequests(message => child.postMessage(message));
     return new Promise((resolve, reject) => {
       const fail = (error: Error) => {
         clearTimeout(timeout);
@@ -52,22 +44,6 @@ export class RuntimeHost {
       };
       // The total deadline covers build, import, and synchronous assembly; progress messages do not extend it.
       const timeout = setTimeout(() => fail(Object.assign(new Error("Task runtime initialization timed out after 60 seconds."), { reason: "timeout" })), 60_000);
-      let lastPong = 0;
-      const watch = () => {
-        lastPong = Date.now();
-        this.heartbeat = setInterval(() => {
-          if (this.child !== child || this.status !== "ready") return;
-          if (Date.now() - lastPong > this.liveness.timeoutMs) {
-            console.error("Task runtime stopped responding and was terminated.");
-            this.stopHeartbeat();
-            requests.close(`The task runtime stopped responding. Restart ${applicationBrand.en} and inspect the workspace before retrying.`);
-            this.setStatus("unavailable");
-            child.kill();
-            return;
-          }
-          try { child.postMessage({ kind: "ping" }); } catch { /* The exit event handles termination. */ }
-        }, this.liveness.intervalMs);
-      };
       child.on("error", () => {
         console.error("Task runtime encountered a fatal process error.");
         fail(new Error("Task runtime encountered a fatal process error."));
@@ -89,7 +65,6 @@ export class RuntimeHost {
           });
           return;
         }
-        if (raw?.kind === "pong") { lastPong = Date.now(); return; }
         if (raw?.kind === "response") { requests.receive(raw); return; }
         const parsed = runtimeMessageSchema.safeParse(raw);
         if (!parsed.success) return;
@@ -99,7 +74,6 @@ export class RuntimeHost {
           clearTimeout(timeout);
           if (this.status !== "starting") return;
           this.setStatus("ready");
-          watch();
           resolve();
         } else if (parsed.data.kind === "fatal") {
           fail(Object.assign(new Error(parsed.data.message), { reason: parsed.data.reason, directory: parsed.data.directory }));
@@ -107,7 +81,6 @@ export class RuntimeHost {
       });
       child.once("exit", code => {
         clearTimeout(timeout);
-        this.stopHeartbeat();
         this.child = null;
         requests.close();
         if (this.status !== "stopping") this.setStatus("unavailable");
@@ -134,13 +107,7 @@ export class RuntimeHost {
     try { this.child!.postMessage({ kind: "connection.close", id }); } catch { /* The child has exited. */ }
   }
 
-  private stopHeartbeat(): void {
-    if (this.heartbeat) clearInterval(this.heartbeat);
-    this.heartbeat = null;
-  }
-
   stop(): Promise<void> {
-    this.stopHeartbeat();
     this.setStatus("stopping");
     this.requests?.close(`${applicationBrand.en} is shutting down.`);
     const child = this.child;
