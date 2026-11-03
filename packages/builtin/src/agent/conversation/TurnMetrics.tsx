@@ -9,7 +9,7 @@ import { conversationMessages } from "../../messages/conversation";
 import { percent, Stat, Stats } from "../panel-kit";
 import { rateKeys, tokensPerSecond } from "../diagnostics/performance";
 import { formatDuration } from "../diagnostics/format";
-import { MetricTooltip } from "./MetricTooltip";
+import { MetricCard } from "./MetricCard";
 import { usageFields, type TurnMetricsData } from "./turn-metrics";
 
 const throughput = (i18n: I18n, value: number | null) => value === null ? "—"
@@ -25,15 +25,13 @@ export function TurnMetrics({ metrics, incomplete }: { metrics: TurnMetricsData;
   const hit = metrics.cache ? percent(i18n, metrics.cache.read, metrics.cache.input, 1) : "—";
   const output = metrics.performance.rates.output;
   const speed = throughput(i18n, tokensPerSecond(output));
-  const header = <div className="space-y-1">
-    <div className="flex items-baseline justify-between gap-3">
-      <h4 className="type-label">{title}</h4>
-      <span className="type-caption">{i18n.formatMessage(messages.requests, { count: metrics.count })}</span>
-    </div>
-    {incomplete && <p className="type-caption">{i18n.text(messages.incomplete)}</p>}
+  const header = <div className="flex items-baseline justify-between gap-3">
+    <h4 className="type-label">{title}</h4>
+    <span className="type-caption">{incomplete && <>{i18n.text(conversationMessages.incomplete)} · </>}
+      {i18n.formatMessage(messages.requests, { count: metrics.count })}</span>
   </div>;
   return <div className="-ml-1.5 flex flex-wrap items-center gap-1" aria-label={title}>
-    <MetricTooltip label={`${title} · ${i18n.text(messages.cache)}`} icon={<DatabaseZap />} value={hit}>
+    <MetricCard label={`${title} · ${i18n.text(messages.cache)}`} icon={<DatabaseZap />} value={hit}>
       {header}
       <Stats>
         <Stat label={i18n.text(diagnosticMessages.cacheHit)} value={hit} caption={coverage(metrics.cache?.count ?? 0)} />
@@ -42,14 +40,11 @@ export function TurnMetrics({ metrics, incomplete }: { metrics: TurnMetricsData;
       <Separator />
       <Stats>{usageFields.map(field => <Stat key={field} label={i18n.text(diagnosticMessages[field])}
         value={count(metrics.usage[field].value)} caption={coverage(metrics.usage[field].count)} />)}</Stats>
-      <div className="space-y-1">
-        {metrics.cache && <p className="type-caption tabular-nums">{i18n.formatMessage(messages.cacheBasis, {
-          read: formatCount(metrics.cache.read), input: formatCount(metrics.cache.input),
-        })}</p>}
-        <p className="type-caption">{i18n.text(messages.cacheHint)}</p>
-      </div>
-    </MetricTooltip>
-    <MetricTooltip label={`${title} · ${i18n.text(messages.throughput)}`} icon={<Gauge />} value={speed}>
+      {metrics.cache && <p className="type-caption tabular-nums">{i18n.formatMessage(messages.cacheBasis, {
+        read: formatCount(metrics.cache.read), input: formatCount(metrics.cache.input),
+      })}</p>}
+    </MetricCard>
+    <MetricCard label={`${title} · ${i18n.text(messages.throughput)}`} icon={<Gauge />} value={speed}>
       {header}
       <Stats>
         <Stat label={i18n.text(performanceMessages.output)} value={speed} caption={coverage(output.count)} />
@@ -59,9 +54,8 @@ export function TurnMetrics({ metrics, incomplete }: { metrics: TurnMetricsData;
           label={i18n.text(performanceMessages[key])} value={throughput(i18n, tokensPerSecond(metrics.performance.rates[key]))}
           caption={coverage(metrics.performance.rates[key].count)} />)}
       </Stats>
-      <p className="type-caption">{i18n.text(messages.throughputHint)}</p>
-    </MetricTooltip>
-    {metrics.performance.timed > 0 && <span className="type-caption tabular-nums" title={i18n.text(performanceMessages.totalDurationHint)}>
+    </MetricCard>
+    {metrics.performance.timed > 0 && <span className="type-caption tabular-nums">
       {formatDuration(i18n, metrics.performance.durationMs)}
     </span>}
     {incomplete && <span className="type-caption">{i18n.text(conversationMessages.incomplete)}</span>}

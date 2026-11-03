@@ -6,9 +6,9 @@ import { StatusIcon } from "@asterism-app/ui/ui/status";
 import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { Progress } from "@asterism-app/ui/ui/progress";
+import { ProgressRing } from "@asterism-app/ui/ui/progress-ring";
 import { updatesMessages as messages } from "../messages/updates";
 import { useI18n } from "../shared/i18n";
-import { cn } from "@asterism-app/ui/utils";
 import { fadeTransition } from "../shared/weave/motion";
 import { useUpdates } from "../features/updates/state";
 import { UpdateAction, UpdateError, UpdateNotesLink, useUpdateSummary } from "../features/updates/controls";
@@ -35,7 +35,7 @@ export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
               <AnimatePresence initial={false}>
                 <motion.span key={status} className="absolute inset-0 flex items-center justify-center"
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
-                  {status === "downloading" ? <DownloadRing progress={state.progress} />
+                  {status === "downloading" ? <ProgressRing value={state.progress > 0 ? state.progress / 100 : "indeterminate"} className="text-primary-text" />
                     : status === "checking" || status === "restarting" ? <StatusIcon tone="progress" className="size-4" />
                     : status === "ready" ? <CircleArrowUp className="size-4 text-primary-text" />
                     : <StatusIcon tone={status === "error" ? "error" : "neutral"} className="size-4" />}
@@ -77,16 +77,4 @@ export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
       </div>
     </PopoverContent>
   </Popover>;
-}
-
-/** Download progress drawn on the lucide 24-unit grid so it matches neighboring titlebar icons; before the first progress event it spins a short arc. */
-function DownloadRing({ progress }: { progress: number }) {
-  const pending = progress <= 0;
-  const filled = pending ? 25 : Math.min(progress, 100);
-  return <svg viewBox="0 0 24 24" fill="none" strokeWidth={2} stroke="currentColor"
-    className={cn("size-4 -rotate-90 text-primary-text", pending && "animate-spin motion-reduce:animate-none")}>
-    <circle cx={12} cy={12} r={10} className="opacity-25" />
-    <circle cx={12} cy={12} r={10} pathLength={100} strokeLinecap="round" strokeDasharray="100 100"
-      strokeDashoffset={100 - filled} className="transition-[stroke-dashoffset] duration-300 ease-out motion-reduce:transition-none" />
-  </svg>;
 }

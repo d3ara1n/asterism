@@ -10,8 +10,5 @@ export const turnMetricMessages = pluginNamespace("asterism.builtin").messages("
   requests: { id: "turnMetrics.requests", defaultMessage: "{count, plural, one {# model request} other {# model requests}}" },
   coverage: { id: "turnMetrics.coverage", defaultMessage: "{count} of {total} requests reported" },
   cacheBasis: { id: "turnMetrics.cacheBasis", defaultMessage: "{read} cached / {input} input toks" },
-  cacheHint: { id: "turnMetrics.cacheHint", defaultMessage: "Total cached input ÷ total input across requests with both values reported." },
-  throughputHint: { id: "turnMetrics.throughputHint", defaultMessage: "Total output tokens ÷ their total request time, including model waiting and reasoning. Tool execution is excluded." },
-  incomplete: { id: "turnMetrics.incomplete", defaultMessage: "This turn is incomplete. Showing reported measurements." },
   tps: { id: "turnMetrics.tps", defaultMessage: "{value} t/s" },
 }));

@@ -6,7 +6,8 @@ import { useProviderUsage } from "./use-usage";
 import { AgentToolbarItem, useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { Progress } from "@asterism-app/ui/ui/progress";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
-import { MetricTooltip } from "../agent/conversation/MetricTooltip";
+import { cn } from "@asterism-app/ui/utils";
+import { MetricCard } from "../agent/conversation/MetricCard";
 import { usageMessages as messages } from "../messages/usage";
 
 /** Query consumers understand only public result types; they import no vendor query implementations or presets. */
@@ -35,7 +36,7 @@ export function UsageToolbarItem() {
     const hours = Math.floor(minutes / 60);
     return hours < 24 ? `${hours}h ${minutes % 60}m` : `${Math.floor(hours / 24)}d ${hours % 24}h`;
   };
-  return <AgentToolbarItem><MetricTooltip label={i18n.text(title)} value={value}
+  return <AgentToolbarItem><MetricCard label={i18n.text(title)} value={value}
     icon={<>
       {primary ? <Progress className="h-1.5 w-14" value={quotaRemaining(primary) * 100}
         aria-label={i18n.text(primary.label)} aria-valuetext={i18n.formatMessage(messages.remaining, { value })} />
@@ -45,10 +46,11 @@ export function UsageToolbarItem() {
     <h4 className="type-label">{i18n.text(title)}</h4>
     {state.items.map(item => <div key={item.id} className="space-y-1">
       <div className="flex items-baseline justify-between gap-4">
-        <span>{i18n.text(item.label)}</span><span className="tabular-nums">{i18n.formatMessage(messages.remaining, { value: amount(item) })}</span>
+        <span>{i18n.text(item.label)}</span><span className={cn("tabular-nums", item.type === "quota" && quotaRemaining(item) === 0 && "text-warning")}>
+          {i18n.formatMessage(messages.remaining, { value: amount(item) })}</span>
       </div>
       {item.type === "quota" && <>
-        <Progress className="h-1" value={quotaRemaining(item) * 100} aria-label={i18n.text(item.label)} />
+        <Progress className={cn("h-1", quotaRemaining(item) === 0 && "bg-warning/25")} value={quotaRemaining(item) * 100} aria-label={i18n.text(item.label)} />
         {item.value.type === "quantity" && <p className="type-caption tabular-nums">
           {i18n.formatNumber(item.value.remaining)} / {i18n.formatNumber(item.value.limit)} {i18n.text(item.value.unit)}
         </p>}
@@ -60,12 +62,11 @@ export function UsageToolbarItem() {
     </div>)}
     {state.items.length === 0 && !state.error && <p className="type-caption">{i18n.text(state.state === "loading" ? messages.loading
       : state.state === "waiting" ? messages.waiting : messages.empty)}</p>}
-    {state.source === "headers" && <p className="type-caption">{i18n.text(messages.headerSource)}</p>}
-    {primary?.category === "rate_limit" && <p className="type-caption">{i18n.text(messages.rateHint)}</p>}
     {state.model && <p className="type-caption">{i18n.formatMessage(messages.reportedModel, { model: state.model })}</p>}
-    {exhausted && <p className="type-caption">{i18n.text(messages.exhausted)}</p>}
-    {stale && <p className="type-caption">{i18n.text(messages.stale)}</p>}
     {state.error && <p className="type-caption">{i18n.text(messages[state.error])}</p>}
-    {state.updatedAt !== null && <p className="type-caption">{i18n.formatMessage(messages.updated, { time: i18n.formatDate(state.updatedAt, { hour: "numeric", minute: "2-digit" }) })}</p>}
-  </MetricTooltip></AgentToolbarItem>;
+    {state.updatedAt !== null && <p className={cn("type-caption flex items-center gap-1", stale && "text-warning")}>
+      {stale && <AlertCircle className="size-3" aria-hidden="true" />}
+      {i18n.formatMessage(messages.updated, { time: i18n.formatDate(state.updatedAt, { hour: "numeric", minute: "2-digit" }) })}
+    </p>}
+  </MetricCard></AgentToolbarItem>;
 }

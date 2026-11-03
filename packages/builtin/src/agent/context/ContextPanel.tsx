@@ -11,11 +11,11 @@ import { modelReference } from "@asterism-app/sdk/contracts";
 import { resolveAgentModel } from "@asterism-app/builtin-api/contracts";
 import { useSettingsConfiguration } from "../../configuration/renderer-state";
 import { contextMessages as messages } from "../../messages/context";
-import { COMPRESSION_RESERVE } from "../context-budget";
 import { readAgentInsight } from "../renderer-history";
 import type { AgentView } from "../data";
 import { diagnosticModel } from "../diagnostics/cost";
-import { ease, PanelBody, percent, Section, stripes, Swatch, SystemComposition } from "../panel-kit";
+import { ease, PanelBody, percent, Section, Swatch, SystemComposition } from "../panel-kit";
+import { WindowMeter } from "./WindowMeter";
 import { allocateTiles, conversationCategories, type ContextInsight, type ConversationCategory } from "./insight";
 
 const COLUMNS = 20, ROWS = 5;
@@ -25,7 +25,7 @@ const fill: Record<ConversationCategory, string> = {
   result: "bg-chart-3", context: "bg-chart-7", summary: "bg-chart-8", agentMessage: "bg-chart-5",
   eventMessage: "bg-chart-9",
 };
-/** Window usage: used capacity comes from reported input, while the window and reserve come from the measured request's model configuration; unmeasured content is not plotted. */
+/** Window usage: used capacity comes from reported input, while the window and reserve come from the measured request's model configuration. */
 function WindowUsage({ insight, selection }: { insight: ContextInsight; selection: z.infer<typeof AgentView.schema>["selection"] }) {
   const i18n = useI18n();
   const { snapshot: configuration } = useSettingsConfiguration();
@@ -36,38 +36,16 @@ function WindowUsage({ insight, selection }: { insight: ContextInsight; selectio
   const changed = measured && current && modelReference(measured) !== modelReference(current);
   if (usage.compressedAfter) return <Section title={i18n.text(messages.window)}><p className="type-caption">{i18n.text(messages.compressed)}</p></Section>;
   const window = measured?.contextWindow ?? null;
-  const reserve = window ? Math.min(COMPRESSION_RESERVE, window) : 0;
-  const used = window ? Math.min(usage.input, window) : usage.input;
-  const free = window ? Math.max(window - reserve - used, 0) : 0;
-  const share = (value: number) => window ? `${value / window * 100}%` : "0%";
-  const legend = [
-    { key: "used", label: messages.used, value: usage.input, swatch: <Swatch className="bg-chart-1" /> },
-    ...window ? [
-      { key: "free", label: messages.free, value: free, swatch: <Swatch className="bg-muted ring-1 ring-border ring-inset" /> },
-      { key: "reserve", label: messages.reserve, value: reserve, swatch: <Swatch className="ring-1 ring-border ring-inset" style={stripes} /> },
-    ] : [],
-  ];
   return <Section title={i18n.text(messages.window)} aside={window ? percent(i18n, usage.input, window) : undefined}>
     <div className="flex items-baseline gap-1.5">
       <span className="type-page tabular-nums">{formatCount(usage.input)}</span>
       <span className="type-caption tabular-nums">{window ? i18n.formatMessage(messages.windowOf, { window: formatCount(window) }) : i18n.text(messages.tokens)}</span>
     </div>
-    {window && <div role="img" aria-label={`${i18n.text(messages.used)} ${percent(i18n, usage.input, window)}`}
-      className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted ring-1 ring-border ring-inset">
-      <motion.div className="h-full bg-chart-1" initial={{ width: 0 }} animate={{ width: share(used) }}
-        transition={{ duration: 0.6, ease }} />
-      <div className="h-full flex-1" />
-      <div className="h-full border-l border-border" style={{ ...stripes, width: share(reserve) }} />
-    </div>}
-    <ul className="space-y-1">{legend.map(item => <li key={item.key} className="flex items-center gap-2 type-caption">
-      {item.swatch}<span className="flex-1">{i18n.text(item.label)}</span>
-      <span className="tabular-nums">{formatCount(item.value)}</span>
-    </li>)}</ul>
-    <div className="space-y-1">
+    <WindowMeter input={usage.input} window={window} />
+    {(!window || changed) && <div className="space-y-1">
       {!window && <p className="type-caption">{i18n.text(messages.windowUnknown)}</p>}
       {changed && <p className="type-caption">{i18n.formatMessage(messages.modelChanged, { model: measured.name })}</p>}
-      <p className="type-caption">{i18n.text(messages.reported)} {i18n.text(messages.pending)}</p>
-    </div>
+    </div>}
   </Section>;
 }
 

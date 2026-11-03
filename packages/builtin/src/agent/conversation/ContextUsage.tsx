@@ -4,14 +4,16 @@ import { useI18n, useRendererCatalogs, useRendererObject, useSessionRead } from 
 import { ModelCatalog } from "@asterism-app/sdk/contracts";
 import { useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { formatCount } from "@asterism-app/ui/format-count";
+import { ProgressRing } from "@asterism-app/ui/ui/progress-ring";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { contextMessages as messages } from "../../messages/context";
 import { readAgentMeasurements } from "../renderer-history";
 import { diagnosticModel } from "../diagnostics/cost";
 import { percent } from "../panel-kit";
-import { MetricTooltip } from "./MetricTooltip";
-import { commonMessages } from "@asterism-app/ui/messages/common";
+import { WindowMeter } from "../context/WindowMeter";
+import { MetricCard } from "./MetricCard";
 
-/** Conversation measurements share their source with the context panel; only reported usage from saved requests is shown. */
+/** Conversation measurements share their source with the context panel; the ring stays unmeasured until a saved request reports input. */
 export function ContextUsage() {
   const i18n = useI18n();
   const object = useRendererObject();
@@ -26,29 +28,25 @@ export function ContextUsage() {
   const window = measured?.contextWindow ?? null;
   const input = usage && !usage.compressedAfter ? usage.input : null;
   const ratio = input !== null && window ? input / window : null;
-  const status = !result ? read.status === "loading" ? commonMessages.loading : messages.unavailable : !usage ? messages.noUsage
-    : usage.compressedAfter ? messages.compressed : !window ? messages.windowUnknown : null;
-  const value = ratio !== null ? percent(i18n, input!, window!, 1) : "—";
-  const title = `${i18n.text(messages.window)} · ${value}`;
-  const description = status ? i18n.text(status) : i18n.text(messages.reported);
+  const status = !result ? read.status === "loading" ? commonMessages.loading : messages.unavailable
+    : !usage ? messages.noUsage : usage.compressedAfter ? messages.compressed : null;
+  const value = ratio !== null ? percent(i18n, input!, window!, 1) : input !== null ? formatCount(input) : "—";
 
-  return <MetricTooltip label={i18n.text(messages.window)} value={value}
-    icon={<svg aria-hidden="true" viewBox="0 0 20 20" className="size-4 -rotate-90" fill="none" strokeWidth="2.5">
-      <circle cx="10" cy="10" r="8" className="stroke-muted" />
-      {ratio !== null ? <circle cx="10" cy="10" r="8" pathLength="100" className="stroke-chart-1"
-        strokeDasharray={`${Math.min(Math.max(ratio, 0), 1) * 100} 100`} />
-        : <circle cx="10" cy="10" r="8" pathLength="100" className="stroke-muted-foreground" strokeDasharray="4 8" />}
-    </svg>}>
-    <h4 className="type-label tabular-nums">{title}</h4>
-    <div className="type-caption space-y-1">
-      {input !== null && <p className="tabular-nums">{formatCount(input)} {window
-        ? i18n.formatMessage(messages.windowOf, { window: formatCount(window) }) : i18n.text(messages.tokens)}</p>}
-      <p>{description}</p>
-      {input !== null && <>
-        {status && <p>{i18n.text(messages.reported)}</p>}
-        {changed && <p>{i18n.formatMessage(messages.modelChanged, { model: measured.name })}</p>}
-        <p>{i18n.text(messages.pending)}</p>
-      </>}
+  return <MetricCard label={i18n.text(messages.window)} value={value}
+    icon={<ProgressRing value={ratio} />}>
+    <div className="flex items-baseline justify-between gap-3">
+      <h4 className="type-label">{i18n.text(messages.window)}</h4>
+      {ratio !== null && <span className="type-section tabular-nums">{value}</span>}
     </div>
-  </MetricTooltip>;
+    {input !== null ? <>
+      <div className="flex items-baseline gap-1.5">
+        <span className="type-page tabular-nums">{formatCount(input)}</span>
+        <span className="type-caption tabular-nums">{window
+          ? i18n.formatMessage(messages.windowOf, { window: formatCount(window) }) : i18n.text(messages.tokens)}</span>
+      </div>
+      <WindowMeter input={input} window={window} fill="bg-primary" />
+      {!window && <p className="type-caption">{i18n.text(messages.windowUnknown)}</p>}
+      {changed && <p className="type-caption">{i18n.formatMessage(messages.modelChanged, { model: measured.name })}</p>}
+    </> : status && <p className="type-caption">{i18n.text(status)}</p>}
+  </MetricCard>;
 }
