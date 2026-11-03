@@ -6,8 +6,12 @@ import { ArrowLeft, Bell, BellOff, CornerUpLeft, Eye, Hash, List, Megaphone, Mes
 import { cardRenderer, creationEntry, recordRenderer, toolRenderer, useI18n, useRendererCalls, useRendererObject, useRendererSettings,
   type CreationInputProps, type I18n, type RendererModule, type RendererReceipt, type ContentReader, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { messagingText, type MessagingConversation, type MessagingConnectionInfo, type MessagingConnectionStatus, type MessagingMessage } from "@asterism-app/sdk/contracts";
-import { AttachmentGroup } from "@asterism-app/ui/ui/attachment";
-import { FilePreview } from "../shared/attachments";
+import { FilePreview, MessageAttachments, type InputFile } from "../shared/attachments";
+import { Message, MessageContent, MessageHeader } from "@asterism-app/ui/ui/message";
+import { Bubble, BubbleContent } from "@asterism-app/ui/ui/bubble";
+import { Marker, MarkerContent } from "@asterism-app/ui/ui/marker";
+import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport,
+  useMessageScroller } from "@asterism-app/ui/ui/message-scroller";
 import { mediaMessages } from "../messages/media";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -213,43 +217,55 @@ function ConnectionConversations({ connection, back, notify, error }: {
 
 /* ---------- Chat: message timeline and composer ---------- */
 
-type ChatPart = ChatMessage["parts"][number];
-type ChatFile = Extract<ChatPart, { kind: "file" }>;
-/** Consecutive attachments share one group; text parts keep their position between them. */
-function MessageParts({ message, content }: { message: ChatMessage; content: ContentReader }) {
-  const segments: (Exclude<ChatPart, ChatFile> | ChatFile[])[] = [];
-  for (const part of message.parts) {
-    const last = segments.at(-1);
-    if (part.kind === "text") segments.push(part);
-    else if (Array.isArray(last)) last.push(part);
-    else segments.push([part]);
-  }
-  return <div className="flex min-w-0 flex-col gap-2">{segments.map((segment, index) => Array.isArray(segment)
-    ? <AttachmentGroup key={index}>{segment.map(part => <FilePreview key={part.id} content={content} part={{ kind: "file-reference", ref: part.ref,
-      mediaType: part.mediaType, ...(part.filename ? { filename: part.filename } : {}), ...(part.size === undefined ? {} : { size: part.size }) }} />)}</AttachmentGroup>
-    : <p key={index} className="type-body whitespace-pre-wrap break-words">{segment.text}</p>)}</div>;
+function chatFiles(message: ChatMessage): InputFile[] {
+  return message.parts.flatMap(part => part.kind === "file" ? [{ kind: "file-reference" as const, ref: part.ref, mediaType: part.mediaType,
+    ...(part.filename ? { filename: part.filename } : {}), ...(part.size === undefined ? {} : { size: part.size }) }] : []);
+}
+function chatTexts(message: ChatMessage): string[] {
+  return message.parts.flatMap(part => part.kind === "text" && part.text ? [part.text] : []);
+}
+/** Tool results show a message without a bubble: attachments first, then its text. */
+function MessageBody({ message, content }: { message: ChatMessage; content: ContentReader }) {
+  return <div className="flex min-w-0 flex-col gap-1.5">
+    <MessageAttachments parts={chatFiles(message)} content={content} />
+    {chatTexts(message).map((text, index) => <p key={index} className="type-body whitespace-pre-wrap wrap-anywhere">{text}</p>)}
+  </div>;
 }
 function MessagesResult({ result }: ToolRenderProps<z.infer<typeof ChatRead.schema>>) {
   const object = useRendererObject(), i18n = useI18n();
   return <div className="flex flex-col gap-3">{result?.data?.messages.map(message => <div key={message.id} className="flex flex-col gap-1">
     <span className="type-caption text-muted-foreground">{message.sender.name} · {i18n.formatDate(Date.parse(message.sentAt), { dateStyle: "medium", timeStyle: "short" })}</span>
-    <MessageParts message={message} content={object.content} />
+    <MessageBody message={message} content={object.content} />
   </div>)}</div>;
 }
 function SentResult({ result }: ToolRenderProps<z.infer<typeof ChatSend.schema>>) {
   const object = useRendererObject();
-  return result?.data ? <MessageParts message={result.data} content={object.content} /> : null;
+  return result?.data ? <MessageBody message={result.data} content={object.content} /> : null;
 }
 function SeenResult({ result }: ToolRenderProps<z.infer<typeof ChatSee.schema>>) {
   const object = useRendererObject(), image = result?.data;
   return image ? <FilePreview content={object.content} part={{ kind: "file", file: image.file, ref: image.ref,
     mediaType: image.mediaType, size: image.size, ...(image.filename ? { filename: image.filename } : {}) }} /> : null;
 }
+
+type ChatEntry = { kind: "day"; key: string; sentAt: string } | { kind: "system"; message: ChatMessage } | { kind: "message"; message: ChatMessage; first: boolean };
+/** Timeline rows in display order: a day marker opens each local day, and the first message of a sender group carries its name. */
+function chatEntries(items: readonly ChatMessage[]): ChatEntry[] {
+  return groupTimeline(items).flatMap((group, index, groups) => [
+    ...(groups[index - 1]?.day === group.day ? [] : [{ kind: "day" as const, key: `day:${group.day}`, sentAt: group.messages[0]!.sentAt }]),
+    ...group.messages.map((message, position): ChatEntry => group.sender.role === "system"
+      ? { kind: "system", message } : { kind: "message", message, first: position === 0 }),
+  ]);
+}
+const entrance = { duration: 0.22, ease: [0.23, 1, 0.32, 1] } as const;
+
 function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
-  const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n(), operations = useOperations();
+  const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n(), operations = useOperations(), reducedMotion = useReducedMotion();
   const [items, setItems] = useState<ChatMessage[] | null>(null), [loadError, setLoadError] = useState<string | null>(null);
   const [text, setText] = useState(""), [replyTo, setReplyTo] = useState<MessagingMessage | null>(null);
-  const log = useRef<HTMLOListElement>(null), pinned = useRef(true);
+  // Each successful send asks the timeline to return to the newest message, which it then follows as the reload arrives.
+  const [follow, setFollow] = useState(0);
+  const composer = useRef<HTMLTextAreaElement>(null);
   const status = data.connection?.status ?? "unavailable";
   const usable = !!data.connection?.enabled && status !== "unavailable";
   // Reload on mount, on each observed event for this conversation, and when the connection becomes usable.
@@ -262,12 +278,6 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
     }, error => { if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : i18n.text(messages.failed)); });
     return () => controller.abort();
   }, [calls, object.ref.id, data.connectionId, data.latest, status === "connected", usable]);
-  // Stay at the newest message unless the reader has scrolled away from it.
-  useLayoutEffect(() => {
-    const element = log.current;
-    if (element && pinned.current) element.scrollTop = element.scrollHeight;
-  }, [items]);
-  const byId = new Map((items ?? []).map(message => [message.id, message]));
   const nameOf = (message: MessagingMessage) => message.sender.role === "self" ? i18n.text(messages.you) : message.sender.name;
   // Sending keeps the composer in place: the draft is read-only and repeated submits are ignored, without dimming the card.
   const sending = operations.pending("send");
@@ -275,10 +285,11 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
     if (!usable || !text.trim()) return;
     void operations.run("send", async () => {
       const receipt = await object.invoke(SendChat, { text, ...(replyTo ? { replyTo: replyTo.id } : {}) });
-      if (receipt.ok) { setText(""); setReplyTo(null); pinned.current = true; }
+      if (receipt.ok) { setText(""); setReplyTo(null); setFollow(value => value + 1); }
       return receipt;
     });
   };
+  const reply = (message: MessagingMessage) => { setReplyTo(message); composer.current?.focus(); };
   return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
     <header className="flex min-w-0 flex-col border-b px-3 py-1.5">
       <span className="type-caption truncate">
@@ -286,56 +297,30 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
       </span>
       {status !== "connected" && <ConnectionStatus connection={data.connection ?? { status }} />}
     </header>
-    <ol ref={log} role="log" aria-label={i18n.text(messages.chat)}
-      className="flex min-h-0 flex-1 select-text flex-col gap-3 overflow-auto px-3 py-2"
-      onScroll={event => { const element = event.currentTarget; pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24; }}>
-      {usable && items === null && !loadError && <li className="flex flex-1 items-center justify-center"><Spinner aria-hidden="true" /></li>}
-      {items?.length === 0 && <li className="type-caption flex flex-1 items-center justify-center">{i18n.text(messages.noMessages)}</li>}
-      {groupTimeline(items ?? []).map((group, index, groups) => {
-        const first = group.messages[0]!, newDay = groups[index - 1]?.day !== group.day;
-        const day = newDay && <li className="type-caption self-center tabular-nums">
-          {i18n.formatDate(Date.parse(first.sentAt), { dateStyle: "medium" })}
-        </li>;
-        if (group.sender.role === "system") return <Group key={first.id} day={day}>{group.messages.map(message =>
-          <li key={message.id} className="type-caption self-center text-center">{messagingText(message)}</li>)}</Group>;
-        const self = group.sender.role === "self";
-        return <Group key={first.id} day={day}>
-          <li className={cn("flex min-w-0 flex-col gap-0.5", self ? "items-end" : "items-start")}>
-            <span className="type-label px-1">{nameOf(first)}</span>
-            <ol className={cn("flex min-w-0 max-w-[85%] flex-col gap-0.5", self ? "items-end" : "items-start")}>
-              {group.messages.map(message => {
-                const quoted = message.replyTo ? byId.get(message.replyTo) : undefined;
-                return <li key={message.id} className={cn("group/message flex min-w-0 items-end gap-1", self && "flex-row-reverse")}>
-                  <div className={cn("min-w-0 rounded-lg px-2.5 py-1.5", self ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                    {message.replyTo && <p className={cn("type-caption mb-1 truncate border-l-2 pl-1.5", self ? "border-primary-foreground/50 text-primary-foreground/80" : "border-border")}>
-                      {i18n.formatMessage(messages.inReplyTo, { name: quoted ? nameOf(quoted) : message.replyTo })}{quoted ? ` · ${messagingText(quoted)}` : ""}
-                    </p>}
-                    <MessageParts message={message} content={object.content} />
-                  </div>
-                  <span className="type-caption shrink-0 tabular-nums opacity-0 transition-opacity group-hover/message:opacity-100 group-focus-within/message:opacity-100">
-                    {i18n.formatDate(Date.parse(message.sentAt), { hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                  {/* Rendered only while replies are possible; a disabled style would override the hover-only visibility. */}
-                  {usable && <IconButton size="icon-xs" label={i18n.text(messages.reply)}
-                    className="opacity-0 group-hover/message:opacity-100 focus-visible:opacity-100" onClick={() => setReplyTo(message)}>
-                    <CornerUpLeft />
-                  </IconButton>}
-                </li>;
-              })}
-            </ol>
-          </li>
-        </Group>;
-      })}
-    </ol>
+    <div className="relative min-h-0 flex-1">
+      {items ? <MessageScrollerProvider autoScroll defaultScrollPosition="end">
+        <ChatTimeline items={items} follow={follow} usable={usable} nameOf={nameOf} onReply={reply} />
+      </MessageScrollerProvider>
+        : usable && !loadError && <div className="flex h-full items-center justify-center"><Spinner aria-hidden="true" /></div>}
+    </div>
     <ErrorLine error={loadError} />
-    <form className="flex flex-col gap-1.5 border-t p-2" onSubmit={event => { event.preventDefault(); send(); }}>
-      {replyTo && <div className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted px-2 py-1">
-        <CornerUpLeft className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-        <span className="type-caption min-w-0 flex-1 truncate">{i18n.formatMessage(messages.replyingTo, { name: nameOf(replyTo) })} · {messagingText(replyTo)}</span>
-        <IconButton size="icon-xs" label={i18n.text(messages.cancelReply)} onClick={() => setReplyTo(null)}><X /></IconButton>
-      </div>}
+    <form className="flex flex-col border-t p-2" onSubmit={event => { event.preventDefault(); send(); }}>
+      <AnimatePresence initial={false}>
+        {replyTo && <motion.div key="reply" className="overflow-hidden"
+          initial={reducedMotion ? false : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
+          exit={reducedMotion ? { opacity: 0, transition: { duration: 0 } } : { height: 0, opacity: 0 }} transition={entrance}>
+          <div className="flex min-w-0 items-center gap-2 pb-2">
+            <CornerUpLeft className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+            <div className="flex min-w-0 flex-1 flex-col rounded-md border-l-2 border-primary/60 bg-muted px-2 py-1 text-xs leading-snug">
+              <span className="truncate font-medium">{i18n.formatMessage(messages.replyingTo, { name: nameOf(replyTo) })}</span>
+              <span className="truncate text-muted-foreground">{messagingText(replyTo)}</span>
+            </div>
+            <IconButton size="icon-xs" label={i18n.text(messages.cancelReply)} onClick={() => setReplyTo(null)}><X /></IconButton>
+          </div>
+        </motion.div>}
+      </AnimatePresence>
       <div className="flex items-end gap-1.5">
-        <Textarea rows={1} value={text} disabled={!usable} readOnly={sending} aria-label={i18n.text(messages.text)}
+        <Textarea ref={composer} rows={1} value={text} disabled={!usable} readOnly={sending} aria-label={i18n.text(messages.text)}
           placeholder={i18n.text(messages.composerHint)} className="max-h-32 min-h-9 flex-1 resize-none"
           onChange={event => setText(event.target.value)}
           onKeyDown={event => {
@@ -351,8 +336,113 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
     </form>
   </div>;
 }
-function Group({ day, children }: { day: ReactNode; children: ReactNode }) {
-  return <>{day}{children}</>;
+
+/**
+ * Items paint without containment: `content-visibility: auto` clips each item to its box, which would cut the jump highlight
+ * ringing beyond a bubble. A Chat shows one page of recent messages, so skipping offscreen rendering gains little.
+ */
+const itemPaint = "[content-visibility:visible]";
+
+/** Mounted with loaded messages, so the scroller opens at the newest one; messages that arrive later animate in. */
+function ChatTimeline({ items, follow, usable, nameOf, onReply }: {
+  items: readonly ChatMessage[]; follow: number; usable: boolean;
+  nameOf(message: MessagingMessage): string; onReply(message: MessagingMessage): void;
+}) {
+  const i18n = useI18n(), scroller = useMessageScroller(), reducedMotion = useReducedMotion();
+  const content = useRef<HTMLDivElement>(null);
+  const seen = useRef<Set<string> | null>(null);
+  seen.current ??= new Set(items.map(message => message.id));
+  const known = seen.current;
+  useLayoutEffect(() => { for (const message of items) known.add(message.id); }, [items, known]);
+  useEffect(() => { if (follow) scroller.scrollToEnd({ behavior: reducedMotion ? "auto" : "smooth" }); }, [follow]);
+  // The quoted message is brought into view and its surface briefly rings so the eye finds it.
+  const jump = (id: string) => {
+    if (!scroller.scrollToMessage(id, { align: "center", behavior: reducedMotion ? "auto" : "smooth" })) return;
+    const surface = content.current?.querySelector<HTMLElement>(
+      `[data-message-id="${CSS.escape(id)}"] :is([data-slot=bubble-content], [data-slot=message-attachments])`);
+    if (!surface) return;
+    const color = getComputedStyle(surface).getPropertyValue("--ring").trim() || "currentColor";
+    surface.animate([{ boxShadow: `0 0 0 2px ${color}` }, { boxShadow: `0 0 0 ${reducedMotion ? 2 : 8}px transparent` }],
+      { duration: 1200, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+  };
+  const byId = new Map(items.map(message => [message.id, message]));
+  return <MessageScroller className="absolute inset-0">
+    <MessageScrollerViewport aria-label={i18n.text(messages.chat)} className="select-text overflow-x-hidden">
+      <MessageScrollerContent ref={content} className="gap-0 px-3 pt-1 pb-3">
+        {items.length === 0 && <MessageScrollerItem className="flex flex-1 items-center justify-center">
+          <p className="type-caption">{i18n.text(messages.noMessages)}</p>
+        </MessageScrollerItem>}
+        {chatEntries(items).map(entry => {
+          if (entry.kind === "day") return <MessageScrollerItem key={entry.key} className={cn(itemPaint, "pt-3")}>
+            <Marker variant="separator" className="text-xs tabular-nums"><MarkerContent>{i18n.formatDate(Date.parse(entry.sentAt), { dateStyle: "medium" })}</MarkerContent></Marker>
+          </MessageScrollerItem>;
+          const { message } = entry;
+          if (entry.kind === "system") return <MessageScrollerItem key={message.id} messageId={message.id} className={cn(itemPaint, "pt-2")}>
+            <Marker className="justify-center text-xs"><MarkerContent className="text-center">{messagingText(message)}</MarkerContent></Marker>
+          </MessageScrollerItem>;
+          return <MessageScrollerItem key={message.id} messageId={message.id} className={cn(itemPaint, entry.first ? "pt-3" : "pt-1")}>
+            <ChatRow message={message} first={entry.first} fresh={!known.has(message.id)} usable={usable} nameOf={nameOf}
+              quoted={message.replyTo ? byId.get(message.replyTo) : undefined} onReply={onReply} onJump={jump} />
+          </MessageScrollerItem>;
+        })}
+      </MessageScrollerContent>
+    </MessageScrollerViewport>
+    <MessageScrollerButton className="bottom-3" />
+  </MessageScroller>;
+}
+
+/**
+ * One message: attachments above its text bubble, both on the sender's side. Time and reply sit in a rail beside the body,
+ * outside its width, and appear on hover or focus.
+*/
+function ChatRow({ message, first, fresh, usable, quoted, nameOf, onReply, onJump }: {
+  message: ChatMessage; first: boolean; fresh: boolean; usable: boolean; quoted: ChatMessage | undefined;
+  nameOf(message: MessagingMessage): string; onReply(message: MessagingMessage): void; onJump(id: string): void;
+}) {
+  const i18n = useI18n(), object = useRendererObject(), reducedMotion = useReducedMotion();
+  const self = message.sender.role === "self", align = self ? "end" : "start";
+  const texts = chatTexts(message), sentAt = Date.parse(message.sentAt);
+  return <motion.div initial={fresh && !reducedMotion ? { opacity: 0, y: 8, scale: 0.98 } : false} animate={{ opacity: 1, y: 0, scale: 1 }}
+    transition={entrance} style={{ transformOrigin: self ? "bottom right" : "bottom left" }}>
+    <Message align={align}>
+      <MessageContent className="gap-1">
+        {first && <MessageHeader className="px-1"><span className="truncate">{nameOf(message)}</span></MessageHeader>}
+        <div data-slot="chat-body" className="group/row relative flex w-fit max-w-[80%] min-w-0 flex-col gap-1">
+          <MessageAttachments parts={chatFiles(message)} content={object.content} align={align} className="rounded-xl" />
+          {(texts.length > 0 || message.replyTo) && <Bubble variant={self ? "default" : "muted"} align={align} className="max-w-full">
+            <BubbleContent className="flex flex-col gap-1.5 px-2.5 py-1.5 wrap-anywhere">
+              {message.replyTo && <Quote id={message.replyTo} quoted={quoted} self={self} nameOf={nameOf} onJump={onJump} />}
+              {texts.map((text, index) => <p key={index} className="whitespace-pre-wrap">{text}</p>)}
+            </BubbleContent>
+          </Bubble>}
+          <div className={cn("absolute bottom-0 flex items-center gap-0.5 whitespace-nowrap opacity-0 transition-opacity duration-150",
+            "group-hover/row:opacity-100 group-focus-within/row:opacity-100", self ? "right-full mr-1 flex-row-reverse" : "left-full ml-1")}>
+            <time dateTime={message.sentAt} title={i18n.formatDate(sentAt, { dateStyle: "full", timeStyle: "medium" })}
+              className="type-caption px-0.5 tabular-nums">{i18n.formatDate(sentAt, { hour: "2-digit", minute: "2-digit" })}</time>
+            {usable && <IconButton size="icon-xs" label={i18n.text(messages.reply)} onClick={() => onReply(message)}><CornerUpLeft /></IconButton>}
+          </div>
+        </div>
+      </MessageContent>
+    </Message>
+  </motion.div>;
+}
+
+/** The quoted message inside a bubble; a loaded quote jumps to its message. Text wraps within the bubble instead of widening it. */
+function Quote({ id, quoted, self, nameOf, onJump }: {
+  id: string; quoted: ChatMessage | undefined; self: boolean; nameOf(message: MessagingMessage): string; onJump(id: string): void;
+}) {
+  const i18n = useI18n();
+  const name = quoted ? nameOf(quoted) : id, label = i18n.formatMessage(messages.inReplyTo, { name });
+  const className = cn("flex min-w-0 flex-col rounded-md border-l-2 px-2 py-1 text-left text-xs leading-snug wrap-anywhere",
+    self ? "border-primary-foreground/60 bg-primary-foreground/15" : "border-primary/60 bg-foreground/5");
+  const body = <>
+    <span className="line-clamp-1 font-medium">{name}</span>
+    {quoted && <span className="line-clamp-2 opacity-80">{messagingText(quoted)}</span>}
+  </>;
+  return quoted
+    ? <button type="button" title={label} aria-label={label} onClick={() => onJump(quoted.id)} className={cn(className,
+      "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", self ? "hover:bg-primary-foreground/25" : "hover:bg-foreground/10")}>{body}</button>
+    : <div title={label} className={className}>{body}</div>;
 }
 
 /* ---------- Chat creation: pick an observed conversation or enter its address ---------- */

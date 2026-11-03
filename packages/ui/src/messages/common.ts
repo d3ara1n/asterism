@@ -189,4 +189,12 @@ export const commonMessages = pluginNamespace("asterism.host").messages("en", de
     id: "provider.baseUrl",
     defaultMessage: "Base URL",
   },
+  scrollToEnd: {
+    id: "scrollToEnd",
+    defaultMessage: "Scroll to latest",
+  },
+  scrollToStart: {
+    id: "scrollToStart",
+    defaultMessage: "Scroll to start",
+  },
 }));

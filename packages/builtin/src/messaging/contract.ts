@@ -74,7 +74,7 @@ export const ChatRead = defineImplementation({
 export const ChatSend = defineImplementation({
   ...builtin.data("chat.send", chatMessageSchema.describe("The message accepted by the external messaging service.")),
   resource: Chat, tool: Send,
-  targetSchema: z.strictObject({ replyTo: z.string().min(1).optional() }).nullable().describe("Send text parts to this conversation. Null sends a message; replyTo quotes a message ID."),
+  targetSchema: z.strictObject({ replyTo: z.string().min(1).optional() }).nullable().describe("Send to this conversation. Null sends a message; replyTo quotes a message ID."),
   effect: "write", execution: "sequential",
 });
 export const ChatSee = defineImplementation({

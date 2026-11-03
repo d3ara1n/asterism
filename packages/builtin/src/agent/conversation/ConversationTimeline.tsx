@@ -1,4 +1,4 @@
-import { RendererViewStateProvider, useI18n, useRendererObject, useRendererViewState, type RendererViewStateEntry } from "@asterism-app/sdk/renderer";
+import { RendererViewStateProvider, useI18n, useRendererObject, useRendererViewState, type RendererViewStateEntry, type ContentReader } from "@asterism-app/sdk/renderer";
 import { TriangleAlert, Info } from "lucide-react";
 import { memo, useLayoutEffect, useMemo, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -11,7 +11,7 @@ import { Markdown } from "./Markdown";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { generating, mountedTimelineIndexes, timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";
-import { FilePreview } from "../../shared/attachments";
+import { MessageAttachments, type InputFile } from "../../shared/attachments";
 import { Disclosure } from "./Disclosure";
 import { TurnFooter } from "./TurnFooter";
 import { MessageSender } from "./MessageSender";
@@ -91,12 +91,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
   const streaming = generating(node);
   const shell = blockShell(node);
   switch (node.kind) {
-    case "message": return <article data-conversation-message={node.id}
-      className={cn("flex min-w-0 max-w-[92%] flex-col gap-2", node.sender.kind === "user" ? "ml-auto" : "mr-auto")}>
-      <MessageSender sender={node.sender} />
-      <div data-message-surface="" className={cn("flex flex-col gap-2 rounded-md px-3 py-2", messageAppearance[node.sender.kind].surface)}>{node.parts.map((part, index) =>
-        part.kind === "text" ? <Markdown key={index}>{part.text}</Markdown>
-          : <FilePreview key={index} part={part} content={object.content} />)}</div></article>;
+    case "message": return <MessageNode node={node} content={object.content} />;
     case "text": return <article className={cn("rounded-md outline-1 outline-offset-4 outline-transparent",
       shell.dashed && "outline-dashed outline-border", shell.failed && "outline-destructive")}>
       <Markdown streaming={streaming}>{node.text}</Markdown></article>;
@@ -112,6 +107,20 @@ function NodeContent({ node }: { node: TimelineItem }) {
       </AlertDescription></Alert>;
     default: return null;
   }
+}
+/** Attachments sit beside the text surface on the sender's side; a files-only message carries the landing highlight on its attachments. */
+function MessageNode({ node, content }: { node: Extract<TimelineItem, { kind: "message" }>; content: ContentReader }) {
+  const user = node.sender.kind === "user";
+  const files = node.parts.filter((part): part is InputFile => part.kind !== "text");
+  const texts = node.parts.flatMap(part => part.kind === "text" && part.text ? [part.text] : []);
+  return <article data-conversation-message={node.id}
+    className={cn("flex min-w-0 max-w-[92%] flex-col gap-1.5", user ? "ml-auto items-end" : "mr-auto items-start")}>
+    <MessageSender sender={node.sender} />
+    <MessageAttachments parts={files} content={content} align={user ? "end" : "start"} {...(texts.length ? {} : { "data-message-surface": "" })} />
+    {texts.length > 0 && <div data-message-surface="" className={cn("flex w-full flex-col gap-2 rounded-md px-3 py-2", messageAppearance[node.sender.kind].surface)}>
+      {texts.map((text, index) => <Markdown key={index}>{text}</Markdown>)}
+    </div>}
+  </article>;
 }
 function Summary({ text }: { text: string }) {
   const [open, setOpen] = useRendererViewState(viewStateKeys.disclosure, false);

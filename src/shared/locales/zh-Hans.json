@@ -728,6 +728,8 @@
   "paletteCoral": "珊瑚",
   "paletteRose": "蔷薇",
   "loading": "正在加载",
+  "scrollToEnd": "滚动到最新",
+  "scrollToStart": "滚动到开头",
   "commandPalette": "命令菜单",
   "commandSearch": "查找要运行的命令…",
   "thinkingOff": "关闭",
