@@ -34,10 +34,6 @@ export const settingsMessages = pluginNamespace("asterism.host").messages("en", 
     id: "aboutSummary",
     defaultMessage: "A personal AI workbench",
   },
-  aboutBody: {
-    id: "aboutBody",
-    defaultMessage: "Asterism brings agents, working materials and their progress to one workbench. Use your models, link the resources they need, and follow the work through cards and history. Conversations, notes and layout are saved on this device; resource operations require explicit authorization.",
-  },
   aboutIdentity: {
     id: "aboutIdentity",
     defaultMessage: "Application ID",
@@ -45,10 +41,6 @@ export const settingsMessages = pluginNamespace("asterism.host").messages("en", 
   aboutLogs: {
     id: "aboutLogs",
     defaultMessage: "Logs",
-  },
-  aboutLogsHint: {
-    id: "aboutLogsHint",
-    defaultMessage: "Background errors and diagnostics are written here.",
   },
   aboutOpenLogs: {
     id: "aboutOpenLogs",

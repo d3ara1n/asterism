@@ -5,13 +5,12 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
 import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
-import { Progress } from "@asterism-app/ui/ui/progress";
 import { ProgressRing } from "@asterism-app/ui/ui/progress-ring";
 import { updatesMessages as messages } from "../messages/updates";
 import { useI18n } from "../shared/i18n";
 import { fadeTransition } from "../shared/weave/motion";
 import { useUpdates } from "../features/updates/state";
-import { UpdateAction, UpdateError, UpdateNotesLink, useUpdateSummary } from "../features/updates/controls";
+import { UpdateAction, UpdateStatus, UpdateVersions, useUpdateSummary } from "../features/updates/controls";
 
 /** The update entry stays visible while the popover is open, presenting checks and results after retries. */
 export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
@@ -54,19 +53,9 @@ export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
           navigating.current = false;
         }
       }}>
-      <h2 id={titleId} className="type-section">{i18n.text(messages.title)}</h2>
-      <div className="space-y-1">
-        <p className="type-body" role="status">{summary}</p>
-        <p className="type-caption break-words">
-          {state.availableVersion
-            ? i18n.formatMessage(messages.versionChange, { current: state.version, next: state.availableVersion })
-            : i18n.formatMessage(messages.version, { version: state.version })}
-        </p>
-      </div>
-      {state.status === "downloading" && <Progress value={state.progress} aria-label={i18n.text(messages.title)} />}
-      {state.status === "ready" && <p className="type-caption">{i18n.text(messages.installHint)}</p>}
-      <UpdateNotesLink />
-      <UpdateError />
+      <h2 id={titleId} className="sr-only">{i18n.text(messages.title)}</h2>
+      <UpdateVersions compact />
+      <UpdateStatus />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={() => {
           navigating.current = true;

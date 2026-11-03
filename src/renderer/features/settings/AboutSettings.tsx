@@ -1,11 +1,8 @@
 import { useId, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, CircleArrowUp, Copy } from "lucide-react";
+import { Copy } from "lucide-react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { Progress } from "@asterism-app/ui/ui/progress";
 import { Separator } from "@asterism-app/ui/ui/separator";
-import { StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import appIcon from "../../../../assets/icon/asterism.svg";
 import { applicationId } from "../../../shared/application";
@@ -13,10 +10,9 @@ import { appMessages } from "../../messages/app";
 import { settingsMessages } from "../../messages/settings";
 import { updatesMessages as messages } from "../../messages/updates";
 import { useI18n } from "../../shared/i18n";
-import { fadeTransition } from "../../shared/weave/motion";
 import { toast } from "../../shared/toast";
 import { useUpdates } from "../updates/state";
-import { UpdateAction, UpdateError, UpdateNotesLink, useUpdateSummary } from "../updates/controls";
+import { UpdateAction, UpdateStatus, UpdateVersions } from "../updates/controls";
 import { Row } from "./layout";
 
 /** About page: the application identity card (icon, name, version) presents update state, with secondary information in compact rows afterward. */
@@ -29,8 +25,7 @@ export function AboutSettings() {
       <p className="type-caption mt-1">{i18n.text(settingsMessages.aboutSummary)}</p>
     </header>
     <UpdatePanel />
-    <p className="type-caption mx-auto max-w-prose px-1 py-6 text-center">{i18n.text(settingsMessages.aboutBody)}</p>
-    <Separator />
+    <Separator className="mt-6" />
     <ChannelRow />
     <Separator />
     <Row label={i18n.text(settingsMessages.aboutIdentity)}>
@@ -38,63 +33,35 @@ export function AboutSettings() {
       <CopyIdentity />
     </Row>
     <Separator />
-    <Row label={i18n.text(settingsMessages.aboutLogs)} hint={i18n.text(settingsMessages.aboutLogsHint)}>
+    <Row label={i18n.text(settingsMessages.aboutLogs)}>
       <Button size="sm" variant="outline" onClick={() => void window.host.openLogs().then(error => { if (error) console.error(`Log folder could not be opened: ${error}`); })}>
         {i18n.text(settingsMessages.aboutOpenLogs)}</Button>
     </Row>
   </div>;
 }
 
-/** The single visual focus for update state: current version, target version, status row, and progress share one subdued surface, replacing content by state. */
+/** The single visual focus for update state: versions, action, status, and progress share one subdued surface, replacing content by state. */
 function UpdatePanel() {
   const i18n = useI18n();
-  const { state, failure } = useUpdates();
-  const summary = useUpdateSummary();
   const labelId = useId();
-  const status = failure ? "error" : !state ? null : !state.enabled ? "unavailable" : state.status;
-  const tone: StatusTone = status === "error" ? "error" : status === "checking" || status === "downloading" || status === "restarting" ? "progress"
-    : status === "current" || status === "ready" ? "success" : "neutral";
-
   return <section className="rounded-lg bg-muted px-5 py-4" aria-labelledby={labelId}>
     <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
         <h3 id={labelId} className="type-label">{i18n.text(messages.currentVersion)}</h3>
-        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="type-display">{state?.version ?? "…"}</span>
-          {state?.availableVersion && <>
-            <ArrowRight className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="sr-only">{i18n.text(messages.nextVersion)}</span>
-            <span className="type-display text-primary-text">{state.availableVersion}</span>
-          </>}
-        </p>
+        <div className="mt-1"><UpdateVersions /></div>
       </div>
       <UpdateAction />
     </div>
-    <div className="mt-4 space-y-2">
-      {/* UpdateError handles failure explanations and original errors (role=alert); the status row represents only other states to avoid repeating the same message. */}
-      <div role="status" aria-live="polite">
-        <AnimatePresence mode="wait" initial={false}>
-          {status !== "error" && <motion.p key={status ?? "loading"} className="type-body flex min-h-5 items-center gap-2"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
-            {status && <StatusIcon tone={tone} icon={status === "ready" ? CircleArrowUp : undefined} className="size-4 shrink-0" />}
-            <span className="min-w-0 break-words">{summary}</span>
-          </motion.p>}
-        </AnimatePresence>
-      </div>
-      {state?.status === "downloading" && <Progress value={state.progress} aria-label={i18n.text(messages.title)} className="h-1.5" />}
-      {state?.status === "ready" && <p className="type-caption">{i18n.text(messages.installHint)}</p>}
-      <UpdateNotesLink />
-      <UpdateError />
-    </div>
+    <div className="mt-4"><UpdateStatus /></div>
   </section>;
 }
 
-/** Update channel: stable releases or including prereleases; takes effect immediately, with the description following the selected channel. */
+/** Update channel: stable releases or including prereleases; takes effect immediately. */
 function ChannelRow() {
   const i18n = useI18n();
   const { state, saving, installing, set } = useUpdates();
   const prerelease = state?.includePrerelease ?? false;
-  return <Row label={i18n.text(messages.channel)} hint={i18n.text(prerelease ? messages.channelPrereleaseHint : messages.channelStableHint)}>
+  return <Row label={i18n.text(messages.channel)}>
     <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.text(messages.channel)}
       value={state ? (prerelease ? "prerelease" : "stable") : ""} disabled={!state || saving || installing}
       onValueChange={value => { if (value) void set(value === "prerelease"); }}>
