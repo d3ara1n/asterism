@@ -23,7 +23,7 @@ export function searchSummary(data: FindResult | GrepResult) {
 
 const plural = (count: number, one: string, other: string) => `${count} ${count === 1 ? one : other}`;
 
-function stopMessage(reason: Exclude<SearchStopReason, null>, content: boolean): string {
+export function stopMessage(reason: Exclude<SearchStopReason, null>, content: boolean): string {
   switch (reason) {
     case "limit": return content ? "Search stopped at the matching-line limit." : "Search stopped at the file limit.";
     case "output_bytes": return "Search stopped when the returned results reached the 64 KiB budget.";
@@ -40,7 +40,7 @@ function ending(data: FindResult | GrepResult): string[] {
   const summary = searchSummary(data), lines: string[] = [];
   if (summary.empty === "no_matches") {
     lines.push(summary.unit === "rows" ? "No matching lines." : "No matching files.",
-      "Hidden-entry and ignore-file filtering apply unless hidden or noIgnore is set.");
+      "Hidden-entry and ignore-file filtering apply according to the selected resource target.");
   }
   if (summary.empty === "incomplete") lines.push("No results returned; the search is incomplete.");
   if (data.stopReason !== null) lines.push(stopMessage(data.stopReason, summary.unit === "rows"));

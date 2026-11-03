@@ -46,9 +46,9 @@ function Header(props: Props & { grep?: boolean }) {
 function FindHeader(props: ToolRenderProps<FindResult>) { return <Header {...props} />; }
 function GrepHeader(props: ToolRenderProps<GrepResult>) { return <Header {...props} grep />; }
 
-function Options({ args }: { args: Props["args"] }) {
+export function SearchOptions({ args, target }: { args: Props["args"]; target: Props["target"] }) {
   const i18n = useI18n();
-  const options = searchOptions(args);
+  const options = searchOptions(args, target);
   if (!options.length) return null;
   const label = (option: SearchOption): ReactNode => {
     switch (option.kind) {
@@ -98,11 +98,11 @@ function GrepFileRow({ file, name, initialOpen }: { file: GrepFile; name: string
   </Collapsible>;
 }
 
-function Results({ data, args }: { data: FindResult | GrepResult; args: Props["args"] }) {
+function Results({ data, selection }: { data: FindResult | GrepResult; selection: Props["target"] }) {
   const i18n = useI18n();
   const path = (value: string) => displayPath(data.path, value);
   const summary = searchSummary(data);
-  const filters = searchFilters(args);
+  const filters = searchFilters(selection);
   let content: ReactNode, omitted = 0;
   if ("rows" in data && data.mode === "content") {
     const files = grepFiles(data.rows, TOOL_BODY_LINE_LIMIT);
@@ -136,13 +136,13 @@ function Results({ data, args }: { data: FindResult | GrepResult; args: Props["a
 }
 
 /** Shared by execution and final states: first lists arguments differing from defaults, then appends grouped results when they arrive. */
-function Body({ args, result }: Props) {
+function Body({ args, target, result }: Props) {
   const data = result?.data;
-  const options = searchOptions(args);
+  const options = searchOptions(args, target);
   if (!data && !options.length) return null;
   return <div className="flex flex-col gap-2">
-    <Options args={args} />
-    {data && <Results data={data} args={args} />}
+    <SearchOptions args={args} target={target} />
+    {data && <Results data={data} selection={"rows" in data ? target : args} />}
   </div>;
 }
 

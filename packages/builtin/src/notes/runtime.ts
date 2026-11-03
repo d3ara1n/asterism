@@ -1,6 +1,8 @@
 import { noteCard } from "../shared/card-appearance.ts";
 import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@asterism-app/sdk/runtime";
-import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteEdit, NoteWrite, NoteReplace, MAX_NOTE_LENGTH } from "./contract.ts";
+import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteGrep, NoteEdit, NoteWrite, NoteReplace, MAX_NOTE_LENGTH } from "./contract.ts";
+import { grepNote, noteGrepToModel } from "./search.ts";
+import { FilesystemError } from "../filesystem/errors.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { TextError, readText, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
 
@@ -56,10 +58,26 @@ export default defineModule(() => ({
       async call(_data, target, _args, { object, signal }) {
         try {
           signal.throwIfAborted();
-          return { kind: "succeeded", data: readText(requireText(object), target?.anchored !== false) };
+          return { kind: "succeeded", data: readText(requireText(object), target?.anchored !== false, {
+            offset: target?.offset, limit: target?.limit ?? 1000, maxBytes: 64 * 1024,
+          }) };
         } catch (error) { if (error instanceof TextError) return error.outcome(); throw error; }
       },
       toModel: readToModel,
+    }),
+    implementTool(NoteGrep, {
+      async call(_data, target, args, { object, signal }) {
+        try {
+          signal.throwIfAborted();
+          return { kind: "succeeded", data: await grepNote(requireText(object), args, target?.anchored !== false, signal) };
+        } catch (error) {
+          if (signal.aborted) return { kind: "cancelled", message: "Note search was cancelled." };
+          if (error instanceof TextError) return error.outcome();
+          if (error instanceof FilesystemError) return error.outcome;
+          throw error;
+        }
+      },
+      toModel: noteGrepToModel,
     }),
     implementTool(NoteEdit, {
       async call(_data, _target, args, { object, signal }) {

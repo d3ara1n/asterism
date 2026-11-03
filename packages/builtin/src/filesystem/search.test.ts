@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readText } from "../shared/text.ts";
+import { readText, editText } from "../shared/text.ts";
 import { findOutput, grepOutput, SearchRecords } from "./search-output.ts";
 import { excerptWindow } from "../shared/text-row.ts";
 import { computeLineHash } from "../shared/hashline/hash.ts";
@@ -62,6 +62,16 @@ describe("Search output protocol", () => {
     expect(searchSummary(data)).toMatchObject({ returned: 3, matches: 1, excerpts: 0, complete: true });
     // When context lines are present, file headings list matching line numbers so the model need not infer matches from position.
     expect(grepToModel(data)).toContain('"file.txt" · 1 matching line: 2');
+  });
+
+  // A note is UTF-16 text; stdin encoding replaces isolated surrogates, while edit still validates the original body.
+  it("anchors in-memory search results to original lines rather than their UTF-8 transport representation", () => {
+    const original = "before \uD800 found", transported = "before \uFFFD found";
+    const data = collect(grepOutput(".", "", { pattern: "found" }, true, () => original),
+      event("match", `${transported}\n`, 1, Buffer.byteLength("before \uFFFD ")));
+    expect(data.rows[0]).toMatchObject({ content: original, hash: computeLineHash(1, original) });
+    const { line, hash } = data.rows[0];
+    expect(editText(original, [{ op: "replace", anchor: { line, hash: hash! }, body: ["updated"] }]).text).toBe("updated");
   });
 
   // A single minified JS/SVG line can reach hundreds of KiB; matches must remain visible, with excerpts centered near matches rather than line starts. rg offsets are UTF-8 bytes; anchors use full lines, and excerpts must not create false anchors.
@@ -268,7 +278,7 @@ describe("Search result UI layout", () => {
     expect(searchOptions({ pattern: "x", ignoreCase: true, literal: false, context: 0, limit: 500, outputMode: "content" })).toEqual([
       { kind: "flag", flag: "ignoreCase" },
     ]);
-    expect(searchOptions({ outputMode: "count", context: 2, limit: 50, glob: ["*.ts", 3] })).toEqual([
+    expect(searchOptions({ context: 2, limit: 50 }, { outputMode: "count", glob: ["*.ts", 3] })).toEqual([
       { kind: "mode", value: "count" }, { kind: "context", value: 2 }, { kind: "limit", value: 50 }, { kind: "glob", value: "*.ts" },
     ]);
     expect(searchOptions(null)).toEqual([]);

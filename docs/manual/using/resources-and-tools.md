@@ -36,7 +36,9 @@ Notes retain current text. Their earlier tool results may appear in history, but
 
 Files and notes support anchored edits, full-content writes, and bulk replacement. `edit` changes selected lines using anchors returned by reading, searching, or a previous edit or replacement. `write` supplies complete content. `replace` applies literal text or a JavaScript regular expression to the entire selected target and returns the match count, actual diff, and fresh anchors. Literal replacement text is inserted verbatim; regular-expression replacements support capture groups. A replacement with no matches reports an error and leaves the target unchanged.
 
-Directory and note reads include edit anchors by default. Set `target.anchored` to `false` for a view with line numbers only; `read` takes empty operation arguments. Directory content searches support the same target option. Manual reads and searches return line numbers without edit anchors.
+Directory and note reads include edit anchors by default. Select a line range with `target.offset` and `target.limit`; the result's `nextOffset` identifies where to continue. Set `target.anchored` to `false` for a view with line numbers only; `read` takes empty operation arguments. Directory and note content searches support the same anchor option. Manual reads and searches return line numbers without edit anchors.
+
+Use `grep` to locate a pattern in a note's current body or in directory and manual files. Its arguments select the pattern, literal or regular-expression matching, case and word matching, surrounding context, and result limit. Directory and manual targets additionally select file globs, hidden and ignore-file filtering, and the output view: matching content, matching paths, or matching-line counts per file.
 
 ## Open a directory file
 

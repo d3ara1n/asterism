@@ -1,4 +1,4 @@
-import type { GrepArgs } from "@asterism-app/builtin-api/contracts";
+import type { TextRow } from "@asterism-app/builtin-api/contracts";
 import type { GrepResult } from "./search-contract.ts";
 import { displayText } from "../shared/text-row.ts";
 
@@ -37,6 +37,16 @@ export function groupByDirectory<T>(items: readonly T[], pathOf: (item: T) => st
 type Row = GrepResult["rows"][number];
 export interface GrepSegment { rows: { line: number; content: string; match: boolean }[] }
 export interface GrepFile { path: string; matches: number; segments: GrepSegment[]; omitted: number }
+export function grepSegments(rows: readonly (TextRow & { match: boolean })[], limit: number): GrepSegment[] {
+  const segments: GrepSegment[] = [];
+  for (const row of rows.slice(0, limit)) {
+    const entry = { line: row.line, content: displayText(row), match: row.match };
+    const last = segments.at(-1);
+    if (last && last.rows.at(-1)!.line + 1 === row.line) last.rows.push(entry);
+    else segments.push({ rows: [entry] });
+  }
+  return segments;
+}
 /** content results are grouped by file and sorted by line number within each file; consecutive lines form an excerpt, long-line excerpts mark both ends with ellipses, and each file has its own line budget. */
 export function grepFiles(rows: readonly Row[], limit: number): GrepFile[] {
   const byPath = new Map<string, Row[]>();
@@ -46,13 +56,7 @@ export function grepFiles(rows: readonly Row[], limit: number): GrepFile[] {
   }
   return [...byPath].map(([path, list]) => {
     const sorted = [...list].sort((a, b) => a.line - b.line);
-    const segments: GrepSegment[] = [];
-    for (const row of sorted.slice(0, limit)) {
-      const entry = { line: row.line, content: displayText(row), match: row.match };
-      const last = segments.at(-1);
-      if (last && last.rows.at(-1)!.line + 1 === row.line) last.rows.push(entry);
-      else segments.push({ rows: [entry] });
-    }
+    const segments = grepSegments(sorted, limit);
     return { path, matches: list.filter(row => row.match).length, segments, omitted: Math.max(0, sorted.length - limit) };
   });
 }
@@ -63,9 +67,9 @@ export type SearchOption =
   | { kind: "mode"; value: "files" | "count" }
   | { kind: "glob"; value: string };
 /** Lists only arguments that differ from defaults; fields of unclear shape in partial JSON arguments are ignored. */
-export function searchOptions(args: unknown): SearchOption[] {
+export function searchOptions(args: unknown, target?: unknown): SearchOption[] {
   if (args === null || typeof args !== "object" || Array.isArray(args)) return [];
-  const value = args as Partial<Record<keyof GrepArgs, unknown>>;
+  const value = { ...args, ...(target !== null && typeof target === "object" && !Array.isArray(target) ? target : {}) } as Record<string, unknown>;
   const options: SearchOption[] = [];
   if (value.outputMode === "files" || value.outputMode === "count") options.push({ kind: "mode", value: value.outputMode });
   for (const flag of ["literal", "ignoreCase", "word", "hidden", "noIgnore"] as const) {

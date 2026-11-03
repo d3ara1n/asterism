@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
-import { FileText, BookOpen, FilePenLine, FilePlus2, Copy, Replace } from "lucide-react";
+import { FileText, BookOpen, FilePenLine, FilePlus2, Copy, Replace, Search } from "lucide-react";
 import { toast } from "sonner";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 
 import { Markdown } from "../agent/conversation/Markdown";
 import { commonMessages } from "../messages/common";
 import { textMessages } from "../messages/text";
+import { filesystemMessages } from "../messages/filesystem";
 import { prepareCodeView } from "../shared/code-view";
 import { textReadViews, textWriteViews, textEditViews, textReplaceViews } from "../text-view";
-import { Note, CreateNote, NoteView, NoteRead, NoteEdit, NoteWrite, NoteReplace } from "./contract";
+import { Note, CreateNote, NoteView, NoteRead, NoteGrep, NoteEdit, NoteWrite, NoteReplace } from "./contract";
+import { noteGrepViews } from "./search-view";
 import { NoteInput } from "./creation";
 
 import { noteCard as appearance } from "../shared/card-appearance.ts";
@@ -48,6 +50,10 @@ export default {
     </div>; },
   })],
   tools: [
+    toolRenderer(NoteGrep, {
+      label: filesystemMessages.toolDirectoryGrep, icon: <Search className="size-3.5" />,
+      ...noteGrepViews,
+    }),
     toolRenderer(NoteRead, {
       label: textMessages.toolTextRead, icon: <BookOpen className="size-3.5" />,
       ...textReadViews,

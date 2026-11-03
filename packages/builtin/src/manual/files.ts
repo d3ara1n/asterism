@@ -65,11 +65,12 @@ export async function grepManual(sources: readonly ManualSource[], target: z.inf
     signal.throwIfAborted();
     const selected = manualPath(sources, target?.path ?? ".");
     let prefix = "";
-    const output = grepOutput(selected.path, () => prefix, args, false);
+    const options = { ...args, ...target };
+    const output = grepOutput(selected.path, () => prefix, options, false);
     for (const scope of selected.kind === "source" ? [selected.scope] : selected.scopes) {
       const search = await searchScope(scope.source.directory, scope.path, false);
       prefix = posix.join(scope.source.path, search.prefix);
-      output.result.stopReason = await runSearch(search.cwd, searchArguments("grep", args, search.operand), output.records, signal);
+      output.result.stopReason = await runSearch(search.cwd, searchArguments("grep", options, search.operand), output.records, signal);
       if (output.result.stopReason !== null) break;
     }
     return { kind: "succeeded", data: output.result };

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { defineImplementation, defineCreation } from "@asterism-app/sdk/contracts";
-import { builtin, Read, Edit, Write, Replace, textReadSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
+import { builtin, Read, Edit, Write, Replace, Grep, textReadSchema, textReadTargetSchema, textRowSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
+import { stopReasonSchema } from "../filesystem/search-contract.ts";
 
 export const MAX_NOTE_LENGTH = 100_000;
 export const Note = builtin.resource("note", z.object({}));
@@ -12,13 +13,21 @@ export const CreateNote = defineCreation(Note, { id: builtin.name("note.create")
 });
 export const NoteContent = builtin.data("note.content", z.strictObject({ text: z.string().max(MAX_NOTE_LENGTH) }));
 export const NoteView = builtin.data("note.card", z.strictObject({ text: z.string().nullable() }));
-const targetSchema = z.null().describe("Pass null to select this note's complete current text. Notes have no internal path or read range. Content is limited to 100,000 UTF-16 code units; edits must keep the final text within that limit.");
+const targetSchema = z.null().describe("Pass null to select this note's complete current text. Notes have no internal path. Content is limited to 100,000 UTF-16 code units; edits must keep the final text within that limit.");
 export const NoteRead = defineImplementation({
   ...builtin.data("note.read", textReadSchema),
   resource: Note, tool: Read,
-  targetSchema: z.strictObject({
-    anchored: z.boolean().optional().describe("Include LINE#HASH edit anchors; defaults to true. False returns text with line numbers only."),
-  }).nullable().describe("Read this note's complete current text. Null uses the default reading view. Notes have no internal path or read range."),
+  targetSchema: textReadTargetSchema.nullable().describe("Select this note's current text, line range and reading view. Null uses defaults. nextOffset marks the start of remaining lines. Notes have no internal path."),
+  effect: "read", execution: "parallel",
+});
+export const NoteGrep = defineImplementation({
+  ...builtin.data("note.grep", z.strictObject({
+    rows: z.array(textRowSchema.extend({ match: z.boolean().describe("True for a matching line, false for surrounding context.") })),
+    stopReason: stopReasonSchema,
+  }).describe("Matching and context lines in the current note, with absolute line numbers and optional edit anchors. Long lines are excerpted near the first match; anchors refer to complete lines.")),
+  resource: Note, tool: Grep,
+  targetSchema: textReadTargetSchema.pick({ anchored: true }).nullable()
+    .describe("Search this note's complete current text. Null includes edit anchors by default. Notes have no internal path or file filters."),
   effect: "read", execution: "parallel",
 });
 export const NoteEdit = defineImplementation({

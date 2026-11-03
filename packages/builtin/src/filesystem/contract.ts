@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineImplementation, defineCreation, defineCall, contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
-import { builtin, List, Read, Edit, Write, Save, Replace, See, textReadSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
+import { builtin, List, Read, Edit, Write, Save, Replace, See, textReadSchema, textReadTargetSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
 export const CreateDirectory = defineCreation(Directory, { id: builtin.name("directory.create"),
@@ -33,11 +33,8 @@ export const DirectoryList = defineImplementation({
 const filePath = z.string().min(1).max(4096).describe("File path relative to the linked directory root, e.g. 'src/main.ts'. Absolute paths and targets escaping the root through .. or symlinks are rejected.");
 const fileTarget = z.strictObject({ path: filePath })
   .describe("Select one UTF-8 text file with {\"path\":\"relative/file.txt\"}. Content operations are limited to 8 MiB. edit and replace require an existing file; write can create missing parents inside the root.");
-export const directoryReadTargetSchema = z.strictObject({
+export const directoryReadTargetSchema = textReadTargetSchema.extend({
   path: filePath,
-  offset: z.number().int().positive().optional().describe("First line to read, 1-based in the complete file; defaults to 1."),
-  limit: z.number().int().positive().max(2000).optional().describe("Maximum lines to read; defaults to 1000, maximum 2000. The output is also limited to 64 KiB of line text; lines longer than 16000 characters are returned as excerpts."),
-  anchored: z.boolean().optional().describe("Include LINE#HASH edit anchors; defaults to true. Anchors identify complete lines, including those displayed as excerpts. False returns text with line numbers only."),
 }).describe("Select file content, its line range, and reading view, e.g. {\"path\":\"src/main.ts\",\"offset\":100,\"limit\":80,\"anchored\":false}. Content is UTF-8 text; nextOffset marks the start of remaining lines.");
 export const DirectoryRead = defineImplementation({
   ...builtin.data("directory.read", textReadSchema.extend({ path: filePath })

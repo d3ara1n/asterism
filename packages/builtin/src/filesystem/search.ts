@@ -45,8 +45,9 @@ export async function grepFiles(root: string, target: z.infer<typeof DirectoryGr
   const path = target?.path ?? ".";
   try {
     const selected = await searchScope(root, path, false);
-    const output = grepOutput(path, selected.prefix, args, target?.anchored !== false);
-    output.result.stopReason = await runSearch(selected.cwd, searchArguments("grep", args, selected.operand), output.records, signal);
+    const options = { ...args, ...target };
+    const output = grepOutput(path, selected.prefix, options, target?.anchored !== false);
+    output.result.stopReason = await runSearch(selected.cwd, searchArguments("grep", options, selected.operand), output.records, signal);
     return { kind: "succeeded", data: output.result };
   } catch (error) { return failure(error, signal); }
 }

@@ -4,19 +4,23 @@ import type { FindArgs, GrepArgs } from "@asterism-app/builtin-api/contracts";
 import { FilesystemError, failed } from "./errors.ts";
 import type { SearchRecords } from "./search-output.ts";
 import type { SearchStopReason } from "./search-contract.ts";
+import type { z } from "zod";
+import type { directoryGrepTargetSchema } from "./search-contract.ts";
+
+type GrepOptions = GrepArgs & Partial<z.infer<typeof directoryGrepTargetSchema>>;
 
 /** After Forge unpacking, OS processes use the physical executable path; development paths remain unchanged. */
 export function executablePath(path: string): string {
   return path.replace(/([\\/])([^\\/]+\.asar)(?=[\\/])/g, "$1$2.unpacked");
 }
 
-export function searchArguments(kind: "find" | "grep", args: FindArgs | GrepArgs, operand: string): string[] {
+export function searchArguments(kind: "find" | "grep", args: FindArgs | GrepOptions, operand: string): string[] {
   const flags = ["--no-config", "--no-follow", "--no-require-git", "--color=never", "--path-separator=/"];
   if (args.hidden) flags.push("--hidden");
   if (args.noIgnore) flags.push("--no-ignore");
   if (kind === "find") flags.push("--files", "--null", "--glob", args.pattern);
   else {
-    const grep = args as GrepArgs;
+    const grep = args as GrepOptions;
     if (grep.outputMode === "files") flags.push("--files-with-matches", "--null");
     else if (grep.outputMode === "count") flags.push("--count", "--null", "--with-filename");
     else flags.push("--json");
@@ -34,16 +38,16 @@ export function searchArguments(kind: "find" | "grep", args: FindArgs | GrepArgs
 }
 
 /** A single rg subprocess without a shell; cancellation or reaching the output budget ends the process, and results are delivered after pipes close. */
-export async function runSearch(cwd: string, argv: string[], records: SearchRecords, signal: AbortSignal): Promise<SearchStopReason> {
+export async function runSearch(cwd: string | undefined, argv: string[], records: SearchRecords, signal: AbortSignal, input?: string): Promise<SearchStopReason> {
   signal.throwIfAborted();
   return new Promise<SearchStopReason>((resolve, reject) => {
-    const child = spawn(executablePath(rgPath), argv, { cwd, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const child = spawn(executablePath(rgPath), argv, { cwd, stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"], windowsHide: true });
     let stopReason: SearchStopReason = null, fault: unknown, stderr = "";
     const stop = () => { child.kill("SIGKILL"); };
     const abort = () => stop();
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) abort();
-    child.stdout.on("data", (chunk: Buffer) => {
+    child.stdout!.on("data", (chunk: Buffer) => {
       if (stopReason !== null || fault || signal.aborted) return;
       try {
         stopReason = records.push(chunk);
@@ -54,13 +58,20 @@ export async function runSearch(cwd: string, argv: string[], records: SearchReco
         stop();
       }
     });
-    child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(0, 16 * 1024); });
+    child.stderr!.setEncoding("utf8");
+    child.stderr!.on("data", (chunk: string) => { stderr = (stderr + chunk).slice(0, 16 * 1024); });
     child.on("error", error => {
       fault = new FilesystemError(failed("search_process", `The bundled ripgrep process could not run: ${error.message}`));
     });
-    child.stdout.on("error", error => { fault = error; stop(); });
-    child.stderr.on("error", error => { fault = error; stop(); });
+    child.stdout!.on("error", error => { fault = error; stop(); });
+    child.stderr!.on("error", error => { fault = error; stop(); });
+    if (child.stdin) {
+      // Early search completion or an invalid regex can close stdin before the complete body is consumed.
+      child.stdin.on("error", (error: NodeJS.ErrnoException) => {
+        if (error.code !== "EPIPE") { fault = error; stop(); }
+      });
+      child.stdin.end(input);
+    }
     child.on("close", (code, termination) => {
       signal.removeEventListener("abort", abort);
       if (signal.aborted) { reject(signal.reason); return; }

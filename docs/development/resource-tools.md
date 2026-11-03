@@ -4,9 +4,11 @@ Filesystem, manual, note, shell, and terminal operations share resource dispatch
 
 ## Text operations
 
-Directories and notes share public read, edit, and write contracts. Implementations supply their own targets and result data.
+Directories and notes share public read, grep, edit, replace, and write contracts. Implementations supply their own targets and result data.
 
 Text reads use absolute source line numbers. Directory and note reading targets select whether to include edit anchors, enabled by default. The shared read contract has empty operation arguments; resource implementations own content, range, and view selection. Anchored output hashes the complete line before any display shortening. A long-line excerpt identifies its actual range and full length; the anchor still refers to the full line.
+
+Directory and note reads select a starting line and line limit, with bounded output and a continuation position. Note grep searches the current body using the same line-oriented ripgrep matching semantics as directory grep. Its results contain matching and context lines with optional edit anchors and explicit stop reasons.
 
 Edit validates a batch against one current text value. Replace and delete ranges include both endpoints; insertion retains the anchor line. Append and prepend need no anchor. A stale anchor or overlapping range rejects the batch without writing. Suggested moved-line matches remain retry information rather than silently retargeting an edit.
 
@@ -21,6 +23,8 @@ Notes store current text in object data. Saving does not append a note-content h
 ## Directory search
 
 Find and grep are read-only resource implementations backed by packaged ripgrep. Every call searches current files; it creates no separate index.
+
+The public grep contract owns text matching, surrounding context, and the result limit. Directory and manual targets own path selection, file globs, hidden and ignore-file filtering, and content, matching-path, or per-file count views. Note targets select the anchor view for one body and have no file selection.
 
 The manual is a separate resource with empty state and parameterless creation. It exposes list, find, grep, and read over a virtual directory of application guides, public-package material, and directories declared by loaded plugins. The host collects those sources and exposes their current catalog through the SDK. Resource state contains neither installation paths nor captured documents. Files remain at their original locations, with installed application sources unpacked for native search. Linking and agent policy determine tool availability as for other resources.
 

@@ -84,7 +84,8 @@ interface RgEvent {
   };
 }
 
-export function grepOutput(path: string, prefix: string | (() => string), args: GrepArgs, anchored = true) {
+export function grepOutput(path: string, prefix: string | (() => string),
+  args: GrepArgs & { outputMode?: GrepResult["mode"] }, anchored = true, sourceLine?: (line: number) => string) {
   const mode = args.outputMode ?? "content";
   const result: GrepResult = { path, mode, rows: [], files: [], stopReason: null };
   const budget = new Budget(args.limit ?? 500);
@@ -122,7 +123,7 @@ export function grepOutput(path: string, prefix: string | (() => string), args: 
     // Compute anchors from complete lines before extracting excerpts; rg submatch offsets are UTF-8 bytes within the line, while context lines have no match and are excerpted from the start.
     const byte = match ? event.data.submatches?.[0]?.start ?? 0 : 0;
     const focus = content.length > SEARCH_EXCERPT_THRESHOLD ? Buffer.from(content, "utf8").subarray(0, byte).toString("utf8").length : 0;
-    const entry: GrepResult["rows"][number] = { ...textRow(line, content, anchored, SEARCH_EXCERPT_THRESHOLD, focus), path, match };
+    const entry: GrepResult["rows"][number] = { ...textRow(line, sourceLine ? sourceLine(line) : content, anchored, SEARCH_EXCERPT_THRESHOLD, focus), path, match };
     // limit counts only matching lines; context lines are constrained only by the byte budget.
     const stopReason = budget.add(entry, entry.match);
     if (stopReason !== null) { trimDanglingContext(result.rows, args.context ?? 0); return stopReason; }
