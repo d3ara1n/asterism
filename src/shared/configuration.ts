@@ -7,6 +7,7 @@ export { modelExpressionSchema, parseModelExpression, formatModelExpression, mod
 import { z } from "zod";
 import { messagingConnectionSchema, messagingConnectionInfoSchema, messagingProviderTypeSchema, webProviderStateSchema, webProviderTypeSchema } from "@asterism-app/sdk/contracts";
 import { modelCompatibilitySchema } from "./model-compatibility.ts";
+import { credentialUpdateSchema } from "./provider-settings.ts";
 
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
@@ -96,10 +97,6 @@ export const configurationSnapshotSchema = z.strictObject({
   modelProviderPresets: z.array(modelProviderPresetSchema).optional(),
   usageProviders: z.array(usageProviderInfoSchema).optional(),
 });
-const credentialUpdateSchema = z.discriminatedUnion("action", [
-  z.strictObject({ action: z.literal("keep") }), z.strictObject({ action: z.literal("clear") }),
-  z.strictObject({ action: z.literal("replace"), value: z.string().trim().min(1).max(16_384) }),
-]);
 export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("messaging.save"), id: z.string().min(1).nullable(),
     value: messagingConnectionSchema.omit({ id: true }), secrets: z.record(z.string(), credentialUpdateSchema) }),

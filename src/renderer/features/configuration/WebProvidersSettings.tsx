@@ -21,15 +21,15 @@ import { Editor } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { Section } from "../settings/layout";
 import { ProviderKeyLink } from "./ProviderKeyLink";
-import { credentialChanged, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
-import { ProviderSettingFields, secretUpdates, settingValues, settingsComplete } from "./ProviderSettingFields";
+import { ProviderSettingFields } from "./ProviderSettingFields";
+import { credentialChanged, secretUpdates, settingValues, settingsComplete, type CredentialDraft } from "./provider-settings";
 
 type SecretSetting = Extract<ProviderSetting, { kind: "secret" }>;
 function useCapabilities() {
   const i18n = useI18n();
   return (type: WebProviderType) => [type.search && i18n.text(messages.search), type.fetch && i18n.text(messages.fetch)].filter(Boolean).join(" · ");
 }
-/** Only conditions that stop a saved provider from working are surfaced; a normal provider shows no badge. */
+/** Surface unavailable provider types and credential access failures. */
 function useProviderIssue() {
   const i18n = useI18n();
   return (type: WebProviderType | undefined, state: WebProviderConfiguration): { tone: StatusTone; label: string } | null => {
@@ -39,7 +39,6 @@ function useProviderIssue() {
       const secret = state.secrets[setting.key];
       if (secret === "decryption_failed") return { tone: "error", label: i18n.text(providersMessages.decryptionFailed) };
       if (secret === "storage_unavailable") return { tone: "warning", label: i18n.text(providersMessages.credentialProtectionUnavailable) };
-      if (setting.required && secret !== "available") return { tone: "warning", label: i18n.formatMessage(messages.missingSecret, { label: i18n.text(setting.label) }) };
     }
     return null;
   };
@@ -191,7 +190,7 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
   const type = snapshot?.webProviderTypes.find(type => type.id === typeId);
   const saved = snapshot?.webProviders.find(state => state.id === typeId) ?? null;
   const [values, setValues] = useState(() => settingValues(type?.settings, saved?.settings ?? {}));
-  const [secrets, setSecrets] = useState<Record<string, ConnectionCredentialDraft>>({});
+  const [secrets, setSecrets] = useState<Record<string, CredentialDraft>>({});
   const action = useConfigurationAction("inline");
   const savedValues = settingValues(type?.settings, saved?.settings ?? {});
   const dirty = !saved || Object.values(secrets).some(credentialChanged)

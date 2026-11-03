@@ -12,6 +12,10 @@ Plugins supply presets. Payment products and regions can require separate entrie
 
 Fixed fields constrain connection editing without changing credential replacement or request semantics. Custom connections accept explicitly supplied endpoint and compatibility choices.
 
+Model connections share one field declaration and the same input controls and credential rules as other provider families. Presets supply initial values and fixed fields. Required text must be entered, and choices must belong to their declaration. Protocol, endpoint, identity, and compatibility constraints remain owned by the model connection schema.
+
+API-key authentication requires a supplied or retained credential when saving. Blank credential inputs retain an existing value; replacements are trimmed, and required credentials cannot be cleared independently. Unauthenticated connections require no credential, and saving a change to unauthenticated access removes the previous credential. Forms and save commands use shared validation rules. List status presents actual operations and access failures; connection tests belong to individual models.
+
 Global configuration and encrypted credentials have independent storage. Existing deletions are preserved; invalid configuration is not silently replaced with defaults.
 
 ## Model discovery and parameter lookup

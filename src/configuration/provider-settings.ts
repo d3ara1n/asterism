@@ -1,6 +1,5 @@
 import type { ProviderSetting, UiText } from "@asterism-app/sdk/contracts";
 
-export type CredentialUpdate = { action: "keep" } | { action: "clear" } | { action: "replace"; value: string };
 const plainText = (text: UiText) => typeof text === "string" ? text : text.defaultMessage;
 
 /** A saved value the current declaration cannot use; callers map the reason to their domain error. */
@@ -29,37 +28,6 @@ export async function resolveProviderSettings(settings: readonly ProviderSetting
     else if (setting.required) throw new ProviderSettingError("missing", setting.key, `Setting '${label}' is required.`);
   }
   return values;
-}
-
-/**
- * Validate a save command and return the non-secret values to persist.
- * Only declared keys are accepted; required values must be supplied, and required secrets must be kept or replaced.
- * Unsubmitted choices stay unsaved so they follow the declared default.
- */
-export function validateProviderSettings(settings: readonly ProviderSetting[], values: Readonly<Record<string, string>>,
-  secrets: Readonly<Record<string, CredentialUpdate>>, savedSecretKeys: ReadonlySet<string>): Record<string, string> | null {
-  const declared = new Map(settings.map(setting => [setting.key, setting]));
-  if (Object.keys(values).some(key => declared.get(key)?.kind === "secret" || !declared.has(key))) return null;
-  if (Object.keys(secrets).some(key => declared.get(key)?.kind !== "secret")) return null;
-  const result: Record<string, string> = {};
-  for (const setting of settings) {
-    if (setting.kind === "secret") {
-      const update = secrets[setting.key] ?? { action: "keep" };
-      if (setting.required && (update.action === "clear" || update.action === "keep" && !savedSecretKeys.has(setting.key))) return null;
-      continue;
-    }
-    const value = values[setting.key];
-    if (setting.kind === "choice") {
-      if (value === undefined) continue;
-      if (!setting.options.some(option => option.value === value)) return null;
-      result[setting.key] = value;
-      continue;
-    }
-    const text = value?.trim() ?? "";
-    if (setting.required && !text) return null;
-    if (text) result[setting.key] = text;
-  }
-  return result;
 }
 
 /** Secret keys a snapshot reports: declared secrets, or saved references when the type is unavailable. */

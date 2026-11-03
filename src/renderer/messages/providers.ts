@@ -1,6 +1,7 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const providersMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  optional: { id: "provider.optional", defaultMessage: "Optional" },
   usage: { id: "providerUsage.selection", defaultMessage: "Usage query" },
   usageOff: { id: "providerUsage.off", defaultMessage: "Off" },
   usageMissing: { id: "providerUsage.missing", defaultMessage: "{id} (unavailable)" },
@@ -48,39 +49,15 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     defaultMessage: "Remove {name}",
   },
   image: { id: "model_modality_image", defaultMessage: "Image" },
-  disabled: {
-    id: "features_configuration_ProvidersSettings_1",
-    defaultMessage: "Disabled",
-  },
-  needsApiKey: {
-    id: "features_configuration_ProvidersSettings_2",
-    defaultMessage: "Needs API key",
-  },
-  noModels: {
-    id: "features_configuration_ProvidersSettings_3",
-    defaultMessage: "No models",
-  },
-  lastTestFailed: {
-    id: "features_configuration_ProvidersSettings_4",
-    defaultMessage: "Last test failed",
-  },
-  connected: {
-    id: "features_configuration_ProvidersSettings_5",
-    defaultMessage: "Connected",
-  },
-  notTested: {
-    id: "features_configuration_ProvidersSettings_6",
-    defaultMessage: "Not tested",
-  },
   noAuthentication: {
     id: "features_configuration_ProvidersSettings_7",
     defaultMessage: "No authentication",
   },
-  noKeySaved: {
+  noCredentialSaved: {
     id: "features_configuration_ProvidersSettings_8",
-    defaultMessage: "No key saved",
+    defaultMessage: "No credential saved",
   },
-  keySaved: {
+  credentialSaved: {
     id: "features_configuration_ProvidersSettings_9",
     defaultMessage: "Saved securely",
   },
@@ -241,25 +218,25 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   noAuthenticationOption: {
     id: "features_configuration_ProvidersSettings_54",
-    defaultMessage: "None (local service)",
+    defaultMessage: "None",
   },
   getKey: {
     id: "features_configuration_ProvidersSettings_55",
     defaultMessage: "Get a key",
   },
-  keepSavedKey: {
+  keepSavedCredential: {
     id: "features_configuration_ProvidersSettings_56",
-    defaultMessage: "Leave blank to keep the saved key",
+    defaultMessage: "Leave blank to keep the saved credential",
   },
-  pasteApiKey: {
+  enterCredential: {
     id: "features_configuration_ProvidersSettings_57",
-    defaultMessage: "Paste API key",
+    defaultMessage: "Enter credential",
   },
-  keyRemovalHint: {
+  credentialRemovalHint: {
     id: "features_configuration_ProvidersSettings_58",
-    defaultMessage: "The saved key will be removed when saved.",
+    defaultMessage: "The saved credential will be removed when saved.",
   },
-  keyStorageHint: {
+  credentialStorageHint: {
     id: "features_configuration_ProvidersSettings_59",
     defaultMessage: "Stored with system encryption after saving.",
   },
@@ -267,13 +244,13 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     id: "features_configuration_ProvidersSettings_60",
     defaultMessage: "Undo",
   },
-  removeSavedKey: {
+  removeSavedCredential: {
     id: "features_configuration_ProvidersSettings_61",
-    defaultMessage: "Remove saved key",
+    defaultMessage: "Remove saved credential",
   },
   encryptionUnavailable: {
     id: "features_configuration_ProvidersSettings_62",
-    defaultMessage: "System encryption is unavailable. API keys cannot be saved.",
+    defaultMessage: "System encryption is unavailable. Credentials cannot be saved.",
   },
   models: {
     id: "features_configuration_ProvidersSettings_63",

@@ -15,8 +15,6 @@ export const webProviderMessages = pluginNamespace("asterism.host").messages("en
   added: { id: "webProviders.added", defaultMessage: "Added" },
   search: { id: "webProviders.search", defaultMessage: "Search" },
   fetch: { id: "webProviders.fetch", defaultMessage: "Fetch" },
-  optional: { id: "webProviders.optional", defaultMessage: "Optional" },
-  missingSecret: { id: "webProviders.missingSecret", defaultMessage: "Missing {label}" },
   fetchScope: { id: "webProviders.fetchScope", defaultMessage: "Fetch scope" },
   fetchScopeHint: { id: "webProviders.fetchScopeHint", defaultMessage: "URL fetches try this service only for matching addresses." },
   allUrls: { id: "webProviders.allUrls", defaultMessage: "All URLs" },

@@ -16,7 +16,8 @@ import { WebError, MessagingError } from "@asterism-app/sdk/runtime";
 import type { ProviderSetting } from "@asterism-app/sdk/contracts";
 import { randomUUID } from "node:crypto";
 import { MessagingRegistry } from "./messaging.ts";
-import { reportedSecretKeys, validateProviderSettings, type CredentialUpdate } from "./provider-settings.ts";
+import { reportedSecretKeys } from "./provider-settings.ts";
+import { credentialComplete, validateProviderSettings, type CredentialUpdate } from "../shared/provider-settings.ts";
 
 const saveKinds = { "modelProvider.save": "modelProvider", "model.save": "model" } as const;
 
@@ -235,6 +236,8 @@ export class ConfigurationService {
     }
     const id = command.value.id;
     const oldRef = command.id ? this.store.get("modelProvider", command.id)?.credentialRef ?? null : null;
+    if (!credentialComplete(command.value.auth === "api_key", command.credential, oldRef !== null))
+      throw new ConfigurationError("invalid_request", "An API key is required for API key authentication.");
     let ref = oldRef;
     let newRef: string | null = null;
     try {

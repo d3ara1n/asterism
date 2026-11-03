@@ -180,7 +180,7 @@ describe("Real configuration and consumption boundaries", () => {
     await save({});
     expect(service.current().webProviders[0]?.secrets).toEqual({ apiKey: "available" });
   });
-  // Editing rules must persist independently per connection; fixed auth methods cannot prevent renaming, toggling, or credential management.
+  // Editing rules persist independently per connection; fixed authentication still permits credential replacement.
   it("preset fixed fields survive reopen while connection identity and keys remain editable", async () => {
     const { service, root, protector } = setup();
     const value = { ...modelProviderPresetDraft(modelProviderPresets.find(preset => preset.id === "kimi")!), enabled: true };
@@ -195,8 +195,28 @@ describe("Real configuration and consumption boundaries", () => {
     const reopened = new ConfigurationService(root, protector);
     cleanups.push(() => reopened.close());
     expect(reopened.current().modelProviders[0]).toMatchObject(renamed);
-    await reopened.execute({ type: "modelProvider.save", id: renamed.id, value: { ...renamed, enabled: true }, credential: { action: "clear" } });
-    expect(reopened.current().modelProviders[0]).toMatchObject({ enabled: true, credentialState: "missing", fixedFields: value.fixedFields });
+    await reopened.execute({ type: "modelProvider.save", id: renamed.id, value: { ...renamed, enabled: true }, credential: { action: "keep" } });
+    expect(reopened.current().modelProviders[0]).toMatchObject({ enabled: true, credentialState: "available", fixedFields: value.fixedFields });
+  });
+
+  // Authentication changes must validate against the resulting connection before changing stored credentials.
+  it("requires a model API key and releases it when switching to unauthenticated access", async () => {
+    const { service, root } = setup();
+    const keyed = { ...providerValue, auth: "api_key" as const };
+    await expect(service.execute({ type: "modelProvider.save", id: null, value: keyed, credential: { action: "keep" } }))
+      .rejects.toMatchObject({ code: "invalid_request" });
+    expect(service.current().modelProviders).toEqual([]);
+    await service.execute({ type: "modelProvider.save", id: null, value: keyed, credential: { action: "replace", value: "key" } });
+    await expect(service.execute({ type: "modelProvider.save", id: keyed.id, value: keyed, credential: { action: "clear" } }))
+      .rejects.toMatchObject({ code: "invalid_request" });
+    expect(await service.executionCredential(keyed.id)).toBe("key");
+    await service.execute({ type: "modelProvider.save", id: keyed.id, value: { ...keyed, name: "Renamed" }, credential: { action: "keep" } });
+    await service.execute({ type: "modelProvider.save", id: keyed.id, value: { ...keyed, auth: "none" }, credential: { action: "clear" } });
+    expect(service.current().modelProviders[0]?.credentialState).toBe("not_required");
+    expect(readdirSync(join(root, "credentials"))).toEqual([]);
+    await expect(service.execute({ type: "modelProvider.save", id: keyed.id, value: keyed, credential: { action: "keep" } }))
+      .rejects.toMatchObject({ code: "invalid_request" });
+    expect(service.current().modelProviders[0]?.auth).toBe("none");
   });
 
   // Hidden does not mean immutable: the command boundary rejects fixed-value changes and rule removal without contaminating configuration or credentials.

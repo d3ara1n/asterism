@@ -12,8 +12,8 @@ import { useIsland } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
 import { Editor, TextField, ChoiceField, ToggleField } from "./forms";
-import { credentialChanged, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
-import { ProviderSettingFields, secretUpdates, settingValues, settingsComplete } from "./ProviderSettingFields";
+import { ProviderSettingFields } from "./ProviderSettingFields";
+import { credentialChanged, secretUpdates, settingValues, settingsComplete, type CredentialDraft } from "./provider-settings";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { messagingMessages as messages } from "../../messages/messaging";
 
@@ -73,7 +73,7 @@ function MessagingEditor({ id }: { id: string | null }) {
   const [name, setName] = useState(saved?.name ?? "");
   const [enabled, setEnabled] = useState(saved?.enabled ?? true);
   const [values, setValues] = useState(() => settingValues(type?.settings, saved?.settings ?? {}));
-  const [secrets, setSecrets] = useState<Record<string, ConnectionCredentialDraft>>({});
+  const [secrets, setSecrets] = useState<Record<string, CredentialDraft>>({});
   const savedValues = settingValues(type?.settings, saved?.settings ?? {});
   const complete = !!type && !!name.trim() && settingsComplete(type.settings, values, secrets, saved?.secrets);
   const dirty = !saved || name !== saved.name || enabled !== saved.enabled ||

@@ -1,16 +1,15 @@
 import { Plus, Zap, Search, PlugZap } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { applyModelParameters, canEditModelProviderField, createModelInput, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ModelProviderInput, type ProviderModel, type TestError } from "../../../shared/configuration";
+import { applyModelParameters, canEditModelProviderField, createModelInput, modelProviderInputSchema, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ProviderModel, type TestError } from "../../../shared/configuration";
 import { modelProviderPresetDraft, type ModelProviderPreset, type ModelProviderDraft } from "../../../shared/provider-presets";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { providersMessages } from "../../messages/providers";
 import { thinkingLabels } from "@asterism-app/ui/messages/model-selection";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { Badge } from "@asterism-app/ui/ui/badge";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "@asterism-app/ui/ui/empty";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
-import { StatusBadge, StatusText, type StatusTone } from "@asterism-app/ui/ui/status";
+import { StatusText } from "@asterism-app/ui/ui/status";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Checkbox } from "@asterism-app/ui/ui/checkbox";
 import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription, FieldSet, FieldLegend } from "@asterism-app/ui/ui/field";
@@ -23,36 +22,26 @@ import { cn } from "@asterism-app/ui/utils";
 import { useIsland } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
-import { ConfigurationActionError, Editor, EditorSection, TextField, ChoiceField, NumberField } from "./forms";
+import { ConfigurationActionError, Editor, EditorSection, TextField, NumberField } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { ModelCompatibilityEditor } from "./ModelCompatibilityEditor";
 import { ModelCostEditor } from "./ModelCostEditor";
 import { modelProtocolLabels } from "./protocols";
 import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
 import { useModelParameters } from "./ModelParameters";
-import { ConnectionAuthentication, credentialChanged as draftChanged, type ConnectionCredentialDraft } from "./ConnectionAuthentication";
+import { credentialChanged as draftChanged, credentialUpdate, settingValues, settingsComplete, type CredentialDraft } from "./provider-settings";
+import { ProviderSettingFields } from "./ProviderSettingFields";
+import { modelProviderFields } from "./model-provider-fields";
 import { ProviderKeyLink } from "./ProviderKeyLink";
 import { ProviderUsageButton } from "./ProviderUsageButton";
 
-const protocols = Object.entries(modelProtocolLabels).map(([value, label]) => ({ value, label }));
-const protocolLabel = (value: string) => protocols.find(item => item.value === value)?.label ?? value;
+const protocolLabel = (value: ModelProvider["protocol"]) => modelProtocolLabels[value];
 type ProviderValue = ModelProviderDraft;
 
 /* ---------- State derivation: shared by list and details, both reading the latest snapshot directly ---------- */
 
-interface Health { tone: StatusTone; label: string }
 const latestTest = (snapshot: ConfigurationSnapshot, modelId: string): ConnectionTest | undefined =>
   snapshot.tests.filter(test => test.model === modelId).at(-1);
-function providerHealth(snapshot: ConfigurationSnapshot, provider: ModelProvider): Health {
-  if (!provider.enabled) return { tone: "neutral", label: getI18n().formatMessage(providersMessages.disabled) };
-  if (provider.auth === "api_key" && provider.credentialState !== "available") return { tone: "warning", label: getI18n().formatMessage(providersMessages.needsApiKey) };
-  const models = snapshot.models.filter(model => model.providerId === provider.id);
-  if (!models.length) return { tone: "neutral", label: getI18n().formatMessage(providersMessages.noModels) };
-  const tests = models.map(model => latestTest(snapshot, modelReference(model)));
-  if (tests.some(test => test?.state === "failed")) return { tone: "error", label: getI18n().formatMessage(providersMessages.lastTestFailed) };
-  if (tests.some(test => test?.state === "succeeded")) return { tone: "success", label: getI18n().formatMessage(providersMessages.connected) };
-  return { tone: "neutral", label: getI18n().formatMessage(providersMessages.notTested) };
-}
 /** Suggest the next step by error category; original information remains displayed with the result. */
 const testHints = (): Record<TestError, string> => ({
   configuration: getI18n().formatMessage(providersMessages.invalidSettings),
@@ -120,13 +109,11 @@ function ProviderRow({ provider, snapshot, selected, onOpen }: {
   const i18n = useI18n();
   const quick = useQuickActions();
   const count = snapshot.models.filter(model => model.providerId === provider.id).length;
-  const health = providerHealth(snapshot, provider);
   return <ListRow mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{provider.name.trim().charAt(0).toUpperCase() || "?"}</span>}
-    title={provider.name} selected={selected} onOpen={onOpen}
+    title={provider.name} selected={selected} inactive={!provider.enabled} onOpen={onOpen}
     description={<>{canEditModelProviderField(provider, "protocol") && <>{protocolLabel(provider.protocol)} · </>}{i18n.formatMessage(providersMessages.modelCount, { count })}</>}
     actions={<>
       {provider.enabled && provider.usage && <ProviderUsageButton key={provider.usage} providerId={provider.id} />}
-      <StatusBadge tone={health.tone}>{health.label}</StatusBadge>
       <Switch aria-label={i18n.formatMessage(providersMessages.enableProvider, { provider_name: provider.name })} checked={provider.enabled} disabled={quick.busy}
         onCheckedChange={next => void quick.setProviderEnabled(provider, next)} />
     </>} />;
@@ -213,7 +200,7 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
   const current = snapshot?.modelProviders.find(item => item.id === id);
   // Drafts omit enabled: enabling is an immediate action that always uses the snapshot, preventing mutual overwrites with the parent island's switch.
   const [value, setValue] = useState<ProviderValue>(() => current ? providerValue(current) : structuredClone(initialValue));
-  const [credential, setCredential] = useState<ConnectionCredentialDraft>({ action: current ? "keep" : "replace", key: "" });
+  const [credential, setCredential] = useState<CredentialDraft>({ action: current ? "keep" : "replace", key: "" });
   const set = <K extends keyof typeof value>(field: K, next: (typeof value)[K]) => setValue(previous => ({ ...previous, [field]: next }));
   // A prefilled ID remains independent; for a blank connection, generate it from the name until the user edits the ID manually.
   const [idEdited, setIdEdited] = useState(!!current || !!initialValue.id);
@@ -222,6 +209,21 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
   const saved = current ? providerValue(current) : null;
   const credentialChanged = value.auth === "api_key" && draftChanged(credential);
   const dirty = !saved || JSON.stringify(saved) !== JSON.stringify(value) || credentialChanged;
+  const fields = modelProviderFields(value, snapshot?.usageProviders ?? [], keyUrl);
+  const values = settingValues(fields, {
+    name: value.name, id: value.id, protocol: value.protocol, baseUrl: value.baseUrl, auth: value.auth,
+    usage: value.usage ? `usage:${value.usage}` : "off",
+  });
+  const secrets: Record<string, CredentialDraft> = value.auth === "api_key" ? { apiKey: credential } : {};
+  const secretStates = current ? { apiKey: current.credentialState } : undefined;
+  const complete = modelProviderInputSchema.safeParse({ ...value, enabled: current?.enabled ?? true }).success
+    && settingsComplete(fields, values, secrets, secretStates);
+  const setField = (key: string, next: string) => {
+    if (key === "name") setName(next);
+    else if (key === "id") { setIdEdited(true); set("id", next); }
+    else if (key === "usage") set("usage", next === "off" ? null : next.slice(6));
+    else setValue(previous => ({ ...previous, [key]: next }));
+  };
 
   const openModel = (modelId: string | null, origin?: HTMLElement | null) => {
     if (id) island.open({ id: `model-${modelId ?? "new"}`, label: providersMessages.model, width: panelIslandWidth, origin,
@@ -229,41 +231,30 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
   };
   const models = snapshot?.models.filter(model => model.providerId === id) ?? [];
 
-  return <Editor form="provider-form" title={current?.name ?? i18n.formatMessage(providersMessages.newProvider)} dirty={dirty} busy={busy} error={error}
+  return <Editor form="provider-form" title={current?.name ?? i18n.formatMessage(providersMessages.newProvider)} dirty={dirty} busy={busy} error={error} saveDisabled={!complete}
     description={canEditModelProviderField(value, "protocol") ? protocolLabel(value.protocol) : undefined}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteProviderTitle),
       description: i18n.formatMessage(providersMessages.deleteProviderDescription, { current_name: current.name, models_length: models.length }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "modelProvider", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
     <form id="provider-form" onSubmit={async event => {
       event.preventDefault();
+      if (!complete) return;
       const result = await run({ type: "modelProvider.save", id, value: { ...value, enabled: current?.enabled ?? true },
-        credential: value.auth === "none" || credential.action === "clear" ? { action: "clear" }
-          : credential.action === "replace" && credential.key.trim() ? { action: "replace", value: credential.key } : { action: "keep" } });
+        credential: value.auth === "none" ? { action: "clear" } : credentialUpdate(credential) });
       if (result?.ok) {
         const persisted = result.snapshot.modelProviders.find(item => item.id === result.savedId);
         if (persisted) setValue(providerValue(persisted));
         setId(result.savedId);
         setCredential({ key: "", action: "keep" });
       }
-    }}>
+    }}><fieldset disabled={busy} className="contents">
       <EditorSection title={i18n.formatMessage(providersMessages.connection)}><FieldGroup>
-        <TextField label={i18n.formatMessage(providersMessages.displayName)} value={value.name} onChange={setName} required />
-        <TextField label={i18n.formatMessage(providersMessages.providerId)} value={value.id} onChange={next => { setIdEdited(true); set("id", next); }} required hint={i18n.formatMessage(providersMessages.providerIdHint)} />
-        {canEditModelProviderField(value, "protocol") && <ChoiceField label={i18n.formatMessage(providersMessages.protocol)} value={value.protocol} options={protocols} onChange={next => next && set("protocol", next as ModelProviderInput["protocol"])} />}
-        {canEditModelProviderField(value, "baseUrl") && <TextField label={i18n.text(commonMessages.baseUrl)} value={value.baseUrl} onChange={next => set("baseUrl", next)} required
-          hint={value.auth === "api_key" ? i18n.formatMessage(providersMessages.httpsRequired) : undefined} />}
-        <ConnectionAuthentication auth={value.auth} editable={canEditModelProviderField(value, "auth")}
-          credentialState={current?.credentialState} storageAvailable={snapshot?.credentialStorageAvailable ?? false} keyUrl={keyUrl}
-          draft={credential} onAuthChange={next => set("auth", next)} onDraftChange={setCredential} />
-        {canEditModelProviderField(value, "usage") && <ChoiceField label={i18n.text(providersMessages.usage)}
-          value={value.usage ? `usage:${value.usage}` : "__none"} onChange={next => next && set("usage", next === "__none" ? null : next.slice(6))}
-          options={[{ value: "__none", label: i18n.text(providersMessages.usageOff) },
-            ...(snapshot?.usageProviders ?? []).map(provider => ({ value: `usage:${provider.id}`, label: i18n.text(provider.label) })),
-            ...(value.usage && !snapshot?.usageProviders?.some(provider => provider.id === value.usage)
-              ? [{ value: `usage:${value.usage}`, label: i18n.formatMessage(providersMessages.usageMissing, { id: value.usage }) }] : [])]} />}
+        <ProviderSettingFields settings={fields} values={values} onValue={setField}
+          drafts={secrets} onDraft={(_key, draft) => setCredential(draft)} secretStates={secretStates}
+          storageAvailable={snapshot?.credentialStorageAvailable ?? false} />
       </FieldGroup></EditorSection>
       {canEditModelProviderField(value, "compatibility") && <ModelCompatibilityEditor value={value.compatibility} onChange={next => set("compatibility", next)} />}
-    </form>
+      </fieldset></form>
 
     {current && snapshot && <EditorSection title={i18n.formatMessage(providersMessages.models)}
       hint={dirty ? i18n.text(providersMessages.saveBeforeDiscovery) : undefined}
