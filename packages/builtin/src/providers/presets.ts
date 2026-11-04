@@ -4,7 +4,6 @@ import { builtin } from "@asterism-app/builtin-api/contracts";
 const presetMessages = builtin.messages("en", defineMessages({
   mainlandChina: { id: "providerPreset.mainlandChina", defaultMessage: "Mainland China" },
   international: { id: "providerPreset.international", defaultMessage: "International" },
-  coding: { id: "providerPreset.coding", defaultMessage: "Coding plan · Supported clients only" },
 }));
 
 /** Official entry points fix connection details; the editor consumes only rules and does not recognize preset identities. */
@@ -53,6 +52,33 @@ export const modelProviderPresets: readonly ModelProviderPreset[] = [
     verifiedOn: "2026-10-15", keywords: ["router", "aggregator"],
   },
   {
+    id: "together", name: "Together AI", billing: "usage",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.together.ai/v1", auth: "api_key",
+      compatibility: [
+        { id: "responsesReasoning", value: { encryptedContent: false, summary: false } },
+        { id: "customThinkingLevels", value: { max: "xhigh" } },
+      ] },
+    keyUrl: "https://api.together.ai/settings/projects/~current/api-keys",
+    sources: ["https://docs.together.ai/docs/inference/responses-api"],
+    verifiedOn: "2026-11-04", keywords: ["togetherai", "aggregator", "glm"],
+  },
+  {
+    id: "fireworks", name: "Fireworks AI", billing: "usage",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.fireworks.ai/inference/v1", auth: "api_key",
+      compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }] },
+    keyUrl: "https://app.fireworks.ai/settings/users/api-keys",
+    sources: ["https://docs.fireworks.ai/guides/response-api"],
+    verifiedOn: "2026-11-04", keywords: ["fireworksai", "aggregator"],
+  },
+  {
+    id: "huggingface", name: "Hugging Face", billing: "usage",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://router.huggingface.co/v1", auth: "api_key",
+      compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }] },
+    keyUrl: "https://huggingface.co/settings/tokens",
+    sources: ["https://huggingface.co/docs/inference-providers/en/guides/responses-api"],
+    verifiedOn: "2026-11-04", keywords: ["hf", "inference providers", "aggregator"],
+  },
+  {
     id: "opencode", name: "OpenCode Console", billing: "usage",
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://opencode.ai/inference/v1", auth: "api_key", compatibility: [] },
     keyUrl: "https://opencode.ai/console",
@@ -84,7 +110,7 @@ export const modelProviderPresets: readonly ModelProviderPreset[] = [
     verifiedOn: "2026-10-15", keywords: ["moonshot", "月之暗面"],
   },
   {
-    id: "kimi-plan-cn", name: "Kimi Code", billing: "subscription", region: presetMessages.mainlandChina, plan: presetMessages.coding,
+    id: "kimi-plan-cn", name: "Kimi Code", billing: "subscription", region: presetMessages.mainlandChina,
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.kimi.com/coding/v1", auth: "api_key", usage: "kimi-plan-cn",
       compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }] },
     keyUrl: "https://www.kimi.com/code/console",
@@ -92,7 +118,7 @@ export const modelProviderPresets: readonly ModelProviderPreset[] = [
     verifiedOn: "2026-10-15", keywords: ["moonshot", "月之暗面", "coding"],
   },
   {
-    id: "kimi-plan", name: "Kimi Code", billing: "subscription", region: presetMessages.international, plan: presetMessages.coding,
+    id: "kimi-plan", name: "Kimi Code", billing: "subscription", region: presetMessages.international,
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.kimi.ai/coding/v1", auth: "api_key", usage: "kimi-plan",
       compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }] },
     keyUrl: "https://www.kimi.com/code/console",
@@ -114,14 +140,14 @@ export const modelProviderPresets: readonly ModelProviderPreset[] = [
     verifiedOn: "2026-10-15", keywords: ["zai", "glm", "zhipu", "智谱"],
   },
   {
-    id: "zai-plan-cn", name: "Zhipu AI", billing: "subscription", region: presetMessages.mainlandChina, plan: presetMessages.coding,
+    id: "zai-plan-cn", name: "Zhipu AI", billing: "subscription", region: presetMessages.mainlandChina,
     connection: { ...zaiResponses("https://open.bigmodel.cn/api/v1"), usage: "zai-plan-cn" },
     keyUrl: "https://bigmodel.cn/coding-plan/personal/overview",
     sources: ["https://docs.bigmodel.cn/cn/coding-plan/tool/codex", "https://docs.bigmodel.cn/api-reference/response/创建-response"],
     verifiedOn: "2026-10-15", keywords: ["z.ai", "zai", "glm", "bigmodel", "智谱"],
   },
   {
-    id: "zai-plan", name: "Z.ai", billing: "subscription", region: presetMessages.international, plan: presetMessages.coding,
+    id: "zai-plan", name: "Z.ai", billing: "subscription", region: presetMessages.international,
     connection: { ...zaiResponses("https://api.z.ai/api/v1"), usage: "zai-plan" },
     keyUrl: "https://z.ai/manage-apikey/apikey-list",
     sources: ["https://docs.z.ai/devpack/tool/codex", "https://docs.z.ai/devpack/usage-policy", "https://docs.bigmodel.cn/api-reference/response/创建-response"],

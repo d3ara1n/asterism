@@ -119,7 +119,6 @@
   "resources.agentExamples": "任务示例",
   "providerPreset.mainlandChina": "中国大陆",
   "providerPreset.international": "国际",
-  "providerPreset.coding": "编程套餐 · 仅限受支持客户端",
   "usage.title": "账户用量",
   "usage.rateLimits": "限流余量",
   "usage.tokenRate": "Token 限流",
