@@ -7,6 +7,7 @@ export interface ScriptInput {
 }
 export type ScriptRequest =
   | { type: "call"; id: number; name: string; args: Json }
+  | { type: "log"; value: Json }
   | { type: "done"; value: Json }
   | { type: "error"; message: string };
 export interface ScriptReply {

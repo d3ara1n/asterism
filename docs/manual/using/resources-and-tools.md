@@ -18,7 +18,7 @@ Resource creation has its own discovery and inspection tools. The available crea
 
 `await` expresses dependencies; `Promise.all` and `Promise.allSettled` submit calls together. Direct calls and all script child calls in the same tool batch share a scheduler. Sequential tools share one queue in submission order; parallel tools can run alongside sequential and other parallel tools. Concurrent submission creates no implicit dependency between calls.
 
-Each result retains its `kind` and raw `data`. `text(result)` returns the text from its existing model projection without publishing anything. Return the selected JSON value or text directly:
+Each result retains its `kind` and raw `data`. `text(result)` returns the text from its existing model projection without publishing anything. Use `log(value)` to output intermediate information and return the selected final JSON value or text:
 
 ```js
 const directory = resources.get("directory-resource-id");
@@ -26,11 +26,14 @@ const result = await directory.read({
   target: { path: "README.md" },
   args: {},
 });
+log({ path: "README.md", kind: result.kind });
 return {
   kind: result.kind,
   text: text(result),
 };
 ```
+
+`log(value)` accepts one JSON-serializable value and returns `undefined`. Each entry captures the value immediately, so later object changes leave earlier entries intact. Logs appear in the execution view as they arrive. The model receives them in emission order, followed by the return value, when the tool finishes. Concurrent branches log in their actual emission order. With no logs, the model receives the return value directly. Log serialization failures throw ordinary JavaScript exceptions that the script can catch; log content does not change the script's outcome.
 
 Tool outcomes have six terminal kinds: `succeeded` means success, `partial` means partial success, `rejected` means the call was rejected, `failed` means execution failed, `cancelled` means the call was cancelled, and `unknown` means the operation's outcome is uncertain and effects may have occurred. `rejected` and `failed` carry `error: { code, message }`; `partial`, `cancelled`, and `unknown` carry `message`. `data` may be `null`, and its presence alone does not indicate success.
 
@@ -42,7 +45,7 @@ Getting a handle performs no tool call and grants no access. Method execution us
 
 Resource inspection includes each tool's `requiresInteraction` flag. Tools requiring user interaction, such as `ask_user`, use direct model calls. Script tool bindings exclude interaction-required top-level tools, and resource methods reject interaction-required operations. Tools supporting both modes receive a noninteractive execution context in scripts.
 
-Only the final return value reaches the model. History retains the code, child call identities, timing and outcome summaries, and the returned value. Child arguments and outputs are temporary. The execution title summarizes call progress and failures. The body lists calls grouped by tool and resource with repeat counts, timing, statuses, and diagnostics, followed by the return value and the script code.
+Explicit logs and the final return value reach the model. Logs already received by the host remain available after an exception, timeout, or cancellation. History retains the code, child call identities, timing and outcome summaries, logs, and the returned value. Child arguments and outputs are temporary unless explicitly logged or returned. The execution title summarizes call progress and failures. The body lists calls grouped by tool and resource with repeat counts, timing, statuses, and diagnostics. Logs appear as muted text lines, with the return value and script code available separately.
 
 Each script has an isolated JavaScript environment and the current request's captured access, configuration, and tool policy. Filesystem, network, and process operations use tools; the environment provides JavaScript and the declared helpers without Node APIs, direct filesystem or network access, timers, or a session handle. An optional `timeout_ms` covers the whole script, including tool calls; expiry produces `kind: "failed"` and `error.code: "script_timeout"`. External cancellation produces `kind: "cancelled"`. Completion, failure, timeout, or cancellation cancels outstanding child calls, waits for them to settle, and releases the script environment. Unawaited calls share this lifetime. Completed effects remain without rollback.
 

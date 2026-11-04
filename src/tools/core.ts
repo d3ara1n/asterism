@@ -34,8 +34,9 @@ export const scriptCallSchema = toolInvocationSchema.extend({
 export type ScriptCall = z.infer<typeof scriptCallSchema>;
 export const ResourceScriptResult = defineData(coreId("resource-script"), z.strictObject({
   calls: z.array(scriptCallSchema),
+  logs: z.array(jsonSchema).default([]),
   value: jsonSchema.optional(),
-}).describe("Nested call identities, timing and outcomes, and the script's final return value."));
+}).describe("Nested call identities, timing and outcomes, explicit script logs, and the script's final return value."));
 
 export const ResourceScript = defineTool({
   id: "core.tool.resource_script",
@@ -49,13 +50,14 @@ export const ResourceScript = defineTool({
     "rejected and failed outcomes carry error: { code, message }; partial, cancelled, and unknown outcomes carry message. Tool outcomes fulfill the call's promise for every kind, so await returns unsuccessful outcomes for branching and try/catch handles JavaScript exceptions. A child tool's unsuccessful outcome alone leaves the script running and can be returned by a successful script.",
     "await expresses dependencies; Promise.all and Promise.allSettled submit calls together. Tool outcomes such as failed or rejected are fulfilled promise values: Promise.all returns them normally, and Promise.allSettled reports status: \"fulfilled\" with the tool outcome in value. One unsuccessful tool outcome leaves other submitted calls running.",
     "Direct calls and all script child calls in the same tool batch share a scheduler. Sequential tools share one queue in submission order; parallel tools can run alongside sequential and other parallel tools. Concurrent submission creates no implicit dependency between calls.",
-    "text(result) joins the text parts of the result's existing model projection into one string without publishing it. The script's final return value supplies its model output; strings remain text and other JSON values become JSON text. Child outputs reach the model through that return value. An omitted or nullish return becomes null; return values use JSON serialization.",
+    "text(result) joins the text parts of the result's existing model projection into one string without publishing it. The script's final return value supplies its final model output; strings remain text and other JSON values become JSON text. An omitted or nullish return becomes null; return values use JSON serialization.",
+    "log(value) synchronously serializes one JSON-serializable value and returns undefined. Logs appear in the execution view as they arrive and precede the final return value in the model's tool result. Entries retain their values at the time of logging and their emission order, including concurrent branches. Child outputs reach the model through explicit log calls or the final return value. Log serialization failures throw JavaScript exceptions; log content does not change the execution outcome.",
     "Each script has an isolated JavaScript environment. All calls use this request's captured resource access, configuration, and tool policy. Filesystem, network, and process operations use tools; the environment provides JavaScript and the declared helpers, without Node APIs, direct filesystem or network access, timers, or a session handle.",
     "An uncaught JavaScript exception or return-value serialization failure ends the script with kind: \"failed\" and error.code: \"script_failed\". timeout_ms covers the whole script, including tool calls, and expiry produces error.code: \"script_timeout\". External cancellation produces kind: \"cancelled\".",
-    "Script completion, failure, timeout, or cancellation cancels outstanding child calls, waits for them to settle, and releases the script environment. Unawaited calls share this lifetime. Completed effects remain without rollback. History records nested call identities, timing, and outcome summaries without child arguments or outputs.",
+    "Script completion, failure, timeout, or cancellation cancels outstanding child calls, waits for them to settle, and releases the script environment. Unawaited calls share this lifetime. Completed effects remain without rollback. History records nested call identities, timing, and outcome summaries, together with explicit logs and the returned value. Child arguments and outputs remain temporary unless explicitly logged or returned. Logs already received by the host remain available after failure, timeout, or cancellation.",
   ],
   argsSchema: z.strictObject({
-    code: z.string().describe("JavaScript async function body. Return the data or text to send back to the model."),
+    code: z.string().describe("JavaScript async function body. Use log(value) for intermediate output and return for the final data or text to send back to the model."),
     timeout_ms: z.number().int().positive().optional().describe("Optional deadline for the whole script, including tool calls, in milliseconds."),
   }).describe("JavaScript source and an optional execution deadline."),
 });

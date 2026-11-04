@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { z } from "zod";
 import { CircleCheck, Ellipsis, Workflow, Wrench } from "lucide-react";
 import { toolRenderer, useRendererTools, type ToolRenderProps } from "@asterism-app/sdk/renderer";
-import type { Json } from "@asterism-app/sdk/contracts";
+import { defaultToolModel, type Json } from "@asterism-app/sdk/contracts";
 import { CodeText } from "@asterism-app/ui/code-view";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
@@ -106,9 +106,16 @@ function Body(props: Props) {
   const i18n = useI18n();
   const code = scriptCode(props.args);
   if (props.phase === "input") return code ? <StreamingPreview><CodeText contents={code} language={language} lineNumbers overflow="wrap" /></StreamingPreview> : null;
+  const logs = props.result?.data?.logs ?? [];
   const value = props.phase === "settled" ? props.result.data?.value : undefined;
   return <div className="flex flex-col gap-3">
     <CallList calls={scriptCalls(props)} />
+    {logs.length > 0 && <div className="flex min-w-0 flex-col gap-1 type-caption text-muted-foreground">
+      {logs.map((entry, index) => {
+        const text = defaultToolModel(entry);
+        return <p key={index} className="truncate" title={text}>{text}</p>;
+      })}
+    </div>}
     {(code || value !== undefined) && <ToolDetailsSwitcher stateKey="asterism/resource-script-details" items={[
       ...(code ? [{ value: "code", label: i18n.text(messages.toolScriptCode),
         render: () => props.phase === "settled" ? <ResultScriptCode code={code} />
@@ -119,10 +126,10 @@ function Body(props: Props) {
   </div>;
 }
 
-/** Calls, return value, and source replace the shell's raw argument and result details. */
+/** Calls, logs, return value, and source replace the shell's raw argument and result details. */
 export const scriptToolRenderer = toolRenderer(ResourceScriptResult, {
   label: messages.toolResourceScript, icon: <Workflow className="size-3.5" />, details: false,
   input: { headerRenderer: Header, bodyRenderer: Body, streaming: props => scriptCode(props.args).length > 0 },
-  execution: { headerRenderer: Header, bodyRenderer: Body, streaming: props => scriptCalls(props).length > 0 },
+  execution: { headerRenderer: Header, bodyRenderer: Body, streaming: props => scriptCalls(props).length > 0 || (props.result?.data?.logs.length ?? 0) > 0 },
   result: { headerRenderer: Header, bodyRenderer: Body },
 });

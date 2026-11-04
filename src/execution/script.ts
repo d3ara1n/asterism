@@ -5,7 +5,7 @@ import { ResourceCall, ResourceScriptResult, type ScriptCall } from "../tools/co
 import type { PendingCall, ToolObserver } from "./core.ts";
 import type { ScriptInput, ScriptReply, ScriptRequest } from "./script-protocol.ts";
 
-type ScriptData = { calls: ScriptCall[]; value?: Json };
+type ScriptData = { calls: ScriptCall[]; logs: Json[]; value?: Json };
 interface ScriptOptions {
   id: string;
   code: string;
@@ -39,11 +39,12 @@ function settledSummary(outcome: ToolOutcome): Partial<ScriptCall> {
 /** The script owns its VM and outstanding calls; resources operated on retain their own lifetime. */
 export async function executeResourceScript(options: ScriptOptions): Promise<CallResult> {
   const calls: ScriptCall[] = [];
+  const logs: Json[] = [];
   const controller = new AbortController();
   const signal = AbortSignal.any([options.signal, controller.signal]);
   const interrupt = new SharedArrayBuffer(4);
   const active = new Set<Promise<void>>();
-  const snapshot = (): ScriptData => ({ calls: calls.map(call => ({ ...call })) });
+  const snapshot = (): ScriptData => ({ calls: calls.map(call => ({ ...call })), logs: [...logs] });
   const publish = () => options.publish(ResourceScriptResult.schema.parse(snapshot()));
   let stop: (result: CallResult) => void = () => {};
   let finished = false;
@@ -80,6 +81,9 @@ export async function executeResourceScript(options: ScriptOptions): Promise<Cal
           stop({ kind: "succeeded", data: null });
         } else if (message.type === "error") {
           stop({ kind: "failed", error: { code: "script_failed", message: message.message } });
+        } else if (message.type === "log") {
+          logs.push(message.value);
+          publish();
         } else {
           const call: PendingCall = { callId: `${options.id}/${message.id}`, name: message.name, arguments: message.args };
           const summary: ScriptCall = { id: call.callId, name: call.name, kind: "queued", ...defined({ tool: resourceTool(call) }) };
@@ -116,8 +120,10 @@ export async function executeResourceScript(options: ScriptOptions): Promise<Cal
   return { ...completion, data: { ...snapshot(), ...(value === undefined ? {} : { value }) } };
 }
 
-/** Intermediate summaries remain in history; the model receives only the selected return value. */
+/** Explicit logs precede the return value; child call summaries remain in history. */
 export function scriptToModel(data: Json): string {
   const result = ResourceScriptResult.schema.parse(data);
-  return result.value === undefined ? "" : defaultToolModel(result.value);
+  const value = result.value === undefined ? "" : defaultToolModel(result.value);
+  if (!result.logs.length) return value;
+  return `Logs:\n${result.logs.map(defaultToolModel).join("\n")}${result.value === undefined ? "" : `\n\nReturn value:\n${value}`}`;
 }

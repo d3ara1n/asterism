@@ -62,6 +62,70 @@ describe("Resource script execution", () => {
     expect(progress.some(value => ResourceScriptResult.schema.parse(value).calls.some(call => call.kind === "running"))).toBe(true);
   });
 
+  it("publishes logs before completion and captures values before later mutations", async () => {
+    const started = deferred<void>(), release = deferred<void>();
+    const progress: Json[] = [];
+    const running = script(`
+      log("Reading");
+      const entry = { path: "README.md" };
+      log(entry);
+      entry.path = "changed";
+      const result = await resources.get("r").step({ args: { value: 3 } });
+      log(text(result));
+      return { count: result.data.value };
+    `, capabilities(async value => {
+      started.resolve();
+      await release.promise;
+      return { kind: "succeeded", data: { value } };
+    }), { published(_call, data) { progress.push(data); } });
+    try {
+      await started.promise;
+      const snapshots = progress.map(data => ResourceScriptResult.schema.parse(data));
+      expect(snapshots.find(data => data.logs.length === 1)?.logs).toEqual(["Reading"]);
+      expect(snapshots.at(-1)?.logs).toEqual(["Reading", { path: "README.md" }]);
+      expect(snapshots.at(-1)).not.toHaveProperty("value");
+    } finally { release.resolve(); }
+    const result = await running;
+    expect(result.kind).toBe("succeeded");
+    expect(ResourceScriptResult.schema.parse(result.data).logs).toEqual(["Reading", { path: "README.md" }, "visible 3"]);
+    expect(modelText(result)).toBe('Logs:\nReading\n{"path":"README.md"}\nvisible 3\n\nReturn value:\n{"count":3}');
+  });
+
+  it.each([
+    ["JavaScript exceptions", 'throw new Error("Stopped");'],
+    ["return serialization failures", "return 1n;"],
+    ["log serialization failures", "log(1n);"],
+  ])("retains earlier logs after %s", async (_name, ending) => {
+    const result = await script(`log("Recorded"); ${ending}`);
+    expect(result).toMatchObject({ kind: "failed", error: { code: "script_failed" } });
+    const saved = ResourceScriptResult.schema.parse(result.data);
+    expect(saved.logs).toEqual(["Recorded"]);
+    expect(saved).not.toHaveProperty("value");
+    expect(modelText(result)).toMatch(/^failed \(script_failed\): .+\nLogs:\nRecorded$/);
+  });
+
+  it.each([
+    ["BigInt", "1n"],
+    ["undefined", "undefined"],
+    ["cyclic objects", "(() => { const value = {}; value.self = value; return value; })()"],
+  ])("lets scripts catch log serialization errors for %s", async (_name, expression) => {
+    const result = await script(`
+      let caught = false;
+      try { log(${expression}); } catch (error) { caught = error instanceof TypeError; }
+      log("Recovered");
+      return caught;
+    `);
+    expect(result.kind).toBe("succeeded");
+    expect(ResourceScriptResult.schema.parse(result.data).logs).toEqual(["Recovered"]);
+    expect(modelText(result)).toBe("Logs:\nRecovered\n\nReturn value:\ntrue");
+  });
+
+  it("retains logs alongside the existing null result for an omitted return", async () => {
+    const result = await script('log("Completed");');
+    expect(ResourceScriptResult.schema.parse(result.data)).toMatchObject({ logs: ["Completed"], value: null });
+    expect(modelText(result)).toBe("Logs:\nCompleted\n\nReturn value:\nnull");
+  });
+
   it("keeps structured rejection and failure results available for script branching", async () => {
     const cap = capabilities(async () => ({ kind: "failed", error: { code: "unavailable", message: "Unavailable." } }));
     const result = await script(`
@@ -107,9 +171,9 @@ describe("Resource script execution", () => {
     const first = await script(`
       globalThis.privateValue = 42;
       return [typeof process, typeof require, typeof fetch, typeof setTimeout, typeof session,
-        typeof tools.resource_script, typeof tools.resource_call, typeof globalThis.__invoke];
+        typeof tools.resource_script, typeof tools.resource_call, typeof globalThis.__invoke, typeof globalThis.__log];
     `);
-    expect(modelText(first)).toBe(JSON.stringify(Array(8).fill("undefined")));
+    expect(modelText(first)).toBe(JSON.stringify(Array(9).fill("undefined")));
     expect(modelText(await script("return typeof privateValue;"))).toBe("undefined");
   });
 
@@ -133,6 +197,7 @@ describe("Resource script execution", () => {
     }));
     let outcome: ToolOutcome | undefined;
     const running = executeCoreBatch([{ callId: "script", name: "resource_script", arguments: { code: `
+      log("Waiting for steps");
       return await Promise.all([1, 2].map(value => resources.get("r").step({
         args: { value }
       })));
@@ -151,6 +216,8 @@ describe("Resource script execution", () => {
     expect(saved.calls[0]?.startedAt).toBeDefined();
     expect(saved.calls[1]).not.toHaveProperty("startedAt");
     expect(saved).not.toHaveProperty("value");
+    expect(saved.logs).toEqual(["Waiting for steps"]);
+    expect(modelText(outcome!)).toBe("cancelled: Script execution was cancelled.\nLogs:\nWaiting for steps");
   });
 
   it("fails a promise with no tool capable of settling it and rejects non-JSON return values", async () => {

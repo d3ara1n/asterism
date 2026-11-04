@@ -81,11 +81,24 @@ try {
   });
   vm.setProp(vm.global, "__invoke", bridge);
   bridge.dispose();
+  const logBridge = vm.newFunction("log", value => {
+    send({ type: "log", value: JSON.parse(vm.getString(value)) });
+    return vm.undefined;
+  });
+  vm.setProp(vm.global, "__log", logBridge);
+  logBridge.dispose();
   // Capture JSON functions before user code runs. The bridge exchanges only JSON, never host objects.
   const bootstrap = vm.evalCode(`(() => {
     const invoke = globalThis.__invoke;
     delete globalThis.__invoke;
+    const log = globalThis.__log;
+    delete globalThis.__log;
     const parse = JSON.parse, stringify = JSON.stringify;
+    globalThis.log = value => {
+      const serialized = stringify(value);
+      if (serialized === undefined) throw new TypeError("Log values must be JSON-serializable.");
+      log(serialized);
+    };
     const call = async (name, args) => parse(await invoke(name, stringify(args)));
     const tools = Object.create(null);
     for (const name of ${JSON.stringify(input.tools)}) {
