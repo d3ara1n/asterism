@@ -113,7 +113,7 @@ async function create(service: ApplicationService, sessionId: string, input = 1)
 describe("Host implementation of the workbench SDK", () => {
   it("runs explicit model tools without a workbench resource or timeline position", async () => {
     const c = counter();
-    const { service, sessionId } = open([c.plugin], () => ({ version: "generic", validate() {}, prepare(input) {
+    const { service, sessionId } = open([c.plugin], () => ({ format: () => "generic", validate() {}, prepare(input) {
       expect(input.tools.map(tool => tool.name)).toEqual(["calculate"]);
       return { async *stream() {
         yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "calculate" } };
@@ -360,7 +360,7 @@ describe("Host implementation of the workbench SDK", () => {
     });
     const plugin = definePlugin({ namespace: other, modules: [defineModule(() => ({ topLevelTools: [declaration] }))] });
     const requests: ModelInput[] = [];
-    const { service, sessionId } = open([c.plugin, plugin], () => ({ version: "test/1", validate() {}, prepare(input) {
+    const { service, sessionId } = open([c.plugin, plugin], () => ({ format: () => "test/1", validate() {}, prepare(input) {
       requests.push(input);
       return { async *stream() {
         yield { type: "part.start", part: { id: "q", kind: "toolcall", name: "prompt", callId: "question" } };
@@ -418,7 +418,7 @@ describe("Host implementation of the workbench SDK", () => {
       modules: [defineModule(() => ({ topLevelTools: [previous] }))] });
     const requests: ModelInput[] = [];
     const { service, sessionId } = open([c.plugin, earlier, later], () => ({
-      version: "test/1", validate() {}, prepare(input) {
+      format: () => "test/1", validate() {}, prepare(input) {
         requests.push(input);
         return { async *stream() {
           yield { type: "part.start", part: { id: "q", kind: "toolcall", name: "ask_user", callId: "question" } };
@@ -621,7 +621,7 @@ describe("Host implementation of the workbench SDK", () => {
     }))] });
     const validated: string[] = [];
     const { service } = open([plugin], () => ({
-      version: "test", validate(input) { validated.push(JSON.stringify(input.messages)); },
+      format: () => "test", validate(input) { validated.push(JSON.stringify(input.messages)); },
       prepare() { return { async *stream() { yield { type: "finish", reason: "stop", usage: null } as const; } }; },
     }));
     const target = await configureModel(service);
@@ -675,7 +675,7 @@ describe("Host implementation of the workbench SDK", () => {
     })] });
     const c = counter();
     const { service, sessionId } = open([c.plugin, listener], () => ({
-      version: "test", validate() {},
+      format: () => "test", validate() {},
       prepare(input) {
         const index = requests.push(input.messages) - 1;
         return { async *stream() {
@@ -763,7 +763,7 @@ describe("Host implementation of the workbench SDK", () => {
       return {};
     } });
     const { service } = open([plugin], () => ({
-      version: "test", validate() {},
+      format: () => "test", validate() {},
       prepare() { return { async *stream() {
         entered.resolve();
         await release.promise;
@@ -1090,7 +1090,7 @@ describe("Host implementation of the workbench SDK", () => {
     const ToolOperation = defineOperationRecord(ns.name("tool-operation"), { input: modelToolCallBlockSchema, output: toolOutcomeSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution, ToolOperation] }))] });
     const inputs: ModelInput[] = [];
-    const { service, sessionId } = open([plugin], () => ({ validate() {}, version: "test-adapter", prepare(input) {
+    const { service, sessionId } = open([plugin], () => ({ validate() {}, format: () => "test-adapter", prepare(input) {
       inputs.push(structuredClone(input));
       return { async *stream() {
         yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "resource_list" } };
@@ -1140,7 +1140,7 @@ describe("Host implementation of the workbench SDK", () => {
 
   it("public stream fixes explicit input without saving history or implicitly adding host tools", async () => {
     const c = counter(), inputs: ModelInput[] = [];
-    const { service, sessionId } = open([c.plugin], () => ({ validate() {}, version: "test-adapter", prepare(input) {
+    const { service, sessionId } = open([c.plugin], () => ({ validate() {}, format: () => "test-adapter", prepare(input) {
       inputs.push(input);
       return { async *stream() { yield { type: "finish" as const, reason: "stop", usage: null }; } };
     } }));
@@ -1170,7 +1170,7 @@ describe("Host implementation of the workbench SDK", () => {
     const c = counter();
     const Execution = defineRecord(ns.name("execution"), { schema: modelRunRecordSchema });
     const plugin = definePlugin({ ...c.plugin, modules: [...c.plugin.modules, defineModule(() => ({ records: [Execution] }))] });
-    const { service, sessionId } = open([plugin], () => ({ validate() {}, version: "test", prepare() {
+    const { service, sessionId } = open([plugin], () => ({ validate() {}, format: () => "test", prepare() {
       return { async *stream(signal) {
         yield { type: "part.start", part: { id: "t", kind: "text" } };
         yield { type: "part.delta", partId: "t", delta: "Partial" };

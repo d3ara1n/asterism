@@ -112,7 +112,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
       try {
         const { settings, adapter } = await resolve(target);
         const resolvedMessages = await resolveInput(messages, content, request.signal);
-        const source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
+        const source = { model: modelExpression(settings), adapter: adapter.format(settings), scope: modelScope(settings) };
         for await (const event of adapter.prepare({ settings, system, messages: resolvedMessages, maxOutputTokens, userAgent, sessionId,
           tools: settings.model.capabilities.tools ? tools ?? [] : [] }).stream(request.signal)) {
           request.signal.throwIfAborted();

@@ -59,7 +59,7 @@ async function model(app: ApplicationService) {
   return { provider: "test", model: "test" };
 }
 function adapter(next: () => { name: string; args: Json }[]): ModelAdapter {
-  return { version: "test/1", validate() {}, prepare() {
+  return { format: () => "test/1", validate() {}, prepare() {
     const calls = next();
     return { async *stream() {
       for (const [index, call] of calls.entries()) {
@@ -146,7 +146,7 @@ describe("SDK session resource lifetimes", () => {
 
   it.each(["cancel", "failure"] as const)("releases pending link holds when a captured request ends by %s", async mode => {
     const entered = latch(), finish = latch();
-    const f = open({ adapter: { version: "interrupted", validate() {}, prepare() {
+    const f = open({ adapter: { format: () => "interrupted", validate() {}, prepare() {
       return { async *stream(signal): AsyncIterable<ModelEvent> {
         yield { type: "part.start", part: { id: "text", kind: "text" } };
         entered.release();
@@ -173,7 +173,7 @@ describe("SDK session resource lifetimes", () => {
   it("projects directed pending links independently and keeps old holds valid across relinking", async () => {
     const entered = [latch(), latch()], finish = [latch(), latch()];
     let request = 0;
-    const f = open({ adapter: { version: "links", validate() {}, prepare() {
+    const f = open({ adapter: { format: () => "links", validate() {}, prepare() {
       const index = request++;
       return { async *stream(): AsyncIterable<ModelEvent> {
         if (index < 2) { entered[index]!.release(); await finish[index]!.promise; }
@@ -226,7 +226,7 @@ describe("SDK session resource lifetimes", () => {
     let resourceId = "", request = 0;
     const seen: unknown[] = [];
     const calls = adapter(() => [{ name: "resource_call", args: { resource_id: resourceId, tool: "generate", args: {} } }]);
-    const f = open({ plugins: [plugin], adapter: { version: "temporary", validate() {}, prepare(input) {
+    const f = open({ plugins: [plugin], adapter: { format: () => "temporary", validate() {}, prepare(input) {
       seen.push(input.messages);
       if (request++ === 0) return calls.prepare(input);
       return { async *stream() {
@@ -377,7 +377,7 @@ describe("SDK session resource lifetimes", () => {
     }; } });
     const entered = [latch(), latch()], finishRequest = [latch(), latch()];
     let request = 0, resourceId = "";
-    const f = open({ plugins: [resourcePlugin], adapter: { version: "held", validate() {}, prepare() {
+    const f = open({ plugins: [resourcePlugin], adapter: { format: () => "held", validate() {}, prepare() {
       const index = request++;
       return { async *stream(): AsyncIterable<ModelEvent> {
         if (index < 2) { entered[index]!.release(); await finishRequest[index]!.promise; }
@@ -430,7 +430,7 @@ describe("SDK session resource lifetimes", () => {
   it.each([false, true])("cancels nonbusy owned work on rewind and waits for cleanup with linked resources=%s", async linked => {
     const entered = latch(), cancelled = latch(), finishCleanup = latch(), finished = latch();
     let requestSignal!: AbortSignal;
-    const f = open({ adapter: { version: "external", validate() {}, prepare() {
+    const f = open({ adapter: { format: () => "external", validate() {}, prepare() {
       return { async *stream(signal): AsyncIterable<ModelEvent> {
         requestSignal = signal; entered.release();
         await new Promise<void>(resolve => {

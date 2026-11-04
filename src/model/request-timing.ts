@@ -1,9 +1,7 @@
 import type { RequestTiming, Usage } from "@asterism-app/sdk/contracts";
 import { wrapLanguageModel, type LanguageModel } from "ai";
 import type { ModelEvent } from "./contract.ts";
-import { anthropicUsage } from "./anthropic-usage.ts";
-
-type ProviderPart = Awaited<ReturnType<ReturnType<typeof wrapLanguageModel>["doStream"]>>["stream"] extends ReadableStream<infer Part> ? Part : never;
+import type { ModelProtocol, ProviderPart } from "./protocols/contract.ts";
 
 /** From model invocation start to received terminal state; excludes subsequent caller tool execution. */
 export class RequestTimer {
@@ -38,11 +36,12 @@ export class RequestTimer {
 }
 
 /** Sample as the SDK receives provider content; consumer progress publication and stream finalization do not alter measurements. */
-export function measureModel(model: Exclude<LanguageModel, string>, protocol: string, timer: RequestTimer) {
+export function measureModel(model: Exclude<LanguageModel, string>, protocol: ModelProtocol, timer: RequestTimer) {
   let completion: Extract<ModelEvent, { type: "finish" }> | undefined;
   let responseId: string | undefined;
   let usage: Usage | null = null;
-  const anthropic = anthropicUsage();
+  const meter = protocol.meter?.();
+  const thinking = (delta: string) => timer.output("thinking", delta);
   const callsWithInput = new Set<string>();
   const measured = wrapLanguageModel({ model, middleware: {
     specificationVersion: "v4",
@@ -51,24 +50,14 @@ export function measureModel(model: Exclude<LanguageModel, string>, protocol: st
       return { ...result, stream: result.stream.pipeThrough(new TransformStream<ProviderPart, ProviderPart>({
         transform(part, controller) {
           if (part.type === "text-delta") timer.output("text", part.delta);
-          if (part.type === "reasoning-delta" && protocol !== "openai-responses") timer.output("thinking", part.delta);
-          if (part.type === "raw" && protocol === "openai-responses" && part.rawValue && typeof part.rawValue === "object") {
-            const raw = part.rawValue as Record<string, unknown>;
-            if ((raw.type === "response.reasoning_text.delta" || raw.type === "response.reasoning_summary_text.delta") && typeof raw.delta === "string")
-              timer.output("thinking", raw.delta);
-          }
+          if (part.type === "reasoning-delta" && protocol.sdkReasoning) thinking(part.delta);
+          if (meter) usage = meter.observe(part, usage, thinking);
           if (part.type === "tool-input-delta") {
             timer.output("toolcall", part.delta);
             if (part.delta.length) callsWithInput.add(part.id);
           }
           if (part.type === "tool-call" && !callsWithInput.has(part.toolCallId)) timer.output("toolcall", part.input);
           if (part.type === "response-metadata") responseId = part.id ?? responseId;
-          if (protocol === "anthropic" && part.type === "custom" && part.kind === "anthropic.message_start")
-            usage = anthropic.observe(usage, part.providerMetadata?.anthropic?.usage, false);
-          if (protocol === "anthropic" && part.type === "raw" && part.rawValue && typeof part.rawValue === "object") {
-            const raw = part.rawValue as Record<string, unknown>;
-            if (raw.type === "message_delta") usage = anthropic.observe(usage, raw.usage, true);
-          }
           if (part.type === "error") timer.end("failed");
           if (part.type === "finish") {
             const u = part.usage;

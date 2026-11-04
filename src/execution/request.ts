@@ -64,7 +64,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
     const { adapter, settings, system, messages, userAgent, sessionId, tools: suppliedTools } = await environment;
     const execution = settings.model.capabilities.tools ? suppliedTools ?? unavailableTools : unavailableTools;
     signal.throwIfAborted();
-    source = { model: modelExpression(settings), adapter: adapter.version, scope: modelScope(settings) };
+    source = { model: modelExpression(settings), adapter: adapter.format(settings), scope: modelScope(settings) };
     responseId = randomUUID();
     const tools = [...execution.declarations];
     const prepared = adapter.prepare({ settings, system, messages, userAgent, sessionId, tools });

@@ -3,9 +3,12 @@ import { uiTextSchema, type UiText } from "./i18n.ts";
 import { jsonSchema, type Json } from "./json.ts";
 import { providerUsageIdSchema } from "./provider-usage.ts";
 
+/** Host-owned model wire protocols; plugins select one and cannot register their own. */
+export const modelProtocolIds = ["openai-responses", "openai-chat", "anthropic"] as const;
+export type ModelProtocolId = typeof modelProtocolIds[number];
 export const modelProviderFixedFields = ["protocol", "baseUrl", "auth", "compatibility", "usage"] as const;
 export interface ModelProviderConnection {
-  protocol: "openai-responses" | "openai-chat" | "anthropic";
+  protocol: ModelProtocolId;
   baseUrl: string;
   auth: "api_key" | "none";
   compatibility: { id: string; value?: Json }[];
@@ -26,7 +29,7 @@ export interface ModelProviderPreset {
 }
 const webUrl = z.url({ protocol: /^https?$/ });
 export const modelProviderConnectionSchema = z.strictObject({
-  protocol: z.enum(["openai-responses", "openai-chat", "anthropic"]),
+  protocol: z.enum(modelProtocolIds),
   baseUrl: webUrl, auth: z.enum(["api_key", "none"]),
   compatibility: z.array(z.strictObject({ id: z.string().min(1), value: jsonSchema.optional() })),
   usage: providerUsageIdSchema.nullable().optional(),

@@ -1,6 +1,6 @@
 import { wrapLanguageModel, type LanguageModelMiddleware } from "ai";
 import type { createOpenAI } from "@ai-sdk/openai";
-import { ModelFailure } from "./contract.ts";
+import { ModelFailure } from "../contract.ts";
 
 type ResponsesModel = ReturnType<ReturnType<typeof createOpenAI>["responses"]>;
 type CallOptions = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["params"];

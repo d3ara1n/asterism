@@ -452,7 +452,7 @@ describe("Host immutable content", () => {
 describe("Models consuming immutable content", () => {
   it("hands a resource tool's existing content to its caller without restaging the bytes", async () => {
     let sourceId = "";
-    const f = fixture({ adapter: { version: "resource-file", validate() {}, prepare() { return { async *stream() {
+    const f = fixture({ adapter: { format: () => "resource-file", validate() {}, prepare() { return { async *stream() {
       yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "resource_call" } };
       yield { type: "part.end", partId: "call", arguments: { resource_id: sourceId, tool: "file", target: null, args: {} } };
       yield { type: "finish", reason: "tool-calls", usage: null };
@@ -483,7 +483,7 @@ describe("Models consuming immutable content", () => {
       argsSchema: z.object({}).describe("No parameters."), resultSchema: contentRefSchema.describe("Existing file."),
       effect: "read", execution: "parallel",
       async execute(_args, { object }) { await object.content.read(file); return { kind: "succeeded", data: file }; },
-    })], adapter: { version: "existing", validate() {}, prepare() { return { async *stream() {
+    })], adapter: { format: () => "existing", validate() {}, prepare() { return { async *stream() {
       yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "existing" } };
       yield { type: "part.end", partId: "call", arguments: {} };
       yield { type: "finish", reason: "tool-calls", usage: null };
@@ -514,7 +514,7 @@ describe("Models consuming immutable content", () => {
     await f.service.configuration.execute({ type: "model.save", id: null, value: { providerId: "media", name: "Model", modelId: "model", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: false, tools, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
   }
-  const adapter = (seen: ModelInput[]): ModelAdapter => ({ version: "media-test", validate() {}, prepare(input) {
+  const adapter = (seen: ModelInput[]): ModelAdapter => ({ format: () => "media-test", validate() {}, prepare(input) {
     seen.push(input); return { async *stream() {
       yield { type: "part.start" as const, part: { id: "t", kind: "text" as const } };
       yield { type: "part.delta" as const, partId: "t", delta: "Done" };

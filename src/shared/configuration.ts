@@ -1,7 +1,7 @@
 import {
   mcpSettingsSchema, shellSettingsSchema, modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema,
-  modelProviderFixedFields, providerUsageIdSchema, usageProviderInfoSchema, modelProviderPresetSchema,
+  modelProviderFixedFields, modelProtocolIds, providerUsageIdSchema, usageProviderInfoSchema, modelProviderPresetSchema,
 } from "@asterism-app/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
@@ -15,7 +15,7 @@ const name = z.string().trim().min(1).max(160);
 export const modelProviderIdSchema = z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u, "ModelProvider IDs cannot contain '/' or whitespace.");
 /** Server model ID: a globally recognized model name allowing `/` but no whitespace. */
 const serverModelId = z.string().trim().min(1).max(160).regex(/^\S+$/u, "Model IDs cannot contain whitespace.");
-export const protocolSchema = z.enum(["openai-responses", "openai-chat", "anthropic"]);
+export const protocolSchema = z.enum(modelProtocolIds);
 /** Connection fields that can be fixed; authentication methods exclude credentials and compatibility settings also constrain model editing. */
 export const modelProviderFixedFieldSchema = z.enum(modelProviderFixedFields);
 export type ModelProviderFixedField = z.infer<typeof modelProviderFixedFieldSchema>;

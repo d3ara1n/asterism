@@ -1,6 +1,6 @@
 import { wrapLanguageModel, type LanguageModelMiddleware } from "ai";
 import type { createAnthropic } from "@ai-sdk/anthropic";
-import { ModelFailure } from "./contract.ts";
+import { ModelFailure } from "../contract.ts";
 
 type MessagesModel = ReturnType<ReturnType<typeof createAnthropic>["messages"]>;
 type CallOptions = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["params"];

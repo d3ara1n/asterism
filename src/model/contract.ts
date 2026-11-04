@@ -22,7 +22,8 @@ export interface PreparedModel {
   stream(signal: AbortSignal): AsyncIterable<ModelEvent>;
 }
 export interface ModelAdapter {
-  readonly version: string;
+  /** Native continuation format this adapter produces for the target; recorded as the output's `adapter` origin. */
+  format(settings: ModelSettings): string;
   validate(input: ModelValidationInput): void;
   prepare(input: ModelInput): PreparedModel;
 }

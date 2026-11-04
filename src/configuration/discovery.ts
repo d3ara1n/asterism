@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DiscoveredModel, ModelDiscovery, ModelProvider } from "../shared/configuration.ts";
 import { validateProviderTransport, ProviderTransportError } from "../model/provider.ts";
+import { modelProtocol } from "../model/protocols/index.ts";
 import { ConfigurationError } from "./errors.ts";
 import { parseModelListPage, type ModelListPage } from "./discovery-format.ts";
 
@@ -15,13 +16,8 @@ export type DiscoverModels = (input: DiscoveryInput) => Promise<DiscoveredModel[
 export async function discoverModels({ provider, apiKey, signal }: DiscoveryInput, transport: typeof fetch = fetch): Promise<DiscoveredModel[]> {
   validateProviderTransport(provider);
   const endpoint = new URL(`${provider.baseUrl.replace(/\/+$/, "")}/models`);
-  const headers = new Headers({ accept: "application/json" });
-  if (provider.protocol === "anthropic") headers.set("anthropic-version", "2023-06-01");
-  if (provider.auth === "api_key") {
-    if (!apiKey) throw new ModelDiscoveryError("credential");
-    headers.set(provider.protocol === "anthropic" ? "x-api-key" : "authorization",
-      provider.protocol === "anthropic" ? apiKey : `Bearer ${apiKey}`);
-  }
+  if (provider.auth === "api_key" && !apiKey) throw new ModelDiscoveryError("credential");
+  const headers = modelProtocol(provider.protocol).discoveryHeaders(provider.auth, apiKey);
   const models = new Map<string, DiscoveredModel>();
   const cursors = new Set<string>();
   for (;;) {

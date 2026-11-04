@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema, thinkingLevels, type Json, type ThinkingLevel } from "@asterism-app/sdk/contracts";
+import { jsonSchema, modelProtocolIds, thinkingLevels, type Json, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import type { ModelProviderInput } from "./configuration.ts";
 
 /** Application-predefined declaration catalog; parameters and display share a source and request projection interprets behavior by id. */
@@ -37,7 +37,7 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
     id: "customThinkingLevels",
     kind: "options",
     initialValue: {},
-    appliesTo: { protocols: ["openai-responses", "openai-chat", "anthropic"] },
+    appliesTo: { protocols: modelProtocolIds },
     schema: customThinkingLevelsSchema.meta({
       title: "Custom thinking levels",
       description: "Map standard levels to upstream effort values. Does not change available levels, history or token budgets.",
@@ -57,7 +57,7 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
     id: "customUserAgent",
     kind: "options",
     initialValue: { userAgent: "" },
-    appliesTo: { protocols: ["openai-responses", "openai-chat", "anthropic"] },
+    appliesTo: { protocols: modelProtocolIds },
     schema: z.strictObject({
       userAgent: z.string().trim().min(1).regex(/^[\x20-\x7e]+$/u).meta({
         title: "User-Agent", description: "HTTP client identity. Overrides the identity supplied by the caller.",
@@ -71,7 +71,7 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
     id: "opencodeSession",
     kind: "tag",
     appliesTo: {
-      protocols: ["openai-responses", "openai-chat", "anthropic"],
+      protocols: modelProtocolIds,
       endpoints: ["https://opencode.ai/inference/go/v1"],
     },
     schema: z.undefined().meta({

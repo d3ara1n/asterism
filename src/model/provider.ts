@@ -1,14 +1,9 @@
-import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAI } from "@ai-sdk/openai";
 import type { ModelRequestIdentity } from "@asterism-app/sdk/contracts";
 import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
 import { ModelFailure } from "./contract.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
-import { compatibilityForTarget } from "./projection.ts";
-import { withResponsesReasoning } from "./responses-reasoning.ts";
-import { withAnthropicThinking } from "./anthropic-thinking.ts";
 import { modelRequestHeaders } from "./request-identity.ts";
-import { withThinkingOptions } from "./thinking-options.ts";
+import { modelProtocol } from "./protocols/index.ts";
 
 export class ProviderTransportError extends ModelFailure {
   constructor() { super("configuration", "API key connections require HTTPS, except on loopback addresses."); }
@@ -29,13 +24,7 @@ export function createProviderModel(provider: ModelProviderInput, model: Provide
     if (provider.auth === "none") { headers.delete("authorization"); headers.delete("x-api-key"); }
     return transport(url, { ...init, headers, redirect: "error" });
   };
-  const options = { baseURL: provider.baseUrl, apiKey: provider.auth === "none" ? unauthenticatedApiKey : key, fetch: scopedFetch };
-  const createModel = (transport: typeof fetch) => {
-    if (provider.protocol === "anthropic") return withAnthropicThinking(
-      fetch => createAnthropic({ ...options, fetch }).messages(model.modelId), transport);
-    if (provider.protocol === "openai-chat") return createOpenAI({ ...options, fetch: transport }).chat(model.modelId);
-    const responses = (fetch: typeof transport) => createOpenAI({ ...options, fetch }).responses(model.modelId);
-    return withResponsesReasoning(responses, transport, compatibilityForTarget({ provider, model }));
-  };
-  return withThinkingOptions(createModel, scopedFetch, provider, model);
+  return modelProtocol(provider.protocol).createModel({ provider, model }, {
+    baseURL: provider.baseUrl, apiKey: provider.auth === "none" ? unauthenticatedApiKey : key, fetch: scopedFetch,
+  });
 }

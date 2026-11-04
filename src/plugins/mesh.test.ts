@@ -27,7 +27,7 @@ function open(root = mkdtempSync(join(tmpdir(), "asterism-mesh-")), onSessionCha
   const capture = vi.spyOn(runtimeModules, "loadPlugins").mockImplementation((...args) => {
     modules = original(...args); return modules;
   });
-  const adapter: ModelAdapter = { version: "test/1", validate() {}, prepare: () => ({
+  const adapter: ModelAdapter = { format: () => "test/1", validate() {}, prepare: () => ({
     async *stream() { yield { type: "finish", reason: "stop", usage: null }; },
   }) };
   const app = new ApplicationService(root, { onSessionChanged, adapterFactory: () => adapter, plugins: [

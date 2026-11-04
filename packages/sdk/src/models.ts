@@ -15,7 +15,7 @@ export interface PromptBlock { id: string; text: string; source?: { id: string; 
 export interface PromptFile { readonly file: string; readonly text: string }
 export interface SystemPrompt { blocks: readonly PromptBlock[] }
 /** Reasoning text is the plaintext delivered by the protocol, and summary is an independent summary; both can coexist or be empty, and neither fills the other.
- * continuation carries only native data such as signatures/ciphertext; target projection determines whether it can be reused.
+ * continuation carries only native data such as signatures/ciphertext, shaped by the producing protocol; target projection determines whether it can be reused.
  */
 export type ModelPart =
   | { kind: "thinking"; text: string; summary: string; continuation: Json }
@@ -23,7 +23,7 @@ export type ModelPart =
   | { kind: "toolcall"; callId: string; name: string; arguments: Json; continuation: Json };
 export type ModelItem =
   | { kind: "input" | "context"; parts: readonly ModelInputPart[] }
-  // scope/adapter constrain native data; they do not gate public content in cross-model requests.
+  // scope and adapter (the producing protocol's continuation format) constrain native data; they do not gate public content in cross-model requests.
   | { kind: "output"; parts: ModelPart[]; scope: string; adapter: string }
   | { kind: "result"; callId: string; name: string; outcome: ToolOutcome };
 export interface Usage {

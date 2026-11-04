@@ -137,7 +137,7 @@ describe("AI SDK adaptation contract", () => {
     }
     expect(events.find(event => event.type === "part.delta")).toMatchObject({ partId: "thinking:reasoning-1", delta: "Visible summary", channel: "summary" });
     expect(events.find(event => event.type === "part.end")).toMatchObject({
-      continuation: { openai: { itemId: "reasoning-1", reasoningEncryptedContent: "encrypted-continuation" } },
+      continuation: { itemId: "reasoning-1", reasoningEncryptedContent: "encrypted-continuation" },
     });
   });
 
@@ -147,10 +147,10 @@ describe("AI SDK adaptation contract", () => {
     const adapter = new AiSdkAdapter(async () => "unused");
     current.settings.thinking = "off";
     current.messages = [
-      { kind: "output", adapter: adapter.version, scope: modelScope(current.settings),
-        parts: [{ kind: "thinking", summary: "", text: "Only thought", continuation: { anthropic: { signature: "only-signature" } } }] },
-      { kind: "output", adapter: adapter.version, scope: modelScope(current.settings), parts: [
-        { kind: "thinking", summary: "", text: "Saved thought", continuation: { anthropic: { signature: "saved-signature" } } },
+      { kind: "output", adapter: adapter.format(current.settings), scope: modelScope(current.settings),
+        parts: [{ kind: "thinking", summary: "", text: "Only thought", continuation: { signature: "only-signature" } }] },
+      { kind: "output", adapter: adapter.format(current.settings), scope: modelScope(current.settings), parts: [
+        { kind: "thinking", summary: "", text: "Saved thought", continuation: { signature: "saved-signature" } },
         { kind: "text", text: "Saved answer", continuation: null },
         { kind: "toolcall", callId: "call", name: "read", arguments: {}, continuation: null },
       ] },
@@ -204,7 +204,7 @@ describe("AI SDK adaptation contract", () => {
     const thought = events.find(event => event.type === "part.end");
     if (thought?.type !== "part.end") throw new Error("Missing thinking completion.");
     const next: ModelInput = { ...current, messages: [...current.messages, {
-      kind: "output", adapter: adapter.version, scope: modelScope(current.settings),
+      kind: "output", adapter: adapter.format(current.settings), scope: modelScope(current.settings),
       parts: [{ kind: "thinking", summary: "", text: "Assess the plan.", continuation: thought.continuation ?? null }, { kind: "text", text: "Answer", continuation: null }],
     }] };
     for await (const _event of adapter.prepare(next).stream(new AbortController().signal)) { /* Check the actual serialized request. */ }
@@ -252,7 +252,7 @@ describe("AI SDK adaptation contract", () => {
       { type: "part.delta", partId: "thinking:rs", delta: "\n\n", channel: "summary" },
       { type: "part.delta", partId: "thinking:rs", delta: "Summary 1", channel: "summary" },
     ]);
-    expect(events.find(event => event.type === "part.end")).toMatchObject({ continuation: { openai: { itemId: "rs", reasoningEncryptedContent: "opaque" } } });
+    expect(events.find(event => event.type === "part.end")).toMatchObject({ continuation: { itemId: "rs", reasoningEncryptedContent: "opaque" } });
   });
 
   // An incomplete block does not invalidate terminal state: the execution state machine retains server metering before rejecting unclosed blocks.
@@ -300,8 +300,8 @@ describe("AI SDK adaptation contract", () => {
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
     expect(events.find(event => event.type === "part.delta")).toMatchObject({ partId: "thinking:0", delta: "Reasoning" });
     expect(events.filter(event => event.type === "part.end")).toEqual([
-      expect.objectContaining({ continuation: { anthropic: { signature: "signed-thinking" } } }),
-      expect.objectContaining({ continuation: { anthropic: { redactedData: "redacted-thinking" } } }),
+      expect.objectContaining({ continuation: { signature: "signed-thinking" } }),
+      expect.objectContaining({ continuation: { redactedData: "redacted-thinking" } }),
     ]);
   });
 
@@ -418,7 +418,7 @@ describe("AI SDK adaptation contract", () => {
     expect(serialized).toContain("signature-value"); expect(serialized).not.toContain("credential-not-for-history"); expect(serialized).not.toContain("secret-metadata");
     const thinking = events.find(e => e.type === "part.end" && e.partId === "thinking:r");
     if (thinking?.type !== "part.end") throw new Error("Missing thinking completion.");
-    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", summary: "", text: "Think", continuation: thinking.continuation ?? null }, { kind: "toolcall", callId: "call-1", name: "read", arguments: { resource_id: "note" }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.version },
+    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", summary: "", text: "Think", continuation: thinking.continuation ?? null }, { kind: "toolcall", callId: "call-1", name: "read", arguments: { resource_id: "note" }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.format(input.settings) },
       { kind: "result", callId: "call-1", name: "read", error: false, parts: [{ kind: "text", text: "Note text" }] }] });
     expect(next.map(m => m.role)).toEqual(["user", "assistant", "tool"]);
     expect(JSON.stringify(next)).toContain("signature-value");
@@ -474,13 +474,13 @@ describe("AI SDK adaptation contract", () => {
     const current: ModelInput = { ...input, messages: [{
       kind: "output", adapter: "older-adapter", scope: "different-provider",
       parts: [
-        { kind: "thinking", summary: "", text: "Foreign thought", continuation: { anthropic: { signature: "foreign-signature" } } },
-        { kind: "text", text: "Portable answer", continuation: { openai: { itemId: "foreign-message" } } },
+        { kind: "thinking", summary: "", text: "Foreign thought", continuation: { signature: "foreign-signature" } },
+        { kind: "text", text: "Portable answer", continuation: { itemId: "foreign-message" } },
       ],
     }] };
     expect(() => adapter.prepare(current)).not.toThrow();
     expect(sdkMessages(current)).toEqual([{ role: "assistant", content: [
-      { type: "reasoning", text: "Foreign thought", providerOptions: { asterism: { summary: "" } } },
+      { type: "reasoning", text: "Foreign thought", providerOptions: {} },
       { type: "text", text: "Portable answer", providerOptions: {} },
     ] }]);
   });

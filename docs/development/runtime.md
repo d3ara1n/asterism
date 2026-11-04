@@ -174,11 +174,11 @@ Automatic session naming uses actual user input. Agent and event messages retain
 
 Model input parts are ordered text or stored-file parts backed by immutable ContentRef values. Resource FileRef values reach this layer as projected text, not binary input. The frontend submits the identified media type for stored files; the server determines whether it accepts that input. Request media budgets belong to the model-media implementation.
 
-The adapters support OpenAI Responses, OpenAI Chat Completions, and Anthropic Messages through AI SDK. Tool definitions omit SDK execution handlers, and retries are explicit rather than implicit. Responses requests disable provider storage.
+Model protocols are a closed, host-owned registry: OpenAI Responses, OpenAI Chat Completions, and Anthropic Messages, each implemented over AI SDK. Plugins use the host's model services and cannot register or alter protocols, so one wire protocol has one implementation. The common model layer owns the request lifecycle, history projection, tool-call pairing, cancellation, error classification, and metering. Each protocol owns SDK model creation, request options and thinking encoding, protocol-specific stream events and usage, model discovery headers, and the shape of its native continuation data. Compatibility packs adjust a protocol's encoding within that boundary. Tool definitions omit SDK execution handlers, and retries are explicit rather than implicit. Responses requests disable provider storage.
 
 Credential-bearing requests require HTTPS and reject redirects. Unauthenticated connections omit credential headers. Caller identity headers remain separate from model content and resource authorization.
 
-Each request projects public history toward its target model. Native continuation data is reusable only within its recorded provider, protocol, endpoint, model, and adapter-version scope. Crossing that boundary drops inapplicable native data without rewriting history.
+Each request projects public history toward its target model. Native continuation data is a flat record whose shape belongs to the producing protocol, recorded with that protocol's continuation format. It is reusable only when the target has the same provider, protocol, endpoint, and model scope and the same continuation format. Crossing that boundary drops inapplicable native data without rewriting history.
 
 Tool call IDs transform deterministically when required, keeping calls and results paired. Protocols unable to encode tool-result files reject them unless an explicit compatibility setting supplies the supported transformation.
 

@@ -35,7 +35,7 @@ function input(events: ModelRunEvent[], extra: Partial<ModelRunRequest> = {}): M
     signal: new AbortController().signal, observer: { event(event) { events.push(event); } }, ...extra };
 }
 function model(events: ModelEvent[], prepare = () => {}): ModelAdapter {
-  return { validate() {}, version: "test-adapter", prepare() { prepare(); return { async *stream() { yield* events; } }; } };
+  return { validate() {}, format: () => "test-adapter", prepare() { prepare(); return { async *stream() { yield* events; } }; } };
 }
 async function execute(request: ModelRunRequest, adapter: ModelAdapter, capabilities = empty()) {
   return runModelRequest(request, Promise.resolve({ adapter, settings, tools: bindModelTools(capabilities), system: request.system, messages: await resolveInput(request.messages, undefined, request.signal) }));
@@ -117,7 +117,7 @@ describe("Stateless single model execution", () => {
     const details = { message: "Upstream overloaded", statusCode: 503, responseBody: '{"error":"busy"}' };
     const failure = new ModelFailure("provider_error", details.message, details, "model", true);
     const events: ModelRunEvent[] = [];
-    const result = await execute(input(events), { validate() {}, version: "test", prepare() { return {
+    const result = await execute(input(events), { validate() {}, format: () => "test", prepare() { return {
       async *stream() { yield* text.slice(0, -1); throw failure; },
     }; } });
     expect(result).toMatchObject({ reason: "failed", code: "provider_error", details, retryable: true });
@@ -134,7 +134,7 @@ describe("Stateless single model execution", () => {
     failure.response = response;
     const adapter = outcome === "completed"
       ? model([...text.slice(0, -1), { type: "finish", reason: "stop", usage: null, response }])
-      : { validate() {}, version: "test", prepare() { return { async *stream(): AsyncIterable<ModelEvent> { throw failure; } }; } };
+      : { validate() {}, format: () => "test", prepare() { return { async *stream(): AsyncIterable<ModelEvent> { throw failure; } }; } };
     const events: ModelRunEvent[] = [];
     const result = await execute(input(events), adapter);
     expect(result).toMatchObject({ reason: outcome, response });
@@ -144,7 +144,7 @@ describe("Stateless single model execution", () => {
   it("returns when the tool batch finishes without implicitly starting another request; separate calls use only explicit input", async () => {
     let requests = 0;
     const seen: unknown[] = [];
-    const adapter: ModelAdapter = { validate() {}, version: "test", prepare(request) {
+    const adapter: ModelAdapter = { validate() {}, format: () => "test", prepare(request) {
       requests++; seen.push(structuredClone(request.messages));
       return { async *stream() { yield* calls(["list"]); } };
     } };

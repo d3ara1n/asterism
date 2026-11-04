@@ -3,7 +3,7 @@ import { generateText } from "ai";
 import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
 import { createProviderModel } from "./provider.ts";
-import { aiSdkAdapterVersion } from "./continuation.ts";
+import { modelProtocol } from "./protocols/index.ts";
 import { modelScope, type Json } from "../shared/model.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 
@@ -198,12 +198,12 @@ describe("Explicit compatibility and target projection", () => {
   // Public contract: summaries cannot fill full text; reusable origin ciphertext takes precedence and ciphertext with empty text must survive.
   it("Responses encodes plaintext, summaries, and native ciphertext separately without changing history", async () => {
     const current = input();
-    current.messages = [{ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
+    current.messages = [{ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
       { kind: "thinking", text: "Plain", summary: "Summary", continuation: null },
       { kind: "thinking", text: "", summary: "Summary only", continuation: null },
       { kind: "thinking", text: "Visible full text", summary: "Opaque summary",
-        continuation: { openai: { itemId: "rs_native", reasoningEncryptedContent: "cipher" } } },
-      { kind: "thinking", text: "", summary: "", continuation: { openai: { reasoningEncryptedContent: "cipher-only" } } },
+        continuation: { itemId: "rs_native", reasoningEncryptedContent: "cipher" } },
+      { kind: "thinking", text: "", summary: "", continuation: { reasoningEncryptedContent: "cipher-only" } },
       { kind: "text", text: "Answer", continuation: null },
     ] }];
     const original = structuredClone(current);
@@ -236,13 +236,13 @@ describe("Explicit compatibility and target projection", () => {
   // Messages signatures must match original text; unsigned text encodes unchanged, summaries are not disguised as thinking, and redacted-only blocks continue normally.
   it("Messages natively supports unsigned plaintext, signatures, and redacted reasoning while preserving relative tool order", async () => {
     const current = input("anthropic");
-    current.messages = [{ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
-      { kind: "thinking", text: "  Signed\n", summary: "Display only", continuation: { anthropic: { signature: "signed" } } },
-      { kind: "thinking", text: "", summary: "", continuation: { anthropic: { signature: "empty-signed" } } },
+    current.messages = [{ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
+      { kind: "thinking", text: "  Signed\n", summary: "Display only", continuation: { signature: "signed" } },
+      { kind: "thinking", text: "", summary: "", continuation: { signature: "empty-signed" } },
       { kind: "toolcall", callId: "call", name: "read", arguments: {}, continuation: null },
       { kind: "thinking", text: "Unsigned", summary: "", continuation: null },
       { kind: "thinking", text: "", summary: "Not a full thought", continuation: null },
-      { kind: "thinking", text: "", summary: "", continuation: { anthropic: { redactedData: "opaque" } } },
+      { kind: "thinking", text: "", summary: "", continuation: { redactedData: "opaque" } },
     ] }];
     current.messages.push({ kind: "result", callId: "call", name: "read", error: false, parts: [{ kind: "text", text: "Result" }] });
     expect(((await request(current)).messages as unknown[])[0]).toEqual({ role: "assistant", content: [
@@ -264,8 +264,8 @@ describe("Explicit compatibility and target projection", () => {
   // The SDK trims the last assistant's final text segment; valid leading whitespace must not invalidate reasoning insertion plans or affect original signed text.
   it("Messages accounts for SDK trimming of final text while signed reasoning retains original whitespace", async () => {
     const current = input("anthropic");
-    current.messages = [{ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
-      { kind: "thinking", text: "  Thought\n", summary: "", continuation: { anthropic: { signature: "signed" } } },
+    current.messages = [{ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
+      { kind: "thinking", text: "  Thought\n", summary: "", continuation: { signature: "signed" } },
       { kind: "text", text: "  Indented answer\n", continuation: null },
     ] }];
     expect((await request(current)).messages).toEqual([{ role: "assistant", content: [
@@ -341,13 +341,13 @@ describe("Explicit compatibility and target projection", () => {
     current.messages = [
       { kind: "input", parts: [{ kind: "text", text: "Look" }, { kind: "file", data: new Uint8Array([1, 2, 3]), mediaType: "image/png" }] },
       { kind: "output", ...foreign, parts: [
-        { kind: "thinking", summary: "", text: "Before tool", continuation: { anthropic: { signature: "foreign-signature" } } },
-        { kind: "text", text: "Checking", continuation: { openai: { itemId: "foreign-item" } } },
+        { kind: "thinking", summary: "", text: "Before tool", continuation: { signature: "foreign-signature" } },
+        { kind: "text", text: "Checking", continuation: { itemId: "foreign-item" } },
         { kind: "toolcall", callId: "vendor/call.with.dots", name: "lookup", arguments: { query: "value" }, continuation: null },
       ] },
       { kind: "result", callId: "vendor/call.with.dots", name: "lookup", error: false, parts: [{ kind: "text", text: "Found" }] },
       { kind: "output", ...foreign, parts: [
-        { kind: "thinking", summary: "", text: "After tool", continuation: { openai: { reasoningEncryptedContent: "foreign-ciphertext" } } },
+        { kind: "thinking", summary: "", text: "After tool", continuation: { reasoningEncryptedContent: "foreign-ciphertext" } },
         { kind: "text", text: "Answer", continuation: null },
       ] },
     ];
@@ -367,9 +367,9 @@ describe("Explicit compatibility and target projection", () => {
   // Normal native continuation is the baseline; switching omits only nonreusable data, and switching back projects original history without contamination by intermediate requests.
   it.each(["openai-responses", "anthropic"] as const)("%s native continuation and A→B→A leave history unchanged", async protocol => {
     const current = input(protocol);
-    const native: Json = protocol === "anthropic" ? { anthropic: { signature: "native-token" } }
-      : { openai: { itemId: "rs_native", reasoningEncryptedContent: "native-token" } };
-    current.messages.push({ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
+    const native: Json = protocol === "anthropic" ? { signature: "native-token" }
+      : { itemId: "rs_native", reasoningEncryptedContent: "native-token" };
+    current.messages.push({ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
       { kind: "thinking", summary: "", text: "Visible thought", continuation: native },
       { kind: "text", text: "Portable answer", continuation: null },
     ] });
@@ -381,9 +381,9 @@ describe("Explicit compatibility and target projection", () => {
     other.settings.provider.protocol = protocol === "anthropic" ? "openai-responses" : "anthropic";
     const b = await request(other);
     const resumed = structuredClone(current);
-    const foreign: Json = other.settings.provider.protocol === "anthropic" ? { anthropic: { signature: "foreign-token" } }
-      : { openai: { itemId: "rs_foreign", reasoningEncryptedContent: "foreign-token" } };
-    resumed.messages.push({ kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(other.settings), parts: [
+    const foreign: Json = other.settings.provider.protocol === "anthropic" ? { signature: "foreign-token" }
+      : { itemId: "rs_foreign", reasoningEncryptedContent: "foreign-token" };
+    resumed.messages.push({ kind: "output", adapter: modelProtocol(other.settings.provider.protocol).continuationFormat, scope: modelScope(other.settings), parts: [
       { kind: "thinking", summary: "", text: "B thought", continuation: foreign },
       { kind: "text", text: "B answer", continuation: null },
     ] });
@@ -410,7 +410,7 @@ describe("Explicit compatibility and target projection", () => {
         { kind: "toolcall", callId: "same_id", name: "lookup", arguments: {}, continuation: null },
       ] },
       { kind: "result", callId: "same_id", name: "lookup", error: false, parts: [{ kind: "text", text: "Foreign result" }] },
-      { kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings), parts: [
+      { kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
         { kind: "toolcall", callId: "same_id", name: "lookup", arguments: {}, continuation: null },
       ] },
       { kind: "result", callId: "same_id", name: "lookup", error: false, parts: [{ kind: "text", text: "Native result" }] },
@@ -432,7 +432,7 @@ describe("Explicit compatibility and target projection", () => {
       { kind: "result", callId: "call", name: "lookup", error: false,
         parts: [{ kind: "file", data: new Uint8Array([1]), mediaType: "image/png", filename: "result.png" }] },
       { kind: "result", callId: "second", name: "lookup", error: false, parts: [{ kind: "text", text: "Another result" }] },
-      { kind: "output", adapter: aiSdkAdapterVersion, scope: modelScope(current.settings),
+      { kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings),
         parts: [{ kind: "text", text: "Following answer", continuation: null }] },
     ];
     const messages = sdkMessages(current);

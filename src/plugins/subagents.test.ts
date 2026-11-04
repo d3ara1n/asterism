@@ -60,7 +60,7 @@ async function fixture(child: (input: ModelInput, signal: AbortSignal) => AsyncI
     })] };
   } });
   const options = { plugins: [caller], adapterFactory: () => ({
-    version: "pool-test", validate() {},
+    format: () => "pool-test", validate() {},
     prepare(input: ModelInput) {
       if (input.system.blocks.some(block => block.id === "test.parent")) {
         const command = JSON.parse(inputText(input)[0]!) as { resource_id: string; tool: string; target: Json; args: Json };

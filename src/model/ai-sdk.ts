@@ -1,12 +1,12 @@
 import { jsonSchema as sdkJsonSchema, streamText, tool, APICallError, StreamProviderError, JSONParseError, TypeValidationError, InvalidResponseDataError,
   type ModelMessage, type ToolResultPart, type ToolSet, type LanguageModel } from "ai";
-import { jsonSchema, unauthenticatedApiKey, type Json } from "../shared/model.ts";
+import { jsonSchema, unauthenticatedApiKey, type Json, type ModelSettings } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 import { requestOptions } from "./request-options.ts";
-import { aiSdkAdapterVersion, pickContinuation } from "./continuation.ts";
 import { projectHistory, validateProjection } from "./projection.ts";
+import { modelProtocol, type ModelProtocol } from "./protocols/index.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
 import { describeError, type ModelResponse } from "@asterism-app/sdk/contracts";
@@ -28,9 +28,10 @@ function providerFailure(error: unknown, upstream = false): ModelFailure {
 }
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
-  const chat = input.settings.provider.protocol === "openai-chat";
+  const protocol = modelProtocol(input.settings.provider.protocol);
+  const filesInUserMessage = protocol.toolResultFiles(input.settings) === "user-message";
   const attachments: Extract<ResolvedInputPart, { kind: "file" }>[] = [];
-  /** Target projection has checked explicit tool-file tags; permitted files from the same batch merge into subsequent user messages. */
+  /** Protocol validation has admitted these files; files from the same batch merge into the subsequent user message. */
   const flushAttachments = () => {
     if (!attachments.length) return;
     messages.push({ role: "user", content: [{ type: "text", text: "Files attached from the preceding tool results:" },
@@ -46,10 +47,8 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
     if (item.kind === "output") {
       const parts = item.parts;
       if (parts.length) messages.push({ role: "assistant", content: parts.map(p => {
-        const providerOptions = {
-          ...p.continuation as Record<string, Record<string, Json>>,
-          ...(p.kind === "thinking" ? { asterism: { summary: p.summary } } : {}),
-        };
+        // Projection has restored continuation through the target protocol's allowlist.
+        const providerOptions = protocol.replay(p, p.continuation as Record<string, Json>);
         return p.kind === "toolcall" ? { type: "tool-call" as const, toolCallId: p.callId, toolName: p.name, input: p.arguments, providerOptions }
           : { type: p.kind === "text" ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
       }) });
@@ -57,9 +56,9 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
     if (item.kind === "result") {
       const files = item.parts.filter(part => part.kind === "file");
       const text = item.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
-      // Serialize text once; Chat tool files must pass the explicit compatibility gate before moving to subsequent user messages.
+      // Serialize text once; protocols that cannot carry files in results receive them in the subsequent user message.
       let output: ToolResultPart["output"];
-      if (!files.length || chat) {
+      if (!files.length || filesInUserMessage) {
         const notice = files.length ? `[${files.length} file(s) attached in the following user message: ${files.map(file => file.filename ?? file.mediaType).join(", ")}]` : "";
         const value = [text, notice].filter(Boolean).join("\n");
         output = item.error ? { type: "error-text", value } : { type: "text", value };
@@ -76,10 +75,12 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   return messages;
 }
 export class AiSdkAdapter implements ModelAdapter {
-  readonly version = aiSdkAdapterVersion;
   constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
     private readonly languageModelFactory?: (input: ModelInput, key: string) => Exclude<LanguageModel, string>,
     private readonly transport: typeof fetch = fetch) {}
+  format(settings: ModelSettings): string {
+    return modelProtocol(settings.provider.protocol).continuationFormat;
+  }
   validate(input: ModelValidationInput): void {
     validateProviderTransport(input.settings.provider);
     validateRequestIdentity(input.settings, input);
@@ -139,11 +140,12 @@ export class AiSdkAdapter implements ModelAdapter {
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
     signal.throwIfAborted();
     const timing = new RequestTimer();
-    const measured = measureModel(languageModel, provider.protocol, timing);
+    const protocol = modelProtocol(provider.protocol);
+    const measured = measureModel(languageModel, protocol, timing);
     const cancelled = () => { timing.end("cancelled"); };
     signal.addEventListener("abort", cancelled, { once: true });
     try {
-      for await (const event of this.decode(measured, messages, tools, options, provider.protocol, streamSignal, () => responseMetadata !== null)) {
+      for await (const event of this.decode(measured, messages, tools, options, protocol, streamSignal, () => responseMetadata !== null)) {
         capturePrefix = false; responsePrefix = "";
         yield event.type === "finish" ? { ...event, response: responseMetadata } : event;
       }
@@ -174,7 +176,7 @@ export class AiSdkAdapter implements ModelAdapter {
     }
   }
   private async *decode(measured: ReturnType<typeof measureModel>, messages: ModelMessage[], tools: ToolSet,
-    options: ReturnType<typeof requestOptions>, protocol: ModelInput["settings"]["provider"]["protocol"],
+    options: ReturnType<typeof requestOptions>, protocol: ModelProtocol,
     signal: AbortSignal, receivedResponse: () => boolean): AsyncIterable<ModelEvent> {
     const result = streamText({ model: measured.model, messages, tools,
       ...options, abortSignal: signal,
@@ -185,13 +187,10 @@ export class AiSdkAdapter implements ModelAdapter {
     // Use the SDK's consuming branch to receive continuously so waiting for caller progress handling does not slow sampling.
     void result.consumeStream();
     const calls = new Set<string>();
-    const thinkingItems = new Map<number, { partId: string; itemId: string; summaryIndex: number | null; hasSummary: boolean }>();
-    const continuations = new Map<string, ReturnType<typeof pickContinuation>>();
+    const decodeRaw = protocol.decoder?.();
+    const continuations = new Map<string, Record<string, Json>>();
     const collectContinuation = (id: string, metadata: unknown) => {
-      const accumulated = continuations.get(id) ?? {};
-      for (const [provider, values] of Object.entries(pickContinuation(metadata))) {
-        accumulated[provider] = { ...accumulated[provider], ...values };
-      }
+      const accumulated = { ...continuations.get(id), ...protocol.capture(metadata) };
       continuations.set(id, accumulated);
       return accumulated;
     };
@@ -201,7 +200,7 @@ export class AiSdkAdapter implements ModelAdapter {
       signal.throwIfAborted();
       switch (event.type) {
         case "text-start": case "reasoning-start": {
-          if (event.type === "reasoning-start" && protocol === "openai-responses") break;
+          if (event.type === "reasoning-start" && !protocol.sdkReasoning) break;
           const kind = event.type === "text-start" ? "text" : "thinking";
           const id = `${kind}:${event.id}`;
           collectContinuation(id, event.providerMetadata);
@@ -211,58 +210,20 @@ export class AiSdkAdapter implements ModelAdapter {
         case "raw": {
           if (!event.rawValue || typeof event.rawValue !== "object") break;
           const raw = event.rawValue as Record<string, unknown>;
-          if (raw.type === "error" || raw.type === "response.failed" || raw.error != null)
+          if (raw.type === "error" || raw.error != null || protocol.failureEvent?.(raw))
             rawFailure = JSON.stringify(raw);
-          if (protocol !== "openai-responses") break;
-          // Finalize by Responses item and receive full text and summaries separately; SDK summary segments do not create separate reasoning blocks.
-          if (raw.type === "response.output_item.added" || raw.type === "response.output_item.done") {
-            const item = raw.item as Record<string, unknown> | undefined;
-            if (item?.type !== "reasoning") break;
-            if (typeof item.id !== "string" || !Number.isInteger(raw.output_index) || (raw.output_index as number) < 0)
-              throw new ModelFailure("protocol", "The provider returned an invalid reasoning item.");
-            const index = raw.output_index as number;
-            if (raw.type === "response.output_item.added") {
-              if (thinkingItems.has(index)) throw new ModelFailure("protocol", "The provider started a duplicate reasoning item.");
-              const partId = `thinking:${item.id}`;
-              thinkingItems.set(index, { partId, itemId: item.id, summaryIndex: null, hasSummary: false });
-              yield { type: "part.start", part: { id: partId, kind: "thinking" } };
-            } else {
-              const thinking = thinkingItems.get(index);
-              if (!thinking) throw new ModelFailure("protocol", "The provider ended an inactive reasoning item.");
-              const continuation = pickContinuation({ openai: {
-                itemId: thinking.itemId,
-                ...(typeof item.encrypted_content === "string" ? { reasoningEncryptedContent: item.encrypted_content } : {}),
-              } });
-              yield { type: "part.end", partId: thinking.partId, continuation };
-              thinkingItems.delete(index);
-            }
-            break;
-          }
-          const summary = raw.type === "response.reasoning_summary_text.delta";
-          if (!summary && raw.type !== "response.reasoning_text.delta") break;
-          if (typeof raw.item_id !== "string" || typeof raw.delta !== "string" || !Number.isInteger(raw.output_index))
-            throw new ModelFailure("protocol", "The provider returned an invalid reasoning delta.");
-          const thinking = thinkingItems.get(raw.output_index as number);
-          if (!thinking) throw new ModelFailure("protocol", "The provider updated an inactive reasoning item.");
-          if (summary) {
-            const index = typeof raw.summary_index === "number" ? raw.summary_index : 0;
-            if (thinking.hasSummary && thinking.summaryIndex !== index)
-              yield { type: "part.delta", partId: thinking.partId, delta: "\n\n", channel: "summary" };
-            thinking.summaryIndex = index;
-            thinking.hasSummary ||= raw.delta.length > 0;
-          }
-          yield { type: "part.delta", partId: thinking.partId, delta: raw.delta, ...(summary ? { channel: "summary" as const } : {}) };
+          if (decodeRaw) yield* decodeRaw(raw);
           break;
         }
         case "text-delta": case "reasoning-delta": {
-          if (event.type === "reasoning-delta" && protocol === "openai-responses") break;
+          if (event.type === "reasoning-delta" && !protocol.sdkReasoning) break;
           const partId = `${event.type === "text-delta" ? "text" : "thinking"}:${event.id}`;
           collectContinuation(partId, event.providerMetadata);
           yield { type: "part.delta", partId, delta: event.text };
           break;
         }
         case "text-end": case "reasoning-end": {
-          if (event.type === "reasoning-end" && protocol === "openai-responses") break;
+          if (event.type === "reasoning-end" && !protocol.sdkReasoning) break;
           const partId = `${event.type === "text-end" ? "text" : "thinking"}:${event.id}`;
           const metadata = collectContinuation(partId, event.providerMetadata);
           yield { type: "part.end", partId, continuation: metadata };
@@ -282,7 +243,7 @@ export class AiSdkAdapter implements ModelAdapter {
             calls.add(event.toolCallId);
             yield { type: "part.start", part: { id: `tool:${event.toolCallId}`, kind: "toolcall", callId: event.toolCallId, name: event.toolName } };
           }
-          yield { type: "part.end", partId: `tool:${event.toolCallId}`, arguments: json(event.input), continuation: pickContinuation(event.providerMetadata) }; break;
+          yield { type: "part.end", partId: `tool:${event.toolCallId}`, arguments: json(event.input), continuation: protocol.capture(event.providerMetadata) }; break;
         case "error":
           // Server and transport errors retain original diagnostics; programmatic classification does not replace their messages or response bodies.
           {
@@ -297,7 +258,7 @@ export class AiSdkAdapter implements ModelAdapter {
           if (!event.providerExecuted && rejectedBySdk.has(event.toolCallId)) break;
           throw new ModelFailure("unsupported_content", "The provider returned an unexpected tool result.");
         // custom is provider extension metadata, such as early Anthropic message_start usage, rather than body content;
-        // the receiver collects usage and pickContinuation filters continuation data through an allowlist, so no handling is needed here.
+        // the protocol meter collects usage and protocol capture filters continuation data through an allowlist, so no handling is needed here.
         case "custom": break;
         case "file": case "reasoning-file": case "tool-result":
           throw new ModelFailure("unsupported_content", "The provider returned unsupported response content.");

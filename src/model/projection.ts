@@ -1,36 +1,16 @@
 import { createHash } from "node:crypto";
 import type { ModelPart } from "@asterism-app/sdk/contracts";
-import type { ModelProviderInput, ProviderModel } from "../shared/configuration.ts";
-import { mergeModelCompatibility } from "../shared/model-compatibility.ts";
-import { ModelFailure, type ModelInput, type ModelValidationInput, type ResolvedModelItem } from "./contract.ts";
-import { canReuseContinuation, continuationForTarget } from "./continuation.ts";
+import { modelScope, type Json, type ModelSettings } from "../shared/model.ts";
+import type { ModelInput, ModelValidationInput, ResolvedModelItem } from "./contract.ts";
+import { modelProtocol } from "./protocols/index.ts";
 
-export function compatibilityForTarget(settings: {
-  provider: Pick<ModelProviderInput, "protocol" | "compatibility">; model: Pick<ProviderModel, "compatibility">;
-}) {
-  const entries = mergeModelCompatibility(settings.provider.compatibility, settings.model.compatibility);
-  const has = (id: string) => entries.some(entry => entry.id === id);
-  const reasoning = entries.find(entry => entry.id === "responsesReasoning");
-  const fields = reasoning && "value" in reasoning ? reasoning.value as { content?: "array" | "object"; encryptedContent?: boolean; summary?: boolean } : {};
-  // Protocol encoders interpret known behaviors; appliesTo is display-only and does not affect matching.
-  return {
-    systemMessage: settings.provider.protocol === "openai-responses" && has("systemMessageInMessages"),
-    reasoningContent: fields.content ?? "array",
-    encryptedContent: fields.encryptedContent ?? true,
-    reasoningSummary: fields.summary ?? true,
-    toolFiles: settings.provider.protocol === "openai-chat" && has("toolFilesAsUserMessage"),
-  };
+/** Origin limits native supplementary data reuse only; it does not determine whether public text can participate in requests. */
+export function canReuseContinuation(source: { scope: string; adapter: string }, target: ModelSettings): boolean {
+  return source.adapter === modelProtocol(target.provider.protocol).continuationFormat && source.scope === modelScope(target);
 }
 
 export function validateProjection(input: ModelValidationInput): void {
-  if (input.settings.provider.protocol !== "openai-chat" || compatibilityForTarget(input.settings).toolFiles) return;
-  for (const item of input.messages) {
-    if (item.kind !== "result") continue;
-    const parts = "parts" in item ? item.parts : item.outcome.model;
-    if (parts.some(part => part.kind === "file")) {
-      throw new ModelFailure("tool_files_unsupported", "Chat Completions cannot carry files in tool results. Add the 'Tool files in a user message' compatibility setting or choose another protocol.");
-    }
-  }
+  modelProtocol(input.settings.provider.protocol).validate?.(input);
 }
 
 function portableCallId(seed: string): string {
@@ -38,10 +18,12 @@ function portableCallId(seed: string): string {
 }
 const portableId = /^[A-Za-z0-9_-]{1,64}$/u;
 
-/** Project immutable history each time; omit inapplicable native data without blocking public context. */
+/** Project immutable history each time; omit inapplicable native data without blocking public context.
+ * Projected parts carry the target protocol's restored continuation record; foreign origins carry an empty record. */
 export function projectHistory(input: ModelInput): ResolvedModelItem[] {
   validateProjection(input);
   const { settings } = input;
+  const protocol = modelProtocol(settings.provider.protocol);
   const nativeIds = new Set(input.messages.flatMap(item => item.kind === "output" && canReuseContinuation(item, settings)
     ? item.parts.flatMap(part => part.kind === "toolcall" ? [part.callId] : []) : []));
   const usedIds = new Set<string>();
@@ -56,7 +38,7 @@ export function projectHistory(input: ModelInput): ResolvedModelItem[] {
     const native = canReuseContinuation(item, settings);
     const parts: ModelPart[] = [];
     for (const [partIndex, part] of item.parts.entries()) {
-      const continuation = continuationForTarget(part.continuation, item, settings);
+      const continuation: Record<string, Json> = native ? protocol.restore(part.continuation) : {};
       if (part.kind === "toolcall") {
         // Preserve this origin's original call IDs first; transform foreign IDs only when rejected by the target format or conflicting.
         const callId = native || (portableId.test(part.callId) && !nativeIds.has(part.callId) && !usedIds.has(part.callId))
@@ -66,12 +48,8 @@ export function projectHistory(input: ModelInput): ResolvedModelItem[] {
         parts.push({ ...part, callId, continuation });
       } else if (part.kind === "text") {
         parts.push({ ...part, continuation });
-      } else if (settings.model.capabilities.reasoning) {
-        if (settings.provider.protocol === "openai-responses" && (part.text || part.summary || typeof continuation.openai?.reasoningEncryptedContent === "string"))
-          parts.push({ ...part, continuation });
-        else if (settings.provider.protocol === "anthropic" && (part.text || typeof continuation.anthropic?.signature === "string" || typeof continuation.anthropic?.redactedData === "string"))
-          parts.push({ ...part, continuation });
-        // Chat has no public reasoning input; Anthropic does not disguise separate summaries as thinking or assistant text.
+      } else if (settings.model.capabilities.reasoning && protocol.replaysThinking(part, continuation)) {
+        parts.push({ ...part, continuation });
       }
     }
     if (parts.length) projected.push({ ...item, parts });
