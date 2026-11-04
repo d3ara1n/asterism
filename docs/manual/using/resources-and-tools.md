@@ -14,7 +14,7 @@ Resource creation has its own discovery and inspection tools. The available crea
 
 `resource_script` accepts JavaScript as an async function body. Obtain a resource handle with `resources.get(resource_id)`, then invoke its tools as methods: `resource.read({ target, args })`. The handle binds the resource identity, the method name selects the tool, and `target` and `args` retain their ordinary contracts and defaults. Methods return the same structured outcomes as direct calls. Other top-level operations, such as listing, inspection, and creation, use `tools.<name>(args)`.
 
-Use `await` for dependent operations and `Promise.all` or `Promise.allSettled` to submit independent calls together. Sequential tools execute in submission order relative to other sequential tools; parallel tools can run alongside them. This scheduling applies equally to direct calls and script calls.
+`await` expresses dependencies; `Promise.all` and `Promise.allSettled` submit calls together. Direct calls and all script child calls in the same tool batch share a scheduler. Sequential tools share one queue in submission order; parallel tools can run alongside sequential and other parallel tools. Concurrent submission creates no implicit dependency between calls.
 
 Each result retains its `kind` and raw `data`. `text(result)` returns the text from its existing model projection without publishing anything. Return the selected JSON value or text directly:
 
@@ -30,13 +30,19 @@ return {
 };
 ```
 
+Tool outcomes have six terminal kinds: `succeeded` means success, `partial` means partial success, `rejected` means the call was rejected, `failed` means execution failed, `cancelled` means the call was cancelled, and `unknown` means the operation's outcome is uncertain and effects may have occurred. `rejected` and `failed` carry `error: { code, message }`; `partial`, `cancelled`, and `unknown` carry `message`. `data` may be `null`, and its presence alone does not indicate success.
+
+Every tool outcome fulfills the call's promise. An unsuccessful outcome is available for branching on `result.kind`, while `try/catch` handles JavaScript exceptions. `Promise.all` returns unsuccessful tool outcomes normally; `Promise.allSettled` reports them as `status: "fulfilled"` with the tool outcome in `value`. One unsuccessful tool outcome leaves the script and other submitted calls running. A script can successfully return a child's failure diagnosis.
+
+An uncaught JavaScript exception or return-value serialization failure ends the script with `kind: "failed"` and `error.code: "script_failed"`. Strings remain text and other JSON return values become JSON text; an omitted or nullish return becomes `null`.
+
 Getting a handle performs no tool call and grants no access. Method execution uses the captured request scope and tool support. Handles reserve `then` and `toJSON` for JavaScript interoperability rather than resource operations.
 
 Resource inspection includes each tool's `requiresInteraction` flag. Tools requiring user interaction, such as `ask_user`, use direct model calls. Script tool bindings exclude interaction-required top-level tools, and resource methods reject interaction-required operations. Tools supporting both modes receive a noninteractive execution context in scripts.
 
 Only the final return value reaches the model. History retains the code, child call identities, timing and outcome summaries, and the returned value. Child arguments and outputs are temporary. The execution title summarizes call progress and failures. The body lists calls grouped by tool and resource with repeat counts, timing, statuses, and diagnostics, followed by the return value and the script code.
 
-Each script has an isolated JavaScript environment and the current request's captured access. The host supplies tool calls through a bridge; filesystem, network, and process operations use those tools. An optional `timeout_ms` bounds the whole execution. Ending a script cancels outstanding calls, waits for their completion, and releases the script environment; completed external effects remain.
+Each script has an isolated JavaScript environment and the current request's captured access, configuration, and tool policy. Filesystem, network, and process operations use tools; the environment provides JavaScript and the declared helpers without Node APIs, direct filesystem or network access, timers, or a session handle. An optional `timeout_ms` covers the whole script, including tool calls; expiry produces `kind: "failed"` and `error.code: "script_timeout"`. External cancellation produces `kind: "cancelled"`. Completion, failure, timeout, or cancellation cancels outstanding child calls, waits for them to settle, and releases the script environment. Unawaited calls share this lifetime. Completed effects remain without rollback.
 
 ## Choose material and capabilities
 
