@@ -19,7 +19,6 @@ const system = { blocks: [{
     "search_records searches or lists the admitted records; read_records returns paginated record text.",
     "Record order is timeline append order. Context summaries coexist with their original records. Incomplete output and failed operations carry their saved status.",
     "The answer is a focused Markdown report in the question's language, with saved record IDs identifying supporting evidence and explicit uncertainty where evidence is missing.",
-    "Report text is streamed inside <peek-report>...</peek-report>. Literal delimiter examples in the report use escaped angle brackets. Text outside these delimiters belongs to the investigation exchange.",
     "A response containing tool calls continues the investigation; its report text is provisional and replaced by the next response.",
   ].join("\n"),
 }] };
@@ -61,7 +60,7 @@ publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>> {
   // The overview reserves space for the question, tool declarations, and subsequent retrieval; its budget does not affect original text.
   const overviewBudget = Math.min(18000, Math.max(0, Math.floor((inputBudget ?? 32000) / 4)));
   const messages: ModelItem[] = [{ kind: "input", parts: [{ kind: "text", text: JSON.stringify({
-    question: args.question, snapshot: data.snapshot, includeThinking: args.includeThinking === true,
+    question: args.question, includeThinking: args.includeThinking === true,
     overview: peekOverview(records, overviewBudget),
   }) }] }];
   let publishedAt = -Infinity;

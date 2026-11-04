@@ -27,5 +27,5 @@ export const peekResultSchema = z.strictObject({
 export type PeekResult = z.infer<typeof peekResultSchema>;
 
 export function peekToModel(data: PeekResult): string {
-  return `Snapshot: ${data.snapshot.capturedAt}; timeline position: ${data.snapshot.nodeId ?? "origin"}.\n${data.report}`;
+  return data.report;
 }

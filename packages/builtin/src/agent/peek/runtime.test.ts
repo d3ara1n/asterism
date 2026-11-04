@@ -5,16 +5,16 @@ import { sessionSnapshot } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
 import { message, node } from "../../../../../src/session/test-nodes.ts";
 import { investigateAgent } from "./runtime.ts";
-import { PeekReport } from "./report.ts";
+import { collectPeekResponse } from "./stream.ts";
 import type { PeekResult } from "./contract.ts";
 
 const source = { model: "p/m", adapter: "test/1", scope: "test" };
 const finish = (reason = "stop"): ModelEvent => ({ type: "finish", reason, source,
   usage: { input: 10, output: 5, total: 15, reasoning: null, cacheRead: null, cacheWrite: null } });
-function* text(value: string): Generator<ModelEvent> {
-  yield { type: "part.start", part: { id: "text", kind: "text" } };
-  yield { type: "part.delta", partId: "text", delta: value };
-  yield { type: "part.end", partId: "text", continuation: { openai: { phase: "final_answer" } } };
+function* text(value: string, id = "text"): Generator<ModelEvent> {
+  yield { type: "part.start", part: { id, kind: "text" } };
+  yield { type: "part.delta", partId: id, delta: value };
+  yield { type: "part.end", partId: id, continuation: { openai: { phase: "final_answer" } } };
 }
 function* query(): Generator<ModelEvent> {
   yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "c1", name: "read_records" } };
@@ -34,12 +34,22 @@ function target() {
 
 // Agent investigation contract: deltas enter tool progress, retrieval executes only after a complete terminal state, and cancellation and failure retain their actual outcomes.
 describe("peek investigation stream", () => {
-  it("Parses report tags across delta and text boundaries without publishing text outside the report", () => {
-    const parser = new PeekReport();
-    for (const character of "Searching…<peek-report>Evidence</peek-report>After") parser.push(character);
-    expect(parser.text).toBe("Evidence");
-    expect(parser.finish("fallback")).toBe("Evidence");
-    expect(new PeekReport().finish("Plain terminal report")).toBe("Plain terminal report");
+  it("Uses the last text block as the report while streaming its deltas", async () => {
+    const updates: string[] = [];
+    const stream = async function* (): AsyncGenerator<ModelEvent> {
+      yield* text("Earlier explanation", "explanation");
+      yield { type: "part.start", part: { id: "report", kind: "text" } };
+      yield { type: "part.delta", partId: "report", delta: "Final " };
+      expect(updates.at(-1)).toBe("Final ");
+      yield { type: "part.delta", partId: "report", delta: "evidence [saved]" };
+      yield { type: "part.end", partId: "report" };
+      yield finish();
+    };
+    const signal = new AbortController().signal;
+    const result = await collectPeekResponse(stream(), signal, {
+      progress: (_phase, report) => updates.push(report), finish() {},
+    });
+    expect(result.report).toBe("Final evidence [saved]");
   });
 
   it("Publishes the report before model finalization; subsequent retrieval rounds replace the draft while preserving protocol pairing and measurements", async () => {
@@ -49,7 +59,7 @@ describe("peek investigation stream", () => {
       targets.push({ ...input.target });
       request++;
       if (request === 1) {
-        yield* text("Working…<peek-report>Provisional report</peek-report>");
+        yield* text("Provisional report");
         expect(updates.at(-1)?.report).toBe("Provisional report");
         nodes.push(node("later", "saved", message("a", "New activity")));
         yield* query();
@@ -61,7 +71,7 @@ describe("peek investigation stream", () => {
         expect(input.messages.find(item => item.kind === "output")).toMatchObject({
           scope: "test", adapter: "test/1", parts: [expect.objectContaining({ continuation: { openai: { phase: "final_answer" } } }), expect.objectContaining({ callId: "c1" })],
         });
-        yield* text("<peek-report>Final answer [saved]</peek-report>");
+        yield* text("Final answer [saved]");
         expect(updates.at(-1)?.report).toBe("Final answer [saved]");
         yield finish();
       }
@@ -78,7 +88,7 @@ describe("peek investigation stream", () => {
   it("Does not execute tool calls truncated by the output limit, and saves truncated reports as partial results", async () => {
     const { object } = target();
     const stream: ModelServices["stream"] = async function* () {
-      yield* text("<peek-report>Partial evidence");
+      yield* text("Partial evidence");
       yield* query(); yield finish("length");
     };
     const result = await investigateAgent(deps(stream), object, { question: "Investigate" }, new AbortController().signal, () => {});
@@ -89,7 +99,7 @@ describe("peek investigation stream", () => {
     const { object } = target(), controller = new AbortController();
     const cancelled: ModelServices["stream"] = async function* (request) {
       expect(request.signal).toBe(controller.signal);
-      yield* text("<peek-report>Visible partial");
+      yield* text("Visible partial");
       controller.abort(); request.signal.throwIfAborted();
     };
     expect(await investigateAgent(deps(cancelled), object, { question: "Investigate" }, controller.signal, () => {}))
@@ -101,6 +111,18 @@ describe("peek investigation stream", () => {
     };
     expect(await investigateAgent(deps(missing), object, { question: "Investigate" }, new AbortController().signal, data => updates.push(data)))
       .toMatchObject({ kind: "failed", data: { queries: [] } });
+  });
+
+  it("Returns received text with the transport error when the stream fails during a text block", async () => {
+    const { object } = target();
+    const stream: ModelServices["stream"] = async function* () {
+      yield { type: "part.start", part: { id: "text", kind: "text" } };
+      yield { type: "part.delta", partId: "text", delta: "Evidence received before disconnect" };
+      throw new Error("Connection reset");
+    };
+    expect(await investigateAgent(deps(stream), object, { question: "Investigate" }, new AbortController().signal, () => {}))
+      .toMatchObject({ kind: "failed", data: { report: "Evidence received before disconnect", requests: [] },
+        error: { code: "peek_failed", message: "Connection reset" } });
   });
 
   it("Fails explicitly when utility lacks tool capability, and ends the retrieval loop at the request limit", async () => {

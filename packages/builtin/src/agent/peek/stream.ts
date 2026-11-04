@@ -1,5 +1,4 @@
 import type { ModelEvent, ModelItem, ModelPart } from "@asterism-app/sdk/contracts";
-import { PeekReport } from "./report.ts";
 import type { PeekResult } from "./contract.ts";
 
 type Finish = Extract<ModelEvent, { type: "finish" }>;
@@ -10,7 +9,8 @@ export async function collectPeekResponse(events: AsyncIterable<ModelEvent>, sig
   progress(phase: PeekResult["phase"], report: string): void;
   finish(event: Finish): void;
 }) {
-  const parts = new Map<string, Part>(), report = new PeekReport();
+  const parts = new Map<string, Part>();
+  let report = "";
   let finish: Finish | undefined;
   for await (const event of events) {
     signal.throwIfAborted();
@@ -26,8 +26,12 @@ export async function collectPeekResponse(events: AsyncIterable<ModelEvent>, sig
         ? { kind: "toolcall", name: part.name, callId: part.callId, arguments: null, continuation: null }
         : part.kind === "thinking" ? { kind: "thinking", text: "", summary: "", continuation: null }
           : { kind: "text", text: "", continuation: null } });
-      if (part.kind === "thinking" && !report.text) callbacks.progress("thinking", "");
-      if (part.kind === "toolcall" && !report.text)
+      if (part.kind === "text" && report) {
+        report = "";
+        callbacks.progress("writing", report);
+      }
+      if (part.kind === "thinking" && !report) callbacks.progress("thinking", "");
+      if (part.kind === "toolcall" && !report)
         callbacks.progress(part.name === "read_records" ? "reading" : "searching", "");
       continue;
     }
@@ -35,8 +39,9 @@ export async function collectPeekResponse(events: AsyncIterable<ModelEvent>, sig
     if (!part || part.ended) throw new Error("The investigation stream updated an inactive part.");
     if (event.type === "part.delta") {
       if (part.value.kind === "text") {
-        part.value.text += event.delta; report.push(event.delta);
-        if (report.text) callbacks.progress("writing", report.text);
+        part.value.text += event.delta;
+        report = part.value.text;
+        callbacks.progress("writing", report);
       } else if (part.value.kind === "thinking") {
         if (event.channel === "summary") part.value.summary += event.delta;
         else part.value.text += event.delta;
@@ -55,11 +60,9 @@ export async function collectPeekResponse(events: AsyncIterable<ModelEvent>, sig
   const complete = values.every(part => part.ended && (part.value.kind !== "toolcall" || part.argumentsReady));
   if (new Set(calls.map(call => call.callId)).size !== calls.length)
     throw new Error("The investigation response contains duplicate tool-call IDs.");
-  const lastText = values.findLast(part => part.value.kind === "text")?.value;
-  const text = report.finish(lastText?.kind === "text" ? lastText.text : "");
   const output: Extract<ModelItem, { kind: "output" }> = {
     kind: "output", parts: values.map(part => part.value),
     scope: finish.source?.scope ?? "", adapter: finish.source?.adapter ?? "",
   };
-  return { finish, complete, calls, output, report: text };
+  return { finish, complete, calls, output, report: report.trim() };
 }
