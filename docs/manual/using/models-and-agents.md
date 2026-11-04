@@ -58,6 +58,8 @@ Accepted input starts an idle Agent. While it is running, inputs can join the ne
 
 A resource integration must implement notification delivery to send event messages. Linking a resource alone does not create that integration. The Agent's instructions define how it handles received facts, and its available resources supply the operations it can perform. Application startup restores saved drafts without sending them automatically.
 
+Agent Markdown supports standard footnotes with return links, external web links, and resource locations. Footnotes spanning separate paragraphs become available after the response finishes rendering. Write a resource link as `[label](resource:<resource ID>?location=<percent-encoded location>)`; for example, `[guide](resource:manual-id?location=sdk%2Fdocs%2Fgetting-started.md)`. The resource ID comes from the session's resource listing, and the target resource interprets the location. Directory and manual locations are their relative file paths. Clicking opens the resource using its own interface, independently of the Agent's tool access. Removed resources show a missing-resource notice.
+
 ## Interpret usage
 
 Response token usage and estimated cost describe model requests. Account balance and quota describe a provider account or plan. They may update through different mechanisms and need not agree with an estimated response cost.

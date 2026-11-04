@@ -399,6 +399,8 @@
   "filesystem_renderer_1": "目录",
   "filesystem_renderer_2": "目录",
   "markdownImage": "查看图片",
+  "markdownFootnotes": "脚注",
+  "markdownFootnoteBack": "返回引用",
   "markdownCopied": "已复制",
   "markdownCopyCode": "复制代码",
   "markdownCopyFailed": "无法复制代码",

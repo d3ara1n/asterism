@@ -8,7 +8,7 @@ import type { EventSubscriber } from "./events.ts";
 import type { ResourceDescription } from "./renderer.ts";
 import type { UiText } from "./i18n.ts";
 
-/** Static resource type presentation catalog; querying descriptions grants no access to resource instances. */
+/** Statically registered resource presentation and opening behavior. */
 export interface RendererResources {
   list(): readonly ResourceDescription[];
   get(kind: string): ResourceDescription;

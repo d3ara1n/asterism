@@ -1,6 +1,9 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const objectsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  resourceMissing: { id: "objects.resourceMissing", defaultMessage: "Resource does not exist." },
+  resourceOpenUnsupported: { id: "objects.resourceOpenUnsupported", defaultMessage: "This resource does not support opening locations." },
+  resourceOpenFailed: { id: "objects.resourceOpenFailed", defaultMessage: "Could not open resource." },
   resourceRetiring: { id: "objects.retiring", defaultMessage: "Removed. Waiting for ongoing work to finish." },
   linkHolds: { id: "objects.linkHolds", defaultMessage: "Disconnected. {count, plural, one {# request still uses this link} other {# requests still use this link}}." },
   renameObject: { id: "objects.rename", defaultMessage: "Rename resource" },

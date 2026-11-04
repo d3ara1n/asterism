@@ -1,18 +1,17 @@
 import { CachedMarkdown, Streamdown, type StreamdownProps } from "@lobehub/streamdown";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { useReducedMotion } from "motion/react";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useId, useMemo, useState } from "react";
 
 import { externalWebUrl } from "@asterism-app/ui/links";
 import { markdownMessages } from "../../messages/markdown";
 import { MarkdownCode, MarkdownStreamingContext } from "./MarkdownCode";
+import { MarkdownLink } from "./MarkdownLink";
 import { markdownOptions } from "./markdown-options";
+import { rehypeScopedAnchors } from "./markdown-links";
 
 const components: NonNullable<StreamdownProps["components"]> = {
-  a: ({ href, children }) => {
-    const url = href ? externalWebUrl(href) : null;
-    return url ? <a href={url} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>;
-  },
+  a: ({ node: _node, ...props }) => <MarkdownLink {...props} />,
   img: ({ src, alt, title }) => {
     const url = typeof src === "string" ? externalWebUrl(src) : null;
     return url ? <MarkdownImage key={url} src={url} alt={alt ?? ""} title={title} /> : <span>{alt}</span>;
@@ -37,6 +36,13 @@ const streamSettleMs = 1000;
  * Streamdown has no end signal and retains word-by-word animation while the trailing block is mounted, so mount it only during generation and the drain window.
  */
 export const Markdown = memo(function Markdown({ children, streaming = false }: { children: string; streaming?: boolean }) {
+  const id = useId();
+  const i18n = useI18n();
+  const options = useMemo(() => ({ ...markdownOptions,
+    remarkRehypeOptions: { footnoteLabel: i18n.text(markdownMessages.markdownFootnotes),
+      footnoteBackLabel: i18n.text(markdownMessages.markdownFootnoteBack) },
+    rehypePlugins: [...markdownOptions.rehypePlugins, [rehypeScopedAnchors, { prefix: `markdown-${id}-` }]],
+  } satisfies Omit<StreamdownProps, "content">), [id, i18n]);
   // After the live block is persisted, the same renderer finishes draining smoothed output so switching to static rendering does not abruptly reveal the undisplayed tail.
   const [settling, setSettling] = useState(streaming);
   useEffect(() => {
@@ -48,10 +54,10 @@ export const Markdown = memo(function Markdown({ children, streaming = false }: 
   const live = streaming || settling;
   const reducedMotion = useReducedMotion();
   return <MarkdownStreamingContext value={streaming}>
-    <div className="markdown-content type-body min-w-0 break-words [overflow-wrap:anywhere]">
+    <div data-markdown-root className="markdown-content type-body min-w-0 break-words [overflow-wrap:anywhere]">
       {live && !reducedMotion
-        ? <Streamdown {...markdownOptions} components={components} content={children} latexGuard smoothing="balanced" granularity="word" remend={{ htmlTags: false }} />
-        : <CachedMarkdown {...markdownOptions} components={components}>{children}</CachedMarkdown>}
+        ? <Streamdown {...options} components={components} content={children} latexGuard smoothing="balanced" granularity="word" remend={{ htmlTags: false }} />
+        : <CachedMarkdown {...options} components={components}>{children}</CachedMarkdown>}
     </div>
   </MarkdownStreamingContext>;
 });

@@ -12,6 +12,7 @@ import { listViews } from "../filesystem/list-view";
 import { findViews, grepViews } from "../filesystem/search-view";
 import { FileTreeBody, FileTreeActions } from "../filesystem/FileTree";
 import { useTreeStore } from "../filesystem/tree-store";
+import { fileOpener } from "../filesystem/open-file";
 
 const ManualFile = lazy(() => import("./ManualFile"));
 const useManualTree = () => useTreeStore("asterism.builtin/manual-tree", (calls, ref) => ({
@@ -20,7 +21,7 @@ const useManualTree = () => useTreeStore("asterism.builtin/manual-tree", (calls,
 
 function ManualBody() {
   const { store, state } = useManualTree();
-  return <FileTreeBody store={store} state={state} FileView={ManualFile} />;
+  return <FileTreeBody store={store} state={state} />;
 }
 
 function ManualActions() {
@@ -30,7 +31,7 @@ function ManualActions() {
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: Manual.kind, label: messages.title, icon: <BookOpen className="size-4" />, card: appearance }],
+  resources: [{ kind: Manual.kind, label: messages.title, icon: <BookOpen className="size-4" />, card: appearance, open: fileOpener(ManualFile) }],
   cards: [cardRenderer(ManualView, { ...appearance, Body: ManualBody, Actions: ManualActions })],
   creations: [creationEntry(CreateManual, {
     id: "asterism.builtin/manual.open", label: messages.title, icon: <BookOpen className="size-4" />,

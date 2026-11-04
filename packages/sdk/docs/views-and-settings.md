@@ -20,6 +20,16 @@ Supply a plugin-local identity, accessible label, opening element, and content r
 
 Use the island panel for its title, actions, and close control. Its fill layout lets an editor own scrolling. Mark unsaved content as dirty so closing, replacement, session navigation, and application exit ask before discarding it. A close guard can also retain a view while a save is pending. Closing the island releases its view calls without ending independent backend services.
 
+## Open resource locations
+
+A resource type can declare `open(location, context)` in its renderer resource description. The location is an opaque string interpreted by that resource. A file resource can open an editor or read-only viewer; a browser resource can navigate to a URL. The handler receives the resolved resource reference, typed calls, the opening element, and an island capability bound to the target plugin. It returns whether the open completed; declining an island close guard returns false.
+
+Use `useRendererResourceNavigation().open(resource, location, { origin })` from a card, settings page, Home entry, or island. Supply the session ID and resource ID. The host resolves current resource presence and invokes its registered handler. It reports missing resources, unsupported opening, and handler failures. User and plugin navigation are independent of model-request authorization and directed resource links.
+
+Resources own the meaning of their locations and their content surfaces. A filename remains a file location; opening it does not turn its contents into application navigation or grant embedded text another interaction contract. Directory files use editable text and image surfaces, while manual files use read-only text and image surfaces.
+
+The SDK's `resourceLink(resourceId, location)` creates a Markdown address of the form `resource:<encoded resource ID>?location=<encoded location>`. Encode the resource ID and location independently with percent encoding. A displaying interface supplies the session identity when following the link. The Agent Markdown interface recognizes these addresses; plugins can use `parseResourceLink` when providing their own link interface.
+
 ## Style plugin views
 
 Import CSS from the renderer entry or its components. Asterism builds the imported styles and loads them before frontend preparation and view registration. CSS references to bundled images and fonts keep their relative paths. Style loading failures appear as frontend plugin failures.

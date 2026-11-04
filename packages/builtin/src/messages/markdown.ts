@@ -1,6 +1,8 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const markdownMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
+  markdownFootnotes: { id: "markdownFootnotes", defaultMessage: "Footnotes" },
+  markdownFootnoteBack: { id: "markdownFootnoteBack", defaultMessage: "Back to reference" },
   markdownImage: {
     id: "markdownImage",
     defaultMessage: "View image",

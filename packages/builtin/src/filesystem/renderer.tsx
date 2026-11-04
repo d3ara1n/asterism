@@ -18,6 +18,7 @@ import { useTreeStore } from "./tree-store";
 import { FileTreeBody, FileTreeActions } from "./FileTree";
 import { searchToolRenderers } from "./search-view";
 import { listViews } from "./list-view";
+import { fileOpener } from "./open-file";
 
 import { directoryCard as appearance } from "../shared/card-appearance.ts";
 const DirectoryFile = lazy(() => import("./DirectoryFile"));
@@ -47,12 +48,12 @@ function DirectoryTreeActions() {
 
 function DirectoryTreeBody() {
   const { store, state } = useDirectoryTree();
-  return <FileTreeBody store={store} state={state} FileView={DirectoryFile} />;
+  return <FileTreeBody store={store} state={state} />;
 }
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: Directory.kind, label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance }],
+  resources: [{ kind: Directory.kind, label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance, open: fileOpener(DirectoryFile) }],
   cards: [cardRenderer(DirectoryView, {
     ...appearance,
     Body: DirectoryTreeBody,

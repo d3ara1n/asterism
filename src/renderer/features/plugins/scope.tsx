@@ -1,15 +1,33 @@
 import { Component, useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
-  RendererCallsProvider, RendererIslandPanelProvider, RendererIslandProvider, RendererPreferencesProvider, useRendererCalls,
-  type RendererIsland, type RendererIslandSpec, type RendererCalls,
+  RendererCallsProvider, RendererIslandPanelProvider, RendererIslandProvider, RendererPreferencesProvider, RendererResourceNavigationProvider, useRendererCalls,
+  type RendererIsland, type RendererIslandSpec, type RendererCalls, type RendererResourceNavigation,
 } from "@asterism-app/sdk/renderer";
-import type { PluginCalls } from "@asterism-app/sdk/contracts";
+import { pluginOf } from "@asterism-app/sdk/contracts";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { failureDisplay } from "@asterism-app/ui/error-display";
+import { objectsMessages } from "../../messages/objects";
 import { pluginsMessages as messages } from "../../messages/plugins";
+import { useModuleViews } from "../../modules/views";
+import { runtime } from "../../runtime";
 import { useI18n } from "../../shared/i18n";
+import { operationSucceeded, toast } from "../../shared/toast";
 import { IslandPanel, panelIslandWidth } from "../../shared/weave/IslandPanel";
-import { useIsland, useRootIsland } from "../../shared/weave/Screen";
+import { useIsland, useRootIsland, type IslandApi } from "../../shared/weave/Screen";
 import { pluginPreferences } from "../creation/preferences";
+
+function pluginIsland(island: IslandApi, pluginId: string): RendererIsland {
+  const prefix = `plugin-island:${pluginId}:`;
+  return {
+    get child() { const child = island.child; return child?.startsWith(prefix) ? child.slice(prefix.length) : undefined; },
+    open: spec => island.open({ id: prefix + spec.key, label: spec.label,
+      width: spec.size === "content" ? { min: 560, grow: 2 } : panelIslandWidth, origin: spec.origin,
+      render: () => <PluginIslandContent pluginId={pluginId} spec={spec} /> }),
+    close: options => island.close(options),
+    closeChild: options => island.closeChild(options),
+    guard: guard => island.guard(guard),
+  };
+}
 
 /** Plugin UI errors affect only their own region; the host retains management access. */
 export class SettingsBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
@@ -48,22 +66,42 @@ export function PluginIslandProvider({ pluginId, page = false, placement = "chil
   const containing = useIsland();
   const root = useRootIsland();
   const island = placement === "root" ? root : containing;
-  const prefix = `plugin-island:${pluginId}:`;
-  const adapter = useMemo<RendererIsland>(() => ({
-    get child() { const child = island.child; return child?.startsWith(prefix) ? child.slice(prefix.length) : undefined; },
-    open: spec => island.open({ id: prefix + spec.key, label: spec.label,
-      width: spec.size === "content" ? { min: 560, grow: 2 } : panelIslandWidth, origin: spec.origin,
-      render: () => <PluginIslandContent pluginId={pluginId} spec={spec} /> }),
-    close: options => island.close(options),
-    closeChild: options => island.closeChild(options),
-    guard: guard => island.guard(guard),
-  }), [island, pluginId, prefix]);
+  const registry = useModuleViews();
+  const calls = useRendererCalls();
+  const i18n = useI18n();
+  const adapter = useMemo(() => pluginIsland(island, pluginId), [island, pluginId]);
+  const navigation = useMemo<RendererResourceNavigation>(() => ({
+    async open(target, location, options) {
+      try {
+        const result = await runtime.session.execute({ type: "read", sessionId: target.sessionId });
+        if (!result.ok) {
+          if (result.error.code === "not_found") toast.error(i18n.text(objectsMessages.resourceMissing));
+          else operationSucceeded(result);
+          return false;
+        }
+        if (result.reply.kind !== "view") throw new Error("Resource navigation requires a session view.");
+        const object = result.reply.data.workbench.objects.find(object => object.id === target.id && !object.retiring);
+        if (!object) { toast.error(i18n.text(objectsMessages.resourceMissing)); return false; }
+        const descriptor = registry.resource(object.kind);
+        if (!descriptor.open) { toast.error(i18n.text(objectsMessages.resourceOpenUnsupported)); return false; }
+        const resource = { sessionId: target.sessionId, id: object.id, kind: object.kind };
+        return await descriptor.open(location, { resource, calls, origin: options?.origin,
+          island: pluginIsland(island, pluginOf(object.kind)!) });
+      } catch (error) {
+        console.error("Resource location could not be opened.", error);
+        toast.error(i18n.text(failureDisplay(error, objectsMessages.resourceOpenFailed)));
+        return false;
+      }
+    },
+  }), [island, registry, calls, i18n]);
   useEffect(() => {
     if (!page) return;
-    return () => { if (island.child?.startsWith(prefix)) void island.closeChild({ force: true }); };
-  }, [page, island, prefix]);
+    return () => { void island.closeChild({ force: true }); };
+  }, [page, island]);
   return <RendererIslandProvider value={adapter}>
-    <RendererIslandPanelProvider value={IslandPanel}>{children}</RendererIslandPanelProvider>
+    <RendererResourceNavigationProvider value={navigation}>
+      <RendererIslandPanelProvider value={IslandPanel}>{children}</RendererIslandPanelProvider>
+    </RendererResourceNavigationProvider>
   </RendererIslandProvider>;
 }
 

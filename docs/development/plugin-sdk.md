@@ -164,7 +164,7 @@ Individual preflight builds isolate source errors and exclude failed providers a
 
 Plugins share the document's CSS cascade and host theme variables. CSS Modules localize class names without creating a separate rendering environment. Preprocessors remain the plugin's responsibility; the host consumes their CSS output and serves bundled assets with their relative paths intact.
 
-Resource descriptions supply stable type presentation. Cards and auxiliary panels consume projected data; the host owns their surrounding layout, focus, and lifecycle.
+Resource descriptions supply stable type presentation and optional location-opening behavior. The host resolves current resource identity and delegates opaque locations to the resource implementation, independently of model-request authorization. Target plugins own the resulting operations and views. Cards and auxiliary panels consume projected data; the host owns their surrounding layout, focus, and lifecycle.
 
 Retained object view state survives virtualized item remounts and container changes while that object remains present. Component-local state and persistent resource data remain separate.
 

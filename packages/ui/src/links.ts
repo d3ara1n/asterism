@@ -1,4 +1,4 @@
-/** Model text can open only standard web pages; model-generated URLs are not local operation entry points. */
+/** Normalize external web destinations independently of application navigation. */
 export function externalWebUrl(value: string): string | null {
   try {
     const url = new URL(value);

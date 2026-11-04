@@ -1,11 +1,9 @@
-import { Suspense, type ComponentType, type CSSProperties } from "react";
-import { IslandPanel, useI18n, useRendererIsland, useRendererObject } from "@asterism-app/sdk/renderer";
-import type { ResourceRef } from "@asterism-app/sdk/contracts";
+import type { CSSProperties } from "react";
+import { useI18n, useRendererResourceNavigation, useRendererObject } from "@asterism-app/sdk/renderer";
 import { FileTree } from "@pierre/trees/react";
 import { RefreshCw } from "lucide-react";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
-import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { cn } from "@asterism-app/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
 import type { TreeState, TreeStore } from "./tree-store";
@@ -50,24 +48,17 @@ const treeStyle = {
 } as CSSProperties;
 
 /** Card body: edge-aligned filter bar + file tree; explanatory text fills empty-directory, no-match, and root-failure states. */
-export function FileTreeBody({ store, state, FileView }: {
+export function FileTreeBody({ store, state }: {
   store: TreeStore;
   state: TreeState;
-  FileView: ComponentType<{ resource: ResourceRef; path: string }>;
 }) {
   const i18n = useI18n();
-  const island = useRendererIsland();
+  const navigation = useRendererResourceNavigation();
   const object = useRendererObject();
   const { model } = store;
   const openFile = (path: string, origin: HTMLElement) => {
     if (model.getItem(path)?.isDirectory() !== false) return;
-    const resource = object.ref;
-    void island.open({
-      key: `file:${resource.sessionId}:${resource.id}:${path}`, label: path, size: "content", origin,
-      render: () => <Suspense fallback={<IslandPanel title={path}><Spinner /></IslandPanel>}>
-        <FileView key={path} resource={resource} path={path} />
-      </Suspense>,
-    });
+    void navigation.open(object.ref, path, { origin });
   };
   const notice = state.error ? i18n.text(state.error)
     : state.empty ? i18n.formatMessage(filesystemMessages.toolDirectoryEmpty)

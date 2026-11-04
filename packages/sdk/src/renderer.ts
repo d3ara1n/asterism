@@ -17,6 +17,7 @@ export * from "./renderer-tools.ts";
 export * from "./renderer-records.ts";
 export * from "./renderer-card.ts";
 export * from "./renderer-island.ts";
+export * from "./renderer-resource-open.ts";
 export * from "./renderer-view-state.ts";
 import type { CardPanelDefinition, CardPanelView } from "./renderer-card.ts";
 import type { RecordRenderer } from "./renderer-records.ts";
@@ -30,6 +31,7 @@ import type { EventSubscriber } from "./events.ts";
 import type { PluginCalls } from "./calls.ts";
 import type { RendererCalls } from "./renderer-calls.ts";
 import type { ChannelContract, ChannelEnd, ChannelValue } from "./channels.ts";
+import type { RendererResourceOpener } from "./renderer-resource-open.ts";
 
 /** The frontend end of a channel: messages are delivered in order and buffered until a listener registers; closed resolves when either end terminates. */
 export interface RendererChannel<Up extends ChannelValue = ChannelValue, Down extends ChannelValue = ChannelValue> {
@@ -80,13 +82,15 @@ export function useRendererObject(): RendererObjectContext {
   return object;
 }
 
-/** Static identification information at the type level; does not parse card data or create body components. */
+/** Resource type presentation and location opening, independent of card projection. */
 export interface ResourceDescription {
   kind: string;
   label: UiText;
   icon: ReactNode;
   /** Default card dimensions available before creation, sharing a declaration with the card renderer. */
   card?: CardAppearance;
+  /** Open an opaque location using this resource's own operation or content surface. */
+  open?: RendererResourceOpener;
 }
 export interface CardView extends CardAppearance {
   body: ReactNode;

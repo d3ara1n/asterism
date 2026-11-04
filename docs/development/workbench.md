@@ -76,6 +76,8 @@ Resource views can open content in an island to the right of the workbench, whet
 
 The host owns containment, placement, focus restoration, and close coordination. Plugins own the content and its operations. Expanded content has its own mounted region and receives explicit domain inputs; closing or remounting its source card does not discard its editing state. Resource-bound operations still require the resource to be available.
 
+Resource location opening is a common frontend capability. The host resolves current resource presence and delegates an opaque location to the resource's registered open handler. User and plugin navigation have no model-request authorization filter. Removed resources produce a missing-resource notice. The target plugin owns location interpretation, operations, and expanded views; cross-plugin opens retain the target's island identity and plugin region.
+
 Content islands are transient frontend state outside history. Session navigation consults close guards before releasing them. Unsaved panels confirm discarding edits on closure, replacement, session navigation, application exit, and window reload. Saving remains an explicit content operation; a failed save retains the draft.
 
 The directory plugin dispatches file content to independent text and image surfaces. The host does not interpret file formats. The text editor reads current text and saves to the actual file. Its buffer belongs to the island, and later backend-processed writes win. Editing does not reinterpret or update earlier tool results. Git gutter marks compare the current buffer with a captured HEAD baseline; they do not add repository management operations.
@@ -103,6 +105,8 @@ The conversation is virtualized and reads a window of recent records. Earlier me
 The virtual list owns measurement, scroll compensation, and item positioning. Following output stops on deliberate reading gestures or navigation and resumes at the end. The conversation outline treats each input as a chapter: it locates the reader from virtualizer measurements, surfaces the current input once it scrolls out of view, and navigates by input position without moving the execution cursor.
 
 Markdown uses shared rendering for history and live output. Code preserves copyable source; math uses KaTeX; Mermaid renders completed source and retains source on failure. Streaming animation drains and then yields to static rendering.
+
+Markdown footnotes navigate within their containing Markdown surface, with document-local anchor identities and return links. During generation, parsing operates on individual blocks; cross-block footnotes resolve when the response settles into whole-document rendering. External web destinations open in the browser. Resource destinations carry an instance ID and an opaque location and use the same resource opening capability as resource views. File contents retain their own viewer contract rather than inheriting the Agent interface's link behavior.
 
 Composer controls follow the Agent’s execution state: stop while running, continue for incomplete work, and ordinary send otherwise. Configuration changes apply to the next request.
 
