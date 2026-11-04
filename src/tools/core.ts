@@ -76,8 +76,8 @@ export const ResourceInspect = defineTool({
   name: "resource_inspect",
   description: "Inspect a linked resource's live state and available tools.",
   guidelines: [
-    "The result contains live resource state and the selected tool definitions.",
-    "An unknown tool name is rejected with the currently available names.",
+    "Inspect a linked resource to understand its state and how to use its available tools.",
+    "When revisiting a resource, use tools: [] to check its state without repeating known tool definitions, or supply previously discovered tool names when you need to clarify their usage or arguments.",
   ],
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
