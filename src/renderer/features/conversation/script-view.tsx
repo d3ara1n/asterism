@@ -6,7 +6,7 @@ import type { Json } from "@asterism-app/sdk/contracts";
 import { CodeText } from "@asterism-app/ui/code-view";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
-import { ToolDetails } from "@asterism-app/ui/tool-content";
+import { ToolDetailsSwitcher } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { toolOutcomeLabels, toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
@@ -95,15 +95,14 @@ function Body(props: Props) {
   const code = scriptCode(props.args);
   if (props.phase === "input") return code ? <StreamingPreview><CodeText contents={code} language={language} lineNumbers /></StreamingPreview> : null;
   const value = props.phase === "settled" ? props.result.data?.value : undefined;
-  return <div className="space-y-3">
+  return <div className="flex flex-col gap-3">
     <CallList calls={scriptCalls(props)} />
-    {value !== undefined && <section className="space-y-2">
-      <p className="type-label">{i18n.text(messages.toolScriptValue)}</p>
-      <JsonView value={value} />
-    </section>}
-    {code && <ToolDetails label={i18n.text(messages.toolScriptCode)} stateKey="asterism/resource-script-code">
-      <CodeText contents={code} language={language} lineNumbers />
-    </ToolDetails>}
+    {(code || value !== undefined) && <ToolDetailsSwitcher stateKey="asterism/resource-script-details" items={[
+      ...(code ? [{ value: "code", label: i18n.text(messages.toolScriptCode),
+        render: () => <CodeText contents={code} language={language} lineNumbers /> }] : []),
+      ...(value !== undefined ? [{ value: "result", label: i18n.text(messages.toolScriptValue),
+        render: () => <JsonView value={value} /> }] : []),
+    ]} />}
   </div>;
 }
 
