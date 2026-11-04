@@ -98,7 +98,7 @@ export function UpdateAction() {
 }
 
 /** View release notes for the target version on its GitHub Release page; the window-open handler delegates to the system browser. */
-function UpdateNotesLink() {
+export function UpdateNotesLink() {
   const i18n = useI18n();
   const { state } = useUpdates();
   if (!state?.releaseUrl) return null;

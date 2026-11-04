@@ -10,7 +10,7 @@ import { updatesMessages as messages } from "../messages/updates";
 import { useI18n } from "../shared/i18n";
 import { fadeTransition } from "../shared/weave/motion";
 import { useUpdates } from "../features/updates/state";
-import { UpdateAction, UpdateStatus, UpdateVersions, useUpdateSummary } from "../features/updates/controls";
+import { UpdateAction, UpdateNotesLink, UpdateStatus, UpdateVersions, useUpdateSummary } from "../features/updates/controls";
 
 /** The update entry stays visible while the popover is open, presenting checks and results after retries. */
 export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
@@ -55,7 +55,7 @@ export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
       }}>
       <h2 id={titleId} className="sr-only">{i18n.text(messages.title)}</h2>
       <UpdateVersions compact />
-      <UpdateStatus />
+      {status === "ready" ? <UpdateNotesLink /> : <UpdateStatus />}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={() => {
           navigating.current = true;
