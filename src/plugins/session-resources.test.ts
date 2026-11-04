@@ -8,6 +8,7 @@ import { definePlugin, defineModule, implementCreation, implementResource, imple
 import { agentCreations, defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { CreateAgent, ReadAgentCreations } from "@asterism-app/builtin-api/contracts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
+import { ConfigureAlarm, ConfigureTimer, ControlTimer, SetAlarmEnabled } from "../../packages/builtin/src/schedules/contract.ts";
 import { BuiltinApplicationService as ApplicationService, configureBuiltin } from "../../packages/builtin/src/testing.ts";
 import type { ModelAdapter, ModelEvent } from "../model/contract.ts";
 import { placementGap } from "../shared/workbench-layout.ts";
@@ -694,6 +695,70 @@ describe("SDK session resource lifetimes", () => {
     await expect(f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: null })).rejects.toThrow("settle");
     controller.abort(); end.release(); await rejected;
     expect(f.session.snapshot().resources.all()).toEqual([]);
+  });
+});
+
+describe("Agent schedule controls", () => {
+  // Model writes must enforce card activation guards and leave the saved configuration intact on rejection.
+  it("rejects timer activation without a message and configuration while a card-started timer runs", async () => {
+    let calls: { name: string; args: Json }[] = [
+      { name: "resource_create", args: { creation_id: "asterism.builtin/timer.create", input: {} } },
+    ];
+    const f = open({ adapter: adapter(() => calls) }), target = await model(f.app), actor = await f.session.create(Create, 0);
+    const run = runner(f, actor, target), created = (await run()).tools[0]!;
+    expect(created.kind).toBe("succeeded");
+    const resourceId = (created.data as { resource_id: string }).resource_id;
+    const timer = f.session.snapshot().resources.all().find(resource => resource.ref.id === resourceId)!.ref;
+    const call = async (tool: string, args: Json = {}) => {
+      calls = [{ name: "resource_call", args: { resource_id: resourceId, tool, args } }];
+      return (await run()).tools[0]!;
+    };
+    expect(await call("timer_start")).toMatchObject({ kind: "rejected", error: { code: "conflict" } });
+    expect(await call("timer_get")).toMatchObject({ kind: "succeeded", data: { nextAt: null } });
+    const settings = { durationSeconds: 3600, repeat: false, message: "Review progress." };
+    await call("timer_set", settings);
+    await f.session.invoke(ControlTimer, timer, { action: "start" });
+    const running = await call("timer_get");
+    expect(await call("timer_set", { ...settings, durationSeconds: 7200 })).toMatchObject({
+      kind: "rejected", error: { code: "conflict" },
+    });
+    expect((await call("timer_get")).data).toEqual(running.data);
+    await call("timer_pause");
+    await f.session.invoke(ConfigureTimer, timer, { ...settings, durationSeconds: 7200 });
+    expect(await call("timer_start")).toMatchObject({ kind: "succeeded", data: { durationSeconds: 7200 } });
+    expect(await call("timer_reset")).toMatchObject({
+      kind: "succeeded", data: { nextAt: null, remainingMs: 7_200_000 },
+    });
+  });
+
+  // Card enablement and model configuration must share one current state; rejected writes cannot clear an armed schedule.
+  it("rejects alarm activation without a message and configuration while a card-enabled alarm is armed", async () => {
+    let calls: { name: string; args: Json }[] = [
+      { name: "resource_create", args: { creation_id: "asterism.builtin/alarm.create", input: {} } },
+    ];
+    const f = open({ adapter: adapter(() => calls) }), target = await model(f.app), actor = await f.session.create(Create, 0);
+    const run = runner(f, actor, target), created = (await run()).tools[0]!;
+    expect(created.kind).toBe("succeeded");
+    const resourceId = (created.data as { resource_id: string }).resource_id;
+    const alarm = f.session.snapshot().resources.all().find(resource => resource.ref.id === resourceId)!.ref;
+    const call = async (tool: string, args: Json = {}) => {
+      calls = [{ name: "resource_call", args: { resource_id: resourceId, tool, args } }];
+      return (await run()).tools[0]!;
+    };
+    const settings = { time: "07:30", weekdays: [1, 2, 3, 4, 5], message: "  " };
+    await f.session.invoke(ConfigureAlarm, alarm, settings);
+    expect(await call("alarm_enable")).toMatchObject({ kind: "rejected", error: { code: "conflict" } });
+    expect(await call("alarm_get")).toMatchObject({ kind: "succeeded", data: { enabled: false, nextAt: null } });
+    await call("alarm_set", { ...settings, message: "Begin the morning review." });
+    await f.session.invoke(SetAlarmEnabled, alarm, { enabled: true });
+    const armed = await call("alarm_get");
+    expect(await call("alarm_set", { ...settings, time: "08:30", message: "New review." })).toMatchObject({
+      kind: "rejected", error: { code: "conflict" },
+    });
+    expect((await call("alarm_get")).data).toEqual(armed.data);
+    expect(await call("alarm_disable")).toMatchObject({ kind: "succeeded", data: { enabled: false, nextAt: null } });
+    await call("alarm_set", { ...settings, time: "08:30", message: "New review." });
+    expect(await call("alarm_enable")).toMatchObject({ kind: "succeeded", data: { enabled: true, time: "08:30" } });
   });
 });
 

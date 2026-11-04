@@ -1,11 +1,12 @@
 import { nanoid } from "nanoid";
 import { Agent, SubmitAgentInput } from "@asterism-app/builtin-api/contracts";
-import { ResourcePresenceChanged, SystemResumed } from "@asterism-app/sdk/contracts";
-import { defineModule, implementAction, implementCreation, implementResource, PluginApiError,
-  type Lifetime, type ObjectReader, type PluginContext, type ResourceRef, type ResourceSnapshot } from "@asterism-app/sdk/runtime";
+import { ResourcePresenceChanged, SystemResumed, type Json } from "@asterism-app/sdk/contracts";
+import { defineModule, implementAction, implementCreation, implementResource, implementTool, PluginApiError,
+  type CallResult, type Lifetime, type ObjectExecutor, type ObjectReader, type PluginContext, type ResourceRef, type ResourceSnapshot } from "@asterism-app/sdk/runtime";
 import { scheduleCard } from "../shared/card-appearance.ts";
 import { Alarm, AlarmState, AlarmView, ConfigureAlarm, ConfigureTimer, ControlTimer, CreateAlarm, CreateTimer,
-  SetAlarmEnabled, Timer, TimerState, TimerView } from "./contract.ts";
+  SetAlarmEnabled, Timer, TimerState, TimerView, AlarmGet, AlarmSet, AlarmEnable, AlarmDisable,
+  TimerGet, TimerSet, TimerStart, TimerPause, TimerReset, type AlarmSettings, type TimerSettings } from "./contract.ts";
 import { configureTimer, controlTimer, expireAlarm, expireTimer, normalizeWeekdays, setAlarmEnabled } from "./time.ts";
 import { planWakeup } from "./deadlines.ts";
 import { scheduleMessages as messages } from "../messages/schedules.ts";
@@ -18,6 +19,17 @@ function requireState<T>(state: T | null): T {
 /** A trigger without a message would deliver nothing; activation requires one. */
 function requireMessage(message: string): void {
   if (!message.trim()) throw new PluginApiError("conflict", "Set a non-empty message before activating the schedule.", undefined, messages.messageRequired);
+}
+
+async function scheduleResult<T extends Json>(signal: AbortSignal, work: () => T): Promise<CallResult<T>> {
+  try {
+    signal.throwIfAborted();
+    return { kind: "succeeded", data: work() };
+  } catch (error) {
+    if (signal.aborted) return { kind: "cancelled", message: "The schedule operation was cancelled before completion." };
+    if (error instanceof PluginApiError) return { kind: "rejected", error: { code: error.reason ?? error.code, message: error.message } };
+    throw error;
+  }
 }
 
 /** State advances before independent submissions; recipient execution and delivery outcomes do not control the schedule. */
@@ -99,6 +111,38 @@ export default defineModule(plugin => {
     if (removed) rearm();
   });
   plugin.lifetime.defer(() => { if (clock !== undefined) clearTimeout(clock); resources.clear(); });
+  const saveTimerSettings = (object: ObjectExecutor, settings: TimerSettings) => {
+    if (requireState(object.get(TimerState)).nextAt !== null)
+      throw new PluginApiError("conflict", "Pause or reset the timer before configuring it.", undefined, messages.timerRunning);
+    const next = configureTimer(settings);
+    object.commit(writer => { writer.set(TimerState, next); });
+    update(object.ref, next.nextAt);
+    return next;
+  };
+  const changeTimer = (object: ObjectExecutor, action: "start" | "pause" | "reset") => {
+    const state = requireState(object.get(TimerState));
+    if (action === "start" && state.nextAt === null) requireMessage(state.message);
+    const next = controlTimer(state, action, Date.now());
+    object.commit(writer => { writer.set(TimerState, next); });
+    update(object.ref, next.nextAt);
+    return next;
+  };
+  const saveAlarmSettings = (object: ObjectExecutor, { weekdays, ...settings }: AlarmSettings) => {
+    const state = requireState(object.get(AlarmState));
+    if (state.enabled)
+      throw new PluginApiError("conflict", "Turn off the alarm before configuring it.", undefined, messages.alarmEnabled);
+    const next = { ...state, ...settings, weekdays: normalizeWeekdays(weekdays) };
+    object.commit(writer => { writer.set(AlarmState, next); });
+    return next;
+  };
+  const changeAlarmEnabled = (object: ObjectExecutor, enabled: boolean) => {
+    const state = requireState(object.get(AlarmState));
+    if (enabled && !state.enabled) requireMessage(state.message);
+    const next = setAlarmEnabled(state, enabled, Date.now());
+    object.commit(writer => { writer.set(AlarmState, next); });
+    update(object.ref, next.nextAt);
+    return next;
+  };
   return {
     resources: [
       implementResource(Timer, TimerView, {
@@ -112,20 +156,8 @@ export default defineModule(plugin => {
         project: (_data, object) => object.get(TimerState),
         inspect: async (_data, object) => object.get(TimerState),
         actions: [
-          implementAction(ConfigureTimer, { async execute(settings, object) {
-            if (requireState(object.get(TimerState)).nextAt !== null)
-              throw new PluginApiError("conflict", "Pause or reset the timer before configuring it.", undefined, messages.timerRunning);
-            const next = configureTimer(settings);
-            object.commit(writer => { writer.set(TimerState, next); });
-            update(object.ref, next.nextAt);
-          } }),
-          implementAction(ControlTimer, { async execute({ action }, object) {
-            const state = requireState(object.get(TimerState));
-            if (action === "start" && state.nextAt === null) requireMessage(state.message);
-            const next = controlTimer(state, action, Date.now());
-            object.commit(writer => { writer.set(TimerState, next); });
-            update(object.ref, next.nextAt);
-          } }),
+          implementAction(ConfigureTimer, { async execute(settings, object) { saveTimerSettings(object, settings); } }),
+          implementAction(ControlTimer, { async execute({ action }, object) { changeTimer(object, action); } }),
         ],
       }),
       implementResource(Alarm, AlarmView, {
@@ -139,21 +171,39 @@ export default defineModule(plugin => {
         project: (_data, object) => object.get(AlarmState),
         inspect: async (_data, object) => object.get(AlarmState),
         actions: [
-          implementAction(ConfigureAlarm, { async execute({ weekdays, ...settings }, object) {
-            const state = requireState(object.get(AlarmState));
-            if (state.enabled)
-              throw new PluginApiError("conflict", "Turn off the alarm before configuring it.", undefined, messages.alarmEnabled);
-            object.commit(writer => { writer.set(AlarmState, { ...state, ...settings, weekdays: normalizeWeekdays(weekdays) }); });
-          } }),
-          implementAction(SetAlarmEnabled, { async execute({ enabled }, object) {
-            const state = requireState(object.get(AlarmState));
-            if (enabled && !state.enabled) requireMessage(state.message);
-            const next = setAlarmEnabled(state, enabled, Date.now());
-            object.commit(writer => { writer.set(AlarmState, next); });
-            update(object.ref, next.nextAt);
-          } }),
+          implementAction(ConfigureAlarm, { async execute(settings, object) { saveAlarmSettings(object, settings); } }),
+          implementAction(SetAlarmEnabled, { async execute({ enabled }, object) { changeAlarmEnabled(object, enabled); } }),
         ],
       }),
+    ],
+    tools: [
+      implementTool(TimerGet, { async call(_data, _target, _args, { object, signal }) {
+        return scheduleResult(signal, () => requireState(object.get(TimerState)));
+      } }),
+      implementTool(TimerSet, { async call(_data, _target, args, { object, signal }) {
+        return scheduleResult(signal, () => saveTimerSettings(object, args));
+      } }),
+      implementTool(TimerStart, { async call(_data, _target, _args, { object, signal }) {
+        return scheduleResult(signal, () => changeTimer(object, "start"));
+      } }),
+      implementTool(TimerPause, { async call(_data, _target, _args, { object, signal }) {
+        return scheduleResult(signal, () => changeTimer(object, "pause"));
+      } }),
+      implementTool(TimerReset, { async call(_data, _target, _args, { object, signal }) {
+        return scheduleResult(signal, () => changeTimer(object, "reset"));
+      } }),
+      implementTool(AlarmGet, { async call(_data, _target, _args, { object, signal }) {
+        return scheduleResult(signal, () => requireState(object.get(AlarmState)));
+      } }),
+      implementTool(AlarmSet, { async call(_data, _target, args, { object, signal }) {
+        return scheduleResult(signal, () => saveAlarmSettings(object, args));
+      } }),
+      implementTool(AlarmEnable, { async call(_data, _target, _args, { object, signal }) {
+        return scheduleResult(signal, () => changeAlarmEnabled(object, true));
+      } }),
+      implementTool(AlarmDisable, { async call(_data, _target, _args, { object, signal }) {
+        return scheduleResult(signal, () => changeAlarmEnabled(object, false));
+      } }),
     ],
   };
 });

@@ -31,6 +31,7 @@ import { updateParadigmConfiguration } from "./configuration/runtime.ts";
 import { createSubagentPoolModule } from "./subagents/runtime.ts";
 import { CreateSubagentPool, createPoolSchema } from "./subagents/contract.ts";
 import schedules from "./schedules/runtime.ts";
+import { CreateAlarm, CreateTimer } from "./schedules/contract.ts";
 
 /** Composes only plugin business logic; the application owns loading, host services, and external plugin dependencies. */
 export default definePlugin({ namespace: builtin,
@@ -49,6 +50,12 @@ export default definePlugin({ namespace: builtin,
         providers, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.shell), createNamingModule(application.userAgent), notes, questions,
         resourceOperations, mcp, web, mesh, schedules, messaging, ...messagingCreations, createSubagentPoolModule(application, usage, skills),
         createManualModule(() => plugin.manual.sources(), application.name), createShellModule(), createTerminalModule(),
+        defineAgentCreation({ id: CreateTimer.id, creation: CreateTimer,
+          description: "Create a stopped Timer with a 30-minute duration, no repeat, and an empty message. Its resource tools read, configure, start, pause, and reset the countdown.",
+          inputSchema: z.strictObject({}).describe("Create a Timer with default settings."), toInput: () => ({}) }),
+        defineAgentCreation({ id: CreateAlarm.id, creation: CreateAlarm,
+          description: "Create a disabled Alarm at 07:30 every day with an empty message. Its resource tools read, configure, enable, and disable the repeating schedule.",
+          inputSchema: z.strictObject({}).describe("Create an Alarm with default settings."), toInput: () => ({}) }),
         defineAgentCreation({ id: CreateSubagentPool.id, creation: CreateSubagentPool,
           description: "Create a shared Subagent Pool. It runs independent tasks using Agent roles and the resources linked to the pool.",
           inputSchema: createPoolSchema.extend({ resources: z.array(z.string()).optional()
