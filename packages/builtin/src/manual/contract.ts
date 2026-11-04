@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineCall, defineCreation, defineImplementation } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 import { DirectoryList, DirectoryRead, directoryReadTargetSchema, treeChildrenInput, treeChildrenOutput } from "../filesystem/contract.ts";
-import { DirectoryFind, DirectoryGrep, directoryGrepTargetSchema } from "../filesystem/search-contract.ts";
+import { DirectoryFind, DirectoryGrep, directoryFindTargetSchema, directoryGrepTargetSchema } from "../filesystem/search-contract.ts";
 import { ReadDirectoryFile } from "../filesystem/editor-contract.ts";
 
 export const Manual = builtin.resource("manual", z.strictObject({}));
@@ -33,7 +33,7 @@ export const ManualRead = defineImplementation({
 });
 export const ManualFind = defineImplementation({
   ...DirectoryFind, ...builtin.data("manual.find", DirectoryFind.schema), resource: Manual,
-  targetSchema: directoryTarget,
+  targetSchema: directoryFindTargetSchema.extend({ path }).nullable().describe(directoryTarget.description!),
 });
 export const ManualGrep = defineImplementation({
   ...DirectoryGrep, ...builtin.data("manual.grep", DirectoryGrep.schema.describe("A bounded search of manual sources. Content rows include source-qualified paths and line numbers without edit anchors; files and count modes describe matching files.")), resource: Manual,

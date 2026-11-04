@@ -4,19 +4,19 @@ import { builtin, Find, Grep, textRowSchema } from "@asterism-app/builtin-api/co
 import { Directory } from "./contract.ts";
 
 const path = z.string().describe("File path relative to the directory resource root, with '/' separators.");
-const searchTargetSchema = z.strictObject({
+export const directoryFindTargetSchema = z.strictObject({
   path: z.string().min(1).max(4096).describe("Relative directory or file path within the directory resource; '.' selects its root."),
-});
-export const directoryGrepTargetSchema = searchTargetSchema.extend({
   hidden: z.boolean().optional().describe("Include hidden entries; defaults to false. Ignore-file filtering is controlled separately by noIgnore."),
   noIgnore: z.boolean().optional().describe("Disable ignore-file filtering; defaults to false. Hidden-entry filtering is controlled separately by hidden."),
+});
+export const directoryGrepTargetSchema = directoryFindTargetSchema.extend({
   glob: z.array(z.string().min(1).refine(value => !value.includes("\0"), "Globs must be free of NUL characters.")).optional()
     .describe("Ripgrep file globs relative to the selected search directory. Patterns without '/' match filenames at any depth. Prefix exclusions with '!'; later globs take precedence. Positive globs override hidden and ignore rules; excluded directories are skipped with their descendants."),
   outputMode: z.enum(["content", "files", "count"]).optional()
     .describe("Result view; defaults to content. content returns matching and context lines grouped by file; files returns matching paths; count returns matching-line counts per file, rather than regex occurrences."),
   anchored: z.boolean().optional().describe("Include LINE#HASH edit anchors in content mode; defaults to true. Anchors identify complete lines and are shared with read and edit. False returns text with line numbers only."),
 });
-const target = searchTargetSchema.nullable()
+const target = directoryFindTargetSchema.nullable()
   .describe("Null selects the resource root. find selects a directory; grep selects a directory or one file. Selected symbolic links resolve inside the resource root; recursive traversal skips symbolic links. Git metadata entries are excluded from search targets.");
 export const stopReasonSchema = z.enum(["limit", "output_bytes", "record_bytes"]).nullable()
   .describe("Null means the search completed. Otherwise it stopped at the requested limit of matching lines or files, the 64 KiB result budget, or the 1 MiB process-record limit. Total matching rows or files are unknown after an early stop.");

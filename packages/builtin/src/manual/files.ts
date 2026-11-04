@@ -52,7 +52,7 @@ export async function findManual(sources: readonly ManualSource[], target: z.inf
     for (const scope of selected.kind === "source" ? [selected.scope] : selected.scopes) {
       const search = await searchScope(scope.source.directory, scope.path, true);
       prefix = posix.join(scope.source.path, search.prefix);
-      output.result.stopReason = await runSearch(search.cwd, searchArguments("find", args, search.operand), output.records, signal);
+      output.result.stopReason = await runSearch(search.cwd, searchArguments("find", { ...args, ...target }, search.operand), output.records, signal);
       if (output.result.stopReason !== null) break;
     }
     return { kind: "succeeded", data: output.result };

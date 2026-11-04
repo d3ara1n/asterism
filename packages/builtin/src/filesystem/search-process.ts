@@ -5,8 +5,9 @@ import { FilesystemError, failed } from "./errors.ts";
 import type { SearchRecords } from "./search-output.ts";
 import type { SearchStopReason } from "./search-contract.ts";
 import type { z } from "zod";
-import type { directoryGrepTargetSchema } from "./search-contract.ts";
+import type { directoryFindTargetSchema, directoryGrepTargetSchema } from "./search-contract.ts";
 
+type FindOptions = FindArgs & Partial<z.infer<typeof directoryFindTargetSchema>>;
 type GrepOptions = GrepArgs & Partial<z.infer<typeof directoryGrepTargetSchema>>;
 
 /** After Forge unpacking, OS processes use the physical executable path; development paths remain unchanged. */
@@ -14,7 +15,7 @@ export function executablePath(path: string): string {
   return path.replace(/([\\/])([^\\/]+\.asar)(?=[\\/])/g, "$1$2.unpacked");
 }
 
-export function searchArguments(kind: "find" | "grep", args: FindArgs | GrepOptions, operand: string): string[] {
+export function searchArguments(kind: "find" | "grep", args: FindOptions | GrepOptions, operand: string): string[] {
   const flags = ["--no-config", "--no-follow", "--no-require-git", "--color=never", "--path-separator=/"];
   if (args.hidden) flags.push("--hidden");
   if (args.noIgnore) flags.push("--no-ignore");

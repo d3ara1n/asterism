@@ -92,7 +92,7 @@ Requests hold each captured relationship until their work finishes. A disconnect
 
 ## Tools and saved results
 
-A tool contract owns its identity, meaning, shared argument schema, description, and usage guidance. Resource implementations own target schemas and execution behavior. Targets select content, scope, or a resource-specific view, including supported reading ranges and edit-anchor presentation. Top-level tools declare their operation directly.
+A tool contract owns its identity, meaning, shared argument schema, description, and usage guidance. Its argument schema stays the same across resource implementations. Resource implementations own target schemas and execution behavior. Targets select content, scope, or a resource-specific view, including supported reading ranges and edit-anchor presentation. Top-level tools declare their operation directly.
 
 A result schema is a decoding and encoding contract, not model-facing documentation. It defines how an implementation's output is stored, transferred, and projected, so a model that needs to know what an operation returns reads an actual outcome rather than a declared shape. Inspection therefore publishes argument and target contracts, and a narrowed projection can ask for guidance, schemas, or both per request.
 

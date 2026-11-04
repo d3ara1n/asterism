@@ -86,6 +86,106 @@ describe("text tool contracts", () => {
     expect(textChange(text, "other\n", "note").anchors).toEqual([]);
   });
 
+  // Boundary insertions consume no original lines; range application must not remove the inserted text.
+  it("combines insertions at both range boundaries with replacement regardless of operation order", () => {
+    const text = "a\nb\nc\nd";
+    const a = (line: number) => ({ line, hash: computeLineHash(line, ["a", "b", "c", "d"][line - 1]) });
+    const edits = [
+      { op: "insert_after" as const, anchor: a(3), body: ["after"] },
+      { op: "replace" as const, anchor: a(2), end: a(3), body: ["B1", "B2"] },
+      { op: "insert_before" as const, anchor: a(2), body: ["before"] },
+    ];
+    for (const batch of [edits, [...edits].reverse()]) {
+      const edited = editText(text, batch);
+      expect(edited.text).toBe("a\nbefore\nB1\nB2\nafter\nd");
+      expect(edited.touchedLines).toEqual([1, 2, 3, 4]);
+    }
+  });
+
+  // Different anchors can identify the same gap; sorting must preserve input order within it.
+  it("orders shared-gap insertions by the batch array before a replacement starting there", () => {
+    const text = "a\nb\nc";
+    const first = { line: 1, hash: computeLineHash(1, "a") };
+    const second = { line: 2, hash: computeLineHash(2, "b") };
+    const insertions = [
+      { op: "insert_before" as const, anchor: second, body: ["x"] },
+      { op: "insert_after" as const, anchor: first, body: ["y"] },
+      { op: "insert_before" as const, anchor: second, body: ["z"] },
+    ];
+    const replacement = { op: "replace" as const, anchor: second, body: ["B"] };
+    const edited = editText(text, [replacement, ...insertions]);
+    expect(edited.text).toBe("a\nx\ny\nz\nB\nc");
+    expect(edited.touchedLines).toEqual([1, 2, 3, 4]);
+    expect(editText(text, [replacement, ...[...insertions].reverse()]).text).toBe("a\nz\ny\nx\nB\nc");
+  });
+
+  it("retains boundary insertions around deletion and an adjacent expanding replacement", () => {
+    const text = "a\nb\nc\nd\ne";
+    const a = (line: number) => ({ line, hash: computeLineHash(line, ["a", "b", "c", "d", "e"][line - 1]) });
+    const edited = editText(text, [
+      { op: "replace", anchor: a(4), body: ["D1", "D2"] },
+      { op: "delete", anchor: a(2), end: a(3) },
+      { op: "insert_before", anchor: a(2), body: ["left"] },
+      { op: "insert_after", anchor: a(3), body: ["middle1"] },
+      { op: "insert_before", anchor: a(4), body: ["middle2"] },
+    ]);
+    expect(edited.text).toBe("a\nleft\nmiddle1\nmiddle2\nD1\nD2\ne");
+    expect(edited.touchedLines).toEqual([1, 2, 3, 4, 5]);
+    const change = textChange(text, edited.text, "text.txt", edited.touchedLines);
+    expect(change.anchors.map(row => [row.line, row.content])).toEqual([
+      [2, "left"], [3, "middle1"], [4, "middle2"], [5, "D1"], [6, "D2"],
+    ]);
+  });
+
+  it("combines prepend and append with deletion to empty text and orders insertions into an empty target", () => {
+    const text = "a\nb\n";
+    const edited = editText(text, [
+      { op: "append", body: ["last"] },
+      { op: "delete", anchor: { line: 1, hash: computeLineHash(1, "a") }, end: { line: 2, hash: computeLineHash(2, "b") } },
+      { op: "prepend", body: ["first"] },
+    ]);
+    expect(edited.text).toBe("first\nlast\n");
+    expect(edited.touchedLines).toEqual([0, 1]);
+    expect(editText("", [{ op: "append", body: ["one"] }, { op: "prepend", body: ["two"] }]).text).toBe("one\ntwo\n");
+  });
+
+  // Zero-width operations must not hide the active consuming range during conflict checks.
+  it("rejects insertions strictly inside replaced or deleted ranges and identifies both conflicting operations", () => {
+    const text = "a\nb\nc\nd";
+    const a = (line: number) => ({ line, hash: computeLineHash(line, ["a", "b", "c", "d"][line - 1]) });
+    for (const op of ["replace", "delete"] as const) {
+      const range = op === "replace"
+        ? { op, anchor: a(1), end: a(4), body: ["replacement"] }
+        : { op, anchor: a(1), end: a(4) };
+      expect(() => editText(text, [
+        { op: "insert_after", anchor: a(2), body: ["inside"] },
+        range,
+        { op: "insert_before", anchor: a(1), body: ["boundary1"] },
+        { op: "prepend", body: ["boundary2"] },
+      ])).toThrow("overlapping edits[1] and edits[0]");
+    }
+  });
+
+  it("preserves mixed separators and missing final newline when composing boundary insertions and resized ranges", () => {
+    const text = "a\r\nb\nc\r\nd";
+    const edited = editText(text, [
+      { op: "append", body: ["tail"] },
+      { op: "insert_after", anchor: { line: 3, hash: computeLineHash(3, "c") }, body: ["right"] },
+      { op: "replace", anchor: { line: 2, hash: computeLineHash(2, "b") }, end: { line: 3, hash: computeLineHash(3, "c") }, body: ["B1", "B2", "B3"] },
+      { op: "insert_before", anchor: { line: 2, hash: computeLineHash(2, "b") }, body: ["left"] },
+      { op: "prepend", body: ["head"] },
+    ]);
+    expect(edited.text).toBe("head\r\na\r\nleft\r\nB1\nB2\r\nB3\r\nright\r\nd\r\ntail");
+    const change = textChange(text, edited.text, "text.txt", edited.touchedLines);
+    expect(change.anchors.map(row => [row.line, row.content])).toEqual([
+      [1, "head"], [3, "left"], [4, "B1"], [5, "B2"], [6, "B3"], [7, "right"], [9, "tail"],
+    ]);
+    expect(applyPatch(text, change.diff)).toBe(edited.text);
+    const last = change.anchors.at(-1)!;
+    expect(editText(edited.text, [{ op: "replace", anchor: { line: last.line, hash: last.hash! }, body: ["TAIL"] }]).text)
+      .toBe("head\r\na\r\nleft\r\nB1\nB2\r\nB3\r\nright\r\nd\r\nTAIL");
+  });
+
   it("provides explicit new anchors for additions, deletions, deletion to empty text, and insertions at either end, preserving the missing-final-newline marker", () => {
     const before = "a\nb";
     const rows = readText(before, true).rows;

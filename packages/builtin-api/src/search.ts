@@ -14,11 +14,12 @@ const globGuidelines = [
 export const Find = defineTool({
   id: builtin.name("tool.find"), name: "find",
   description: "Find files by glob pattern within a resource.",
-  guidelines: globGuidelines,
+  guidelines: [
+    ...globGuidelines,
+    "target selects the search scope and resource-specific file filtering according to the resource implementation's schema.",
+  ],
   argsSchema: z.strictObject({
     pattern: pattern.describe("File glob relative to the selected search directory, using '/' separators; for example '**/*.ts' or '**/package.json'."),
-    hidden: z.boolean().optional().describe("Disable hidden-entry filtering; defaults to false. Ignore-file filtering is controlled separately by noIgnore."),
-    noIgnore: z.boolean().optional().describe("Disable ignore-file filtering; defaults to false. Hidden-entry filtering is controlled separately by hidden."),
     ...selection,
   }).describe("A file glob and search selection options."),
 });

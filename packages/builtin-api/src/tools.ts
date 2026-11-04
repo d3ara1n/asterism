@@ -51,10 +51,11 @@ export const Edit = defineTool({
     "insert_before/insert_after preserve the anchor line. body contains the new lines.",
     "append/prepend take body. Each body item is one text line; an empty string represents a blank line.",
     "All operations refer to the same pre-edit content and commit as one batch. Anchor or overlap failures preserve the original text.",
+    "Replace/delete ranges conflict when they share original lines. Insertions can share range boundaries; an insertion strictly inside a replaced or deleted range conflicts. Insertions at the same original gap appear in edits array order.",
     "Anchor mismatch results include current-line or shifted candidates. Successful results include the actual diff and fresh anchors.",
   ],
   argsSchema: z.strictObject({
-    edits: z.array(editOperationSchema).min(1).max(500).describe("One to 500 non-overlapping hashline operations, all referring to the same current text."),
+    edits: z.array(editOperationSchema).min(1).max(500).describe("One to 500 hashline operations referring to the same current text. Replace/delete ranges have no shared lines; insertions may share boundaries and use array order at the same gap."),
   }).describe("A complete batch of line-based edit operations. The target is selected separately."),
 });
 

@@ -35,7 +35,7 @@ export async function findFiles(root: string, target: z.infer<typeof DirectoryFi
   try {
     const selected = await searchScope(root, path, true);
     const output = findOutput(path, selected.prefix, args.limit ?? 500);
-    output.result.stopReason = await runSearch(selected.cwd, searchArguments("find", args, selected.operand), output.records, signal);
+    output.result.stopReason = await runSearch(selected.cwd, searchArguments("find", { ...args, ...target }, selected.operand), output.records, signal);
     return { kind: "succeeded", data: output.result };
   } catch (error) { return failure(error, signal); }
 }

@@ -1,10 +1,12 @@
 # Hashline text core
 
-Line hashing and batch text editing adapted from @d3ara1n/pi-hashline-edit, version 0.7.1, under the MIT license. The adaptation preserves hashing, batch validation, moved-line candidates, range checks, and per-line endings. A final standalone carriage return remains content.
+Line hashing and batch text editing adapted from @d3ara1n/pi-hashline-edit, version 0.7.1, under the MIT license. The adaptation preserves hashing, batch validation, moved-line candidates, and per-line endings. A final standalone carriage return remains content.
 
 Hashes combine line number and complete text. They are short comparison aids, not resource identity or authorization. A batch validates against one current text value and either applies together or fails without partial edits.
 
 Range endpoints protect their referenced lines, not every interior line. Moved-line candidates support an explicit retry rather than automatic relocation. Append and prepend need no anchors.
+
+All operations use original text coordinates. Replace and delete conflict when they consume the same original lines. Insertions at either boundary of a range are accepted; insertions strictly inside it conflict. Multiple insertions at the same gap appear in input array order. Results are assembled from the original lines, preserving their separators and returning fresh positions for inserted lines and surviving deletion gaps.
 
 The pure core does not access files or storage. The backend owns resource access, persistence, and result presentation.
 

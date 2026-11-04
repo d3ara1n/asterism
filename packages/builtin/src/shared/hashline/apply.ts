@@ -108,22 +108,18 @@ function translateEdit(
   }
 }
 
-function maxAffected(op: SpanOp): number {
-  return op.lo === op.hi ? op.lo : op.hi - 1;
-}
-
 export function applyEdits(text: string, edits: Edit[], hashLen = 4, shiftRadius = DEFAULT_SHIFT_RADIUS): ApplyResult {
   const lines = splitLines(text);
   const ending = detectLineEnding(text);
 
-  const ops: SpanOp[] = [];
+  const ops: (SpanOp & { index: number })[] = [];
   const anchorFailures: AnchorFailure[] = [];
   let rangeError: string | null = null;
 
   for (let i = 0; i < edits.length; i++) {
     const t = translateEdit(edits[i], i, lines, hashLen, shiftRadius);
     if (t.ok) {
-      ops.push(t.op);
+      ops.push({ ...t.op, index: i });
     } else if ("anchorFailures" in t) {
       anchorFailures.push(...t.anchorFailures);
     } else if (rangeError === null) {
@@ -137,30 +133,45 @@ export function applyEdits(text: string, edits: Edit[], hashLen = 4, shiftRadius
     return { ok: false, failure: { kind: "range", message: rangeError } };
   }
   const sorted = [...ops].sort((a, b) => a.lo - b.lo || a.hi - b.hi);
-  for (let k = 1; k < sorted.length; k++) {
-    if (sorted[k].lo <= maxAffected(sorted[k - 1])) {
+  // Insertions precede a range at its starting gap; stable sorting preserves array order at a shared gap.
+  let previousRange: (typeof ops)[number] | undefined;
+  for (const op of sorted) {
+    if (previousRange && op.lo < previousRange.hi) {
       return {
         ok: false,
         failure: {
           kind: "range",
-          message: `overlapping edits near line ${sorted[k].lo + 1}; issue one edit per range`,
+          message: `overlapping edits[${previousRange.index}] and edits[${op.index}] near line ${op.lo + 1}: ${
+            op.lo === op.hi ? "insertion is inside a replaced or deleted range" : "ranges modify the same original lines"
+          }.`,
         },
       };
     }
+    if (op.lo < op.hi) previousRange = op;
   }
   const separators = text.match(/\r?\n/g) ?? [];
   const separator = ending === "crlf" ? "\r\n" : "\n";
-  let result = lines.map((content, i) => ({ content, separator: separators[i] ?? "" }));
-  for (const op of [...sorted].sort((a, b) => b.lo - a.lo)) {
-    const removed = result.slice(op.lo, op.hi);
-    const inserted = op.newLines.map((content, i) => ({
-      content,
-      separator: i === op.newLines.length - 1 && removed.length > 0
-        ? removed[removed.length - 1].separator
-        : removed[i]?.separator || separator,
-    }));
-    result.splice(op.lo, op.hi - op.lo, ...inserted);
+  const original = lines.map((content, i) => ({ content, separator: separators[i] ?? "" }));
+  const result: typeof original = [];
+  const touched: number[] = [];
+  let cursor = 0;
+  // Build from original coordinates so boundary insertions cannot become input to a later range edit.
+  for (const op of sorted) {
+    while (cursor < op.lo) result.push(original[cursor++]);
+    const removed = original.slice(op.lo, op.hi);
+    if (op.newLines.length === 0) touched.push(result.length);
+    for (let i = 0; i < op.newLines.length; i++) {
+      touched.push(result.length);
+      result.push({
+        content: op.newLines[i],
+        separator: i === op.newLines.length - 1 && removed.length > 0
+          ? removed[removed.length - 1].separator
+          : removed[i]?.separator || separator,
+      });
+    }
+    cursor = op.hi;
   }
+  while (cursor < original.length) result.push(original[cursor++]);
   const finalNewline = hasFinalNewline(text);
   const newText = result.map(({ content, separator: current }, i) =>
     content + (i < result.length - 1 || finalNewline ? current || separator : ""),
@@ -170,21 +181,9 @@ export function applyEdits(text: string, edits: Edit[], hashLen = 4, shiftRadius
       ok: false,
       failure: {
         kind: "noop",
-        message: "edit parsed and applied cleanly but produced no change; body is byte-identical — the bug is elsewhere, re-read first",
+        message: "The edit batch produced no change; the resulting text is byte-identical to the current text.",
       },
     };
   }
-  const touched: number[] = [];
-  let delta = 0;
-  for (const op of sorted) {
-    const newLo = op.lo + delta;
-    if (op.newLines.length > 0) {
-      for (let i = 0; i < op.newLines.length; i++) touched.push(newLo + i);
-    } else if (newLo < result.length) {
-      touched.push(newLo);
-    }
-    delta += op.newLines.length - (op.hi - op.lo);
-  }
-
-  return { ok: true, text: newText, changed: true, touchedLines: touched };
+  return { ok: true, text: newText, changed: true, touchedLines: [...new Set(touched)].filter(line => line < result.length) };
 }
