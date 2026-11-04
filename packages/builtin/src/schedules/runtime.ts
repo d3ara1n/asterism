@@ -6,12 +6,18 @@ import { defineModule, implementAction, implementCreation, implementResource, Pl
 import { scheduleCard } from "../shared/card-appearance.ts";
 import { Alarm, AlarmState, AlarmView, ConfigureAlarm, ConfigureTimer, ControlTimer, CreateAlarm, CreateTimer,
   SetAlarmEnabled, Timer, TimerState, TimerView } from "./contract.ts";
-import { configureAlarm, configureTimer, controlTimer, expireAlarm, expireTimer, nextAlarmAt } from "./time.ts";
+import { configureTimer, controlTimer, expireAlarm, expireTimer, normalizeWeekdays, setAlarmEnabled } from "./time.ts";
 import { planWakeup } from "./deadlines.ts";
+import { scheduleMessages as messages } from "../messages/schedules.ts";
 
 function requireState<T>(state: T | null): T {
   if (state === null) throw new PluginApiError("unavailable", "The schedule state is unavailable.");
   return state;
+}
+
+/** A trigger without a message would deliver nothing; activation requires one. */
+function requireMessage(message: string): void {
+  if (!message.trim()) throw new PluginApiError("conflict", "Set a non-empty message before activating the schedule.", undefined, messages.messageRequired);
 }
 
 /** State advances before independent submissions; recipient execution and delivery outcomes do not control the schedule. */
@@ -99,21 +105,24 @@ export default defineModule(plugin => {
         card: scheduleCard, links: { receive: true }, attach,
         creation: implementCreation(CreateTimer, {
           create({ title, ...settings }, object) {
-            object.commit(writer => { writer.set(TimerState, { ...settings,
-              nextAt: Date.now() + settings.durationSeconds * 1000, remainingMs: settings.durationSeconds * 1000 }); });
-            return { title, data: {} };
+            object.commit(writer => { writer.set(TimerState, configureTimer(settings)); });
+            return { title: title ?? "Timer", data: {} };
           },
         }),
         project: (_data, object) => object.get(TimerState),
         inspect: async (_data, object) => object.get(TimerState),
         actions: [
           implementAction(ConfigureTimer, { async execute(settings, object) {
-            const next = configureTimer(requireState(object.get(TimerState)), settings, Date.now());
+            if (requireState(object.get(TimerState)).nextAt !== null)
+              throw new PluginApiError("conflict", "Pause or reset the timer before configuring it.", undefined, messages.timerRunning);
+            const next = configureTimer(settings);
             object.commit(writer => { writer.set(TimerState, next); });
             update(object.ref, next.nextAt);
           } }),
           implementAction(ControlTimer, { async execute({ action }, object) {
-            const next = controlTimer(requireState(object.get(TimerState)), action, Date.now());
+            const state = requireState(object.get(TimerState));
+            if (action === "start" && state.nextAt === null) requireMessage(state.message);
+            const next = controlTimer(state, action, Date.now());
             object.commit(writer => { writer.set(TimerState, next); });
             update(object.ref, next.nextAt);
           } }),
@@ -122,22 +131,24 @@ export default defineModule(plugin => {
       implementResource(Alarm, AlarmView, {
         card: scheduleCard, links: { receive: true }, attach,
         creation: implementCreation(CreateAlarm, {
-          create({ title, ...settings }, object) {
-            object.commit(writer => { writer.set(AlarmState, { ...settings, enabled: true, nextAt: nextAlarmAt(settings, Date.now()) }); });
-            return { title, data: {} };
+          create({ title, weekdays, ...settings }, object) {
+            object.commit(writer => { writer.set(AlarmState, { ...settings, weekdays: normalizeWeekdays(weekdays), enabled: false, nextAt: null }); });
+            return { title: title ?? "Alarm", data: {} };
           },
         }),
         project: (_data, object) => object.get(AlarmState),
         inspect: async (_data, object) => object.get(AlarmState),
         actions: [
-          implementAction(ConfigureAlarm, { async execute(settings, object) {
-            const next = configureAlarm(requireState(object.get(AlarmState)), settings, Date.now());
-            object.commit(writer => { writer.set(AlarmState, next); });
-            update(object.ref, next.nextAt);
+          implementAction(ConfigureAlarm, { async execute({ weekdays, ...settings }, object) {
+            const state = requireState(object.get(AlarmState));
+            if (state.enabled)
+              throw new PluginApiError("conflict", "Turn off the alarm before configuring it.", undefined, messages.alarmEnabled);
+            object.commit(writer => { writer.set(AlarmState, { ...state, ...settings, weekdays: normalizeWeekdays(weekdays) }); });
           } }),
           implementAction(SetAlarmEnabled, { async execute({ enabled }, object) {
             const state = requireState(object.get(AlarmState));
-            const next = { ...state, enabled, nextAt: enabled ? nextAlarmAt(state, Date.now()) : null };
+            if (enabled && !state.enabled) requireMessage(state.message);
+            const next = setAlarmEnabled(state, enabled, Date.now());
             object.commit(writer => { writer.set(AlarmState, next); });
             update(object.ref, next.nextAt);
           } }),

@@ -62,7 +62,7 @@ Each script has an isolated JavaScript environment and the current request's cap
 | Agent | Send work to another conversation and inspect or wait for its progress |
 | Mesh | Discover and contact agents across sessions through a shared channel |
 | Timer | Send a message after a countdown, optionally repeating |
-| Alarm | Send a message at a local date and clock time, optionally repeating on selected weekdays |
+| Alarm | Send a message at a local clock time on selected weekdays |
 | Message attachment | Supply a file or image as part of a particular input |
 
 Directory and terminal operations affect the actual machine. Check an operation’s result when its effects are uncertain. A history branch does not create an isolated copy of those files or processes.
@@ -157,9 +157,9 @@ Switching a Mesh's channel keeps its workbench links and local task descriptions
 
 Create a Timer or Alarm from the resource menu. Each resource owns one schedule and one message. Expose each receiving Agent to the schedule: drag from the Agent's connection point to the Timer or Alarm. The reverse link independently lets an Agent inspect the schedule.
 
-A Timer starts when created. Set its hours, minutes, seconds, message, and Repeat switch. Pause preserves the remaining duration; Start resumes it. Reset stops the timer and restores its full duration. Editing its duration resets the countdown, preserving whether it is running or paused. A repeating timer starts another full interval when it triggers, independently of message delivery or Agent execution.
+A new Timer is stopped at a 30-minute duration with no message. Flip the card with its edit button to set hours, minutes, seconds, Repeat, and the message; Done saves and returns to the front, where the ring shows the remaining time. Start requires a message. Pause preserves the remaining duration; Start resumes it. Reset stops the timer and restores its full duration. A running timer cannot be edited: pause or reset it first. Saving restores the full duration. A repeating timer starts another full interval when it triggers, independently of message delivery or Agent execution.
 
-An Alarm uses the computer's local clock. With no weekdays selected it triggers once, on the selected date or at the next occurrence of its clock time if the date is empty. Select weekdays for a repeating alarm. Its switch enables or disables that alarm; editing preserves the switch state.
+An Alarm uses the computer's local clock and always repeats on its selected weekdays; use a Timer for a single delay. A new Alarm is off, set to 07:30 every day with no message. The switch on the front turns it on or off; turning it on requires a message and schedules the next future occurrence. Turn the alarm off before flipping the card to edit its time, weekdays, or message.
 
 Schedules run in the backend while their session is active, including when its cards are hidden or another session is open. Sleep and application shutdown count toward the saved deadline. When execution resumes, every overdue resource triggers independently. A repeating timer then begins its next full interval; a repeating alarm selects its next future weekday occurrence. Archiving the session suspends scheduling until restoration.
 

@@ -1,9 +1,10 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import type { AlarmData, AlarmSettings, TimerData } from "./contract.ts";
-import { configureAlarm, configureTimer, controlTimer, expireAlarm, expireTimer, nextAlarmAt } from "./time.ts";
+import { controlTimer, expireAlarm, expireTimer, nextAlarmAt, normalizeWeekdays } from "./time.ts";
 
 const timer: TimerData = { durationSeconds: 1800, repeat: true, message: "Check progress.", nextAt: 1_800_000, remainingMs: 1_800_000 };
-const alarm: AlarmSettings = { time: "07:30", date: null, weekdays: [], message: "Start the morning review." };
+const everyDay = [0, 1, 2, 3, 4, 5, 6];
+const alarm: AlarmSettings = { time: "07:30", weekdays: everyDay, message: "Start the morning review." };
 afterEach(() => vi.unstubAllEnvs());
 
 describe("countdown scheduling", () => {
@@ -29,37 +30,17 @@ describe("countdown scheduling", () => {
     expect(controlTimer(timer, "reset", 600_000)).toMatchObject({ nextAt: null, remainingMs: 1_800_000 });
     expect(controlTimer({ ...timer, nextAt: null, remainingMs: 0 }, "start", 600_000).nextAt).toBe(2_400_000);
   });
-
-  it("preserves a pending countdown when only its message or repeat setting changes", () => {
-    expect(configureTimer(timer, { durationSeconds: 1800, message: "Updated.", repeat: false }, 600_000))
-      .toMatchObject({ nextAt: 1_800_000, message: "Updated.", repeat: false });
-  });
-
-  it("applies a new full duration while preserving whether the timer is running or paused", () => {
-    const settings = { durationSeconds: 60, message: timer.message, repeat: false };
-    expect(configureTimer(timer, settings, 600_000)).toMatchObject({ nextAt: 660_000, remainingMs: 60_000 });
-    expect(configureTimer({ ...timer, nextAt: null, remainingMs: 12_000 }, settings, 600_000))
-      .toMatchObject({ nextAt: null, remainingMs: 60_000 });
-  });
 });
 
-describe("calendar alarm scheduling", () => {
-  it("retains an explicit date after its time has passed so startup can deliver it", () => {
-    const now = new Date(2024, 0, 9, 10, 10).getTime();
-    const nextAt = nextAlarmAt({ ...alarm, date: "2024-01-09" }, now);
-    expect(nextAt).toBe(new Date(2024, 0, 9, 7, 30).getTime());
-    const pending: AlarmData = { ...alarm, date: "2024-01-09", enabled: true, nextAt };
-    expect(expireAlarm(pending, now)).toMatchObject({ enabled: false, nextAt: null });
-  });
-
-  it("selects the next clock time when a one-time alarm has no date", () => {
+describe("repeating alarm scheduling", () => {
+  it("never selects a past occurrence: a clock time already passed today moves to the next selected day", () => {
     expect(nextAlarmAt(alarm, new Date(2024, 0, 8, 7, 29).getTime())).toBe(new Date(2024, 0, 8, 7, 30).getTime());
     expect(nextAlarmAt(alarm, new Date(2024, 0, 8, 7, 30).getTime())).toBe(new Date(2024, 0, 9, 7, 30).getTime());
+    expect(nextAlarmAt({ ...alarm, weekdays: [1] }, new Date(2024, 0, 8, 10).getTime())).toBe(new Date(2024, 0, 15, 7, 30).getTime());
   });
 
-  it("selects a configured weekday across a week boundary after a delayed trigger", () => {
-    const settings = { ...alarm, weekdays: [1] };
-    const pending: AlarmData = { ...settings, enabled: true, nextAt: new Date(2024, 0, 8, 7, 30).getTime() };
+  it("fires an occurrence missed during sleep once, then selects the next future weekday", () => {
+    const pending: AlarmData = { ...alarm, weekdays: [1], enabled: true, nextAt: new Date(2024, 0, 8, 7, 30).getTime() };
     expect(expireAlarm(pending, new Date(2024, 0, 9, 10, 10).getTime())?.nextAt)
       .toBe(new Date(2024, 0, 15, 7, 30).getTime());
   });
@@ -70,17 +51,13 @@ describe("calendar alarm scheduling", () => {
     expect(expireAlarm({ ...pending, enabled: false }, 2000)).toBeNull();
   });
 
-  it("preserves an overdue occurrence when editing only its message", () => {
-    const pending: AlarmData = { ...alarm, enabled: true, nextAt: new Date(2024, 0, 9, 7, 30).getTime() };
-    const updated = configureAlarm(pending, { ...alarm, message: "Updated." }, new Date(2024, 0, 9, 10, 10).getTime());
-    expect(updated.nextAt).toBe(new Date(2024, 0, 9, 7, 30).getTime());
-    expect(expireAlarm(updated, new Date(2024, 0, 9, 10, 10).getTime())?.message).toBe("Updated.");
+  it("orders and deduplicates selected weekdays", () => {
+    expect(normalizeWeekdays([3, 0, 3, 6, 1])).toEqual([0, 1, 3, 6]);
   });
 
   it("keeps a repeating alarm at its local clock time across daylight-saving changes", () => {
     vi.stubEnv("TZ", "America/New_York");
-    const now = new Date(2024, 2, 9, 8).getTime();
-    const nextAt = nextAlarmAt({ ...alarm, weekdays: [0, 1, 2, 3, 4, 5, 6] }, now);
+    const nextAt = nextAlarmAt(alarm, new Date(2024, 2, 9, 8).getTime());
     expect(nextAt).toBe(new Date("2024-03-10T07:30:00-04:00").getTime());
   });
 

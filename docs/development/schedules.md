@@ -1,6 +1,8 @@
 # Timer and alarm resources
 
-Each Timer resource owns one countdown and message. Each Alarm resource owns one calendar schedule and message. Their mutable current data preserves configuration and pending absolute deadlines across application restarts. History navigation does not restore an earlier countdown or replay a completed occurrence.
+Each Timer resource owns one countdown and message. Each Alarm resource owns one weekly schedule and message: a local clock time on at least one weekday, always repeating. One-time delays belong to Timers. Their mutable current data preserves configuration and pending absolute deadlines across application restarts. History navigation does not restore an earlier countdown or replay a completed occurrence.
+
+Configuration and activation are separate states. A new resource is inactive with default settings and an empty message. A Timer accepts configuration only while it has no pending deadline, and configuration restores its full duration. An Alarm accepts configuration only while disabled; enabling it selects the first future occurrence. Activation requires a non-empty message, because a trigger without one would deliver nothing. Resource actions enforce these rules for every caller; cards reflect them by disabling unavailable controls.
 
 A shared backend scheduler processes attached resources across active sessions. It caches resource references and their absolute deadlines and maintains one timeout for the nearest deadline. Creation, configuration, countdown controls, enablement, and removal update that directory; changing the nearest deadline replaces the pending wait. There is no periodic scan of saved resource state and no separate runtime instance for each schedule. Resource presence controls participation; UI mounting and session selection do not. Removing a resource or archiving its session ends its participation. No pending deadline means no timeout.
 
