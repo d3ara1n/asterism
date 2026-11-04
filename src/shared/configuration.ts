@@ -19,10 +19,10 @@ export const protocolSchema = z.enum(["openai-responses", "openai-chat", "anthro
 /** Connection fields that can be fixed; authentication methods exclude credentials and compatibility settings also constrain model editing. */
 export const modelProviderFixedFieldSchema = z.enum(modelProviderFixedFields);
 export type ModelProviderFixedField = z.infer<typeof modelProviderFixedFieldSchema>;
-const endpoint = z.string().trim().url().refine(value => {
+const endpoint = z.string().trim().url().pipe(z.string().refine(value => {
   const url = new URL(value);
   return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
-}, "Use an HTTP(S) base URL without credentials, query, or fragment.");
+}, "Use an HTTP(S) base URL without credentials, query, or fragment."));
 export const modelProviderInputSchema = z.strictObject({
   id: modelProviderIdSchema, name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none"]),
   compatibility: modelCompatibilitySchema,

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { uiTextSchema } from "./i18n.ts";
 
-const helpUrlSchema = z.string().url().refine(value => ["http:", "https:"].includes(new URL(value).protocol), "An HTTP or HTTPS URL is required.");
+const helpUrlSchema = z.url({ protocol: /^https?$/, error: "An HTTP or HTTPS URL is required." });
 const base = { key: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/u), label: uiTextSchema, description: uiTextSchema.optional() };
 
 /**

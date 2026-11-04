@@ -24,7 +24,7 @@ export interface ModelProviderPreset {
   verifiedOn: string;
   keywords?: readonly string[];
 }
-const webUrl = z.string().url().refine(value => ["http:", "https:"].includes(new URL(value).protocol));
+const webUrl = z.url({ protocol: /^https?$/ });
 export const modelProviderConnectionSchema = z.strictObject({
   protocol: z.enum(["openai-responses", "openai-chat", "anthropic"]),
   baseUrl: webUrl, auth: z.enum(["api_key", "none"]),
