@@ -61,6 +61,13 @@ export const SessionTitleChanged = defineEvent("asterism/session-title", {
   semantics: { kind: "snapshot", key: ["sessionId"] },
 });
 
+/** The operating system resumed; consumers can re-evaluate absolute deadlines against the current wall clock. */
+export const SystemResumed = defineEvent("asterism/system-resumed", {
+  schema: z.strictObject({}),
+  source: "host",
+  semantics: { kind: "occurrence" },
+});
+
 /** Transient changes to the current resource set; used to release UI state across sessions. */
 export const ResourcePresenceChanged = defineEvent("asterism/resource-presence", {
   schema: z.strictObject({

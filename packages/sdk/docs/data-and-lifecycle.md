@@ -48,6 +48,8 @@ An object writer can complete that object's pending records. A session writer ca
 
 Transient events announce change. A consumer needing current state establishes its subscription and reads the current value; later notifications prompt another read.
 
+The host publishes `SystemResumed` when the operating system resumes from sleep. Subscribe through `plugin.ipc.events` with the plugin lifetime signal when maintaining absolute deadlines or other state affected by elapsed sleep time. Re-evaluate against the current wall clock when handling the event. It is a transient occurrence and is not replayed after application startup.
+
 Typed calls describe request and response values with ordinary Zod schemas. The caller supplies the input schema's input; the implementation receives its parsed output, including defaults. The implementation returns JSON accepted by the output schema, and the caller receives that schema's parsed output. These types are inferred from the shared declaration, so a conversion such as string to number does not require separate type annotations.
 
 ## Read typed history

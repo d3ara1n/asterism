@@ -61,6 +61,8 @@ Each script has an isolated JavaScript environment and the current request's cap
 | MCP Host | Access tools from configured Model Context Protocol servers |
 | Agent | Send work to another conversation and inspect or wait for its progress |
 | Mesh | Discover and contact agents across sessions through a shared channel |
+| Timer | Send a message after a countdown, optionally repeating |
+| Alarm | Send a message at a local date and clock time, optionally repeating on selected weekdays |
 | Message attachment | Supply a file or image as part of a particular input |
 
 Directory and terminal operations affect the actual machine. Check an operation’s result when its effects are uncertain. A history branch does not create an isolated copy of those files or processes.
@@ -150,6 +152,18 @@ The first agent with a name receives zero. Later agents with the same name recei
 Task descriptions belong to each Mesh resource and agent pair. `get_profile` with a null target reads your description on that Mesh; `set_profile` updates it using the caller's identity and accepts no named target. Names and configured agent types are read from the agents. A caller that is not exposed to the channel has a null profile ID. If multiple Mesh resources expose the same agent to one channel, listings show that agent once and combine its distinct descriptions.
 
 Switching a Mesh's channel keeps its workbench links and local task descriptions. Requests already in progress retain their captured channel and members; the next request uses the new selection. Hiding a card retains membership. Removing its last exposure path or archiving its session removes the member.
+
+## Schedule messages
+
+Create a Timer or Alarm from the resource menu. Each resource owns one schedule and one message. Expose each receiving Agent to the schedule: drag from the Agent's connection point to the Timer or Alarm. The reverse link independently lets an Agent inspect the schedule.
+
+A Timer starts when created. Set its hours, minutes, seconds, message, and Repeat switch. Pause preserves the remaining duration; Start resumes it. Reset stops the timer and restores its full duration. Editing its duration resets the countdown, preserving whether it is running or paused. A repeating timer starts another full interval when it triggers, independently of message delivery or Agent execution.
+
+An Alarm uses the computer's local clock. With no weekdays selected it triggers once, on the selected date or at the next occurrence of its clock time if the date is empty. Select weekdays for a repeating alarm. Its switch enables or disables that alarm; editing preserves the switch state.
+
+Schedules run in the backend while their session is active, including when its cards are hidden or another session is open. Sleep and application shutdown count toward the saved deadline. When execution resumes, every overdue resource triggers independently. A repeating timer then begins its next full interval; a repeating alarm selects its next future weekday occurrence. Archiving the session suspends scheduling until restoration.
+
+Each trigger sends the saved message to every directly linked Agent as a resource event, with the schedule's name as its source. Delivery uses steering: an idle Agent starts work, and a running Agent receives the message at its next request boundary. Schedules advance without waiting for delivery or a response.
 
 ## Manage resource views
 

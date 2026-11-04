@@ -12,3 +12,4 @@ export const conversationsCard = { width: 360, height: 420, minWidth: 300, minHe
 export const chatCard = { width: 380, height: 480, minWidth: 300, minHeight: 280 } satisfies CardAppearance;
 export const meshCard = { width: 340, height: 300, minWidth: 280, minHeight: 200 } satisfies CardAppearance;
 export const subagentPoolCard = { width: 420, height: 420, minWidth: 320, minHeight: 240 } satisfies CardAppearance;
+export const scheduleCard = { width: 340, height: 320, minWidth: 280, minHeight: 220 } satisfies CardAppearance;

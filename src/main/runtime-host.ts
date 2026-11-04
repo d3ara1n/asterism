@@ -1,7 +1,7 @@
 import { utilityProcess, type MessagePortMain, type UtilityProcess } from "electron";
 import { applicationBrand } from "../shared/application.ts";
 import { observeProcess } from "./logging.ts";
-import { runtimeMessageSchema, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
+import { runtimeMessageSchema, systemResumeMessage, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
 import { RuntimeRequests } from "./requests.ts";
 import { handleSecretRequest } from "./secrets.ts";
 import { handleProxyRequest } from "./proxy.ts";
@@ -87,6 +87,10 @@ export class RuntimeHost {
         reject(new Error("Task runtime exited with code " + code));
       });
     });
+  }
+
+  resume(): void {
+    if (this.ready) this.child!.postMessage({ kind: systemResumeMessage });
   }
 
   execute(command: Command): Promise<CommandResult> {

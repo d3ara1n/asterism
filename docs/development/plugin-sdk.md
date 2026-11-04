@@ -110,6 +110,8 @@ Occurrence events preserve every event. Snapshot events may coalesce the latest 
 
 Consumers subscribe and then query domain state. The event bus does not retain current state or replay a disconnected interval.
 
+System resume is a host occurrence delivered through the same event bus. The main process supplies the operating-system notification, while each consuming plugin owns the meaning of elapsed time and any deadline recalculation.
+
 Object channels support sustained bidirectional data. Opening validates current presence and plugin ownership. Closing, object disappearance, provider unavailability, or connection loss ends the channel. It neither writes history nor occupies the timeline by itself.
 
 The host trusts installed plugins. It protects identity, history, and its declared interfaces without adding speculative quotas, silent overflow, or automatic business recovery.

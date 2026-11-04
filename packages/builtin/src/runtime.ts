@@ -30,6 +30,7 @@ import { resolveParadigmConfiguration } from "./configuration/state.ts";
 import { updateParadigmConfiguration } from "./configuration/runtime.ts";
 import { createSubagentPoolModule } from "./subagents/runtime.ts";
 import { CreateSubagentPool, createPoolSchema } from "./subagents/contract.ts";
+import schedules from "./schedules/runtime.ts";
 
 /** Composes only plugin business logic; the application owns loading, host services, and external plugin dependencies. */
 export default definePlugin({ namespace: builtin,
@@ -46,7 +47,7 @@ export default definePlugin({ namespace: builtin,
           })],
         modules: [defineAgentInstructions([{ id: "environment", text: environment(application.name).text }]),
         providers, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.shell), createNamingModule(application.userAgent), notes, questions,
-        resourceOperations, mcp, web, mesh, messaging, ...messagingCreations, createSubagentPoolModule(application, usage, skills),
+        resourceOperations, mcp, web, mesh, schedules, messaging, ...messagingCreations, createSubagentPoolModule(application, usage, skills),
         createManualModule(() => plugin.manual.sources(), application.name), createShellModule(), createTerminalModule(),
         defineAgentCreation({ id: CreateSubagentPool.id, creation: CreateSubagentPool,
           description: "Create a shared Subagent Pool. It runs independent tasks using Agent roles and the resources linked to the pool.",

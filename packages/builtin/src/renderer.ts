@@ -20,8 +20,9 @@ import usage from "./usage/renderer";
 import messaging from "./messaging/renderer";
 import web from "./web/renderer";
 import subagents from "./subagents/renderer";
+import schedules from "./schedules/renderer";
 
-const builtinViews: readonly RendererModule[] = [agent, filesystem, manual, mcp, mesh, naming, notes, questions, resources, shell, skills, terminal, usage, web, subagents, messaging];
+const builtinViews: readonly RendererModule[] = [agent, filesystem, manual, mcp, mesh, naming, notes, questions, resources, shell, skills, terminal, usage, web, subagents, messaging, schedules];
 export default defineRendererPlugin({
   modules: [...builtinViews, agentFeedbackRenderer], settings: builtinSettingsPages, prepare: prepareHomeEntry,
   sessionEntries: [{ id: "conversation", title: homeMessages.entryTitle, Body: ConversationEntry }],

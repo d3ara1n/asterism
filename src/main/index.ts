@@ -1,5 +1,5 @@
 import { pathWithin } from "../storage/paths.ts";
-import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, net, protocol, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, net, powerMonitor, protocol, session, shell } from "electron";
 import { randomUUID } from "node:crypto";
 import { externalWebUrl } from "@asterism-app/ui/links";
 import { mkdirSync } from "node:fs";
@@ -377,6 +377,7 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.whenReady().then(async () => {
     if (quitting) return;
+    powerMonitor.on("resume", () => runtime.resume());
     // Permission checks and requests share one policy, allowing only trusted main-frame font enumeration and clipboard writes.
     // Determine trust from the window's current URL: file:// origins can be "null", so origin strings are insufficient.
     const permitted = (contents: Electron.WebContents | null, permission: string, isMainFrame: boolean) =>

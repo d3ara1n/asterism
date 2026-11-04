@@ -1,6 +1,7 @@
 import { ApplicationService } from "./service.ts";
 import { dispatch } from "./dispatch.ts";
-import { protocolVersion } from "../shared/contracts.ts";
+import { protocolVersion, systemResumeMessage } from "../shared/contracts.ts";
+import { SystemResumed } from "@asterism-app/sdk/contracts";
 import { SecretClient } from "./secret-client.ts";
 import { join } from "node:path";
 import { importPackages, packageCandidates, runtimeDependencies } from "../plugins/packages.ts";
@@ -69,6 +70,7 @@ try {
       return;
     }
     if (secrets.receive(data)) return;
+    if (data?.kind === systemResumeMessage) { service.sessions.events.publish(SystemResumed, null, {}); return; }
     if (data?.kind === "connection.open" && typeof data.id === "string" && ports[0]) {
       disconnect(data.id);
       const endpoint = ports[0];

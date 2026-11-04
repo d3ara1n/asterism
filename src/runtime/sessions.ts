@@ -1,5 +1,5 @@
 import { createSharedServices } from "./shared-services.ts";
-import { SessionTitleAssigned, type Presentation, type Source, resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, type FileRef, ResourceStatusChanged, SessionTitleChanged } from "@asterism-app/sdk/contracts";
+import { SessionTitleAssigned, type Presentation, type Source, resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, type FileRef, ResourceStatusChanged, SessionTitleChanged, SystemResumed } from "@asterism-app/sdk/contracts";
 import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, type ManualSource, type PreparedCreation, PluginApiError } from "@asterism-app/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -85,6 +85,7 @@ export class SessionService {
     this.tree = new SessionTree(db);
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(ResourceStatusChanged);
+    this.events.declarePublic(SystemResumed);
     this.shared = createSharedServices({ db, dataRoot, configuration, events: this.events,
       manualSources: () => options.manualSources?.(this.packages) ?? [], packageRoots: options.packageRoots ?? new Map(), skillDirectories: options.skillDirectories ?? [] });
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
