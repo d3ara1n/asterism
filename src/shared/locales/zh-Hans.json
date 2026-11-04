@@ -486,7 +486,6 @@
   "toolUsageDetails": "用法与参数",
   "toolArguments": "参数",
   "toolTarget": "目标",
-  "toolResultSchema": "结果结构",
   "toolNoOutput": "此次操作没有产出内容。",
   "toolOutcomeSucceeded": "已完成",
   "toolOutcomePartial": "部分完成",

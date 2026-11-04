@@ -13,9 +13,13 @@ export const ResourceInspectResult = defineData(coreId("resource-inspect"), z.st
   state: jsonSchema,
   notice: z.string().optional(),
   tools: z.array(z.strictObject({
-    name: z.string(), description: z.string(), guidelines: z.array(z.string()), args: jsonSchema,
+    name: z.string(),
+    description: z.string().optional().describe("Present unless the inspection requested schemas only."),
+    guidelines: z.array(z.string()).optional().describe("Present unless the inspection requested schemas only."),
+    args: jsonSchema.optional().describe("Present unless the inspection requested guidance only."),
+    target: jsonSchema.optional().describe("Present unless the inspection requested guidance only."),
     requiresInteraction: z.boolean().optional().describe("True when this tool requires a user interaction surface."),
-    implementation: contractReferenceSchema, target: jsonSchema, result: jsonSchema,
+    implementation: contractReferenceSchema,
   })),
 }));
 
@@ -72,11 +76,14 @@ export const ResourceInspect = defineTool({
   name: "resource_inspect",
   description: "Inspect a linked resource's live state and available tools.",
   guidelines: [
-    "The result contains live resource state and available tool descriptions, guidelines, and schemas.",
+    "The result contains live resource state and the selected tool definitions.",
+    "An unknown tool name is rejected with the currently available names.",
   ],
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
-  }).describe("Identify the linked resource whose live state and available tool definitions are needed."),
+    tools: z.array(z.string().min(1)).optional().describe("Tool names to include. Omit for all available tools; an empty array returns none."),
+    detail: z.enum(["full", "prompt", "schema"]).optional().describe("Defaults to full, which returns guidance and schemas. prompt returns only description and guidelines; schema returns only args and target schemas."),
+  }).describe("Identify the linked resource, and optionally narrow which tool definitions and which part of each definition to return."),
 });
 
 export const ResourceCall = defineTool({
@@ -85,7 +92,7 @@ export const ResourceCall = defineTool({
   description: "Use an available tool on a linked resource.",
   guidelines: [
     "A tool name identifies an operation. Across resources that expose the same tool, its meaning and args schema remain consistent.",
-    "resource_id selects the resource, args supplies the operation's shared parameters, and target selects content, scope, or a resource-specific view. Available tools, target schemas, and result schemas can differ by resource; resource_inspect describes them for the selected resource.",
+    "resource_id selects the resource, args supplies the operation's shared parameters, and target selects content, scope, or a resource-specific view. Available tools and target schemas can differ by resource; resource_inspect describes them for the selected resource.",
     "Domain qualifiers in tool names describe the operation's scope, such as terminal_input for terminal interaction.",
     "Omitting target is equivalent to null; this is valid only when the implementation accepts null.",
     jsonArgumentHint,

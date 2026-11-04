@@ -23,7 +23,6 @@ export interface ToolImplementation {
   tool: ToolContract;
   effect: "read" | "write";
   targetSchema: z.ZodType<Json>;
-  resultSchema: z.ZodType<Json>;
   capture?(resource: FoldedObject, caller: ToolCaller): ToolImplementation;
   prepare(resource: FoldedObject, target: Json, args: Json, caller: ToolCaller, interactive?: boolean): Invocation | PreparedResult;
 }

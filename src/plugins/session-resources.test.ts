@@ -329,7 +329,7 @@ describe("SDK session resource lifetimes", () => {
     expect(result.tools[4]).toMatchObject({ kind: "succeeded", data: false });
     expect(result.tools[5]).toMatchObject({ kind: "succeeded", data: { value: {
       requiredBinding: "undefined", required: { kind: "rejected", code: "interaction_unavailable" },
-      top: false, resource: false, tools: [{ name: "dual", requiresInteraction: false }],
+      top: false, resource: false, tools: [{ name: "dual" }],
     } } });
     expect(entered).toBe(0);
     expect(ownerBusy).toBe(false);
@@ -344,7 +344,7 @@ describe("SDK session resource lifetimes", () => {
     expect(interactive.tools[5]).toMatchObject({ kind: "succeeded", data: { value: {
       requiredBinding: "undefined", required: { kind: "rejected", code: "interaction_unavailable" },
       top: false, resource: false, tools: [
-        { name: "required", requiresInteraction: true }, { name: "dual", requiresInteraction: false },
+        { name: "required", requiresInteraction: true }, { name: "dual" },
       ],
     } } });
     expect(entered).toBe(2);

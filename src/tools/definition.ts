@@ -2,11 +2,13 @@ import { z } from "zod";
 import { jsonSchema, type Json } from "@asterism-app/sdk/contracts";
 import type { ToolContract } from "@asterism-app/sdk/contracts";
 
+/** Model-facing schemas are embedded in larger payloads, so the root `$schema` dialect URL is dropped from each one. */
 export function schemaOf(schema: z.ZodType<Json>): Json {
-  return jsonSchema.parse(z.toJSONSchema(schema));
+  const { $schema: _dialect, ...projected } = z.toJSONSchema(schema);
+  return jsonSchema.parse(projected);
 }
 
-/** Both tool layers share definition projection; resource implementations add target/result separately. */
+/** Both tool layers share definition projection; the model layer adds availability and resource implementations add target separately. */
 export function projectTool(tool: ToolContract) {
   return {
     name: tool.name,

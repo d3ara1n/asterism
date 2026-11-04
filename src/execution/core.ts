@@ -32,10 +32,10 @@ const actions: readonly CoreAction[] = [
     } }) },
   { tool: ResourceInspect,
     resolve(args, capabilities) {
-      const { resource_id } = ResourceInspect.argsSchema.parse(args);
+      const { resource_id, tools, detail } = ResourceInspect.argsSchema.parse(args);
       return { effect: "read", execution: "parallel", implementation: reference(ResourceInspectResult), ...capabilities.identity(resource_id),
         async execute() {
-          const result = await capabilities.inspect(resource_id);
+          const result = await capabilities.inspect(resource_id, { tools, detail });
           return result.kind === "succeeded" ? { ...result, data: ResourceInspectResult.schema.parse(result.data) } : result;
         } };
     } },

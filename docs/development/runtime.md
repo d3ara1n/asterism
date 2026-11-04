@@ -118,7 +118,7 @@ Top-level tools register statically during assembly. Resource tools are discover
 
 The host reserves resource listing, inspection, invocation, and script orchestration. Inspection and execution share the captured capability view. A resource call validates target identity, captured access, tool support, target shape, and arguments.
 
-Link notifications carry resource identity, not state or tool definitions. Resources own the state exposed through discovery: listing returns that state alongside identity, while inspection also expands the tools available in the captured capability view. The host assembles these results without interpreting resource-specific state fields.
+Link notifications carry resource identity, not state or tool definitions. Resources own the state exposed through discovery: listing returns that state alongside identity, while inspection expands the tools available in the captured capability view. The host assembles these results without interpreting resource-specific state fields. Inspection narrows by tool name and by projection depth, and reports an unknown name with the names currently available.
 
 Plugin tool policy filters plugin top-level and resource-tool names. It does not turn the reserved host discovery entries into grants of access.
 

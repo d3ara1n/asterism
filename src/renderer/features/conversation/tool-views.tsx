@@ -65,28 +65,29 @@ function ResourceInspectHeader({ invocation }: InspectProps) {
 }
 function ResourceInspectBody({ result }: InspectProps) {
   const i18n = useI18n();
-  return result?.data ? <div className="space-y-4">
-    <section className="space-y-2"><p className="type-label">{i18n.formatMessage(toolsMessages.toolResourceState)}</p><ResourceFields value={result.data.state} /></section>
-    {result.data.notice && <p className="type-caption">{result.data.notice}</p>}
+  if (!result?.data) return null;
+  const { state, notice, tools } = result.data;
+  return <div className="space-y-4">
+    <section className="space-y-2"><p className="type-label">{i18n.formatMessage(toolsMessages.toolResourceState)}</p><ResourceFields value={state} /></section>
+    {notice && <p className="type-caption">{notice}</p>}
     <section className="space-y-2">
       <p className="type-label">{i18n.formatMessage(toolsMessages.toolAvailableTools)}</p>
-      {!result.data.tools.length && <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoTools)}</p>}
-      <ItemGroup>{result.data.tools.map(tool => <Item key={tool.name} size="sm" className="px-0">
+      {!tools.length && <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoTools)}</p>}
+      <ItemGroup>{tools.map(tool => <Item key={tool.name} size="sm" className="px-0">
         <ItemContent>
           <ItemTitle>{tool.name}{tool.requiresInteraction && <Badge variant="secondary">
             {i18n.formatMessage(toolsMessages.toolRequiresInteraction)}
           </Badge>}</ItemTitle>
-          <ItemDescription className="line-clamp-none">{tool.description}</ItemDescription>
+          {tool.description && <ItemDescription className="line-clamp-none">{tool.description}</ItemDescription>}
           <ToolDetails label={i18n.formatMessage(toolsMessages.toolUsageDetails)} stateKey={`asterism/tool-usage:${tool.name}`}>
-            {!!tool.guidelines.length && <ul className="list-disc space-y-1 pl-4 type-caption">{tool.guidelines.map((line, index) => <li key={index}>{line}</li>)}</ul>}
-            <p className="type-label">{i18n.formatMessage(toolsMessages.toolArguments)}</p><JsonView value={tool.args} />
-            <p className="type-label">{i18n.formatMessage(toolsMessages.toolTarget)}</p><JsonView value={tool.target} />
-            <p className="type-label">{i18n.formatMessage(toolsMessages.toolResultSchema)}</p><JsonView value={tool.result} />
+            {!!tool.guidelines?.length && <ul className="list-disc space-y-1 pl-4 type-caption">{tool.guidelines.map((line, index) => <li key={index}>{line}</li>)}</ul>}
+            {tool.args !== undefined && <><p className="type-label">{i18n.formatMessage(toolsMessages.toolArguments)}</p><JsonView value={tool.args} /></>}
+            {tool.target !== undefined && <><p className="type-label">{i18n.formatMessage(toolsMessages.toolTarget)}</p><JsonView value={tool.target} /></>}
           </ToolDetails>
         </ItemContent>
       </Item>)}</ItemGroup>
     </section>
-  </div> : null;
+  </div>;
 }
 const inspectView = { headerRenderer: ResourceInspectHeader, bodyRenderer: ResourceInspectBody };
 const inspect = toolRenderer(ResourceInspectResult, {
