@@ -27,6 +27,7 @@ export class ApplicationUpdates {
   constructor() {
     this.updater.autoDownload = false;
     this.updater.autoInstallOnAppQuit = false;
+    this.updater.disableDifferentialDownload = true;
     this.updater.allowDowngrade = false;
     this.updater.logger = console;
     this.updater.on("download-progress", progress => this.patch({ progress: progress.percent }));
@@ -81,12 +82,11 @@ export class ApplicationUpdates {
       }
       const candidate = selectUpdateRelease(releases, this.state.version, includePrerelease);
       if (!candidate) { this.patch({ status: "current" }); return this.state; }
-      // The generic HTTP provider consumes the selected Release's standard update manifest; the framework still handles download, deltas, and installation.
+      // The generic HTTP provider consumes the selected Release's standard update manifest; the framework handles full downloads and installation.
       this.updater.setFeedURL({
         provider: "generic",
         url: `https://github.com/${repository}/releases/download/${encodeURIComponent(candidate.tag_name)}/`,
         channel: "latest",
-        useMultipleRangeRequest: false,
       });
       const result = await this.updater.checkForUpdates();
       if (!result?.isUpdateAvailable) {

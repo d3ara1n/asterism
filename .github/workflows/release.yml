@@ -149,7 +149,6 @@ jobs:
             out/*.zip
             out/*.exe
             out/*.AppImage
-            out/*.blockmap
             out/latest*.yml
       - name: Remove macOS signing identity
         if: always() && runner.os == 'macOS'

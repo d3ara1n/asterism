@@ -38,7 +38,7 @@ const config: Configuration = {
   },
   dmg: { sign: false },
   win: { target: ["nsis"], icon: "assets/icon/asterism.ico", verifyUpdateCodeSignature: false },
-  nsis: { oneClick: false, allowToChangeInstallationDirectory: true, perMachine: false },
+  nsis: { oneClick: false, allowToChangeInstallationDirectory: true, perMachine: false, differentialPackage: false },
   linux: { target: ["AppImage"], icon: "assets/icon/asterism.png", category: "Utility" },
 };
 
