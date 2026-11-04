@@ -78,7 +78,7 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
           {/* Narrow containers show only the type icon, leaving width for the title; the type name always remains the icon's accessible name and tooltip. */}
           <span role="img" aria-label={kind} title={kind} className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">{icon}</span>
           <div className="flex min-w-0 flex-1 items-baseline gap-2">
-            <p aria-hidden="true" className="type-label hidden max-w-1/3 shrink-0 truncate @min-[24rem]/card:block">{kind}</p>
+            <p aria-hidden="true" className="type-label hidden max-w-1/3 shrink-0 truncate @min-[16rem]/card:block">{kind}</p>
             <h2 className="type-section min-w-0 flex-1 truncate" title={title}>{title}</h2>
           </div>
           <div className="nodrag flex shrink-0 items-center gap-0.5">
