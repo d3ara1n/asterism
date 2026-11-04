@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConnectionEvent, SessionRecord } from "@asterism-app/sdk/contracts";
-import { Chat, Conversations, SubscriptionChanged, type SubscriptionTarget } from "./contract.ts";
-import { foldSubscriptions, matchesSubscription, selectDeliveries } from "./subscriptions.ts";
+import { SubscriptionChanged, type SubscriptionTarget } from "./contract.ts";
+import { foldSubscriptions, matchesSubscription } from "./subscriptions.ts";
 
 function record(sequence: number, target: SubscriptionTarget, enabled: boolean): SessionRecord {
   return { id: String(sequence), sessionId: "session", parentId: sequence > 1 ? String(sequence - 1) : null,
@@ -28,23 +28,5 @@ describe("Messaging subscription projection", () => {
     expect(matchesSubscription({ connectionId: "bot", conversationId: "group" }, incoming)).toBe(true);
     expect(matchesSubscription({ connectionId: "bot", conversationId: "group", threadId: "other" }, incoming)).toBe(false);
     expect(matchesSubscription({ connectionId: "another", conversationId: "group" }, incoming)).toBe(false);
-  });
-  // An Agent exposed to both a Conversations list and a Chat for the same conversation must not receive the event twice.
-  it("delivers once per recipient and prefers a Chat over a Conversations summary", () => {
-    const ref = (id: string, kind: string) => ({ sessionId: "session", id, kind });
-    const agent = ref("agent", "agent"), other = ref("other", "agent");
-    const list = ref("list", Conversations.kind), chat = ref("chat", Chat.kind), second = ref("chat-2", Chat.kind);
-    const deliveries = selectDeliveries([
-      { source: list, title: "List", recipient: agent },
-      { source: chat, title: "Chat", recipient: agent },
-      { source: second, title: "Second", recipient: agent },
-      { source: list, title: "List", recipient: other },
-    ]);
-    expect(deliveries.map(item => [item.recipient.id, item.source.id])).toEqual([["agent", "chat"], ["other", "list"]]);
-  });
-  it("keeps separate recipients, including same-named Agents in different sessions", () => {
-    const agent = { sessionId: "s", id: "agent", kind: "agent" }, list = { sessionId: "s", id: "list", kind: Conversations.kind };
-    const other = { ...agent, sessionId: "t" };
-    expect(selectDeliveries([{ source: list, title: "List", recipient: agent }, { source: list, title: "List", recipient: other }])).toHaveLength(2);
   });
 });

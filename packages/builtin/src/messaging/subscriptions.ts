@@ -1,5 +1,5 @@
-import type { ConnectionEvent, ConversationAddress, ResourceRef, SessionRecord } from "@asterism-app/sdk/contracts";
-import { Chat, SubscriptionChanged, type SubscriptionTarget } from "./contract.ts";
+import type { ConnectionEvent, ConversationAddress, SessionRecord } from "@asterism-app/sdk/contracts";
+import { SubscriptionChanged, type SubscriptionTarget } from "./contract.ts";
 
 export function subscriptionKey(target: SubscriptionTarget): string {
   return JSON.stringify([target.connectionId, target.conversationId ?? null, target.threadId ?? null]);
@@ -22,19 +22,4 @@ export function matchesSubscription(target: SubscriptionTarget, { connectionId, 
   if (target.connectionId !== connectionId) return false;
   if (!target.conversationId) return event.kind === "conversation.discovered";
   return event.kind === "messages.received" && coversAddress(target, connectionId, event.conversation);
-}
-
-export interface DeliveryCandidate { source: ResourceRef; title: string; recipient: ResourceRef }
-/**
- * One event reaches each recipient once. A Chat delivers the full messages, so it is preferred over a Conversations summary;
- * otherwise the first matching source is kept.
- */
-export function selectDeliveries(candidates: readonly DeliveryCandidate[]): DeliveryCandidate[] {
-  const selected = new Map<string, DeliveryCandidate>();
-  for (const candidate of candidates) {
-    const key = JSON.stringify([candidate.recipient.sessionId, candidate.recipient.id]);
-    const existing = selected.get(key);
-    if (!existing || existing.source.kind !== Chat.kind && candidate.source.kind === Chat.kind) selected.set(key, candidate);
-  }
-  return [...selected.values()];
 }

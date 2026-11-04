@@ -11,7 +11,7 @@ import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema,
   ChatSee, type SubscriptionTarget, type ViewConnection } from "./contract.ts";
 import { captureImage, chatFileRef, chatMessage, chatMessagesToModel, messageInputParts, openChatFile } from "./content.ts";
 import { inputPartsToModel } from "../shared/file-parts.ts";
-import { coversAddress, foldSubscriptions, matchesSubscription, selectDeliveries, type DeliveryCandidate } from "./subscriptions.ts";
+import { coversAddress, foldSubscriptions, matchesSubscription } from "./subscriptions.ts";
 import { telegramProvider } from "./telegram.ts";
 import { discordProvider } from "./discord.ts";
 import { slackProvider } from "./slack.ts";
@@ -95,7 +95,6 @@ export default defineModule(plugin => {
       if (!messages.length) return;
       event = { ...event, event: { ...event.event, messages } };
     }
-    const bySession = new Map<string, DeliveryCandidate[]>();
     for (const ref of objects.values()) {
       const object = executor(ref);
       const receives = ref.kind === Conversations.kind
@@ -103,27 +102,24 @@ export default defineModule(plugin => {
         : event.event.kind === "messages.received" && !!chatBinding(ref) && matchesSubscription(chatBinding(ref)!, event);
       if (!receives) continue;
       const title = object.snapshot()?.title ?? ref.id;
-      const candidates = bySession.get(ref.sessionId) ?? [];
-      for (const recipient of object.session.snapshot().resources.linkedTo(ref))
-        if (recipient.ref.kind === Agent.kind) candidates.push({ source: ref, title, recipient: recipient.ref });
-      bySession.set(ref.sessionId, candidates);
-    }
-    for (const candidates of bySession.values()) for (const delivery of selectDeliveries(candidates)) {
-      const source = { ...delivery.source };
-      plugin.tasks.start(`messaging/${nanoid()}`, signal => plugin.content.withScope(async content => {
-        const binding = source.kind === Chat.kind ? chatBinding(source) : null;
-        const parts: AgentInputPart[] = [{ kind: "text", text: eventText(event, !binding) }];
-        // Captured images are staged for this input only; its record retains them.
-        if (binding && event.event.kind === "messages.received") parts.push(...await messageInputParts(event.event.messages.flatMap(message => [
-          { kind: "text" as const, text: messageLines(message).join("\n") }, ...chatMessage(source, message).parts,
-        ]),
-          async function* (part) { yield* openChatFile(await plugin.messaging.resolve(binding.connectionId, { signal }), binding, part.ref.locator, signal); },
-          content, signal));
-        await plugin.session(source.sessionId).invoke(SubmitAgentInput, delivery.recipient, {
-          submissionId: nanoid(16), mode: "follow", parts,
-          sender: { kind: "event", resource: source, name: delivery.title },
-        }, { signal, content });
-      }), { object: source, affectsHistory: false });
+      const source = { ...ref };
+      for (const recipient of object.session.snapshot().resources.linkedTo(ref)) {
+        if (recipient.ref.kind !== Agent.kind) continue;
+        plugin.tasks.start(`messaging/${nanoid()}`, signal => plugin.content.withScope(async content => {
+          const binding = source.kind === Chat.kind ? chatBinding(source) : null;
+          const parts: AgentInputPart[] = [{ kind: "text", text: eventText(event, !binding) }];
+          // Captured images are staged for this input only; its record retains them.
+          if (binding && event.event.kind === "messages.received") parts.push(...await messageInputParts(event.event.messages.flatMap(message => [
+            { kind: "text" as const, text: messageLines(message).join("\n") }, ...chatMessage(source, message).parts,
+          ]),
+            async function* (part) { yield* openChatFile(await plugin.messaging.resolve(binding.connectionId, { signal }), binding, part.ref.locator, signal); },
+            content, signal));
+          await plugin.session(source.sessionId).invoke(SubmitAgentInput, recipient.ref, {
+            submissionId: nanoid(16), mode: "follow", parts,
+            sender: { kind: "event", resource: source, name: title },
+          }, { signal, content });
+        }), { object: source, affectsHistory: false });
+      }
     }
   }));
 
