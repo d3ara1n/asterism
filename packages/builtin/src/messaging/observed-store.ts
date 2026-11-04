@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
+import { MessagingError } from "@asterism-app/sdk/runtime";
 import { messageSchema, type ConversationAddress, type ConversationList, type ConversationQuery, type Json, type MessageList, type MessageQuery, type MessagingConversation, type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { ensureMessagingSchema } from "./storage-schema.ts";
-import { decodeObservedCursor, encodeObservedCursor, translateSequence, type SequenceShift } from "./cursor.ts";
 
 /** Decode retained text-only observations without changing their identity or polling position. */
 function storedMessage(data: string): MessagingMessage {
@@ -14,14 +14,25 @@ function storedMessage(data: string): MessagingMessage {
 }
 
 interface Row { data: string; sequence: number; discovered?: number }
+function encodeObservedCursor(scope: string, sequence: number): string {
+  return Buffer.from(JSON.stringify([scope, sequence])).toString("base64url");
+}
+function decodeObservedCursor(cursor: string | undefined, scope: string, latest: number): number | null {
+  if (cursor === undefined) return null;
+  let value: unknown;
+  try { value = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")); }
+  catch { /* Invalid opaque cursors are reported at the provider boundary. */ }
+  if (Array.isArray(value) && value.length === 2 && value[0] === scope &&
+    Number.isSafeInteger(value[1]) && value[1] >= 0 && value[1] <= latest) return value[1];
+  throw new MessagingError("invalid_cursor", "The cursor does not belong to this query or its stored history.");
+}
 /** Account keys start with the connection ID and include the provider's external identity. */
 export function forgetObservedConnection(db: DatabaseSync, connectionId: string): void {
   ensureMessagingSchema(db);
   const prefix = `${JSON.stringify([connectionId]).slice(0, -1)},`;
   db.exec("BEGIN");
   try {
-    for (const table of ["messaging_messages", "messaging_dialogs", "messaging_provider_state", "messaging_message_aliases",
-      "messaging_file_aliases", "messaging_cursor_scopes", "messaging_accounts"])
+    for (const table of ["messaging_messages", "messaging_dialogs", "messaging_provider_state", "messaging_message_aliases", "messaging_accounts"])
       db.prepare(`DELETE FROM ${table} WHERE substr(account, 1, length(?)) = ?`).run(prefix, prefix);
     db.exec("COMMIT");
   } catch (error) { db.exec("ROLLBACK"); throw error; }
@@ -35,13 +46,6 @@ export class ObservedMessages {
   }
   private sequence(): number {
     return (this.db.prepare("SELECT sequence FROM messaging_accounts WHERE account = ?").get(this.account) as { sequence: number }).sequence;
-  }
-  private cursor(cursor: string | undefined, scope: string, latest: number): number | null {
-    return decodeObservedCursor(cursor, scope, latest, (source, sequence) => {
-      const row = this.db.prepare("SELECT max_sequence, shifts FROM messaging_cursor_scopes WHERE account = ? AND source = ? AND target = ?")
-        .get(this.account, source, scope) as { max_sequence: number; shifts: string } | undefined;
-      return row && sequence <= row.max_sequence ? translateSequence(sequence, JSON.parse(row.shifts) as SequenceShift[]) : undefined;
-    });
   }
   state(key: string): Json | undefined {
     const row = this.db.prepare("SELECT data FROM messaging_provider_state WHERE account = ? AND key = ?")
@@ -70,13 +74,6 @@ export class ObservedMessages {
     const row = this.db.prepare("SELECT data FROM messaging_messages WHERE account = ? AND chat = ? AND id = ?")
       .get(this.account, chat, this.resolveId(chat, id)) as { data: string } | undefined;
     return row ? this.decode(chat, row.data) : undefined;
-  }
-  fileMessage(chat: string, messageId: string, fileId: string): MessagingMessage | undefined {
-    const message = this.message(chat, messageId);
-    if (message?.parts.some(part => part.kind === "file" && part.id === fileId)) return message;
-    const row = this.db.prepare("SELECT target_id FROM messaging_file_aliases WHERE account = ? AND chat = ? AND message_id = ? AND file_id = ?")
-      .get(this.account, chat, messageId, fileId) as { target_id: string } | undefined;
-    return row ? this.message(chat, row.target_id) : undefined;
   }
   group(address: ConversationAddress, groupId: string): MessagingMessage[] {
     const rows = this.db.prepare(`SELECT data FROM messaging_messages
@@ -111,7 +108,7 @@ export class ObservedMessages {
     return { discovered: !existing, inserted: !prior };
   }
   list(query: ConversationQuery): ConversationList {
-    const latest = this.sequence(), since = this.cursor(query.since, `${this.account}/dialogs`, latest);
+    const latest = this.sequence(), since = decodeObservedCursor(query.since, `${this.account}/dialogs`, latest);
     const rows = this.db.prepare(`SELECT data, sequence, discovered FROM messaging_dialogs
       WHERE account = ? AND sequence > ? ORDER BY sequence DESC`).all(this.account, since ?? -1) as unknown as Row[];
     return {
@@ -134,7 +131,7 @@ export class ObservedMessages {
     }
     const latest = this.sequence();
     const scope = JSON.stringify([this.account, query.conversationId, query.threadId ?? null]);
-    const since = this.cursor(query.since, scope, latest), limit = query.limit ?? 50;
+    const since = decodeObservedCursor(query.since, scope, latest), limit = query.limit ?? 50;
     const rows = this.db.prepare(`SELECT data, sequence FROM messaging_messages
       WHERE account = ? AND chat = ? AND (? IS NULL OR thread = ? OR id = ?) AND sequence > ?
       ORDER BY sequence ${since === null ? "DESC" : "ASC"} LIMIT ?`)

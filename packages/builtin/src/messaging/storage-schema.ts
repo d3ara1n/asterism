@@ -24,13 +24,5 @@ export function ensureMessagingSchema(db: DatabaseSync): void {
       account TEXT NOT NULL, chat TEXT NOT NULL, alias TEXT NOT NULL, message_id TEXT NOT NULL,
       PRIMARY KEY (account, chat, alias)
     );
-    CREATE TABLE IF NOT EXISTS messaging_file_aliases (
-      account TEXT NOT NULL, chat TEXT NOT NULL, message_id TEXT NOT NULL, file_id TEXT NOT NULL, target_id TEXT NOT NULL,
-      PRIMARY KEY (account, chat, message_id, file_id)
-    );
-    CREATE TABLE IF NOT EXISTS messaging_cursor_scopes (
-      account TEXT NOT NULL, source TEXT NOT NULL, target TEXT NOT NULL, max_sequence INTEGER NOT NULL, shifts TEXT NOT NULL,
-      PRIMARY KEY (account, source)
-    );
   `);
 }
