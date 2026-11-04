@@ -31,7 +31,7 @@ function Body({ args, target, result }: Props) {
   const segments = data && grepSegments(data.rows, TOOL_BODY_LINE_LIMIT);
   return <div className="flex flex-col gap-2">
     <SearchOptions args={args} target={target} />
-    {segments?.map(segment => <CodeRows key={segment.rows[0].line} rows={segment.rows} overflow="scroll"
+    {segments?.map(segment => <CodeRows key={segment.rows[0].line} rows={segment.rows}
       dimmed={segment.rows.flatMap((row, index) => row.match ? [] : [index])} />)}
     {data && <>
       {!data.rows.length && <p className="type-caption">{i18n.text(data.stopReason === null

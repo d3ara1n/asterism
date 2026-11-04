@@ -90,7 +90,7 @@ function GrepFileRow({ file, name, initialOpen }: { file: GrepFile; name: string
     </CollapsibleTrigger>
     <CollapsibleContent className="flex flex-col gap-2 py-1.5 pl-5">
       {open && <>
-        {file.segments.map(segment => <CodeRows key={segment.rows[0].line} rows={segment.rows} filename={file.path} overflow="scroll"
+        {file.segments.map(segment => <CodeRows key={segment.rows[0].line} rows={segment.rows} filename={file.path}
           dimmed={segment.rows.flatMap((row, index) => row.match ? [] : [index])} />)}
         {file.omitted > 0 && <p className="type-caption">{i18n.formatMessage(textMessages.toolTextPreviewOmitted, { count: file.omitted })}</p>}
       </>}

@@ -93,13 +93,13 @@ function CallList({ calls }: { calls: readonly ScriptCall[] }) {
 function Body(props: Props) {
   const i18n = useI18n();
   const code = scriptCode(props.args);
-  if (props.phase === "input") return code ? <StreamingPreview><CodeText contents={code} language={language} lineNumbers /></StreamingPreview> : null;
+  if (props.phase === "input") return code ? <StreamingPreview><CodeText contents={code} language={language} lineNumbers overflow="wrap" /></StreamingPreview> : null;
   const value = props.phase === "settled" ? props.result.data?.value : undefined;
   return <div className="flex flex-col gap-3">
     <CallList calls={scriptCalls(props)} />
     {(code || value !== undefined) && <ToolDetailsSwitcher stateKey="asterism/resource-script-details" items={[
       ...(code ? [{ value: "code", label: i18n.text(messages.toolScriptCode),
-        render: () => <CodeText contents={code} language={language} lineNumbers /> }] : []),
+        render: () => <CodeText contents={code} language={language} lineNumbers overflow="wrap" /> }] : []),
       ...(value !== undefined ? [{ value: "result", label: i18n.text(messages.toolScriptValue),
         render: () => <JsonView value={value} /> }] : []),
     ]} />}

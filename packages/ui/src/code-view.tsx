@@ -31,7 +31,7 @@ export function prepareCodeView(): Promise<void> {
 /**
  * Contiguous excerpt rows; line-number labels show each row's absolute position.
  * dimmed contains zero-based line indices within the excerpt to de-emphasize; line numbers and body text share data-line-index and are dimmed together through the library's unsafeCSS layer.
- * filename selects the grammar by extension. overflow defaults to wrapping; search excerpts and similar content can opt into horizontal scrolling.
+ * filename selects the grammar by extension. overflow defaults to wrapping.
  */
 export function CodeRows({ rows, filename, dimmed, overflow }: {
   rows: readonly { line: number; content: string }[]; filename?: string; dimmed?: readonly number[]; overflow?: "wrap" | "scroll";
@@ -54,14 +54,13 @@ export function CodeRows({ rows, filename, dimmed, overflow }: {
   return rows.length ? <File file={file} options={options} className="pierre-code type-code" disableWorkerPool /> : null;
 }
 
-const textOptions = { ...codeViewOptions, disableLineNumbers: true, overflow: "scroll" } satisfies FileOptions<undefined, undefined>;
-const numberedTextOptions = { ...codeViewOptions, overflow: "scroll" } satisfies FileOptions<undefined, undefined>;
-
 /** Resolved languages; remounting (such as switching back to static rendering after streaming) highlights immediately without first falling back to plain text. */
 const resolvedLanguages = new Map<string, string>();
 
 /** Whole text in an explicit language, such as fenced Markdown code or script source; Pierre resolves aliases and loads grammars itself. */
-export function CodeText({ contents, language, lineNumbers = false }: { contents: string; language: string; lineNumbers?: boolean }) {
+export function CodeText({ contents, language, lineNumbers = false, overflow = "scroll" }: {
+  contents: string; language: string; lineNumbers?: boolean; overflow?: "wrap" | "scroll";
+}) {
   const requested = language.toLowerCase();
   const [, setResolved] = useState<string>();
   useEffect(() => {
@@ -79,7 +78,10 @@ export function CodeText({ contents, language, lineNumbers = false }: { contents
   }, [requested]);
   const lang = resolvedLanguages.get(requested) ?? "text";
   const file = useMemo(() => ({ name: "code", contents, lang }), [contents, lang]);
-  return <File file={file} options={lineNumbers ? numberedTextOptions : textOptions} className="pierre-code type-code" disableWorkerPool />;
+  const options = useMemo<FileOptions<undefined, undefined>>(() => ({
+    ...codeViewOptions, disableLineNumbers: !lineNumbers, overflow,
+  }), [lineNumbers, overflow]);
+  return <File file={file} options={options} className="pierre-code type-code" disableWorkerPool />;
 }
 
 export const diffViewOptions = {
@@ -100,6 +102,6 @@ export function parseFileDiff(patch: string): FileDiffMetadata | null {
 /** Unified diff of one file. A patch string that does not parse as a single file diff renders as plain diff text. */
 export function CodeDiff({ diff }: { diff: FileDiffMetadata | string }) {
   const fileDiff = useMemo(() => typeof diff === "string" ? parseFileDiff(diff) : diff, [diff]);
-  if (!fileDiff) return <CodeText contents={typeof diff === "string" ? diff : ""} language="diff" />;
+  if (!fileDiff) return <CodeText contents={typeof diff === "string" ? diff : ""} language="diff" overflow="wrap" />;
   return <FileDiff fileDiff={fileDiff} options={diffViewOptions} className="pierre-code type-code" disableWorkerPool />;
 }
