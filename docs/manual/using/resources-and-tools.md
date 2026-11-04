@@ -58,6 +58,8 @@ Directory commands start a fresh noninteractive shell using the application's de
 
 Directory listings expose references for regular files. A reference identifies a source resource and a location within it. Pass it to an operation that accepts file references, or forward it to another Agent through Send or Mesh. Passing a reference transfers the address; it does not read the file or supply its contents to the receiving model. A consuming operation fetches the file when needed, so later changes are visible and missing files fail at consumption.
 
+The Directory `metadata` tool queries a relative `target.path`, with `.` selecting the resource root. It returns the path, resolved type (`file`, `directory`, or `other`), regular-file size in bytes (`null` for other types), and last modification time as a UTC ISO 8601 string. These fields have the same meaning on every platform. Symbolic links are followed within the resource root; missing targets and broken links return `path_not_found`.
+
 The Directory `save` tool consumes a FileRef and writes its bytes to `target.path`, relative to the linked directory. It supports binary files, creates missing parent directories, and replaces an existing destination only after the source is fully read. A failed or cancelled transfer preserves the previous file. Its result includes the saved byte count and a new FileRef from the directory. User-facing attachment **Save as…** controls instead open the system dialog and allow any user-selected destination.
 
 Notes retain current text. Their earlier tool results may appear in history, but browsing that history does not restore note contents.

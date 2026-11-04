@@ -41,6 +41,10 @@ export const filesystemMessages = pluginNamespace("asterism.builtin").messages("
     id: "toolDirectoryList",
     defaultMessage: "List directory",
   },
+  toolDirectoryMetadata: {
+    id: "toolDirectoryMetadata",
+    defaultMessage: "Read metadata",
+  },
   toolDirectoryFind: {
     id: "toolDirectoryFind",
     defaultMessage: "Find files",

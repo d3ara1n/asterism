@@ -18,6 +18,17 @@ export const List = defineTool({
   argsSchema: z.strictObject({}).describe("Empty parameter object."),
 });
 
+export const Metadata = defineTool({
+  id: builtin.name("tool.metadata"),
+  name: "metadata",
+  description: "Read metadata for the selected target.",
+  guidelines: [
+    "target selects an entry according to the resource implementation's schema. args is an empty object.",
+    "The resource implementation defines the metadata fields and their meaning.",
+  ],
+  argsSchema: z.strictObject({}).describe("Empty parameter object."),
+});
+
 export const Read = defineTool({
   id: builtin.name("tool.read"),
   name: "read",

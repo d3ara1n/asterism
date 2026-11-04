@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineImplementation, defineCreation, defineCall, contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
-import { builtin, List, Read, Edit, Write, Save, Replace, See, textReadSchema, textReadTargetSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
+import { builtin, List, Metadata, Read, Edit, Write, Save, Replace, See, textReadSchema, textReadTargetSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
 export const CreateDirectory = defineCreation(Directory, { id: builtin.name("directory.create"),
@@ -27,6 +27,20 @@ export const DirectoryList = defineImplementation({
       path: z.string().min(1).max(4096).describe("Directory path relative to the resource root, for example 'src'; absolute paths and paths resolving outside the root are rejected."),
     }),
   ]).describe("Pass null for the resource root or an object such as {\"path\":\"subdir\"} for a subdirectory. Symbolic links must resolve inside the resource root."),
+  effect: "read", execution: "parallel",
+});
+
+export const DirectoryMetadata = defineImplementation({
+  ...builtin.data("directory.metadata", z.strictObject({
+    path: z.string().describe("The queried path relative to the resource root; '.' denotes the root."),
+    type: z.enum(["file", "directory", "other"]).describe("The resolved target type. Symbolic links report their target's type."),
+    size: z.number().int().nonnegative().nullable().describe("Size in bytes for a regular file; null for directories and other entry types."),
+    modifiedAt: z.iso.datetime().describe("Last modification time as a UTC ISO 8601 string."),
+  }).describe("Filesystem metadata with the same fields and meanings on every platform.")),
+  resource: Directory, tool: Metadata,
+  targetSchema: z.strictObject({
+    path: z.string().min(1).max(4096).describe("File or directory path relative to the resource root; '.' selects the root. Absolute paths and paths resolving outside the root are rejected. Symbolic links are followed within the root; missing targets and broken links return path_not_found."),
+  }).describe("Select one filesystem entry with {\"path\":\"relative/path\"}; '.' selects the resource root."),
   effect: "read", execution: "parallel",
 });
 

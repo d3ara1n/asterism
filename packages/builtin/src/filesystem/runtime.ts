@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { TextError, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
-import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryStatus } from "./contract.ts";
+import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryStatus } from "./contract.ts";
 import { saveFileContent } from "./save.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { readImageFile } from "./image-io.ts";
@@ -17,7 +17,7 @@ import { DirectoryExec } from "./exec-contract.ts";
 import { execToModel } from "../shell/contract.ts";
 import type { ShellExecution } from "@asterism-app/sdk/runtime";
 import { searchTools } from "./search.ts";
-import { listFiles, readFileContent, readChildren } from "./read.ts";
+import { listFiles, readMetadata, readFileContent, readChildren } from "./read.ts";
 import { readDirectoryStatus } from "./git-status.ts";
 import { fileFailure } from "./file-io.ts";
 import { editorCalls } from "./editor-runtime.ts";
@@ -100,6 +100,9 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
           ? { ...entry, ref: { source: { ...object.ref }, locator: { path: join(result.data.path, entry.name) } } }
           : entry) } };
       },
+    }),
+    implementTool(DirectoryMetadata, {
+      call: (directory, target, _args, { signal }) => readMetadata(directory.path, target, signal),
     }),
     implementTool(DirectoryRead, {
       call: (directory, target, _args, { signal }) => readFileContent(directory.path, target, signal),

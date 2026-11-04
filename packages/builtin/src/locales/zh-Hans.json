@@ -295,6 +295,7 @@
   "resources.inputSchema": "输入 schema",
   "resources.removed": "已从会话移除并解除全部链接，历史记录保留。",
   "toolDirectoryList": "列出目录",
+  "toolDirectoryMetadata": "读取元数据",
   "toolDirectoryFind": "查找文件",
   "toolDirectoryGrep": "搜索正文",
   "toolSearchFiles": "{count}{truncated, select, true {+} other {}} 个文件",

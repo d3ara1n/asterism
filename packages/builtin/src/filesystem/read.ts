@@ -1,8 +1,8 @@
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import type { z } from "zod";
 import type { CallResult } from "@asterism-app/sdk/runtime";
 import { TextError, readText } from "../shared/text.ts";
-import { DirectoryList, DirectoryRead } from "./contract.ts";
+import { DirectoryList, DirectoryMetadata, DirectoryRead } from "./contract.ts";
 import { withinDirectory } from "./paths.ts";
 import { filesystemFailure } from "./errors.ts";
 import { readTextFile } from "./text-io.ts";
@@ -33,6 +33,24 @@ export async function listFiles(root: string, target: z.infer<typeof DirectoryLi
   } catch (error) {
     signal.throwIfAborted();
     return filesystemFailure(error, "List target directory");
+  }
+}
+
+export async function readMetadata(root: string, target: z.infer<typeof DirectoryMetadata.targetSchema>,
+  signal: AbortSignal): Promise<CallResult<z.infer<typeof DirectoryMetadata.schema>>> {
+  try {
+    signal.throwIfAborted();
+    const info = await stat(await withinDirectory(root, target.path));
+    signal.throwIfAborted();
+    return { kind: "succeeded", data: {
+      path: target.path,
+      type: info.isFile() ? "file" : info.isDirectory() ? "directory" : "other",
+      size: info.isFile() ? info.size : null,
+      modifiedAt: info.mtime.toISOString(),
+    } };
+  } catch (error) {
+    if (signal.aborted) return { kind: "cancelled", message: "Read target metadata was cancelled." };
+    return filesystemFailure(error, "Read target metadata");
   }
 }
 

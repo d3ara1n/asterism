@@ -1,7 +1,7 @@
 import { lazy } from "react";
 import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
-import { Eye, Folder, BookOpen, FileDown, FilePenLine, FilePlus2, ListTree, Replace } from "lucide-react";
+import { Eye, Folder, BookOpen, FileDown, FilePenLine, FilePlus2, Info, ListTree, Replace } from "lucide-react";
 
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { filesystemMessages } from "../messages/filesystem";
@@ -9,7 +9,7 @@ import { textMessages } from "../messages/text";
 import { prepareCodeView } from "@asterism-app/ui/code-view";
 import { textReadViews, textWriteViews, textEditViews, textReplaceViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
-import { Directory, CreateDirectory, DirectoryView, DirectoryChildren, DirectoryStatus, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee } from "./contract";
+import { Directory, CreateDirectory, DirectoryView, DirectoryChildren, DirectoryStatus, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee } from "./contract";
 import { FilePreview } from "../shared/attachments";
 import { mediaMessages } from "../messages/media";
 import { DirectoryInput } from "./creation";
@@ -59,6 +59,7 @@ export default {
     Actions: DirectoryTreeActions,
   })],
   tools: [
+    toolRenderer(DirectoryMetadata, { label: filesystemMessages.toolDirectoryMetadata, icon: <Info /> }),
     toolRenderer(DirectorySave, { label: mediaMessages.save, icon: <FileDown /> }),
     ...searchToolRenderers,
     execToolRenderer,
