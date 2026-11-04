@@ -1,6 +1,6 @@
 import { noteCard } from "../shared/card-appearance.ts";
-import { defineModule, implementResource, implementCreation, implementTool, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@asterism-app/sdk/runtime";
-import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteGrep, NoteEdit, NoteWrite, NoteReplace, MAX_NOTE_LENGTH } from "./contract.ts";
+import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@asterism-app/sdk/runtime";
+import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteGrep, NoteEdit, NoteWrite, NoteReplace, ReadNoteText, SaveNoteText, MAX_NOTE_LENGTH } from "./contract.ts";
 import { grepNote, noteGrepToModel } from "./search.ts";
 import { FilesystemError } from "../filesystem/errors.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
@@ -36,7 +36,7 @@ function mutationFailure(error: unknown, signal: AbortSignal, operation: string)
 }
 
 /** Notes save only the current mutable body; cursor rewind does not restore the body. */
-export default defineModule(() => ({
+export default defineModule(plugin => ({
   resources: [implementResource(Note, NoteView, {
     card: noteCard,
     template: { current: [NoteContent] },
@@ -53,6 +53,17 @@ export default defineModule(() => ({
         length: content?.text.length ?? null, maxLength: MAX_NOTE_LENGTH };
     },
   })],
+  calls: [
+    implementCall(ReadNoteText, async (_input, { object }) => {
+      const note = plugin.object(object.ref.sessionId, Note, object.ref.id);
+      return { title: titleOf(note), text: requireText(note) };
+    }),
+    implementCall(SaveNoteText, async ({ text }, { object, signal }) => {
+      signal.throwIfAborted();
+      save(plugin.object(object.ref.sessionId, Note, object.ref.id), text);
+      return null;
+    }),
+  ],
   tools: [
     implementTool(NoteRead, {
       async call(_data, target, _args, { object, signal }) {

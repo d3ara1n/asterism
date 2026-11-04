@@ -1,6 +1,14 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const textMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
+  editNote: {
+    id: "note.edit",
+    defaultMessage: "Edit note",
+  },
+  noteOpenFailed: {
+    id: "note.openFailed",
+    defaultMessage: "Could not open note",
+  },
   copyNoteMarkdown: {
     id: "note.copyMarkdown",
     defaultMessage: "Copy Markdown",

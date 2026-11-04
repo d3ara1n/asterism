@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineImplementation, defineCreation } from "@asterism-app/sdk/contracts";
+import { defineImplementation, defineCreation, defineCall } from "@asterism-app/sdk/contracts";
 import { builtin, Read, Edit, Write, Replace, Grep, textReadSchema, textReadTargetSchema, textRowSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 import { stopReasonSchema } from "../filesystem/search-contract.ts";
 
@@ -13,6 +13,16 @@ export const CreateNote = defineCreation(Note, { id: builtin.name("note.create")
 });
 export const NoteContent = builtin.data("note.content", z.strictObject({ text: z.string().max(MAX_NOTE_LENGTH) }));
 export const NoteView = builtin.data("note.card", z.strictObject({ text: z.string().nullable() }));
+export const ReadNoteText = defineCall(builtin.name("note.editor.read"), {
+  scope: "object",
+  input: z.strictObject({}),
+  output: z.strictObject({ title: z.string(), text: z.string() }),
+});
+export const SaveNoteText = defineCall(builtin.name("note.editor.save"), {
+  scope: "object",
+  input: NoteContent.schema,
+  output: z.null(),
+});
 const targetSchema = z.null().describe("Pass null to select this note's complete current text. Notes have no internal path. Content is limited to 100,000 UTF-16 code units; edits must keep the final text within that limit.");
 export const NoteRead = defineImplementation({
   ...builtin.data("note.read", textReadSchema),

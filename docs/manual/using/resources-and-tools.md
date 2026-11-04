@@ -75,6 +75,8 @@ The Directory `save` tool consumes a FileRef and writes its bytes to `target.pat
 
 Notes retain current text. Their earlier tool results may appear in history, but browsing that history does not restore note contents.
 
+Choose **Edit note** in a Note card's title bar to open its Markdown source in an editor island. Choose **Save** or press **Cmd+S / Ctrl+S** to update the note and its card. Notes support up to 100,000 UTF-16 code units. The editor holds a draft until saved; closing or replacing an editor with unsaved changes requires confirmation. Saving replaces the note's current body in backend processing order.
+
 Files and notes support anchored edits, full-content writes, and bulk replacement. `edit` changes selected lines using anchors returned by reading, searching, or a previous edit or replacement. `write` supplies complete content. `replace` applies literal text or a JavaScript regular expression to the entire selected target and returns the match count, actual diff, and fresh anchors. Literal replacement text is inserted verbatim; regular-expression replacements support capture groups. A replacement with no matches reports an error and leaves the target unchanged.
 
 An edit batch uses the text as it stood before the batch. Insertions can sit at either boundary of a replaced or deleted range, and multiple insertions at the same original gap appear in array order. Ranges that share original lines, or an insertion strictly inside a replaced or deleted range, reject the whole batch.

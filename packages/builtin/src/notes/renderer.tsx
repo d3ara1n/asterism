@@ -1,8 +1,5 @@
-import { useState } from "react";
 import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
-import { FileText, BookOpen, FilePenLine, FilePlus2, Copy, Replace, Search } from "lucide-react";
-import { toast } from "sonner";
-import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { FileText, BookOpen, FilePenLine, FilePlus2, Replace, Search } from "lucide-react";
 
 import { Markdown } from "../agent/conversation/Markdown";
 import { commonMessages } from "../messages/common";
@@ -13,30 +10,9 @@ import { textReadViews, textWriteViews, textEditViews, textReplaceViews } from "
 import { Note, CreateNote, NoteView, NoteRead, NoteGrep, NoteEdit, NoteWrite, NoteReplace } from "./contract";
 import { noteGrepViews } from "./search-view";
 import { NoteInput } from "./creation";
+import { NoteActions } from "./NoteActions";
 
 import { noteCard as appearance } from "../shared/card-appearance.ts";
-
-function NoteActions({ data }: { data: { text: string | null } }) {
-  const i18n = useI18n();
-  const [copying, setCopying] = useState(false);
-  const copy = async () => {
-    if (data.text === null || copying) return;
-    setCopying(true);
-    try {
-      await navigator.clipboard.writeText(data.text);
-      toast.success(i18n.text(textMessages.noteCopied));
-    } catch (error) {
-      console.error("Note could not be copied.", error);
-      toast.error(i18n.text(textMessages.noteCopyFailed));
-    } finally {
-      setCopying(false);
-    }
-  };
-  return <IconButton size="icon-xs" label={i18n.text(textMessages.copyNoteMarkdown)}
-    disabled={data.text === null || copying} onClick={() => { void copy(); }}>
-    <Copy />
-  </IconButton>;
-}
 
 export default {
   prepare: prepareCodeView,
