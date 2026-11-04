@@ -90,6 +90,18 @@ function CallList({ calls }: { calls: readonly ScriptCall[] }) {
   return groups.length ? <ul className="space-y-1.5">{groups.map(group => <GroupRow key={group.key} group={group} now={now} />)}</ul> : null;
 }
 
+function ResultScriptCode({ code }: { code: string }) {
+  const [formatted, setFormatted] = useState<{ source: string; contents: string }>();
+  useEffect(() => {
+    let active = true;
+    void import("./script-code").then(({ formatScriptCode }) => formatScriptCode(code)).then(contents => {
+      if (active) setFormatted({ source: code, contents });
+    });
+    return () => { active = false; };
+  }, [code]);
+  return <CodeText contents={formatted?.source === code ? formatted.contents : code} language={language} lineNumbers overflow="wrap" />;
+}
+
 function Body(props: Props) {
   const i18n = useI18n();
   const code = scriptCode(props.args);
@@ -99,7 +111,8 @@ function Body(props: Props) {
     <CallList calls={scriptCalls(props)} />
     {(code || value !== undefined) && <ToolDetailsSwitcher stateKey="asterism/resource-script-details" items={[
       ...(code ? [{ value: "code", label: i18n.text(messages.toolScriptCode),
-        render: () => <CodeText contents={code} language={language} lineNumbers overflow="wrap" /> }] : []),
+        render: () => props.phase === "settled" ? <ResultScriptCode code={code} />
+          : <CodeText contents={code} language={language} lineNumbers overflow="wrap" /> }] : []),
       ...(value !== undefined ? [{ value: "result", label: i18n.text(messages.toolScriptValue),
         render: () => <JsonView value={value} /> }] : []),
     ]} />}
