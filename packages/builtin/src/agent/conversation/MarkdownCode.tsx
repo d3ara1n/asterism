@@ -4,7 +4,7 @@ import { createContext, useContext, useState } from "react";
 import { toast } from "sonner";
 
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { CodeText } from "../../code-view";
+import { CodeText } from "@asterism-app/ui/code-view";
 import { markdownMessages } from "../../messages/markdown";
 import { MermaidDiagram } from "./MermaidDiagram";
 

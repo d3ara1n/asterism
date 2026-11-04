@@ -5,20 +5,26 @@ import type { CallResult, Invocation, PreparedResult } from "../tools/contract.t
 import { finishToolResult, resolveToolCompletion } from "../tools/result.ts";
 import { declareTool } from "../tools/definition.ts";
 import { jsonArgumentHint, validationMessage } from "../tools/validation.ts";
-import { ResourceCall, ResourceInspect, ResourceList, ResourceInspectResult, ResourceListResult } from "../tools/core.ts";
+import { ResourceCall, ResourceInspect, ResourceList, ResourceScript, ResourceInspectResult, ResourceListResult, ResourceScriptResult } from "../tools/core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
 import type { BoundTopLevelTool } from "../plugins/top-level-tools.ts";
+import { ToolScheduler } from "./scheduler.ts";
+import { executeResourceScript, scriptToModel } from "./script.ts";
 
-/** Fixed host operation entries; represented as tools only in the provider protocol, outside the resource tool catalog. */
-interface CoreAction {
-  tool: ToolContract;
-  resolve(args: Json, capabilities: AgentCapabilities): Invocation | PreparedResult;
-}
 export type PendingCall = ModelToolCall;
 export type ToolObserver = ModelToolObserver;
-
-// Host entries cannot be overridden; static contributions captured at request start supply plugin top-level tools.
+interface DispatchContext {
+  id: string;
+  tools: string[];
+  interactive?: boolean;
+  execute(call: PendingCall, signal: AbortSignal, observer: ToolObserver): Promise<ToolOutcome>;
+}
+/** Fixed host operations share the same dispatcher as captured plugin top-level tools. */
+interface CoreAction {
+  tool: ToolContract;
+  resolve(args: Json, capabilities: AgentCapabilities, context: DispatchContext): Invocation | PreparedResult;
+}
 const actions: readonly CoreAction[] = [
   { tool: ResourceList,
     resolve: (_args, capabilities) => ({ effect: "read", execution: "parallel", implementation: reference(ResourceListResult), async execute() {
@@ -34,9 +40,15 @@ const actions: readonly CoreAction[] = [
         } };
     } },
   { tool: ResourceCall,
-    resolve(args, capabilities) {
+    resolve(args, capabilities, context) {
       const { resource_id, tool, target, args: inner } = ResourceCall.argsSchema.parse(args);
-      return capabilities.resolve(resource_id, tool, target, inner);
+      return capabilities.resolve(resource_id, tool, target, inner, context.interactive);
+    } },
+  { tool: ResourceScript,
+    resolve(args, _capabilities, context) {
+      const input = ResourceScript.argsSchema.parse(args);
+      return { effect: "write", execution: "parallel", implementation: reference(ResourceScriptResult), toModel: scriptToModel,
+        execute: (signal, publish) => executeResourceScript({ ...input, ...context, signal, publish: publish ?? (() => {}) }) };
     } },
 ];
 
@@ -57,6 +69,7 @@ export function bindModelTools(capabilities: AgentCapabilities, tools: readonly 
 export function previewCoreCall(name: string, args: Json, capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = []): ToolInvocationInfo {
   const tool = tools.find(entry => entry.tool.name === name && entry.available);
   if (tool) return { implementation: reference(tool.tool) };
+  if (name === ResourceScript.name) return { implementation: reference(ResourceScriptResult) };
   if (!args || typeof args !== "object" || Array.isArray(args)) return {};
   if (typeof args.resource_id !== "string") return {};
   if (name === "resource_inspect") return capabilities.identity(args.resource_id);
@@ -64,21 +77,38 @@ export function previewCoreCall(name: string, args: Json, capabilities: AgentCap
     ? capabilities.preview(args.resource_id, args.tool) : {};
 }
 
-/** Resolve actual resource tools before scheduling by execution policy; published snapshots do not change the batch's model delivery boundary. */
-export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities,
-  signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
-  observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = []): Promise<void> {
-  const resolved = calls.map(call => {
+interface PreparedCall {
+  call: PendingCall;
+  result: Invocation | PreparedResult;
+  info: ToolInvocationInfo;
+}
+/** Direct calls and script calls share resolution, validation, scheduling, and completion. */
+class ToolDispatcher {
+  private readonly scheduler = new ToolScheduler();
+  private readonly callableNames: string[];
+  constructor(private readonly capabilities: AgentCapabilities, private readonly tools: readonly BoundTopLevelTool[],
+    private readonly handover?: ContentLease) {
+    this.callableNames = [...actions, ...tools.filter(entry => entry.available)]
+      .filter(entry => !entry.tool.requiresInteraction)
+      .map(entry => entry.tool.name).filter(name => name !== ResourceScript.name && name !== ResourceCall.name);
+  }
+
+  prepare(call: PendingCall, observer: ToolObserver, interactive?: boolean): PreparedCall {
     let result: Invocation | PreparedResult;
     const action = actions.find(action => action.tool.name === call.name);
-    const extension = tools.find(entry => entry.tool.name === call.name);
+    const extension = this.tools.find(entry => entry.tool.name === call.name);
     const definition = action?.tool ?? extension?.tool;
     if (!definition) result = { kind: "rejected", error: { code: "operation_unavailable", message: "This operation is unavailable." } };
     else {
       const parsed = definition.argsSchema.safeParse(call.arguments);
       if (!parsed.success) result = { kind: "rejected", error: { code: "invalid_arguments",
         message: `${validationMessage(parsed.error, call.name)}.${call.name === "resource_call" ? ` ${jsonArgumentHint}` : ""}` } };
-      else result = action ? action.resolve(parsed.data, capabilities) : extension!.resolve(parsed.data, call.callId);
+      else result = action ? action.resolve(parsed.data, this.capabilities, {
+        id: call.callId,
+        tools: this.callableNames,
+        interactive,
+        execute: (child, signal, childObserver) => this.run(this.prepare(child, childObserver, false), signal, childObserver),
+      }) : extension!.resolve(parsed.data, call.callId, interactive);
     }
     const info: ToolInvocationInfo = {
       ...(result.implementation ? { implementation: result.implementation } : {}),
@@ -86,10 +116,18 @@ export async function executeCoreBatch(calls: readonly PendingCall[], capabiliti
     };
     observer.prepared?.(call, info);
     return { call, result, info };
-  });
-  const run = async ({ call, result, info }: typeof resolved[number]): Promise<void> => {
-    const complete = (completion: CallResult, latest: Json = null) => settle(call,
-      finishToolResult(completion, { ...info, finishedAt: Date.now() }, latest, "execute" in result ? result.toModel : undefined));
+  }
+
+  run(prepared: PreparedCall, signal: AbortSignal, observer: ToolObserver): Promise<ToolOutcome> {
+    const { result } = prepared;
+    return "execute" in result
+      ? this.scheduler.run(result.execution, signal, () => this.invoke(prepared, signal, observer))
+      : this.invoke(prepared, signal, observer);
+  }
+
+  private async invoke({ call, result, info }: PreparedCall, signal: AbortSignal, observer: ToolObserver): Promise<ToolOutcome> {
+    const complete = (completion: CallResult, latest: Json = null) => finishToolResult(completion,
+      { ...info, finishedAt: Date.now() }, latest, "execute" in result ? result.toModel : undefined);
     if (signal.aborted) return complete({ kind: "cancelled", message: "The operation was not started." });
     if (!("execute" in result)) return complete(result);
     info = { ...info, startedAt: Date.now() };
@@ -102,7 +140,7 @@ export async function executeCoreBatch(calls: readonly PendingCall[], capabiliti
         if (!active) return;
         latest = jsonSchema.parse(data);
         observer.published?.(call, latest);
-      }, handover);
+      }, this.handover);
       // Validate completion data at the execution boundary; schema failures must still finalize and retain prior valid output.
       completion = resolveToolCompletion(completion, latest);
     } catch {
@@ -111,13 +149,17 @@ export async function executeCoreBatch(calls: readonly PendingCall[], capabiliti
         : signal.aborted ? { kind: "cancelled", message: "Operation execution was cancelled." }
           : { kind: "failed", error: { code: "tool_failed", message: "The operation could not complete." } };
     } finally { active = false; }
-    complete(completion, latest);
-  };
-  if (resolved.some(({ result }) => "execute" in result && result.execution === "sequential")) {
-    for (const call of resolved) await run(call);
-  } else {
-    const outcomes = await Promise.allSettled(resolved.map(run));
-    const failed = outcomes.find(outcome => outcome.status === "rejected");
-    if (failed?.status === "rejected") throw failed.reason;
+    return complete(completion, latest);
   }
+}
+
+/** Captured request capabilities and one scheduler cover the entire batch, including scripts' child operations. */
+export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities,
+  signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
+  observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = []): Promise<void> {
+  const dispatcher = new ToolDispatcher(capabilities, tools, handover);
+  const prepared = calls.map(call => dispatcher.prepare(call, observer));
+  const outcomes = await Promise.allSettled(prepared.map(async entry => settle(entry.call, await dispatcher.run(entry, signal, observer))));
+  const failed = outcomes.find(outcome => outcome.status === "rejected");
+  if (failed?.status === "rejected") throw failed.reason;
 }

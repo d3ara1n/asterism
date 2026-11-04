@@ -1,16 +1,14 @@
 import { textMessages } from "./messages/text";
 import { formatCount } from "@asterism-app/ui/format-count";
-import { toolsMessages } from "./messages/tools";
+import { toolsMessages } from "@asterism-app/ui/messages/tools";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import type { Json, ToolResult } from "@asterism-app/sdk/contracts";
 import { useMemo } from "react";
-import { FileDiff, type FileDiffOptions } from "@pierre/diffs/react";
 import type { TextRead, TextChange, TextReplace } from "@asterism-app/builtin-api/contracts";
 import { inputField, inputText, characterCount, toolTextTail, editPreviewText } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
 import { displayText } from "./shared/text-row";
-import { CodeRows } from "./code-view";
-import { codeViewOptions } from "./shared/code-view";
+import { CodeDiff, CodeRows } from "@asterism-app/ui/code-view";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 
@@ -122,15 +120,10 @@ function DiffBodyPreview({ diff }: { diff: string }) {
   const preview = useMemo(() => diffBodyPreview(diff), [diff]);
   if (!preview) return <TextBodyPreview text={diff} />;
   return <div className="space-y-2">
-    <FileDiff fileDiff={preview.fileDiff} options={diffViewOptions} className="pierre-code type-code" disableWorkerPool />
+    <CodeDiff diff={preview.fileDiff} />
     <OmittedLines count={preview.omitted} />
   </div>;
 }
-
-const diffViewOptions = {
-  ...codeViewOptions, diffStyle: "unified", diffIndicators: "bars", lineDiffType: "none",
-  hunkSeparators: "simple", expandUnchanged: false,
-} as const satisfies FileDiffOptions<undefined, undefined>;
 
 const readView = { headerRenderer: TextReadHeader, bodyRenderer: TextReadBody };
 const writeView = { headerRenderer: TextWriteHeader, bodyRenderer: TextWriteBody };

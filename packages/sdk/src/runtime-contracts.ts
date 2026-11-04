@@ -155,6 +155,7 @@ export type PreparedResult = CallResult & ToolInvocationInfo;
 export type ToolCaller = Readonly<Pick<ResourceSnapshot, "ref" | "title"> & { agent?: string }>;
 export interface ToolInvocation extends ToolInvocationInfo {
   effect: "read" | "write";
+  /** Sequential operations share submission order; parallel operations can overlap either lane. */
   execution: "parallel" | "sequential";
   execute(signal: AbortSignal, publish?: (data: Json) => void): Promise<CallResult>;
   toModel?(data: Json): ToolModelOutput;

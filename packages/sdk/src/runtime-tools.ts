@@ -19,6 +19,7 @@ export interface TopLevelTool<A extends Json = Json, D extends Json = Json> exte
   /** Encodes D for progress/history and decodes it for views and model projection. */
   readonly resultSchema: z.ZodType<D>;
   readonly effect: "read" | "write";
+  /** Sequential operations share submission order; parallel operations can overlap either lane. */
   readonly execution: "parallel" | "sequential";
   execute(args: A, context: TopLevelToolContext<D>): Promise<CallResult<D>>;
   toModel?(data: D): ToolModelOutput;

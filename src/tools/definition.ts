@@ -13,6 +13,7 @@ export function projectTool(tool: ToolContract) {
     description: tool.description,
     guidelines: [...tool.guidelines],
     args: schemaOf(tool.argsSchema),
+    requiresInteraction: tool.requiresInteraction === true,
   };
 }
 

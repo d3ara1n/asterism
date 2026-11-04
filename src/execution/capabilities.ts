@@ -5,6 +5,7 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import type { Invocation, PreparedResult, ToolImplementation } from "../tools/contract.ts";
 import { projectTool, schemaOf } from "../tools/definition.ts";
+import { interactionUnavailable } from "../tools/result.ts";
 import type { ToolCaller } from "@asterism-app/sdk/runtime";
 
 /** External tool policy; support relationships, resource links, and this policy are checked independently. */
@@ -68,7 +69,7 @@ export class AgentCapabilities {
       : `Agent role "${this.caller.agent}" cannot call tools on this resource.`;
   }
 
-  resolve(id: string, name: string, selector: Json, args: Json): Invocation | PreparedResult {
+  resolve(id: string, name: string, selector: Json, args: Json, interactive = this.interactive): Invocation | PreparedResult {
     const target = this.linked.get(id);
     if (!target) return denied();
     const restriction = this.restriction(target.resource.kind);
@@ -77,9 +78,9 @@ export class AgentCapabilities {
     if (!tool && !this.resources.has(target.resource.kind)) return { ...this.identity(id), kind: "rejected", error: { code: "implementation_missing",
       message: `The plugin providing ${target.resource.kind} is unavailable.` } };
     if (!tool) return { ...this.identity(id), kind: "rejected", error: { code: "tool_unavailable", message: "This tool is unavailable for the resource." } };
-    if (!this.interactive && tool.tool.requiresInteraction) return { ...this.identity(id), kind: "rejected",
-      error: { code: "interaction_unavailable", message: "This execution is noninteractive. The tool requires user interaction." } };
+    const canInteract = this.interactive && interactive;
+    if (!canInteract && tool.tool.requiresInteraction) return { ...this.identity(id), ...interactionUnavailable() };
     if (!this.caller) throw new Error("Tool execution requires a bound caller.");
-    return { ...tool.prepare(target.resource, selector, args, this.caller, this.interactive), ...this.identity(id) };
+    return { ...tool.prepare(target.resource, selector, args, this.caller, canInteract), ...this.identity(id) };
   }
 }

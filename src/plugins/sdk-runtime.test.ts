@@ -375,13 +375,13 @@ describe("Host implementation of the workbench SDK", () => {
       system: { blocks: [] }, messages: [], tools: { allow }, signal: new AbortController().signal, observer: { event() {} },
     });
     const allowed = await run(["prompt"]);
-    expect(requests[0]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "prompt"]);
+    expect(requests[0]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "resource_script", "prompt"]);
     expect(allowed.tools[0]).toMatchObject({ kind: "succeeded", implementation: { id: declaration.id }, data: "Answer: Hello",
       model: [{ kind: "text", text: '{"answer":"Answer: Hello"}' }] });
     expect(cached.data).toEqual({ answer: "Answer: Hello" });
     expect(allowed.tools[0]).not.toHaveProperty("resource");
     const denied = await run([]);
-    expect(requests[1]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call"]);
+    expect(requests[1]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "resource_script"]);
     expect(denied.tools[0]?.kind).toBe("rejected");
     expect(invoked).toBe(1);
     expect((await run(["prompt"])).tools[0]).toMatchObject({ kind: "succeeded", data: "Answer: Hello" });

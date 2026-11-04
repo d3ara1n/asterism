@@ -6,7 +6,7 @@ import { Eye, Folder, BookOpen, FileDown, FilePenLine, FilePlus2, ListTree, Repl
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
-import { prepareCodeView } from "../shared/code-view";
+import { prepareCodeView } from "@asterism-app/ui/code-view";
 import { textReadViews, textWriteViews, textEditViews, textReplaceViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
 import { Directory, CreateDirectory, DirectoryView, DirectoryChildren, DirectoryStatus, DirectoryList, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee } from "./contract";

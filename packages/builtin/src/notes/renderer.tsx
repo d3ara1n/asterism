@@ -8,7 +8,7 @@ import { Markdown } from "../agent/conversation/Markdown";
 import { commonMessages } from "../messages/common";
 import { textMessages } from "../messages/text";
 import { filesystemMessages } from "../messages/filesystem";
-import { prepareCodeView } from "../shared/code-view";
+import { prepareCodeView } from "@asterism-app/ui/code-view";
 import { textReadViews, textWriteViews, textEditViews, textReplaceViews } from "../text-view";
 import { Note, CreateNote, NoteView, NoteRead, NoteGrep, NoteEdit, NoteWrite, NoteReplace } from "./contract";
 import { noteGrepViews } from "./search-view";

@@ -5,7 +5,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { StatusBadge, StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
+import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
+import { toolOutcomeLabels, toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
 import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
 import { toolCallState, type ToolCallNode } from "./tool-state";
@@ -13,11 +14,6 @@ import { BuiltinSettings } from "../../settings/contract";
 import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { viewStateKeys } from "./view-state";
 import { blockShell } from "./block-shell";
-
-const labels = {
-  partial: toolsMessages.toolPartial, failed: toolsMessages.toolFailed,
-  rejected: toolsMessages.toolRejected, cancelled: toolsMessages.toolCancelled, unknown: toolsMessages.toolUnknown,
-};
 
 /** The shell manages only lifecycle and expansion; the two content entry points fall back independently, and updates or persistence do not reset expansion. */
 export function ToolCall({ node }: { node: ToolCallNode }) {
@@ -36,10 +32,9 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const outcome = "outcome" in node ? node.outcome : null;
   const hasResultDetails = outcome && outcome.data !== null && outcome.model.every(part => part.kind === "text");
   const diagnostic = result && ("error" in result ? result.error.message : "message" in result ? result.message : null);
-  const error = result?.kind === "failed" || result?.kind === "rejected" || result?.kind === "unknown";
+  const settled = result && result.kind !== "running" ? result.kind : null;
   // Request-level failure belongs to the outer shell and notice; the badge reports how local execution ended.
-  const status = result && result.kind !== "running" && result.kind !== "succeeded" ? i18n.text(labels[result.kind]) : null;
-  const tone: StatusTone = error ? "error" : result?.kind === "partial" ? "warning" : "neutral";
+  const status = settled && settled !== "succeeded" ? i18n.text(toolOutcomeLabels[settled]) : null;
   const icon = state.phase === "input"
     ? <motion.span className="inline-flex" animate={reducedMotion ? undefined : { opacity: [0.45, 1, 0.45] }} transition={{ duration: 1.4, repeat: Infinity }}><TextCursorInput className="size-3.5" /></motion.span>
     : state.phase === "executing" ? <StatusIcon tone="progress" className="size-3.5" />
@@ -50,15 +45,15 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
       {view && (!filling || view.header !== undefined || view.body !== undefined || view.label !== undefined) ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
         : <ToolHeader label={state.phase === "incomplete" ? tools.label(node.name, node.invocation?.implementation?.id ?? null) ?? node.name : tools.preparation(node.name)} />}
     </span>
-    {status && <StatusBadge tone={tone}>{status}</StatusBadge>}
-    {state.phase === "settled" && result?.kind === "succeeded" && <span className="sr-only">{i18n.formatMessage(toolsMessages.toolSucceeded)}</span>}
+    {status && settled && <StatusBadge tone={toolOutcomeTone(settled)}>{status}</StatusBadge>}
+    {state.phase === "settled" && settled === "succeeded" && <span className="sr-only">{i18n.text(toolOutcomeLabels.succeeded)}</span>}
   </>;
   return <Disclosure header={header} {...disclosure} {...blockShell(node)} expandable={!filling || hasInputBody}
     pending={state.phase === "input" || state.phase === "ready"}>
     <div className="space-y-3">
       {view && (view.body ?? (!filling && state.phase !== "incomplete" && <DefaultToolBody {...view.props} />))}
       {diagnostic && <p className="type-caption whitespace-pre-wrap">{diagnostic}</p>}
-      {(state.phase === "settled" || state.phase === "incomplete") && <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
+      {view?.details !== false && (state.phase === "settled" || state.phase === "incomplete") && <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
         { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails),
           render: () => <JsonView value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /> },
         ...(hasResultDetails ? [{ value: "result", label: i18n.formatMessage(toolsMessages.toolResultDetails),

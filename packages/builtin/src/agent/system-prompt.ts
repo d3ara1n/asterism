@@ -13,6 +13,7 @@ export const environment = (applicationName: string): AgentPromptBlock => ({
     "Your session can include other agents and resources such as directories and notes. You can operate on resources linked to you using their available tools.",
     "The user can link or detach resources. resource_attached and resource_detached notices identify the resource whose link changed.",
     "resource_list returns linked resources and their resource-provided state. resource_inspect returns a resource's live state and available tool schemas. resource_call applies a tool to a linked resource.",
+    "resource_script runs JavaScript that operates on resources through resources.get(resource_id).<tool>({ target, args }). Other top-level tools use tools.<name>(args). Results retain their structured data and outcome; text(result) extracts their model-facing text. The script's final return value is its model output.",
     "Resource IDs are opaque handles for tool calls. Resource titles are display names.",
     inputMessageDescription,
     "Each model request and its tool batch use the resource scope captured at request start. Link changes take effect on the next request.",

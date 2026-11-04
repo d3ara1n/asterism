@@ -116,7 +116,7 @@ Request occupancy prevents history cursor movement but does not itself mark the 
 
 Top-level tools register statically during assembly. Resource tools are discovered through the captured links, support relations, and agent policy. Resource changes do not mutate protocol tool declarations during a response.
 
-The host reserves `resource_list`, `resource_inspect`, and `resource_call`. Inspection and execution share the captured capability view. A resource call validates target identity, captured access, tool support, target shape, and arguments.
+The host reserves resource listing, inspection, invocation, and script orchestration. Inspection and execution share the captured capability view. A resource call validates target identity, captured access, tool support, target shape, and arguments.
 
 Link notifications carry resource identity, not state or tool definitions. Resources own the state exposed through discovery: listing returns that state alongside identity, while inspection also expands the tools available in the captured capability view. The host assembles these results without interpreting resource-specific state fields.
 
@@ -132,7 +132,7 @@ Invalid duplicate identities within a plugin fail assembly. Historical results r
 
 Only a normally completed response with complete arguments starts tools. Truncated or unterminated generation does not execute partial calls.
 
-The host publishes complete tool inputs before starting the batch, then validates, binds invocation context, executes, and delivers outcomes to the caller's record consumer. The consuming paradigm can begin operation records for these inputs and complete them with the outcomes. The host waits for the batch to finish before returning the request result. A batch containing sequential tools preserves order. Parallel completion order does not change historical positions or model result pairing.
+The host publishes complete tool inputs before starting the batch, then validates, binds invocation context, executes, and delivers outcomes to the caller's record consumer. The consuming paradigm can begin operation records for these inputs and complete them with the outcomes. One request-scoped scheduler accepts direct calls and script child calls. Sequential operations execute in submission order relative to other sequential operations; parallel operations can overlap both parallel and sequential operations. Dependencies require waiting before submitting the dependent call. Independent requests retain independent scheduling scopes. The host waits for the batch to finish before returning the request result. Completion order does not change historical positions or model result pairing.
 
 Progress publishes validated current output without writing history. A final outcome records actual implementation, timing, display data, and model projection. The six outcomes are success, rejection, failure, cancellation, partial result, and unknown effect.
 
@@ -143,6 +143,14 @@ Omitted failure data can retain the last valid progress; explicit null clears it
 Temporary conversations can retain tool attachments in an independent content scope and supply that reader to later requests. Timeline writers and temporary owners acquire their own references before the request handoff closes. Concurrent requests through one access owner have independent handoff holds.
 
 Tool outcomes feed the Agent’s next request; a failed or cancelled tool does not itself terminate the Agent loop. Cancelling the whole Agent propagates through its current work.
+
+## Resource script execution
+
+Resource orchestration evaluates an async JavaScript body in a fresh QuickJS WebAssembly runtime on a worker thread. Local resource handles bind identity, and their methods select existing resource tools without separate declarations or implementations. Method inputs preserve the tool's target and argument contracts. The bridge forwards calls through the ordinary resource dispatcher with its resolution, policy checks, scheduling, and result projection; other top-level tools retain their ordinary argument shape. The sandbox holds JSON values and bridge functions; resource instances and session capabilities stay in the host. Runtime memory is bounded, and cancellation interrupts computation independently of the worker's event loop.
+
+Scripts are noninteractive execution surfaces. Tools requiring user interaction remain available to direct interactive model calls; script bindings omit them, and resource dispatch rejects them before implementation entry. Inspection exposes their interaction requirement. Tools supporting both modes receive the script's noninteractive context while retaining the captured request's other capabilities.
+
+Child results are available to the script as their ordinary structured outcomes, including raw data and model projection. A text helper extracts projected text as a value. The outer model result contains the final returned JSON value or text, or the script's actual failure. Child calls retain identity, timing, terminal outcome, and diagnostic summaries in the outer result, without persisting their arguments or outputs. Progress replaces the current complete summary snapshot; the final snapshot preserves actual outcomes after outstanding calls have been cancelled and settled. Worker, runtime, listeners, and execution timers belong to the script scope. External resources retain their own lifetimes, and completed effects survive script termination.
 
 ## Questions and communication
 

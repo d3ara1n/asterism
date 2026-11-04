@@ -10,6 +10,34 @@ Use current descriptions for arguments, internal targets, and result formats. Ta
 
 Resource creation has its own discovery and inspection tools. The available creation entries determine which resources an agent can create. New links become available at the next model request.
 
+## Organize calls with JavaScript
+
+`resource_script` accepts JavaScript as an async function body. Obtain a resource handle with `resources.get(resource_id)`, then invoke its tools as methods: `resource.read({ target, args })`. The handle binds the resource identity, the method name selects the tool, and `target` and `args` retain their ordinary contracts and defaults. Methods return the same structured outcomes as direct calls. Other top-level operations, such as listing, inspection, and creation, use `tools.<name>(args)`.
+
+Use `await` for dependent operations and `Promise.all` or `Promise.allSettled` to submit independent calls together. Sequential tools execute in submission order relative to other sequential tools; parallel tools can run alongside them. This scheduling applies equally to direct calls and script calls.
+
+Each result retains its `kind` and raw `data`. `text(result)` returns the text from its existing model projection without publishing anything. Return the selected JSON value or text directly:
+
+```js
+const directory = resources.get("directory-resource-id");
+const result = await directory.read({
+  target: { path: "README.md" },
+  args: {},
+});
+return {
+  kind: result.kind,
+  text: text(result),
+};
+```
+
+Getting a handle performs no tool call and grants no access. Method execution uses the captured request scope and tool support. Handles reserve `then` and `toJSON` for JavaScript interoperability rather than resource operations.
+
+Resource inspection includes each tool's `requiresInteraction` flag. Tools requiring user interaction, such as `ask_user`, use direct model calls. Script tool bindings exclude interaction-required top-level tools, and resource methods reject interaction-required operations. Tools supporting both modes receive a noninteractive execution context in scripts.
+
+Only the final return value reaches the model. History retains the code, child call identities, timing and outcome summaries, and the returned value. Child arguments and outputs are temporary. The execution title summarizes call progress and failures. The body lists calls grouped by tool and resource with repeat counts, timing, statuses, and diagnostics, followed by the return value and the script code.
+
+Each script has an isolated JavaScript environment and the current request's captured access. The host supplies tool calls through a bridge; filesystem, network, and process operations use those tools. An optional `timeout_ms` bounds the whole execution. Ending a script cancels outstanding calls, waits for their completion, and releases the script environment; completed external effects remain.
+
 ## Choose material and capabilities
 
 | Resource or input | Use |

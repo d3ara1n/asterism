@@ -48,6 +48,8 @@ export interface ToolExecutionPhaseView<P> extends ToolStreamingPhaseView<P> {
 export interface ToolRendererDefinition<D = Json, T = Json, A = Json> {
   label?: UiText;
   icon?: ReactNode;
+  /** Whether the conversation shell exposes raw argument/result details; defaults to true. */
+  details?: boolean;
   input?: ToolStreamingPhaseView<ToolInputRenderProps>;
   execution?: ToolExecutionPhaseView<ToolExecutionRenderProps<D, T, A>>;
   result?: ToolPhaseView<ToolResultRenderProps<D, T, A>>;
@@ -55,6 +57,7 @@ export interface ToolRendererDefinition<D = Json, T = Json, A = Json> {
 export interface ToolView {
   label?: UiText;
   icon?: ReactNode;
+  details?: boolean;
   header?: ReactNode;
   body?: ReactNode;
   /** Bodies in input or execution phases may participate in streaming preview expansion and collapse; false means no match this time, and phase completion is determined by the call lifecycle. */
@@ -66,14 +69,16 @@ export interface ToolRenderer {
   contract: ContractReference;
   /** Display name of the tool, readable without rendering a call. */
   label?: UiText;
+  /** Static operation icon, available to call summaries without rendering arguments or results. */
+  icon?: ReactNode;
   resolve(props: ToolRenderProps): ToolView | null;
 }
 
 function render<P extends { phase: ToolRenderProps["phase"] }>(
-  definition: Pick<ToolView, "label" | "icon">, view: ToolExecutionPhaseView<P> | undefined, props: P,
+  definition: Pick<ToolView, "label" | "icon" | "details">, view: ToolExecutionPhaseView<P> | undefined, props: P,
 ): ToolView {
   return {
-    label: definition.label, icon: definition.icon,
+    label: definition.label, icon: definition.icon, details: definition.details,
     header: view?.headerRenderer ? createElement(view.headerRenderer, props) : undefined,
     body: view?.bodyRenderer ? createElement(view.bodyRenderer, props) : undefined,
     streaming: (props.phase === "input" || props.phase === "executing")
@@ -87,7 +92,7 @@ export function toolRenderer<D extends Json, T extends Json = Json, A extends Js
   contract: DataContract<D> & { targetSchema?: z.ZodType<T>; tool?: { argsSchema: z.ZodType<A> } },
   definition: ToolRendererDefinition<D, T, A>,
 ): ToolRenderer {
-  return { contract: reference(contract), label: definition.label, resolve(props) {
+  return { contract: reference(contract), label: definition.label, icon: definition.icon, resolve(props) {
     if (props.phase === "input") return definition.input ? render(definition, definition.input, props) : null;
     const data = props.result?.data;
     const parsed = data === null || data === undefined ? null : contract.schema.safeParse(data);

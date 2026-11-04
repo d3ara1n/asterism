@@ -34,9 +34,13 @@ Both resource tools and top-level tools receive `caller`, containing the access 
 
 Describe the operation's purpose and observable behavior. Parameters should explain business meaning that names and types alone do not express. Results should distinguish known success, failure, cancellation, partial output, and uncertain effects.
 
+Declare `execution: "sequential"` when an operation must preserve submission order relative to other sequential operations in the request. Parallel operations can overlap either category. This execution policy is independent of the operation's read/write effect. Direct model calls and resource script calls share validation, scheduling, and completion, so tools require no separate script implementation.
+
 A tool contribution can capture resource-specific configuration and access at the start of each model request. Return a bound contribution using the same implementation contract; the host uses it for that request's tool batch. This is useful for a resource whose selected network or reachable objects can change while a model is responding. Capture addressing and authorization facts, while reading ordinary mutable content when the operation runs.
 
 Declare `requiresInteraction: true` when a tool cannot complete without user interaction. The host excludes it from noninteractive requests and rejects unsupported calls before entering the implementation. Tools supporting both modes can inspect `interactive` in their execution context. A renderer that only displays progress or results does not make a tool interactive.
+
+Resource inspection includes the interaction requirement. Resource scripts are noninteractive surfaces, including within an interactive model request; interaction-required operations use direct model calls. Their other execution and authorization contracts remain shared.
 
 Use `plugin.execution.run` to execute one model request with tools bound to a resource's current links and the real session. Supply that resource as the access owner and select the interaction capability. The execution holds captured relationships through the tool batch; subsequent calls capture current links again. Calls sharing an access owner keep independent message inputs and can run concurrently.
 

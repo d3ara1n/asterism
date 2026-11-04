@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import type { Json } from "./json.ts";
 import type { DataContract } from "./presentation.ts";
 import type { ConfigContract } from "./config.ts";
@@ -19,6 +19,8 @@ export interface RendererTools {
   preparation(name: string): string;
   /** Localized name of a tool by its model-facing name and implementation contract; null when no view declares one. */
   label(name: string, implementation: string | null): string | null;
+  /** Static icon of a tool by the same identity; null when no view declares one. */
+  icon(name: string, implementation: string | null): ReactNode;
 }
 export interface RendererModels { readonly blocks: readonly ModelLiveBlock[] }
 export interface RendererNavigation { home(): void }

@@ -21,6 +21,7 @@ export interface ImplementationContract<S extends Json, T extends Json, A extend
   tool: ToolContract<A>;
   targetSchema: z.ZodType<T>;
   effect: "read" | "write";
+  /** Sequential operations share submission order; parallel operations can overlap either lane. */
   execution: "parallel" | "sequential";
 }
 export function defineResource<S extends Json>(kind: string, stateSchema: z.ZodType<S>): ResourceContract<S> {

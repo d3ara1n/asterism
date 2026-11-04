@@ -13,6 +13,46 @@ export const toolsMessages = pluginNamespace("asterism.host").messages("en", def
     id: "toolPreparingInspect",
     defaultMessage: "Preparing to inspect a resource…",
   },
+  toolPreparingScript: {
+    id: "toolPreparingScript",
+    defaultMessage: "Preparing resource orchestration…",
+  },
+  toolResourceScript: {
+    id: "toolResourceScript",
+    defaultMessage: "Resource orchestration",
+  },
+  toolScriptQueued: {
+    id: "toolScriptQueued",
+    defaultMessage: "Queued",
+  },
+  toolScriptRunning: {
+    id: "toolScriptRunning",
+    defaultMessage: "Running",
+  },
+  toolScriptElapsed: {
+    id: "toolScriptElapsed",
+    defaultMessage: "{seconds}s",
+  },
+  toolScriptCalls: {
+    id: "toolScriptCalls",
+    defaultMessage: "{count, plural, one {# call} other {# calls}}",
+  },
+  toolScriptFailedCount: {
+    id: "toolScriptFailedCount",
+    defaultMessage: "{count} failed",
+  },
+  toolScriptPartialCount: {
+    id: "toolScriptPartialCount",
+    defaultMessage: "{count} partial",
+  },
+  toolScriptCode: {
+    id: "toolScriptCode",
+    defaultMessage: "Code",
+  },
+  toolScriptValue: {
+    id: "toolScriptValue",
+    defaultMessage: "Return value",
+  },
   toolResourceList: {
     id: "toolResourceList",
     defaultMessage: "Available resources",
@@ -40,6 +80,10 @@ export const toolsMessages = pluginNamespace("asterism.host").messages("en", def
   toolAvailableTools: {
     id: "toolAvailableTools",
     defaultMessage: "Available tools",
+  },
+  toolRequiresInteraction: {
+    id: "toolRequiresInteraction",
+    defaultMessage: "User interaction",
   },
   toolNoTools: {
     id: "toolNoTools",

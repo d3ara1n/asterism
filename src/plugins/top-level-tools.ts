@@ -3,24 +3,23 @@ import { PluginApiError, type TopLevelTool, type ToolCaller } from "@asterism-ap
 import type { Invocation, PreparedResult } from "../tools/contract.ts";
 import type { SdkContext } from "./sdk-context.ts";
 import type { RunGroup } from "./lifecycle.ts";
-import { resolveToolCompletion } from "../tools/result.ts";
+import { interactionUnavailable, resolveToolCompletion } from "../tools/result.ts";
 import { encodePluginData } from "./data-encoding.ts";
 
 export interface BoundTopLevelTool {
   tool: ToolContract;
   available: boolean;
-  resolve(args: Json, callId: string): Invocation | PreparedResult;
+  resolve(args: Json, callId: string, interactive?: boolean): Invocation | PreparedResult;
 }
 export interface RegisteredTopLevelTool { tool: TopLevelTool; sdk: SdkContext; runs: RunGroup }
-export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean): BoundTopLevelTool[] {
+export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], requestInteractive: boolean): BoundTopLevelTool[] {
   const ref = caller.ref;
   return entries.filter(entry => policy(entry.tool.name)).map(({ tool, sdk, runs }) => ({
     tool,
-    available: interactive || !tool.requiresInteraction,
-    resolve(args, callId) {
-      if (!interactive && tool.requiresInteraction) return {
-        kind: "rejected", error: { code: "interaction_unavailable", message: "This execution is noninteractive. The tool requires user interaction." },
-      };
+    available: requestInteractive || !tool.requiresInteraction,
+    resolve(args, callId, interactive = requestInteractive) {
+      const canInteract = requestInteractive && interactive;
+      if (!canInteract && tool.requiresInteraction) return interactionUnavailable();
       return {
         implementation: reference(tool), effect: tool.effect, execution: tool.execution,
         toModel: data => {
@@ -39,7 +38,7 @@ export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ca
           };
           try {
             const result = await tool.execute(args, {
-              object: sdk.reader(ref, scope), caller, session: sdk.toolSession(ref, linked, scope, current), callId, signal: current, interactive,
+              object: sdk.reader(ref, scope), caller, session: sdk.toolSession(ref, linked, scope, current), callId, signal: current, interactive: canInteract,
               publish(data) {
                 if (!scope.active) return;
                 latest = encode(data); publish?.(latest);

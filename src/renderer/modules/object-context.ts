@@ -5,7 +5,7 @@ import type { WorkbenchObject } from "../../shared/workbench";
 import { useWorkbench } from "../features/workbench/context";
 import { useObjectLive, useSession } from "../features/session/state";
 import { useConfiguration } from "../features/configuration/state";
-import { resolveToolView, toolLabel, toolPreparation } from "../features/conversation/tool-views";
+import { resolveToolView, toolIcon, toolLabel, toolPreparation } from "../features/conversation/tool-views";
 import { useModuleViews } from "./views";
 import { pluginPreferences } from "../features/creation/preferences";
 import { contentInput, contentReader, contentCommand } from "../features/creation/content";
@@ -66,7 +66,8 @@ export function ObjectServices({ object, children }: { object: WorkbenchObject; 
   // Subscribe only to this object's live blocks: this card's model context retains its identity while other objects generate.
   const models = useMemo(() => ({ blocks: live }), [live]);
   const tools = useMemo(() => ({ resolve: (props: Parameters<typeof resolveToolView>[0]) => resolveToolView(props, registry), preparation: toolPreparation,
-    label: (name: string, implementation: string | null) => toolLabel(name, implementation, registry) }), [registry]);
+    label: (name: string, implementation: string | null) => toolLabel(name, implementation, registry),
+    icon: (name: string, implementation: string | null) => toolIcon(name, implementation, registry) }), [registry]);
   const preferences = useMemo(() => pluginPreferences(pluginOf(object.kind) ?? "unknown"), [object.kind]);
   return createElement(RendererModelsProvider, { value: models }, createElement(RendererToolsProvider, { value: tools },
     createElement(RendererPreferencesProvider, { value: preferences }, children)));

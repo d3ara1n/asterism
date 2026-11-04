@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { CodeRows } from "../code-view";
+import { CodeRows } from "@asterism-app/ui/code-view";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { inputText } from "../shared/tool-preview";

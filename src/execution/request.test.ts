@@ -242,9 +242,9 @@ describe("Stateless single model execution", () => {
     expect(extensions).toHaveBeenCalledTimes(1);
     expect(system.blocks[0]?.text).toBe("Environment");
     const saved = modelCompletionSchema.parse(result.completion);
-    expect(saved.extensions).toContainEqual({ contract: { id: contract.id }, data: ["resource_list", "resource_inspect", "resource_call"] });
+    expect(saved.extensions).toContainEqual({ contract: { id: contract.id }, data: ["resource_list", "resource_inspect", "resource_call", "resource_script"] });
     expect(saved.extensions).toContainEqual(unknown);
-    expect(completionData(saved, contract)).toEqual({ tools: ["resource_list", "resource_inspect", "resource_call"] });
+    expect(completionData(saved, contract)).toEqual({ tools: ["resource_list", "resource_inspect", "resource_call", "resource_script"] });
     expect(completionData(saved, defineData("missing/plugin", z.string()))).toBeNull();
     expect(completionData(saved, defineData(contract.id, z.number()))).toBeNull();
     extensions.mockClear();

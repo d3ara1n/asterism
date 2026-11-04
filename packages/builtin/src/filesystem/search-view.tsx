@@ -5,7 +5,7 @@ import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
 import { cn } from "@asterism-app/ui/utils";
-import { CodeRows } from "../code-view";
+import { CodeRows } from "@asterism-app/ui/code-view";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { inputText } from "../shared/tool-preview";

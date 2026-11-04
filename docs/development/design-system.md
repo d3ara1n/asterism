@@ -69,7 +69,7 @@ Auxiliary panels respond to card width rather than window width or canvas zoom. 
 
 Tool headers form single-line summaries with a shrinkable target area and stable trailing statistics. Preserve meaningful information across input, execution, and result phases.
 
-The tool shell does not impose one global body height. Renderers choose local scroll or preview behavior. Built-in code and diff views use Pierre Diffs; Markdown uses the shared renderer. Full saved data remains distinct from presentation budgets.
+The tool shell does not impose one global body height. Renderers choose local scroll or preview behavior. Code and diff views use the shared Pierre Diffs presentation in `packages/ui/`, available to every plugin; Markdown uses the shared renderer. Full saved data remains distinct from presentation budgets.
 
 Shared streaming previews have bounded tail views and are noninteractive. Final results switch to the appropriate full reading view.
 

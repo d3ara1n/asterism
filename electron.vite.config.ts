@@ -27,7 +27,12 @@ export default defineConfig({
       },
       outDir: resolve("dist/main"),
       rolldownOptions: {
-        input: { index: resolve("src/main/index.ts"), runtime: resolve("src/runtime/index.ts"), "prepare-data": resolve("src/runtime/prepare-data.ts") },
+        input: {
+          index: resolve("src/main/index.ts"),
+          runtime: resolve("src/runtime/index.ts"),
+          "prepare-data": resolve("src/runtime/prepare-data.ts"),
+          "script-worker": resolve("src/execution/script-worker.ts"),
+        },
         // Package asset resolution uses the same two-level depth as src/plugins and src/runtime.
         output: { format: "es", entryFileNames: "[name].js", chunkFileNames: "[name]-[hash].js" },
       },

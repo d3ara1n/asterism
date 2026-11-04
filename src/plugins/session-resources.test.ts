@@ -297,6 +297,19 @@ describe("SDK session resource lifetimes", () => {
       { name: "required", args: {} }, { name: "dual", args: {} },
       { name: "resource_call", args: { resource_id: resourceId, tool: "required", args: {} } },
       { name: "resource_call", args: { resource_id: resourceId, tool: "dual", args: {} } },
+      { name: "resource_script", args: { code: `
+        const inspection = await tools.resource_inspect({ resource_id: ${JSON.stringify(resourceId)} });
+        const handle = resources.get(${JSON.stringify(resourceId)});
+        const required = await handle.required({ args: {} });
+        const top = await tools.dual({});
+        const resource = await handle.dual({ args: {} });
+        return {
+          requiredBinding: typeof tools.required,
+          required: { kind: required.kind, code: required.error.code },
+          top: top.data, resource: resource.data,
+          tools: inspection.data.tools.map(tool => ({ name: tool.name, requiresInteraction: tool.requiresInteraction })),
+        };
+      ` } },
     ]);
     const f = open({ plugins: [plugin], adapter: { ...base, prepare(input) {
       advertised = input.tools.map(tool => tool.name); return base.prepare(input);
@@ -314,8 +327,27 @@ describe("SDK session resource lifetimes", () => {
     expect(result.tools[3]).toMatchObject({ kind: "rejected", error: { code: "interaction_unavailable" } });
     expect(result.tools[2]).toMatchObject({ kind: "succeeded", data: false });
     expect(result.tools[4]).toMatchObject({ kind: "succeeded", data: false });
+    expect(result.tools[5]).toMatchObject({ kind: "succeeded", data: { value: {
+      requiredBinding: "undefined", required: { kind: "rejected", code: "interaction_unavailable" },
+      top: false, resource: false, tools: [{ name: "dual", requiresInteraction: false }],
+    } } });
     expect(entered).toBe(0);
     expect(ownerBusy).toBe(false);
+
+    const interactive = await f.plugin.execution.run({ access: actor, interactive: true, target, requestParentId: null,
+      system: { blocks: [] }, messages: [], signal: new AbortController().signal, observer: { event() {} } });
+    expect(advertised).toContain("required");
+    expect(interactive.tools[1]).toMatchObject({ kind: "succeeded", data: true });
+    expect(interactive.tools[2]).toMatchObject({ kind: "succeeded", data: true });
+    expect(interactive.tools[3]).toMatchObject({ kind: "succeeded", data: true });
+    expect(interactive.tools[4]).toMatchObject({ kind: "succeeded", data: true });
+    expect(interactive.tools[5]).toMatchObject({ kind: "succeeded", data: { value: {
+      requiredBinding: "undefined", required: { kind: "rejected", code: "interaction_unavailable" },
+      top: false, resource: false, tools: [
+        { name: "required", requiresInteraction: true }, { name: "dual", requiresInteraction: false },
+      ],
+    } } });
+    expect(entered).toBe(2);
   });
 
   it.each(["remove", "rewind"] as const)("%s retains one instance for overlapping requests, excludes it from later capture, and does not restore it on restart", async mode => {

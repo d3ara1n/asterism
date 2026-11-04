@@ -6,7 +6,8 @@ import { motion, useReducedMotion } from "motion/react";
 import { conversationMessages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";
 import { conversationTransition, immediateTransition } from "./motion";
-import { toolCallState, type ToolCallNode } from "./tool-state";
+import type { ToolCallNode } from "./tool-state";
+import { toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
 
 /** Distinct tools shown before the remainder collapses into a count. */
 const visibleTools = 5;
@@ -40,9 +41,9 @@ export function TurnProcess({ node, onToggle, onMount }: {
   const tools = useRendererTools();
   const reducedMotion = useReducedMotion();
   const groups = toolGroups(node.tools);
-  const kinds = node.tools.map(resultKind);
-  const failed = kinds.filter(kind => kind === "failed" || kind === "rejected" || kind === "unknown").length;
-  const partial = kinds.filter(kind => kind === "partial").length;
+  const tones = node.tools.flatMap(call => { const kind = resultKind(call); return kind && kind !== "running" ? [toolOutcomeTone(kind)] : []; });
+  const failed = tones.filter(tone => tone === "error").length;
+  const partial = tones.filter(tone => tone === "warning").length;
   return <Marker variant="separator" asChild><Button type="button" variant="ghost" size="sm" aria-expanded={node.open} onClick={onToggle}
     ref={button => { if (button) onMount(node.id, button); }}
     className="w-full gap-2 px-0 text-xs font-normal text-muted-foreground">
@@ -56,8 +57,7 @@ export function TurnProcess({ node, onToggle, onMount }: {
         <span className="sr-only">{i18n.formatMessage(conversationMessages.processToolCount, { count: node.tools.length })}</span>
         <span aria-hidden="true" className="flex min-w-0 items-center gap-2 overflow-hidden">
           {groups.slice(0, visibleTools).map(group => {
-            const props = toolCallState(group.node).props;
-            const icon = props ? tools.resolve(props).icon : undefined;
+            const icon = tools.icon(group.node.name, implementation(group.node));
             const label = tools.label(group.node.name, implementation(group.node)) ?? group.node.name;
             return <span key={group.key} title={label} className="inline-flex shrink-0 items-center gap-0.5 tabular-nums [&_svg]:size-3.5">
               {icon ?? <Wrench />}{group.count > 1 && group.count}

@@ -6,7 +6,7 @@ import { manualMessages as messages } from "../messages/manual";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { manualCard as appearance } from "../shared/card-appearance";
-import { prepareCodeView } from "../shared/code-view";
+import { prepareCodeView } from "@asterism-app/ui/code-view";
 import { textReadViews } from "../text-view";
 import { listViews } from "../filesystem/list-view";
 import { findViews, grepViews } from "../filesystem/search-view";

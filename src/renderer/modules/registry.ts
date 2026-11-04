@@ -1,7 +1,7 @@
 import { pluginOf, withValues, type ContractReference, type Presentation, type SessionRecord, type UiText } from "@asterism-app/sdk/contracts";
 import type { RecordRenderer, RecordRenderContext, RecordView, CardRenderer, CardView, CreationEntry, ResourceDescription, RendererModule, RendererObjectContext, ToolRenderProps, ToolRenderer, ToolView } from "@asterism-app/sdk/renderer";
 import { Box } from "lucide-react";
-import { createElement } from "react";
+import { createElement, type ReactNode } from "react";
 
 import { objectsMessages } from "../messages/objects";
 
@@ -60,5 +60,8 @@ export class ViewRegistry {
   /** Display name declared by the tool view registered for an implementation contract. */
   toolLabel(contract: string): UiText | undefined {
     return this.tools.get(contract)?.label;
+  }
+  toolIcon(contract: string): ReactNode {
+    return this.tools.get(contract)?.icon;
   }
 }

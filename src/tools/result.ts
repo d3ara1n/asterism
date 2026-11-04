@@ -2,6 +2,11 @@ import type { Json, ModelInputPart, ToolModelOutput } from "@asterism-app/sdk/co
 import { defaultToolModel, toolCompletionSchema, toolOutcomeSchema, type ToolInvocationInfo, type ToolOutcome } from "@asterism-app/sdk/contracts";
 import type { CallResult } from "./contract.ts";
 
+/** Shared rejection for interaction-required tools on a noninteractive surface, checked before implementation entry. */
+export function interactionUnavailable(): CallResult {
+  return { kind: "rejected", error: { code: "interaction_unavailable", message: "This execution is noninteractive. The tool requires user interaction." } };
+}
+
 /** Only unsuccessful outcomes may inherit intermediate output; previews cannot implicitly become successful results. */
 export function resolveToolCompletion(result: CallResult, latest: Json = null) {
   if ((result.kind === "succeeded" || result.kind === "partial") && result.data === undefined) {

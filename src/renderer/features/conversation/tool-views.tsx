@@ -5,7 +5,7 @@ import type { z } from "zod";
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
 import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism-app/sdk/renderer";
 
-import { ResourceCall, ResourceInspect, ResourceInspectResult, ResourceList, ResourceListResult } from "../../../tools/core";
+import { ResourceCall, ResourceInspect, ResourceInspectResult, ResourceList, ResourceListResult, ResourceScript } from "../../../tools/core";
 import { toolsMessages } from "../../messages/tools";
 import { JsonView, useModuleViews } from "../../modules/views";
 import type { ViewRegistry } from "../../modules/registry";
@@ -13,6 +13,8 @@ import { getI18n, useI18n } from "../../shared/i18n";
 import { ToolDetails } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@asterism-app/ui/ui/item";
+import { Badge } from "@asterism-app/ui/ui/badge";
+import { scriptToolRenderer } from "./script-view";
 
 /** State fields can come from any resource; ordinary scalars are read directly, while compound values retain complete data. */
 function ResourceFields({ value }: { value: Json }) {
@@ -71,7 +73,9 @@ function ResourceInspectBody({ result }: InspectProps) {
       {!result.data.tools.length && <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoTools)}</p>}
       <ItemGroup>{result.data.tools.map(tool => <Item key={tool.name} size="sm" className="px-0">
         <ItemContent>
-          <ItemTitle>{tool.name}</ItemTitle>
+          <ItemTitle>{tool.name}{tool.requiresInteraction && <Badge variant="secondary">
+            {i18n.formatMessage(toolsMessages.toolRequiresInteraction)}
+          </Badge>}</ItemTitle>
           <ItemDescription className="line-clamp-none">{tool.description}</ItemDescription>
           <ToolDetails label={i18n.formatMessage(toolsMessages.toolUsageDetails)} stateKey={`asterism/tool-usage:${tool.name}`}>
             {!!tool.guidelines.length && <ul className="list-disc space-y-1 pl-4 type-caption">{tool.guidelines.map((line, index) => <li key={index}>{line}</li>)}</ul>}
@@ -91,46 +95,46 @@ const inspect = toolRenderer(ResourceInspectResult, {
 });
 
 export interface ResolvedToolView extends ToolView { props: ToolRenderProps }
-function fixed(renderer: ToolRenderer, props: ToolRenderProps, label: UiText, icon: ReactNode): ResolvedToolView {
+/** Host entries with fixed names; each renderer carries the entry's label and icon. */
+const fixedTools = new Map<string, { preparation: UiText; renderer: ToolRenderer }>([
+  [ResourceList.name, { preparation: toolsMessages.toolPreparingList, renderer: list }],
+  [ResourceInspect.name, { preparation: toolsMessages.toolPreparingInspect, renderer: inspect }],
+  [ResourceScript.name, { preparation: toolsMessages.toolPreparingScript, renderer: scriptToolRenderer }],
+]);
+function fixed(renderer: ToolRenderer, props: ToolRenderProps): ResolvedToolView {
   const identity = props.invocation.implementation;
   const view = !identity || identity.id === renderer.contract.id ? renderer.resolve(props) : null;
-  return { label, icon, ...view, props };
+  return { label: renderer.label, icon: renderer.icon, ...view, props };
 }
 /** The fixed entry's own adapter handles forwarding; the shared shell does not know the resource tool protocol. */
-const builtinViews = new Map<string, {
-  preparation: UiText;
-  render(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView;
-}>([
-  [ResourceList.name, { preparation: toolsMessages.toolPreparingList, render: props => fixed(list, props, toolsMessages.toolResourceList, <Boxes className="size-3.5" />) }],
-  [ResourceInspect.name, { preparation: toolsMessages.toolPreparingInspect, render: props => fixed(inspect, props, toolsMessages.toolResourceInspect, <ScanSearch className="size-3.5" />) }],
-  [ResourceCall.name, { preparation: toolsMessages.toolPreparing, render(props, registry) {
-    if (props.phase === "input") {
-      const args = props.args;
-      if (!args || typeof args !== "object" || Array.isArray(args) || typeof args.tool !== "string") return { props };
-      const inner = { ...props, name: args.tool, target: args.target ?? null, args: args.args ?? null };
-      return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
-    }
-    const parsed = ResourceCall.argsSchema.safeParse(props.args);
-    if (!parsed.success) return { props, label: toolsMessages.toolResourceCall };
-    const inner = { ...props, name: parsed.data.tool, target: parsed.data.target, args: parsed.data.args };
+function resourceCall(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView {
+  if (props.phase === "input") {
+    const args = props.args;
+    if (!args || typeof args !== "object" || Array.isArray(args) || typeof args.tool !== "string") return { props };
+    const inner = { ...props, name: args.tool, target: args.target ?? null, args: args.args ?? null };
     return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
-  } }],
-]);
+  }
+  const parsed = ResourceCall.argsSchema.safeParse(props.args);
+  if (!parsed.success) return { props, label: toolsMessages.toolResourceCall };
+  const inner = { ...props, name: parsed.data.tool, target: parsed.data.target, args: parsed.data.args };
+  return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
+}
 export function toolPreparation(name: string): string {
-  return getI18n().text(builtinViews.get(name)?.preparation ?? toolsMessages.toolPreparing);
+  return getI18n().text(fixedTools.get(name)?.preparation ?? toolsMessages.toolPreparing);
 }
 /** Fixed entries carry their own names; dispatched and plugin tools use the view registered for their implementation. */
-const fixedLabels = new Map<string, UiText>([
-  [ResourceList.name, toolsMessages.toolResourceList],
-  [ResourceInspect.name, toolsMessages.toolResourceInspect],
-]);
 export function toolLabel(name: string, implementation: string | null, registry: ViewRegistry): string | null {
-  const label = fixedLabels.get(name) ?? (implementation ? registry.toolLabel(implementation) : undefined);
+  const label = fixedTools.get(name)?.renderer.label ?? (implementation ? registry.toolLabel(implementation) : undefined);
   return label ? getI18n().text(label) : null;
+}
+export function toolIcon(name: string, implementation: string | null, registry: ViewRegistry): ReactNode {
+  return fixedTools.get(name)?.renderer.icon ?? (implementation ? registry.toolIcon(implementation) : undefined) ?? null;
 }
 export function resolveToolView(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView {
   if (props.phase === "input" && props.argumentsText !== undefined)
     props = { ...props, args: previewArguments(props.argumentsText) };
-  return builtinViews.get(props.name)?.render(props, registry)
-    ?? { props, icon: <Wrench className="size-3.5" />, ...registry.tool(props.invocation.implementation, props) };
+  const entry = fixedTools.get(props.name);
+  if (entry) return fixed(entry.renderer, props);
+  if (props.name === ResourceCall.name) return resourceCall(props, registry);
+  return { props, icon: <Wrench className="size-3.5" />, ...registry.tool(props.invocation.implementation, props) };
 }
