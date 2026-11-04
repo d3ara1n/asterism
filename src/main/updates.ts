@@ -113,7 +113,7 @@ export class ApplicationUpdates {
     if (this.state.status !== "restarting") return;
     // macOS native signature validation finishes asynchronously afterward; failures can display the startup recovery entry.
     this.updater.once("error", onFailure);
-    try { this.updater.quitAndInstall(false, true); }
+    try { this.updater.quitAndInstall(process.platform === "win32", true); }
     catch (error) {
       this.updater.removeListener("error", onFailure);
       const failure = error instanceof Error ? error : new Error(String(error));
