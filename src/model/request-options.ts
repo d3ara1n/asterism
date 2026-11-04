@@ -24,10 +24,7 @@ export function requestOptions(provider: Connection, model: ProviderModel, reque
     topP: model.generation.topP ?? undefined,
     providerOptions: provider.protocol === "openai-responses" ? { openai: { store: false } } : {},
   };
-  if (request.purpose === "probe") {
-    options.maxOutputTokens = Math.min(model.generation.maxOutputTokens ?? 64, 128);
-    return options;
-  }
+  if (request.purpose === "probe") return options;
   if (request.maxOutputTokens !== undefined) {
     if (!Number.isSafeInteger(request.maxOutputTokens) || request.maxOutputTokens <= 0)
       throw new ModelFailure("invalid_argument", "The output token limit must be a positive safe integer.");

@@ -61,7 +61,7 @@ describe("Protocol connection tests", () => {
     expect(JSON.stringify(init)).not.toContain("environment-key-must-not-be-used");
     const body = JSON.parse(String(init?.body));
     expect(body).toMatchObject({ model: "test-model", temperature: 0.3, top_p: 0.8 });
-    expect(body.max_output_tokens ?? body.max_tokens ?? body.max_completion_tokens).toBe(128);
+    expect(body.max_output_tokens ?? body.max_tokens ?? body.max_completion_tokens).toBe(1000);
     expect(body).not.toHaveProperty("reasoning");
     expect(body).not.toHaveProperty("reasoning_effort");
     expect(body).not.toHaveProperty("thinking");

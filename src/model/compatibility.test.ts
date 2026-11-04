@@ -161,7 +161,7 @@ describe("Reasoning level and budget mappings", () => {
     await generateText({ model: languageModel, prompt: "Question", ...requestOptions(provider, model, { purpose: "probe" }) });
     expect(bodies[0]).toMatchObject({ thinking: { type: "enabled", budget_tokens: 2048 }, max_tokens: 10000 });
     expect(bodies[1]).not.toHaveProperty("thinking");
-    expect(bodies[1]).toMatchObject({ max_tokens: 128 });
+    expect(bodies[1]).toMatchObject({ max_tokens: 10000 });
   });
 });
 
