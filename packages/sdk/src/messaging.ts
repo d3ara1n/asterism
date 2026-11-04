@@ -43,18 +43,23 @@ export const messagingTextPartSchema = z.strictObject({ kind: z.literal("text"),
 export const messagingPartSchema = z.discriminatedUnion("kind", [messagingTextPartSchema, messagingFilePartSchema]);
 export const messageSchema = z.strictObject({
   id, sender: messageSenderSchema, parts: z.array(messagingPartSchema),
-  sentAt: z.string(), replyTo: id.optional(), threadId: id.optional(),
+  sentAt: z.string(), replyTo: id.optional(), threadId: id.optional(), groupId: id.optional(),
 });
 export const messagingFileQuerySchema = conversationAddressSchema.extend({ messageId: id, fileId: id });
 export const conversationQuerySchema = z.strictObject({ since: id.optional() });
 export const conversationListSchema = z.strictObject({
   conversations: z.array(conversationSchema), cursor: id.optional(), truncated: z.boolean(),
 });
-export const messageQuerySchema = conversationAddressSchema.extend({
-  since: id.optional(), limit: z.number().int().positive().optional(),
-});
+const messagePageTargetSchema = z.strictObject({ since: id.optional(), limit: z.number().int().positive().optional() });
+const messageIdsTargetSchema = z.strictObject({ messageIds: z.array(id).min(1) });
+export const messageReadTargetSchema = z.union([messagePageTargetSchema, messageIdsTargetSchema]);
+export const messageQuerySchema = z.union([
+  conversationAddressSchema.extend(messagePageTargetSchema.shape),
+  conversationAddressSchema.extend(messageIdsTargetSchema.shape),
+]);
 export const messageListSchema = z.strictObject({
   messages: z.array(messageSchema), cursor: id.optional(), truncated: z.boolean(),
+  missingIds: z.array(id).optional(),
 });
 /** Files are references resolved by the provider when sending; text accompanies them as a caption. */
 export const sendMessageSchema = conversationAddressSchema.extend({
@@ -63,7 +68,7 @@ export const sendMessageSchema = conversationAddressSchema.extend({
 }).refine(value => value.parts.some(part => part.kind === "file-reference" || part.text.trim()), "A message requires text or a file.");
 export const messagingEventSchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("conversation.discovered"), conversation: conversationSchema }),
-  z.strictObject({ kind: z.literal("message.received"), conversation: conversationSchema, message: messageSchema }),
+  z.strictObject({ kind: z.literal("messages.received"), conversation: conversationSchema, messages: z.array(messageSchema).min(1) }),
 ]);
 export type MessagingProviderType = z.infer<typeof messagingProviderTypeSchema>;
 export type MessagingConnection = z.infer<typeof messagingConnectionSchema>;

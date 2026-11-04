@@ -2,7 +2,7 @@ import { MessagingError, type PluginContext } from "@asterism-app/sdk/runtime";
 import { fileMediaType, type FileReferencePart, type MessagingConversation, type MessagingEvent, type MessagingMessage, type MessagingFileQuery, type MessagingFilePart, type SendMessage } from "@asterism-app/sdk/contracts";
 import { ObservedMessages } from "./observed-store.ts";
 
-export interface ObservedMessage { conversation: MessagingConversation; message: MessagingMessage }
+export interface ObservedMessage { conversation: MessagingConversation; message: MessagingMessage; aliases?: readonly string[] }
 /** Apply one provider's SDK error mapping while preserving operation cancellation. */
 export const providerCall = (mapError: (error: unknown) => unknown) => async <T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> => {
   signal.throwIfAborted();
@@ -17,7 +17,7 @@ export function outgoingMessage({ parts, ...address }: SendMessage) {
 }
 /** Verify that an attachment belongs to the addressed observed message; returns both for platform lookups. */
 export function observedFile(store: ObservedMessages, query: MessagingFileQuery): { message: MessagingMessage; file: MessagingFilePart } {
-  const message = store.message(query.conversationId, query.messageId);
+  const message = store.fileMessage(query.conversationId, query.messageId, query.fileId);
   const file = message?.parts.find((part): part is MessagingFilePart => part.kind === "file" && part.id === query.fileId);
   if (!message || !file || (query.threadId && message.threadId !== query.threadId && message.id !== query.threadId))
     throw new MessagingError("invalid_input", "The attachment does not belong to this conversation and message.");
@@ -32,11 +32,13 @@ export async function* downloadFile(url: string, signal: AbortSignal, headers?: 
   } finally { await reader.cancel(); reader.releaseLock(); }
 }
 export function messageObserver(store: ObservedMessages, publish: (event: MessagingEvent) => void) {
-  return ({ conversation, message }: ObservedMessage, notify = true) => {
-    const result = store.observe(conversation, message);
+  return ({ conversation, message, aliases }: ObservedMessage, notify = true) => {
+    for (const alias of aliases ?? []) store.alias(conversation.conversationId, alias, message.id);
+    const value = message.replyTo ? { ...message, replyTo: store.resolveId(conversation.conversationId, message.replyTo) } : message;
+    const result = store.observe(conversation, value);
     if (result.discovered) publish({ kind: "conversation.discovered", conversation });
-    if (notify && result.inserted) publish({ kind: "message.received", conversation, message });
-    return message;
+    if (notify && result.inserted) publish({ kind: "messages.received", conversation, messages: [value] });
+    return value;
   };
 }
 

@@ -21,12 +21,12 @@ export function coversAddress(target: SubscriptionTarget, connectionId: string, 
 export function matchesSubscription(target: SubscriptionTarget, { connectionId, event }: ConnectionEvent): boolean {
   if (target.connectionId !== connectionId) return false;
   if (!target.conversationId) return event.kind === "conversation.discovered";
-  return event.kind === "message.received" && coversAddress(target, connectionId, event.conversation);
+  return event.kind === "messages.received" && coversAddress(target, connectionId, event.conversation);
 }
 
 export interface DeliveryCandidate { source: ResourceRef; title: string; recipient: ResourceRef }
 /**
- * One event reaches each recipient once. A Chat delivers the full message, so it is preferred over a Conversations summary;
+ * One event reaches each recipient once. A Chat delivers the full messages, so it is preferred over a Conversations summary;
  * otherwise the first matching source is kept.
  */
 export function selectDeliveries(candidates: readonly DeliveryCandidate[]): DeliveryCandidate[] {

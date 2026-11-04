@@ -19,10 +19,12 @@ export function qqMessage(input: InboundMessage, selfId: string): ObservedMessag
   if (input.kind !== "c2c" && input.kind !== "group") return;
   const targetId = input.kind === "c2c" ? input.senderId : input.groupOpenid!;
   return {
+    ...(input.msgIdx ? { aliases: [input.msgIdx] } : {}),
     conversation: { conversationId: `${input.kind}:${targetId}`, title: input.kind === "c2c" ? input.senderName ?? targetId : targetId,
       kind: input.kind === "c2c" ? "private" : "group", activity: input.timestamp },
     message: { id: input.messageId, sender: { id: input.senderId, name: input.senderName ?? input.senderId,
       role: input.senderId === selfId ? "self" : "participant" }, sentAt: input.timestamp,
+      ...(input.refMsgIdx ? { replyTo: input.refMsgIdx } : {}),
       parts: [
         ...(input.content ? [{ kind: "text" as const, text: input.content }] : []),
         ...(input.attachments ?? []).map(file => ({ kind: "file" as const, id: file.url,
@@ -93,6 +95,7 @@ export function qqProvider(plugin: PluginContext): MessagingProviderDefinition {
           const sentAt = new Date(typeof sent.timestamp === "number" ? sent.timestamp * 1000 : sent.timestamp).toISOString();
           const previous = store.conversation(input);
           return observe({
+            ...(sent.ext_info?.ref_idx ? { aliases: [sent.ext_info.ref_idx] } : {}),
             conversation: { conversationId: input.conversationId, title: previous?.title ?? target.targetId,
               kind: target.scope === "c2c" ? "private" : "group", activity: sentAt },
             message: { id: sent.id, sender: { id: self.id, name: self.username, role: "self" },

@@ -49,14 +49,14 @@ const reference = (part: ChatFilePart): Extract<AgentInputPart, { kind: "file-re
 });
 
 /**
- * Agent input for one received message: images within the input limits become captured model files that keep their
+ * Agent input for received message parts: images within the input limits become captured model files that keep their
  * reference; other attachments stay references. A failed capture keeps the reference and states the failure as text.
  */
-export async function messageInputParts(message: ChatMessage, open: (part: ChatFilePart) => AsyncIterable<Uint8Array>,
+export async function messageInputParts(messageParts: readonly ChatMessage["parts"][number][], open: (part: ChatFilePart) => AsyncIterable<Uint8Array>,
   content: ContentScope, signal: AbortSignal): Promise<AgentInputPart[]> {
   const parts: AgentInputPart[] = [];
   let count = 0, total = 0;
-  for (const part of message.parts) {
+  for (const part of messageParts) {
     if (part.kind === "text") { parts.push(part); continue; }
     const remaining = Math.min(modelInputLimits.file, modelInputLimits.total - total);
     if (!part.mediaType.startsWith("image/")) { parts.push(reference(part)); continue; }
@@ -77,7 +77,7 @@ export async function messageInputParts(message: ChatMessage, open: (part: ChatF
 }
 
 const messageHeader = (message: ChatMessage) =>
-  `Message ${message.id} · ${message.sender.name} (${message.sender.role}) · ${message.sentAt}${message.replyTo ? ` · reply to ${message.replyTo}` : ""}`;
+  `Message ${message.id} · ${message.sender.name} (${message.sender.role}) · ${message.sentAt}${message.replyTo ? ` · reply to ${message.replyTo}` : ""}${message.groupId ? ` · group ${message.groupId}` : ""}`;
 /** Read and send results present attachments as references; `see` supplies image content on request. */
 export function chatMessagesToModel(messages: readonly ChatMessage[]): ModelInputPart[] {
   return messages.flatMap(message => [{ kind: "text" as const, text: messageHeader(message) },

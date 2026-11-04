@@ -138,7 +138,7 @@ export function discordProvider(plugin: PluginContext): MessagingProviderDefinit
           const { message: observed } = observedFile(store, query);
           // Attachment URLs are signed and expire; fetching the message returns a current URL.
           const channelId = observed.threadId ?? query.conversationId;
-          const message = await call(signal, () => rest.get(Routes.channelMessage(channelId, query.messageId), { signal }) as Promise<APIMessage>);
+          const message = await call(signal, () => rest.get(Routes.channelMessage(channelId, observed.id), { signal }) as Promise<APIMessage>);
           const file = message.attachments.find(file => file.id === query.fileId);
           if (!file) throw new MessagingError("unavailable", "The Discord attachment is no longer available.");
           yield* downloadFile(file.url, signal);

@@ -10,7 +10,11 @@ Links determine communication. Link a resource to an Agent to make its tools ava
 
 Conversations notifications are off initially. Subscribe to a connection to hear about newly discovered conversations, or to a particular conversation to hear about incoming messages. The list's notification reports activity; the Agent can open a Chat and read messages for content. Subscriptions are saved in session history and follow its current path. Notifications reach resources in sessions open in the running application.
 
-The list tool accepts a null target for connections and a connection target for conversations. Providers may return a cursor. Passing that cursor in a later query asks for subsequent changes without changing another reader's position. Chat reads can also return cursors. Query results remain in tool history; no separate read marking is required. Each message's sender has a role: self for the connection's own identity, participant for others, and system for platform notices. Messages the connection sent itself are not delivered back as events.
+The list tool accepts a null target for connections and a connection target for conversations. Providers may return a cursor. Passing that cursor in a later query asks for subsequent changes without changing another reader's position. Chat reads can also return cursors. Query results remain in tool history; no separate read marking is required.
+
+A Chat read with a `messageIds` array retrieves specific retained messages, such as a message identified by `replyTo`, within the Chat's conversation and topic. It returns found messages in requested order, once per resolved message, and lists unavailable IDs in `missingIds`; this query returns no cursor.
+
+Each message's sender has a role: self for the connection's own identity, participant for others, and system for platform notices. Messages the connection sent itself are not delivered back as events.
 
 Agents send external messages with the Chat's send tool. Their ordinary responses appear in Asterism. Define communication responsibilities in Agent instructions or linked notes.
 
@@ -28,7 +32,11 @@ Create a bot with Telegram's BotFather and enter its token in a Telegram Bot con
 
 Telegram Bot API does not provide a general conversation list or arbitrary chat-history retrieval. This provider lists conversations observed by the connection and reads messages it has retained locally. Group privacy settings determine which messages Telegram delivers. A newly configured bot does not gain access to earlier group history.
 
-The integration preserves captions and attachment metadata, sends text and referenced files, supports replies by message ID, and preserves topic addresses. A single still image within Telegram's photo limit is sent as a photo and other files as documents; several files are sent as one album with the text as its caption, as documents unless all are photos. Telegram accepts at most 10 files per send and 50 MB per uploaded file. Telegram delivers an album as one update per item; the connection records it as one message identified by its first item, waits briefly for the remaining items, and then delivers a single new-message input. Replies to any album item refer to that message. Received photos select the largest available variant; downloads through Telegram's hosted Bot API are limited to 20 MB. Incoming edits update retained messages without emitting a new-message notification. Provider observations survive connection restarts and are shared across resources.
+The integration preserves captions and attachment metadata, sends text and referenced files, supports replies by message ID, and preserves topic addresses. A single still image within Telegram's photo limit is sent as a photo and other files as documents; several files are sent as one album with the text as its caption, as documents unless all are photos. Telegram accepts at most 10 files per send and 50 MB per uploaded file.
+
+Telegram delivers an album as one message per item. Each item keeps its own message ID, body, and attachments, and items share a `groupId`. The connection waits briefly for the remaining items and delivers them together as one Agent input. Replies address individual items. Sending an album returns the first item's receipt; all sent items are available in Chat history. A received reply also retains its attached original message when that message was not previously observed, making it available to ID reads.
+
+Received photos select the largest available variant; downloads through Telegram's hosted Bot API are limited to 20 MB. Incoming edits update retained messages without emitting a new-message notification. Provider observations survive connection restarts and are shared across resources.
 
 ## Discord Bot
 
@@ -51,6 +59,8 @@ Create a robot in the QQ Bot Open Platform and enter its AppID and AppSecret in 
 A conversation ID is `c2c:<user_openid>` for private chats or `group:<group_openid>` for groups. These platform identities are distinct from QQ account numbers. The provider retains received and sent messages locally; QQ does not provide earlier conversation history. Group messages delivered by the platform are observed whether or not they mention the bot. Platform permissions determine which events are delivered.
 
 The provider sends text. A reply uses the selected incoming message ID; sending without a reply target requests a proactive message. QQ controls reply validity, message quotas, and sending permissions, and its refusals appear as operation errors. Received attachments retain file references and can be opened while their platform URLs remain available. File sending and topics are unsupported by this provider.
+
+Incoming replies preserve their reference identifier. When the referenced message was observed, the provider resolves QQ's separate reference index to that message's ID. ID reads accept either identifier; unavailable originals appear in `missingIds`.
 
 ## Observed conversations and connectivity
 

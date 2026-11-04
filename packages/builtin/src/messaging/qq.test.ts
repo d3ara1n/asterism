@@ -1,8 +1,11 @@
+import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, dispatchEvent } from "@tencent-connect/qqbot-nodejs/protocol";
 import { qqMessage, qqTarget } from "./qq.ts";
 import { QQApi, qqApiError, qqResponse } from "./qq-api.ts";
 import { definitelyNotSent } from "./outcome.ts";
+import { ObservedMessages } from "./observed-store.ts";
+import { messageObserver } from "./provider-shared.ts";
 
 function received(type: string, data: unknown) {
   const result = dispatchEvent(type, data, "test-bot");
@@ -43,6 +46,27 @@ describe("QQ conversation addressing", () => {
     expect(() => qqTarget({ conversationId: "123456" })).toThrow("c2c:<user_openid>");
     expect(() => qqTarget({ conversationId: "group:" })).toThrow("c2c:<user_openid>");
     expect(() => qqTarget({ conversationId: "c2c:user", threadId: "topic" })).toThrow("do not have topics");
+  });
+  it("resolves a group quote index to the observed platform message and keeps unknown references readable as missing", () => {
+    const db = new DatabaseSync(":memory:");
+    try {
+      const store = new ObservedMessages(db, JSON.stringify(["connection", "qq", "app"]));
+      const observe = messageObserver(store, () => {});
+      const original = qqMessage(received("GROUP_MESSAGE_CREATE", {
+        id: "original-message", group_openid: "group", author: { member_openid: "author" }, content: "Budget: 3000", timestamp,
+        message_scene: { ext: ["msg_idx=opaque-reference"] },
+      }), "bot")!;
+      observe(original);
+      const reply = qqMessage(received("GROUP_AT_MESSAGE_CREATE", {
+        id: "reply-message", group_openid: "group", author: { member_openid: "reader" }, content: "Please assess", timestamp,
+        message_type: 103, msg_elements: [{ msg_idx: "opaque-reference", content: "Budget: 3000" }],
+      }), "bot")!;
+      expect(observe(reply).replyTo).toBe("original-message");
+      expect(store.read({ conversationId: "group:group", messageIds: ["opaque-reference", "unseen-reference"] })).toMatchObject({
+        messages: [{ id: "original-message", parts: [{ kind: "text", text: "Budget: 3000" }] }],
+        missingIds: ["unseen-reference"],
+      });
+    } finally { db.close(); }
   });
 });
 

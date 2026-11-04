@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { defineAction, defineCall, defineCreation, defineImplementation, defineRecord, defineTool,
   conversationAddressSchema, conversationListSchema, messageListSchema, messagingConnectionInfoSchema,
-  messageSchema, uiTextSchema, messagingFilePartSchema, messagingTextPartSchema, contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
+  messageSchema, messageReadTargetSchema, uiTextSchema, messagingFilePartSchema, messagingTextPartSchema, contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
 import { builtin, List, Read, Send, See } from "@asterism-app/builtin-api/contracts";
 
 export const Conversations = builtin.resource("conversations", z.strictObject({}));
@@ -63,12 +63,10 @@ export const ConversationsList = defineImplementation({
   targetSchema: listTargetSchema.describe("Null lists connections. A connection ID lists its conversations; since compares changes against a returned cursor."),
   effect: "read", execution: "parallel",
 });
-export const chatReadTargetSchema = z.strictObject({
-  since: z.string().min(1).optional(), limit: z.number().int().positive().optional(),
-}).nullable();
+export const chatReadTargetSchema = messageReadTargetSchema.nullable();
 export const ChatRead = defineImplementation({
-  ...builtin.data("chat.read", chatMessageListSchema.describe("Messages with attachment file references. The cursor is a reusable query position, not a read receipt.")),
-  resource: Chat, tool: Read, targetSchema: chatReadTargetSchema.describe("Null reads recent messages; since continues from a returned cursor."),
+  ...builtin.data("chat.read", chatMessageListSchema.describe("Messages with attachment file references. ID queries return found messages in requested order, once per resolved message, and missingIds. Page queries return a reusable cursor.")),
+  resource: Chat, tool: Read, targetSchema: chatReadTargetSchema.describe("Null reads recent messages; since continues from a returned cursor. messageIds reads specific retained messages within this Chat's conversation and topic."),
   effect: "read", execution: "parallel",
 });
 export const ChatSend = defineImplementation({

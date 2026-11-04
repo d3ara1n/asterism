@@ -1,8 +1,10 @@
 import { Api, GrammyError, HttpError, InputFile, type ApiClientOptions } from "grammy";
 import type { Message } from "grammy/types";
+import { z } from "zod";
 import { MessagingError, type PluginContext, type MessagingProviderDefinition } from "@asterism-app/sdk/runtime";
 import type { MessageSenderRole, MessagingConversation, MessagingMessage, MessagingFilePart } from "@asterism-app/sdk/contracts";
-import { TelegramStore, forgetTelegramConnection, telegramAccount } from "./telegram-store.ts";
+import { ObservedMessages, forgetObservedConnection } from "./observed-store.ts";
+import { TelegramAlbums } from "./telegram-albums.ts";
 import { messagingMessages as messages } from "../messages/messaging.ts";
 import { downloadFile, messagingFiles, outgoingMessage, observedFile, providerCall } from "./provider-shared.ts";
 
@@ -69,6 +71,7 @@ export function telegramMessage(message: Message, selfId: number): { conversatio
       ...(file ? [file] : text ? [] : [{ kind: "text" as const, text: media ?? "[Service message]" }]),
     ],
       sentAt: new Date(message.date * 1000).toISOString(),
+      ...(message.media_group_id ? { groupId: message.media_group_id } : {}),
       ...(threadId ? { threadId } : {}), ...(message.reply_to_message ? { replyTo: String(message.reply_to_message.message_id) } : {}) },
   };
 }
@@ -112,47 +115,51 @@ export function telegramProvider(plugin: PluginContext): MessagingProviderDefini
     id: "telegram-bot", label: messages.telegram,
     settings: [{ kind: "secret", key: "token", label: messages.token, description: messages.tokenHint, required: true,
       helpUrl: "https://core.telegram.org/bots/features#botfather" }],
-    forget: connectionId => forgetTelegramConnection(plugin.db(), connectionId),
+    forget: connectionId => forgetObservedConnection(plugin.db(), connectionId),
     async create({ connectionId, settings, signal, publish }) {
       const api = new Api(settings.token!, { fetch: telegramFetch() });
       const me = await call(signal, () => api.getMe(apiSignal(signal)));
-      const store = new TelegramStore(plugin.db(), telegramAccount(connectionId, me.id));
+      const store = new ObservedMessages(plugin.db(), JSON.stringify([connectionId, "telegram", String(me.id)]));
+      let offset = z.strictObject({ offset: z.number().int().nonnegative() }).parse(store.state("receiver") ?? { offset: 0 }).offset;
+      const advance = (value: number) => { store.setState("receiver", { offset: value }); offset = value; };
       return {
         identity: me.username ? `@${me.username}` : me.first_name,
         async receive({ signal, ready }) {
           // Album items arrive as separate updates; publish the album once no item has arrived for a short window.
-          const pending = new Map<string, MessagingConversation>();
+          const pending = new TelegramAlbums(store);
           const flush = (keep: ReadonlySet<string>) => {
-            for (const [key, conversation] of pending) {
-              if (keep.has(key)) continue;
-              pending.delete(key);
-              const album = store.album(conversation.conversationId, JSON.parse(key)[1]);
-              if (album) publish({ kind: "message.received", conversation, message: album });
-            }
+            for (const event of pending.flush(keep)) publish(event);
           };
           // The first poll returns immediately, so acceptance is reported without waiting for the long-poll timeout.
           let timeout = 0;
           try {
             while (!signal.aborted) {
-              const updates = await call(signal, () => api.getUpdates({ offset: store.offset(), timeout: pending.size ? albumWaitSeconds : timeout,
+              const updates = await call(signal, () => api.getUpdates({ offset, timeout: pending.size ? albumWaitSeconds : timeout,
                 allowed_updates: ["message", "edited_message", "channel_post", "edited_channel_post"] }, apiSignal(signal)));
               if (timeout === 0) { ready(); timeout = longPollSeconds; }
               const touched = new Set<string>();
               for (const update of updates) {
                 signal.throwIfAborted();
-                if (update.update_id < store.offset()) continue;
+                if (update.update_id < offset) continue;
                 const message = update.message ?? update.edited_message ?? update.channel_post ?? update.edited_channel_post;
                 if (message) {
                   const normalized = telegramMessage(message, me.id), group = message.media_group_id;
-                  const recorded = store.record(normalized.conversation, normalized.message, group);
-                  store.advance(update.update_id + 1);
+                  if (message.reply_to_message) {
+                    const quoted = telegramMessage(message.reply_to_message as Message, me.id);
+                    // A reply can supply a message that privacy settings never delivered on its own.
+                    if (!store.message(quoted.conversation.conversationId, quoted.message.id)) {
+                      const retained = store.observe(quoted.conversation, quoted.message);
+                      if (retained.discovered) publish({ kind: "conversation.discovered", conversation: quoted.conversation });
+                    }
+                  }
+                  const recorded = store.observe(normalized.conversation, normalized.message);
+                  advance(update.update_id + 1);
                   if (recorded.discovered) publish({ kind: "conversation.discovered", conversation: normalized.conversation });
                   // Edits update the retained message; only newly observed messages become events.
                   if (!(update.message || update.channel_post) || !recorded.inserted) continue;
-                  if (!group) { publish({ kind: "message.received", conversation: normalized.conversation, message: recorded.message }); continue; }
-                  const key = JSON.stringify([normalized.conversation.conversationId, group]);
-                  pending.set(key, normalized.conversation); touched.add(key);
-                } else store.advance(update.update_id + 1);
+                  if (!group) { publish({ kind: "messages.received", conversation: normalized.conversation, messages: [normalized.message] }); continue; }
+                  touched.add(pending.touch(normalized.conversation, group));
+                } else advance(update.update_id + 1);
               }
               flush(touched);
             }
@@ -192,16 +199,15 @@ export function telegramProvider(plugin: PluginContext): MessagingProviderDefini
             const media = uploads.every(upload => upload.photo)
               ? uploads.map((upload, index) => ({ type: "photo" as const, media: upload.file, ...extra(index) }))
               : uploads.map((upload, index) => ({ type: "document" as const, media: upload.file, ...extra(index) }));
-            const group = await api.sendMediaGroup(input.conversationId, media, options, apiSignal(signal));
-            return group;
+            return api.sendMediaGroup(input.conversationId, media, options, apiSignal(signal));
           });
-          // A media group returns one message per item; the store records them as one album message.
+          // Every returned item retains its platform ID; the send receipt identifies the first message.
           let result: MessagingMessage | undefined;
           for (const item of (Array.isArray(sent) ? sent : [sent]) as Message[]) {
             const normalized = telegramMessage(item, me.id);
-            const recorded = store.record(normalized.conversation, normalized.message, item.media_group_id);
+            const recorded = store.observe(normalized.conversation, normalized.message);
             if (recorded.discovered) publish({ kind: "conversation.discovered", conversation: normalized.conversation });
-            result = recorded.message;
+            result ??= normalized.message;
           }
           return result!;
         },

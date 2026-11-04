@@ -1,6 +1,7 @@
 import { defineStorage } from "@asterism-app/sdk/runtime";
 import { jsonSchema } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
+import { migrateMessagingV1 } from "./messaging/storage-migration.ts";
 
 const settingsV2 = z.object({
   paradigm: z.object({
@@ -29,5 +30,5 @@ export default defineStorage([
       return settings;
     },
   } },
-  { kind: "sqlite", path: ".asterism/db.sqlite", version: 1, migrations: {} },
+  { kind: "sqlite", path: ".asterism/db.sqlite", version: 2, migrations: { 1: migrateMessagingV1 } },
 ]);

@@ -21,8 +21,8 @@ describe("Messaging subscription projection", () => {
   it("connection discovery does not subscribe to every message; a topic subscription only matches that topic", () => {
     const conversation = { conversationId: "group", threadId: "topic", title: "Group", kind: "supergroup" };
     const discovered: ConnectionEvent = { connectionId: "bot", event: { kind: "conversation.discovered", conversation } };
-    const incoming: ConnectionEvent = { connectionId: "bot", event: { kind: "message.received", conversation,
-      message: { id: "1", sender: { id: "user", name: "User", role: "participant" }, parts: [{ kind: "text", text: "Hello" }], sentAt: "2026-01-01T00:00:00Z" } } };
+    const incoming: ConnectionEvent = { connectionId: "bot", event: { kind: "messages.received", conversation,
+      messages: [{ id: "1", sender: { id: "user", name: "User", role: "participant" }, parts: [{ kind: "text", text: "Hello" }], sentAt: "2026-01-01T00:00:00Z" }] } };
     expect(matchesSubscription({ connectionId: "bot" }, discovered)).toBe(true);
     expect(matchesSubscription({ connectionId: "bot" }, incoming)).toBe(false);
     expect(matchesSubscription({ connectionId: "bot", conversationId: "group" }, incoming)).toBe(true);

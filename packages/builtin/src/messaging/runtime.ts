@@ -28,12 +28,13 @@ const addressLines = (connectionId: string, address: ConversationAddress) => [
 const messageLines = (message: MessagingMessage) => [
   `messageId: ${message.id}`, `sender: ${message.sender.name} (${message.sender.id}, ${message.sender.role})`, `sentAt: ${message.sentAt}`,
   ...(message.replyTo ? [`replyTo: ${message.replyTo}`] : []),
+  ...(message.groupId ? [`groupId: ${message.groupId}`] : []),
 ];
 /** Event metadata with addresses usable by tools; a Chat follows it with the message parts. */
-function eventText({ connectionId, event }: ConnectionEvent): string {
+function eventText({ connectionId, event }: ConnectionEvent, includeMessages = true): string {
   const location = [...addressLines(connectionId, event.conversation), `title: ${event.conversation.title}`, `kind: ${event.conversation.kind}`];
   if (event.kind === "conversation.discovered") return ["Conversation discovered", ...location].join("\n");
-  return ["New message", ...location, ...messageLines(event.message)].join("\n");
+  return ["New messages", ...location, ...(includeMessages ? event.messages.flatMap(messageLines) : [])].join("\n");
 }
 
 export default defineModule(plugin => {
@@ -87,15 +88,19 @@ export default defineModule(plugin => {
   plugin.lifetime.defer(plugin.messaging.subscribe(event => {
     const { connectionId } = event;
     touch(connectionId, event.event.conversation, JSON.stringify([event.event.conversation.conversationId,
-      event.event.conversation.threadId ?? null, event.event.kind === "message.received" ? event.event.message.id : event.event.kind]));
+      event.event.conversation.threadId ?? null, event.event.kind === "messages.received" ? event.event.messages.map(message => message.id) : event.event.kind]));
     // The connection's own messages are observations, not input; delivering them would echo an Agent's sends back to it.
-    if (event.event.kind === "message.received" && event.event.message.sender.role === "self") return;
+    if (event.event.kind === "messages.received") {
+      const messages = event.event.messages.filter(message => message.sender.role !== "self");
+      if (!messages.length) return;
+      event = { ...event, event: { ...event.event, messages } };
+    }
     const bySession = new Map<string, DeliveryCandidate[]>();
     for (const ref of objects.values()) {
       const object = executor(ref);
       const receives = ref.kind === Conversations.kind
         ? subscriptions(object).some(target => matchesSubscription(target, event))
-        : event.event.kind === "message.received" && !!chatBinding(ref) && matchesSubscription(chatBinding(ref)!, event);
+        : event.event.kind === "messages.received" && !!chatBinding(ref) && matchesSubscription(chatBinding(ref)!, event);
       if (!receives) continue;
       const title = object.snapshot()?.title ?? ref.id;
       const candidates = bySession.get(ref.sessionId) ?? [];
@@ -107,9 +112,11 @@ export default defineModule(plugin => {
       const source = { ...delivery.source };
       plugin.tasks.start(`messaging/${nanoid()}`, signal => plugin.content.withScope(async content => {
         const binding = source.kind === Chat.kind ? chatBinding(source) : null;
-        const parts: AgentInputPart[] = [{ kind: "text", text: eventText(event) }];
+        const parts: AgentInputPart[] = [{ kind: "text", text: eventText(event, !binding) }];
         // Captured images are staged for this input only; its record retains them.
-        if (binding && event.event.kind === "message.received") parts.push(...await messageInputParts(chatMessage(source, event.event.message),
+        if (binding && event.event.kind === "messages.received") parts.push(...await messageInputParts(event.event.messages.flatMap(message => [
+          { kind: "text" as const, text: messageLines(message).join("\n") }, ...chatMessage(source, message).parts,
+        ]),
           async function* (part) { yield* openChatFile(await plugin.messaging.resolve(binding.connectionId, { signal }), binding, part.ref.locator, signal); },
           content, signal));
         await plugin.session(source.sessionId).invoke(SubmitAgentInput, delivery.recipient, {
@@ -212,7 +219,7 @@ export default defineModule(plugin => {
             return { ...result, messages: result.messages.map(message => chatMessage(object.ref, message)) };
           });
         },
-        toModel: data => [{ kind: "text", text: JSON.stringify({ cursor: data.cursor, truncated: data.truncated }) }, ...chatMessagesToModel(data.messages)],
+        toModel: data => [{ kind: "text", text: JSON.stringify({ cursor: data.cursor, truncated: data.truncated, missingIds: data.missingIds }) }, ...chatMessagesToModel(data.messages)],
       })),
       capturedTool(captured => implementTool(ChatSee, {
         call(data, target, _args, { object, signal }) {
