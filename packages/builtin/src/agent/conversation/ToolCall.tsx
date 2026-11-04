@@ -50,7 +50,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   </>;
   return <Disclosure header={header} {...disclosure} {...blockShell(node)} expandable={!filling || hasInputBody}
     pending={state.phase === "input" || state.phase === "ready"}>
-    <div className="space-y-3">
+    <div className="space-y-3 [--code-font-size:var(--text-xs)]">
       {view && (view.body ?? (!filling && state.phase !== "incomplete" && <DefaultToolBody {...view.props} />))}
       {diagnostic && <p className="type-caption whitespace-pre-wrap">{diagnostic}</p>}
       {view?.details !== false && (state.phase === "settled" || state.phase === "incomplete") && <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
