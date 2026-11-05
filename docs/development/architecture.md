@@ -10,7 +10,7 @@ The project uses npm, electron-vite for compilation, electron-builder for packag
 
 | Process or entry | Responsibility |
 | --- | --- |
-| Main | Windows, platform integration, data paths, process supervision, credentials, and shutdown |
+| Main | Windows, platform integration, data paths, process supervision, and shutdown |
 | Preload | Restricted desktop bridge and transfer of the runtime connection |
 | Preparation runtime | Storage preparation and recovery before business services start |
 | Business runtime | Database, application services, execution, tools, and plugin host |
@@ -106,7 +106,7 @@ Application identity and data layout are centralized. Development and installed 
 | Global model, provider, and other paradigm-neutral shared configuration | Host configuration services |
 | Roles, Agent configurations, and other paradigm-specific configuration | Owning plugin through generic plugin storage facilities |
 | Appearance, language, update and network preferences, window cache | Main process |
-| Encrypted credential files | Runtime storage with main-process `safeStorage` operations |
+| Credentials and credential-command expressions | Saved with their owning entry: host configuration or plugin storage |
 | Session tree, current data, templates, view state, content roots | Runtime SQLite database |
 | Immutable bytes | Runtime content store |
 | Plugin-private data | Plugin directory and optional host-managed facilities |
@@ -133,11 +133,11 @@ Before migration, save a complete recovery point of persistent application data 
 
 Restoring or starting fresh first preserves current data in another recovery point. Interrupted operations can resume. Restoration pauses automatic migration until an explicit retry, avoiding a recovery loop. Retention and recovery paths belong to the storage implementation.
 
-Recovery points cover application data. External files, service effects, and operating-system credential portability are outside that guarantee.
+Recovery points cover application data, including locally stored credentials and credential-command expressions. External files and service effects are outside that guarantee.
 
 ## Direct runtime transport
 
-Main transfers a MessagePort between the renderer and runtime. Business requests and updates use that direct connection; main retains startup, supervision, shutdown, and credential control traffic.
+Main transfers a MessagePort between the renderer and runtime. Business requests and updates use that direct connection; main retains startup, supervision, and shutdown traffic.
 
 Commands validate at their owning boundary. Trusted runtime push frames use structured cloning and do not undergo redundant per-frame schema validation.
 
@@ -175,4 +175,4 @@ Published content uses controlled rendering: untrusted HTML is not executed, KaT
 
 Resource authorization defines model context and operation scope, not an operating system sandbox. Shells, terminals, MCP servers, and trusted plugins run with the current user’s capabilities. Asterism does not implement a general permission model or agent behavior audit.
 
-Credential encryption stays in main. An unavailable secure backend does not permit plaintext credential persistence. Raw keys remain separate from history and diagnostics.
+Credentials are stored as entered in host configuration with owner-only file permissions; external credential managers are reached through user-configured commands. Raw keys remain separate from history and diagnostics.

@@ -1,23 +1,25 @@
 import type { DatabaseSync } from "node:sqlite";
+import { isDeepStrictEqual } from "node:util";
 import { implementCall, PluginApiError } from "@asterism-app/sdk/runtime";
 import {
-  ReadMcp, ReadMcpTools, ReadMcpCredentials, SaveMcpServer, SetMcpServerEnabled, RemoveMcpServer,
+  ReadMcp, ReadMcpTools, SaveMcpServer, SetMcpServerEnabled, RemoveMcpServer,
   ConnectMcpServer, DisconnectMcpServer, AuthorizeMcpServer, ResetMcpAuth,
 } from "@asterism-app/sdk/contracts";
 import type { ConfigurationService } from "../configuration/service.ts";
-import { McpHostService, credentialKey, oauthKey } from "./service.ts";
-import { McpCredentialStore } from "./storage.ts";
+import { McpHostService } from "./service.ts";
+import { McpAuthorizationStore } from "./storage.ts";
 
-/** Configuration, credentials and connections share the host lifetime independently of resource plugins. */
+/** Configuration, authorization and connections share the host lifetime independently of resource plugins. */
 export class McpApplication {
   readonly service: McpHostService;
   private readonly lifetime = new AbortController();
   private readonly listeners = new Set<() => void>();
-  private readonly secrets: McpCredentialStore;
+  private readonly authorizations: McpAuthorizationStore;
   private readonly unsubscribe: () => void;
   constructor(db: DatabaseSync, private readonly configuration: ConfigurationService, changed: () => void) {
-    this.secrets = new McpCredentialStore(configuration);
-    this.service = new McpHostService({ db, signal: this.lifetime.signal, secrets: this.secrets, log: console }, () => {
+    this.authorizations = new McpAuthorizationStore(configuration);
+    this.service = new McpHostService({ db, signal: this.lifetime.signal, authorizations: this.authorizations, log: console,
+      resolveCredential: (value, signal) => configuration.resolveCredential(value, signal) }, () => {
       changed();
       for (const listener of this.listeners) listener();
     });
@@ -38,22 +40,16 @@ export class McpApplication {
   readonly calls = [
     implementCall(ReadMcp, async () => this.service.states()),
     implementCall(ReadMcpTools, async ({ serverId }) => this.service.tools(serverId)),
-    implementCall(ReadMcpCredentials, ({ serverId }) => { this.configured(serverId); return this.service.credentials(serverId); }),
-    implementCall(SaveMcpServer, async ({ server, create, credentials }) => {
-      const exists = this.servers().some(item => item.id === server.id);
-      if (create && exists) throw new PluginApiError("conflict", `An MCP server with ID '${server.id}' already exists.`);
-      if (!create && !exists) throw new PluginApiError("not_found", `The MCP server '${server.id}' is not configured.`);
-      // A new server inherits no credentials or authorization left by an earlier server with the same ID.
-      if (create) {
-        await this.secrets.delete(oauthKey(server.id));
-        if (credentials.action === "replace") await this.secrets.set(credentialKey(server.id), JSON.stringify(credentials.values));
-        else await this.secrets.delete(credentialKey(server.id));
-      } else if (credentials.action === "replace") {
-        await this.secrets.set(credentialKey(server.id), JSON.stringify(credentials.values));
-        await this.service.credentialsChanged(server.id);
-      }
+    implementCall(SaveMcpServer, async ({ server, create }) => {
+      const previous = this.servers().find(item => item.id === server.id);
+      if (create && previous) throw new PluginApiError("conflict", `An MCP server with ID '${server.id}' already exists.`);
+      if (!create && !previous) throw new PluginApiError("not_found", `The MCP server '${server.id}' is not configured.`);
+      // A new server inherits no authorization left by an earlier server with the same ID.
+      if (create) this.authorizations.delete(server.id);
       this.configuration.updateMcp(current => ({ servers: create ? [...current.servers, server]
         : current.servers.map(item => item.id === server.id ? server : item) }));
+      if (previous && (!isDeepStrictEqual(previous.env, server.env) || !isDeepStrictEqual(previous.headers, server.headers)))
+        await this.service.credentialsChanged(server.id);
       return null;
     }),
     implementCall(SetMcpServerEnabled, async ({ serverId, enabled }) => {
@@ -64,8 +60,7 @@ export class McpApplication {
     implementCall(RemoveMcpServer, async ({ serverId }) => {
       this.configuration.updateMcp(current => ({ servers: current.servers.filter(item => item.id !== serverId) }));
       await this.service.settled();
-      await this.secrets.delete(credentialKey(serverId));
-      await this.secrets.delete(oauthKey(serverId));
+      this.authorizations.delete(serverId);
       return null;
     }),
     // Settings connections run in the background; state events report the result while other actions remain available.
@@ -80,7 +75,7 @@ export class McpApplication {
     implementCall(AuthorizeMcpServer, ({ serverId }) => this.service.authorize(serverId)),
     implementCall(ResetMcpAuth, async ({ serverId }) => {
       await this.service.disconnect(serverId);
-      await this.secrets.delete(oauthKey(serverId));
+      this.authorizations.delete(serverId);
       this.service.invalidateDirectory(serverId);
       return null;
     }),

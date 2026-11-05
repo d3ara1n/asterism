@@ -126,7 +126,7 @@ Usage providers distinguish active queries from response-header interpretation. 
 
 The host's shared usage service reads configured credentials, caches query results, and retains explicitly supplied header observations. Model requests use concrete provider/model targets. Role resolution and prompt composition belong to the requesting paradigm. The model runner accepts explicit messages and executable tools; session execution binds current resource access and linked context around it. The output observer owns recording, and workbench progress is an optional sink selected by the consumer.
 
-Backend credentials remain explicit trusted-plugin capabilities. Frontend consumption uses typed domain calls rather than the credential vault.
+Backend credentials remain explicit trusted-plugin capabilities. Plugin secrets are stored as given in the plugin's managed directory. Frontend consumption uses typed domain calls.
 
 ## Persistence and content
 

@@ -1,18 +1,22 @@
 import { prepareApplicationData, restoreApplicationData, startFreshApplicationData } from "../storage/application.ts";
 import { clearPause } from "../storage/preparation.ts";
 import type { PreparationMessage } from "../shared/recovery.ts";
+import { LegacyCredentials } from "./legacy-credentials.ts";
 
 /** Send final results after commit and cleanup; the main process terminates this process on receipt. Arguments: data root, app version, operation, and restore target. */
 const port = process.parentPort;
 if (!port) throw new Error("Data preparation requires an Electron utility process.");
 const post = (message: PreparationMessage) => port.postMessage(message);
+const credentials = new LegacyCredentials(message => port.postMessage(message));
+port.on("message", ({ data }) => credentials.receive(data));
 const [root, version, action = "prepare", point] = process.argv.slice(2);
 let terminal: PreparationMessage;
 try {
   if (!root || !version) throw new Error("Data preparation requires the data directory and application version.");
   if (action === "prepare") {
     terminal = { kind: "result", result: await prepareApplicationData(root, version,
-      status => post({ kind: "host", status }), progress => post({ kind: "progress", ...progress })) };
+      status => post({ kind: "host", status }), progress => post({ kind: "progress", ...progress }),
+      ciphertext => credentials.decrypt(ciphertext)) };
   } else {
     if (action === "retry") clearPause(root);
     else if (action === "fresh") startFreshApplicationData(root, version);

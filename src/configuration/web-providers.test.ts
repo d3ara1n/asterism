@@ -40,10 +40,10 @@ function provider(id: string, overrides: Partial<WebProviderDefinition> = {}): W
 }
 const apiKey = { kind: "secret" as const, key: "apiKey", label: "API key", required: true };
 function registry(definitions: WebProviderDefinition[], states = definitions.map(item => state(item.id)),
-  secret: (id: string, key: string) => Promise<string | null> = async () => null) {
+  credential: (value: string) => Promise<string> = async value => value) {
   const life = new RunLifecycle(() => {});
   lifecycles.push(life);
-  const web = new WebProviderRegistry({ list: () => states, secret });
+  const web = new WebProviderRegistry({ list: () => states, credential });
   web.declare("test.web", definitions, life.group("call"));
   return web;
 }
@@ -54,17 +54,17 @@ describe("Web provider settings resolution", () => {
     { kind: "secret" as const, key: "token", label: "Token", required: false },
     { kind: "choice" as const, key: "mode", label: "Mode", default: "auto", options: [{ value: "auto", label: "Auto" }, { value: "deep", label: "Deep" }] },
   ] };
-  const secrets = (values: Record<string, string>) => async (key: string) => values[key] ?? null;
+  const resolve = async (value: string) => value;
   // Unsaved choices must use the declared default; saved choices must survive; unset optional secrets stay absent rather than empty.
   it("applies choice defaults, keeps saved choices, and omits unset optional secrets", async () => {
-    expect(await resolveWebSettings(type, {}, secrets({ apiKey: "key" }))).toEqual({ apiKey: "key", mode: "auto" });
-    expect(await resolveWebSettings(type, { mode: "deep" }, secrets({ apiKey: "key", token: "t" }))).toEqual({ apiKey: "key", token: "t", mode: "deep" });
+    expect(await resolveWebSettings(type, { apiKey: "key" }, resolve)).toEqual({ apiKey: "key", mode: "auto" });
+    expect(await resolveWebSettings(type, { apiKey: "key", token: "t", mode: "deep" }, resolve)).toEqual({ apiKey: "key", token: "t", mode: "deep" });
   });
   // A plugin update can remove an option or add a required secret; the provider must not run with a silently substituted value.
   it("rejects saved choices the declaration no longer offers and missing required secrets", async () => {
-    await expect(resolveWebSettings(type, { mode: "removed" }, secrets({ apiKey: "key" })))
+    await expect(resolveWebSettings(type, { apiKey: "key", mode: "removed" }, resolve))
       .rejects.toMatchObject({ code: "provider_unavailable", message: expect.stringContaining("'removed'") });
-    await expect(resolveWebSettings(type, {}, secrets({}))).rejects.toMatchObject({ code: "credential_unavailable" });
+    await expect(resolveWebSettings(type, {}, resolve)).rejects.toMatchObject({ code: "credential_unavailable" });
   });
 });
 
@@ -84,7 +84,7 @@ describe("Ordered web provider fallback", () => {
       provider("disabled"), provider("fetch-only", { search: false }),
     ];
     const states = [state("missing"), state("disabled", false), state("fetch-only"),
-      ...["key", "request", "protocol", "success", "unused"].map(id => state(id))];
+      { ...state("key"), settings: { apiKey: "!locked" } }, ...["request", "protocol", "success", "unused"].map(id => state(id))];
     const web = registry(definitions.reverse(), states, async () => { throw new WebError("credential_unavailable", "Key unreadable."); });
     const result = await web.search({ query: "query", maxResults: 5 }, options());
     expect(calls).toEqual(["request", "protocol", "success"]);
@@ -227,7 +227,7 @@ describe("Ordered web provider fallback", () => {
   });
 
   it("retains captured priority, enablement, and credentials for later attempts", async () => {
-    const states = [state("first"), state("second")];
+    const states = [state("first"), { ...state("second"), settings: { apiKey: "!read-key" } }];
     let key = "original";
     const used: (string | null)[] = [];
     const web = registry([

@@ -2,7 +2,7 @@ import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { OAuthClientProvider, OAuthDiscoveryState, StoredOAuthTokens, StoredOAuthClientInformation } from "@modelcontextprotocol/client";
-import type { McpSecrets } from "./environment.ts";
+import type { McpAuthorizations } from "./environment.ts";
 
 const savedSchema = z.object({
   token: z.looseObject({ access_token: z.string(), token_type: z.string() }).optional(),
@@ -32,7 +32,7 @@ export interface AuthorizationRequest {
 }
 
 /**
- * OAuth provider for one connection transition. Persistent state (client registration, tokens, and callback port) is saved in the host vault;
+ * OAuth provider for one connection transition. Persistent state (client registration, tokens, and callback port) is saved in host configuration;
  * the PKCE verifier, discovery, and state belong to this authorization attempt. Settings starts the callback listener before opening the browser.
  * The connection transition owns authorization; replacing a transport does not close the listener.
  * Once interactive is disabled, expired tokens no longer trigger browser authorization; the caller closes the connection and authorizes again on the next connection.
@@ -49,12 +49,12 @@ export class McpOAuth implements OAuthClientProvider {
   private pending?: AuthorizationRequest;
   private cancelAuthorization?: (reason: unknown) => void;
   interactive = true;
-  constructor(private readonly secrets: McpSecrets, private readonly key: string, private readonly signal: AbortSignal) {}
+  constructor(private readonly authorizations: McpAuthorizations, private readonly serverId: string, private readonly signal: AbortSignal) {}
 
   async load(): Promise<void> {
-    const raw = await this.secrets.get(this.key);
+    const raw = this.authorizations.get(this.serverId);
     if (raw) {
-      const saved = savedSchema.safeParse(JSON.parse(raw));
+      const saved = savedSchema.safeParse(raw);
       if (!saved.success) throw new Error("Saved MCP authorization is invalid. Reset authorization in MCP settings.");
       this.token = saved.data.token as StoredOAuthTokens | undefined;
       this.client = saved.data.client as StoredOAuthClientInformation | undefined;
@@ -87,7 +87,9 @@ export class McpOAuth implements OAuthClientProvider {
     if (scope === "all" || scope === "discovery") this.discovery = undefined;
     await this.save();
   }
-  private save() { return this.secrets.set(this.key, JSON.stringify({ token: this.token, client: this.client, port: this.port })); }
+  private async save() {
+    this.authorizations.set(this.serverId, { ...this.token && { token: this.token }, ...this.client && { client: this.client }, port: this.port });
+  }
 
   async redirectToAuthorization(url: URL): Promise<void> {
     if (!this.interactive) throw new Error("MCP authorization expired. The next connection starts a new authorization.");

@@ -18,8 +18,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
 import { useMcpSettings } from "../configuration/state";
 import { PluginIslandProvider } from "../plugins/scope";
-import { SaveMcpServer, ReadMcpCredentials, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, AuthorizeMcpServer, DisconnectMcpServer, ResetMcpAuth,
-  type McpServerConfig, type McpServerState, type McpCredentialUpdate } from "@asterism-app/sdk/contracts";
+import { SaveMcpServer, SetMcpServerEnabled, RemoveMcpServer, ConnectMcpServer, AuthorizeMcpServer, DisconnectMcpServer, ResetMcpAuth,
+  type McpServerConfig, type McpServerState } from "@asterism-app/sdk/contracts";
 import { draftOf, validateDraft, slugifyServerId, type McpDraft, type McpField, type McpFieldError } from "./form";
 import { phaseTone, useMcpStatus } from "@asterism-app/ui/mcp-status";
 import { useLifetimeSignal } from "@asterism-app/ui/use-lifetime";
@@ -27,7 +27,7 @@ import { failureDisplay } from "@asterism-app/ui/error-display";
 import type { UiText } from "@asterism-app/sdk/contracts";
 
 const blank = (taken: string[]): McpServerConfig => ({ id: slugifyServerId("", taken), name: "", enabled: true, mode: "lazy",
-  idleSeconds: 300, transport: "stdio", command: "", args: [], cwd: "", url: "", auth: "none" });
+  idleSeconds: 300, transport: "stdio", command: "", args: [], cwd: "", url: "", auth: "none", env: {}, headers: {} });
 const summary = (server: McpServerConfig) => server.transport === "stdio" ? [server.command, ...server.args].filter(Boolean).join(" ") : server.url;
 const islandKey = (serverId: string | null) => `mcp:${serverId ?? "new"}`;
 
@@ -161,8 +161,8 @@ function McpSettingsBody() {
 }
 
 /**
- * Server editor island: serverId is null for creation. Existing servers can be saved only after their saved key-value pairs have been read;
- * it stays open after saving and uses the saved result as the new baseline. After successful creation, onCreated reopens it using the server identity.
+ * Server editor island: serverId is null for creation. It stays open after saving and uses the saved result as the new baseline.
+ * After successful creation, onCreated reopens it using the server identity.
  * Closes the island if the server is removed elsewhere.
  */
 function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | null; initial?: McpServerConfig; onCreated(server: McpServerConfig): void }) {
@@ -171,24 +171,13 @@ function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | 
   const create = serverId === null;
   const saved = create ? undefined : servers.find(server => server.id === serverId);
   const source = saved ?? initial;
-  const [baseline, setBaseline] = useState<McpDraft>(() => draftOf(source ?? blank(servers.map(server => server.id)), {}, create));
+  const [baseline, setBaseline] = useState<McpDraft>(() => draftOf(source ?? blank(servers.map(server => server.id)), create));
   const [draft, setDraft] = useState(baseline);
-  const [ready, setReady] = useState(create);
   const [errors, setErrors] = useState<Partial<Record<McpField, McpFieldError>>>({});
   const [failure, setFailure] = useState<UiText | null>(null);
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<McpServerConfig | null>(null);
 
-  useEffect(() => {
-    if (create || !source) return;
-    const controller = new AbortController();
-    void calls.invoke(ReadMcpCredentials, { serverId: source.id }, { signal: controller.signal }).then(values => {
-      if (controller.signal.aborted) return;
-      const entries = draftOf(source, values, false).entries;
-      setBaseline(current => ({ ...current, entries })); setDraft(current => ({ ...current, entries })); setReady(true);
-    }, error => { if (!controller.signal.aborted) setFailure(failureDisplay(error, messages.actionFailed)); });
-    return () => controller.abort();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // A server that was previously present and disappears is considered removed; configuration may not yet have arrived when reopening after creation, so render initial first.
   const seen = useRef(false);
   useEffect(() => {
@@ -201,21 +190,19 @@ function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | 
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
   const submit = async () => {
-    if (!ready || saving || !dirty) return;
+    if (saving || !dirty) return;
     const result = validateDraft(draft, servers.map(server => server.id).filter(item => create || item !== draft.server.id));
     if (!result.ok) { setErrors(result.errors); setFailure(null); return; }
     setErrors({}); setFailure(null); setSaving(true);
     try {
-      const credentials: McpCredentialUpdate = create || draft.entries !== baseline.entries
-        ? { action: "replace", values: result.credentials } : { action: "keep" };
-      await calls.invoke(SaveMcpServer, { server: result.server, create, credentials }, {});
+      await calls.invoke(SaveMcpServer, { server: result.server, create }, {});
       if (create) { setBaseline(draft); setCreated(result.server); }
-      else { const next = draftOf(result.server, result.credentials, false); setBaseline(next); setDraft(next); }
+      else { const next = draftOf(result.server, false); setBaseline(next); setDraft(next); }
     } catch (error) { setFailure(failureDisplay(error, messages.actionFailed)); }
     finally { setSaving(false); }
   };
 
-  const disabled = saving || !ready, server = draft.server;
+  const disabled = saving, server = draft.server;
   const patch = (next: (draft: McpDraft) => McpDraft) => setDraft(next);
   const update = (value: Partial<McpServerConfig>) => patch(current => ({ ...current, server: { ...current.server, ...value } }));
   const field = (key: string, label: ReactNode, control: ReactNode) => {
@@ -270,7 +257,7 @@ function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | 
             onChange={event => patch(current => ({ ...current, idle: event.target.value }))} />)}
         {field("entries", i18n.text(server.transport === "stdio" ? messages.env : messages.headers),
           <Textarea id={`${id}-entries`} rows={4} className="font-mono" disabled={disabled} spellCheck={false} autoComplete="off"
-            value={draft.entries} aria-invalid={"entries" in errors || undefined} placeholder={i18n.text(ready ? messages.entriesPlaceholder : messages.loadingEntries)}
+            value={draft.entries} aria-invalid={"entries" in errors || undefined} placeholder={i18n.text(messages.entriesPlaceholder)}
             onChange={event => patch(current => ({ ...current, entries: event.target.value }))} />)}
       </FieldSet>
       {failure && <p role="alert" className="type-caption text-destructive break-words">{i18n.text(failure)}</p>}

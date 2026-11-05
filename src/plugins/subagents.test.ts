@@ -70,8 +70,8 @@ async function fixture(child: (input: ModelInput, signal: AbortSignal) => AsyncI
     },
   }) };
   let app = new BuiltinApplicationService(root, options); apps.push(app);
-  await app.configuration.execute({ type: "modelProvider.save", id: null, credential: { action: "keep" }, value: {
-    id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [],
+  await app.configuration.execute({ type: "modelProvider.save", id: null, value: {
+    id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [], apiKey: "",
   } });
   await app.configuration.execute({ type: "model.save", id: null, value: {
     providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],

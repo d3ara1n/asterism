@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseArgumentLines, parseCredentialLines, slugifyServerId } from "./form.ts";
+import { parseArgumentLines, parseEntryLines, slugifyServerId } from "./form.ts";
 
 describe("MCP form field parsing", () => {
   it("generates server identities without colliding with existing entries", () => {
@@ -8,8 +8,8 @@ describe("MCP form field parsing", () => {
     expect(slugifyServerId("文件系统", [])).toBe("server");
   });
   it("preserves equals signs and whitespace within credential values", () => {
-    expect(parseCredentialLines("Authorization=Bearer abc==\nCUSTOM= a=b \n")).toEqual({ Authorization: "Bearer abc==", CUSTOM: " a=b " });
-    expect(() => parseCredentialLines("missing separator")).toThrow("KEY=VALUE");
+    expect(parseEntryLines("Authorization=Bearer abc==\nCUSTOM= a=b \n")).toEqual({ Authorization: "Bearer abc==", CUSTOM: " a=b " });
+    expect(() => parseEntryLines("missing separator")).toThrow("KEY=VALUE");
   });
   it("removes trailing line breaks while retaining explicit empty arguments", () => {
     expect(parseArgumentLines("-y\n@scope/server\n\n")).toEqual(["-y", "@scope/server"]);

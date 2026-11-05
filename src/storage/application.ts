@@ -32,8 +32,8 @@ export const applicationDataPaths: readonly DataPath[] = [
 function preferenceStorage(root: string, name: string): StorageDefinition {
   return jsonStorage({ id: name, file: join(root, `${name}.json`), version: preferenceVersion, migrations: {} });
 }
-export function hostStorages(root: string): StorageDefinition[] {
-  return [packageListStorage(root), configurationStorage(root), workspaceStorage(root),
+export function hostStorages(root: string, decrypt?: (ciphertext: string) => Promise<string>): StorageDefinition[] {
+  return [packageListStorage(root), configurationStorage(root, decrypt), workspaceStorage(root),
     ...[applicationStorage.appearanceStore, applicationStorage.languageStore, applicationStorage.updatesStore, applicationStorage.networkStore].map(name => preferenceStorage(root, name))];
 }
 
@@ -66,9 +66,9 @@ async function discoverPluginStorage(root: string, built: readonly BuiltPackage[
 }
 
 export async function prepareApplicationData(root: string, version: string, onHost?: (status: "migrating" | "ready") => void,
-  onProgress?: (progress: PreparationProgress) => void): Promise<PreparationResult> {
+  onProgress?: (progress: PreparationProgress) => void, decrypt?: (ciphertext: string) => Promise<string>): Promise<PreparationResult> {
   let pluginBuild: string | undefined;
-  const result = await prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root), onHost, onProgress,
+  const result = await prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root, decrypt), onHost, onProgress,
     discover: async () => {
       const cache = join(root, "plugins", ".cache");
       const built = await buildPackages(applicationPackages(root), join(root, "plugins"), cache, [], [],

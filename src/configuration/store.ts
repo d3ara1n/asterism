@@ -4,28 +4,28 @@ import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
-import { canEditModelProviderField, modelReference, modelSchema, modelProviderInputSchema, sessionEntrySelectionSchema,
-  type ModelProviderInput, type ProviderModel } from "../shared/configuration.ts";
+import { canEditModelProviderField, modelReference, modelSchema, modelProviderSchema, sessionEntrySelectionSchema,
+  type ModelProvider, type ProviderModel } from "../shared/configuration.ts";
 import { mcpSettingsSchema, defaultMcpSettings, shellSettingsSchema, defaultShellSettings, modelCostSchema, webProviderStateSchema, type WebProviderState, messagingConnectionSchema, type MessagingConnection } from "@asterism-app/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 import { jsonStorage } from "../storage/migrations.ts";
+import { migrateConfiguration13 } from "./credential-migration.ts";
 
 /** Global configuration format; increment on changes and append an n → n+1 migration to `configurationStorage`. */
-export const configurationVersion = 13;
-const storedProviderSchema = modelProviderInputSchema.extend({ credentialRef: z.string().uuid().nullable() }).strip();
-/** Secret references are keyed by setting key; values live in the credential vault. */
-const storedWebProviderSchema = webProviderStateSchema.extend({ secretRefs: z.record(z.string(), z.string().uuid()) });
+export const configurationVersion = 14;
+const storedProviderSchema = modelProviderSchema.strip();
 const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
 /** Models use `<providerId>/<modelId>` identities; other entries use id. */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
 const documentSchema = z.strictObject({
   version: z.literal(configurationVersion),
   mcp: mcpSettingsSchema,
-  mcpCredentialRefs: z.record(z.string(), z.string().uuid()),
+  /** OAuth state the MCP client writes, keyed by server ID. */
+  mcpAuthorizations: z.record(z.string(), z.record(z.string(), z.unknown())),
   shell: shellSettingsSchema,
-  webProviders: z.array(storedWebProviderSchema),
-  messagingConnections: z.array(messagingConnectionSchema.extend({ secretRefs: z.record(z.string(), z.string().uuid()) })),
+  webProviders: z.array(webProviderStateSchema),
+  messagingConnections: z.array(messagingConnectionSchema),
   modelProviders: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   sessionEntry: sessionEntrySelectionSchema.nullable(),
 }).superRefine((document, context) => {
@@ -45,13 +45,13 @@ const collections = { messaging: "messagingConnections", modelProvider: "modelPr
 export type ConfigurationKind = keyof typeof collections;
 type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collections)[K]][number] };
 type ConfigurationSave =
-  | { kind: "messaging"; id: string | null; value: MessagingConnection; secretRefs: Record<string, string> }
-  | { kind: "webProvider"; id: string; value: WebProviderState; secretRefs: Record<string, string> }
-  | { kind: "modelProvider"; id: string | null; value: ModelProviderInput; credentialRef: string | null }
+  | { kind: "messaging"; id: string | null; value: MessagingConnection }
+  | { kind: "webProvider"; id: string; value: WebProviderState }
+  | { kind: "modelProvider"; id: string | null; value: ModelProvider }
   | { kind: "model"; id: string | null; value: ProviderModel };
 
 function initialConfiguration(): ConfigurationDocument {
-  return { version: configurationVersion, mcp: structuredClone(defaultMcpSettings), mcpCredentialRefs: {},
+  return { version: configurationVersion, mcp: structuredClone(defaultMcpSettings), mcpAuthorizations: {},
     shell: structuredClone(defaultShellSettings), messagingConnections: [], modelProviders: [], webProviders: [], models: [], sessionEntry: null };
 }
 /**
@@ -65,9 +65,9 @@ export function migrateConfiguration12(value: unknown): unknown {
   })) };
 }
 /** Append conversions for released formats here; business reads and writes always consume the current document. */
-export function configurationStorage(root: string) {
+export function configurationStorage(root: string, decrypt?: (ciphertext: string) => Promise<string>) {
   return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile), version: configurationVersion,
-    migrations: { 12: migrateConfiguration12 } });
+    migrations: { 12: migrateConfiguration12, 13: value => migrateConfiguration13(root, value, decrypt) } });
 }
 
 /** Locate by old identity and replace; reject new identities that conflict with other entries. */
@@ -98,11 +98,11 @@ export class ConfigurationStore {
     catch { throw new ConfigurationError("unavailable", "The application configuration is invalid or unsupported. Back up and repair configuration.json before restarting."); }
   }
   mcp() { return structuredClone(this.document.mcp); }
-  mcpCredentialReference(key: string) { return this.document.mcpCredentialRefs[key] ?? null; }
-  setMcpCredentialReference(key: string, reference: string | null) {
-    const refs = { ...this.document.mcpCredentialRefs };
-    if (reference === null) delete refs[key]; else refs[key] = reference;
-    this.commit({ ...this.document, mcpCredentialRefs: refs });
+  mcpAuthorization(serverId: string) { return structuredClone(this.document.mcpAuthorizations[serverId] ?? null); }
+  setMcpAuthorization(serverId: string, value: Record<string, unknown> | null): void {
+    const authorizations = { ...this.document.mcpAuthorizations };
+    if (value === null) delete authorizations[serverId]; else authorizations[serverId] = value;
+    this.commit({ ...this.document, mcpAuthorizations: authorizations });
   }
   setMcp(value: z.infer<typeof mcpSettingsSchema>) { this.commit({ ...this.document, mcp: value }); }
   shell() { return structuredClone(this.document.shell); }
@@ -121,15 +121,14 @@ export class ConfigurationStore {
     const next = structuredClone(this.document);
     const { id } = input;
     switch (input.kind) {
-      case "messaging": upsert(next.messagingConnections, input.id, { ...input.value, secretRefs: input.secretRefs }); break;
-      case "webProvider": upsert(next.webProviders, input.id, { ...input.value, secretRefs: input.secretRefs }); break;
+      case "messaging": upsert(next.messagingConnections, input.id, input.value); break;
+      case "webProvider": upsert(next.webProviders, input.id, input.value); break;
       case "modelProvider":
-        upsert(next.modelProviders, id, { ...input.value, credentialRef: input.credentialRef });
+        upsert(next.modelProviders, id, input.value);
         // Providers own their models: renaming moves models with them without rewriting saved model references.
         if (id !== null && id !== input.value.id) for (const model of next.models) if (model.providerId === id) model.providerId = input.value.id;
         break;
       case "model": upsert(next.models, id, input.value); break;
-
     }
     this.commit(next);
   }
@@ -161,8 +160,8 @@ export class ConfigurationStore {
       if (!isDeepStrictEqual(compatibility, input.value.compatibility)) reject();
     }
   }
-  /** Return the vault references the removed entry owned. */
-  remove(kind: ConfigurationKind, id: string): { credentialRefs: string[] } {
+
+  remove(kind: ConfigurationKind, id: string): void {
     const old = this.get(kind, id);
     if (!old) throw new ConfigurationError("not_found", "This configuration no longer exists.");
     const next = structuredClone(this.document);
@@ -174,8 +173,6 @@ export class ConfigurationStore {
       case "model": next.models = next.models.filter(item => modelReference(item) !== id); break;
     }
     this.commit(next);
-    if ("secretRefs" in old) return { credentialRefs: Object.values(old.secretRefs) };
-    return { credentialRefs: "credentialRef" in old && old.credentialRef ? [old.credentialRef] : [] };
   }
   /** Save all selections together; existing models retain their values and retries do not overwrite user configuration. */
   addModels(models: ProviderModel[]): void {

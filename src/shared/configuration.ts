@@ -7,7 +7,6 @@ export { modelExpressionSchema, parseModelExpression, formatModelExpression, mod
 import { z } from "zod";
 import { messagingConnectionSchema, messagingConnectionInfoSchema, messagingProviderTypeSchema, webProviderStateSchema, webProviderTypeSchema } from "@asterism-app/sdk/contracts";
 import { modelCompatibilitySchema } from "./model-compatibility.ts";
-import { credentialUpdateSchema } from "./provider-settings.ts";
 
 const id = z.string().min(1).max(160);
 const name = z.string().trim().min(1).max(160);
@@ -30,16 +29,19 @@ export const modelProviderInputSchema = z.strictObject({
   fixedFields: z.array(modelProviderFixedFieldSchema).refine(fields => new Set(fields).size === fields.length,
     "Fixed fields must be unique.").optional(),
 });
-export const credentialStateSchema = z.enum(["not_required", "missing", "available", "storage_unavailable", "decryption_failed"]);
-export type CredentialState = z.infer<typeof credentialStateSchema>;
-/** Secret states are keyed by setting key; values never leave the backend. */
-export const webProviderSchema = webProviderStateSchema.extend({ secrets: z.record(z.string(), credentialStateSchema) });
-export const messagingConfigurationSchema = messagingConnectionSchema.extend({
-  secrets: z.record(z.string(), credentialStateSchema), runtime: messagingConnectionInfoSchema,
-});
+export const webProviderSchema = webProviderStateSchema;
+export const messagingConfigurationSchema = messagingConnectionSchema.extend({ runtime: messagingConnectionInfoSchema });
 export type MessagingConfiguration = z.infer<typeof messagingConfigurationSchema>;
 export type WebProviderConfiguration = z.infer<typeof webProviderSchema>;
-export const modelProviderSchema = modelProviderInputSchema.extend({ credentialState: credentialStateSchema });
+/**
+ * Saved connection with its API key, a literal value or `!` command; empty when no key is saved.
+ * Runtime consumers receive the connection without the key and read the resolved credential separately.
+ */
+export const modelProviderSchema = modelProviderInputSchema.extend({ apiKey: z.string().trim().max(16_384) });
+/** API-key authentication requires a key; other authentication methods carry none. */
+export function modelProviderComplete(provider: Pick<ModelProvider, "auth" | "apiKey">): boolean {
+  return provider.auth !== "api_key" || provider.apiKey.trim() !== "";
+}
 export const modelInputSchema = z.strictObject({
   providerId: modelProviderIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
@@ -93,23 +95,22 @@ export const configurationSnapshotSchema = z.strictObject({
   webProviders: z.array(webProviderSchema),
   webProviderTypes: z.array(webProviderTypeSchema),
   modelProviders: z.array(modelProviderSchema), models: z.array(modelSchema),
-  tests: z.array(connectionTestSchema), discoveries: z.array(modelDiscoverySchema), credentialStorageAvailable: z.boolean(),
+  tests: z.array(connectionTestSchema), discoveries: z.array(modelDiscoverySchema),
   modelProviderPresets: z.array(modelProviderPresetSchema).optional(),
   usageProviders: z.array(usageProviderInfoSchema).optional(),
 });
 export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("messaging.save"), id: z.string().min(1).nullable(),
-    value: messagingConnectionSchema.omit({ id: true }), secrets: z.record(z.string(), credentialUpdateSchema) }),
+    value: messagingConnectionSchema.omit({ id: true }) }),
   z.strictObject({ type: z.literal("messaging.restart"), id: z.string().min(1) }),
   z.strictObject({ type: z.literal("shell.set"), value: shellSettingsSchema }),
-  /** Settings replace saved non-secret values; secrets update only the listed keys. */
   z.strictObject({ type: z.literal("webProvider.save"), id: z.string().trim().min(1), enabled: z.boolean(),
-    settings: z.record(z.string(), z.string()), secrets: z.record(z.string(), credentialUpdateSchema) }),
+    settings: z.record(z.string(), z.string()) }),
   z.strictObject({ type: z.literal("webProvider.reorder"), ids: z.array(z.string().min(1)) }),
   z.strictObject({ type: z.literal("read") }),
   z.strictObject({ type: z.literal("sessionEntry.set"), value: sessionEntrySelectionSchema }),
   // Save targets the current ID; a different ID in value means rename.
-  z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderInputSchema, credential: credentialUpdateSchema }),
+  z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
   z.strictObject({ type: z.literal("remove"), kind: z.enum(["modelProvider", "webProvider", "messaging", "model"]), id: z.string().min(1).max(321) }),
   z.strictObject({ type: z.literal("test.start"), model: modelExpressionSchema }),

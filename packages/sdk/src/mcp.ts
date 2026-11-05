@@ -5,11 +5,13 @@ import { jsonSchema } from "./json.ts";
 
 export const SERVER_ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/u;
 export const serverIdSchema = z.string().min(1).max(64).regex(SERVER_ID_PATTERN);
+/** Environment variables (stdio) or request headers (http); values may be `!` credential commands. */
+export const mcpVariablesSchema = z.record(z.string().min(1), z.string());
 export const mcpServerSchema = z.strictObject({
   id: serverIdSchema, name: z.string().trim().min(1), enabled: z.boolean(),
   mode: z.enum(["eager", "lazy"]), idleSeconds: z.number().int().min(1).max(86_400),
   transport: z.enum(["stdio", "http"]), command: z.string(), args: z.array(z.string()), cwd: z.string(),
-  url: z.string(), auth: z.enum(["none", "oauth"]),
+  url: z.string(), auth: z.enum(["none", "oauth"]), env: mcpVariablesSchema, headers: mcpVariablesSchema,
 }).superRefine((value, ctx) => {
   if (value.transport === "stdio" && !value.command.trim()) ctx.addIssue({ code: "custom", path: ["command"], message: "An executable is required." });
   if (value.transport === "http") {
@@ -21,7 +23,6 @@ export type McpServerConfig = z.infer<typeof mcpServerSchema>;
 export const mcpSettingsSchema = z.object({ servers: z.array(mcpServerSchema).refine(values =>
   new Set(values.map(value => value.id)).size === values.length, "Server IDs are unique.") });
 export const defaultMcpSettings = { servers: [] };
-export const credentialsSchema = z.record(z.string(), z.string());
 export const connectionPhases = ["disconnected", "connecting", "awaiting_auth", "authorizing", "connected", "error"] as const;
 export type ConnectionPhase = typeof connectionPhases[number];
 export const mcpServerStateSchema = z.object({
@@ -43,14 +44,8 @@ export interface McpCatalogServer { config: McpServerConfig; state: McpServerSta
 
 export const McpChanged = defineEvent("core.mcp.changed", { schema: z.object({}), source: "host", semantics: { kind: "snapshot", key: [] } });
 export const ReadMcp = defineCall("core.mcp.status", { scope: "plugin", input: z.object({}), output: z.array(mcpServerStateSchema) });
-/** keep retains saved environment or headers; a new server with keep starts without any. */
-export const mcpCredentialUpdateSchema = z.discriminatedUnion("action", [
-  z.strictObject({ action: z.literal("keep") }), z.strictObject({ action: z.literal("replace"), values: credentialsSchema }),
-]);
-export type McpCredentialUpdate = z.infer<typeof mcpCredentialUpdateSchema>;
 export const SaveMcpServer = defineCall("core.mcp.save-server", { scope: "plugin",
-  input: z.object({ server: mcpServerSchema, create: z.boolean(), credentials: mcpCredentialUpdateSchema }), output: z.null() });
-export const ReadMcpCredentials = defineCall("core.mcp.read-credentials", { scope: "plugin", input: z.object({ serverId: z.string() }), output: credentialsSchema });
+  input: z.object({ server: mcpServerSchema, create: z.boolean() }), output: z.null() });
 export const mcpToolSummarySchema = z.object({ name: z.string(), title: z.string().optional(), description: z.string().optional() });
 export type McpToolSummary = z.infer<typeof mcpToolSummarySchema>;
 export const ReadMcpTools = defineCall("core.mcp.read-tools", { scope: "plugin", input: z.object({ serverId: z.string() }),

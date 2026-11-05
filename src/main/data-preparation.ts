@@ -2,6 +2,7 @@ import { utilityProcess } from "electron";
 import { preparationMessageSchema, type PreparationProgress, type PreparationResult, type RecoveryAction } from "../shared/recovery.ts";
 import { applicationBrand } from "../shared/application.ts";
 import { observeProcess } from "./logging.ts";
+import { migrateLegacyCredential } from "./legacy-credentials.ts";
 
 export type PreparationAction = { kind: "prepare" } | RecoveryAction;
 
@@ -38,6 +39,14 @@ export function prepareDataProcess(entry: string, root: string, version: string,
     signal.addEventListener("abort", abort, { once: true });
     child.on("message", raw => {
       if (stopping) return;
+      if (action.kind === "prepare" && raw?.kind === "credential.migrate") {
+        void migrateLegacyCredential(raw).then(response => {
+          if (response && !stopping) {
+            try { child.postMessage(response); } catch { /* Preparation has exited. */ }
+          }
+        });
+        return;
+      }
       try {
         const message = preparationMessageSchema.parse(raw);
         if (message.kind === "host") {

@@ -11,7 +11,6 @@ import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { ModelSettings } from "../shared/model.ts";
 import { pluginConfigurationCommandSchema, type PluginConfiguration } from "../shared/plugin-configuration.ts";
-import type { SecretProtector } from "../shared/secrets.ts";
 import type { SessionChanged } from "../shared/session.ts";
 import { pluginErrorDisplay } from "./plugin-errors.ts";
 import type { PreparedPluginStorage } from "../plugins/loader.ts";
@@ -37,15 +36,14 @@ export class ApplicationService {
   private readonly folders: FolderStore;
   private readonly list: PackageList;
   private readonly started: string;
-  constructor(root: string, private readonly options: { packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; protector?: SecretProtector; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
+  constructor(root: string, private readonly options: { packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
     this.db = openDatabase(root);
     this.folders = new FolderStore(this.db);
     this.list = applicationPackages(root);
     this.started = JSON.stringify(options.packageEntries ?? this.list.read());
     this.npmRoot = join(root, "plugins");
     try {
-      const unavailable = async (): Promise<string> => { throw new Error("System credential protection is unavailable."); };
-      this.configuration = new ConfigurationService(root, options.protector ?? { available: async () => false, encrypt: unavailable, decrypt: unavailable }, options.onConfigurationChanged);
+      this.configuration = new ConfigurationService(root, options.onConfigurationChanged);
       // Archive cleanup releases references first; session services then explicitly reclaim content.
       collectExpiredSessions(this.db);
       this.sessions = new SessionService(this.db, root, this.configuration, {

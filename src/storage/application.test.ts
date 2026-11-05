@@ -31,7 +31,7 @@ it("managed configuration reads and writes envelopes at declared versions", asyn
   writeJson(file, { version: 1, data: BuiltinSettings.defaults });
   const result = await prepareData(directory, { version: "1", paths: [{ path: "extensions" }], stores: pluginStorages(directory, "asterism.builtin", declarations) });
   expect(result.ok).toBe(true);
-  const storage = new PluginStorage(join(directory, "extensions"), "asterism.builtin", null, () => {}, declarations);
+  const storage = new PluginStorage(join(directory, "extensions"), "asterism.builtin", () => {}, declarations);
   try {
     const configuration = storage.config(BuiltinSettings);
     expect(configuration.get().autoExpand).toBe(false);
@@ -44,7 +44,7 @@ it("managed configuration reads and writes envelopes at declared versions", asyn
 it("envelope version mismatches fall back to defaults", () => {
   const directory = root();
   writeJson(join(directory, "extensions", "asterism.builtin", ".asterism", "config.json"), { version: 7, data: { autoExpand: false } });
-  const storage = new PluginStorage(join(directory, "extensions"), "asterism.builtin", null, () => {}, builtinStorage);
+  const storage = new PluginStorage(join(directory, "extensions"), "asterism.builtin", () => {}, builtinStorage);
   try { expect(storage.configuration("asterism.builtin")).toBeNull(); expect(storage.config(BuiltinSettings).get()).toEqual(BuiltinSettings.defaults); }
   finally { storage.close(); }
 });
@@ -52,7 +52,7 @@ it("envelope version mismatches fall back to defaults", () => {
 // Stamp managed databases on first open so later preparation can use user_version to determine migration needs.
 it("managed databases write declared versions on first open", () => {
   const directory = root();
-  const storage = new PluginStorage(join(directory, "extensions"), "acme.notes", null, () => {}, [{ kind: "sqlite", path: ".asterism/db.sqlite", version: 3, migrations: {} }]);
+  const storage = new PluginStorage(join(directory, "extensions"), "acme.notes", () => {}, [{ kind: "sqlite", path: ".asterism/db.sqlite", version: 3, migrations: {} }]);
   try { expect(storage.db().prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 3 }); }
   finally { storage.close(); }
 });

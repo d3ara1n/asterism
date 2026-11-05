@@ -2,7 +2,6 @@ import { useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Globe, GripVertical, Plus } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
 import type { ProviderSetting, WebProviderType } from "@asterism-app/sdk/contracts";
-import type { WebProviderConfiguration } from "../../../shared/configuration";
 import { webProviderMessages as messages } from "../../messages/web-providers";
 import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
@@ -22,26 +21,18 @@ import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { Section } from "../settings/layout";
 import { ProviderKeyLink } from "./ProviderKeyLink";
 import { ProviderSettingFields } from "./ProviderSettingFields";
-import { credentialChanged, secretUpdates, settingValues, settingsComplete, type CredentialDraft } from "./provider-settings";
+import { settingValues, settingsComplete } from "./provider-settings";
 
 type SecretSetting = Extract<ProviderSetting, { kind: "secret" }>;
 function useCapabilities() {
   const i18n = useI18n();
   return (type: WebProviderType) => [type.search && i18n.text(messages.search), type.fetch && i18n.text(messages.fetch)].filter(Boolean).join(" · ");
 }
-/** Surface unavailable provider types and credential access failures. */
+/** Surface unavailable provider types. */
 function useProviderIssue() {
   const i18n = useI18n();
-  return (type: WebProviderType | undefined, state: WebProviderConfiguration): { tone: StatusTone; label: string } | null => {
-    if (!type) return { tone: "error", label: i18n.text(messages.unavailable) };
-    for (const setting of type.settings) {
-      if (setting.kind !== "secret") continue;
-      const secret = state.secrets[setting.key];
-      if (secret === "decryption_failed") return { tone: "error", label: i18n.text(providersMessages.decryptionFailed) };
-      if (secret === "storage_unavailable") return { tone: "warning", label: i18n.text(providersMessages.credentialProtectionUnavailable) };
-    }
-    return null;
-  };
+  return (type: WebProviderType | undefined): { tone: StatusTone; label: string } | null =>
+    type ? null : { tone: "error", label: i18n.text(messages.unavailable) };
 }
 const initial = (label: string) => label.trim().charAt(0).toUpperCase() || "?";
 
@@ -90,7 +81,7 @@ export function WebProvidersSettings() {
       <ItemGroup className="surface overflow-clip">{ordered.map((state, index) => {
         const type = types.find(type => type.id === state.id);
         const label = type ? i18n.text(type.label) : state.id;
-        const issue = issueOf(type, state);
+        const issue = issueOf(type);
         const moveUpLabel = i18n.formatMessage(messages.moveUp, { provider: label });
         const moveDownLabel = i18n.formatMessage(messages.moveDown, { provider: label });
         return <SortableProvider key={state.id} id={state.id} label={label} disabled={action.busy || states.length < 2}
@@ -113,7 +104,7 @@ export function WebProvidersSettings() {
                 {/* Saving validates against the type declaration, so unavailable types cannot be toggled. */}
                 <Switch aria-label={i18n.formatMessage(messages.enableProvider, { provider: label })} checked={state.enabled} disabled={busy || !type}
                   onCheckedChange={enabled => void action.run({ type: "webProvider.save", id: state.id, enabled,
-                    settings: settingValues(type?.settings, state.settings), secrets: {} })} />
+                    settings: settingValues(type?.settings, state.settings) })} />
               </>} />
           </>}
         </SortableProvider>;
@@ -190,12 +181,10 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
   const type = snapshot?.webProviderTypes.find(type => type.id === typeId);
   const saved = snapshot?.webProviders.find(state => state.id === typeId) ?? null;
   const [values, setValues] = useState(() => settingValues(type?.settings, saved?.settings ?? {}));
-  const [secrets, setSecrets] = useState<Record<string, CredentialDraft>>({});
   const action = useConfigurationAction("inline");
   const savedValues = settingValues(type?.settings, saved?.settings ?? {});
-  const dirty = !saved || Object.values(secrets).some(credentialChanged)
-    || Object.entries(values).some(([key, value]) => savedValues[key] !== value);
-  const complete = !!type && settingsComplete(type.settings, values, secrets, saved?.secrets);
+  const dirty = !saved || Object.entries(values).some(([key, value]) => savedValues[key] !== value);
+  const complete = !!type && settingsComplete(type.settings, values);
   const label = type ? i18n.text(type.label) : typeId;
   return <Editor title={label} description={type ? capabilities(type) : i18n.text(messages.unavailable)}
     form="web-provider-editor" dirty={dirty} busy={action.busy} error={action.error} saveDisabled={!complete}
@@ -206,16 +195,13 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
       event.preventDefault();
       if (!type || !complete) return;
       // Enablement is an immediate list action; saving keeps the current value and new services start enabled.
-      if (await action.run({ type: "webProvider.save", id: typeId, enabled: saved?.enabled ?? true, settings: values, secrets: secretUpdates(secrets) })) {
-        setSecrets({});
+      if (await action.run({ type: "webProvider.save", id: typeId, enabled: saved?.enabled ?? true, settings: values })) {
         void island.close({ force: true });
       }
     }}><fieldset disabled={action.busy} className="flex flex-col gap-6">
       {!type && <p className="type-body text-muted-foreground">{i18n.text(messages.unavailableHint)}</p>}
-      {type && <ProviderSettingFields settings={type.settings} values={values} secretStates={saved?.secrets}
-        storageAvailable={snapshot?.credentialStorageAvailable ?? false}
-        onValue={(key, value) => setValues(current => ({ ...current, [key]: value }))}
-        drafts={secrets} onDraft={(key, draft) => setSecrets(current => ({ ...current, [key]: draft }))} />}
+      {type && <ProviderSettingFields settings={type.settings} values={values}
+        onValue={(key, value) => setValues(current => ({ ...current, [key]: value }))} />}
       {type?.fetch && <FetchScope patterns={type.urlPatterns} />}
     </fieldset></form>
   </Editor>;

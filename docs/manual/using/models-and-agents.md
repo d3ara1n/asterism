@@ -22,6 +22,20 @@ In the model editor, enter a service model ID and fetch parameters to fill the f
 
 Changing a preset catalog does not rewrite connections already saved from it.
 
+## Store credentials or read them from a password manager
+
+Credential fields accept a literal API key or a shell command prefixed with `!`, such as:
+
+```text
+!rbw get openai-api-key
+```
+
+Literal credentials and command expressions are saved in plaintext in the application's local configuration, with owner-only file permissions. Settings show the saved value or command in a masked field; clearing the field removes it.
+
+A command runs the first time its credential is needed, using the platform shell, the application's login environment, and the user's home directory. A successful command must print the credential to standard output; leading and trailing whitespace is removed. Saving or viewing provider settings does not execute it. A failed command or empty output produces a credential error, and the next use runs the command again, for example after unlocking the password manager.
+
+Successful output stays in memory until the application restarts and is shared by every connection using the same command; restart the application to read a rotated value. MCP environment and header fields also accept `!` commands. Resolved output is not written to configuration.
+
 ## Choose a model for work
 
 Use the conversation’s model selector for a specific task. Model roles supply reusable defaults and support features that need a model outside the conversation.

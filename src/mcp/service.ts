@@ -3,11 +3,10 @@ import type { Progress, CallToolResult } from "@modelcontextprotocol/client";
 import { PluginApiError } from "@asterism-app/sdk/runtime";
 import type { McpEnvironment } from "./environment.ts";
 import type { Json } from "@asterism-app/sdk/contracts";
-import { credentialsSchema, type McpServerConfig, type McpServerState, McpError,
+import { type McpServerConfig, type McpServerState, McpError,
   mcpDirectorySchema as directorySchema, parseMcpToolIdentity, type McpCatalogServer, type McpDirectory as Directory } from "@asterism-app/sdk/contracts";
-import { ServerSession, credentialKey, endpointOf, type SessionHost } from "./session.ts";
+import { ServerSession, endpointOf, type SessionHost } from "./session.ts";
 
-export { credentialKey, oauthKey } from "./session.ts";
 export interface CallTarget { session: ServerSession; serverId: string; serverName: string; toolName: string }
 
 /**
@@ -25,13 +24,6 @@ export class McpHostService implements SessionHost {
     this.db = environment.db;
   }
   notify() { if (!this.closed && !this.environment.signal.aborted) this.changed(); }
-  async credentials(id: string): Promise<Record<string, string>> {
-    const raw = await this.environment.secrets.get(credentialKey(id));
-    if (!raw) return {};
-    const parsed = credentialsSchema.safeParse(JSON.parse(raw));
-    if (!parsed.success) throw new Error("Saved MCP environment or headers are invalid. Clear and re-enter them in MCP settings.");
-    return parsed.data;
-  }
   saveDirectory(config: McpServerConfig, directory: Directory | undefined) {
     if (!directory) { this.db.prepare("DELETE FROM mcp_catalog WHERE server_id = ?").run(config.id); return; }
     this.db.prepare("INSERT INTO mcp_catalog VALUES (?, ?, ?) ON CONFLICT(server_id) DO UPDATE SET endpoint=excluded.endpoint, directory=excluded.directory")
@@ -77,7 +69,7 @@ export class McpHostService implements SessionHost {
       if (!this.environment.signal.aborted) this.environment.log.warn(`MCP eager connection to ${session.id} failed: ${String(error)}`);
     });
   }
-  /** After credentials change, the old catalog may no longer match visible tools; eager reconnects with the new credentials after disconnecting. */
+  /** After environment or headers change, the old catalog may no longer match visible tools; eager reconnects with the new values after disconnecting. */
   async credentialsChanged(id: string) {
     const session = this.sessions.get(id);
     if (!session) return;
@@ -85,7 +77,7 @@ export class McpHostService implements SessionHost {
     await session.disconnect();
     if (session.config.enabled && session.config.mode === "eager") this.startEager(session);
   }
-  /** Waits for retired sessions to finish cleanup; credentials are removed after server deletion. */
+  /** Waits for retired sessions to finish cleanup; authorization is removed after server deletion. */
   async settled() { await Promise.allSettled([...this.retiring]); }
 
   private get(id: string) {

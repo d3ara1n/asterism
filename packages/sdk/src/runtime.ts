@@ -36,7 +36,7 @@ export interface PluginConfig<T extends Json> {
   update(next: (current: T) => T): void;
   subscribe(listener: (value: T) => void): () => void;
 }
-/** Namespaced credentials: plaintext exists only in the system-protected vault, while plugin directories store only references. */
+/** Namespaced credentials stored as given in the plugin's managed directory. */
 export interface PluginSecrets {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;

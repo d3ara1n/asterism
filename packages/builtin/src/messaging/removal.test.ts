@@ -51,7 +51,7 @@ describe("Removed messaging connections", () => {
       }] };
     } })] }); apps.push(app);
     const saved = await app.configuration.execute({ type: "messaging.save", id: null,
-      value: { name: "Bot", providerId: "test-messaging-removal", enabled: true, settings: {} }, secrets: {} });
+      value: { name: "Bot", providerId: "test-messaging-removal", enabled: true, settings: {} } });
     const connectionId = saved.savedId!;
     await started;
     const chats: ResourceRef[] = [];

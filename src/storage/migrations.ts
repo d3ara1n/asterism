@@ -4,7 +4,7 @@ import { readJson, writeJson } from "./files.ts";
 
 export interface StorageChange { id: string; from: number; to: number }
 /** An existing outdated file; `apply` executes the full migration chain and commits the new version. */
-export interface StoragePlan { change: StorageChange; apply(): void }
+export interface StoragePlan { change: StorageChange; apply(): void | Promise<void> }
 /** Read versions only: absent or current files need no plan; business logic creates or reads them in current format. */
 export interface StorageDefinition { id: string; file: string; inspect(): StoragePlan | null }
 
@@ -21,7 +21,7 @@ export function migrationPath<T>(id: string, from: number, to: number, steps: Re
 
 export interface JsonStorageOptions {
   id: string; file: string; version: number;
-  migrations: Readonly<Record<number, (value: unknown) => unknown>>;
+  migrations: Readonly<Record<number, (value: unknown) => unknown | Promise<unknown>>>;
   /** Flat host documents put `version` beside body fields; plugin documents use `{ version, data }` envelopes. */
   envelope?: boolean;
 }
@@ -33,9 +33,9 @@ export function jsonStorage({ id, file, version, migrations, envelope }: JsonSto
     if (!Number.isSafeInteger(found)) throw new Error(`Data for ${id} has no format version.`);
     if (found === version) return null;
     const steps = migrationPath(id, found as number, version, migrations);
-    return { change: { id, from: found as number, to: version }, apply() {
+    return { change: { id, from: found as number, to: version }, async apply() {
       let value = envelope ? (raw as { data?: unknown }).data : raw;
-      for (const step of steps) value = step(value);
+      for (const step of steps) value = await step(value);
       // Flat-document migration steps yield next-version bodies; adapters write final version numbers centrally.
       writeJson(file, envelope ? { version, data: value } : { ...(value as object), version });
     } };

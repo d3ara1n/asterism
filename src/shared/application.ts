@@ -20,7 +20,7 @@ export const applicationStorage = {
   databaseDirectory: "db",
   databaseFile: "workspace.sqlite",
   contentDirectory: "content",
-  credentialsDirectory: "credentials",
+  credentialsDirectory: "credentials", // Legacy encrypted values retained for migration and recovery.
   configurationFile: "configuration.json",
   appearanceStore: "appearance",
   languageStore: "language",

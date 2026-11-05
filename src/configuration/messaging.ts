@@ -20,8 +20,8 @@ interface Generation {
 }
 interface Configuration {
   list(): MessagingConnection[];
-  /** Read a saved secret value; null when no value is saved for the key. */
-  secret(id: string, key: string): Promise<string | null>;
+  /** Resolve a saved secret value, running `!` credential commands. */
+  credential(value: string, signal: AbortSignal): Promise<string>;
   /** Connection state changed outside a configuration command. */
   changed(): void;
 }
@@ -143,17 +143,17 @@ export class MessagingRegistry implements MessagingServices {
       generation.status = change.status; generation.error = change.error;
       this.changed(true);
     };
-    const settings = () => {
+    const settings = (signal: AbortSignal) => {
       const state = this.configuration.list().find(item => item.id === id);
       if (!state) throw new MessagingError("unavailable", `Messaging connection '${id}' no longer exists.`);
-      return resolveProviderSettings(entry.info.settings, state.settings, key => this.configuration.secret(id, key)).catch(error => {
+      return resolveProviderSettings(entry.info.settings, state.settings, value => this.configuration.credential(value, signal)).catch(error => {
         throw error instanceof ProviderSettingError ? new MessagingError("unavailable", error.message) : error;
       });
     };
     // Creation runs in the provider lifecycle rather than this generation, so captured operations can finish a pending attempt after replacement.
     const connect = () => {
       const attempt = entry.runs.start(async signal => {
-        const values = await settings();
+        const values = await settings(signal);
         signal.throwIfAborted();
         return entry.definition.create({ connectionId: id, settings: values, signal, publish: raw => this.publish(id, generation, raw) });
       }, { affectsHistory: false }).done;

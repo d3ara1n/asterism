@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { CredentialVault } from "../configuration/credentials.ts";
 import { PluginStorage, managedDirectory } from "./storage.ts";
 
 const roots: string[] = [];
@@ -13,18 +12,11 @@ afterEach(() => {
   for (const storage of storages.splice(0)) storage.close();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
-// Reversible test protection verifies namespace isolation only, without system encryption.
-const protector = {
-  available: async () => true,
-  encrypt: async (value: string) => Buffer.from(value).toString("base64"),
-  decrypt: async (value: string) => Buffer.from(value, "base64").toString(),
-};
 function setup() {
   const root = mkdtempSync(join(tmpdir(), "core-plugin-")); roots.push(root);
-  const vault = new CredentialVault(root, protector);
   const warnings: string[] = [];
   const open = (id: string) => {
-    const storage = new PluginStorage(join(root, "extensions"), id, vault, message => warnings.push(message));
+    const storage = new PluginStorage(join(root, "extensions"), id, message => warnings.push(message));
     storages.push(storage);
     return storage;
   };
@@ -118,14 +110,12 @@ describe("Plugin managed storage", () => {
     expect(seen).toEqual([2, 3, 1]);
   });
 
-  it("two plugins cannot see each other's same-name credentials and plugin directories contain no plaintext", async () => {
+  it("two plugins cannot see each other's same-name credentials, and deletion removes the value", async () => {
     const { open } = setup();
     const a = open("acme.a"), b = open("acme.b");
     await a.secrets.set("token", "secret-a");
     expect(await a.secrets.get("token")).toBe("secret-a");
     expect(await b.secrets.get("token")).toBeNull();
-    const { readFileSync } = await import("node:fs");
-    expect(readFileSync(join(a.dir, managedDirectory, "secrets.json"), "utf8")).not.toContain("secret-a");
     await a.secrets.delete("token");
     expect(await a.secrets.get("token")).toBeNull();
   });

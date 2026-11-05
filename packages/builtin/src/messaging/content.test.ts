@@ -30,7 +30,7 @@ async function setup() {
     }; } }] };
   } })] }); apps.push(app);
   const configured = await app.configuration.execute({ type: "messaging.save", id: null,
-    value: { name: "Test", providerId: "test-attachments", enabled: true, settings: {} }, secrets: {} });
+    value: { name: "Test", providerId: "test-attachments", enabled: true, settings: {} } });
   const sessionId = app.sessions.tree.create("Images");
   await app.sessions.execute({ type: "resource.create", sessionId, kind: Chat.kind, creation: { id: CreateChat.id },
     input: { connectionId: configured.savedId!, conversationId: "conversation", title: "Chat" }, position: { x: 0, y: 0 } });

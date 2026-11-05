@@ -2,7 +2,6 @@ import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
-import type { CredentialVault } from "../configuration/credentials.ts";
 import { jsonSchema, type Json, type ConfigContract } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
@@ -11,7 +10,7 @@ import { encodePluginData } from "./data-encoding.ts";
 /** Host-managed directory name; plugins may freely write elsewhere in their directories. */
 export const managedDirectory = ".asterism";
 const secretKey = z.string().min(1).max(160).regex(/^[A-Za-z0-9._-]+$/u);
-const references = z.record(z.string(), z.string().uuid());
+const savedSecrets = z.record(z.string(), z.string());
 
 function readJson(file: string): unknown {
   try { return JSON.parse(readFileSync(file, "utf8")); }
@@ -25,7 +24,7 @@ function writeJson(file: string, value: unknown): void {
 
 /**
  * Managed storage for one plugin: `<extensions>/<pluginId>/` and its `.asterism/` subdirectory.
- * Directories, configuration, credential references, and databases are created lazily; plaintext credentials exist only in the vault.
+ * Directories, configuration, secrets, and databases are created lazily; secrets are stored as given in `secrets.json`.
  */
 export class PluginStorage {
   readonly dir: string;
@@ -37,8 +36,7 @@ export class PluginStorage {
     write(value: unknown): void;
     encode(value: Json): Json;
   } | null = null;
-  constructor(extensionsDirectory: string, pluginId: string, private readonly vault: CredentialVault | null,
-    private readonly warn: (message: string, error?: unknown) => void,
+  constructor(extensionsDirectory: string, pluginId: string, private readonly warn: (message: string, error?: unknown) => void,
     private readonly declarations: readonly PluginStorageDeclaration[] = []) {
     this.dir = join(extensionsDirectory, pluginId);
     this.managed = join(this.dir, managedDirectory);
@@ -121,30 +119,13 @@ export class PluginStorage {
   }
 
   readonly secrets: PluginSecrets = {
-    get: async key => {
-      const reference = this.references()[this.key(key)];
-      if (!reference) return null;
-      try { return await this.requireVault().read(reference); }
-      catch { throw new PluginApiError("unavailable", "The stored secret cannot be decrypted."); }
-    },
-    set: async (key, value) => {
-      const name = this.key(key);
-      const vault = this.requireVault();
-      if (!(await vault.available())) throw new PluginApiError("unavailable", "System credential protection is unavailable.");
-      const map = this.references();
-      const previous = map[name];
-      map[name] = await vault.write(value);
-      writeJson(join(this.ensure(), "secrets.json"), map);
-      if (previous) this.discard(previous);
-    },
+    get: async key => this.savedSecrets()[this.key(key)] ?? null,
+    set: async (key, value) => { this.writeSecrets({ ...this.savedSecrets(), [this.key(key)]: value }); },
     delete: async key => {
-      const name = this.key(key);
-      const map = this.references();
-      const previous = map[name];
-      if (!previous) return;
-      delete map[name];
-      writeJson(join(this.ensure(), "secrets.json"), map);
-      this.discard(previous);
+      const name = this.key(key), saved = this.savedSecrets();
+      if (!(name in saved)) return;
+      delete saved[name];
+      this.writeSecrets(saved);
     },
   };
 
@@ -166,16 +147,10 @@ export class PluginStorage {
     if (!secretKey.safeParse(key).success) throw new PluginApiError("invalid_argument", "Secret keys use 1-160 letters, digits, '.', '_' or '-'.");
     return key;
   }
-  private requireVault(): CredentialVault {
-    if (!this.vault) throw new PluginApiError("unavailable", "Secret storage is unavailable.");
-    return this.vault;
-  }
-  private references(): Record<string, string> {
-    const parsed = references.safeParse(readJson(join(this.ensure(), "secrets.json")) ?? {});
-    if (!parsed.success) throw new PluginApiError("unavailable", "The plugin secret index is corrupted.");
+  private savedSecrets(): Record<string, string> {
+    const parsed = savedSecrets.safeParse(readJson(join(this.ensure(), "secrets.json")) ?? {});
+    if (!parsed.success) throw new PluginApiError("unavailable", "The plugin secret file is corrupted.");
     return parsed.data;
   }
-  private discard(reference: string): void {
-    try { this.vault?.remove(reference); } catch (error) { this.warn("Unreferenced plugin secret cleanup failed.", error); }
-  }
+  private writeSecrets(value: Record<string, string>): void { writeJson(join(this.ensure(), "secrets.json"), value); }
 }

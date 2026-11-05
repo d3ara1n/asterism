@@ -51,13 +51,13 @@ function sameWebFailure(previous: unknown, current: unknown): boolean {
 interface Entry { owner: string; definition: WebProviderDefinition; info: WebProviderType; runs: RunGroup }
 interface Connections {
   list(): WebProviderState[];
-  /** Read a saved secret value; null when no value is saved for the key. */
-  secret(id: string, key: string): Promise<string | null>;
+  /** Resolve a saved secret value, running `!` credential commands. */
+  credential(value: string, signal: AbortSignal): Promise<string>;
 }
 /** Resolve settings with the shared rules and report failures as web provider errors. */
 export async function resolveWebSettings(type: Pick<WebProviderType, "id" | "settings">, saved: Readonly<Record<string, string>>,
-  secret: (key: string) => Promise<string | null>): Promise<Record<string, string>> {
-  try { return await resolveProviderSettings(type.settings, saved, secret); }
+  resolve: (value: string) => Promise<string>): Promise<Record<string, string>> {
+  try { return await resolveProviderSettings(type.settings, saved, resolve); }
   catch (error) {
     if (!(error instanceof ProviderSettingError)) throw error;
     const setting = type.settings.find(item => item.key === error.key);
@@ -115,7 +115,7 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
     // Resolve settings and secrets and create the instance within its provider lifecycle.
     const instance = await entry.runs.start(async scope => {
       scope.throwIfAborted();
-      const settings = await resolveWebSettings(entry.info, state.settings, key => this.connections.secret(id, key));
+      const settings = await resolveWebSettings(entry.info, state.settings, value => this.connections.credential(value, scope));
       scope.throwIfAborted();
       return entry.definition.create({ settings });
     }, { signal: options.signal, affectsHistory: false }).done;

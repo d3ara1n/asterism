@@ -7,7 +7,7 @@ export function slugifyServerId(name: string, taken: Iterable<string>): string {
   for (let index = 2; ; index++) if (!used.has(`${base}-${index}`)) return `${base}-${index}`;
 }
 /** Preserve equals signs and whitespace in values. */
-export function parseCredentialLines(text: string): Record<string, string> {
+export function parseEntryLines(text: string): Record<string, string> {
   return Object.fromEntries(text.split(/\r?\n/u).filter(line => line.trim()).map(line => {
     const split = line.indexOf("=");
     if (split < 1 || !line.slice(0, split).trim()) throw new Error("Each entry uses KEY=VALUE.");
@@ -33,14 +33,16 @@ export interface McpDraft {
 export type McpField = "name" | "id" | "command" | "url" | "idle" | "entries";
 export type McpFieldError = "required" | "invalidId" | "idTaken" | "invalidUrl" | "invalidTtl" | "invalidEntries";
 export type McpDraftResult =
-  | { ok: true; server: McpServerConfig; credentials: Record<string, string> }
+  | { ok: true; server: McpServerConfig }
   | { ok: false; errors: Partial<Record<McpField, McpFieldError>> };
 
 export function entriesText(values: Record<string, string>): string {
   return Object.entries(values).map(([key, value]) => `${key}=${value}`).join("\n");
 }
-export function draftOf(server: McpServerConfig, entries: Record<string, string>, create: boolean): McpDraft {
-  return { server: structuredClone(server), args: server.args.join("\n"), idle: String(server.idleSeconds), entries: entriesText(entries), create, idEdited: false };
+/** Entries edit environment variables for stdio servers and request headers for HTTP servers. */
+export function draftOf(server: McpServerConfig, create: boolean): McpDraft {
+  return { server: structuredClone(server), args: server.args.join("\n"), idle: String(server.idleSeconds),
+    entries: entriesText(server.transport === "stdio" ? server.env : server.headers), create, idEdited: false };
 }
 
 /** Reports errors by field; taken contains IDs used by other servers. eager mode hides idle seconds and retains the original value when the idle value is invalid. */
@@ -61,10 +63,11 @@ export function validateDraft(draft: McpDraft, taken: readonly string[]): McpDra
   const idle = Number(draft.idle);
   const idleValid = /^\d+$/u.test(draft.idle.trim()) && idle >= 1 && idle <= 86_400;
   if (server.mode === "lazy" && !idleValid) errors.idle = "invalidTtl";
-  let credentials: Record<string, string> = {};
-  try { credentials = parseCredentialLines(draft.entries); } catch { errors.entries = "invalidEntries"; }
+  let entries: Record<string, string> = {};
+  try { entries = parseEntryLines(draft.entries); } catch { errors.entries = "invalidEntries"; }
   if (Object.keys(errors).length) return { ok: false, errors };
   const parsed = mcpServerSchema.parse({ ...server, name: server.name.trim(), command: server.command.trim(), url: server.url.trim(),
-    args: parseArgumentLines(draft.args), idleSeconds: idleValid ? idle : server.idleSeconds });
-  return { ok: true, server: parsed, credentials };
+    args: parseArgumentLines(draft.args), idleSeconds: idleValid ? idle : server.idleSeconds,
+    env: server.transport === "stdio" ? entries : {}, headers: server.transport === "http" ? entries : {} });
+  return { ok: true, server: parsed };
 }

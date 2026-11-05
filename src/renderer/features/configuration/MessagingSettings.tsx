@@ -13,7 +13,7 @@ import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
 import { Editor, TextField, ChoiceField, ToggleField } from "./forms";
 import { ProviderSettingFields } from "./ProviderSettingFields";
-import { credentialChanged, secretUpdates, settingValues, settingsComplete, type CredentialDraft } from "./provider-settings";
+import { settingValues, settingsComplete } from "./provider-settings";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { messagingMessages as messages } from "../../messages/messaging";
 
@@ -73,11 +73,10 @@ function MessagingEditor({ id }: { id: string | null }) {
   const [name, setName] = useState(saved?.name ?? "");
   const [enabled, setEnabled] = useState(saved?.enabled ?? true);
   const [values, setValues] = useState(() => settingValues(type?.settings, saved?.settings ?? {}));
-  const [secrets, setSecrets] = useState<Record<string, CredentialDraft>>({});
   const savedValues = settingValues(type?.settings, saved?.settings ?? {});
-  const complete = !!type && !!name.trim() && settingsComplete(type.settings, values, secrets, saved?.secrets);
+  const complete = !!type && !!name.trim() && settingsComplete(type.settings, values);
   const dirty = !saved || name !== saved.name || enabled !== saved.enabled ||
-    Object.values(secrets).some(credentialChanged) || Object.entries(values).some(([key, value]) => value !== savedValues[key]);
+    Object.entries(values).some(([key, value]) => value !== savedValues[key]);
   return <Editor title={i18n.text(messages.edit)} description={type ? i18n.text(type.label) : i18n.text(messages.unavailable)}
     form={form} busy={action.busy} error={action.error} dirty={dirty} saveDisabled={!complete}
     remove={saved ? { title: i18n.text(messages.remove), description: i18n.text(messages.removeHint), onConfirm: async () => {
@@ -86,7 +85,7 @@ function MessagingEditor({ id }: { id: string | null }) {
     <form id={form} onSubmit={async event => {
       event.preventDefault();
       if (!complete) return;
-      if (await action.run({ type: "messaging.save", id, value: { providerId, name, enabled, settings: values }, secrets: secretUpdates(secrets) }))
+      if (await action.run({ type: "messaging.save", id, value: { providerId, name, enabled, settings: values } }))
         void island.close({ force: true });
     }}>
       <fieldset disabled={action.busy}><FieldGroup>
@@ -96,14 +95,11 @@ function MessagingEditor({ id }: { id: string | null }) {
             if (!value) return;
             setProviderId(value);
             setValues(settingValues(snapshot?.messagingProviderTypes.find(type => type.id === value)?.settings, {}));
-            setSecrets({});
           }} />}
         <TextField label={i18n.text(messages.name)} value={name} onChange={setName} required />
         <ToggleField label={i18n.text(messages.enabled)} value={enabled} onChange={setEnabled} />
-        {type && <ProviderSettingFields settings={type.settings} values={values} secretStates={saved?.secrets}
-          storageAvailable={snapshot?.credentialStorageAvailable ?? false}
-          onValue={(key, value) => setValues(current => ({ ...current, [key]: value }))}
-          drafts={secrets} onDraft={(key, draft) => setSecrets(current => ({ ...current, [key]: draft }))} />}
+        {type && <ProviderSettingFields settings={type.settings} values={values}
+          onValue={(key, value) => setValues(current => ({ ...current, [key]: value }))} />}
       </FieldGroup></fieldset>
     </form>
   </Editor>;

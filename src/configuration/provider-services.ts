@@ -12,7 +12,7 @@ export function createModelProviderServices(configuration: ConfigurationService)
     get: connection,
     credential: async (id, options) => {
       options?.signal?.throwIfAborted();
-      const value = await configuration.executionCredential(id);
+      const value = await configuration.executionCredential(id, options?.signal);
       options?.signal?.throwIfAborted();
       return connection(id)?.auth === "none" ? null : value;
     },

@@ -1,13 +1,17 @@
 import type { DatabaseSync } from "node:sqlite";
 
-export interface McpSecrets {
-  get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<void>;
-  delete(key: string): Promise<void>;
+/** OAuth state the client writes for one server: registration, tokens, and callback port. */
+export type McpAuthorization = Readonly<Record<string, unknown>>;
+export interface McpAuthorizations {
+  get(serverId: string): McpAuthorization | null;
+  set(serverId: string, value: McpAuthorization): void;
+  delete(serverId: string): void;
 }
 export interface McpEnvironment {
   readonly db: DatabaseSync;
   readonly signal: AbortSignal;
-  readonly secrets: McpSecrets;
+  readonly authorizations: McpAuthorizations;
+  /** Resolve a user-entered environment or header value, including `!` credential commands. */
+  resolveCredential(value: string, signal: AbortSignal): Promise<string>;
   readonly log: Pick<Console, "warn" | "error">;
 }

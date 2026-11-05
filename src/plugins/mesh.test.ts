@@ -125,8 +125,8 @@ describe("Mesh resource routing", () => {
     const f = open(), s = f.session("Sender"), other = f.session("Recipient");
     const a = await f.agent(s, "Ada"), b = await f.agent(other, "Atlas"), hidden = await f.agent(other, "Hidden");
     const ma = await f.mesh(s), mb = await f.mesh(other); s.link(a, ma); other.link(mb, b);
-    await f.app.configuration.execute({ type: "modelProvider.save", id: null, credential: { action: "keep" }, value: {
-      id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [],
+    await f.app.configuration.execute({ type: "modelProvider.save", id: null, value: {
+      id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [], apiKey: "",
     } });
     await f.app.configuration.execute({ type: "model.save", id: null, value: {
       providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],

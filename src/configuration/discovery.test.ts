@@ -4,7 +4,7 @@ import { discoverModels } from "./discovery.ts";
 
 const provider: ModelProvider = {
   id: "relay", name: "Relay", baseUrl: "https://example.test/proxy/v1/", protocol: "openai-responses",
-  enabled: true, auth: "api_key", credentialState: "available", compatibility: [],
+  enabled: true, auth: "api_key", apiKey: "key", compatibility: [],
 };
 
 describe("Model discovery protocols and transport boundaries", () => {

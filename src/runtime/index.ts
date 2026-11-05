@@ -2,7 +2,6 @@ import { ApplicationService } from "./service.ts";
 import { dispatch } from "./dispatch.ts";
 import { protocolVersion, systemResumeMessage } from "../shared/contracts.ts";
 import { SystemResumed } from "@asterism-app/sdk/contracts";
-import { SecretClient } from "./secret-client.ts";
 import { join } from "node:path";
 import { importPackages, packageCandidates, runtimeDependencies } from "../plugins/packages.ts";
 import { readPluginBuild } from "../plugins/artifacts.ts";
@@ -20,7 +19,6 @@ import { createNetworkDispatcher } from "./network.ts";
 const port = process.parentPort;
 if (!port) throw new Error("The task runtime must be started as an Electron utility process.");
 let service: ApplicationService;
-const secrets = new SecretClient(message => port.postMessage(message));
 const proxy = new ProxyClient(message => port.postMessage(message));
 const network = createNetworkDispatcher(url => proxy.resolve(url));
 setGlobalDispatcher(network.dispatcher);
@@ -50,7 +48,7 @@ try {
     packageRoots: new Map(packages.flatMap(item => item.manifest ? [[item.manifest.id, item.root] as const] : [])),
     manualSources: packages.flatMap(item => item.status === "ready" && item.manifest
       ? (item.manualSources ?? []).map(source => ({ ...source, pluginId: item.manifest!.id })) : []),
-    plugins: packages.flatMap(item => item.definition ? [item.definition] : []), protector: secrets,
+    plugins: packages.flatMap(item => item.definition ? [item.definition] : []),
     pluginDependencies: runtimeDependencies(packages),
     preparedStorage: { failures: storageFailures,
       declarations: new Map(packages.flatMap(item => item.manifest && item.storage ? [[item.manifest.id, item.storage] as const] : [])) },
@@ -61,7 +59,6 @@ try {
   port.on("message", ({ data, ports }) => {
     if (data?.kind === "shutdown") {
       for (const id of [...connections.keys()]) disconnect(id);
-      secrets.close();
       void service.close().finally(async () => {
         proxy.close();
         await network.close();
@@ -69,7 +66,6 @@ try {
       });
       return;
     }
-    if (secrets.receive(data)) return;
     if (data?.kind === systemResumeMessage) { service.sessions.events.publish(SystemResumed, null, {}); return; }
     if (data?.kind === "connection.open" && typeof data.id === "string" && ports[0]) {
       disconnect(data.id);

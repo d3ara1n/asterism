@@ -56,7 +56,7 @@ export class ModelDiscoveries {
     if (!entry) throw new ConfigurationError("not_found", "The model list is no longer available. Fetch models again.");
     return structuredClone(entry.value);
   }
-  start(provider: ModelProvider, credential: () => Promise<string>): string {
+  start(provider: ModelProvider, credential: (signal: AbortSignal) => Promise<string>): string {
     this.clearProvider(provider.id);
     const id = randomUUID();
     const controller = new AbortController();
@@ -70,9 +70,9 @@ export class ModelDiscoveries {
     void this.run(id, provider, credential, controller.signal);
     return id;
   }
-  private async run(id: string, provider: ModelProvider, credential: () => Promise<string>, signal: AbortSignal): Promise<void> {
+  private async run(id: string, provider: ModelProvider, credential: (signal: AbortSignal) => Promise<string>, signal: AbortSignal): Promise<void> {
     let apiKey: string;
-    try { apiKey = await credential(); }
+    try { apiKey = await credential(signal); }
     catch { this.finish(id, { state: "failed", error: "credential", models: [] }); return; }
     if (signal.aborted) return;
     try {

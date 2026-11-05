@@ -510,7 +510,7 @@ describe("Models consuming immutable content", () => {
   } satisfies StreamRequest);
   async function configure(f: ReturnType<typeof fixture>, tools = false) {
     await f.service.configuration.execute({ type: "modelProvider.save", id: null,
-      value: { id: "media", name: "Media", protocol: "openai-responses", baseUrl: "https://example.invalid", enabled: true, auth: "none", compatibility: [] }, credential: { action: "keep" } });
+      value: { id: "media", name: "Media", protocol: "openai-responses", baseUrl: "https://example.invalid", enabled: true, auth: "none", compatibility: [], apiKey: "" } });
     await f.service.configuration.execute({ type: "model.save", id: null, value: { providerId: "media", name: "Model", modelId: "model", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: false, tools, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
   }

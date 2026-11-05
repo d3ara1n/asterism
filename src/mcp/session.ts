@@ -9,9 +9,7 @@ import { McpOAuth, type AuthorizationRequest } from "./auth.ts";
 import { closeProcessTree } from "../shell/process-tree.ts";
 import { applicationBrand, applicationVersion } from "../shared/application.ts";
 
-export const credentialKey = (id: string) => `mcp.${id}.credentials`;
-export const oauthKey = (id: string) => `mcp.${id}.oauth`;
-/** Connection parameter identity; changes make the old connection and cached catalog inapplicable. The save entry point invalidates credential changes separately. */
+/** Connection parameter identity; changes make the old connection and cached catalog inapplicable. The save entry point invalidates environment and header changes separately. */
 export function endpointOf(config: McpServerConfig): string {
   return JSON.stringify(config.transport === "stdio" ? [config.transport, config.command, config.args, config.cwd] : [config.transport, config.url, config.auth]);
 }
@@ -23,7 +21,6 @@ export interface SessionHost {
   readonly environment: McpEnvironment;
   readonly validator: AjvJsonSchemaValidator;
   readonly closed: boolean;
-  credentials(id: string): Promise<Record<string, string>>;
   saveDirectory(config: McpServerConfig, directory: Directory | undefined): void;
   notify(): void;
 }
@@ -110,10 +107,13 @@ export class ServerSession {
     this.setPhase("connecting", null);
     let oauth: McpOAuth | undefined, attempt: Live | undefined, stderr = "";
     try {
-      const values = await this.host.credentials(config.id);
+      const values: Record<string, string> = {};
+      // Sequential resolution keeps interactive credential managers to one prompt at a time.
+      for (const [key, value] of Object.entries(config.transport === "stdio" ? config.env : config.headers))
+        values[key] = await this.host.environment.resolveCredential(value, scope);
       scope.throwIfAborted();
       if (config.transport === "http" && config.auth === "oauth") {
-        oauth = new McpOAuth(this.host.environment.secrets, oauthKey(config.id), scope);
+        oauth = new McpOAuth(this.host.environment.authorizations, config.id, scope);
         await oauth.load();
       }
       for (;;) {

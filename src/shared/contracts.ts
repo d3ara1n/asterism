@@ -12,7 +12,7 @@ import type { NetworkBridge } from "./network.ts";
 import type { RendererFailure } from "./renderer-failure.ts";
 import { pluginDiagnosticSchema } from "./plugin-startup.ts";
 
-export const protocolVersion = 16;
+export const protocolVersion = 17;
 export const systemResumeMessage = "system.resume";
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");

@@ -3,13 +3,12 @@ import { applicationBrand } from "../shared/application.ts";
 import { observeProcess } from "./logging.ts";
 import { runtimeMessageSchema, systemResumeMessage, type Command, type CommandResult, type RuntimeStatus } from "../shared/contracts.ts";
 import { RuntimeRequests } from "./requests.ts";
-import { handleSecretRequest } from "./secrets.ts";
 import { handleProxyRequest } from "./proxy.ts";
 import type { StartupStage } from "../shared/startup.ts";
 import type { PluginStorageFailure } from "../shared/recovery.ts";
 
 /**
- * Task process supervision and control: startup, exit reporting, shutdown, and credential decryption stay in the main process.
+ * Task process supervision and control: startup, exit reporting, and shutdown stay in the main process.
  * Renderer business traffic enters the task process over direct ports without forwarding here.
  * Requests have no deadline; the task process becomes unavailable only when it exits or fails as a process.
  */
@@ -53,14 +52,6 @@ export class RuntimeHost {
           void handleProxyRequest(raw).then(response => {
             if (response && this.child === child) {
               try { child.postMessage(response); } catch { /* The child has exited. */ }
-            }
-          });
-          return;
-        }
-        if (raw?.kind === "secret.request") {
-          void handleSecretRequest(raw).then(response => {
-            if (response && this.child === child && this.status !== "stopping") {
-              try { child.postMessage(response); } catch { /* The child may have exited; do not log credential messages. */ }
             }
           });
           return;

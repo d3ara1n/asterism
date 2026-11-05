@@ -16,7 +16,7 @@ Asterism owns server configuration and connection actions in a host settings pag
 
 Stdio uses an executable and argument array without shell concatenation, with the application environment plus configured overrides. Streamable HTTP supports the declared authentication methods, including headers and OAuth.
 
-Environment values, headers, and OAuth material use the application credential vault, with references retained in host configuration. Changes invalidate affected discovery and connections. A newly created server does not inherit old credentials merely because it reuses an ID.
+Environment variables and headers are part of the server configuration and are edited with it. OAuth registration, tokens, and callback port are client-written state stored per server in host configuration; resetting authorization, removing the server, or creating a server with a reused ID clears it. Environment and header values beginning with `!` are credential commands, resolved when a connection opens; command output stays in memory for the application's lifetime. Editing shows the saved expressions without executing them. Changing environment variables or headers invalidates the server's discovery and reconnects eager connections.
 
 OAuth discovery, registration, exchange, and refresh use the official SDK. A connection that needs browser authorization waits for the user to start it in settings. Starting authorization opens the local callback listener before the browser and starts a bounded wait. Reopening the browser uses the same attempt and deadline.
 

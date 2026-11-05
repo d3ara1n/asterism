@@ -190,15 +190,15 @@ export async function prepareData(root: string, options: PreparationOptions): Pr
         point = readPoint(root, snapshot(root, options.paths, options.version, changes));
       }
     };
-    const apply = (plan: StoragePlan) => {
+    const apply = async (plan: StoragePlan) => {
       options.onProgress?.({ stage: "data", detail: plan.change.id });
       const started = performance.now();
       console.info(`Storage migration started. storage=${plan.change.id} from=${plan.change.from} to=${plan.change.to}`);
-      plan.apply();
+      await plan.apply();
       console.info(`Storage migration completed. storage=${plan.change.id} elapsedMs=${Math.round(performance.now() - started)}`);
     };
     record(host.map(plan => plan.change));
-    for (const plan of host) apply(plan);
+    for (const plan of host) await apply(plan);
     if (paused) saveState(root, null);
     if (host.length) options.onHost?.("ready");
     const plugins: PluginStorageFailure[] = [];
@@ -209,7 +209,7 @@ export async function prepareData(root: string, options: PreparationOptions): Pr
         if (group.error) throw new Error(group.error);
         const plans = plansOf(group.stores);
         record(plans.map(plan => plan.change));
-        for (const plan of plans) apply(plan);
+        for (const plan of plans) await apply(plan);
       } catch (error) {
         console.error(`Storage of plugin ${group.id} could not be prepared.`, error);
         plugins.push({ id: group.id, error: message(error) });

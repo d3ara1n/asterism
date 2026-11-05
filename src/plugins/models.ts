@@ -42,22 +42,22 @@ export function resolveTarget(snapshot: Pick<ConfigurationSnapshot, "modelProvid
   const resolved = resolveProviderModel(snapshot, model);
   if (!resolved) return { ok: false, reason: "model_unavailable" };
   const { provider } = resolved;
-  if (provider.auth === "api_key" && provider.credentialState !== "available") return { ok: false, reason: "credential_unavailable" };
+  if (provider.auth === "api_key" && !provider.apiKey) return { ok: false, reason: "credential_unavailable" };
   return { ok: true, model, thinking };
 }
 
 export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): HostModels {
-  // Refresh credential availability before requests; catalog reads synchronously use current configuration.
+  // Capture current connection settings before requests; catalog reads remain synchronous.
   const current = () => configuration.modelCatalog();
-  const resolve = async (target: ModelTarget, execute = true): Promise<ResolvedTarget> => {
+  const resolve = async (target: ModelTarget, execute = true, signal?: AbortSignal): Promise<ResolvedTarget> => {
     await configuration.execute({ type: "read" });
     const config = current();
     const result = resolveTarget(config, target);
     if (!result.ok) throw new ModelTargetFailure(result.reason, `The model target ${target.provider}/${target.model} is unavailable (${result.reason}).`);
     const { model, provider } = resolveProviderModel(config, result.model)!;
-    const { credentialState: _state, ...connection } = provider;
+    const { apiKey: _apiKey, ...connection } = provider;
     const settings: ModelSettings = { provider: connection, model, thinking: result.thinking };
-    const credential = adapterFactory || !execute ? null : await configuration.executionCredential(connection.id);
+    const credential = adapterFactory || !execute ? null : await configuration.executionCredential(connection.id, signal);
     const adapter = adapterFactory?.(settings)
       ?? new AiSdkAdapter(async () => credential);
     return { settings, adapter };
@@ -110,7 +110,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
       });
       const content = capture(messages, options?.content);
       try {
-        const { settings, adapter } = await resolve(target);
+        const { settings, adapter } = await resolve(target, true, request.signal);
         const resolvedMessages = await resolveInput(messages, content, request.signal);
         const source = { model: modelExpression(settings), adapter: adapter.format(settings), scope: modelScope(settings) };
         for await (const event of adapter.prepare({ settings, system, messages: resolvedMessages, maxOutputTokens, userAgent, sessionId,
@@ -129,7 +129,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
       let captured: Promise<void>;
       try { request.signal.throwIfAborted(); content = capture(messages, request.content); captured = Promise.resolve(); }
       catch (error) { captured = Promise.reject(error); }
-      const preparation = [resolve(target), Promise.resolve(system), captured] as const;
+      const preparation = [resolve(target, true, request.signal), Promise.resolve(system), captured] as const;
       const environment = Promise.all(preparation).then(async ([resolved, preparedSystem]) => ({
         ...resolved, userAgent, sessionId, tools: request.tools,
         messages: await resolveInput(messages, content, request.signal),

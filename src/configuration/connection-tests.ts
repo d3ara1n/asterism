@@ -17,7 +17,7 @@ export class ModelConnectionTests {
         this.tests.delete(key);
     }
   }
-  start(provider: ModelProvider, model: ProviderModel, credential: () => Promise<string>): string {
+  start(provider: ModelProvider, model: ProviderModel, credential: (signal: AbortSignal) => Promise<string>): string {
     for (const [key, test] of this.tests) {
       if (this.tests.size < 50) break;
       if (test.value.state !== "running") this.tests.delete(key);
@@ -35,13 +35,13 @@ export class ModelConnectionTests {
     void this.run(id, provider, model, credential, controller.signal);
     return id;
   }
-  private async run(id: string, provider: ModelProvider, model: ProviderModel, credential: () => Promise<string>, signal: AbortSignal): Promise<void> {
+  private async run(id: string, provider: ModelProvider, model: ProviderModel, credential: (signal: AbortSignal) => Promise<string>, signal: AbortSignal): Promise<void> {
     let apiKey = "";
     if (provider.auth === "api_key") {
       try {
-        apiKey = await credential();
+        apiKey = await credential(signal);
       } catch {
-        this.finish(id, { state: "failed", error: "credential", message: "The credential is missing or cannot be decrypted. Enter it again in settings." });
+        this.finish(id, { state: "failed", error: "credential", message: "The credential could not be resolved. Check the saved value or credential command." });
         return;
       }
     }

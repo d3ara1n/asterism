@@ -49,26 +49,6 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     defaultMessage: "Remove {name}",
   },
   image: { id: "model_modality_image", defaultMessage: "Image" },
-  noAuthentication: {
-    id: "features_configuration_ProvidersSettings_7",
-    defaultMessage: "No authentication",
-  },
-  noCredentialSaved: {
-    id: "features_configuration_ProvidersSettings_8",
-    defaultMessage: "No credential saved",
-  },
-  credentialSaved: {
-    id: "features_configuration_ProvidersSettings_9",
-    defaultMessage: "Saved securely",
-  },
-  credentialProtectionUnavailable: {
-    id: "features_configuration_ProvidersSettings_10",
-    defaultMessage: "System credential protection is unavailable",
-  },
-  decryptionFailed: {
-    id: "features_configuration_ProvidersSettings_11",
-    defaultMessage: "Decryption failed, enter it again",
-  },
   invalidSettings: {
     id: "features_configuration_ProvidersSettings_12",
     defaultMessage: "Check the provider and model settings.",
@@ -224,33 +204,9 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     id: "features_configuration_ProvidersSettings_55",
     defaultMessage: "Get a key",
   },
-  keepSavedCredential: {
-    id: "features_configuration_ProvidersSettings_56",
-    defaultMessage: "Leave blank to keep the saved credential",
-  },
-  enterCredential: {
-    id: "features_configuration_ProvidersSettings_57",
-    defaultMessage: "Enter credential",
-  },
-  credentialRemovalHint: {
-    id: "features_configuration_ProvidersSettings_58",
-    defaultMessage: "The saved credential will be removed when saved.",
-  },
-  credentialStorageHint: {
+  credentialCommandHint: {
     id: "features_configuration_ProvidersSettings_59",
-    defaultMessage: "Stored with system encryption after saving.",
-  },
-  undo: {
-    id: "features_configuration_ProvidersSettings_60",
-    defaultMessage: "Undo",
-  },
-  removeSavedCredential: {
-    id: "features_configuration_ProvidersSettings_61",
-    defaultMessage: "Remove saved credential",
-  },
-  encryptionUnavailable: {
-    id: "features_configuration_ProvidersSettings_62",
-    defaultMessage: "System encryption is unavailable. Credentials cannot be saved.",
+    defaultMessage: "Enter a value or a command such as !rbw get openai-api-key.",
   },
   models: {
     id: "features_configuration_ProvidersSettings_63",

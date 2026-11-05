@@ -1,7 +1,7 @@
 import { Plus, Zap, Search, PlugZap } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { applyModelParameters, canEditModelProviderField, createModelInput, modelProviderInputSchema, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ProviderModel, type TestError } from "../../../shared/configuration";
+import { applyModelParameters, canEditModelProviderField, createModelInput, modelProviderComplete, modelProviderSchema, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ProviderModel, type TestError } from "../../../shared/configuration";
 import { modelProviderPresetDraft, type ModelProviderPreset, type ModelProviderDraft } from "../../../shared/provider-presets";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { providersMessages } from "../../messages/providers";
@@ -29,14 +29,14 @@ import { ModelCostEditor } from "./ModelCostEditor";
 import { modelProtocolLabels } from "./protocols";
 import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
 import { useModelParameters } from "./ModelParameters";
-import { credentialChanged as draftChanged, credentialUpdate, settingValues, settingsComplete, type CredentialDraft } from "./provider-settings";
+import { settingValues, settingsComplete } from "./provider-settings";
 import { ProviderSettingFields } from "./ProviderSettingFields";
 import { modelProviderFields } from "./model-provider-fields";
 import { ProviderKeyLink } from "./ProviderKeyLink";
 import { ProviderUsageButton } from "./ProviderUsageButton";
 
 const protocolLabel = (value: ModelProvider["protocol"]) => modelProtocolLabels[value];
-type ProviderValue = ModelProviderDraft;
+type ProviderValue = Omit<ModelProvider, "enabled">;
 
 /* ---------- State derivation: shared by list and details, both reading the latest snapshot directly ---------- */
 
@@ -63,7 +63,7 @@ function useQuickActions() {
   const { run, busy } = useConfigurationAction("toast");
   return {
     busy,
-    setProviderEnabled: (provider: ModelProvider, enabled: boolean) => run({ type: "modelProvider.save", id: provider.id, credential: { action: "keep" },
+    setProviderEnabled: (provider: ModelProvider, enabled: boolean) => run({ type: "modelProvider.save", id: provider.id,
       value: { ...providerValue(provider), enabled } }),
     setModelEnabled: (model: ProviderModel, enabled: boolean) => run({ type: "model.save", id: modelReference(model), value: { ...modelValue(model), enabled } }),
     test: (model: ProviderModel) => {
@@ -74,7 +74,7 @@ function useQuickActions() {
 }
 /** Detail drafts and quick actions share field projection; each operation explicitly supplies the enabled state. */
 const providerValue = (provider: ModelProvider): ProviderValue => ({
-  id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth,
+  id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth, apiKey: provider.apiKey,
   compatibility: structuredClone(provider.compatibility),
   ...(provider.usage !== undefined && { usage: provider.usage }),
   ...(provider.fixedFields && { fixedFields: [...provider.fixedFields] }),
@@ -174,7 +174,7 @@ export function slugify(name: string, options: { slash?: boolean } = {}): string
   const allowed = options.slash ? /[^\p{L}\p{N}._\/-]/gu : /[^\p{L}\p{N}._-]/gu;
   return name.trim().toLowerCase().replace(/\s+/gu, "-").replace(allowed, "").replace(/-+/gu, "-").replace(/^-|-$/gu, "");
 }
-const blank: ProviderValue = { id: "", name: "", protocol: "openai-responses", baseUrl: "", auth: "api_key", compatibility: [] };
+const blank: ProviderValue = { id: "", name: "", protocol: "openai-responses", baseUrl: "", auth: "api_key", apiKey: "", compatibility: [] };
 
 /** The selection entry generates configuration and editing rules; the editor receives only the key link and does not retain preset identity. */
 function ProviderCreation() {
@@ -184,7 +184,7 @@ function ProviderCreation() {
   if (picked) return <ProviderEditor initialId={null} initialValue={picked.value} keyUrl={picked.keyUrl} />;
   return <Editor form="provider-form" title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false} busy={false} error={null}>
     <PresetPicker onPick={preset => setPicked(preset ? { keyUrl: preset.keyUrl, value: {
-      ...modelProviderPresetDraft(preset, snapshot?.modelProviders.map(provider => provider.id)),
+      ...modelProviderPresetDraft(preset, snapshot?.modelProviders.map(provider => provider.id)), apiKey: "",
       name: `${preset.name} · ${presetDescription(preset)}`,
     } } : { value: structuredClone(blank) })} />
   </Editor>;
@@ -200,24 +200,20 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
   const current = snapshot?.modelProviders.find(item => item.id === id);
   // Drafts omit enabled: enabling is an immediate action that always uses the snapshot, preventing mutual overwrites with the parent island's switch.
   const [value, setValue] = useState<ProviderValue>(() => current ? providerValue(current) : structuredClone(initialValue));
-  const [credential, setCredential] = useState<CredentialDraft>({ action: current ? "keep" : "replace", key: "" });
   const set = <K extends keyof typeof value>(field: K, next: (typeof value)[K]) => setValue(previous => ({ ...previous, [field]: next }));
   // A prefilled ID remains independent; for a blank connection, generate it from the name until the user edits the ID manually.
   const [idEdited, setIdEdited] = useState(!!current || !!initialValue.id);
   const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { id: slugify(name) }) }));
 
   const saved = current ? providerValue(current) : null;
-  const credentialChanged = value.auth === "api_key" && draftChanged(credential);
-  const dirty = !saved || JSON.stringify(saved) !== JSON.stringify(value) || credentialChanged;
+  const dirty = !saved || JSON.stringify(saved) !== JSON.stringify(value);
   const fields = modelProviderFields(value, snapshot?.usageProviders ?? [], keyUrl);
   const values = settingValues(fields, {
-    name: value.name, id: value.id, protocol: value.protocol, baseUrl: value.baseUrl, auth: value.auth,
+    name: value.name, id: value.id, protocol: value.protocol, baseUrl: value.baseUrl, auth: value.auth, apiKey: value.apiKey,
     usage: value.usage ? `usage:${value.usage}` : "off",
   });
-  const secrets: Record<string, CredentialDraft> = value.auth === "api_key" ? { apiKey: credential } : {};
-  const secretStates = current ? { apiKey: current.credentialState } : undefined;
-  const complete = modelProviderInputSchema.safeParse({ ...value, enabled: current?.enabled ?? true }).success
-    && settingsComplete(fields, values, secrets, secretStates);
+  const complete = modelProviderSchema.safeParse({ ...value, enabled: current?.enabled ?? true }).success
+    && modelProviderComplete(value) && settingsComplete(fields, values);
   const setField = (key: string, next: string) => {
     if (key === "name") setName(next);
     else if (key === "id") { setIdEdited(true); set("id", next); }
@@ -239,19 +235,15 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
     <form id="provider-form" onSubmit={async event => {
       event.preventDefault();
       if (!complete) return;
-      const result = await run({ type: "modelProvider.save", id, value: { ...value, enabled: current?.enabled ?? true },
-        credential: value.auth === "none" ? { action: "clear" } : credentialUpdate(credential) });
+      const result = await run({ type: "modelProvider.save", id, value: { ...value, enabled: current?.enabled ?? true } });
       if (result?.ok) {
         const persisted = result.snapshot.modelProviders.find(item => item.id === result.savedId);
         if (persisted) setValue(providerValue(persisted));
         setId(result.savedId);
-        setCredential({ key: "", action: "keep" });
       }
     }}><fieldset disabled={busy} className="contents">
       <EditorSection title={i18n.formatMessage(providersMessages.connection)}><FieldGroup>
-        <ProviderSettingFields settings={fields} values={values} onValue={setField}
-          drafts={secrets} onDraft={(_key, draft) => setCredential(draft)} secretStates={secretStates}
-          storageAvailable={snapshot?.credentialStorageAvailable ?? false} />
+        <ProviderSettingFields settings={fields} values={values} onValue={setField} />
       </FieldGroup></EditorSection>
       {canEditModelProviderField(value, "compatibility") && <ModelCompatibilityEditor value={value.compatibility} onChange={next => set("compatibility", next)} />}
       </fieldset></form>

@@ -63,11 +63,11 @@ function deferred<T>() {
 
 const config: McpServerConfig = {
   id: "remote", name: "Remote", enabled: true, mode: "eager", idleSeconds: 300,
-  transport: "http", command: "", args: [], cwd: "", url: "https://mcp.example.test", auth: "oauth",
+  transport: "http", command: "", args: [], cwd: "", url: "https://mcp.example.test", auth: "oauth", env: {}, headers: {},
 };
 let session: ServerSession, provider: McpOAuth;
 let phases: ConnectionPhase[], waits: Map<ConnectionPhase, ReturnType<typeof deferred<void>>>;
-let saved: Map<string, string>;
+let saved: Map<string, Record<string, unknown>>;
 const reached = (phase: ConnectionPhase) => {
   if (session.state().connection === phase) return Promise.resolve();
   const waiting = deferred<void>();
@@ -81,15 +81,15 @@ beforeEach(() => {
   doubles.connect.mockReset();
   doubles.exchange.mockReset();
   phases = []; waits = new Map();
-  saved = new Map([["mcp.remote.oauth", JSON.stringify({ port: 62986 })]]);
+  saved = new Map([["remote", { port: 62986 }]]);
   const host: SessionHost = {
     environment: {
       signal: new AbortController().signal,
-      secrets: { get: async (key: string) => saved.get(key) ?? null, set: async (key: string, value: string) => { saved.set(key, value); } },
+      authorizations: { get: (id: string) => saved.get(id) ?? null, set: (id: string, value: Record<string, unknown>) => { saved.set(id, value); } },
       log: { warn() {}, error() {} },
     } as unknown as McpEnvironment,
     validator: {} as AjvJsonSchemaValidator, closed: false,
-    credentials: async () => ({}), saveDirectory() {},
+    saveDirectory() {},
     notify() {
       const phase = session.state().connection;
       if (phases.at(-1) !== phase) phases.push(phase);
@@ -169,7 +169,7 @@ describe("MCP authorization lifecycle", () => {
     expect(session.state()).toMatchObject({ connection: "disconnected", authorizationUrl: null, authorizationExpiresAt: null });
     expect(doubles.servers.every(server => !server.listening)).toBe(true);
     expect(doubles.exchange).not.toHaveBeenCalled();
-    expect(saved.get("mcp.remote.oauth")).toBe(JSON.stringify({ port: 62986 }));
+    expect(saved.get("remote")).toEqual({ port: 62986 });
   });
 
   it("reports a callback bind failure and releases the connection wait", async () => {

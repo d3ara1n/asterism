@@ -15,8 +15,8 @@ export function testHostServices(overrides: Partial<Omit<PluginHostServices, "sh
     ...host,
     shared: {
       agentCatalog: new AgentCatalogService([]), extensions: new ModelProviderExtensions(),
-      webProviders: new WebProviderRegistry({ list: () => [], secret: async () => null }),
-      messaging: new MessagingRegistry({ list: () => [], secret: async () => null, changed() {} }),
+      webProviders: new WebProviderRegistry({ list: () => [], credential: async value => value }),
+      messaging: new MessagingRegistry({ list: () => [], credential: async value => value, changed() {} }),
       manualSources: () => [], packageRoots: new Map(), calls: [],
       ...shared,
     } as SharedServices,

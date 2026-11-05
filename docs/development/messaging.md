@@ -2,7 +2,7 @@
 
 Messaging is an application capability for communicating through configured external identities. Its meaning is independent of an Agent paradigm. The host owns connection configuration, credentials, provider registration, and shared connection lifetimes. Plugins declare providers. The SDK defines addresses, messages, events, queries, and operation contracts.
 
-Each configured connection has its own stable identity and selects a provider type. Several connections may use the same provider. Providers declare their settings with the provider setting kinds shared by every provider family; the host renders, validates, and resolves them with the same rules and stores secrets separately from ordinary settings. Connection names identify configured accounts without assigning responsibilities or instructions.
+Each configured connection has its own stable identity and selects a provider type. Several connections may use the same provider. Providers declare their settings with the provider setting kinds shared by every provider family; the host renders, validates, and resolves them with the same rules, storing secrets with the connection's other settings. Connection names identify configured accounts without assigning responsibilities or instructions.
 
 An enabled connection shares one provider instance across sessions and consumers. Configuration changes replace it with a new generation. Only one receiver per connection runs at a time: a replacement receives after the previous generation has stopped. A model request captures the instances it can use; its operations retain that configuration, while later requests capture the updated connection. Application shutdown ends receiving work.
 

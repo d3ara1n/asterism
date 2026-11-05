@@ -17,9 +17,7 @@ function open(plugins: PluginDefinition[], pluginDependencies?: ReadonlyMap<stri
   const root = mkdtempSync(join(tmpdir(), "asterism-provider-usage-"));
   let observer!: PluginContext;
   const service = new ApplicationService(root, { pluginDependencies, plugins: [...plugins,
-    definePlugin({ namespace: pluginNamespace("test.observer"), setup(context) { observer = context; return {}; } })], protector: {
-    available: async () => true, encrypt: async value => Buffer.from(value).toString("base64"), decrypt: async value => Buffer.from(value, "base64").toString(),
-  } });
+    definePlugin({ namespace: pluginNamespace("test.observer"), setup(context) { observer = context; return {}; } })] });
   let closing: Promise<void> | undefined;
   const close = () => closing ??= service.close();
   cleanups.push(async () => { await close(); rmSync(root, { recursive: true, force: true }); });
@@ -32,7 +30,7 @@ const items: UsageItem[] = [
 const value = { id: "my-glm", name: "My GLM", protocol: "openai-chat" as const, auth: "api_key" as const,
   baseUrl: "https://example.test/v1", enabled: true, compatibility: [], usage: "test-usage" };
 const save = (service: ApplicationService, id: string | null = null, name = "My GLM") => service.configuration.execute({
-  type: "modelProvider.save", id, value: { ...value, name }, credential: { action: "replace", value: "private-test-key" },
+  type: "modelProvider.save", id, value: { ...value, name, apiKey: "private-test-key" },
 });
 const read = (plugin: PluginContext, refresh = false) => plugin.ipc.calls.invoke(ReadUsage, { providerId: value.id, refresh }, {});
 
@@ -40,7 +38,7 @@ describe("Plugin presets and account usage", () => {
   // Models deliver only public response metadata; calling plugins explicitly choose consumption, independently of text and token usage.
   it("calling plugins obtain and explicitly consume response headers while model services do not update other consumers automatically", async () => {
     const { service, observer } = open([]);
-    await service.configuration.execute({ type: "modelProvider.save", id: null, value: { ...value, auth: "none", usage: "openai" }, credential: { action: "keep" } });
+    await service.configuration.execute({ type: "modelProvider.save", id: null, value: { ...value, auth: "none", usage: "openai", apiKey: "" } });
     const model = createModelInput(value.id, { name: "Test", modelId: "test" });
     model.capabilities.reasoning = false; model.capabilities.tools = false;
     await service.configuration.execute({ type: "model.save", id: null, value: model });

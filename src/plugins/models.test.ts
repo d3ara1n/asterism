@@ -6,7 +6,7 @@ import { resolveTarget } from "./models.ts";
 function configuration(): Pick<ConfigurationSnapshot, "modelProviders" | "models"> {
   return {
     modelProviders: [{ id: "p", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid",
-      enabled: true, auth: "none", compatibility: [], credentialState: "not_required" }],
+      enabled: true, auth: "none", compatibility: [], apiKey: "" }],
     models: [{ providerId: "p", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] },
       generation: { temperature: null, topP: null, maxOutputTokens: 8192 } }],
@@ -32,9 +32,9 @@ describe("Concrete model targets", () => {
   it("requires credentials for authenticated providers without changing the selected target", () => {
     const config = configuration();
     config.modelProviders[0]!.auth = "api_key";
-    config.modelProviders[0]!.credentialState = "missing";
+    config.modelProviders[0]!.apiKey = "";
     expect(resolveTarget(config, { provider: "p", model: "test" })).toEqual({ ok: false, reason: "credential_unavailable" });
-    config.modelProviders[0]!.credentialState = "available";
+    config.modelProviders[0]!.apiKey = "key";
     expect(resolveTarget(config, { provider: "p", model: "test", thinking: "off" })).toEqual({ ok: true, model: "p/test", thinking: "off" });
   });
 });

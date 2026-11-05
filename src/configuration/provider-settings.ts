@@ -9,10 +9,11 @@ export class ProviderSettingError extends Error {
 
 /**
  * Resolve saved values against the current declaration.
- * Missing choices use their declared default; required text and secrets must be present; unset optional values are absent.
+ * Missing choices use their declared default; secrets pass through `resolve`, which runs credential commands;
+ * required values must be present; unset optional values are absent.
  */
 export async function resolveProviderSettings(settings: readonly ProviderSetting[], saved: Readonly<Record<string, string>>,
-  secret: (key: string) => Promise<string | null>): Promise<Record<string, string>> {
+  resolve: (value: string) => Promise<string>): Promise<Record<string, string>> {
   const values: Record<string, string> = {};
   for (const setting of settings) {
     const label = plainText(setting.label);
@@ -23,14 +24,9 @@ export async function resolveProviderSettings(settings: readonly ProviderSetting
       values[setting.key] = value;
       continue;
     }
-    const value = setting.kind === "text" ? saved[setting.key]?.trim() || null : await secret(setting.key);
-    if (value !== null) values[setting.key] = value;
+    const value = saved[setting.key]?.trim();
+    if (value) values[setting.key] = setting.kind === "secret" ? await resolve(value) : value;
     else if (setting.required) throw new ProviderSettingError("missing", setting.key, `Setting '${label}' is required.`);
   }
   return values;
-}
-
-/** Secret keys a snapshot reports: declared secrets, or saved references when the type is unavailable. */
-export function reportedSecretKeys(settings: readonly ProviderSetting[] | undefined, refs: Readonly<Record<string, string>>): string[] {
-  return settings ? settings.filter(setting => setting.kind === "secret").map(setting => setting.key) : Object.keys(refs);
 }

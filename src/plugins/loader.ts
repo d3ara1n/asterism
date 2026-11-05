@@ -1,7 +1,6 @@
 import { belongsTo, ResourcePresenceChanged, type ActionContract, type ResourceCall, type ResourceSnapshot, type SessionRecord, type SessionSnapshot, type ToolContract } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type PluginDefinition, type PluginLogger, type PluginTasks,
   type ResourceRef, type SessionObserver, type CommandPreparer, type ModuleContribution } from "@asterism-app/sdk/runtime";
-import type { CredentialVault } from "../configuration/credentials.ts";
 import type { ResourceBackend } from "../resources/contract.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import type { SessionDataStore } from "../session/data.ts";
@@ -50,7 +49,6 @@ export interface PluginHostServices {
   refOf(objectId: string): ResourceRef | null;
   sessions: SessionHost;
   models: HostModels;
-  vault?: CredentialVault | null;
   /** Plugin configuration changes: settings saves, default restoration, and backend updates all notify here. */
   configurationChanged?: (pluginId: string) => void;
   /** Plugin storage prepared before windows: format declarations stamp managed configuration and databases; failed plugins skip setup for this startup. */
@@ -177,7 +175,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const write = services.log ?? defaultLog;
       const log: PluginLogger = { info: message => write(id, "info", message), warn: message => write(id, "warn", message),
         error: (message, error) => write(id, "error", message, error) };
-      const storage = new PluginStorage(services.extensionsDirectory, id, services.vault ?? null, log.warn, services.preparedStorage?.declarations.get(id) ?? []);
+      const storage = new PluginStorage(services.extensionsDirectory, id, log.warn, services.preparedStorage?.declarations.get(id) ?? []);
       storage.onChanged = () => services.configurationChanged?.(id);
       const lifecycle = new RunLifecycle(sessionId => services.sessions.progressChanged(sessionId)); lifecycles.push(lifecycle);
       lifecycle.signal.addEventListener("abort", () => agentCatalog.remove(id), { once: true });

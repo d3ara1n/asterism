@@ -21,7 +21,7 @@ function instance(name: string, overrides: Partial<MessagingInstance> = {}): Mes
 function setup(initial: MessagingConnection, delay: typeof retryDelay = retryDelay) {
   let state = initial;
   const life = new RunLifecycle(() => {});
-  const registry = new MessagingRegistry({ list: () => [state], secret: async () => null, changed() {} }, delay);
+  const registry = new MessagingRegistry({ list: () => [state], credential: async value => value, changed() {} }, delay);
   cleanups.push(async () => { registry.close(); await life.close(); });
   return { registry, life, set(next: MessagingConnection) { state = next; } };
 }

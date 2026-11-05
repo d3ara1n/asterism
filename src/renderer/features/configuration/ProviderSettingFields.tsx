@@ -1,13 +1,11 @@
 import { useId } from "react";
 import type { ProviderSetting } from "@asterism-app/sdk/contracts";
-import type { CredentialState } from "../../../shared/configuration";
 import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
 import { Field, FieldContent, FieldDescription, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@asterism-app/ui/ui/field";
 import { RadioGroup, RadioGroupItem } from "@asterism-app/ui/ui/radio-group";
 import { ChoiceField, TextField } from "./forms";
 import { CredentialField } from "./CredentialField";
-import { keepCredentialDraft, type CredentialDraft } from "./provider-settings";
 
 type ChoiceSetting = Extract<ProviderSetting, { kind: "choice" }>;
 /** Choices with few options render as described radio cards; longer lists use a select. */
@@ -40,25 +38,19 @@ function ChoiceSettingField({ setting, value, onChange }: { setting: ChoiceSetti
   </FieldSet>;
 }
 
-/** Render a provider's declared settings in declaration order; secret values stay in drafts until saved. */
-export function ProviderSettingFields({ settings, values, onValue, drafts, onDraft, secretStates, storageAvailable }: {
+/** Render a provider's declared settings in declaration order; secrets edit their saved values in masked inputs. */
+export function ProviderSettingFields({ settings, values, onValue }: {
   settings: readonly ProviderSetting[];
   values: Readonly<Record<string, string>>;
   onValue(key: string, value: string): void;
-  drafts: Readonly<Record<string, CredentialDraft>>;
-  onDraft(key: string, draft: CredentialDraft): void;
-  /** Saved secret states; undefined before the first save. */
-  secretStates: Readonly<Record<string, CredentialState>> | undefined;
-  storageAvailable: boolean;
 }) {
   const i18n = useI18n();
   const optional = i18n.text(providersMessages.optional);
   return <>{settings.map(setting => {
     const description = setting.description && i18n.text(setting.description);
     if (setting.kind === "secret") return <CredentialField key={setting.key} label={i18n.text(setting.label)}
-      required={setting.required} description={description} credentialState={secretStates?.[setting.key]}
-      storageAvailable={storageAvailable} keyUrl={setting.helpUrl}
-      draft={drafts[setting.key] ?? keepCredentialDraft} onDraftChange={draft => onDraft(setting.key, draft)} />;
+      required={setting.required} description={description} keyUrl={setting.helpUrl}
+      value={values[setting.key] ?? ""} onChange={value => onValue(setting.key, value)} />;
     if (setting.kind === "choice") return <ChoiceSettingField key={setting.key} setting={setting}
       value={values[setting.key] ?? setting.default} onChange={value => onValue(setting.key, value)} />;
     return <TextField key={setting.key} label={setting.required ? i18n.text(setting.label) : `${i18n.text(setting.label)} · ${optional}`}

@@ -6,7 +6,7 @@ const base = { key: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/u), label: uiTextS
 
 /**
  * Provider settings use a closed set of kinds that the host renders, validates, and stores.
- * Secret values are stored in the credential vault and never appear in configuration snapshots.
+ * Secret values are stored with other settings and may be `!` credential commands; settings inputs mask them.
  * Text values are saved trimmed; choices always resolve to a declared option.
  */
 export const providerSettingSchema = z.discriminatedUnion("kind", [
