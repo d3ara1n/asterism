@@ -67,6 +67,14 @@ For cross-session messaging, obtain the target session executor and submit throu
 
 Mesh messages retain their internal sender attribution in history. Model projection uses the channel name, Agent name, and numeric disambiguator; a sender not exposed to the channel is marked as not visible. Communication resources own their member directory and task descriptions. Resolve targets against the request's captured access scope. Read current task descriptions when handling an operation; identity resolution and mutable profile text have separate lifetimes.
 
+## Investigate a conversation
+
+Peek uses the configured utility model to explain an Agent's saved records. Backend plugins obtain a client with `agentServices(plugin).peek(target)` after resolving an authorized Agent reference. Renderer contributions bind `createPeekClient(object)` to their displayed Agent. Both clients offer `run(input, { signal, onProgress })` for a final outcome and `stream(input, { signal })` for progress followed by a terminal result.
+
+Supply a `question` and optionally `includeThinking` to admit saved readable thinking. Each call captures fresh evidence from the target's current timeline and keeps that snapshot fixed throughout its retrieval rounds. Progress contains a complete report snapshot, which replaces the previous report rather than appending to it. The final outcome distinguishes success, partial output, cancellation, and failure. Breaking out of a stream cancels its investigation.
+
+For follow-ups, pass `history` containing earlier questions, reports, and their outcomes. This context belongs to the caller and is separate from the target's saved records. Keep incomplete reports marked with their actual outcome. The service does not retain conversations or write investigation exchanges to the target. Single-call tools, including Mesh Peek, supply no history; a conversational interface owns its temporary history and passes it explicitly on each call.
+
 ## Prepare incoming input
 
 An external preparer can inspect, replace, or reject any of the three message sources using the original built-in action contract. Its replacement supplies raw action input that will be parsed again. Preparation applies to idle input, queued steering and follow-ups, and Home's initial input. It runs before acceptance, including on retries, so it is not an acceptance notification. Preparation has read capabilities and does not commit session mutations.

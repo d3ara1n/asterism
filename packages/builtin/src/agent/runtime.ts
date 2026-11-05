@@ -16,7 +16,7 @@ import { projectAgentTurnState } from "./state-projection.ts";
 import { agentExecutionState } from "./state.ts";
 import type { AgentTurnState } from "./state.ts";
 import type { ProviderUsage } from "@asterism-app/sdk/runtime";
-import { createPeekTool, investigateAgent } from "./peek/runtime.ts";
+import { createPeekChannel, createPeekClient, createPeekTool } from "./peek/service.ts";
 import { AgentSoftwareFeedback } from "./feedback.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
 import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft, DiscardAgentDraft, MoveAgentDraft } from "./drafts-contract.ts";
@@ -45,9 +45,10 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
       if (!object.snapshot()) throw new PluginApiError("not_found", "The Agent is unavailable on its current session path.");
       return object;
     };
+    const peekAgent = (ref: ResourceRef) => createPeekClient(peek, () => agentObject(ref), plugin.lifetime.signal);
     registerAgentServices(plugin, {
       describe: ref => ({ type: selectionOf(agentObject(ref)).selection.agent }),
-      peek: (ref, args, signal, publish) => investigateAgent(peek, agentObject(ref), args, signal, publish),
+      peek: peekAgent,
     });
     // Draft and configuration updates reuse the current path's turn state; rederive it only when the history position changes.
     const turns = new Map<string, { nodeId: string | null; interruptions: readonly (string | null)[]; state: AgentTurnState }>();
@@ -73,7 +74,8 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
         return { sessionId };
       })],
       events: [AgentSoftwareFeedback, AgentInputAccepted, AgentTurnEnded],
-      tools: [createPeekTool(peek), createSendTool(), createWaitTool(controller)],
+      tools: [createPeekTool(peekAgent), createSendTool(), createWaitTool(controller)],
+      channels: [createPeekChannel(peekAgent)],
       resources: [implementResource(Agent, AgentView, {
         card: agentCard,
         template: { current: [AgentSelection], createTitle: generateAgentName },

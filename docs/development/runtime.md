@@ -168,7 +168,9 @@ Agent `send` invokes input admission with host-bound sender identity. Acceptance
 
 Automatic session naming uses actual user input. Agent and event messages retain their own attribution and do not become user requests for naming.
 
-`peek` reads a fixed target-agent history snapshot through an independent utility-model investigation. It does not run the target Agent or inherit its tools. Saved results identify the snapshot, report, query trace, and actual model usage.
+Peek reads a fixed target-agent history snapshot through an independent utility-model investigation. The Agent paradigm owns the shared investigation service, consumed by resource tools, renderer interfaces, and third-party plugins. It does not run the target Agent or inherit its tools. Tool outcomes identify the snapshot, report, query trace, and actual model usage.
+
+Each investigation captures fresh target records and accepts explicit prior Peek exchanges as separate context. The service retains no conversational state. Mesh and direct resource tools perform independent single-call investigations; the explanation panel owns temporary question/report history and accumulates it across follow-ups without appending to the main timeline. Retrieval calls and model continuation data belong only to their current investigation. Streaming and final-result clients share the same execution and cancellation boundary. Closing the panel cancels its current investigation while retaining received reports in temporary view state.
 
 ## Model input and protocol adaptation
 

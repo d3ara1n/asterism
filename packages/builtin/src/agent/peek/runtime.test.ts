@@ -6,6 +6,7 @@ import { nodeView } from "../../../../../src/session/view.ts";
 import { message, node } from "../../../../../src/session/test-nodes.ts";
 import { investigateAgent } from "./runtime.ts";
 import { collectPeekResponse } from "./stream.ts";
+import { createPeekClient } from "./service.ts";
 import type { PeekResult } from "./contract.ts";
 
 const source = { model: "p/m", adapter: "test/1", scope: "test" };
@@ -34,6 +35,56 @@ function target() {
 
 // Agent investigation contract: deltas enter tool progress, retrieval executes only after a complete terminal state, and cancellation and failure retain their actual outcomes.
 describe("peek investigation stream", () => {
+  it("Cancels the model investigation when a public stream consumer exits early", async () => {
+    const { object } = target();
+    let requestSignal: AbortSignal | undefined;
+    let finishRequest!: () => void;
+    const finished = new Promise<void>(resolve => { finishRequest = resolve; });
+    const stream: ModelServices["stream"] = async function* (input) {
+      requestSignal = input.signal;
+      try {
+        await new Promise<void>(resolve => { input.signal.addEventListener("abort", () => resolve(), { once: true }); });
+        input.signal.throwIfAborted();
+      } finally { finishRequest(); }
+    };
+    const lifetime = new AbortController();
+    const peek = createPeekClient(deps(stream), () => object, lifetime.signal);
+    try {
+      for await (const event of peek.stream({ question: "Explain" }, { signal: lifetime.signal })) {
+        expect(event.type).toBe("progress");
+        break;
+      }
+      await finished;
+      expect(requestSignal?.aborted).toBe(true);
+    } finally { lifetime.abort(); }
+  });
+
+  it("Keeps prior Peek exchanges separate from evidence, refreshes evidence for follow-ups, and leaves independent calls without history", async () => {
+    const { object, nodes } = target(), requests: StreamRequest[] = [];
+    const stream: ModelServices["stream"] = async function* (input) {
+      requests.push(input);
+      yield* text("The change is still pending."); yield finish();
+    };
+    const signal = new AbortController().signal;
+    await investigateAgent(deps(stream), object, { question: "Explain the change" }, signal, () => {});
+    nodes.push(node("decision", "saved", message("a", "The change was approved.")));
+    await investigateAgent(deps(stream), object, { question: "Is that still true?", history: [{
+      question: "Explain the change", report: "The change is still pending.", outcome: "succeeded",
+    }] }, signal, () => {});
+    await investigateAgent(deps(stream), object, { question: "An independent investigation" }, signal, () => {});
+
+    const evidence = requests[1].system.blocks.find(block => block.id.endsWith(".records"))!.text;
+    const history = requests[1].system.blocks.find(block => block.id.endsWith(".history"))!.text;
+    expect(evidence).toContain("The change was approved.");
+    expect(evidence).not.toContain("The change is still pending.");
+    expect(history).toContain("Explain the change");
+    expect(history).toContain("The change is still pending.");
+    expect(requests[1].messages).toEqual([{ kind: "input", parts: [{ kind: "text", text: "Is that still true?" }] }]);
+    expect(requests[0].system.blocks.some(block => block.id.endsWith(".history"))).toBe(false);
+    expect(requests[2].system.blocks.some(block => block.id.endsWith(".history"))).toBe(false);
+    expect(object.session.snapshot).toHaveBeenCalledTimes(3);
+  });
+
   it("Uses the last text block as the report while streaming its deltas", async () => {
     const updates: string[] = [];
     const stream = async function* (): AsyncGenerator<ModelEvent> {

@@ -1,12 +1,9 @@
 import { formatModelExpression, type ModelItem, type ModelTarget } from "@asterism-app/sdk/contracts";
-import { implementTool, PluginApiError, type CallResult, type ModelServices, type ObjectReader } from "@asterism-app/sdk/runtime";
-import { builtin, peekToModel } from "@asterism-app/builtin-api/contracts";
-import type { z } from "zod";
-import { AgentPeek, Peek, type PeekResult } from "./contract.ts";
+import { PluginApiError, type ModelServices, type ObjectReader, type ProviderUsage } from "@asterism-app/sdk/runtime";
+import { builtin, type PeekInput, type PeekOutcome, type PeekResult } from "@asterism-app/builtin-api/contracts";
 import { peekOutline, projectPeekRecords } from "./snapshot.ts";
 import { retrievalTools, retrieve } from "./retrieval.ts";
 import { collectPeekResponse } from "./stream.ts";
-import type { ProviderUsage } from "@asterism-app/sdk/runtime";
 import { inputMessageDescription } from "../input-message.ts";
 
 const requestLimit = 24, maxOutputTokens = 8192;
@@ -32,15 +29,15 @@ function estimate(value: unknown): number {
   return Math.ceil(tokens);
 }
 
-interface PeekDependencies {
+export interface PeekDependencies {
   models: Pick<ModelServices, "stream" | "list">;
   utility(): ModelTarget;
   userAgent: string;
   usage?: Pick<ProviderUsage, "consume">;
 }
 export async function investigateAgent(deps: PeekDependencies, object: Pick<ObjectReader, "ref"> & { session: Pick<ObjectReader["session"], "snapshot"> },
-args: z.infer<typeof Peek.argsSchema>, signal: AbortSignal,
-publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>> {
+args: PeekInput, signal: AbortSignal,
+publish: (data: PeekResult) => void): Promise<PeekOutcome> {
   signal.throwIfAborted();
   const snapshot = object.session.snapshot();
   const records = projectPeekRecords(snapshot, object.ref.id, args.includeThinking === true);
@@ -64,7 +61,13 @@ publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>> {
     text: `<session_record>
 ${peekOutline(records)}
 </session_record>`,
-  }] };
+  }, ...(args.history?.length ? [{
+    id: builtin.name("agent.peek.history"), kind: "system" as const, from: builtin.id,
+    text: [
+      "These are prior exchanges in this separate Peek conversation, supplied by its caller. They provide follow-up context and are not records from the investigated Agent. Reports marked partial, cancelled, or failed are incomplete.",
+      JSON.stringify(args.history),
+    ].join("\n"),
+  }] : [])] };
   const messages: ModelItem[] = [{ kind: "input", parts: [{ kind: "text", text: args.question }] }];
   let publishedAt = -Infinity;
   const update = (phase: PeekResult["phase"], report = data.report) => {
@@ -128,13 +131,4 @@ ${peekOutline(records)}
     if (signal.aborted) return { kind: "cancelled", data, message: "The investigation was cancelled." };
     return { kind: "failed", data, error: { code: "peek_failed", message: error instanceof Error ? error.message : "The investigation failed." } };
   }
-}
-
-export function createPeekTool(deps: PeekDependencies) {
-  return implementTool(AgentPeek, {
-    call(_resource, _target, args, { object, signal, publish }) {
-      return investigateAgent(deps, object, args, signal, publish);
-    },
-    toModel: peekToModel,
-  });
 }

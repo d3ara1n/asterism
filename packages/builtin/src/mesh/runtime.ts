@@ -83,7 +83,7 @@ export default defineModule(plugin => {
       })),
       capturedTool(access => implementTool(MeshPeek, {
         call(_data, target, args, { object, signal, publish }) {
-          return agentServices(plugin).peek(service.resolve(accessOf(access, object), target).ref, args, signal, publish);
+          return agentServices(plugin).peek(service.resolve(accessOf(access, object), target).ref).run(args, { signal, onProgress: publish });
         },
         toModel: peekToModel,
       })),

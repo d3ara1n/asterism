@@ -3,6 +3,8 @@ import { pluginOf, pluginNamespace, type ThinkingLevel, type UiText } from "@ast
 import type { AgentSelection } from "./configuration.ts";
 import type { CatalogModel } from "./catalogs.ts";
 
+export { createPeekClient } from "./peek-renderer.ts";
+
 /** One instance mounts per expanded Agent card; obtains the associated object through SDK useRendererObject. */
 export interface AgentUIContribution {
   readonly id: string;

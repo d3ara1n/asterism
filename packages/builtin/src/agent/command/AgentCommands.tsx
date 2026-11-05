@@ -1,9 +1,10 @@
-import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Dialog } from "radix-ui";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Bookmark, BookmarkPlus, TextQuote } from "lucide-react";
+import { Bookmark, BookmarkPlus, ScanSearch, TextQuote } from "lucide-react";
 import { toast } from "sonner";
-import { useI18n } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererObject } from "@asterism-app/sdk/renderer";
+import { createPeekClient } from "@asterism-app/builtin-api/renderer";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { useSettingsAction } from "@asterism-app/ui/use-settings-action";
 import { settingsMessages } from "../../settings/contract";
@@ -12,6 +13,9 @@ import { savedTextMessages } from "../../messages/saved-text";
 import { savedTextName, useSavedText } from "../../saved-text/use-saved-text";
 import { useConversationInteraction } from "../conversation/interaction";
 import { CommandPalette, firstEntry, type CommandPage } from "./CommandPalette";
+import { peekMessages } from "../../messages/peek";
+import { createPeekConversation } from "../peek/conversation";
+import { PeekPanel } from "../peek/PeekPanel";
 
 type PageId = "root" | "saved-text";
 
@@ -21,12 +25,17 @@ const immediate = { duration: 0 } as const;
 /** Each Agent view owns its keyboard scope and a command surface that is modal only within that view. */
 export function AgentCommands({ children, composerHidden }: { children: ReactNode; composerHidden: boolean }) {
   const i18n = useI18n();
+  const object = useRendererObject();
+  const peek = object.retained.get("asterism.builtin/agent.peek", createPeekConversation, value => value.stop());
+  const peekClient = createPeekClient(object);
+  useEffect(() => () => peek.stop(), [peek]);
   const interaction = useConversationInteraction();
   const draft = useSyncExternalStore(interaction.draft.subscribe, interaction.draft.getSnapshot);
   const savedText = useSavedText();
   const { run, busy, error } = useSettingsAction(settingsMessages.saveFailed);
   const reducedMotion = useReducedMotion();
   const [open, setOpen] = useState(false);
+  const [surface, setSurface] = useState<"commands" | "peek">("commands");
   const [stack, setStack] = useState<readonly PageId[]>(["root"]);
   const [search, setSearch] = useState("");
   const [value, setValue] = useState("");
@@ -41,6 +50,13 @@ export function AgentCommands({ children, composerHidden }: { children: ReactNod
     root: {
       id: "root", placeholder: i18n.text(commandMessages.placeholder),
       groups: [{
+        id: "peek", heading: i18n.text(peekMessages.title),
+        entries: [{
+          id: "peek/explain", label: i18n.text(peekMessages.explain), icon: <ScanSearch />,
+          disabled: busy || !object.view.ready,
+          onSelect: () => setSurface("peek"),
+        }],
+      }, {
         id: "saved-text", heading: i18n.text(savedTextMessages.title),
         entries: [{
           id: "saved-text/insert", label: i18n.text(savedTextMessages.insert), icon: <TextQuote />,
@@ -83,11 +99,12 @@ export function AgentCommands({ children, composerHidden }: { children: ReactNod
   function show() {
     previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     restoreFocus.current = true;
+    setSurface("commands");
     navigate(["root"]);
     setOpen(true);
   }
-  function close() { if (!busy) setOpen(false); }
-  const back = () => { if (stack.length > 1) navigate(stack.slice(0, -1)); else close(); };
+  function close() { if (!busy) { peek.stop(); setOpen(false); } }
+  const back = () => { if (surface === "commands" && stack.length > 1) navigate(stack.slice(0, -1)); else close(); };
 
   return <div tabIndex={-1} className="relative flex min-h-0 flex-1 flex-col outline-none [container-type:size]"
     onPointerDown={event => {
@@ -129,12 +146,14 @@ export function AgentCommands({ children, composerHidden }: { children: ReactNod
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: -4, transition: { duration: 0.12, ease: [0.4, 0, 1, 1] } }}
             transition={reducedMotion ? immediate : panelTransition}>
-            <Dialog.Title className="sr-only">{i18n.text(commandMessages.title)}</Dialog.Title>
-            <CommandPalette page={page} depth={stack.length - 1} search={search} onSearch={setSearch}
-              value={value} onValue={setValue} onBack={back} />
-            {(error || savedText.error) && <Alert variant="destructive" className="m-2 mt-0 w-auto">
-              <AlertDescription>{i18n.text(error ?? savedText.error!)}</AlertDescription>
-            </Alert>}
+            {surface === "peek" ? <PeekPanel conversation={peek} client={peekClient} ready={object.view.ready} onClose={close} /> : <>
+              <Dialog.Title className="sr-only">{i18n.text(commandMessages.title)}</Dialog.Title>
+              <CommandPalette page={page} depth={stack.length - 1} search={search} onSearch={setSearch}
+                value={value} onValue={setValue} onBack={back} />
+              {(error || savedText.error) && <Alert variant="destructive" className="m-2 mt-0 w-auto">
+                <AlertDescription>{i18n.text(error ?? savedText.error!)}</AlertDescription>
+              </Alert>}
+            </>}
           </motion.div>
         </Dialog.Content>}
       </AnimatePresence>

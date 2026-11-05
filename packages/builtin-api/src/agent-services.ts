@@ -1,13 +1,11 @@
-import type { z } from "zod";
 import type { ResourceRef, SessionDirectory } from "@asterism-app/sdk/contracts";
-import { PluginApiError, type CallResult, type PluginContext } from "@asterism-app/sdk/runtime";
-import type { Peek, PeekResult } from "./peek.ts";
+import { PluginApiError, type PluginContext } from "@asterism-app/sdk/runtime";
+import type { PeekClient } from "./peek.ts";
 
 /** Agent-owned operations for trusted plugins that have resolved an authorized resource reference. */
 export interface AgentServices {
   describe(target: ResourceRef): { type: string };
-  peek(target: ResourceRef, args: z.infer<typeof Peek.argsSchema>, signal: AbortSignal,
-    publish: (data: PeekResult) => void): Promise<CallResult<PeekResult>>;
+  peek(target: ResourceRef): PeekClient;
 }
 const services = new WeakMap<SessionDirectory, AgentServices>();
 
