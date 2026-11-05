@@ -5,6 +5,15 @@ export function hasModelContent(block: ModelBlock): boolean {
   return block.kind === "toolcall" ? block.argumentsText === null : block.complete;
 }
 
+/** A normal reply contains every block of a stopped response and no tool calls; the terminal ordinal establishes the expected block count. */
+export function isCompletedResponse(blocks: readonly ModelBlock[]): boolean {
+  const terminal = blocks.find(block => block.completion);
+  return terminal?.completion?.finishReason === "stop"
+    && (!terminal.completion.termination || terminal.completion.termination.reason === "completed")
+    && terminal.ordinal + 1 === blocks.length
+    && blocks.every(block => block.ordinal < blocks.length && block.complete && block.kind !== "toolcall");
+}
+
 /** Shared by model input and history shells. Each response precedes its following user/context boundary. */
 export function participatingBlocks(blocks: readonly ModelBlock[]): ModelBlock[] {
   const ordered = blocks.filter(hasModelContent).sort((a, b) => a.ordinal - b.ordinal);

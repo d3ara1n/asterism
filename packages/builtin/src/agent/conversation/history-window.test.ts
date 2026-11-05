@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { sessionSnapshot } from "../../../../../src/plugins/records";
 import { nodeView } from "../../../../../src/session/view";
-import { agentSource, call, event, message, node, text } from "../../../../../src/session/test-nodes";
+import { agentSource, call, event, message, node, text, thinking } from "../../../../../src/session/test-nodes";
 import type { CompressionActivity } from "../feedback";
 import { ConversationHistoryWindow } from "./history-window";
 import { savedTimeline, withLive } from "./timeline";
-import { groupTurnProcesses, visibleTurnProcesses } from "./turn-process";
+import { groupConversationProcesses, visibleConversationProcesses } from "./conversation-process";
 
 const completion = { finishReason: "stop", rawFinishReason: null, providerResponseId: null, usage: null } as const;
 const summary = (keptFrom: string) => event(ContextSummary.id, { summary: "Internal handoff", keptFrom,
@@ -52,11 +52,25 @@ describe("Conversation reading range after compression", () => {
     ];
     const saved = project(path, new ConversationHistoryWindow());
     expect(ids(saved)).toEqual(["compression-boundary:summary", "kept", "reply", "turn-metrics:u"]);
-    const grouped = groupTurnProcesses(withLive(saved, []), false);
-    expect(visibleTurnProcesses(grouped, new Set()).map(item => item.id))
-      .toEqual(["compression-boundary:summary", "turn-process:u", "reply", "turn-metrics:u"]);
-    expect(visibleTurnProcesses(grouped, new Set(["turn-process:u"])).map(item => item.id))
-      .toEqual(["compression-boundary:summary", "kept", "turn-process:u", "reply", "turn-metrics:u"]);
+    const grouped = groupConversationProcesses(withLive(saved, []), false);
+    expect(visibleConversationProcesses(grouped, new Set()).map(item => item.id))
+      .toEqual(["compression-boundary:summary", "conversation-process:final", "reply", "turn-metrics:u"]);
+    expect(visibleConversationProcesses(grouped, new Set(["conversation-process:final"])).map(item => item.id))
+      .toEqual(["compression-boundary:summary", "kept", "conversation-process:final", "reply", "turn-metrics:u"]);
+  });
+
+  // Completion is a fact of the full response, even when the reading window omits its initial blocks.
+  it("A window starting inside the final response preserves its remaining body without creating a process", () => {
+    const path = [
+      node("u", null, message("a", "Work")),
+      node("reason", "u", thinking("a", "final", 0)),
+      node("part1", "reason", text("a", "final", 1, "First")),
+      node("part2", "part1", text("a", "final", 2, "Second", { completion })),
+    ];
+    const saved = savedTimeline(snapshot(path).records.all({ scope: "timeline" }), "a", false, [], { from: "part1" });
+    const grouped = groupConversationProcesses(withLive(saved, []), false);
+    expect(visibleConversationProcesses(grouped, new Set()).map(item => item.id)).toEqual(["part1", "part2", "turn-metrics:u"]);
+    expect(grouped.processIds.size).toBe(0);
   });
 
   // A new summary must not abruptly remove earlier content from an open view; reusing the same in-memory reading window preserves its boundary, and only a new window adopts the latest summary.

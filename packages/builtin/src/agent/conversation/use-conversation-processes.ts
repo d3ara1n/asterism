@@ -1,11 +1,11 @@
 import { useCallback, useLayoutEffect, useMemo, useState } from "react";
 import type { TimelineItem } from "./timeline";
-import { groupTurnProcesses, visibleTurnProcesses } from "./turn-process";
+import { groupConversationProcesses, visibleConversationProcesses } from "./conversation-process";
 import type { TimelineViewState } from "./view-state";
 
-/** Whole-turn expansion state is retained with the Agent view; resuming removes the summary, and the next settlement defaults to collapsed again. */
-export function useTurnProcesses(items: readonly TimelineItem[], viewState: TimelineViewState, running: boolean) {
-  const grouped = useMemo(() => groupTurnProcesses(items, running), [items, running]);
+/** Group expansion is retained with the Agent view; only the running tail loses its summary until it settles again. */
+export function useConversationProcesses(items: readonly TimelineItem[], viewState: TimelineViewState, running: boolean) {
+  const grouped = useMemo(() => groupConversationProcesses(items, running), [items, running]);
   const [open, setOpen] = useState(() => viewState.openProcesses);
   const save = useCallback((value: ReadonlySet<string>) => {
     viewState.openProcesses = value;
@@ -16,7 +16,7 @@ export function useTurnProcesses(items: readonly TimelineItem[], viewState: Time
       save(new Set([...open].filter(id => grouped.processIds.has(id))));
     }
   }, [grouped, open, save]);
-  const timeline = useMemo(() => visibleTurnProcesses(grouped, open), [grouped, open]);
+  const timeline = useMemo(() => visibleConversationProcesses(grouped, open), [grouped, open]);
   const toggle = useCallback((id: string) => {
     const next = new Set(open);
     if (next.has(id)) next.delete(id);

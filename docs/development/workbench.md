@@ -110,7 +110,7 @@ Markdown footnotes navigate within their containing Markdown surface, with docum
 
 Composer controls follow the Agent’s execution state: stop while running, continue for incomplete work, and ordinary send otherwise. Configuration changes apply to the next request.
 
-## Drafts and turn presentation
+## Drafts and conversation presentation
 
 Agent drafts preserve complete text, stored files, file references, sender, and delivery mode. Their preview never replaces the stored input. File references display descriptive metadata without fetching content. Mode changes and reorder operations act by identity and follow backend order.
 
@@ -118,9 +118,9 @@ Taking a draft into an empty composer removes it from drafts. Swapping with comp
 
 Lost receipts retain the submission identity and content needed for retry. Explicit failure preserves the original content. Restoration does not send drafts automatically.
 
-During execution, process entries remain available for interaction. Once a turn settles, its thinking, tools, and intermediate replies fold behind a summary. Inputs, compaction markers, and execution feedback stay visible.
+Process folding groups the conversation by input, independently of execution turns and their measurements. Consecutive inputs share a group; an input after model content starts the next group, including when delivered as a steer within the same execution turn. The running tail remains available for interaction. Earlier groups and a stopped tail fold their thinking, tools, and intermediate replies behind separate summaries, preserving each group's final reply. A group with nothing to hide has no summary. Inputs, compaction markers, execution feedback, and turn measurements stay visible.
 
-The final reply is the complete body of the last normally completed response. Failure does not promote an earlier intermediate reply into a final answer. Copy uses that same final-body definition.
+Each conversation group's final reply is the complete body of its last response when that response completed normally. Failure does not promote an earlier intermediate reply into a final answer. Turn measurements and the turn's copy action retain the execution turn's scope.
 
 Manual expansion preserves the summary’s reading position. Automatic collapse respects whether the view follows output or reads earlier content. Virtualized movement and disclosure animation have separate ownership.
 

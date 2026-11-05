@@ -3,7 +3,7 @@ import { retainExitingItems } from "./timeline-presence";
 import { timelineKey, type TimelineItem } from "./timeline";
 
 const text = (id: string): TimelineItem => ({ kind: "text", id, responseId: id, ordinal: 0, text: id, endedAt: 1 });
-const process: TimelineItem = { kind: "turn-process", id: "process", open: false, incomplete: false, tools: [] };
+const process: TimelineItem = { kind: "conversation-process", id: "process", open: false, incomplete: false, tools: [] };
 
 describe("Exiting item order in the virtual list", () => {
   // Automatic folding adds a new summary row; retained visible process items should stay above it, while offscreen content occupies no exit position.
@@ -15,14 +15,15 @@ describe("Exiting item order in the virtual list", () => {
     expect(result.map(item => item.id)).toEqual(["visible", "process", "answer"]);
   });
 
-  // Same-turn steer messages remain visible; earlier process items must not first move past a supplemental message merely to group them above the summary.
+  // Steer closes the preceding group; exiting entries stay above their own summary on each side of the input.
   it("Exiting process items do not cross intervening supplemental messages", () => {
     const before = text("before"), after = text("after"), answer = text("answer");
+    const earlier: TimelineItem = { ...process, id: "earlier-process" };
     const steer: TimelineItem = { kind: "message", id: "steer", parts: [], sender: { kind: "user" }, startsTurn: false };
-    const result = retainExitingItems([before, steer, after, answer], [steer, process, answer],
+    const result = retainExitingItems([before, steer, after, answer], [earlier, steer, process, answer],
       new Set([timelineKey(before), timelineKey(after)]),
-      new Map([[timelineKey(before), process.id], [timelineKey(after), process.id]]));
-    expect(result.map(item => item.id)).toEqual(["before", "steer", "after", "process", "answer"]);
+      new Map([[timelineKey(before), earlier.id], [timelineKey(after), process.id]]));
+    expect(result.map(item => item.id)).toEqual(["before", "earlier-process", "steer", "after", "process", "answer"]);
   });
 
   // Repeated clicks can restore an item before its exit completes; reuse the target version without duplicating the old item or losing the latest content.

@@ -4,18 +4,20 @@ import { decodeExecution, ContextSummary, Execution, AgentInputMessage, type Age
 import { turnMetrics, type TurnMetricsData } from "./turn-metrics";
 import type { CompressionActivity, InlineFeedback } from "../feedback";
 import type { HistoryBoundary } from "./history-window";
-import { participatingBlocks } from "../response-messages";
+import { isCompletedResponse, participatingBlocks } from "../response-messages";
 
 type SavedBlock = Extract<z.infer<typeof Execution.schema>, { type: "block" }>["block"] & {
   /** partialContext: the block did not fully participate in later model input; failed: the request generating it failed before it closed. */
   id: string; createdAt: string; partialContext?: boolean; failed?: boolean;
+  /** Computed before windowing and display filtering, so a retained response fragment keeps its completion state. */
+  responseCompleted?: boolean;
 };
 export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "message"; id: string; parts: readonly AgentInputPart[]; sender: AgentMessageSender; startsTurn?: boolean }
   | { kind: "summary"; id: string; text: string }
   | { kind: "compression"; id: string; status: CompressionActivity["status"] | "completed" | "boundary" }
-  | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null; finalResponseId: string | null }
-  | { kind: "turn-process"; id: string; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; incomplete: boolean; open: boolean }
+  | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null }
+  | { kind: "conversation-process"; id: string; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; incomplete: boolean; open: boolean }
   | ({ kind: "notice" } & InlineFeedback);
 /** Saved and live model blocks; notices may carry a responseId but are not blocks. */
 export function isModelBlock(item: TimelineItem): item is SavedBlock | ModelLiveBlock {
@@ -65,17 +67,18 @@ export function savedTimeline(path: readonly SessionRecord[], agentId: string, r
     const blocks = responses.get(value.responseId) ?? [];
     blocks.push(value); responses.set(value.responseId, blocks);
   }
-  const presentation = new Map<string, { partialContext?: boolean; failed?: boolean }>();
+  const presentation = new Map<string, { partialContext?: boolean; failed?: boolean; responseCompleted: boolean }>();
   const persistedErrors = new Set<string>();
   for (const [responseId, blocks] of responses) {
     const participating = new Set(participatingBlocks(blocks).map(block => block.ordinal));
     const terminal = blocks.find(block => block.completion?.termination);
     const termination = terminal?.completion?.termination;
+    const responseCompleted = isCompletedResponse(blocks);
     for (const block of blocks) {
       const partialContext = !participating.has(block.ordinal) || !block.complete;
       // Tool execution failures are outcomes shown by the tool view; only the request failure colors unfinished blocks.
       const failed = !block.complete && termination?.reason === "failed";
-      presentation.set(timelineKey(block), { ...(partialContext ? { partialContext: true } : {}), ...(failed ? { failed: true } : {}) });
+      presentation.set(timelineKey(block), { responseCompleted, ...(partialContext ? { partialContext: true } : {}), ...(failed ? { failed: true } : {}) });
     }
     if (termination?.reason === "failed") {
       persistedErrors.add(responseId);
@@ -119,7 +122,6 @@ export function savedTimeline(path: readonly SessionRecord[], agentId: string, r
   const measured = (turn: typeof summaries[number]): TimelineItem => ({
     kind: "turn-metrics", id: `turn-metrics:${turn.inputId}`, inputId: turn.inputId, metrics: turn.metrics, incomplete: turn.incomplete,
     replyMarkdown: turn.replyMarkdown,
-    finalResponseId: turn.finalResponseId,
   });
   const items = saved.flatMap(value => {
     const turn = value.kind === "message" ? before.get(value.id) : undefined;

@@ -18,7 +18,7 @@ import { MessageSender } from "./MessageSender";
 import { messageAppearance } from "../message-presentation";
 import { TimelineViewState, viewStateKeys } from "./view-state";
 import { ExecutionErrorDetails } from "../ErrorDetails";
-import { TurnProcess } from "./TurnProcess";
+import { ConversationProcess } from "./ConversationProcess";
 import { CompressionMarker } from "./CompressionMarker";
 import type { useTimelinePresence } from "./timeline-presence";
 import { conversationTransition, immediateTransition } from "./motion";
@@ -54,8 +54,8 @@ export function VirtualConversationTimeline({ items, target, presence, reducedMo
       const key = timelineKey(node);
       return <TimelinePresenceItem key={key} itemKey={key} present={present.has(key)} enter={presence.entering.has(key)}
         overlayExit={node.kind === "compression"}
-        reducedMotion={reducedMotion} onMount={presence.onMount} onExitComplete={presence.onExitComplete}>{node.kind === "turn-process"
-        ? <TurnProcess node={node} onToggle={() => onToggleProcess(node.id)} onMount={onProcessMount} />
+        reducedMotion={reducedMotion} onMount={presence.onMount} onExitComplete={presence.onExitComplete}>{node.kind === "conversation-process"
+        ? <ConversationProcess node={node} onToggle={() => onToggleProcess(node.id)} onMount={onProcessMount} />
         : <NodeView node={node} entry={viewState.entry(key)} />}</TimelinePresenceItem>;
     }}
   </Virtualizer>;

@@ -20,7 +20,7 @@ import { AgentToolbar, AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
 import { AgentDraftsPanel } from "./Drafts";
 import type { AgentExecutionState } from "../state";
 import type { AgentActivity, CompressionActivity, InlineFeedback } from "../feedback";
-import { useTurnProcesses } from "./use-turn-processes";
+import { useConversationProcesses } from "./use-conversation-processes";
 import { useReducedMotion } from "motion/react";
 import { useTimelinePresence } from "./timeline-presence";
 
@@ -55,7 +55,7 @@ export function Conversation({ feedback, compressions, activity = null }: {
   const viewState = object.retained.get(viewStateKey, () => new TimelineViewState());
   const running = executionState === "running";
   const { read, items, loadEarlier } = useConversationHistory(snapshot, agentId, viewState.historyWindow, models.blocks, running, feedback, compressions);
-  const { timeline: target, processOwners, toggle } = useTurnProcesses(items, viewState, running);
+  const { timeline: target, processOwners, toggle } = useConversationProcesses(items, viewState, running);
   const reducedMotion = useReducedMotion() === true;
   const presence = useTimelinePresence(target, processOwners, reducedMotion);
   const timeline = presence.items;

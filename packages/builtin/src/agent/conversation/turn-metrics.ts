@@ -25,7 +25,6 @@ export interface TurnMeasurement {
   incomplete: boolean;
   metrics: TurnMetricsData;
   replyMarkdown: string | null;
-  finalResponseId: string | null;
 }
 
 /** Preserves historical turns; consecutive input in a batch and steer messages belong to the same turn, and only the currently running turn is hidden. */
@@ -50,7 +49,6 @@ export function turnMetrics(path: readonly SessionRecord[], agentId: string, run
       incomplete,
       metrics: summarizeRequests(current),
       replyMarkdown: reply.trim() ? reply : null,
-      finalResponseId: reply.trim() ? current[0]!.responseId : null,
     }];
   });
 }

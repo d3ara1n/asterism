@@ -41,7 +41,7 @@ export function useTimelinePresence(target: readonly TimelineItem[], owners: Rea
     const entrances = new Set([...entering.current].filter(key => targetKeys.has(key)));
     for (const item of target) {
       const key = timelineKey(item);
-      if (!previousKeys.has(key) && (owners.has(key) || item.kind === "turn-process" || item.kind === "compression"))
+      if (!previousKeys.has(key) && (owners.has(key) || item.kind === "conversation-process" || item.kind === "compression"))
         entrances.add(key);
     }
     entering.current = reducedMotion ? new Set() : entrances;

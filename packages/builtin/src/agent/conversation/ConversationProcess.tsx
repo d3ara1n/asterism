@@ -32,8 +32,8 @@ function toolGroups(tools: readonly ToolCallNode[]) {
 }
 
 /** The summary sits at the end of the process; expanded original items appear above the button. */
-export function TurnProcess({ node, onToggle, onMount }: {
-  node: Extract<TimelineItem, { kind: "turn-process" }>;
+export function ConversationProcess({ node, onToggle, onMount }: {
+  node: Extract<TimelineItem, { kind: "conversation-process" }>;
   onToggle(): void;
   onMount(id: string, button: HTMLButtonElement): void;
 }) {
