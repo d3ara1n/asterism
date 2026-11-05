@@ -17,6 +17,7 @@ import { createShellModule } from "./shell/runtime.ts";
 import { createTerminalModule } from "./terminal/runtime.ts";
 import { CreateTerminal } from "./terminal/contract.ts";
 import mcp from "./mcp/runtime.ts";
+import { CreateMcpHost } from "./mcp/contract.ts";
 import web from "./web/runtime.ts";
 import { CreateWeb } from "./web/contract.ts";
 import { SkillCatalog } from "./skills/catalog.ts";
@@ -69,6 +70,10 @@ export default definePlugin({ namespace: builtin,
         defineAgentCreation({ id: CreateManual.id, creation: CreateManual,
           description: "Open the Asterism manual for software use and plugin development. Provides list, find, grep, and read over application guides, public package examples, and documentation exposed by loaded plugins.",
           guidelines: [] }),
+        defineAgentCreation({ id: CreateMcpHost.id, creation: CreateMcpHost,
+          description: "Create an MCP Host for browsing, searching, and calling tools from the application's configured MCP servers.",
+          guidelines: ["MCP Hosts share the application's configured MCP servers and their enabled state.",
+            "A server awaiting OAuth completes its connection after the user authorizes it in MCP settings."] }),
         defineAgentCreation({ id: CreateWeb.id, creation: CreateWeb,
           description: "Create a Web resource for web searches and URL content retrieval through the application's configured web providers.",
           guidelines: ["Web resources share the application's provider configuration and priority order."] }),
