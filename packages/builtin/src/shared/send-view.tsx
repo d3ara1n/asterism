@@ -4,7 +4,7 @@ import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { inputFileName, type SendResult } from "@asterism-app/builtin-api/contracts";
 import { fileReferencePartSchema, type Json } from "@asterism-app/sdk/contracts";
 import { sendMessages as messages } from "../messages/send";
-import { Markdown } from "../agent/conversation/Markdown";
+import { Markdown } from "@asterism-app/ui/markdown";
 import { inputText, inputField } from "./tool-preview";
 import { messageTarget } from "./message-target";
 

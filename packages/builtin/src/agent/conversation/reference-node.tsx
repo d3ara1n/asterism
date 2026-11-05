@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
-import { ReferenceChipFace } from "./reference-chip";
+import { ReferenceChipFace } from "@asterism-app/ui/reference-chip";
 import { referenceNodeName } from "./reference-serialization";
 
 /** A reference chip is an inline atom that leaves the editor as a markdown link. */

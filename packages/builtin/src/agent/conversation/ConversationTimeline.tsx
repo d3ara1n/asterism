@@ -7,7 +7,7 @@ import { Virtualizer, type VirtualizerHandle } from "virtua";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { cn } from "@asterism-app/ui/utils";
 import { conversationMessages } from "../../messages/conversation";
-import { Markdown } from "./Markdown";
+import { Markdown } from "@asterism-app/ui/markdown";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { generating, mountedTimelineIndexes, timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";

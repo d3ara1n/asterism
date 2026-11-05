@@ -1,7 +1,7 @@
 import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
 import { FileText, BookOpen, FilePenLine, FilePlus2, Replace, Search } from "lucide-react";
 
-import { Markdown } from "../agent/conversation/Markdown";
+import { Markdown } from "@asterism-app/ui/markdown";
 import { commonMessages } from "../messages/common";
 import { textMessages } from "../messages/text";
 import { filesystemMessages } from "../messages/filesystem";

@@ -7,7 +7,7 @@ import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { thinkingMessages } from "../../messages/thinking";
 import { BuiltinSettings } from "../../settings/contract";
 import { Disclosure } from "./Disclosure";
-import { Markdown } from "./Markdown";
+import { Markdown } from "@asterism-app/ui/markdown";
 import { thinkingDuration } from "./thinking-state";
 import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { generating, type TimelineItem } from "./timeline";

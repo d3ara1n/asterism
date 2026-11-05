@@ -4,7 +4,7 @@ import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import type { PeekResult } from "@asterism-app/builtin-api/contracts";
 import { peekMessages as messages } from "../messages/peek";
-import { Markdown } from "../agent/conversation/Markdown";
+import { Markdown } from "@asterism-app/ui/markdown";
 import { messageTarget } from "./message-target";
 
 function Header({ phase, invocation, result, target }: ToolRenderProps<PeekResult>) {

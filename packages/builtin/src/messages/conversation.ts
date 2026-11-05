@@ -106,6 +106,5 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
     id: "agent_conversation_ConversationTimeline_5",
     defaultMessage: "You",
   },
-  removeReference: { id: "agent_conversation_removeReference", defaultMessage: "Remove reference" },
   referenceMenu: { id: "agent_conversation_referenceMenu", defaultMessage: "References" },
 }));

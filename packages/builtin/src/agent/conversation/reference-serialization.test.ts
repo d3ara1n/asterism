@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { serializeDoc, parseComposerText, parseComposerInline, isReferenceHref, referenceKind, referenceTriggerAllowedAfter } from "./reference-serialization";
+import { serializeDoc, parseComposerText, parseComposerInline, isReferenceHref, referenceTriggerAllowedAfter } from "./reference-serialization";
 
 describe("Reference serialization", () => {
   it("serializes a doc with text and chips to markdown link text", () => {
@@ -92,14 +92,6 @@ describe("Reference serialization", () => {
       { type: "referenceChip", attrs: { label: "b", href: "skill:b" } },
     ]);
   });
-  it("classifies reference kinds for chip presentation", () => {
-    expect(referenceKind("skill:pricing")).toBe("skill");
-    expect(referenceKind("resource:Dir-1/")).toBe("directory");
-    expect(referenceKind("resource:Dir-1/src/")).toBe("directory");
-    expect(referenceKind("resource:Dir-1/src/a.ts")).toBe("file");
-    expect(referenceKind("https://example.com")).toBeNull();
-  });
-
   it("parses dropped multi-line reference text into inline content with hard breaks", () => {
     expect(parseComposerInline("[a.md](resource:D/a.md)\nsee [pricing](skill:pricing)")).toEqual([
       { type: "referenceChip", attrs: { label: "a.md", href: "resource:D/a.md" } },

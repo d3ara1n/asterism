@@ -5,7 +5,7 @@ import { webResponseSchema, type Json, type WebDocument, type WebResponse } from
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract";
 import { webMessages as messages } from "../messages/web";
-import { Markdown } from "../agent/conversation/Markdown";
+import { Markdown } from "@asterism-app/ui/markdown";
 import { settledBodyViews } from "../shared/tool-views";
 import { WebCard } from "./WebCard";
 

@@ -76,17 +76,17 @@ Agent Markdown supports standard footnotes with return links and external web li
 
 ## Explain the current conversation
 
-With focus inside an Agent's content, press **Cmd+K / Ctrl+K** to open its command panel. The panel covers only that Agent view, including when the Agent is open in an island.
+With focus inside an Agent's content, press **Cmd+K / Ctrl+K** to open its command panel. The panel covers only that Agent view, including when the Agent is open in an island. Escape closes the panel from any level. In a nested list, Backspace in an empty search returns to the previous level.
 
-In the **Peek** group, choose **Explain current conversation** to open a modal panel. Enter what you want to understand and send it to start an investigation using the configured utility model. Continue with follow-up questions in the same panel; Peek keeps these exchanges as separate, temporary context. Each question reads a fresh snapshot of the main conversation, including saved records preceding context compression. The status badge shows the current investigation phase.
+In the **Peek** group, choose **Explain current conversation** to replace the command list with a Peek panel that fills the Agent view. Enter what you want to understand and send it to start an investigation using the configured utility model. Continue with follow-up questions in the same panel; Peek keeps these exchanges as separate, temporary context. Each question reads a fresh snapshot of the main conversation, including saved records preceding context compression. While an investigation runs, the input area shows its current phase and a stop control and accepts no further input.
 
-Stop ends the current explanation and keeps text already received. Closing the panel also stops an active investigation. Opening it again restores the temporary exchanges; they are not saved across application restarts. Peek does not add messages to the main conversation or interrupt its Agent. Mesh Peek remains a single-call investigation with no retained follow-up context.
+Stop ends the current explanation and keeps text already received; incomplete or stopped answers carry their own marker. Closing the panel also stops an active investigation. Opening it again restores the temporary exchanges; they are not saved across application restarts. Peek does not add messages to the main conversation or interrupt its Agent. Mesh Peek remains a single-call investigation with no retained follow-up context.
 
 ## Reuse saved text
 
 Manage reusable messages in **Saved text** in the built-in plugin settings. Each entry opens in its own island with a name and a body; the body can contain multiple paragraphs, lists, and code. Names can repeat, and editing preserves the body's whitespace and line breaks.
 
-The Agent's **Cmd+K / Ctrl+K** command panel includes a **Saved text** group. Commands appear only when their conditions hold. **Insert saved text** appears when saved text exists and opens a nested list searchable by name; Backspace in an empty search or Escape returns to the previous level, and Escape at the top level closes the panel. **Save input as saved text** appears when the composer contains text and stores it immediately, named after its first non-blank line; rename it in settings.
+The Agent's **Cmd+K / Ctrl+K** command panel includes a **Saved text** group. Commands appear only when their conditions hold. **Insert saved text** appears when saved text exists and opens a nested list searchable by name. **Save input as saved text** appears when the composer contains text and stores it immediately, named after its first non-blank line; rename it in settings.
 
 Choosing saved text first stores the current input and attachments in the draft box, then loads the selected body into the composer. Saving to the draft box uses the manual delivery mode (`none`), including while the Agent is running. Change a draft's delivery mode to queue it for execution. If saving the current input fails, the composer retains it.
 

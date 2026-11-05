@@ -1,14 +1,14 @@
 import { CachedMarkdown, Streamdown, type StreamdownProps } from "@lobehub/streamdown";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { useReducedMotion } from "motion/react";
+import { useReducedMotion } from "./reduced-motion";
 import { memo, useEffect, useId, useMemo, useState } from "react";
 
-import { externalWebUrl } from "@asterism-app/ui/links";
-import { markdownMessages } from "../../messages/markdown";
-import { MarkdownCode, MarkdownStreamingContext } from "./MarkdownCode";
-import { MarkdownLink } from "./MarkdownLink";
-import { markdownOptions } from "./markdown-options";
-import { rehypeScopedAnchors } from "./markdown-links";
+import { externalWebUrl } from "../links";
+import { markdownMessages } from "../messages/markdown";
+import { MarkdownCode, MarkdownStreamingContext } from "./code";
+import { MarkdownLink } from "./link";
+import { markdownOptions } from "./options";
+import { rehypeScopedAnchors } from "./anchors";
 
 const components: NonNullable<StreamdownProps["components"]> = {
   a: ({ node: _node, ...props }) => <MarkdownLink {...props} />,
@@ -32,6 +32,7 @@ const components: NonNullable<StreamdownProps["components"]> = {
 const streamSettleMs = 1000;
 
 /**
+ * Shared Markdown for every plugin; typography and KaTeX styles come from the host stylesheet (`.markdown-content`).
  * The library handles parsing, completion, and fade-in; historical content is displayed statically.
  * Streamdown has no end signal and retains word-by-word animation while the trailing block is mounted, so mount it only during generation and the drain window.
  */

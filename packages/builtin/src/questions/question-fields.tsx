@@ -9,7 +9,7 @@ import { Textarea } from "@asterism-app/ui/ui/textarea";
 import { InputGroup, InputGroupTextarea } from "@asterism-app/ui/ui/input-group";
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@asterism-app/ui/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
-import { Markdown } from "../agent/conversation/Markdown";
+import { Markdown } from "@asterism-app/ui/markdown";
 import { questionMessages as messages } from "../messages/questions";
 import type { Question } from "./contract";
 import type { AnswerDraft } from "./drafts";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { scopeMarkdownAnchors } from "./markdown-links";
+import { scopeMarkdownAnchors } from "./anchors";
 
 describe("Markdown navigation", () => {
   it("scopes both footnote directions and accessible descriptions to one document", () => {

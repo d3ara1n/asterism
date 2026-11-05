@@ -12,7 +12,7 @@ interface PeekConversationState {
 }
 
 /** Temporary question/report history belongs to this view, not the target Agent or the investigation's retrieval loop. */
-export function createPeekConversation() {
+export function createPeekConversation(client: PeekClient) {
   let state: PeekConversationState = { turns: [], draft: "", pending: false };
   let controller: AbortController | null = null;
   const listeners = new Set<() => void>();
@@ -21,7 +21,7 @@ export function createPeekConversation() {
     for (const listener of listeners) listener();
   };
   const updateTurn = (turn: PeekTurn) => update({ ...state, turns: [...state.turns.slice(0, -1), turn] });
-  const submit = async (client: PeekClient, question: string): Promise<boolean> => {
+  const submit = async (question: string): Promise<boolean> => {
     question = question.trim();
     if (state.pending || !question) return false;
     const history: PeekExchange[] = state.turns.map(turn => ({

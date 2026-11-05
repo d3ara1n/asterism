@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { cn } from "@asterism-app/ui/utils";
+import { cn } from "./utils";
 import { BookOpen, FileText, Folder, Link2, X, type LucideIcon } from "lucide-react";
-import { conversationMessages } from "../../messages/conversation";
-import { referenceKind, type ReferenceKind } from "./reference-serialization";
+import { commonMessages } from "./messages/common";
+import { referenceKind, type ReferenceKind } from "./references";
 
 /** Icon and tone per reference kind: skills use violet, resource locations use blue. */
 const kindStyles: Record<ReferenceKind, { icon: LucideIcon; tone: string }> = {
@@ -29,7 +29,7 @@ export function ReferenceChipFace({ href, children, selected = false, onRemove }
     <span className="truncate" translate="no">{children}</span>
     {onRemove && <button type="button" tabIndex={-1}
       className="-mr-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
-      aria-label={i18n.text(conversationMessages.removeReference)} title={i18n.text(conversationMessages.removeReference)}
+      aria-label={i18n.text(commonMessages.removeReference)} title={i18n.text(commonMessages.removeReference)}
       // Keep the editor selection; deleting must not move focus out of the composer.
       onMouseDown={event => event.preventDefault()}
       onClick={onRemove}><X className="size-3" /></button>}

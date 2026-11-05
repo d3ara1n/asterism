@@ -140,9 +140,15 @@ describe("Mesh resource routing", () => {
     expect(await call(captured, ma, "send", { title: "Atlas" }, { parts })).toMatchObject({ kind: "succeeded" });
     expect(other.snapshot().records.query(AgentInputMessage, { scope: "timeline" }).map(record => record.status === "known" ? record.data : null)).toContainEqual(
       expect.objectContaining({ parts, sender: expect.objectContaining({ name: "Ada", mesh: { channel: "Default", id: null } }) }));
-    const peek = vi.spyOn(agentServices(f.plugin), "peek");
+    const services = agentServices(f.plugin), resolvePeek = services.peek.bind(services), inputs: unknown[] = [];
+    // The service binds the target; the bound client receives the question.
+    const peek = vi.spyOn(services, "peek").mockImplementation(ref => {
+      const client = resolvePeek(ref);
+      return { ...client, run: (input, options) => { inputs.push(input); return client.run(input, options); } };
+    });
     await call(captured, ma, "peek", { title: "Atlas" }, { question: "What arrived?" });
-    expect(peek).toHaveBeenCalledWith({ sessionId: b.sessionId, id: b.id, kind: b.kind }, { question: "What arrived?" }, expect.any(AbortSignal), expect.any(Function));
+    expect(peek).toHaveBeenCalledWith({ sessionId: b.sessionId, id: b.id, kind: b.kind });
+    expect(inputs).toEqual([expect.objectContaining({ question: "What arrived?" })]);
     await expect(call(captured, ma, "peek", { title: hidden.title }, { question: "Hidden?" })).rejects.toThrow("No Agent");
     expect(peek).toHaveBeenCalledTimes(1);
   });

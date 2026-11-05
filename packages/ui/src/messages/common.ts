@@ -197,4 +197,8 @@ export const commonMessages = pluginNamespace("asterism.host").messages("en", de
     id: "scrollToStart",
     defaultMessage: "Scroll to start",
   },
+  removeReference: {
+    id: "removeReference",
+    defaultMessage: "Remove reference",
+  },
 }));

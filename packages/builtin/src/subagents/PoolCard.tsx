@@ -12,7 +12,7 @@ import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { ItemGroup } from "@asterism-app/ui/ui/item";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
-import { Markdown } from "../agent/conversation/Markdown";
+import { Markdown } from "@asterism-app/ui/markdown";
 import { Disclosure } from "../agent/conversation/Disclosure";
 import { subagentMessages as messages } from "../messages/subagents";
 import { PoolChannel, CancelSubagent, SteerSubagent, type FinishedStatus, type TaskSnapshot, type TaskSummary, type ProcessFrame } from "./contract";

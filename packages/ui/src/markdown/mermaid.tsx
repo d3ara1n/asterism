@@ -1,9 +1,9 @@
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { MermaidConfig } from "mermaid";
-import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
-import { StatusText } from "@asterism-app/ui/ui/status";
-import { markdownMessages } from "../../messages/markdown";
+import { Alert, AlertDescription } from "../ui/alert";
+import { StatusText } from "../ui/status";
+import { markdownMessages } from "../messages/markdown";
 import { useMermaidTheme } from "./mermaid-theme";
 
 type RenderedDiagram = { code: string; theme: MermaidConfig } & ({ svg: string; error?: never } | { error: true; svg?: never });

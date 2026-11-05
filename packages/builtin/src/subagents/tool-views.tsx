@@ -1,7 +1,7 @@
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ActivityTail, InstructionList } from "./ActivityTail";
-import { Markdown } from "../agent/conversation/Markdown";
+import { Markdown } from "@asterism-app/ui/markdown";
 import { subagentMessages as messages } from "../messages/subagents";
 import { TaskStateText, TaskStatus, Usage } from "./task-parts";
 import type { DelegateInput, TaskSnapshot, TaskSummary, WaitEntry } from "./contract";

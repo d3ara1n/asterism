@@ -1,8 +1,8 @@
 import { useState, type ComponentProps } from "react";
 import { parseResourceUrl, parseSkillUrl, type ResourceUrl } from "@asterism-app/sdk/contracts";
 import { useRendererObject, useRendererResourceNavigation } from "@asterism-app/sdk/renderer";
-import { externalWebUrl } from "@asterism-app/ui/links";
-import { ReferenceChipFace } from "./reference-chip";
+import { externalWebUrl } from "../links";
+import { ReferenceChipFace } from "../reference-chip";
 
 type AnchorProps = ComponentProps<"a">;
 
