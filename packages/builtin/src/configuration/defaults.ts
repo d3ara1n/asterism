@@ -5,13 +5,13 @@ import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 export const defaultAgents: AgentConfiguration[] = [
   {
     "id": defaultAgentPreset,
-    "delegates": ["explorer", "researcher", "advisor"],
+    "delegates": null,
     "resources": null,
     "excludeResources": null,
     "builtin": true,
     "enabled": true,
-    "description": "Implementation of features, fixes, refactors, and content changes.",
-    "systemPrompt": "Implementation worker. Implement features, fixes, refactors, and content changes within the requested scope.",
+    "description": "General-purpose agent for tasks across domains.",
+    "systemPrompt": "General-purpose agent. Carry out the requested task using the available context and capabilities.",
     "modelRole": "default",
     "examples": [
       "Rename all snake_case fields to camelCase",
@@ -20,9 +20,7 @@ export const defaultAgents: AgentConfiguration[] = [
     "subagent": {
       "instructions": [
         "Work autonomously on the delegated task using its supplied context.",
-        "Return a concise report:",
-        "## Changes: list each file touched and what changed",
-        "## Verification: checks performed and remaining verification gaps",
+        "Return the result with relevant supporting details and any unresolved gaps.",
       ].join("\n"),
       "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
     }
