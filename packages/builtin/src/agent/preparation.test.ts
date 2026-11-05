@@ -29,13 +29,13 @@ describe("Agent request preparation", () => {
       retained = value;
     } }).setup(context("example.second", sessions, catalog, second));
     const assemble = createRequestAssembly(context("asterism.builtin", sessions, catalog, new AbortController()), new SkillCatalog(catalog));
-    const prepared = assemble({ id: "worker", systemPrompt: "Work" })();
+    const prepared = assemble({ id: "worker", systemPrompt: "Work" }, { provider: "test", model: "test-model" })();
     expect(prepared.skills.map(skill => [skill.name, skill.source.plugin])).toEqual([["keep", "example.skills"]]);
     expect(prepared.blocks[0]).toMatchObject({ text: "Edited after filtering", source: { id: "example.instructions:one", plugin: "example.instructions" } });
     retained!.blocks[0]!.text = "Later mutation";
     expect(prepared.system.blocks[0]!.text).toContain("Edited after filtering");
     expect(prepared.system.blocks[0]!.text).not.toContain("Later mutation");
     second.abort(); first.abort();
-    expect(assemble({ id: "worker", systemPrompt: "Work" })().blocks[0]!.text).toBe("Original");
+    expect(assemble({ id: "worker", systemPrompt: "Work" }, { provider: "test", model: "test-model" })().blocks[0]!.text).toBe("Original");
   });
 });

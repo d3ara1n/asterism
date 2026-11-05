@@ -1,5 +1,5 @@
 import { AgentSelection, AgentDrafts } from "./data.ts";
-import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecutor, type ObjectInitializer, type ObjectWriter, type ContentReader } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type ModelTarget, type ModelServices, type ObjectReader, type ObjectExecutor, type ObjectInitializer, type ObjectWriter, type ContentReader } from "@asterism-app/sdk/runtime";
 import { type SubmitAgentInputData, type AgentSelection as Selection, AgentInputMessage, AgentInputAccepted, type AgentConfiguration } from "@asterism-app/builtin-api/contracts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { SystemPrompt } from "@asterism-app/sdk/contracts";
@@ -16,7 +16,7 @@ function writeInput(input: SubmitAgentInputData, object: ObjectReader, writer: O
 }
 
 /** Resource actions accept inputs independently and share model preflight checks; submission identity and persistence form one atomic acceptance. */
-export function createAdmission(deps: { selection: AgentSelectionService; validate: ModelServices["validate"]; running(object: ObjectReader): boolean; systemPrompt: (agent: Pick<AgentConfiguration, "id" | "systemPrompt">) => SystemPrompt }) {
+export function createAdmission(deps: { selection: AgentSelectionService; validate: ModelServices["validate"]; running(object: ObjectReader): boolean; systemPrompt: (agent: Pick<AgentConfiguration, "id" | "systemPrompt">, target: ModelTarget) => SystemPrompt }) {
   const idle = (object: ObjectReader) => {
     if (deps.running(object)) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
   };
@@ -30,12 +30,14 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
     const agent = deps.selection.agent(current.selection), snapshot = object.session.snapshot();
     const messages = projectForAgent(snapshot, object.ref.id);
     if (input) messages.push(projectInputMessage(input));
-    await deps.validate({ target: deps.selection.target(current.selection), system: deps.systemPrompt(agent), messages, signal }, { content });
+    const target = deps.selection.target(current.selection);
+    await deps.validate({ target, system: deps.systemPrompt(agent, target), messages, signal }, { content });
   };
   return {
     async prepareInitial(input: SubmitAgentInputData, selection: Selection, signal: AbortSignal, content: ContentReader) {
       const agent = deps.selection.agent(selection);
-      await deps.validate({ target: deps.selection.target(selection), system: deps.systemPrompt(agent), messages: [projectInputMessage(input)], signal }, { content });
+      const target = deps.selection.target(selection);
+      await deps.validate({ target, system: deps.systemPrompt(agent, target), messages: [projectInputMessage(input)], signal }, { content });
     },
     acceptInitial(input: SubmitAgentInputData, object: ObjectInitializer) {
       object.commit(writer => { writeInput(input, object, writer, false); });

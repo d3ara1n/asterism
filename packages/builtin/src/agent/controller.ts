@@ -89,9 +89,10 @@ export function createAgentController(deps: AgentControllerDependencies) {
       };
       const compress = (signal: AbortSignal) => {
         const selection = selectionOf(object).selection;
-        const { system } = deps.prepareRequest(deps.selection.agent(selection))();
+        const target = deps.selection.target(selection);
+        const { system } = deps.prepareRequest(deps.selection.agent(selection), target)();
         const tokens = Math.ceil(system.blocks.reduce((size, block) => size + block.text.length, 0) / 4);
-        return compressContext(object, deps.selection.target(selection), tokens, deps.models, signal,
+        return compressContext(object, target, tokens, deps.models, signal,
           value => deps.feedback.report(object, value), deps.userAgent, () => deps.feedback.beginCompression(object));
       };
       const publish = (status: ResourceStatus["status"]) => object.events.publish(ResourceStatusChanged, {
@@ -152,12 +153,13 @@ export function createAgentController(deps: AgentControllerDependencies) {
               };
               let result: ModelRunResult;
               try {
-                const prepare = deps.prepareRequest(agent);
+                const target = deps.selection.target(selection);
+                const prepare = deps.prepareRequest(agent, target);
                 let prepared: ReturnType<typeof prepare>;
                 result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
                   agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },
                   userAgent: deps.userAgent, completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
-                  target: deps.selection.target(selection), system: files => { prepared = prepare(files); return prepared.system; }, messages: projectForAgent(snapshot, object.ref.id), signal: current,
+                  target, system: files => { prepared = prepare(files); return prepared.system; }, messages: projectForAgent(snapshot, object.ref.id), signal: current,
                   observer: { event(event) { progress.event(event); return observer.event(event); } },
                 }));
               } catch (error) {

@@ -144,7 +144,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
           const prepare = deps.prepare({ ...currentAgent, systemPrompt: [
             currentAgent.systemPrompt,
             currentAgent.subagent.instructions,
-          ].filter(text => text.trim()).join("\n\n") });
+          ].filter(text => text.trim()).join("\n\n") }, target);
           snapshot.output.usage.requests++;
           const event = (event: ModelRunEvent): undefined => {
             if (event.type === "progress") {

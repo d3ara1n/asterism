@@ -30,7 +30,7 @@ import { builtinConfiguration, resolveRoleTarget } from "../configuration/runtim
 export function createAgentModule(application: ApplicationIdentity, usage: ProviderUsage, skills: SkillCatalog) {
   return defineModule(plugin => {
     const prepareRequest = createRequestAssembly(plugin, skills);
-    const systemPrompt = (agent: Parameters<typeof prepareRequest>[0]) => prepareRequest(agent)().system;
+    const systemPrompt = (agent: Parameters<typeof prepareRequest>[0], target: Parameters<typeof prepareRequest>[1]) => prepareRequest(agent, target)().system;
     const selection = createSelection({ agents: () => builtinConfiguration(plugin).agents, roles: () => builtinConfiguration(plugin).roles });
     const peek = { models: plugin.models, userAgent: application.userAgent, usage,
       utility: () => resolveRoleTarget(builtinConfiguration(plugin).roles, "utility") };
