@@ -13,6 +13,7 @@ export * from "./channels.ts";
 export * from "./tool-result.ts";
 export * from "./workspace.ts";
 export * from "./resource-links.ts";
+export * from "./skill-links.ts";
 export type * from "./models.ts";
 export { thinkingLevels } from "./models.ts";
 export * from "./model-records.ts";

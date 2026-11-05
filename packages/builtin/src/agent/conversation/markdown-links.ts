@@ -1,12 +1,3 @@
-import { parseResourceLink } from "@asterism-app/sdk/contracts";
-import { externalWebUrl } from "@asterism-app/ui/links";
-
-/** Resource locations apply to links; images continue to use external web sources. */
-export function markdownUrl(url: string, key: string): string {
-  if (key === "href" && (url.startsWith("#") || parseResourceLink(url))) return url;
-  return externalWebUrl(url) ?? "";
-}
-
 interface MarkdownNode {
   type: string;
   properties?: Record<string, unknown>;

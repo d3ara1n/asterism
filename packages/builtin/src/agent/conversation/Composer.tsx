@@ -1,23 +1,25 @@
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { Square, ArrowUp, Archive } from "lucide-react";
-import { useState, useSyncExternalStore, type Ref } from "react";
+import { useRef, useState, useSyncExternalStore, type Ref } from "react";
 import type { MessageDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
 import { AttachFiles, DraftFiles, DraftFileError, fileInputEvents } from "./Files";
+import { ComposerEditor, type ComposerEditorHandle } from "./composer-editor";
 
 import { Button } from "@asterism-app/ui/ui/button";
-import { InputGroup, InputGroupTextarea, InputGroupAddon } from "@asterism-app/ui/ui/input-group";
+import { InputGroup, InputGroupAddon } from "@asterism-app/ui/ui/input-group";
 import { commonMessages } from "../../messages/common";
 import { conversationMessages } from "../../messages/conversation";
 
 export function MessageComposer({ draft, inputRef, ready, executionState, writable, onSend, onSave, onCancel, onContinue }: {
-  draft: MessageDraft; inputRef: Ref<HTMLTextAreaElement>;
+  draft: MessageDraft; inputRef: Ref<ComposerEditorHandle>;
   ready: boolean; executionState: AgentExecutionState; writable: boolean;
   onSend(): Promise<void>; onSave(): Promise<unknown>; onCancel(): Promise<unknown>; onContinue(): Promise<void>;
 }) {
   const i18n = useI18n();
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const [controlPending, setControlPending] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
   const control = async (work: () => Promise<unknown>) => {
     if (controlPending) return;
     setControlPending(true);
@@ -26,15 +28,12 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
   const running = executionState === "running";
   const cancelDisabled = !ready || controlPending;
   const busy = state.locked;
-  return <form {...fileInputEvents(draft, busy || !ready)} onSubmit={event => { event.preventDefault(); void onSend(); }}>
+  return <form ref={form} {...fileInputEvents(draft, busy || !ready)} onSubmit={event => { event.preventDefault(); void onSend(); }}>
   <InputGroup>
-    <InputGroupTextarea ref={inputRef} rows={3} maxLength={100_000} value={state.text} disabled={busy}
-      onChange={event => draft.setText(event.target.value)} aria-label={i18n.formatMessage(conversationMessages.messagePlaceholder)}
-      placeholder={running ? i18n.formatMessage(conversationMessages.draftPlaceholder) : i18n.formatMessage(conversationMessages.continuePlaceholder)}
-      onKeyDown={event => {
-        if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-        event.preventDefault(); event.currentTarget.form?.requestSubmit();
-      }} />
+    <ComposerEditor ref={inputRef} value={state.text} disabled={busy} onChange={draft.setText}
+      onSubmit={() => form.current?.requestSubmit()}
+      label={i18n.formatMessage(conversationMessages.messagePlaceholder)}
+      placeholder={running ? i18n.formatMessage(conversationMessages.draftPlaceholder) : i18n.formatMessage(conversationMessages.continuePlaceholder)} />
     <InputGroupAddon align="block-end" className="min-w-0 gap-1">
       <AttachFiles draft={draft} disabled={busy || !ready} />
       <DraftFiles draft={draft} disabled={busy} />

@@ -1,21 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { markdownUrl, scopeMarkdownAnchors } from "./markdown-links";
+import { scopeMarkdownAnchors } from "./markdown-links";
 
 describe("Markdown navigation", () => {
-  it("retains local anchors and resource destinations only for link attributes", () => {
-    expect(markdownUrl("#user-content-fn-1", "href")).toBe("#user-content-fn-1");
-    expect(markdownUrl("resource:Manual-A?location=sdk%2Fguide.md", "href"))
-      .toBe("resource:Manual-A?location=sdk%2Fguide.md");
-    expect(markdownUrl("#user-content-fn-1", "src")).toBe("");
-    expect(markdownUrl("resource:Manual-A?location=sdk%2Fguide.md", "src")).toBe("");
-    expect(markdownUrl("https://example.com/image.png", "src")).toBe("https://example.com/image.png");
-  });
-
-  it("keeps bare paths, malformed resource addresses and executable schemes inert", () => {
-    for (const url of ["../file.md", "/etc/passwd", "file:///etc/passwd", "javascript:alert(1)",
-      "resource:abc?location=%XX"]) expect(markdownUrl(url, "href")).toBe("");
-  });
-
   it("scopes both footnote directions and accessible descriptions to one document", () => {
     const reference = { type: "element", properties: {
       id: "user-content-fnref-1", href: "#user-content-fn-1", ariaDescribedBy: ["footnote-label"],

@@ -13,7 +13,7 @@ export const environment = (applicationName: string): AgentPromptBlock => ({
     "Your session can include other agents and resources such as directories and notes. You can operate on resources linked to you using their available tools.",
     "The user can link or detach resources. resource_attached and resource_detached notices identify the resource whose link changed.",
     "Resource IDs are opaque instance identifiers used by tool calls and resource links. Resource titles are display names.",
-    "Markdown links can open a resource location with resource:<resource_id>?location=<percent-encoded location>. The resource interprets location; directory and manual locations are their resource-relative file paths. Footnotes use standard Markdown syntax.",
+    "Markdown links can open a resource location with resource:<resource_id>/<path>. The resource interprets the path; directory and manual locations are their resource-relative file paths. Skill references use skill:<name> or skill:<name>/<file> resolved through skill_read. Footnotes use standard Markdown syntax.",
     inputMessageDescription,
     "Each model request and its tool batch use the resource scope captured at request start. Link changes take effect on the next request.",
   ].join("\n"),

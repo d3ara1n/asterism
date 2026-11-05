@@ -5,4 +5,5 @@ export const skillsMessages = builtin.messages("en", defineMessages({
   refresh: { id: "skills.refresh", defaultMessage: "Refresh skills" },
   count: { id: "skills.count", defaultMessage: "{count, plural, one {# skill} other {# skills}}" },
   read: { id: "skills.read", defaultMessage: "Read skill" },
+  category: { id: "skills.category", defaultMessage: "Skills" },
 }));

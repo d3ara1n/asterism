@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { builtin, textReadSchema } from "@asterism-app/builtin-api/contracts";
+import { defineCall } from "@asterism-app/sdk/contracts";
 
 export const skillMetadataSchema = z.object({
   name: z.string().trim().min(1),
   description: z.string().trim().min(1),
 });
 export type SkillMetadata = z.infer<typeof skillMetadataSchema>;
+
 export const skillReadArgsSchema = z.strictObject({
   name: z.string().min(1).describe("Skill name from the system prompt's skill catalog."),
   path: z.string().min(1).default("SKILL.md").describe("UTF-8 file path relative to the selected skill's directory. Defaults to SKILL.md; references and scripts use paths within the same skill package."),
@@ -13,11 +15,17 @@ export const skillReadArgsSchema = z.strictObject({
   limit: z.number().int().positive().max(2000).default(1000).describe("Maximum lines to read. Defaults to 1000, maximum 2000; output also has a 64 KiB limit."),
 }).describe("Select a skill, a file within its package, and a line range.");
 export type SkillReadArgs = z.infer<typeof skillReadArgsSchema>;
+
 export const SkillRead = builtin.data("skill.read", textReadSchema.extend({
   name: z.string(),
   path: z.string(),
   directory: z.string(),
 }).describe("Selected skill file lines, absolute skill directory, total line count, and nextOffset for remaining text."));
+
+/** Effective skills after override resolution, sorted by name. Available to the renderer for skill pickers. */
+export const SkillList = defineCall(builtin.name("skill.list"), {
+  scope: "plugin", input: z.strictObject({}), output: z.array(skillMetadataSchema),
+});
 
 const skillIssueSchema = z.strictObject({ file: z.string(), message: z.string() });
 export type SkillIssue = z.infer<typeof skillIssueSchema>;

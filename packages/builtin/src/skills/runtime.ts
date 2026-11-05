@@ -1,13 +1,17 @@
-import { defineModule, defineTopLevelTool, PluginApiError } from "@asterism-app/sdk/runtime";
+import { defineModule, defineTopLevelTool, implementCall, PluginApiError } from "@asterism-app/sdk/runtime";
 import { z } from "zod";
 import { TextError, readToModel } from "../shared/text.ts";
 import { filesystemFailure } from "../filesystem/errors.ts";
 import type { SkillCatalog } from "./catalog.ts";
-import { SkillRead, SkillRefresh, skillReadArgsSchema } from "./contract.ts";
+import { SkillRead, SkillRefresh, SkillList, skillReadArgsSchema } from "./contract.ts";
 
 export function createSkillsModule(catalog: SkillCatalog) {
   return defineModule(() => {
     return {
+      calls: [implementCall(SkillList, async (_input, { signal }) => {
+        signal.throwIfAborted();
+        return catalog.skills().map(({ name, description }) => ({ name, description }));
+      })],
       topLevelTools: [defineTopLevelTool({
         id: SkillRead.id,
         name: "skill_read",

@@ -5,6 +5,7 @@ import { VirtualConversationTimeline } from "./ConversationTimeline";
 import { ConversationNavigation, type ConversationNavigationHandle } from "./ConversationNavigation";
 
 import { MessageComposer } from "./Composer";
+import type { ComposerEditorHandle } from "./composer-editor";
 import { conversationMessages } from "../../messages/conversation";
 import { useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk/renderer";
 
@@ -62,14 +63,14 @@ export function Conversation({ feedback, compressions, activity = null }: {
   const { scroll, list, awayFromBottom, latest, jumpTo, preserveItem, onProcessMount, onScroll, onResize, onScrollEnd } =
     useOutputFollow(timeline, processOwners, presence.skipEntrances);
   const navigation = useRef<ConversationNavigationHandle>(null);
-  const composer = useRef<HTMLTextAreaElement>(null);
+  const composer = useRef<ComposerEditorHandle>(null);
   const composerHidden = useComposerHidden();
 
   if (!snapshot) return null;
   const send = async () => {
     if (composerHidden) return;
     if (!await interaction.send()) return;
-    latest(); composer.current?.focus({ preventScroll: true });
+    latest(); composer.current?.focus();
   };
   const resume = async () => {
     if (composerHidden) return;
@@ -106,7 +107,7 @@ export function Conversation({ feedback, compressions, activity = null }: {
       </div>}
     </div>
     <AgentUIRegion position="bottom" />
-    {!composerHidden && <AgentDraftsPanel onTake={() => composer.current?.focus({ preventScroll: true })} />}
+    {!composerHidden && <AgentDraftsPanel onTake={() => composer.current?.focus()} />}
     {!composerHidden && <footer className="shrink-0 space-y-1 border-t px-3 pt-1 pb-2">
       <AgentToolbar />
       <MessageComposer draft={interaction.draft} inputRef={composer}

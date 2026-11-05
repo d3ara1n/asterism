@@ -1,7 +1,8 @@
 import { useState, type ComponentProps } from "react";
-import { parseResourceLink, type ResourceLink } from "@asterism-app/sdk/contracts";
+import { parseResourceLink, parseSkillLink, type ResourceLink } from "@asterism-app/sdk/contracts";
 import { useRendererObject, useRendererResourceNavigation } from "@asterism-app/sdk/renderer";
 import { externalWebUrl } from "@asterism-app/ui/links";
+import { ReferenceChipFace } from "./reference-chip";
 
 type AnchorProps = ComponentProps<"a">;
 
@@ -15,6 +16,8 @@ export function MarkdownLink({ href, children, ...props }: AnchorProps) {
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: "nearest" });
   }}>{children}</a>;
+  // Skills have no navigation target; the chip keeps the reference recognizable in rendered messages.
+  if (href && parseSkillLink(href)) return <ReferenceChipFace href={href}>{children}</ReferenceChipFace>;
   const resource = href ? parseResourceLink(href) : null;
   if (resource) return <ResourceLocationLink {...props} href={href} destination={resource}>{children}</ResourceLocationLink>;
   const url = href ? externalWebUrl(href) : null;
