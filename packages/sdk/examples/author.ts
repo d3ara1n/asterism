@@ -133,7 +133,7 @@ export async function modelWork(plugin: PluginContext, object: ObjectExecutor, s
     const result = await plugin.execution.run({
       access: object.ref, interactive: false, requestParentId: snapshot.position.nodeId, target: { provider: "configured-provider", model: "configured-model" },
       system: { blocks: [{ id: research.name("instruction"), text: "Inspect linked materials and report findings." }] },
-      messages: projectOwnContext(snapshot, object.ref), cache: { expectHit: request > 0 }, signal,
+      messages: projectOwnContext(snapshot, object.ref), signal,
       observer: { event(event) {
         if (event.type === "progress") return;
         object.commit(writer => {

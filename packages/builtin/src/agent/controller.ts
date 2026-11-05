@@ -128,9 +128,9 @@ export function createAgentController(deps: AgentControllerDependencies) {
               return true;
             },
             completed: async current => { await compress(current); },
-            async request(index, current) {
+            async request(_index, current) {
               // Preparation failures end execution before consuming another input.
-              const compressed = await compress(current);
+              await compress(current);
               const selection = selectionOf(object).selection, agent = deps.selection.agent(selection);
               const snapshot = object.session.snapshot();
               const toolRecords = new Map<string, string>();
@@ -158,7 +158,6 @@ export function createAgentController(deps: AgentControllerDependencies) {
                   agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },
                   userAgent: deps.userAgent, completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
                   target: deps.selection.target(selection), system: files => { prepared = prepare(files); return prepared.system; }, messages: projectForAgent(snapshot, object.ref.id), signal: current,
-                  cache: { expectHit: index > 0 && !compressed },
                   observer: { event(event) { progress.event(event); return observer.event(event); } },
                 }));
               } catch (error) {

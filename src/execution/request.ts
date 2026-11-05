@@ -26,7 +26,7 @@ const unavailableTools: ModelTools = {
   },
 };
 /** One completion and its entire tool batch. Buffers exist only for this call; outputs go to consumers without touching the timeline. */
-export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | "observer" | "requestParentId" | "cache" | "completionExtensions">,
+export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | "observer" | "requestParentId" | "completionExtensions">,
   environment: Promise<ModelExecutionEnvironment>): Promise<ModelRunResult> {
   const controller = new AbortController();
   const signal = AbortSignal.any([request.signal, controller.signal]);
@@ -44,7 +44,6 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
       controller.abort();
     }
   };
-  const diagnostic = (code: string, message: string, level: "error" | "warning" = "error") => emit({ type: "diagnostic", origin: "model", code, message, level });
   let source: ModelSource | null = null;
   let responseId: string | null = null;
   let completion: ModelCompletion | null = null;
@@ -127,8 +126,6 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
           started(call, info) { buffer.start(byCall.get(call.callId)!, info); progress(); },
           published(call, data) { buffer.publish(byCall.get(call.callId)!, data); progress(); },
         });
-      if (request.cache?.expectHit && finish.usage?.cacheRead === 0 && (finish.usage.input ?? 0) > 2048)
-        diagnostic("cache_miss", "The provider reported no cached input for this request.", "warning");
       // Deliver tool outcomes as feedback for the next request; the outer cancellation signal and controller manage the agent lifetime.
       signal.throwIfAborted();
     } finally {

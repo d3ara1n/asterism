@@ -117,7 +117,6 @@ export interface ModelRunRequest extends ModelRequestIdentity {
   system: SystemPrompt;
   messages: ModelItem[];
   tools?: ModelTools;
-  cache?: { expectHit: boolean };
   /** Synchronously package domain data after final request preparation; delivered with the actual response's completion. */
   completionExtensions?: (context: ModelRequestContext) => readonly Presentation[];
   signal: AbortSignal;

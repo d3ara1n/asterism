@@ -207,17 +207,6 @@ describe("Stateless single model execution", () => {
     expect(events.filter(event => event.type === "diagnostic")).toEqual([]);
   });
 
-  it("cache hits reflect each explicit input rather than inference from the previous call", async () => {
-    const finish = { type: "finish" as const, reason: "stop", usage: { input: 3000, output: 10, total: 3010, reasoning: null, cacheRead: 0, cacheWrite: null } };
-    const adapter = model([...text.slice(0, -1), finish]);
-    const first: ModelRunEvent[] = []; const second: ModelRunEvent[] = []; const third: ModelRunEvent[] = [];
-    await execute(input(first), adapter);
-    await execute(input(second, { cache: { expectHit: true } }), adapter);
-    await execute(input(third), adapter);
-    expect(first.filter(event => event.type === "diagnostic")).toEqual([]);
-    expect(second.filter(event => event.type === "diagnostic")).toMatchObject([{ code: "cache_miss", level: "warning" }]);
-    expect(third.filter(event => event.type === "diagnostic")).toEqual([]);
-  });
   // Domain extensions consume an independent copy of the final state and accompany usage on the highest-index block; the public layer retains only the envelope.
   it("generates domain extensions after preparation and delivers them once with the terminal block; unknown or incompatible extensions preserve public metering", async () => {
     const contract = defineData("example.agent/request", z.codec(z.array(z.string()), z.object({ tools: z.array(z.string()) }), {

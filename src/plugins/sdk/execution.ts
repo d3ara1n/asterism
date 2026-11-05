@@ -57,8 +57,8 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
       const resourcePolicy = (kind: string) => (allowedResources === null || allowedResources.has(kind)) && !excludedResources.has(kind);
       const caller: ToolCaller = Object.freeze({ ref, title: source.title, ...(request.agent === undefined ? {} : { agent: request.agent }) });
       const interactive = request.interactive;
-      const { target, messages, cache, userAgent, requestParentId } = structuredClone({
-        target: request.target, messages: request.messages, cache: request.cache, userAgent: request.userAgent, requestParentId: request.requestParentId,
+      const { target, messages, userAgent, requestParentId } = structuredClone({
+        target: request.target, messages: request.messages, userAgent: request.userAgent, requestParentId: request.requestParentId,
       });
       const system = typeof request.system === "function" ? request.system : structuredClone(request.system);
       const release = host.holds.acquire(ref, linkedRefs);
@@ -70,7 +70,7 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
           const boundTools = topLevelTools(caller, policy, linkedRefs, interactive);
           const preparedSystem = host.sessions.context(linked).then(files => typeof system === "function" ? system(files) : system);
           return await host.models.run({ target, system: preparedSystem,
-            messages, cache, userAgent, sessionId: ref.sessionId, requestParentId,
+            messages, userAgent, sessionId: ref.sessionId, requestParentId,
             signal, tools: bindModelTools(capabilities, boundTools, handover),
             completionExtensions: request.completionExtensions,
             content: values => options?.content
