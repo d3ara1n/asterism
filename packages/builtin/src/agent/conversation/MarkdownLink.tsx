@@ -1,5 +1,5 @@
 import { useState, type ComponentProps } from "react";
-import { parseResourceLink, parseSkillLink, type ResourceLink } from "@asterism-app/sdk/contracts";
+import { parseResourceUrl, parseSkillUrl, type ResourceUrl } from "@asterism-app/sdk/contracts";
 import { useRendererObject, useRendererResourceNavigation } from "@asterism-app/sdk/renderer";
 import { externalWebUrl } from "@asterism-app/ui/links";
 import { ReferenceChipFace } from "./reference-chip";
@@ -17,14 +17,14 @@ export function MarkdownLink({ href, children, ...props }: AnchorProps) {
     target.scrollIntoView({ block: "nearest" });
   }}>{children}</a>;
   // Skills have no navigation target; the chip keeps the reference recognizable in rendered messages.
-  if (href && parseSkillLink(href)) return <ReferenceChipFace href={href}>{children}</ReferenceChipFace>;
-  const resource = href ? parseResourceLink(href) : null;
+  if (href && parseSkillUrl(href)) return <ReferenceChipFace href={href}>{children}</ReferenceChipFace>;
+  const resource = href ? parseResourceUrl(href) : null;
   if (resource) return <ResourceLocationLink {...props} href={href} destination={resource}>{children}</ResourceLocationLink>;
   const url = href ? externalWebUrl(href) : null;
   return url ? <a {...props} href={url} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>;
 }
 
-function ResourceLocationLink({ destination, children, ...props }: AnchorProps & { destination: ResourceLink }) {
+function ResourceLocationLink({ destination, children, ...props }: AnchorProps & { destination: ResourceUrl }) {
   const object = useRendererObject();
   const navigation = useRendererResourceNavigation();
   const [pending, setPending] = useState(false);

@@ -38,7 +38,7 @@ Chips show the reference kind by icon and tone: skills use a violet book icon; r
 
 `+` button: currently opens the file attachment picker. Future: add a reference option.
 
-Drag-and-drop: deferred. Requires a broader unified-reference infrastructure where any plugin UI element can be marked as draggable, carrying a structured reference. The composer would receive the drop and insert a chip at the drop position. Native HTML5 drag-and-drop with a custom MIME type (`application/vnd.asterism.reference`) is the planned approach.
+Drag-and-drop: a generic SDK contract. A reference drag carries reference text (Markdown links with reference URLs) under the single type `application/vnd.asterism.reference`; no `text/plain` copy, so the canvas and other targets ignore it without special-casing. A reference is only a string: no session check, no authorization, and it may name nothing present. The composer inserts dropped text at the drop point and parses it like typed text. Sources (file trees, cards) adopt the contract later.
 
 ### User-typed references need no detection
 
@@ -50,8 +50,8 @@ Unsent drafts currently store text and re-parse reference links into chips; stor
 
 ### SDK (`packages/sdk`)
 
-- `resource-links.ts`: `resource:<id>/<path>`, each path segment percent-encoded.
-- `skill-links.ts`: `skill:<name>` and `skill:<name>/<path>`, encoded per segment.
+- `reference-urls.ts`: `resourceUrl`/`skillUrl` and parsers for `resource:<id>/<path>` and `skill:<name>[/<path>]`, encoded per segment; `referenceMarkdown` writes the link form. Named reference URLs so "resource link" keeps its meaning as the link relation.
+- `renderer-references.ts`: `setReferenceDrag`, `hasReferenceDrag`, `readReferenceDrag`.
 
 ### Builtin (`packages/builtin`)
 
@@ -62,6 +62,7 @@ Unsent drafts currently store text and re-parse reference links into chips; stor
 - `reference-menu-model.ts`: pure category/view navigation and skill ranking.
 - `reference-menu.tsx`: category drill-down menu above the composer with a virtualized list; reads the catalog on each opening; keyboard input is forwarded from the editor.
 - `composer-editor.tsx`: Tiptap editor. `@tiptap/suggestion` owns the trigger range, dismissal and IME state; a lower-priority keymap submits on Enter through the form; Shift/Mod+Enter insert hard breaks. The draft text is the source of truth and external changes replace the document outside undo history. Dynamic placeholder, 100 000-character limit and `input-group-control` slot match the former textarea.
+- `composer-editor.tsx` also accepts reference drops at the drop point.
 - `Composer.tsx` / `Conversation.tsx`: the composer ref is the editor handle.
 - Tiptap dependencies are declared in `packages/builtin/package.json` at 3.32.2.
 
@@ -69,6 +70,6 @@ Unsent drafts currently store text and re-parse reference links into chips; stor
 
 - [ ] IME validation: Chinese input (candidate selection, Enter/Space/Backspace, typing beside chips, `@` during composition, undo, paste) on the target Electron/Chromium version.
 - [ ] `+` button reference menu: a reference option beside the file attachment picker.
-- [ ] Drag-and-drop insertion: a shared drag-source contract carrying a structured reference, and `handleDrop` in the editor.
+- [ ] Drag sources: directory file tree rows and resource cards call `setReferenceDrag`.
 - [ ] Draft JSON storage for exact chip round-trip in unsent drafts. Sent messages store text only.
 - [ ] Resource reference browsing: directory resources are hierarchical; drag-and-drop from directory cards is the intended path.

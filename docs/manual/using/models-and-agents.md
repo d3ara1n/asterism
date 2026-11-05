@@ -72,7 +72,18 @@ Accepted input starts an idle Agent. While it is running, inputs can join the ne
 
 A resource integration must implement notification delivery to send event messages. Linking a resource alone does not create that integration. The Agent's instructions define how it handles received facts, and its available resources supply the operations it can perform. Application startup restores saved drafts without sending them automatically.
 
-Agent Markdown supports standard footnotes with return links, external web links, and resource locations. Footnotes spanning separate paragraphs become available after the response finishes rendering. Write a resource link as `[label](resource:<resource ID>?location=<percent-encoded location>)`; for example, `[guide](resource:manual-id?location=sdk%2Fdocs%2Fgetting-started.md)`. The resource ID comes from the session's resource listing, and the target resource interprets the location. Directory and manual locations are their relative file paths. Clicking opens the resource using its own interface, independently of the Agent's tool access. Removed resources show a missing-resource notice.
+Agent Markdown supports standard footnotes with return links and external web links. Footnotes spanning separate paragraphs become available after the response finishes rendering.
+
+## Reference resources and skills
+
+A reference is a Markdown link whose destination is a reference URL. Two schemes exist:
+
+- `[label](resource:<resource ID>/<location>)` names a location inside a resource, for example `[guide](resource:manual-id/sdk/docs/getting-started.md)`. The resource ID comes from the session's resource listing. The resource interprets the location; directory and manual locations are relative file paths. Each location segment is percent-encoded, with `/` separating segments.
+- `[label](skill:<name>)` or `[label](skill:<name>/<package path>)` names a skill or a file inside its package. `skill_read` reads it by name and path.
+
+References are ordinary text in both user and Agent messages. A reference URL grants no access and may name something absent: a resource that was removed or is not linked to the Agent remains a valid string. In rendered messages, a resource reference opens the resource through its own interface, independently of the Agent's tool access, and a removed resource shows a missing-resource notice. A skill reference appears as a violet chip and opens nothing.
+
+In the composer, references appear as chips: violet for skills, blue for resource locations. Typing `@` opens a reference menu. Its first level lists categories; typing searches all categories, and name matches rank before description matches. Arrow keys move the selection, Enter or Tab chooses, and ArrowLeft or Backspace on an empty query returns from a category. Plugin views can also offer references by dragging; dropping them in the composer inserts the chips at the drop point. A sent message contains the same Markdown links, and typing a link by hand has the same effect.
 
 ## Interpret usage
 

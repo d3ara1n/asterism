@@ -84,6 +84,7 @@ These terms distinguish the concepts used when developing Asterism. Each definit
 | Presentation | Typed data interpreted by a compatible display consumer |
 | UiText | A literal string or owned message descriptor |
 | Skill | An instruction package read selectively by name |
+| Reference URL | A `resource:` or `skill:` string naming something to act on; it grants nothing and may name nothing present |
 
 ## Providers and measurement
 

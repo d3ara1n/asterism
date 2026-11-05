@@ -7,10 +7,11 @@ import Text from "@tiptap/extension-text";
 import HardBreak from "@tiptap/extension-hard-break";
 import { CharacterCount, Placeholder, UndoRedo } from "@tiptap/extensions";
 import { Suggestion, exitSuggestion, findSuggestionMatch } from "@tiptap/suggestion";
-import { PluginKey } from "@tiptap/pm/state";
-import { skillLink } from "@asterism-app/sdk/contracts";
+import { Plugin, PluginKey } from "@tiptap/pm/state";
+import { skillUrl } from "@asterism-app/sdk/contracts";
+import { hasReferenceDrag, readReferenceDrag } from "@asterism-app/sdk/renderer";
 import { ReferenceChip } from "./reference-node";
-import { parseComposerText, referenceNodeName, referenceTriggerAllowedAfter, serializeDoc } from "./reference-serialization";
+import { parseComposerInline, parseComposerText, referenceNodeName, referenceTriggerAllowedAfter, serializeDoc } from "./reference-serialization";
 import { ReferenceMenu, type ReferenceMenuHandle } from "./reference-menu";
 
 export interface ComposerEditorHandle {
@@ -76,13 +77,42 @@ function submitOnEnter(bridge: { current: EditorBridge }) {
   });
 }
 
+/** Dropped reference text is inserted at the drop point and parsed like typed text; file drops keep the attachment path. */
+const referenceDrop = Extension.create({
+  name: "referenceDrop",
+  addProseMirrorPlugins() {
+    const editor = this.editor;
+    return [new Plugin({
+      props: {
+        handleDOMEvents: {
+          dragover: (_view, event) => {
+            if (!event.dataTransfer || !hasReferenceDrag(event.dataTransfer)) return false;
+            event.preventDefault();
+            event.dataTransfer.dropEffect = editor.isEditable ? "copy" : "none";
+            return true;
+          },
+        },
+        handleDrop: (view, event) => {
+          const text = event.dataTransfer && readReferenceDrag(event.dataTransfer);
+          if (text == null) return false;
+          event.preventDefault();
+          if (!editor.isEditable || !text) return true;
+          const position = view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ?? view.state.selection.to;
+          editor.chain().focus().insertContentAt(position, [...parseComposerInline(text), { type: "text", text: " " }]).run();
+          return true;
+        },
+      },
+    })];
+  },
+});
+
 function createOptions(bridge: { current: EditorBridge }) {
   return {
     extensions: [
       Document, Paragraph, Text, HardBreak, UndoRedo, ReferenceChip,
       CharacterCount.configure({ limit: maxLength }),
       Placeholder.configure({ placeholder: () => bridge.current.placeholder }),
-      referenceSuggestion(bridge), submitOnEnter(bridge),
+      referenceSuggestion(bridge), submitOnEnter(bridge), referenceDrop,
     ],
     editorProps: {
       attributes: () => {
@@ -151,7 +181,7 @@ export function ComposerEditor({ ref, value, placeholder, label, disabled, onCha
       onSelect={skill => {
         editor.chain().focus()
           .insertContentAt(suggestion.range, [
-            { type: referenceNodeName, attrs: { label: skill.name, href: skillLink(skill.name) } }, { type: "text", text: " " }])
+            { type: referenceNodeName, attrs: { label: skill.name, href: skillUrl(skill.name) } }, { type: "text", text: " " }])
           .run();
       }} />}
   </div>;

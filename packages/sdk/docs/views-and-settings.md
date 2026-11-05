@@ -28,7 +28,9 @@ Use `useRendererResourceNavigation().open(resource, location, { origin })` from 
 
 Resources own the meaning of their locations and their content surfaces. A filename remains a file location; opening it does not turn its contents into application navigation or grant embedded text another interaction contract. Directory files use editable text and image surfaces, while manual files use read-only text and image surfaces.
 
-The SDK's `resourceLink(resourceId, location)` creates a Markdown address of the form `resource:<encoded resource ID>?location=<encoded location>`. Encode the resource ID and location independently with percent encoding. A displaying interface supplies the session identity when following the link. The Agent Markdown interface recognizes these addresses; plugins can use `parseResourceLink` when providing their own link interface.
+A reference URL is a string that names something to act on: `resource:<encoded resource ID>/<location>` addresses a resource location, and `skill:<encoded name>[/<package path>]` addresses a skill in the Agent skill catalog. Location segments are percent-encoded individually and keep `/` as a separator. `resourceUrl`, `skillUrl`, and their `parse*` counterparts build and read them; `referenceMarkdown(label, url)` writes the Markdown link form. A reference URL is only text: it can name a resource that is absent, removed, or not linked to anyone, and following it reports what it finds at that time. A displaying interface supplies the session identity when following a resource URL. The Agent Markdown interface recognizes both schemes.
+
+Any view can start a reference drag. In `dragstart`, call `setReferenceDrag(event.dataTransfer, text)` with reference text, usually one or more `referenceMarkdown` links. The drag carries only the `application/vnd.asterism.reference` type, so surfaces that do not read references, including the canvas, ignore it. Targets check `hasReferenceDrag` during `dragover` and read the text with `readReferenceDrag` on `drop`. The Agent composer inserts dropped reference text at the drop point, where resource and skill links become chips.
 
 ## Style plugin views
 

@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/core";
-import { parseResourceLink, parseSkillLink } from "@asterism-app/sdk/contracts";
+import { parseResourceUrl, parseSkillUrl } from "@asterism-app/sdk/contracts";
 
 /** Tiptap node type of a composer reference chip. */
 export const referenceNodeName = "referenceChip";
@@ -11,8 +11,8 @@ const referencePattern = /\[([^\]\r\n]*)\]\(((?:resource|skill):[^()\s]+)\)/gu;
 export type ReferenceKind = "skill" | "directory" | "file";
 
 export function referenceKind(href: string): ReferenceKind | null {
-  if (parseSkillLink(href)) return "skill";
-  const resource = parseResourceLink(href);
+  if (parseSkillUrl(href)) return "skill";
+  const resource = parseResourceUrl(href);
   if (!resource) return null;
   // A resource root or a trailing slash addresses a container; other locations address an item.
   return !resource.location || resource.location.endsWith("/") ? "directory" : "file";
@@ -48,10 +48,18 @@ function serializeInline(node: JSONContent): string {
 
 /** Submitted text → composer document: each line is a paragraph, reference links become chips. */
 export function parseComposerText(input: string): JSONContent {
-  return { type: "doc", content: input.split("\n").map(parseLine) };
+  return { type: "doc", content: input.split("\n").map(line => {
+    const content = parseLine(line);
+    return content.length ? { type: "paragraph", content } : { type: "paragraph" };
+  }) };
 }
 
-function parseLine(line: string): JSONContent {
+/** Text inserted at a position inside a paragraph, such as dropped references: lines become hard breaks. */
+export function parseComposerInline(input: string): JSONContent[] {
+  return input.split("\n").flatMap((line, index) => [...index ? [{ type: "hardBreak" }] : [], ...parseLine(line)]);
+}
+
+function parseLine(line: string): JSONContent[] {
   const content: JSONContent[] = [];
   let last = 0;
   const text = (value: string) => { if (value) content.push({ type: "text", text: value }); };
@@ -63,5 +71,5 @@ function parseLine(line: string): JSONContent {
     last = match.index + source.length;
   }
   text(line.slice(last));
-  return content.length ? { type: "paragraph", content } : { type: "paragraph" };
+  return content;
 }
