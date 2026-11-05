@@ -23,8 +23,8 @@ describe("Telegram message normalization", () => {
     expect(joined.sender.role).toBe("system");
     expect(joined.parts).toEqual([{ kind: "text", text: "[Service message]" }]);
   });
-  // Captioned media and topics must stay addressable and readable.
-  it("selects the largest photo variant and preserves its caption, topic and reply addresses", () => {
+  // Captioned media and threads must stay addressable and readable.
+  it("selects the largest photo variant and preserves its caption, thread and reply addresses", () => {
     const normalized = telegramMessage(base({ from: { id: 7, is_bot: false, first_name: "Ada" }, photo: [
       { file_id: "large", file_unique_id: "u1", width: 800, height: 600 },
       { file_id: "small", file_unique_id: "u2", width: 80, height: 60 },
@@ -67,7 +67,7 @@ describe("Telegram quoted content", () => {
   it.each([
     { id: -10, type: "supergroup" as const, title: "Other chat" },
     { ...chat, type: "supergroup" as const },
-  ])("retains an external image under the reply without interpreting source chat $id as the current topic", externalChat => {
+  ])("retains an external image under the reply without interpreting source chat $id as the current thread", externalChat => {
     const db = new DatabaseSync(":memory:");
     try {
       const store = new ObservedMessages(db, "telegram-quotes");

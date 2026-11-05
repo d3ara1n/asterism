@@ -36,7 +36,7 @@ export const chatCreateSchema = chatBindingSchema.extend({ title: z.string().tri
 export const CreateChat = defineCreation(Chat, { id: builtin.name("chat.create"), schema: chatCreateSchema });
 export const subscriptionTargetSchema = z.strictObject({
   connectionId: z.string().min(1), conversationId: z.string().min(1).optional(), threadId: z.string().min(1).optional(),
-}).refine(value => !value.threadId || !!value.conversationId, "A topic belongs to a conversation.");
+}).refine(value => !value.threadId || !!value.conversationId, "A thread belongs to a conversation.");
 /** title is the display name of the target when the change was made; matching uses only the target. */
 export const subscriptionSchema = z.strictObject({ target: subscriptionTargetSchema, enabled: z.boolean(), title: z.string().optional() });
 export const SubscriptionChanged = defineRecord(builtin.name("messaging.subscription-changed"), { schema: subscriptionSchema });
@@ -52,7 +52,7 @@ export const Subscribe = defineTool({
 export const ConversationsSubscribe = defineImplementation({
   ...builtin.data("conversations.subscribe-result", subscriptionSchema.describe("The updated notification subscription.")),
   resource: Conversations, tool: Subscribe, targetSchema: subscriptionTargetSchema.describe(
-    "A connection subscribes to newly discovered conversations. A conversation, optionally narrowed to a topic, subscribes to incoming messages."),
+    "A connection subscribes to newly discovered conversations. A conversation, optionally narrowed to a thread, subscribes to incoming messages."),
   effect: "write", execution: "sequential",
 });
 export const listTargetSchema = z.strictObject({ connectionId: z.string().min(1), since: z.string().min(1).optional() }).nullable();
@@ -69,7 +69,7 @@ export const ConversationsList = defineImplementation({
 export const chatReadTargetSchema = messageReadTargetSchema.nullable();
 export const ChatRead = defineImplementation({
   ...builtin.data("chat.read", chatMessageListSchema.describe("Messages with attachment file references and any quoted content supplied with a reply. Quoted files belong to the enclosing reply's messageId. ID queries return found messages in requested order, once per resolved message, and missingIds. Page queries return a reusable cursor.")),
-  resource: Chat, tool: Read, targetSchema: chatReadTargetSchema.describe("Null reads recent messages; since continues from a returned cursor. messageIds reads specific retained messages within this Chat's conversation and topic."),
+  resource: Chat, tool: Read, targetSchema: chatReadTargetSchema.describe("Null reads recent messages; since continues from a returned cursor. messageIds reads specific retained messages within this Chat's conversation and thread."),
   effect: "read", execution: "parallel",
 });
 export const ChatSend = defineImplementation({

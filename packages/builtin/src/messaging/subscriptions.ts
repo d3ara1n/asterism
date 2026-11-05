@@ -13,7 +13,7 @@ export function foldSubscriptions(records: readonly SessionRecord[]): Subscripti
   }
   return [...selected.values()];
 }
-/** A conversation target covers all of its topics unless it names one. */
+/** A conversation target covers all of its threads unless it names one. */
 export function coversAddress(target: SubscriptionTarget, connectionId: string, address: ConversationAddress): boolean {
   return target.connectionId === connectionId && target.conversationId === address.conversationId &&
     (!target.threadId || target.threadId === address.threadId);

@@ -17,7 +17,7 @@ const message = (id: string, text = id, threadId?: string): MessagingMessage => 
 });
 
 describe("Observed messaging events", () => {
-  it("reads conversation changes independently and pages topic messages without skipping a page", () => {
+  it("reads conversation changes independently and pages thread messages without skipping a page", () => {
     const { store } = setup(), conversation = { conversationId: "chat", title: "Chat", kind: "group" };
     const before = store.read({ conversationId: "chat", threadId: "root" }).cursor;
     store.observe({ ...conversation, threadId: "root" }, message("1", "one", "root"));
@@ -89,7 +89,7 @@ describe("Observed messaging events", () => {
     });
     expect(store.read({ conversationId: "chat", since: cursor }).messages).toEqual([]);
   });
-  it("scopes ID lookups to the account, conversation and topic, including the topic root", () => {
+  it("scopes ID lookups to the account, conversation and thread, including the thread root", () => {
     const { db, store } = setup(), conversation = { conversationId: "chat", title: "Chat", kind: "channel" };
     store.observe(conversation, message("root"));
     store.observe({ ...conversation, threadId: "root" }, message("reply", "reply", "root"));

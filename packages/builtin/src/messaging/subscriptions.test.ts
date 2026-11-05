@@ -18,7 +18,7 @@ describe("Messaging subscription projection", () => {
     expect(foldSubscriptions([prefix[0]!, record(4, chat, false)])).toEqual([connection]);
     expect(foldSubscriptions([])).toEqual([]);
   });
-  it("connection discovery does not subscribe to every message; a topic subscription only matches that topic", () => {
+  it("connection discovery does not subscribe to every message; a thread subscription only matches that thread", () => {
     const conversation = { conversationId: "group", threadId: "topic", title: "Group", kind: "supergroup" };
     const discovered: ConnectionEvent = { connectionId: "bot", event: { kind: "conversation.discovered", conversation } };
     const incoming: ConnectionEvent = { connectionId: "bot", event: { kind: "messages.received", conversation,

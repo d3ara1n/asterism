@@ -30,7 +30,7 @@ describe("Telegram album delivery", () => {
     expect(batches.flush(new Set())).toEqual([]);
     expect(store.read({ conversationId: "chat", messageIds: ["11", "10"] }).messages).toEqual([item("11", "album"), item("10", "album")]);
   });
-  it("closes inactive groups independently and reads current members without crossing chats or topics", () => {
+  it("closes inactive groups independently and reads current members without crossing chats or threads", () => {
     const { store, batches } = setup(), topic = { ...chat, threadId: "topic" };
     store.observe(topic, { ...item("1", "same-group"), threadId: "topic" });
     const active = batches.touch(topic, "same-group");

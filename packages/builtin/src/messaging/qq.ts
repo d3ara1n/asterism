@@ -9,7 +9,7 @@ import { QQApi } from "./qq-api.ts";
 
 /** Scope is part of the address: a user openid and a group openid are separate identities. */
 export function qqTarget(input: Pick<SendMessage, "conversationId" | "threadId" | "replyTo">) {
-  if (input.threadId) throw new MessagingError("unsupported", "QQ private and group chats do not have topics.");
+  if (input.threadId) throw new MessagingError("unsupported", "QQ private and group chats do not have threads.");
   const match = /^(c2c|group):(.+)$/.exec(input.conversationId);
   if (!match) throw new MessagingError("invalid_input", "A QQ conversation ID must be c2c:<user_openid> or group:<group_openid>.");
   return { scope: match[1] as ChatScope, targetId: match[2]!, msgId: input.replyTo };

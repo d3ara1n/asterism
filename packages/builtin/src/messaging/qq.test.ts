@@ -42,10 +42,10 @@ describe("QQ conversation addressing", () => {
     ]);
   });
 
-  it("rejects ambiguous addresses and topics instead of sending to a different target", () => {
+  it("rejects ambiguous addresses and threads instead of sending to a different target", () => {
     expect(() => qqTarget({ conversationId: "123456" })).toThrow("c2c:<user_openid>");
     expect(() => qqTarget({ conversationId: "group:" })).toThrow("c2c:<user_openid>");
-    expect(() => qqTarget({ conversationId: "c2c:user", threadId: "topic" })).toThrow("do not have topics");
+    expect(() => qqTarget({ conversationId: "c2c:user", threadId: "topic" })).toThrow("do not have threads");
   });
   it("resolves a group quote index to the observed platform message and keeps unknown references readable as missing", () => {
     const db = new DatabaseSync(":memory:");

@@ -20,7 +20,7 @@ export const messagingMessages = builtin.messages("en", defineMessages({
   tokenHint: { id: "messaging.tokenHint", defaultMessage: "Create a bot with BotFather and paste the token it returns." },
   connection: { id: "messaging.connection", defaultMessage: "Connection" },
   conversation: { id: "messaging.conversation", defaultMessage: "Conversation ID" },
-  thread: { id: "messaging.thread", defaultMessage: "Topic ID (optional)" },
+  thread: { id: "messaging.thread", defaultMessage: "Thread ID (optional)" },
   title: { id: "messaging.title", defaultMessage: "Title" },
   observed: { id: "messaging.observed", defaultMessage: "Conversation" },
   manual: { id: "messaging.manual", defaultMessage: "Enter an ID" },
