@@ -37,7 +37,7 @@ Reuse maintained libraries for general controls, animation, layout, drag, and vi
 - `empty`, `field`, `item`: link hover uses `text-primary-text`.
 - `dialog`, `command`, `spinner`: built-in labels come from `useI18n()` and `commonMessages`; `DialogContent` accepts `closeLabel`, and `CommandDialog` title and description default to localized messages.
 - `progress`: forwards `value` to the Radix root so the value attributes are exposed.
-- `message-scroller`: the jump button's screen-reader label comes from `commonMessages`; the viewport drops the undefined `scroll-fade-b` utility.
+- `message-scroller`: the jump button's screen-reader label comes from `commonMessages`; the viewport drops the undefined `scroll-fade-b` utility and keeps scrollbar visibility independent of autoscrolling.
 
 ## Language
 
