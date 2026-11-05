@@ -29,7 +29,7 @@ export function MessagingSettings() {
   const types = snapshot?.messagingProviderTypes ?? [];
   const open = (id: string | null, origin: HTMLElement) => island.open({
     id: `messaging-${id ?? "new"}`, label: messages.edit, width: panelIslandWidth, origin,
-    render: () => <MessagingEditor key={id ?? "new"} id={id} />,
+    render: () => <MessagingEditor key={id ?? "new"} initialId={id} />,
   });
   const connections = snapshot?.messagingConnections ?? [];
   return <Section title={i18n.text(messages.title)} hint={i18n.text(messages.hint)}
@@ -64,9 +64,10 @@ export function MessagingSettings() {
   </Section>;
 }
 
-function MessagingEditor({ id }: { id: string | null }) {
+function MessagingEditor({ initialId }: { initialId: string | null }) {
   const i18n = useI18n(), island = useIsland(), form = useId();
   const { snapshot } = useSettingsConfiguration(), action = useConfigurationAction("inline");
+  const [id, setId] = useState(initialId);
   const saved = snapshot?.messagingConnections.find(connection => connection.id === id);
   const [providerId, setProviderId] = useState(saved?.providerId ?? snapshot?.messagingProviderTypes[0]?.id ?? "");
   const type = snapshot?.messagingProviderTypes.find(type => type.id === providerId);
@@ -85,8 +86,16 @@ function MessagingEditor({ id }: { id: string | null }) {
     <form id={form} onSubmit={async event => {
       event.preventDefault();
       if (!complete) return;
-      if (await action.run({ type: "messaging.save", id, value: { providerId, name, enabled, settings: values } }))
-        void island.close({ force: true });
+      const result = await action.run({ type: "messaging.save", id, value: { providerId, name, enabled, settings: values } });
+      if (result?.ok) {
+        const persisted = result.snapshot.messagingConnections.find(connection => connection.id === result.savedId);
+        if (persisted) {
+          setName(persisted.name);
+          setEnabled(persisted.enabled);
+          setValues(settingValues(type.settings, persisted.settings));
+        }
+        setId(result.savedId);
+      }
     }}>
       <fieldset disabled={action.busy}><FieldGroup>
         {!saved && <ChoiceField label={i18n.text(messages.provider)} value={providerId}

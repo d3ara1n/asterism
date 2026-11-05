@@ -195,8 +195,10 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
       event.preventDefault();
       if (!type || !complete) return;
       // Enablement is an immediate list action; saving keeps the current value and new services start enabled.
-      if (await action.run({ type: "webProvider.save", id: typeId, enabled: saved?.enabled ?? true, settings: values })) {
-        void island.close({ force: true });
+      const result = await action.run({ type: "webProvider.save", id: typeId, enabled: saved?.enabled ?? true, settings: values });
+      if (result?.ok) {
+        const persisted = result.snapshot.webProviders.find(state => state.id === result.savedId);
+        if (persisted) setValues(settingValues(type.settings, persisted.settings));
       }
     }}><fieldset disabled={action.busy} className="flex flex-col gap-6">
       {!type && <p className="type-body text-muted-foreground">{i18n.text(messages.unavailableHint)}</p>}
