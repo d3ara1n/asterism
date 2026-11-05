@@ -56,7 +56,7 @@ const configurationPages = new Set<string>(["providers", "shell", "mcp"]);
 
 /**
  * Settings screen: the root island initially shows category cards tiled over the material; opening a category fades out the overview and scales and fades in category content from the clicked card's transform origin,
- * reversing toward the same origin when closing. Animate only opacity/transform, without layout interpolation. Category content can open deeper islands on the right (such as provider details).
+ * reversing toward the same origin when closing. Animate only opacity/transform, without layout interpolation. Category content can open islands at the right end (such as provider details).
  */
 export type SettingsTarget = ({ category: SettingsCategoryId } | { pluginId: string; pageId: string; location?: string }) & { sequence: number };
 function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId: string | null; onOpen: (id: string) => void; onClosed: () => void; manager: PluginManager; location?: string }) {
@@ -85,7 +85,7 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
     onOpen(id);
   };
   const close = async () => {
-    if (!openId || !(await island.closeChild())) return;
+    if (!openId || !(await island.closeOwned())) return;
     lastCard.current = openId;
     onClosed();
   };
@@ -159,7 +159,7 @@ export function SettingsPage({ active, target }: { active: boolean; target: Sett
   useEffect(() => {
     if (openId?.startsWith("plugin:") && !registry.pages.has(openId)) setOpenId(null);
   }, [openId, registry.pages]);
-  // Return to the category overview when leaving settings (recreate the screen and clear deeper islands).
+  // Return to the category overview when leaving settings (recreate the screen and clear its islands).
   // Reset after the page strip finishes sliding and settings leave the viewport, avoiding visible reconstruction during exit.
   useEffect(() => {
     if (active) return;

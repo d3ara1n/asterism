@@ -23,7 +23,7 @@ function useSessionArchive(): SessionArchive {
   return value;
 }
 
-/** Session management layout within general settings: shows only counts; the recycle bin opens as a deeper island rather than a separate settings category. */
+/** Session management layout within general settings: shows only counts; the recycle bin opens as its own island rather than a separate settings category. */
 export function SessionsSettings() {
   const i18n = useI18n();
   const island = useIsland();
@@ -33,7 +33,7 @@ export function SessionsSettings() {
     <ItemGroup className="surface">
       <Row label={i18n.formatMessage(settingsMessages.conversationCount, { count: snapshot?.sessions.length ?? 0 })}
         hint={i18n.formatMessage(settingsMessages.archivedCount, { count: archived })}>
-        <Button size="sm" variant="outline" disabled={!snapshot} aria-pressed={island.child === "recycle-bin"}
+        <Button size="sm" variant="outline" disabled={!snapshot} aria-pressed={island.has("recycle-bin")}
           onClick={event => void island.open({ id: "recycle-bin", label: settingsMessages.recycleBin, width: panelIslandWidth,
             origin: event.currentTarget, render: () => <RecycleBin /> })}>
           <Trash2 />{i18n.text(settingsMessages.recycleBin)}

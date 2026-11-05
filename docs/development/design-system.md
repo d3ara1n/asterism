@@ -43,11 +43,11 @@ The Linux native-titlebar switch is resolved when creating the window and requir
 
 Window owns titlebar and managed space. Screens move within that space; islands are columns within a screen. Descendants do not independently compensate for the titlebar.
 
-Settings sits to the left of the main screen. The sidebar and focused object are controlled leading islands; Home or the workbench is the main root island. Navigation moves screens explicitly rather than intercepting system gestures.
+Settings sits to the left of the main screen. Home or the workbench is the main root island; the navigation sidebar leads it and the titlebar panel trails the ordinary islands as fixed islands. Navigation moves screens explicitly rather than intercepting system gestures.
 
 Islands declare minimum width, growth weight, and optional maximum. When they fit, distribute space and center them. When they overflow, use minimum widths and reveal the focused island. Segment navigation makes completely displaced islands reachable.
 
-A child opens to its parent’s right and replaces deeper children. Escape closes the focused eligible child and restores its opener. Host-owned borders and focus highlights remain outside clipped content.
+An ordinary island opens at the right end of the screen and belongs to the island that opened it; closing an island also closes the islands it opened. Escape closes the focused closable island and restores its opener. Host-owned borders and focus highlights remain outside clipped content.
 
 Feature code requests island operations through the shared interface. Layout calculations remain independent of business components.
 

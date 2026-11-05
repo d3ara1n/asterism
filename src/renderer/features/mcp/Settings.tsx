@@ -112,7 +112,7 @@ function McpSettingsBody() {
     const phase = state?.connection ?? "disconnected";
     const oauth = server.transport === "http" && server.auth === "oauth";
     return <div key={server.id} role="listitem">
-      <ListRow selected={island.child === islandKey(server.id)} onOpen={origin => { void open(server.id, origin); }}
+      <ListRow selected={island.has(islandKey(server.id))} onOpen={origin => { void open(server.id, origin); }}
         media={<StatusIcon tone={server.enabled ? phaseTone[phase] : "neutral"} className="size-4 shrink-0" />}
         title={<span className="flex min-w-0 items-center gap-2"><span className="truncate">{server.name}</span>
           {!server.enabled && <Badge variant="secondary">{i18n.text(messages.disabled)}</Badge>}</span>}

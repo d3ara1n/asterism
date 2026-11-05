@@ -15,7 +15,7 @@ import { useObjectCollapse } from "./object-collapse";
 const noPanels: readonly CardPanelView[] = [];
 
 /**
- * Shared shell for object content: titlebar, auxiliary panel container, and focus management. Cards and focus islands are its two container types,
+ * Shared shell for object content: titlebar, auxiliary panel container, and focus management. Cards and object islands are its two container types,
  * sharing the same content; the shell provides `@container/card`, and content adapts to its container width without knowing the container type.
  */
 export function ObjectSurface({ icon, kind, title, actions, controls, panels = noPanels, collapsed = false, expandedHeight, resizing = false, onExpand, headerClassName, children }: {

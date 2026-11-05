@@ -58,27 +58,31 @@ Locate reveals hidden cards when needed, waits for measurement, and frames their
 
 Hiding is available through the object panel. Removing is a distinct confirmed object operation governed by busy state.
 
-## Auxiliary panels and focus
+## Auxiliary panels and object islands
 
 Card panels show supplemental object information within the same card width. Wide cards split body and panel; narrow cards overlay the body. Opening a panel preserves the body mount, and only the selected panel is mounted.
 
 The card shell owns panel focus, switching, closing, and Escape handling. Independent popovers handle Escape first. Closing restores the opening control when available.
 
-Object focus moves content into a leading island beside the workbench. The canvas retains a placeholder card and its links. Only one object is focused per session. Focus changes presentation and may remount content, but preserves object-retained state and backend work.
+Opening an object in an island moves its content out of the canvas card into an ordinary island. Each object has at most one island: while it is open, the card shows a placeholder with a return control and no open control, so the content mounts once. Several objects can be open side by side. Moving content between card and island may remount it but preserves object-retained state and backend work.
 
-The focused object and the island width are session layout state, saved beside card views and the canvas viewport and outside history. Reopening a session or restarting restores both. The projection shows no focus once the focused object leaves the current projection, so branch selection or removal ends focus without a separate release step. Ending focus keeps the width for the next entry.
+## Islands
 
-Without a chosen width, the focus island shares the screen with the main view and the pair fills the window. Size presets set a fixed width that holds regardless of the window. A fixed width can exceed the window; the screen strip then scrolls horizontally and follows the focused island. Restoring the default size returns to the shared layout.
+The main screen runs, left to right: the navigation sidebar, the canvas, ordinary islands, and the panel opened from the titlebar. The sidebar, canvas, and panel are fixed: they take part in layout but keep their own visibility and are never reordered. The canvas is always first among working surfaces and cannot close.
+
+Ordinary islands behave like windows. A new island opens at the right end. Opening an identity that is already open locates that island instead of creating another or replacing its content; the requester chooses identities, so it decides between a single instance and separate instances. Each island records the island that opened it. Closing an island also closes the islands it opened, transitively, regardless of where the user has moved them; position never implies a relationship. The island menu in each island's chrome swaps it with its left or right neighbor and sets its size. Without a chosen size an island shares the screen; a size preset holds regardless of the window and may make the strip scroll horizontally, following the focused island.
+
+The arrangement of restorable islands, with order, owners, and sizes, is session layout state saved beside card views and the canvas viewport and outside history. Restorable islands are object islands and resource locations opened through resource navigation; other islands exist only while open. Switching sessions closes the current session's islands through their guards, and opening a session or restarting restores its arrangement. Islands whose object or resource leaves the current projection close without consulting guards, together with the islands they opened, and the projection omits them.
 
 ## Content expansion
 
-Resource views can open content in an island to the right of the workbench, whether the source is a canvas card or the leading focus island. Expansion leaves the source in place. Opening another content island replaces the previous one through its close guards. Islands opened from an expanded view continue to its right.
+Resource views can open content in an island from a canvas card or an object island. Expansion leaves the source in place. The new island belongs to the island containing its source and opens at the right end of the screen.
 
 The host owns containment, placement, focus restoration, and close coordination. Plugins own the content and its operations. Expanded content has its own mounted region and receives explicit domain inputs; closing or remounting its source card does not discard its editing state. Resource-bound operations still require the resource to be available.
 
 Resource location opening is a common frontend capability. The host resolves current resource presence and delegates an opaque location to the resource's registered open handler. User and plugin navigation have no model-request authorization filter. Removed resources produce a missing-resource notice. The target plugin owns location interpretation, operations, and expanded views; cross-plugin opens retain the target's island identity and plugin region.
 
-Content islands are transient frontend state outside history. Session navigation consults close guards before releasing them. Unsaved panels confirm discarding edits on closure, replacement, session navigation, application exit, and window reload. Saving remains an explicit content operation; a failed save retains the draft.
+Island content is frontend state outside history. Unsaved panels confirm discarding edits on closure, closure through the island that opened them, session navigation, application exit, and window reload. Saving remains an explicit content operation; a failed save retains the draft.
 
 The directory plugin dispatches file content to independent text and image surfaces. The host does not interpret file formats. The text editor reads current text and saves to the actual file. Its buffer belongs to the island, and later backend-processed writes win. Editing does not reinterpret or update earlier tool results. Git gutter marks compare the current buffer with a captured HEAD baseline; they do not add repository management operations.
 

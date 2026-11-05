@@ -68,11 +68,9 @@ export function RolesSettings() {
   const i18n = useI18n();
   const { snapshot, readError, load } = useSettingsConfiguration();
   const island = useIsland();
-  const [editingId, setEditingId] = useState<string | null>(null);
   const open = async (id: string | null, origin?: HTMLElement | null) => {
     const opened = await island.open({ key: `role-${id ?? "new"}`, label: rolesMessages.modelRole, origin,
-      render: () => <RoleEditor key={id ?? "new"} initialId={id} onSaved={setEditingId} /> });
-    if (opened) setEditingId(id);
+      render: () => <RoleEditor key={id ?? "new"} initialId={id} /> });
     return opened;
   };
   const roles = snapshot?.roles ?? [];
@@ -81,7 +79,7 @@ export function RolesSettings() {
     <ReadStatus loaded={!!snapshot} error={readError} onRetry={() => void load()} />
     {snapshot && <ItemGroup className="surface">{roles.map((role, index) =>
       <div key={role.id}>{index > 0 && <ItemSeparator />}
-        <RoleRow role={role} snapshot={snapshot} selected={!!island.child && editingId === role.id} onOpen={origin => open(role.id, origin)} />
+        <RoleRow role={role} snapshot={snapshot} selected={island.has(`role-${role.id}`)} onOpen={origin => open(role.id, origin)} />
       </div>)}</ItemGroup>}
   </Section>;
 }
@@ -110,7 +108,7 @@ function RoleRow({ role, snapshot, selected, onOpen }: {
     </>} />;
 }
 /** Details contain only infrequent fields; model, thinking, and enabling are immediate inline actions excluded from the draft to prevent mutual overwrites. */
-function RoleEditor({ initialId, onSaved }: { initialId: string | null; onSaved(id: string): void }) {
+function RoleEditor({ initialId }: { initialId: string | null }) {
   const i18n = useI18n();
   const slugField = useId();
   const { snapshot } = useSettingsConfiguration();
@@ -136,7 +134,7 @@ function RoleEditor({ initialId, onSaved }: { initialId: string | null; onSaved(
       const next: ModelRoleOverrides = { ...latest };
       for (const field of ["description", "hidden"] as const) { if (value[field] === undefined) delete next[field]; else (next as Record<string, unknown>)[field] = value[field]; }
       const result = await run({ type: "role.save", id, value: { ...next, id: slug } });
-      if (result?.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); onSaved(result.savedId); setValue(pick(result.snapshot.overrides.roles[result.savedId]!)); }
+      if (result?.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); setValue(pick(result.snapshot.overrides.roles[result.savedId]!)); }
     }}><FieldGroup>
       <Field><FieldLabel htmlFor={slugField}>{i18n.formatMessage(rolesMessages.id)}</FieldLabel>
         <Input id={slugField} value={slug} readOnly={current?.builtin} required maxLength={160} pattern="[a-z0-9]+((_|-)[a-z0-9]+)*" className="font-mono" onChange={event => setSlug(event.target.value)} /></Field>

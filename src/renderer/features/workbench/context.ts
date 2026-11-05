@@ -4,7 +4,7 @@ import type { WorkbenchSnapshot } from "../../../shared/workbench";
 import type { SessionController } from "../session/controller";
 import type { WorkbenchCanvas } from "./canvas";
 
-/** Environment provided by the workbench to cards and deeper islands; card node data retains only objects and view state. */
+/** Environment provided by the workbench to cards and islands; card node data retains only objects and view state. */
 export interface WorkbenchEnvironment {
   controller: SessionController;
   session: WorkbenchSnapshot;
@@ -12,12 +12,18 @@ export interface WorkbenchEnvironment {
   run: (command: WorkbenchOperation) => Promise<boolean>;
 
 }
+/** Object islands of the current session: one per object, opened from its card and closed back to it. */
+export interface WorkbenchIslands {
+  openObject(objectId: string, origin: HTMLElement | null): void;
+  closeObject(objectId: string): void;
+}
 export type WorkbenchView = WorkbenchEnvironment & {
   canvas: WorkbenchCanvas;
+  islands: WorkbenchIslands;
 };
 
 /**
- * Deeper islands and the focus island are rendered by Screen outside the workbench's React subtree;
+ * Object and panel islands are rendered by Screen outside the workbench's React subtree;
  * the application holds a store, the current workbench writes its latest environment into it, and islands subscribe through WorkbenchScope.
  */
 export class WorkbenchStore {

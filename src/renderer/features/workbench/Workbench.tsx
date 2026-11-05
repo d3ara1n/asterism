@@ -2,12 +2,10 @@ import { RendererNavigationProvider, type DropItem } from "@asterism-app/sdk/ren
 import { SmartEdgeProvider, type SmartEdgeProviderOptions } from "@tisoap/react-flow-smart-edge";
 import { ReactFlowProvider, ReactFlow, useReactFlow, applyNodeChanges, applyEdgeChanges, ConnectionMode, ConnectionLineType, type NodeChange, type EdgeChange, type Edge, type Connection, type IsValidConnection } from "@xyflow/react";
 import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 
 import { maximumViewportZoom, type Point, type WorkbenchSnapshot } from "../../../shared/workbench";
-import { accessMessages } from "../../messages/access";
 import { commonMessages } from "@asterism-app/ui/messages/common";
-import { historyMessages } from "../../messages/history";
 import { objectsMessages } from "../../messages/objects";
 import { workbenchMessages } from "../../messages/workbench";
 import { RendererCatalogProvider } from "../../modules/object-context";
@@ -20,17 +18,16 @@ import type { DragKind } from "../creation/routing";
 import { dropCandidates } from "../creation/routing";
 import { dragKinds, snapshotDrop } from "../creation/snapshot";
 import type { WorkbenchOperation } from "../session/controller";
-import { SessionHistoryPanel } from "../session/History";
-import { AccessPanel } from "./AccessPanel";
 import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
 import { layoutConnections, samePorts, type ConnectionEdge } from "./connections";
 import { handleSizeVariables, linkEdgeTypes, linkRoutingOptions } from "./LinkEdge";
-import { WorkbenchScope, WorkbenchContext, useWorkbench, type WorkbenchEnvironment, type WorkbenchStore, type WorkbenchView } from "./context";
+import { WorkbenchContext, useWorkbench, type WorkbenchEnvironment, type WorkbenchIslands, type WorkbenchStore, type WorkbenchView } from "./context";
+import { objectIslandId, objectIslandSpec } from "./ObjectIsland";
+import { useSessionIslands } from "./session-islands";
 import { workbenchNodes } from "./nodes";
 import { type ViewPatch } from "./ObjectCard";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ObjectNode, type ObjectNodeType } from "./ObjectNode";
-import { ObjectsPanel } from "./ObjectsPanel";
 import { confirmCardSizes, saveCardSize, type SizeIntent } from "./size-intents";
 import { WorkbenchBackground, WorkbenchFooter } from "./WorkbenchSurface";
 
@@ -38,18 +35,15 @@ const nodeTypes = { object: ObjectNode };
 const connectionLineTypes = { default: ConnectionLineType.Bezier, step: ConnectionLineType.Step, smoothstep: ConnectionLineType.SmoothStep };
 // Always route: a clear endpoint-to-endpoint segment does not mean the native curve clears every card.
 const routingOptions: SmartEdgeProviderOptions = { ...linkRoutingOptions, routeOnlyWhenBlocked: false, routeWhileDragging: true };
-export type PanelKind = "objects" | "history" | "access";
-
-/** Titlebar actions enter the workbench island through this handle; panels open as deeper islands without separate overlays. */
+/** Titlebar actions reach the canvas through this handle; panels are fixed islands owned by the application. */
 export interface WorkbenchHandle {
-  togglePanel: (kind: PanelKind, origin: HTMLElement | null) => void;
   canvas: WorkbenchCanvas;
 }
 
 type DropHandlers = { canDrop(kinds: readonly DragKind[]): boolean; onDropItems(items: readonly DropItem[], origin: Point): void };
 type Props = WorkbenchEnvironment & DropHandlers & {
   ref?: Ref<WorkbenchHandle>; onHome(): void; overview?: boolean; active: boolean;
-  /** Application-owned environment outlet: deeper islands and the focus island obtain the same environment outside the workbench subtree through it. */ store: WorkbenchStore;
+  /** Application-owned environment outlet: object and panel islands obtain the same environment outside the workbench subtree through it. */ store: WorkbenchStore;
 };
 type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
@@ -63,23 +57,26 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
     locateObjects: async (ids, options) => { await canvasRef.current?.locateObjects(ids, options); },
     arrange: async () => { await canvasRef.current?.arrange(); },
   }), []);
-  // Assemble the environment by field, notifying cards and panel islands only when fields actually change.
+  // Object islands are owned by the canvas island; the card that opened one closes it again.
+  const island = useIsland();
+  const latest = useRef({ session, onHome });
+  latest.current = { session, onHome };
+  const islands = useMemo<WorkbenchIslands>(() => ({
+    openObject: (objectId, origin) => {
+      const { session } = latest.current;
+      const object = session.objects.find(item => item.id === objectId);
+      if (object) void island.open(objectIslandSpec({ store, sessionId: session.id, object, origin, onHome: () => latest.current.onHome() }));
+    },
+    closeObject: objectId => { void island.closeOwned({ target: objectIslandId(objectId) }); },
+  }), [island, store]);
+  // Assemble the environment by field, notifying cards and islands only when fields actually change.
   const context = useMemo<WorkbenchView>(
-    () => ({ controller, session, ready, run, canvas }),
-    [controller, session, ready, run, canvas]);
+    () => ({ controller, session, ready, run, canvas, islands }),
+    [controller, session, ready, run, canvas, islands]);
   const latestContext = useRef(context);
   latestContext.current = context;
-  const island = useIsland();
-  const open = useCallback((id: string, label: import("@asterism-app/sdk/contracts").UiText, render: () => ReactNode, origin: HTMLElement | null) => {
-    if (island.child === id) island.closeChild();
-    // Panel islands render outside the workbench subtree and obtain this session's same environment through WorkbenchScope.
-    else island.open({ id, label, width: { min: 320, max: 400 }, origin, render: () => <WorkbenchScope store={store} sessionId={session.id}>{render()}</WorkbenchScope> });
-  }, [island, store, session.id]);
-  useImperativeHandle(ref, () => ({
-    togglePanel: (kind, origin) => open(`workbench-${kind}`, ({ objects: i18n.formatMessage(objectsMessages.objects), history: i18n.formatMessage(historyMessages.history), access: i18n.formatMessage(accessMessages.accessLabel) })[kind],
-      () => kind === "objects" ? <ObjectsPanel /> : kind === "access" ? <AccessPanel /> : <SessionHistoryPanel controller={controller} />, origin),
-    canvas,
-  }), [open, canvas, controller]);
+  useImperativeHandle(ref, () => ({ canvas }), [canvas]);
+  useSessionIslands({ session, run, store, onHome });
   useLayoutEffect(() => store.set(context), [store, context]);
   // On unmount, withdraw the environment written by this workbench so its controller and projection are no longer referenced after leaving the session; exiting islands already have their own environments captured by WorkbenchScope.
   useLayoutEffect(() => () => store.clear(latestContext.current), [store]);

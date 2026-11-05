@@ -1,5 +1,5 @@
 import { Handle, NodeResizeControl, Position, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
-import { Grip, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Grip, PanelLeftClose, PanelRightOpen } from "lucide-react";
 import { memo, useCallback, useEffect } from "react";
 
 import { maximumCardDimension, type WorkbenchObject } from "../../../shared/workbench";
@@ -9,7 +9,8 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { defaultConnectionPorts, type ConnectionPort } from "./connections";
 import { useWorkbench } from "./context";
-import { enterFocus, exitFocus } from "./focus";
+import { objectIslandId } from "./ObjectIsland";
+import { useIslandOpen } from "../../shared/weave/Screen";
 import { minimumCardHeight, minimumCardWidth } from "./layout";
 import { ObjectActions } from "./ObjectActions";
 import { ObjectCard, type ViewPatch } from "./ObjectCard";
@@ -65,7 +66,7 @@ function RetiringObject({ data }: { data: ObjectNodeType["data"] }) {
 
 /**
  * Card content: the workbench owns the frame, and modules provide content through versioned projections; raw data remains viewable when a module is missing.
- * When an object is focused, content moves to the focus island; the card retains view actions and shows only a notice in its content area.
+ * While the object's island is open, content lives there; the card retains view actions and shows only a notice in its content area.
  *
  * Receives only id/data/selected, so the default memo shallow comparison prevents rerenders during dragging;
  * all three props come from application state, unaffected by ReactFlow's internal position props.
@@ -75,24 +76,23 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
 }) {
   const i18n = useI18n();
   const { object, collapsed, onView } = data;
-  const { session, run } = useWorkbench();
-  const focused = session.focus.objectId === object.id;
+  const { islands } = useWorkbench();
+  const opened = useIslandOpen(objectIslandId(object.id));
   const content = useObjectView(object);
   const onObjectView = useCallback((patch: ViewPatch) => onView(object.id, patch), [onView, object.id]);
-  const toggleFocus = () => { void (focused ? exitFocus(run, session.id, object.id) : enterFocus(run, session.id, object.id)); };
-  const focusLabel = i18n.text(focused ? objectsMessages.returnToCard : objectsMessages.openInIsland);
   return <>
     <ObjectCard title={object.title} collapsed={collapsed} expandedHeight={data.expandedHeight} resizing={!!data.resizing} selected={!!selected} onView={onObjectView}
       icon={content.icon} kind={content.kind}
-      panels={focused ? undefined : content.panels}
-      actions={<>{!focused && content.actions}<ObjectActions object={object} appearance={content.view} onView={onObjectView} /></>}
-      controls={<IconButton size="icon-xs" label={focusLabel} aria-pressed={focused} data-object-focus="" onClick={toggleFocus}>
-        {focused ? <PanelLeftClose /> : <PanelLeftOpen />}
+      panels={opened ? undefined : content.panels}
+      actions={<>{!opened && content.actions}<ObjectActions object={object} appearance={content.view} onView={onObjectView} /></>}
+      controls={opened ? undefined : <IconButton size="icon-xs" label={i18n.text(objectsMessages.openInIsland)}
+        onClick={event => islands.openObject(object.id, event.currentTarget)}>
+        <PanelRightOpen />
       </IconButton>}>
-      {focused
+      {opened
         ? <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-          <p className="type-caption">{i18n.text(objectsMessages.focusedInIsland)}</p>
-          <Button variant="outline" size="sm" onClick={() => { void exitFocus(run, session.id, object.id); }}><PanelLeftClose />{i18n.text(objectsMessages.returnToCard)}</Button>
+          <p className="type-caption">{i18n.text(objectsMessages.openedInIsland)}</p>
+          <Button variant="outline" size="sm" onClick={() => islands.closeObject(object.id)}><PanelLeftClose />{i18n.text(objectsMessages.returnToCard)}</Button>
         </div>
         : content.body}
     </ObjectCard>

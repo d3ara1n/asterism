@@ -2,11 +2,11 @@ import { createContext, createElement, useContext, useEffect, useRef, type Compo
 import type { UiText } from "./i18n.ts";
 
 /**
- * Island: an independent surface column within the host screen. Resource cards open beside the workbench, including when focused; other islands open to their own right.
- * The host uniformly manages width, position, motion, and focus; plugins provide only identity, an accessible name, and content.
+ * Island: an independent window-like surface within the host screen. Islands open at the right end of the screen and belong to the island that opened them;
+ * closing an island also closes the islands it opened. The host manages order, width, position, motion, and focus; plugins provide identity, an accessible name, and content.
  */
 export interface RendererIslandSpec {
-  /** Island identity unique within the plugin; the host isolates it by plugin identity. Opening the same identity again replaces its content. */
+  /** Island identity unique within the plugin; the host isolates it by plugin identity. Opening an identity that is already open locates that island and keeps its content. */
   key: string;
   /** The island's accessible name and overflow navigation hint. */
   label: UiText;
@@ -19,20 +19,20 @@ export interface RendererIslandSpec {
 /** Close guard: returning false (or resolving to false) aborts closing; may asynchronously wait for user confirmation. */
 export type RendererCloseGuard = () => boolean | Promise<boolean>;
 export interface RendererIsland {
-  /** Identities of deeper islands opened by this plugin to the right of this island. */
-  readonly child: string | undefined;
-  /** Open a deeper island to the right of this one; replaced islands may refuse through guards. Resolves to whether it opened. */
+  /** Whether an island with this plugin key is open in the screen. */
+  has(key: string): boolean;
+  /** Open an island owned by this one at the right end of the screen, or locate the open island with the same key. Resolves to whether it is shown. */
   open(spec: RendererIslandSpec): Promise<boolean>;
-  /** Close this island and deeper islands; has no effect on the host-managed island containing the plugin settings page. force skips guards. */
+  /** Close this island and the islands it opened; has no effect on host-managed islands such as the one containing a plugin settings page. force skips guards. */
   close(options?: { force?: boolean }): Promise<boolean>;
-  /** Close deeper islands to the right of this one. */
-  closeChild(options?: { force?: boolean }): Promise<boolean>;
+  /** Close the islands this island opened, transitively. */
+  closeOwned(options?: { force?: boolean }): Promise<boolean>;
   /** Register a close guard for this island and return an unregister function. Normally used through useRendererCloseGuard. */
   guard(guard: RendererCloseGuard): () => void;
 }
 /**
- * Panel island frame: the title bar stays fixed and the content scrolls independently; the primary action and close control sit on the right of the title bar.
- * When dirty is true, the host asks for confirmation to discard changes before closing this island, including through ancestor closure or replacement.
+ * Panel island frame: the title bar stays fixed and the content scrolls independently; the primary action, island menu, and close control sit on the right of the title bar.
+ * When dirty is true, the host asks for confirmation to discard changes before closing this island, including closure through the island that opened it.
  */
 export interface RendererIslandPanelProps {
   title: string;

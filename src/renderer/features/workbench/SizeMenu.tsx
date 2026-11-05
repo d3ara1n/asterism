@@ -11,7 +11,7 @@ export const sizePresets = [
   { label: objectsMessages.cardSizeLarge, scale: 1.5 },
 ] as const;
 
-/** Shared size submenu for object surfaces: cards and the focus island present the same entry and presets. */
+/** Size submenu for canvas cards; islands size through the island menu. */
 export function SizeMenu({ onScale, onRestore }: { onScale: (scale: number) => void; onRestore: () => void }) {
   const i18n = useI18n();
   return <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{i18n.formatMessage(objectsMessages.cardSize)}</DropdownMenuSubTrigger>

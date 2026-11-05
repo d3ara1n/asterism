@@ -19,7 +19,7 @@ These terms distinguish the concepts used when developing Asterism. Each definit
 | View state | Presentation choices outside historical records |
 | Retained object state | User-created frontend state retained while an object remains present |
 | Item view state | Per-conversation-item choices retained across virtualization |
-| Focus island | Leading surface presenting an object outside its canvas card |
+| Object island | Ordinary island presenting an object outside its canvas card; one per object |
 | Auxiliary panel | Supplemental view inside an object surface |
 | Workbench template | Static resource data, links, and arrangement used to create a new session |
 | Archive | End session resource lifetimes and move the session out of normal lookup |

@@ -32,12 +32,19 @@ function revertFolders(db: DatabaseSync) {
     DROP TABLE templates; ALTER TABLE templates_v30 RENAME TO templates;
     DROP TABLE folders; PRAGMA foreign_keys = ON;`);
 }
+/** Rebuild the format-32 shape: the single focus table instead of the island arrangement. */
+function revertIslands(db: DatabaseSync) {
+  db.exec(`DROP TABLE workbench_islands;
+    CREATE TABLE workbench_focus (session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, object_id TEXT,
+      width REAL CHECK (width IS NULL OR width > 0)) STRICT;`);
+}
 const count = (db: DatabaseSync, table: string, sessionId: string) =>
   Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE session_id = ?`).get(sessionId) as { n: number }).n);
 
 it("migrates existing sessions to uncompleted without changing history", () => {
   const { root, db, tree } = setup(), sessionId = tree.create("Existing");
   const original = tree.appendToTimeline(sessionId, event("example/final", { text: "Saved response" }));
+  revertIslands(db);
   db.exec("ALTER TABLE sessions DROP COLUMN completed; PRAGMA user_version = 31;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
@@ -71,7 +78,7 @@ it("keeps completion independent of history selection, new records, and archival
 it("upgrades the preceding workspace format without rewriting existing history", () => {
   const { root, db, tree } = setup(), sessionId = tree.create("Existing");
   const original = tree.appendToTimeline(sessionId, event("example/final", { text: "Saved response" }));
-  revertFolders(db);
+  revertIslands(db); revertFolders(db);
   db.exec("DROP INDEX session_nodes_pending; PRAGMA user_version = 29;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
@@ -92,7 +99,7 @@ it("adds folder membership without assigning existing rows, and deleting a folde
   const templateId = "7a1f2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d", folderId = "0b1c2d3e-4f5a-4b6c-8d7e-9f0a1b2c3d4e";
   db.prepare("INSERT INTO templates (id, title, created_at, data_json) VALUES (?, ?, ?, ?)")
     .run(templateId, "Template", new Date().toISOString(), JSON.stringify({ objects: [], links: [], views: [] }));
-  revertFolders(db);
+  revertIslands(db); revertFolders(db);
   db.exec("PRAGMA user_version = 30;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
@@ -156,32 +163,30 @@ describe("Archived session presence gate", () => {
   });
 });
 
-const focusWorkbench = (db: DatabaseSync, tree: SessionTree) =>
+const islandWorkbench = (db: DatabaseSync, tree: SessionTree) =>
   new SessionWorkbench(db, tree, {} as ResourceRegistry);
 
-// Focus layout contract: the projection releases focus once the object leaves the current projection, while the fixed width persists.
-describe("Session focus layout", () => {
-  it("projects focus only for present objects and keeps the width across focus changes", () => {
+// Island arrangement contract: stored as written; projection drops islands whose content left the current projection and the islands they opened.
+describe("Session island layout", () => {
+  it("keeps order, owners, and sizes, and drops islands of removed objects transitively", () => {
     const { db, tree } = setup();
     const s = tree.create("S");
     tree.appendToTimeline(s, created("a1", "Agent"));
-    const workbench = focusWorkbench(db, tree);
-    expect(workbench.layout(s).focus).toEqual({ objectId: null, width: null });
+    tree.appendToTimeline(s, created("d1", "Directory"));
+    const workbench = islandWorkbench(db, tree);
+    expect(workbench.layout(s).islands).toEqual([]);
 
-    workbench.mutate({ type: "focus.set", sessionId: s, objectId: "a1" });
-    workbench.mutate({ type: "focus.set", sessionId: s, width: 1080 });
-    expect(workbench.layout(s).focus).toEqual({ objectId: "a1", width: 1080 });
+    const islands = [
+      { id: "object:d1", owner: "main-view", size: null, view: { kind: "object" as const, objectId: "d1" } },
+      { id: "object:a1", owner: "main-view", size: 900, view: { kind: "object" as const, objectId: "a1" } },
+      // Opened from the directory island but naming the agent: removing the directory still closes it.
+      { id: "file:a", owner: "object:d1", size: null, view: { kind: "resource" as const, resourceId: "a1", location: "a.md" } },
+      { id: "file:b", owner: "file:a", size: null, view: { kind: "resource" as const, resourceId: "a1", location: "b.md" } },
+    ];
+    workbench.mutate({ type: "islands.set", sessionId: s, islands });
+    expect(workbench.layout(s).islands).toEqual(islands);
 
-    // Ending focus keeps the width for the next entry.
-    workbench.mutate({ type: "focus.set", sessionId: s, objectId: null });
-    expect(workbench.layout(s).focus).toEqual({ objectId: null, width: 1080 });
-
-    workbench.mutate({ type: "focus.set", sessionId: s, objectId: "a1" });
-    tree.appendToTimeline(s, removed("a1"));
-    expect(workbench.layout(s).focus).toEqual({ objectId: null, width: 1080 });
-    expect(() => workbench.mutate({ type: "focus.set", sessionId: s, objectId: "a1" })).toThrow("Object does not belong to this session.");
-    // A null width restores the shared default; an omitted width keeps it.
-    workbench.mutate({ type: "focus.set", sessionId: s, width: null });
-    expect(workbench.layout(s).focus).toEqual({ objectId: null, width: null });
+    tree.appendToTimeline(s, removed("d1"));
+    expect(workbench.layout(s).islands.map(island => island.id)).toEqual(["object:a1"]);
   });
 });

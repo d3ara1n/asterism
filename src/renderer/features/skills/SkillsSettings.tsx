@@ -73,7 +73,7 @@ function SkillSettingsBody() {
     {catalog && <>
       <ItemGroup className="surface">{catalog.flatMap((group, index) => {
         const row = <div key={group.id} role="listitem">
-          <ListRow selected={island.child === islandKey(group.id)} onOpen={origin => { void open(group.id, origin); }}
+          <ListRow selected={island.has(islandKey(group.id))} onOpen={origin => { void open(group.id, origin); }}
             title={<span className="block truncate font-mono text-xs" title={group.id} translate="no">{group.id}</span>}
             description={group.skills.length
               ? i18n.formatMessage(messages.count, { count: group.skills.length })

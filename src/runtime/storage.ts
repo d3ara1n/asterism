@@ -9,7 +9,7 @@ import { templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 import { mcpSchemaSql } from "../mcp/storage.ts";
 
-export const workspaceDatabaseVersion = 32;
+export const workspaceDatabaseVersion = 33;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
@@ -52,7 +52,7 @@ function initializeWorkspace(db: DatabaseSync): void {
         PRIMARY KEY(session_id, object_id)
       );
       CREATE TABLE viewports (session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE, x REAL NOT NULL, y REAL NOT NULL, zoom REAL NOT NULL);
-      ${focusTableSql}
+      ${islandsTableSql}
       -- Session-level submission deduplication for home sends; agent-internal submission deduplication belongs to agent resource state.
       CREATE TABLE session_submissions (
         id TEXT PRIMARY KEY,
@@ -70,18 +70,19 @@ function initializeWorkspace(db: DatabaseSync): void {
   db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
 }
 
-/** Session focus island state; a null object_id means no object is focused while the width remains; a null width shares the screen. */
-const focusTableSql = `
-      CREATE TABLE workbench_focus (
+/** Restorable ordinary island arrangement per session, validated as a whole when written and read. */
+const islandsTableSql = `
+      CREATE TABLE workbench_islands (
         session_id TEXT PRIMARY KEY REFERENCES sessions(id) ON DELETE CASCADE,
-        object_id TEXT,
-        width REAL CHECK (width IS NULL OR width > 0)
+        islands_json TEXT NOT NULL
       ) STRICT;`;
 
 /** Explicit format transitions preserve supported data; only openDatabase creates new databases. */
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
     version: workspaceDatabaseVersion, migrations: {
+      // The single focus island became an island arrangement; a focused object is not carried over as an island.
+      32: db => { db.exec(`DROP TABLE workbench_focus; ${islandsTableSql}`); },
       31: db => { db.exec(`ALTER TABLE sessions ADD COLUMN ${completedColumnSql};`); },
       29: db => { db.exec(pendingRecordsIndexSql); },
       // Existing sessions and templates start without a folder; no membership is invented for them.

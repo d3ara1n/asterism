@@ -51,7 +51,7 @@ export function NetworkSettings() {
       <ListRow title={i18n.text(messages.proxy)}
         description={preference.mode === "custom" ? `${modeLabel} · ${preference.server}` : modeLabel}
         details={state.restartRequired ? i18n.text(messages.restartRequired) : undefined}
-        selected={island.child === islandId}
+        selected={island.has(islandId)}
         onOpen={origin => void island.open({ id: islandId, label: messages.proxy, width: panelIslandWidth, origin,
           render: () => <ProxyEditor saved={preference} /> })}
         actions={state.restartRequired && <Button size="sm" variant="outline" disabled={restarting} aria-busy={restarting} onClick={restart}>

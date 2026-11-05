@@ -11,9 +11,10 @@ import { WorkbenchFeedback } from "../features/workbench/WorkbenchFeedback";
 import { workbenchPhase } from "../features/workbench/feedback";
 import { Workbench, type WorkbenchHandle } from "../features/workbench/Workbench";
 import { LayoutMenu } from "../features/workbench/LayoutMenu";
-import { WorkbenchStore } from "../features/workbench/context";
-import { FocusIsland } from "../features/workbench/FocusIsland";
-import { focusIslandId, focusIslandWidth } from "../features/workbench/focus";
+import { WorkbenchScope, WorkbenchStore } from "../features/workbench/context";
+import { ObjectsPanel } from "../features/workbench/ObjectsPanel";
+import { AccessPanel } from "../features/workbench/AccessPanel";
+import { SessionHistoryPanel } from "../features/session/History";
 import { Sidebar } from "./Sidebar";
 
 import { HomePage } from "../features/home/HomePage";
@@ -27,13 +28,12 @@ import { SettingsPage, isSettingsCategory, type SettingsTarget } from "../featur
 import { SessionArchiveContext } from "../features/settings/SessionsSettings";
 import { settingsPageKey, usePluginSettingsRegistry } from "../modules/settings";
 import { RendererCatalogProvider } from "../modules/object-context";
-import { Screen, type IslandSpec, type ScreenHandle } from "../shared/weave/Screen";
+import { IslandStrip, Screen, type IslandSpec, type ScreenHandle } from "../shared/weave/Screen";
 import { Toaster } from "../shared/ui/sonner";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { operationSucceeded, toast, useStateToast } from "../shared/toast";
 
 import { errorDisplay } from "../../shared/error-display.ts";
-import type { UiText } from "@asterism-app/sdk/contracts";
 import { accessMessages } from "../messages/access";
 import { appMessages } from "../messages/app";
 import { commonMessages } from "@asterism-app/ui/messages/common";
@@ -55,6 +55,8 @@ import { islandTransition } from "../shared/weave/motion";
 /** The main screen contains the sidebar and home/workbench; settings occupy a separate screen on the left, and the entire main screen slides when switching. */
 type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string; overview?: boolean };
 type PageId = "settings" | "main";
+/** Workbench sidebars opened from the titlebar: one at a time, fixed at the right end of the main screen. */
+type PanelKind = "objects" | "history" | "access";
 const idleSubscribe = () => () => {};
 const noSession = () => null;
 
@@ -63,6 +65,8 @@ export function App({ controller }: { controller: ApplicationController }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const workbench = useRef<WorkbenchHandle>(null);
   const mainScreen = useRef<ScreenHandle>(null);
+  // Ordinary islands of the main screen; the current workbench restores and persists them while the strip's scope is its session.
+  const [mainStrip] = useState(() => new IslandStrip());
   const navigating = useRef(false);
   const returnFocus = useRef<HTMLElement | null>(null);
   const sidebarToggle = useRef<HTMLButtonElement>(null);
@@ -79,8 +83,9 @@ export function App({ controller }: { controller: ApplicationController }) {
     if (!next.delete(key)) next.add(key);
     return next;
   }), []);
-  // Environment outlet for the current workbench: deeper islands on the right and the focus island on the left obtain the session environment through it.
+  // Environment outlet for the current workbench: object and panel islands obtain the session environment through it.
   const [workbenchStore] = useState(() => new WorkbenchStore());
+  const [panel, setPanel] = useState<{ kind: PanelKind; origin: HTMLElement | null } | null>(null);
   // Increment on each navigation; when asynchronous creation completes, use this to determine whether the user has left, without taking over the current view.
   const navigation = useRef(0);
   const run = useCallback(async (command: WorkbenchOperation) => operationSucceeded(await sessionController(command.sessionId).execute(command)), []);
@@ -96,7 +101,6 @@ export function App({ controller }: { controller: ApplicationController }) {
   const sessionBlocked = !!sessionState && (sessionState.navigating || sessionState.status !== "ready");
   const phase = workbenchPhase(state.status, sessionState);
   const writable = ready && !sessionBlocked && !!session;
-  const focusedObjectId = view.kind === "conversation" ? session?.focus.objectId ?? null : null;
   const inSettings = page === "settings";
   const completed = view.kind === "conversation" && !!snapshot?.sessions.find(item => item.id === view.sessionId)?.completed;
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
@@ -126,7 +130,13 @@ export function App({ controller }: { controller: ApplicationController }) {
     try {
       const changingSession = next.kind !== view.kind
         || next.kind === "conversation" && view.kind === "conversation" && next.sessionId !== view.sessionId;
-      if (changingSession && mainScreen.current && !(await mainScreen.current.closeChildren())) return false;
+      if (changingSession && mainScreen.current) {
+        // Leaving a session clears its islands from view, not from its saved arrangement; a cancelled close resumes persistence.
+        const scope = mainStrip.getSnapshot().scope;
+        mainStrip.set({ scope: null });
+        const closed = (!panel || await mainScreen.current.close(`workbench-${panel.kind}`)) && await mainScreen.current.closeAll();
+        if (!closed) { mainStrip.set({ scope }); return false; }
+      }
       navigation.current++;
       controller.setVisibleSession(next.kind === "conversation" ? next.sessionId : null);
       setView(next); setPage("main");
@@ -181,6 +191,11 @@ export function App({ controller }: { controller: ApplicationController }) {
     setSidebarVisible(false);
     requestAnimationFrame(() => sidebarToggle.current?.focus({ preventScroll: true }));
   };
+  /** The same button closes its panel; another button replaces it after the current panel and its islands close. */
+  const togglePanel = async (kind: PanelKind, origin: HTMLElement | null) => {
+    if (panel && !(await mainScreen.current?.close(`workbench-${panel.kind}`))) return;
+    if (panel?.kind !== kind) setPanel({ kind, origin });
+  };
 
   const titleNavigation = <>
     {!inSettings && <IconButton ref={sidebarToggle} size="icon-xs" label={sidebarVisible ? i18n.formatMessage(appMessages.hideSidebar) : i18n.formatMessage(appMessages.showSidebar)}
@@ -211,9 +226,9 @@ export function App({ controller }: { controller: ApplicationController }) {
     </DropdownMenuContent></DropdownMenu>
     <LayoutMenu key={session.id} canvas={() => workbench.current?.canvas ?? null}
       disabled={!writable || !session.objects.some(object => !session.views.find(view => view.objectId === object.id)?.hidden)} />
-    <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("access", event.currentTarget)} aria-label={i18n.formatMessage(accessMessages.accessLabel)}><KeyRound /><span className="toolbar-label">{i18n.formatMessage(accessMessages.access)}</span></Button>
-    <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("objects", event.currentTarget)} aria-label={i18n.formatMessage(objectsMessages.objects)}><ListTree /><span className="toolbar-label">{i18n.formatMessage(objectsMessages.objects)}</span></Button>
-    <Button variant="ghost" size="sm" onClick={event => workbench.current?.togglePanel("history", event.currentTarget)} aria-label={i18n.formatMessage(historyMessages.history)}><History /><span className="toolbar-label">{i18n.formatMessage(historyMessages.history)}</span></Button>
+    <Button variant="ghost" size="sm" aria-pressed={panel?.kind === "access"} onClick={event => void togglePanel("access", event.currentTarget)} aria-label={i18n.formatMessage(accessMessages.accessLabel)}><KeyRound /><span className="toolbar-label">{i18n.formatMessage(accessMessages.access)}</span></Button>
+    <Button variant="ghost" size="sm" aria-pressed={panel?.kind === "objects"} onClick={event => void togglePanel("objects", event.currentTarget)} aria-label={i18n.formatMessage(objectsMessages.objects)}><ListTree /><span className="toolbar-label">{i18n.formatMessage(objectsMessages.objects)}</span></Button>
+    <Button variant="ghost" size="sm" aria-pressed={panel?.kind === "history"} onClick={event => void togglePanel("history", event.currentTarget)} aria-label={i18n.formatMessage(historyMessages.history)}><History /><span className="toolbar-label">{i18n.formatMessage(historyMessages.history)}</span></Button>
   </> : undefined;
 
   // The feedback layer and session canvas are sibling nodes, each reset by session; their key spaces must not overlap.
@@ -244,12 +259,14 @@ export function App({ controller }: { controller: ApplicationController }) {
       onHome={goHome} onSession={openSession} onHide={hideSidebar}
       onRetry={() => { void controller.refresh(); }} />,
   };
-  // Focus island: a controlled leading island between the sidebar and workbench; its content switches with the session, and it exits when returning home.
-  const focusTitle = focusedObjectId ? session?.objects.find(object => object.id === focusedObjectId)?.title : undefined;
-  const focus: IslandSpec | null = view.kind === "conversation" && focusedObjectId ? {
-    id: focusIslandId, label: focusTitle ?? i18n.formatMessage(objectsMessages.focusIsland),
-    width: focusIslandWidth(session?.focus.width ?? null),
-    render: () => <FocusIsland store={workbenchStore} sessionId={view.sessionId} objectId={focusedObjectId} onHome={goHome} />,
+  // Panel sidebar: a fixed trailing island bound to the current session's environment; it closes when leaving the session.
+  const panelSpec: IslandSpec | null = panel && view.kind === "conversation" && active ? {
+    id: `workbench-${panel.kind}`, width: { min: 320, max: 400 }, origin: panel.origin,
+    label: { objects: i18n.formatMessage(objectsMessages.objects), history: i18n.formatMessage(historyMessages.history), access: i18n.formatMessage(accessMessages.accessLabel) }[panel.kind],
+    onClose: () => setPanel(null),
+    render: () => <WorkbenchScope store={workbenchStore} sessionId={view.sessionId}>
+      {panel.kind === "objects" ? <ObjectsPanel /> : panel.kind === "access" ? <AccessPanel /> : <SessionHistoryPanel controller={active} />}
+    </WorkbenchScope>,
   } : null;
   const main: IslandSpec = {
     id: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation",
@@ -293,8 +310,9 @@ export function App({ controller }: { controller: ApplicationController }) {
         { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content:
           <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SettingsPage active={inSettings} target={settingsTarget} /></SessionArchiveContext.Provider> },
         { id: "main", label: mainTitle, surface: false,
-          // Close deeper islands to the right of the workbench when switching sessions.
-          content: <Screen ref={mainScreen} label={i18n.formatMessage(appMessages.appNavigation)} leading={[...(sidebarVisible ? [sidebar] : []), ...(focus ? [focus] : [])]} root={main} resetKey={view.kind === "conversation" ? view.sessionId : "home"} className="h-full" /> },
+          // Navigation closes the panel and ordinary islands before switching sessions.
+          content: <Screen ref={mainScreen} strip={mainStrip} label={i18n.formatMessage(appMessages.appNavigation)} leading={sidebarVisible ? [sidebar] : undefined} root={main}
+            trailing={panelSpec ? [panelSpec] : undefined} className="h-full" /> },
       ]} />
     </Window>
     <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}

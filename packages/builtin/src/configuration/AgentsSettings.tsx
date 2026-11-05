@@ -69,11 +69,9 @@ export function AgentsSettings() {
   const i18n = useI18n();
   const { snapshot, readError, load } = useSettingsConfiguration();
   const island = useIsland();
-  const [editingId, setEditingId] = useState<string | null>(null);
   const open = async (id: string | null, origin?: HTMLElement | null) => {
     const opened = await island.open({ key: `agent-${id ?? "new"}`, label: agentsMessages.agent, origin,
-      render: () => <AgentEditor key={id ?? "new"} initialId={id} onSaved={setEditingId} /> });
-    if (opened) setEditingId(id);
+      render: () => <AgentEditor key={id ?? "new"} initialId={id} /> });
     return opened;
   };
   const agents = snapshot?.agents ?? [];
@@ -82,7 +80,7 @@ export function AgentsSettings() {
     <ReadStatus loaded={!!snapshot} error={readError} onRetry={() => void load()} />
     {snapshot && <ItemGroup className="surface">{agents.map((agent, index) =>
       <div key={agent.id}>{index > 0 && <ItemSeparator />}
-        <AgentRow agent={agent} snapshot={snapshot} selected={!!island.child && editingId === agent.id} onOpen={origin => open(agent.id, origin)} />
+        <AgentRow agent={agent} snapshot={snapshot} selected={island.has(`agent-${agent.id}`)} onOpen={origin => open(agent.id, origin)} />
       </div>)}</ItemGroup>}
   </Section>;
 }
@@ -143,7 +141,7 @@ function RoleSelect({ id, value, onChange }: { id: string; value: string | null;
 
 /* ---------- Editor ---------- */
 
-function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved(id: string): void }) {
+function AgentEditor({ initialId }: { initialId: string | null }) {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
@@ -201,7 +199,7 @@ function AgentEditor({ initialId, onSaved }: { initialId: string | null; onSaved
       event.preventDefault();
       const result = await run({ type: "agent.save", id, value: { ...normalized, id: slug,
         ...(current && snapshot.overrides.agents[current.id]?.enabled !== undefined ? { enabled: snapshot.overrides.agents[current.id]!.enabled } : {}) } });
-      if (result?.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); onSaved(result.savedId); setDraft(strip(result.snapshot.overrides.agents[result.savedId] ?? {})); }
+      if (result?.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); setDraft(strip(result.snapshot.overrides.agents[result.savedId] ?? {})); }
     }}><fieldset disabled={busy}>
 
       <EditorSection title={i18n.formatMessage(agentsMessages.basics)}><FieldGroup>

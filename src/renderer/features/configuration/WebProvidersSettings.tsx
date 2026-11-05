@@ -94,7 +94,7 @@ export function WebProvidersSettings() {
             <ListRow leadingActions={handle} className="isolate rounded-none" disabled={busy} inactive={!state.enabled}
               mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{initial(label)}</span>}
               title={label} description={type && capabilities(type)}
-              selected={island.child === `web-provider-${state.id}`} onOpen={origin => open(state.id, origin)}
+              selected={island.has(`web-provider-${state.id}`)} onOpen={origin => open(state.id, origin)}
               actions={<>
                 {issue && <StatusBadge tone={issue.tone}>{issue.label}</StatusBadge>}
                 <Button variant="ghost" size="icon-sm" disabled={busy || index === 0}

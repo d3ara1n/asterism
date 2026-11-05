@@ -14,15 +14,15 @@ Use host presentation facilities for the surrounding card or operation. Keep dom
 
 ## Open expanded content
 
-Resource card views can use the renderer island capability to open plugin content beside the workbench. The same entry works from a focused resource. Settings pages and expanded views open additional islands to their own right. Opening another island from the same source level replaces deeper content, subject to close guards.
+Resource card views, settings pages, and islands can use the renderer island capability to open plugin content. Islands open at the right end of the screen and belong to the island that opened them; closing an island closes the islands it opened. Opening a key that is already open locates that island and keeps its content, so the key decides between one shared island and separate ones. `has(key)` reports whether a key is open, for example to mark the selected row. The host owns ordering, sizing, and the island menu.
 
 Supply a plugin-local identity, accessible label, opening element, and content renderer. Choose a content surface for an editor or another view that needs more width. The host manages layout and focus. The opened view has an independent plugin region; pass its resource reference and other domain inputs explicitly rather than relying on the source component's React context or mount lifetime.
 
-Use the island panel for its title, actions, and close control. Its fill layout lets an editor own scrolling. Mark unsaved content as dirty so closing, replacement, session navigation, and application exit ask before discarding it. A close guard can also retain a view while a save is pending. Closing the island releases its view calls without ending independent backend services.
+Use the island panel for its title, actions, and close control. Its fill layout lets an editor own scrolling. Mark unsaved content as dirty so closing, closure through the opening island, session navigation, and application exit ask before discarding it. A close guard can also retain a view while a save is pending. Closing the island releases its view calls without ending independent backend services.
 
 ## Open resource locations
 
-A resource type can declare `open(location, context)` in its renderer resource description. The location is an opaque string interpreted by that resource. A file resource can open an editor or read-only viewer; a browser resource can navigate to a URL. The handler receives the resolved resource reference, typed calls, the opening element, and an island capability bound to the target plugin. It returns whether the open completed; declining an island close guard returns false.
+A resource type can declare `open(location, context)` in its renderer resource description. The location is an opaque string interpreted by that resource. A file resource can open an editor or read-only viewer; a browser resource can navigate to a URL. The handler receives the resolved resource reference, typed calls, the opening element, and an island capability bound to the target plugin. It returns whether the open completed. The first island a handler opens for a navigation is restorable: the host saves the resource and location and calls the handler again to rebuild that island when the session reopens, so the handler should derive the island from the location alone.
 
 Use `useRendererResourceNavigation().open(resource, location, { origin })` from a card, settings page, Home entry, or island. Supply the session ID and resource ID. The host resolves current resource presence and invokes its registered handler. It reports missing resources, unsupported opening, and handler failures. User and plugin navigation are independent of model-request authorization and directed resource links.
 

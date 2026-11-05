@@ -97,7 +97,7 @@ export function ModelProvidersSettings() {
       <EmptyContent><Button size="sm" variant="outline" onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addFirstProvider)}</Button></EmptyContent>
     </Empty> : snapshot && <ItemGroup className="surface">{providers.map((provider, index) => {
       return <div key={provider.id}>{index > 0 && <ItemSeparator />}
-        <ProviderRow provider={provider} snapshot={snapshot} selected={island.child === `provider-${provider.id}`} onOpen={origin => open(provider.id, origin)} />
+        <ProviderRow provider={provider} snapshot={snapshot} selected={island.has(`provider-${provider.id}`)} onOpen={origin => open(provider.id, origin)} />
       </div>;
     })}</ItemGroup>}
   </Section>;
@@ -261,7 +261,7 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
         <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addModel)}</Button>
       </>}>
       {models.length ? <ItemGroup className="surface">{models.map((model, index) => <div key={modelReference(model)}>{index > 0 && <ItemSeparator />}
-        <ModelRow model={model} provider={current} selected={island.child === `model-${modelReference(model)}`} onOpen={origin => openModel(modelReference(model), origin)} />
+        <ModelRow model={model} provider={current} selected={island.has(`model-${modelReference(model)}`)} onOpen={origin => openModel(modelReference(model), origin)} />
       </div>)}</ItemGroup>
         : <Empty className="border md:p-6"><EmptyHeader><EmptyDescription>{i18n.formatMessage(providersMessages.emptyModels)}</EmptyDescription></EmptyHeader></Empty>}
     </EditorSection>}

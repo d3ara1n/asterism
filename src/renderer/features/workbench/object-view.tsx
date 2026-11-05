@@ -12,7 +12,7 @@ import { PluginIslandProvider } from "../plugins/scope";
 
 /**
  * Resolved object content view: body, auxiliary panels, and resource actions are all bound to object capabilities and isolated by error boundaries.
- * Cards and focus islands share this resolution; the caller chooses which container mounts the content.
+ * Cards and object islands share this resolution; the caller chooses which container mounts the content.
  */
 export function useObjectView(object: WorkbenchObject) {
   const i18n = useI18n();
@@ -26,7 +26,7 @@ export function useObjectView(object: WorkbenchObject) {
     panels: undefined,
   };
   const bind = (node: ReactNode) => <ObjectServices object={object}>
-    <PluginIslandProvider pluginId={pluginOf(object.presentation.contract.id) ?? "unknown"} placement="root">
+    <PluginIslandProvider pluginId={pluginOf(object.presentation.contract.id) ?? "unknown"}>
       {node}
     </PluginIslandProvider>
   </ObjectServices>;

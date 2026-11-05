@@ -5,7 +5,7 @@ import type { FoldedObject } from "../session/fold.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
 import { ResourceCreated, ResourceRenamed, ResourceRemoved, ResourceAttached, ResourceDetached, type RecordContract, type Json, type ResourceSnapshot } from "@asterism-app/sdk/contracts";
 
-import { type WorkbenchCommand, type WorkbenchLayout, type WorkbenchObject, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
+import { liveIslands, sessionIslandsSchema, type WorkbenchCommand, type WorkbenchLayout, type WorkbenchObject, type WorkbenchSnapshot, type Point, type Viewport } from "../shared/workbench.ts";
 import type { ContentStore, ContentLease, ContentAccess } from "./content-store.ts";
 import { defaultCardPosition } from "../shared/workbench-layout.ts";
 import { placeObject } from "../shared/workbench-placement.ts";
@@ -18,7 +18,6 @@ function resourceLinkNotice(contract: typeof ResourceAttached | typeof ResourceD
 }
 
 type ViewRow = { object_id: string; x: number; y: number; hidden: number; collapsed: number; width: number | null; height: number | null };
-type FocusRow = { object_id: string | null; width: number | null };
 
 /** Session resource events and independent layout; session trees reconstruct current presence and links together. */
 export class SessionWorkbench {
@@ -131,17 +130,12 @@ export class SessionWorkbench {
         this.db.prepare("INSERT INTO viewports VALUES (?, ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET x=excluded.x, y=excluded.y, zoom=excluded.zoom")
           .run(command.sessionId, command.viewport.x, command.viewport.y, command.viewport.zoom);
         break;
-      case "focus.set": {
-        // Focus targets objects in the current projection; projection filtering releases focus when the object later leaves it.
-        if (command.objectId && !folded.objects.some(object => object.id === command.objectId))
-          throw new SessionError("not_found", "Object does not belong to this session.");
-        const previous = this.db.prepare("SELECT object_id, width FROM workbench_focus WHERE session_id = ?").get(command.sessionId) as FocusRow | undefined;
-        this.db.prepare(`INSERT INTO workbench_focus (session_id, object_id, width) VALUES (?, ?, ?)
-          ON CONFLICT(session_id) DO UPDATE SET object_id=excluded.object_id, width=excluded.width`)
-          .run(command.sessionId, command.objectId === undefined ? previous?.object_id ?? null : command.objectId,
-            command.width === undefined ? previous?.width ?? null : command.width);
+      case "islands.set":
+        // The arrangement is stored as written; projection drops islands whose content has left the current projection.
+        this.db.prepare(`INSERT INTO workbench_islands (session_id, islands_json) VALUES (?, ?)
+          ON CONFLICT(session_id) DO UPDATE SET islands_json=excluded.islands_json`)
+          .run(command.sessionId, JSON.stringify(command.islands));
         break;
-      }
     }
   }
 
@@ -176,12 +170,13 @@ export class SessionWorkbench {
     const ids = new Set(this.tree.workbench(sessionId).objects.map(object => object.id));
     const rows = this.db.prepare("SELECT * FROM object_views WHERE session_id = ?").all(sessionId) as ViewRow[];
     const viewport = this.db.prepare("SELECT x, y, zoom FROM viewports WHERE session_id = ?").get(sessionId) as Viewport | undefined;
-    const focus = this.db.prepare("SELECT object_id, width FROM workbench_focus WHERE session_id = ?").get(sessionId) as FocusRow | undefined;
+    const stored = this.db.prepare("SELECT islands_json FROM workbench_islands WHERE session_id = ?").get(sessionId) as { islands_json: string } | undefined;
+    const islands = stored ? sessionIslandsSchema.parse(JSON.parse(stored.islands_json)) : [];
     return {
       views: rows.filter(row => ids.has(row.object_id) || retiring.includes(row.object_id)).map(row => ({
         objectId: row.object_id, position: { x: row.x, y: row.y }, hidden: !!row.hidden, collapsed: !!row.collapsed,
         size: row.width === null || row.height === null ? null : { width: row.width, height: row.height },
       })), viewport: viewport ?? { x: 0, y: 0, zoom: 1 },
-      focus: { objectId: focus?.object_id && ids.has(focus.object_id) ? focus.object_id : null, width: focus?.width ?? null } };
+      islands: liveIslands(islands, ids) };
   }
 }

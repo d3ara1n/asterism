@@ -13,20 +13,53 @@ import { runtime } from "../../runtime";
 import { useI18n } from "../../shared/i18n";
 import { operationSucceeded, toast } from "../../shared/toast";
 import { IslandPanel, panelIslandWidth } from "../../shared/weave/IslandPanel";
-import { useIsland, useRootIsland, type IslandApi } from "../../shared/weave/Screen";
+import { useIsland, type IslandApi, type IslandSpec } from "../../shared/weave/Screen";
+import type { IslandView } from "../../../shared/workbench";
+import type { ViewRegistry } from "../../modules/registry";
 import { pluginPreferences } from "../creation/preferences";
 
-function pluginIsland(island: IslandApi, pluginId: string): RendererIsland {
+/** Host spec for a plugin island; restore tags it as rebuildable from that view. */
+function pluginIslandSpec(pluginId: string, spec: RendererIslandSpec, restore?: IslandView): IslandSpec {
+  return { id: `plugin-island:${pluginId}:${spec.key}`, label: spec.label,
+    width: spec.size === "content" ? { min: 560, grow: 2 } : panelIslandWidth, origin: spec.origin, restore,
+    render: () => <PluginIslandContent pluginId={pluginId} spec={spec} /> };
+}
+
+/** restore tags the first island opened through this adapter: a resource opener shows its location there. */
+function pluginIsland(island: IslandApi, pluginId: string, restore?: IslandView): RendererIsland {
   const prefix = `plugin-island:${pluginId}:`;
+  let tag = restore;
   return {
-    get child() { const child = island.child; return child?.startsWith(prefix) ? child.slice(prefix.length) : undefined; },
-    open: spec => island.open({ id: prefix + spec.key, label: spec.label,
-      width: spec.size === "content" ? { min: 560, grow: 2 } : panelIslandWidth, origin: spec.origin,
-      render: () => <PluginIslandContent pluginId={pluginId} spec={spec} /> }),
+    has: key => island.has(prefix + key),
+    open: spec => { const next = pluginIslandSpec(pluginId, spec, tag); tag = undefined; return island.open(next); },
     close: options => island.close(options),
-    closeChild: options => island.closeChild(options),
+    closeOwned: options => island.closeOwned(options),
     guard: guard => island.guard(guard),
   };
+}
+
+/**
+ * Rebuild a restored resource island: run the resource's opener against a capturing island and take the island it opens.
+ * Null when the resource is absent, cannot open locations, or opens nothing.
+ */
+export async function resolveResourceIsland(registry: ViewRegistry, calls: RendererCalls,
+  object: { id: string; kind: string } | undefined, sessionId: string, view: Extract<IslandView, { kind: "resource" }>): Promise<IslandSpec | null> {
+  const descriptor = object && registry.resource(object.kind);
+  if (!object || !descriptor?.open) return null;
+  const pluginId = pluginOf(object.kind)!;
+  let captured: IslandSpec | null = null;
+  const capture: RendererIsland = {
+    has: () => false,
+    open: async spec => { captured ??= pluginIslandSpec(pluginId, spec, view); return true; },
+    close: async () => false, closeOwned: async () => true, guard: () => () => {},
+  };
+  try {
+    await descriptor.open(view.location, { resource: { sessionId, id: object.id, kind: object.kind }, calls, island: capture });
+  } catch (error) {
+    console.error("Restored resource island could not be opened.", error);
+    return null;
+  }
+  return captured;
 }
 
 /** Plugin UI errors affect only their own region; the host retains management access. */
@@ -58,14 +91,12 @@ export function PluginCallScope({ children }: { children: ReactNode }) {
 
 /**
  * Adapt the containing host island into a plugin island: identities are isolated by plugin, and the host standardizes width and shell.
- * page is the island containing the settings page: when the page unmounts, close the islands it opened as well (content is invalid, so skip guards).
+ * Islands opened here belong to the containing island. page marks a settings page: when it unmounts, close the islands it opened (content is invalid, so skip guards).
  */
-export function PluginIslandProvider({ pluginId, page = false, placement = "child", children }: {
-  pluginId: string; page?: boolean; placement?: "root" | "child"; children: ReactNode;
+export function PluginIslandProvider({ pluginId, page = false, children }: {
+  pluginId: string; page?: boolean; children: ReactNode;
 }) {
-  const containing = useIsland();
-  const root = useRootIsland();
-  const island = placement === "root" ? root : containing;
+  const island = useIsland();
   const registry = useModuleViews();
   const calls = useRendererCalls();
   const i18n = useI18n();
@@ -86,7 +117,7 @@ export function PluginIslandProvider({ pluginId, page = false, placement = "chil
         if (!descriptor.open) { toast.error(i18n.text(objectsMessages.resourceOpenUnsupported)); return false; }
         const resource = { sessionId: target.sessionId, id: object.id, kind: object.kind };
         return await descriptor.open(location, { resource, calls, origin: options?.origin,
-          island: pluginIsland(island, pluginOf(object.kind)!) });
+          island: pluginIsland(island, pluginOf(object.kind)!, { kind: "resource", resourceId: object.id, location }) });
       } catch (error) {
         console.error("Resource location could not be opened.", error);
         toast.error(i18n.text(failureDisplay(error, objectsMessages.resourceOpenFailed)));
@@ -96,7 +127,7 @@ export function PluginIslandProvider({ pluginId, page = false, placement = "chil
   }), [island, registry, calls, i18n]);
   useEffect(() => {
     if (!page) return;
-    return () => { void island.closeChild({ force: true }); };
+    return () => { void island.closeOwned({ force: true }); };
   }, [page, island]);
   return <RendererIslandProvider value={adapter}>
     <RendererResourceNavigationProvider value={navigation}>

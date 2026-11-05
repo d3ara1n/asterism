@@ -50,7 +50,7 @@ export function MessagingSettings() {
         {index > 0 && <ItemSeparator />}
         <ListRow className="rounded-none" mediaVariant="icon" media={<MessageSquare />} title={connection.name}
           description={description} inactive={!connection.enabled}
-          selected={island.child === `messaging-${connection.id}`} onOpen={origin => open(connection.id, origin)}
+          selected={island.has(`messaging-${connection.id}`)} onOpen={origin => open(connection.id, origin)}
           actions={<>
             <StatusBadge tone={statusTone[status]}>{i18n.text(messages[status])}</StatusBadge>
             {restartable.has(status) && <Button variant="ghost" size="icon-sm" disabled={action.busy}

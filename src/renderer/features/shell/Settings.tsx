@@ -31,7 +31,6 @@ export function ShellSettings({ value, disabled, save }: {
   value: Settings; disabled: boolean; save(value: Settings): Promise<boolean>;
 }) {
   const i18n = useI18n(), island = useRendererIsland(), calls = useRendererCalls();
-  const [editingId, setEditingId] = useState<string | null>(null);
   const presetTrigger = useRef<HTMLButtonElement>(null);
   const [discovery, setDiscovery] = useState<ShellProfileList | null>(null);
   const [discoveryFailed, setDiscoveryFailed] = useState(false);
@@ -48,8 +47,7 @@ export function ShellSettings({ value, disabled, save }: {
   const checking = !discovery && !discoveryFailed;
   const open = async (profile: ShellProfile, origin?: HTMLElement | null) => {
     const opened = await island.open({ key: islandKey(profile.id), label: messages.profile, origin,
-      render: () => <ShellProfileEditor id={profile.id} initial={profile} onSaved={setEditingId} /> });
-    if (opened) setEditingId(profile.id);
+      render: () => <ShellProfileEditor id={profile.id} initial={profile} /> });
     return opened;
   };
   const commit = (next: Settings) => {
@@ -71,7 +69,7 @@ export function ShellSettings({ value, disabled, save }: {
   const row = (saved: ShellProfile) => {
     const installedPath = discovery?.profiles.find(item => item.id === saved.id)?.resolvedExecutable;
     return <div key={saved.id} role="listitem">
-      <ListRow selected={!!island.child && editingId === saved.id} onOpen={origin => { void open(saved, origin); }}
+      <ListRow selected={island.has(islandKey(saved.id))} onOpen={origin => { void open(saved, origin); }}
         title={<>{saved.id}{value.selected === saved.id && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}</>}
         description={<span className="font-mono text-xs">{preview(saved)}</span>}
         details={installedPath && <span className="flex min-w-0 items-center gap-2">
@@ -131,7 +129,7 @@ export function ShellSettings({ value, disabled, save }: {
  * Profile editor island: reads the current configuration, stays open after saving, and uses the saved result as its new baseline; the island's close button closes it.
  * Closes the island if the profile is removed elsewhere (for example, by restoring defaults).
  */
-function ShellProfileEditor({ id: initialId, initial, onSaved }: { id: string; initial: ShellProfile; onSaved(id: string): void }) {
+function ShellProfileEditor({ id: initialId, initial }: { id: string; initial: ShellProfile }) {
   const i18n = useI18n(), island = useRendererIsland(), fieldId = useId();
   const [id, setId] = useState(initialId);
   const config = useShellConfiguration();
@@ -168,7 +166,6 @@ function ShellProfileEditor({ id: initialId, initial, onSaved }: { id: string; i
     if (!await config.save(next.data)) return;
     const persisted = next.data.profiles.find(item => item.id === edited.id)!;
     setId(persisted.id);
-    onSaved(persisted.id);
     const normalized = draftOf(persisted);
     setBaseline(normalized); setDraft(normalized);
   };

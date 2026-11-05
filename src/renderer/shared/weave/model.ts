@@ -1,7 +1,8 @@
 /**
  * In-screen layout model for island weaving (weave); pure functions independent of React and DOM.
  *
- * Hierarchy: Screen switches as a whole on the page strip; Islands within a Screen run left to right, with deeper levels farther right.
+ * Screen switches as a whole on the page strip. Within a Screen, fixed leading islands, the root, ordinary islands, and fixed trailing islands run left to right.
+ * Ordinary islands are independent windows: they open at the right end, keep their positions until the user swaps them, and close together with the islands they opened.
  * When the sum of all island min widths fits, distribute width by grow without translation; otherwise each falls back to min,
  * forming an overflowing strip within the screen, with the viewport smoothly following the focused island.
  */
@@ -11,11 +12,8 @@ export interface IslandWidth { min: number; grow?: number; max?: number }
 
 export interface IslandSlot { id: string; width: IslandWidth }
 
-export interface StripState {
-  /** Left to right: farther right means deeper. */
-  islands: IslandSlot[];
-  focus: string;
-}
+/** Ordinary island ownership: owner is the island that opened it, or null; ownership, not position, determines cascading closure. */
+export interface OwnedIsland { id: string; owner: string | null }
 
 export interface Span { left: number; width: number }
 export interface ScreenLayout { spans: Span[]; total: number; overflow: boolean }
@@ -68,21 +66,62 @@ export function follow(spans: Span[], focusIndex: number, viewport: number, offs
   return Math.min(Math.max(next, 0), max);
 }
 
-/** Open an island to the right of parent: replace existing deeper islands to its right and focus the new island. */
-export function openIsland(state: StripState, parent: string, slot: IslandSlot): StripState {
-  const index = state.islands.findIndex(island => island.id === parent);
-  if (index < 0) return state;
-  return { islands: [...state.islands.slice(0, index + 1), slot], focus: slot.id };
+/** Open or locate an ordinary island by identity: an existing identity stays in place; a new one appends at the right end. */
+export function openIsland<T extends OwnedIsland>(islands: readonly T[], island: T): { islands: readonly T[]; opened: boolean } {
+  return islands.some(item => item.id === island.id) ? { islands, opened: false } : { islands: [...islands, island], opened: true };
 }
 
-/** Close the island and all deeper islands to its right, returning focus to the left neighbor; the root island cannot close. */
-export function closeIsland(state: StripState, id: string): StripState {
-  const index = state.islands.findIndex(island => island.id === id);
-  if (index <= 0) return state;
-  return { islands: state.islands.slice(0, index), focus: state.islands[index - 1]!.id };
+/**
+ * Islands removed by closing id: the ordinary islands it opened, transitively, deepest first, followed by id itself when it is ordinary.
+ * id may also be a fixed island or the root, which close only what they opened. Ownership cycles terminate.
+ */
+export function closure(islands: readonly OwnedIsland[], id: string): string[] {
+  const result: string[] = [];
+  const visited = new Set<string>();
+  const visit = (owner: string) => {
+    if (visited.has(owner)) return;
+    visited.add(owner);
+    for (const island of islands) if (island.owner === owner) visit(island.id);
+    if (islands.some(island => island.id === owner)) result.push(owner);
+  };
+  visit(id);
+  return result;
 }
 
-/** Move focus to an existing island without changing the strip's composition. */
-export function focusIsland(state: StripState, id: string): StripState {
-  return state.islands.some(island => island.id === id) && state.focus !== id ? { ...state, focus: id } : state;
+export function removeIslands<T extends OwnedIsland>(islands: readonly T[], ids: readonly string[]): readonly T[] {
+  const removed = new Set(ids);
+  return islands.some(island => removed.has(island.id)) ? islands.filter(island => !removed.has(island.id)) : islands;
+}
+
+/** Swap an ordinary island with its left (-1) or right (1) ordinary neighbor; unchanged at either end. */
+export function moveIsland<T extends OwnedIsland>(islands: readonly T[], id: string, direction: -1 | 1): readonly T[] {
+  const index = islands.findIndex(island => island.id === id);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= islands.length) return islands;
+  const next = [...islands];
+  [next[index], next[target]] = [next[target]!, next[index]!];
+  return next;
+}
+
+/**
+ * Focus after removal, decided on the composed order before removal: a surviving focus stays;
+ * otherwise the nearest survivor left of the removed focus, then the nearest to its right, then fallback.
+ */
+export function focusAfterClose(order: readonly string[], removed: readonly string[], focus: string, fallback: string): string {
+  const gone = new Set(removed);
+  if (!gone.has(focus)) return focus;
+  const index = order.indexOf(focus);
+  for (let i = index - 1; i >= 0; i--) if (!gone.has(order[i]!)) return order[i]!;
+  for (let i = index + 1; i < order.length; i++) if (!gone.has(order[i]!)) return order[i]!;
+  return fallback;
+}
+
+/**
+ * Interpret an island list crossing a persistence boundary: drop repeated identities and detach owners
+ * that are neither in the list nor among keep (fixed identities such as the root, which always exist).
+ */
+export function restoreIslands<T extends OwnedIsland>(islands: readonly T[], keep: ReadonlySet<string> = new Set()): T[] {
+  const seen = new Set<string>();
+  const unique = islands.filter(island => !seen.has(island.id) && !!seen.add(island.id));
+  return unique.map(island => island.owner === null || seen.has(island.owner) || keep.has(island.owner) ? island : { ...island, owner: null });
 }
