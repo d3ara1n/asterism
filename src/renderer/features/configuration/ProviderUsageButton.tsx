@@ -18,6 +18,9 @@ const tone = (share: number) => share >= 0.5
     ? { track: "bg-warning/25", bar: "[&>[data-slot=progress-indicator]]:bg-warning", dot: "bg-warning" }
     : { track: "bg-destructive/25", bar: "[&>[data-slot=progress-indicator]]:bg-destructive", dot: "bg-destructive" };
 
+/** Every glyph in the capsule shares one size; a glyph's own `size-*` still wins over this fallback. */
+const glyphScale = "[&_svg:not([class*='size-'])]:size-3.5";
+
 /**
  * Reads the shared host cache on mount, which queries only when the cache is missing or expired; clicking forces a query.
  * Host change notifications reread the cache; the list never polls. Only the clicked refresh is surfaced as `refreshing`;
@@ -107,7 +110,7 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
     <TooltipTrigger asChild>
       <button type="button" onClick={refresh} aria-busy={refreshing} aria-disabled={refreshing}
         aria-label={i18n.text(messages.usageRefresh)}
-        className={cn("relative z-10 flex min-h-7 items-center rounded-full border px-2 py-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+        className={cn("relative z-10 flex min-h-7 items-center rounded-full border px-2 py-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", glyphScale,
           drained ? "border-warning/60 bg-warning/10" : "border-border/70 bg-muted/40",
           refreshing ? "cursor-wait" : cn("hover:bg-accent", drained ? "hover:border-warning" : "hover:border-border"))}>
         <motion.span className="flex overflow-x-clip [overflow-clip-margin:2px]" style={{ width: capsule.width }}
@@ -118,7 +121,7 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1, transition: { ...fadeTransition, delay: view === "data" && !reducedMotion ? 0.16 : 0 } }}
                 exit={{ opacity: 0, transition: fadeTransition }}>
-                {view === "loading" ? <Spinner />
+                {view === "loading" ? <Spinner className="size-3.5" />
                   : view === "waiting" ? <CircleDashed className="text-muted-foreground" />
                   : view === "error" ? <AlertCircle className="text-warning" />
                   : <>
@@ -134,10 +137,10 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
                         className={cn("size-1.5 rounded-full", tone(quotaRemaining(item)).dot, quotaRemaining(item) === 0 && "ring-1 ring-background")} />)}
                     </span>}
                     {balances.map(item => <span key={item.id} className="flex items-center gap-1 text-xs font-medium tabular-nums">
-                      <Coins className={cn("size-3.5 text-muted-foreground", item.remaining <= 0 && "text-destructive")} aria-hidden="true" />
+                      <Coins className={cn("text-muted-foreground", item.remaining <= 0 && "text-destructive")} aria-hidden="true" />
                       {money(item.remaining, item.currency)}
                     </span>)}
-                    {state?.error && <AlertCircle className="size-3.5 text-warning" aria-hidden="true" />}
+                    {state?.error && <AlertCircle className="text-warning" aria-hidden="true" />}
                   </>}
               </motion.span>}
             </AnimatePresence>
@@ -146,7 +149,7 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
         <AnimatePresence initial={false}>
           {dimmed && <motion.span key="refreshing" className="pointer-events-none absolute inset-0 flex items-center justify-center"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={fadeTransition}>
-            <Spinner />
+            <Spinner className="size-3.5" />
           </motion.span>}
         </AnimatePresence>
       </button>
