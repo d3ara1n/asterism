@@ -9,11 +9,13 @@ export const folderSchemaSql = `
 /** Membership column shared by new schemas and the format migration; null means the row belongs to no folder. */
 export const folderColumnSql = "folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL";
 
+export const completedColumnSql = "completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1))";
+
 /** Runtime database creation and independent contract tests share the session storage structure. */
 export const sessionSchemaSql = `
   ${folderSchemaSql}
   -- archived_at is null for active sessions; otherwise it is the archive time, with startup cleanup deleting sessions past the retention period.
-  CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL, initial_title TEXT NOT NULL, created_at TEXT NOT NULL, cursor TEXT, archived_at TEXT, ${folderColumnSql});
+  CREATE TABLE sessions (id TEXT PRIMARY KEY, title TEXT NOT NULL, initial_title TEXT NOT NULL, created_at TEXT NOT NULL, cursor TEXT, archived_at TEXT, ${folderColumnSql}, ${completedColumnSql});
   CREATE TABLE session_nodes (
     seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE,
     session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,

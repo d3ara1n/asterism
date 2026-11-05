@@ -76,9 +76,14 @@ export class SessionTree {
     return id;
   }
   /** Active session catalog; archived sessions are read only through archived. */
-  list(): { id: string; title: string; createdAt: string }[] {
-    return (this.db.prepare("SELECT id, title, created_at FROM sessions WHERE archived_at IS NULL ORDER BY created_at DESC, rowid DESC").all() as
-      { id: string; title: string; created_at: string }[]).map(r => ({ id: r.id, title: r.title, createdAt: r.created_at }));
+  list(): { id: string; title: string; createdAt: string; completed: boolean }[] {
+    return (this.db.prepare("SELECT id, title, created_at, completed FROM sessions WHERE archived_at IS NULL ORDER BY created_at DESC, rowid DESC").all() as
+      { id: string; title: string; created_at: string; completed: number }[]).map(r => ({ id: r.id, title: r.title, createdAt: r.created_at, completed: r.completed === 1 }));
+  }
+  /** Completion is catalog metadata, independent of execution and historical positions. */
+  setCompleted(sessionId: string, completed: boolean): void {
+    if (!this.db.prepare("UPDATE sessions SET completed = ? WHERE id = ? AND archived_at IS NULL").run(Number(completed), sessionId).changes)
+      throw new SessionError("not_found", "Session not found.");
   }
   /** Trash catalog: lists sessions themselves without reading their contents. */
   archived(): { id: string; title: string; createdAt: string; archivedAt: string }[] {

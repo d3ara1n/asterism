@@ -30,7 +30,7 @@ import { RendererCatalogProvider } from "../modules/object-context";
 import { Screen, type IslandSpec, type ScreenHandle } from "../shared/weave/Screen";
 import { Toaster } from "../shared/ui/sonner";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { operationSucceeded, useStateToast } from "../shared/toast";
+import { operationSucceeded, toast, useStateToast } from "../shared/toast";
 
 import { errorDisplay } from "../../shared/error-display.ts";
 import type { UiText } from "@asterism-app/sdk/contracts";
@@ -98,6 +98,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const writable = ready && !sessionBlocked && !!session;
   const focusedObjectId = view.kind === "conversation" ? session?.focus.objectId ?? null : null;
   const inSettings = page === "settings";
+  const completed = view.kind === "conversation" && !!snapshot?.sessions.find(item => item.id === view.sessionId)?.completed;
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? i18n.formatMessage(commonMessages.conversation);
 
@@ -198,7 +199,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       setSettingsTarget({ category: "about", sequence: ++navigation.current });
     }} />
     <span className="h-4 w-px shrink-0 bg-border" />
-    <span className="window-session-title" title={inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}>{inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}</span>
+    <span className={completed && !inSettings ? "window-session-title line-through" : "window-session-title"} title={inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}>{inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}</span>
   </>;
   const actions = session ? <>
     <DropdownMenu modal={false}><DropdownMenuTrigger asChild>
@@ -233,6 +234,10 @@ export function App({ controller }: { controller: ApplicationController }) {
       renameDisabledSessionId={active && !writable ? active.sessionId : null}
       onRename={renameSession}
       onArchive={archiveSession}
+      onCompletedChange={async (sessionId, completed) => {
+        const failure = await controller.execute({ type: "session.set-completed", sessionId, completed });
+        if (failure) toast.error(i18n.text(failure));
+      }}
       onTemplateSaved={() => { void controller.refresh({ quiet: true }); }}
       homeActive={view.kind === "home"}
       collapsed={collapsedGroups} onToggleGroup={toggleGroup}

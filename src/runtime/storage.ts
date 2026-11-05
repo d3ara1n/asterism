@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { sessionSchemaSql, pendingRecordsIndexSql, folderSchemaSql, folderColumnSql } from "../session/schema.ts";
+import { sessionSchemaSql, pendingRecordsIndexSql, folderSchemaSql, folderColumnSql, completedColumnSql } from "../session/schema.ts";
 import { applicationStorage, sessionRetentionMs } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
 import { templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 import { mcpSchemaSql } from "../mcp/storage.ts";
 
-export const workspaceDatabaseVersion = 31;
+export const workspaceDatabaseVersion = 32;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
@@ -82,6 +82,7 @@ const focusTableSql = `
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
     version: workspaceDatabaseVersion, migrations: {
+      31: db => { db.exec(`ALTER TABLE sessions ADD COLUMN ${completedColumnSql};`); },
       29: db => { db.exec(pendingRecordsIndexSql); },
       // Existing sessions and templates start without a folder; no membership is invented for them.
       30: db => { db.exec(`${folderSchemaSql}

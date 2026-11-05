@@ -29,12 +29,13 @@ type SessionSummary = AppSnapshot["sessions"][number];
 export const noFolderGroup = "none";
 
 /** Application navigation consumes only session summaries; after selecting a session, the application layer explicitly loads the workbench. */
-export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, collapsed, onToggleGroup, onHome, onSession, onRename, onArchive, onTemplateSaved, onHide, onRetry }: {
+export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, collapsed, onToggleGroup, onHome, onSession, onRename, onArchive, onCompletedChange, onTemplateSaved, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
   resourceStatuses: readonly ResourceStatusMark[];
   renameDisabledSessionId: string | null; onRename: (sessionId: string, title: string) => Promise<SessionResult>;
   onArchive: (sessionId: string) => Promise<SessionResult>;
   onTemplateSaved: () => void;
+  onCompletedChange: (sessionId: string, completed: boolean) => Promise<void>;
   /** Collapsed group keys: folder identities or `noFolderGroup`. */
   collapsed: ReadonlySet<string>; onToggleGroup: (key: string) => void;
   homeActive: boolean; onHome: () => void; onSession: (id: string) => void;
@@ -51,10 +52,11 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
     return <ListRow key={session.id} variant="navigation"
       selected={selectedSessionId === session.id} disabled={disabled} onOpen={() => onSession(session.id)}
       buttonProps={{ title: session.title, "aria-current": selectedSessionId === session.id ? "page" : undefined }}
-      media={<MessageSquare className="text-muted-foreground" />} title={<span className="block truncate">{session.title}</span>}
+      media={<MessageSquare className="text-muted-foreground" />} title={<span className={cn("block truncate", session.completed && "line-through")}>{session.title}</span>}
       actions={<>
         <SessionStatus marks={marks} />
         <SessionActions sessionId={session.id} title={session.title} folderId={session.folder_id} disabled={disabled}
+          completed={session.completed} onCompletedChange={completed => onCompletedChange(session.id, completed)}
           renameDisabled={renameDisabledSessionId === session.id}
           onRename={title => onRename(session.id, title)} onArchive={() => onArchive(session.id)} onTemplateSaved={onTemplateSaved} />
       </>} />;

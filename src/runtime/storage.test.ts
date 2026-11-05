@@ -35,6 +35,38 @@ function revertFolders(db: DatabaseSync) {
 const count = (db: DatabaseSync, table: string, sessionId: string) =>
   Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE session_id = ?`).get(sessionId) as { n: number }).n);
 
+it("migrates existing sessions to uncompleted without changing history", () => {
+  const { root, db, tree } = setup(), sessionId = tree.create("Existing");
+  const original = tree.appendToTimeline(sessionId, event("example/final", { text: "Saved response" }));
+  db.exec("ALTER TABLE sessions DROP COLUMN completed; PRAGMA user_version = 31;");
+  db.close(); databases.splice(databases.indexOf(db), 1);
+  workspaceStorage(root).inspect()!.apply();
+  const reopened = openDatabase(root); databases.push(reopened);
+  const next = new SessionTree(reopened);
+  expect(next.list().find(session => session.id === sessionId)?.completed).toBe(false);
+  expect(next.nodes(sessionId)).toEqual([original]);
+});
+
+it("keeps completion independent of history selection, new records, and archival", () => {
+  const { tree } = setup(), sessionId = tree.create("Task"), otherId = tree.create("Other");
+  const original = tree.appendToTimeline(sessionId, event("example/final", { text: "Saved" }));
+  const before = tree.list();
+  tree.setCompleted(sessionId, true);
+  expect(tree.list()).toEqual(before.map(session => ({ ...session, completed: session.id === sessionId })));
+  expect(tree.cursor(sessionId)).toBe(original.id);
+  expect(tree.nodes(sessionId)).toEqual([original]);
+  tree.select(sessionId, null);
+  tree.appendToTimeline(sessionId, event("example/final", { text: "Continued" }));
+  tree.archive(sessionId);
+  tree.restore(sessionId);
+  expect(tree.list().find(session => session.id === sessionId)?.completed).toBe(true);
+  tree.setCompleted(sessionId, false);
+  expect(tree.list().filter(session => session.completed)).toEqual([]);
+  tree.archive(otherId);
+  expect(() => tree.setCompleted(otherId, true)).toThrow("Session not found.");
+  expect(() => tree.setCompleted("missing", true)).toThrow("Session not found.");
+});
+
 // The pending-record index upgrade preserves existing finalized payloads and allows publication in the same database.
 it("upgrades the preceding workspace format without rewriting existing history", () => {
   const { root, db, tree } = setup(), sessionId = tree.create("Existing");

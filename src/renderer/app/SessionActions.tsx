@@ -1,4 +1,4 @@
-import { Archive, LayoutTemplate, MoreHorizontal, Pencil } from "lucide-react";
+import { Archive, Check, Undo2, LayoutTemplate, MoreHorizontal, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import type { SessionResult } from "../../shared/session";
 import { RenameSession } from "../features/session/RenameSession";
@@ -18,15 +18,17 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 
 /** Session row menu: rename, folder membership, save as template, and archive; actions are independent of session navigation. */
-export function SessionActions({ sessionId, title, folderId, disabled, renameDisabled, onRename, onArchive, onTemplateSaved }: {
+export function SessionActions({ sessionId, title, folderId, disabled, renameDisabled, onRename, onArchive, onTemplateSaved, completed, onCompletedChange }: {
   sessionId: string; title: string; folderId: string | null; disabled: boolean; renameDisabled: boolean;
   onRename: (title: string) => Promise<SessionResult>;
   onArchive: () => Promise<SessionResult>;
   onTemplateSaved: () => void;
+  completed: boolean; onCompletedChange: (completed: boolean) => Promise<void>;
 }) {
   const i18n = useI18n();
   const { run } = useFolders();
   const trigger = useRef<HTMLButtonElement>(null);
+  const [marking, setMarking] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
   const [creatingFolder, setCreatingFolder] = useState(false);
@@ -38,6 +40,11 @@ export function SessionActions({ sessionId, title, folderId, disabled, renameDis
   const move = async (target: string | null) => {
     const failure = await run({ type: "session.move", sessionId, folderId: target });
     if (failure) toast.error(i18n.text(failure));
+  };
+  const markCompleted = async () => {
+    setMarking(true);
+    try { await onCompletedChange(!completed); }
+    finally { setMarking(false); }
   };
   const archive = async () => {
     setArchiving(true);
@@ -55,6 +62,9 @@ export function SessionActions({ sessionId, title, folderId, disabled, renameDis
       <DropdownMenuContent align="end" onCloseAutoFocus={event => { if (renaming || confirming || savingTemplate || creatingFolder) event.preventDefault(); }}>
         <DropdownMenuItem disabled={cannotRename} onSelect={() => setRenaming(true)}>
           <Pencil />{i18n.text(appMessages.renameConversation)}…
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={disabled || marking} onSelect={() => { void markCompleted(); }}>
+          {completed ? <Undo2 /> : <Check />}{i18n.text(completed ? appMessages.unmarkCompleted : appMessages.markCompleted)}
         </DropdownMenuItem>
         <MoveToFolderMenu value={folderId} disabled={disabled} onMove={target => { void move(target); }} onCreate={() => setCreatingFolder(true)} />
         <DropdownMenuItem disabled={disabled} onSelect={() => setSavingTemplate(true)}>

@@ -86,6 +86,7 @@ export class ApplicationService {
       else if (command.type === "folder.create") this.folders.create(command.id, command.name, command.color);
       else if (command.type === "folder.update") this.folders.update(command.id, command.name, command.color);
       else if (command.type === "folder.delete") this.folders.delete(command.id);
+      else if (command.type === "session.set-completed") this.sessions.tree.setCompleted(command.sessionId, command.completed);
       else if (command.type === "session.move") this.folders.moveSession(command.sessionId, command.folderId);
       else if (command.type === "template.move") this.folders.moveTemplate(command.templateId, command.folderId);
     } catch (error) {
@@ -95,7 +96,7 @@ export class ApplicationService {
     }
     const workspace = this.db.prepare("SELECT * FROM workspace LIMIT 1").get();
     const membership = this.folders.sessionFolders();
-    const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, folder_id: membership.get(session.id) ?? null }));
+    const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, completed: session.completed, folder_id: membership.get(session.id) ?? null }));
     const archivedSessions = this.sessions.tree.archived().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, archived_at: session.archivedAt }));
     const current = this.list.read();
     const entries = [

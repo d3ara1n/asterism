@@ -31,6 +31,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("plugin.remove"), index: z.number().int().nonnegative() }),
   // Folder catalog and membership changes return the refreshed snapshot so navigation regroups at once.
   ...folderCommands,
+  z.strictObject({ type: z.literal("session.set-completed"), sessionId: id, completed: z.boolean() }),
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export const runtimeStatusSchema = z.enum(["starting", "ready", "unavailable", "stopping"]);
@@ -38,7 +39,7 @@ export type RuntimeStatus = z.infer<typeof runtimeStatusSchema>;
 export const snapshotSchema = z.strictObject({
   workspace: z.strictObject({ id, title: z.string() }),
   folders: z.array(folderSchema),
-  sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), folder_id: folderIdSchema })),
+  sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), folder_id: folderIdSchema, completed: z.boolean() })),
   templates: z.array(templateSummarySchema),
   /** Trash catalog containing sessions themselves only, used for settings counts and restoration. */
   archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string() })),
