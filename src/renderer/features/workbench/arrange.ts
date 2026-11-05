@@ -1,22 +1,53 @@
-import type { Point } from "../../../shared/workbench";
-import type { WorkbenchSnapshot } from "../../../shared/workbench";
-import { runLayout } from "./layout";
-import type { LayoutStrategy, LayoutObject } from "./layout";
+import type { ElkNode } from "elkjs/lib/elk-api";
+import type { CardSize, Point, WorkbenchSnapshot } from "../../../shared/workbench";
+import { placementGap } from "./layout";
 
-export type { LayoutObject };
-export { orbitOrbit, orbitBox, boxBox, orbitGrid, columnColumn } from "./layout";
+export type LayoutObject = CardSize & { id: string; position: Point };
 
-/** Arrange visible objects using the supplied strategy; preserve the original graph center. */
+function center(objects: readonly LayoutObject[]): Point {
+  const left = Math.min(...objects.map(object => object.position.x));
+  const top = Math.min(...objects.map(object => object.position.y));
+  const right = Math.max(...objects.map(object => object.position.x + object.width));
+  const bottom = Math.max(...objects.map(object => object.position.y + object.height));
+  return { x: (left + right) / 2, y: (top + bottom) / 2 };
+}
+
+/** Explicitly arrange visible objects using complete rectangles and real directed links; preserve the original graph center. */
 export async function arrangeObjects(
-  objects: readonly LayoutObject[],
-  links: WorkbenchSnapshot["links"],
-  signal?: AbortSignal,
-  strategy?: LayoutStrategy,
+  objects: readonly LayoutObject[], links: WorkbenchSnapshot["links"], signal?: AbortSignal,
 ): Promise<{ objectId: string; position: Point }[]> {
   if (!objects.length) return [];
   signal?.throwIfAborted();
-  const { orbitOrbit: defaultStrategy } = await import("./layout");
+  const { default: ELK } = await import("elkjs/lib/elk.bundled.js");
   signal?.throwIfAborted();
-  const positions = runLayout(objects, links, strategy ?? defaultStrategy);
-  return objects.map(o => ({ objectId: o.id, position: positions.get(o.id)! }));
+  const elk = new ELK();
+  const ids = new Set(objects.map(object => object.id));
+  const graph: ElkNode = {
+    id: "workbench",
+    layoutOptions: {
+      "elk.algorithm": "layered",
+      "elk.direction": "RIGHT",
+      "elk.spacing.nodeNode": String(placementGap.y),
+      "elk.layered.spacing.nodeNodeBetweenLayers": String(placementGap.x),
+      "elk.spacing.componentComponent": String(Math.max(placementGap.x, placementGap.y)),
+      "elk.separateConnectedComponents": "true",
+      "elk.randomSeed": "1",
+    },
+    children: objects.map(({ id, width, height }) => ({ id, width, height })),
+    edges: links.filter(link => ids.has(link.resourceId) && ids.has(link.receiverId))
+      .map((link, index) => ({ id: `link-${index}`, sources: [link.resourceId], targets: [link.receiverId] })),
+  };
+  const result = await elk.layout(graph);
+  signal?.throwIfAborted();
+  const children = result.children ?? [];
+  if (children.length !== objects.length || children.some(node => !Number.isFinite(node.x) || !Number.isFinite(node.y)))
+    throw new Error("Layout did not return a position for every object.");
+  const byId = new Map(children.map(node => [node.id, node]));
+  const arranged = objects.map(object => ({
+    ...object, position: { x: byId.get(object.id)!.x!, y: byId.get(object.id)!.y! },
+  }));
+  // The ELK root container includes routing space; the workbench uses only node positions, so both centers are calculated from card rectangles.
+  const before = center(objects), after = center(arranged);
+  return arranged.map(object => ({ objectId: object.id,
+    position: { x: object.position.x + before.x - after.x, y: object.position.y + before.y - after.y } }));
 }

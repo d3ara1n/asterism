@@ -11,7 +11,6 @@ import { operationSucceeded, toast } from "../../shared/toast";
 import { useI18n } from "../../shared/i18n";
 import { workbenchMessages } from "../../messages/workbench";
 import { arrangeObjects } from "./arrange";
-import type { LayoutStrategy } from "./layout";
 
 export type ObjectPlacement = { sessionId: string; position: Point; selectedObjectIds: string[] };
 
@@ -22,8 +21,7 @@ export interface WorkbenchCanvas {
   /** Open hidden objects, wait for projection and measurement, then frame them together; empty lists or invalid objects do not move the viewport. */
   locateObjects: (objectIds: readonly string[], options?: { select?: boolean }) => Promise<void>;
   /** Explicitly arrange currently visible cards, save all positions, then frame them together. */
-  /** Explicitly arrange currently visible cards using the given strategy, save all positions, then frame them together. */
-  arrange: (strategy: LayoutStrategy) => Promise<void>;
+  arrange: () => Promise<void>;
 }
 
 type LocateRequest = { objectIds: string[]; select: boolean; token: number };
@@ -98,7 +96,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     if (valid()) setLocating({ objectIds, select: options?.select ?? false, token });
   }, [controller]);
 
-  const arrange = useCallback(async (strategy: LayoutStrategy) => {
+  const arrange = useCallback(async () => {
     const state = controller.getSnapshot();
     const current = flow.getNodes();
     if (arrangement.current || !mounted.current || !available.current || state.navigating
@@ -113,7 +111,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
           id: node.id, position: node.position, width: node.width ?? node.measured?.width ?? size.width,
           height: node.data.collapsed ? node.measured?.height ?? size.height : node.height ?? node.measured?.height ?? size.height,
         };
-      }), state.data.workbench.links, scope.signal, strategy);
+      }), state.data.workbench.links, scope.signal);
       scope.signal.throwIfAborted();
       if (!await run({ type: "views.position", sessionId: controller.sessionId, positions }) || scope.signal.aborted) return;
       // Framing after arrangement includes only participating objects still visible, honoring hiding or removal performed by the user during calculation.
