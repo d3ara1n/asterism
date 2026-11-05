@@ -2,7 +2,7 @@
 
 Filed on 2026-09-17.
 
-Packaging, fixed macOS signing, and a three-platform release pipeline have passed an initial end-to-end trial. Commit-driven prereleases and manual promotion are implemented. One installed prerelease update has been accepted; platform-specific and stable-release acceptance remains pending.
+Packaging, fixed macOS signing, and the three-platform release pipeline are in routine prerelease use: prereleases have been published from main since 2026-10-26, mostly by manual dispatch, with changed public packages published automatically under the `next` dist-tag. Commit-driven prereleases and manual promotion are implemented. One installed prerelease update has been accepted; platform-specific and stable-release acceptance remains pending.
 
 ## Implemented
 
@@ -28,7 +28,7 @@ These additional checks were confirmed by the user on their own installation. Ot
 
 ## Remaining acceptance
 
-- [ ] Verify the generated prerelease version and release notes.
+- [x] Verify the generated prerelease version and release notes. Confirmed by the maintainer across the prerelease series through 2026-11-05.
 - [ ] Verify manual promotion of a tested candidate and its cumulative stable notes.
 - [ ] Verify the packaged plugin-build helper with a current external source plugin. An earlier packaged source-plugin load was accepted on 2026-10-13.
 - [ ] Verify installed updates on Windows and Linux real machines, recording each platform separately.

@@ -32,7 +32,8 @@ A marketplace service is outside the confirmed initial scope.
 
 - [x] Publish initial public packages: `@asterism-app/sdk@0.47.0` and `@asterism-app/builtin-api@0.19.1`, manually published from `e861a14`.
 - [x] Integrate public-package publication into the application Release workflow, with independent package versions and channel dist-tags.
-- [ ] Verify automated package publication and promotion, and complete external-plugin acceptance in `plans/todo-2026-10-27-public-api-stability.md` before declaring stable public interfaces.
+- [x] Verify automated package publication: workflow-run prereleases publish changed packages under the `next` dist-tag, checked against the registry on 2026-11-05.
+- [ ] Verify automated promotion and its dist-tag move once a stable candidate exists, and complete external-plugin acceptance in `plans/todo-2026-10-27-public-api-stability.md` before declaring stable public interfaces.
 
 Confirmed SDK boundary defects and the template-copy participation boundary are resolved. Protocol, authentication, output, and external-message extensions remain driven by concrete integrations. Shared-environment and unchanged-plugin evidence accumulate during internal development; future feature completeness is not a condition for delivering the current SDK.
 

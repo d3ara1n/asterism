@@ -34,7 +34,8 @@ These tasks concern actual package delivery, not future feature completeness.
 - [x] Decide package versions, npm scope ownership, publication access, and release workflow. Packages publish through the application Release workflow with independent computed versions and channel dist-tags.
 - [x] Publish only after explicit authorization. `@asterism-app/sdk@0.47.0` and `@asterism-app/builtin-api@0.19.1` were published manually from `e861a14`.
 - [x] Register npm trusted publishers for both packages (`release.yml` publish, `promote.yml` dist-tag).
-- [ ] Verify the first automated prerelease publication and promotion.
+- [x] Verify the first automated prerelease publication: workflow-run prereleases publish changed packages under `next` (`@asterism-app/sdk` 1.6.0, `@asterism-app/builtin-api` 0.25.1 checked on the registry on 2026-11-05).
+- [ ] Verify the first automated promotion once a stable candidate exists.
 
 Application-side npm acquisition, exact versions/integrity, upgrade, removal, and private-data cleanup remain delivery work in `plans/todo-2026-10-12-plugin-system.md` and `plans/todo-2026-10-26-release-readiness.md`. They are distinct from publishing the SDK package. A marketplace is outside the current scope.
 
@@ -72,4 +73,4 @@ The initial readiness investigation passed typechecks and 98 selected plugin tes
 
 The template participation change passed project typechecks, 95 tests across template, loader, SDK runtime, and content suites, and the bilingual catalog checks. Cases cover selected current data, undeclared data exclusion, unsupported resources, withdrawn policies, removed/invalid saved data, independent identities, immutable history, codecs, and content retention. Initial offline npm previews included all fixed export targets for the three then-private packages. That validation stage did not include npm publication, GUI acceptance, native-runtime acceptance, or real-data cleanup.
 
-The package preparation commit `e861a14` records passing typechecks, a production build, 57 plugin tests, tarball consumer typechecks, and npm publication dry runs. The two public packages were subsequently published manually from that commit as recorded above. Commit `f82a410` integrates package publication and promotion into the application release workflows. The first automated publication and promotion, installed runtime behavior, and external-plugin GUI acceptance remain pending.
+The package preparation commit `e861a14` records passing typechecks, a production build, 57 plugin tests, tarball consumer typechecks, and npm publication dry runs. The two public packages were subsequently published manually from that commit as recorded above. Commit `f82a410` integrates package publication and promotion into the application release workflows. The first automated publication is verified on the registry; the first automated promotion, installed runtime behavior, and external-plugin GUI acceptance remain pending.
