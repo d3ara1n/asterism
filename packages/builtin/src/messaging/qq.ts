@@ -1,7 +1,7 @@
 import { GatewayConnection, GatewayCloseCode, RATE_LIMIT_DELAY, messagePath, getNextMsgSeq,
-  type InboundMessage, type PersistedSession, type ChatScope, type MessageResponse } from "@tencent-connect/qqbot-nodejs/protocol";
+  type InboundMessage, type InboundAttachment, type PersistedSession, type ChatScope, type MessageResponse } from "@tencent-connect/qqbot-nodejs/protocol";
 import { MessagingError, type MessagingProviderDefinition, type PluginContext } from "@asterism-app/sdk/runtime";
-import { fileMediaType, type SendMessage } from "@asterism-app/sdk/contracts";
+import { fileMediaType, type MessagingPart, type SendMessage } from "@asterism-app/sdk/contracts";
 import { messagingMessages as messages } from "../messages/messaging.ts";
 import { ObservedMessages, forgetObservedConnection } from "./observed-store.ts";
 import { messageObserver, outgoingMessage, receiveConnection, observedFile, downloadFile, type ObservedMessage } from "./provider-shared.ts";
@@ -15,9 +15,21 @@ export function qqTarget(input: Pick<SendMessage, "conversationId" | "threadId" 
   return { scope: match[1] as ChatScope, targetId: match[2]!, msgId: input.replyTo };
 }
 
+function qqParts(content?: string, attachments: readonly InboundAttachment[] = []): MessagingPart[] {
+  return [
+    ...(content ? [{ kind: "text" as const, text: content }] : []),
+    ...attachments.map(file => ({ kind: "file" as const, id: file.url,
+      mediaType: fileMediaType({ name: file.filename ?? "", type: file.content_type }),
+      ...(file.filename ? { filename: file.filename } : {}), ...(file.size === undefined ? {} : { size: file.size }) })),
+  ];
+}
+
 export function qqMessage(input: InboundMessage, selfId: string): ObservedMessage | undefined {
   if (input.kind !== "c2c" && input.kind !== "group") return;
   const targetId = input.kind === "c2c" ? input.senderId : input.groupOpenid!;
+  // QQ supplies the quoted fragment in the first element of a type-103 message.
+  const element = input.msgType === 103 ? input.msgElements?.[0] : undefined;
+  const quotedParts = element ? qqParts(element.content, element.attachments) : [];
   return {
     ...(input.msgIdx ? { aliases: [input.msgIdx] } : {}),
     conversation: { conversationId: `${input.kind}:${targetId}`, title: input.kind === "c2c" ? input.senderName ?? targetId : targetId,
@@ -25,12 +37,8 @@ export function qqMessage(input: InboundMessage, selfId: string): ObservedMessag
     message: { id: input.messageId, sender: { id: input.senderId, name: input.senderName ?? input.senderId,
       role: input.senderId === selfId ? "self" : "participant" }, sentAt: input.timestamp,
       ...(input.refMsgIdx ? { replyTo: input.refMsgIdx } : {}),
-      parts: [
-        ...(input.content ? [{ kind: "text" as const, text: input.content }] : []),
-        ...(input.attachments ?? []).map(file => ({ kind: "file" as const, id: file.url,
-          mediaType: fileMediaType({ name: file.filename ?? "", type: file.content_type }),
-          ...(file.filename ? { filename: file.filename } : {}), ...(file.size === undefined ? {} : { size: file.size }) })),
-      ] },
+      parts: qqParts(input.content, input.attachments),
+      ...(quotedParts.length ? { quote: { parts: quotedParts } } : {}) },
   };
 }
 

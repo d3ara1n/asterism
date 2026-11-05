@@ -18,7 +18,8 @@ export function outgoingMessage({ parts, ...address }: SendMessage) {
 /** Verify that an attachment belongs to the addressed observed message; returns both for platform lookups. */
 export function observedFile(store: ObservedMessages, query: MessagingFileQuery): { message: MessagingMessage; file: MessagingFilePart } {
   const message = store.message(query.conversationId, query.messageId);
-  const file = message?.parts.find((part): part is MessagingFilePart => part.kind === "file" && part.id === query.fileId);
+  const file = message && [...message.parts, ...(message.quote?.parts ?? [])]
+    .find((part): part is MessagingFilePart => part.kind === "file" && part.id === query.fileId);
   if (!message || !file || (query.threadId && message.threadId !== query.threadId && message.id !== query.threadId))
     throw new MessagingError("invalid_input", "The attachment does not belong to this conversation and message.");
   return { message, file };

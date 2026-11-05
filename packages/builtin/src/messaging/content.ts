@@ -12,8 +12,19 @@ export const chatFileRef = (source: ResourceRef, messageId: string, fileId: stri
   ({ source: { sessionId: source.sessionId, id: source.id, kind: source.kind }, locator: { messageId, fileId } });
 
 /** Address every platform attachment through the Chat; no content is read. */
-export function chatMessage(source: ResourceRef, message: MessagingMessage): ChatMessage {
-  return { ...message, parts: message.parts.map(part => part.kind === "text" ? part : { ...part, ref: chatFileRef(source, message.id, part.id) }) };
+export function chatMessage(source: ResourceRef, { parts, quote, ...message }: MessagingMessage): ChatMessage {
+  const address = (parts: MessagingMessage["parts"]) => parts.map(part => part.kind === "text" ? part
+    : { ...part, ref: chatFileRef(source, message.id, part.id) });
+  return { ...message, parts: address(parts), ...(quote ? { quote: { parts: address(quote.parts) } } : {}) };
+}
+
+/** Delimit quoted content so its text and files remain distinct from the reply's own body. */
+export function chatMessageParts(message: ChatMessage): ChatMessage["parts"] {
+  return [...message.parts, ...(message.quote ? [
+    { kind: "text" as const, text: `Quoted content${message.replyTo ? ` (${message.replyTo})` : ""}:` },
+    ...message.quote.parts,
+    { kind: "text" as const, text: "End quoted content." },
+  ] : [])];
 }
 
 /** Chat file provider: the locator selects an attachment within the bound conversation. */
@@ -81,5 +92,5 @@ const messageHeader = (message: ChatMessage) =>
 /** Read and send results present attachments as references; `see` supplies image content on request. */
 export function chatMessagesToModel(messages: readonly ChatMessage[]): ModelInputPart[] {
   return messages.flatMap(message => [{ kind: "text" as const, text: messageHeader(message) },
-    ...inputPartsToModel(message.parts.map(part => part.kind === "text" ? part : reference(part)))]);
+    ...inputPartsToModel(chatMessageParts(message).map(part => part.kind === "text" ? part : reference(part)))]);
 }

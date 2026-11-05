@@ -138,22 +138,29 @@ function Transcript({ items, content }: { items: readonly ChatMessage[]; content
               {i18n.formatDate(sentAt, { hour: "2-digit", minute: "2-digit" })}</time>
           </header>
           {group.messages.map(message => <div key={message.id} className="flex min-w-0 flex-col gap-1">
-            {message.replyTo && <QuoteLine id={message.replyTo} quoted={byId.get(message.replyTo)} nameOf={nameOf} />}
+            {(message.replyTo || message.quote) && <QuoteLine id={message.replyTo} quote={message.quote}
+              quoted={message.replyTo ? byId.get(message.replyTo) : undefined} nameOf={nameOf} />}
             <MessageBody message={message} content={content} />
           </div>)}
         </section>}
     </Fragment>;
   })}</div>;
 }
-/** A quoted message outside this result shows its ID. */
-function QuoteLine({ id, quoted, nameOf }: { id: string; quoted: ChatMessage | undefined; nameOf(message: MessagingMessage): string }) {
-  const i18n = useI18n();
-  return <p className="type-caption line-clamp-1 border-l-2 border-primary/60 pl-2 wrap-anywhere">
-    {quoted ? <>
-      <span className="sr-only">{i18n.formatMessage(messages.inReplyTo, { name: nameOf(quoted) })}: </span>
-      <span aria-hidden="true" className="font-medium text-foreground">{nameOf(quoted)} </span>{messagingText(quoted)}
-    </> : i18n.formatMessage(messages.replyToId, { id })}
-  </p>;
+/** An embedded quote remains readable when the original message is outside this result. */
+function QuoteLine({ id, quote, quoted, nameOf }: {
+  id: string | undefined; quote: ChatMessage["quote"]; quoted: ChatMessage | undefined; nameOf(message: MessagingMessage): string;
+}) {
+  const i18n = useI18n(), object = useRendererObject(), snapshot = quote ?? quoted;
+  return <div className="flex min-w-0 flex-col gap-1">
+    <p className="type-caption line-clamp-1 border-l-2 border-primary/60 pl-2 wrap-anywhere">
+      {quoted ? <>
+        <span className="sr-only">{i18n.formatMessage(messages.inReplyTo, { name: nameOf(quoted) })}: </span>
+        <span aria-hidden="true" className="font-medium text-foreground">{nameOf(quoted)} </span>
+      </> : id ? i18n.formatMessage(messages.replyToId, { id }) : null}
+      {snapshot && <> {messagingText(snapshot)}</>}
+    </p>
+    {quote && <MessageAttachments parts={chatFiles(quote)} content={object.content} />}
+  </div>;
 }
 /** A message without a bubble: attachments first, then its text. */
 function MessageBody({ message, content }: { message: ChatMessage; content: ContentReader }) {

@@ -41,9 +41,12 @@ export const messagingFilePartSchema = z.strictObject({
 });
 export const messagingTextPartSchema = z.strictObject({ kind: z.literal("text"), text: z.string() });
 export const messagingPartSchema = z.discriminatedUnion("kind", [messagingTextPartSchema, messagingFilePartSchema]);
+/** Content supplied with a reply, without asserting the original message's identity, author, or time. */
+export const messageQuoteSchema = z.strictObject({ parts: z.array(messagingPartSchema) });
 export const messageSchema = z.strictObject({
   id, sender: messageSenderSchema, parts: z.array(messagingPartSchema),
   sentAt: z.string(), replyTo: id.optional(), threadId: id.optional(), groupId: id.optional(),
+  quote: messageQuoteSchema.optional(),
 });
 export const messagingFileQuerySchema = conversationAddressSchema.extend({ messageId: id, fileId: id });
 export const conversationQuerySchema = z.strictObject({ since: id.optional() });

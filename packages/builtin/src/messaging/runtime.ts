@@ -9,7 +9,7 @@ import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema,
   ConversationsList, ConversationsSubscribe, ConfigureSubscription, SubscriptionChanged, ChatRead, ChatSend,
   BrowseConversations, listResultSchema, ReadChat, SendChat, ChatMessageSent,
   ChatSee, type SubscriptionTarget, type ViewConnection } from "./contract.ts";
-import { captureImage, chatFileRef, chatMessage, chatMessagesToModel, messageInputParts, openChatFile } from "./content.ts";
+import { captureImage, chatFileRef, chatMessage, chatMessageParts, chatMessagesToModel, messageInputParts, openChatFile } from "./content.ts";
 import { inputPartsToModel } from "../shared/file-parts.ts";
 import { coversAddress, foldSubscriptions, matchesSubscription } from "./subscriptions.ts";
 import { telegramProvider } from "./telegram.ts";
@@ -110,7 +110,7 @@ export default defineModule(plugin => {
           const parts: AgentInputPart[] = [{ kind: "text", text: eventText(event, !binding) }];
           // Captured images are staged for this input only; its record retains them.
           if (binding && event.event.kind === "messages.received") parts.push(...await messageInputParts(event.event.messages.flatMap(message => [
-            { kind: "text" as const, text: messageLines(message).join("\n") }, ...chatMessage(source, message).parts,
+            { kind: "text" as const, text: messageLines(message).join("\n") }, ...chatMessageParts(chatMessage(source, message)),
           ]),
             async function* (part) { yield* openChatFile(await plugin.messaging.resolve(binding.connectionId, { signal }), binding, part.ref.locator, signal); },
             content, signal));

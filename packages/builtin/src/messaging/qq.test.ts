@@ -5,7 +5,7 @@ import { qqMessage, qqTarget } from "./qq.ts";
 import { QQApi, qqApiError, qqResponse } from "./qq-api.ts";
 import { definitelyNotSent } from "./outcome.ts";
 import { ObservedMessages } from "./observed-store.ts";
-import { messageObserver } from "./provider-shared.ts";
+import { messageObserver, observedFile } from "./provider-shared.ts";
 
 function received(type: string, data: unknown) {
   const result = dispatchEvent(type, data, "test-bot");
@@ -59,14 +59,65 @@ describe("QQ conversation addressing", () => {
       observe(original);
       const reply = qqMessage(received("GROUP_AT_MESSAGE_CREATE", {
         id: "reply-message", group_openid: "group", author: { member_openid: "reader" }, content: "Please assess", timestamp,
-        message_type: 103, msg_elements: [{ msg_idx: "opaque-reference", content: "Budget: 3000" }],
+        message_type: 103, msg_elements: [{ msg_idx: "opaque-reference", content: "Budget…" }],
       }), "bot")!;
       expect(observe(reply).replyTo).toBe("original-message");
       expect(store.read({ conversationId: "group:group", messageIds: ["opaque-reference", "unseen-reference"] })).toMatchObject({
         messages: [{ id: "original-message", parts: [{ kind: "text", text: "Budget: 3000" }] }],
         missingIds: ["unseen-reference"],
       });
+      expect(store.message("group:group", "reply-message")?.quote).toEqual({ parts: [{ kind: "text", text: "Budget…" }] });
     } finally { db.close(); }
+  });
+
+  it("retains an unseen original's quoted text and image on the reply without inventing a message or delivering another event", () => {
+    const db = new DatabaseSync(":memory:");
+    try {
+      const account = JSON.stringify(["connection", "qq", "app"]), store = new ObservedMessages(db, account), publish = vi.fn();
+      const reply = qqMessage(received("GROUP_AT_MESSAGE_CREATE", {
+        id: "ROBOT1.0_reply", group_openid: "group", author: { member_openid: "reader" }, content: "What is in this picture?", timestamp,
+        message_type: 103, msg_elements: [{ msg_idx: "REFIDX_original", content: "Look at this",
+          attachments: [{ url: "//example.test/original.png", content_type: "image/png", filename: "original.png", size: 42 }] }],
+      }), "bot")!;
+      messageObserver(store, publish)(reply);
+      const reopened = new ObservedMessages(db, account);
+      const result = reopened.read({ conversationId: "group:group", messageIds: ["ROBOT1.0_reply", "REFIDX_original"] });
+      expect(result.missingIds).toEqual(["REFIDX_original"]);
+      expect(result.messages).toMatchObject([{ id: "ROBOT1.0_reply", replyTo: "REFIDX_original",
+        parts: [{ kind: "text", text: "What is in this picture?" }], quote: { parts: [
+          { kind: "text", text: "Look at this" },
+          { kind: "file", id: "//example.test/original.png", mediaType: "image/png", filename: "original.png", size: 42 },
+        ] } }]);
+      expect(reopened.read({ conversationId: "group:group" }).messages.map(message => message.id)).toEqual(["ROBOT1.0_reply"]);
+      expect(publish.mock.calls.filter(([event]) => event.kind === "messages.received")).toHaveLength(1);
+      const query = { conversationId: "group:group", messageId: "ROBOT1.0_reply", fileId: "//example.test/original.png" };
+      expect(observedFile(reopened, query).file.mediaType).toBe("image/png");
+      expect(() => observedFile(reopened, { ...query, conversationId: "group:other" })).toThrow("does not belong");
+      expect(() => observedFile(reopened, { ...query, messageId: "REFIDX_original" })).toThrow("does not belong");
+    } finally { db.close(); }
+  });
+
+  it("keeps an image-only private quote even when QQ supplies its reference only in the scene", () => {
+    const message = qqMessage(received("C2C_MESSAGE_CREATE", {
+      id: "reply", author: { user_openid: "reader" }, content: "Describe it", timestamp, message_type: 103,
+      message_scene: { ext: ["ref_msg_idx=REFIDX_original"] },
+      msg_elements: [{ attachments: [{ url: "https://example.test/image.jpg", content_type: "image/jpeg" }] }],
+    }), "bot")!.message;
+    expect(message.replyTo).toBe("REFIDX_original");
+    expect(message.quote).toEqual({ parts: [{ kind: "file", id: "https://example.test/image.jpg", mediaType: "image/jpeg" }] });
+  });
+
+  it("does not interpret other element-based messages or an empty quote as quoted content", () => {
+    const input = { id: "message", author: { user_openid: "reader" }, content: "Current message", timestamp };
+    const ordinary = qqMessage(received("C2C_MESSAGE_CREATE", {
+      ...input, message_type: 101, msg_elements: [{ content: "Another element" }],
+    }), "bot")!.message;
+    expect(ordinary.quote).toBeUndefined();
+    const empty = qqMessage(received("C2C_MESSAGE_CREATE", {
+      ...input, message_type: 103, message_scene: { ext: ["ref_msg_idx=REFIDX_unavailable"] }, msg_elements: [{}],
+    }), "bot")!.message;
+    expect(empty.replyTo).toBe("REFIDX_unavailable");
+    expect(empty.quote).toBeUndefined();
   });
 });
 

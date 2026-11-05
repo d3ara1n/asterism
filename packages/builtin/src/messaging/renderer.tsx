@@ -366,9 +366,9 @@ function ChatRow({ message, first, fresh, usable, quoted, nameOf, onReply, onJum
         {first && <MessageHeader className="px-1"><span className="truncate">{nameOf(message)}</span></MessageHeader>}
         <div data-slot="chat-body" className="group/row relative flex w-fit max-w-[80%] min-w-0 flex-col gap-1">
           <MessageAttachments parts={chatFiles(message)} content={object.content} align={align} className="rounded-xl" />
-          {(texts.length > 0 || message.replyTo) && <Bubble variant={self ? "default" : "muted"} align={align} className="max-w-full">
+          {(texts.length > 0 || message.replyTo || message.quote) && <Bubble variant={self ? "default" : "muted"} align={align} className="max-w-full">
             <BubbleContent className="flex flex-col gap-1.5 px-2.5 py-1.5 wrap-anywhere">
-              {message.replyTo && <Quote id={message.replyTo} quoted={quoted} self={self} nameOf={nameOf} onJump={onJump} />}
+              {(message.replyTo || message.quote) && <Quote id={message.replyTo} quote={message.quote} quoted={quoted} self={self} nameOf={nameOf} onJump={onJump} />}
               {texts.map((text, index) => <p key={index} className="whitespace-pre-wrap">{text}</p>)}
             </BubbleContent>
           </Bubble>}
@@ -385,21 +385,25 @@ function ChatRow({ message, first, fresh, usable, quoted, nameOf, onReply, onJum
 }
 
 /** The quoted message inside a bubble; a loaded quote jumps to its message. Text wraps within the bubble instead of widening it. */
-function Quote({ id, quoted, self, nameOf, onJump }: {
-  id: string; quoted: ChatMessage | undefined; self: boolean; nameOf(message: MessagingMessage): string; onJump(id: string): void;
+function Quote({ id, quote, quoted, self, nameOf, onJump }: {
+  id: string | undefined; quote: ChatMessage["quote"]; quoted: ChatMessage | undefined;
+  self: boolean; nameOf(message: MessagingMessage): string; onJump(id: string): void;
 }) {
-  const i18n = useI18n();
-  const name = quoted ? nameOf(quoted) : id, label = i18n.formatMessage(messages.inReplyTo, { name });
+  const i18n = useI18n(), object = useRendererObject(), snapshot = quote ?? quoted;
+  const name = quoted ? nameOf(quoted) : id ?? i18n.text(messages.reply), label = i18n.formatMessage(messages.inReplyTo, { name });
   const className = cn("flex min-w-0 flex-col rounded-md border-l-2 px-2 py-1 text-left text-xs leading-snug wrap-anywhere",
     self ? "border-primary-foreground/60 bg-primary-foreground/15" : "border-primary/60 bg-foreground/5");
   const body = <>
     <span className="line-clamp-1 font-medium">{name}</span>
-    {quoted && <span className="line-clamp-2 opacity-80">{messagingText(quoted)}</span>}
+    {snapshot && <span className="line-clamp-2 opacity-80">{messagingText(snapshot)}</span>}
   </>;
-  return quoted
-    ? <button type="button" title={label} aria-label={label} onClick={() => onJump(quoted.id)} className={cn(className,
-      "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", self ? "hover:bg-primary-foreground/25" : "hover:bg-foreground/10")}>{body}</button>
-    : <div title={label} className={className}>{body}</div>;
+  return <div className="flex min-w-0 flex-col gap-1">
+    {quoted
+      ? <button type="button" title={label} aria-label={label} onClick={() => onJump(quoted.id)} className={cn(className,
+        "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", self ? "hover:bg-primary-foreground/25" : "hover:bg-foreground/10")}>{body}</button>
+      : <div title={label} className={className}>{body}</div>}
+    {quote && <MessageAttachments parts={chatFiles(quote)} content={object.content} />}
+  </div>;
 }
 
 /* ---------- Chat creation: pick an observed conversation or enter its address ---------- */

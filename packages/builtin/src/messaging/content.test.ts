@@ -6,7 +6,7 @@ import { modelInputLimits, pluginNamespace, type MessagingMessage } from "@aster
 import { definePlugin, type PluginContext } from "@asterism-app/sdk/runtime";
 import { BuiltinApplicationService } from "../testing.ts";
 import { Chat, CreateChat, ReadChat, chatMessageListSchema, type ChatFilePart } from "./contract.ts";
-import { chatMessage, messageInputParts } from "./content.ts";
+import { chatMessage, chatMessageParts, chatMessagesToModel, messageInputParts } from "./content.ts";
 import { projectInputMessage } from "../agent/input-message.ts";
 
 const roots: string[] = [], apps: BuiltinApplicationService[] = [];
@@ -38,7 +38,7 @@ async function setup() {
   const read = async () => chatMessageListSchema.parse(await app.sessions.calls.invoke(ReadChat.id, null, { object }, null));
   /** Event input assembly as the Chat performs it: attachments resolve through the Chat's FileRef. */
   const input = (values: readonly MessagingMessage[] = [message]) => context.content.withScope(async content => {
-    const parts = await messageInputParts(values.flatMap(value => chatMessage(object, value).parts), (part: ChatFilePart) => context.files.open(part.ref), content, new AbortController().signal);
+    const parts = await messageInputParts(values.flatMap(value => chatMessageParts(chatMessage(object, value))), (part: ChatFilePart) => context.files.open(part.ref), content, new AbortController().signal);
     const files = await Promise.all(parts.map(async part => part.kind === "file" ? Buffer.from(await content.read(part.file)) : null));
     return { parts, files };
   });
@@ -65,6 +65,26 @@ describe("Chat attachment content", () => {
     expect(projected.filter(part => part.kind === "file")).toHaveLength(1);
     // Event text is escaped inside the envelope; the reference metadata still accompanies the captured file.
     expect(projected.some(part => part.kind === "text" && part.text.includes("file-reference"))).toBe(true);
+  });
+  it("addresses an embedded quote's image through the reply and captures its bytes without an original message", async () => {
+    const f = await setup();
+    f.message.replyTo = "unseen-original";
+    f.message.quote = { parts: [{ kind: "text", text: "Quoted caption" }, f.message.parts[1]!] };
+    f.message.parts = [{ kind: "text", text: "Describe the quoted image" }];
+    const read = (await f.read()).messages[0]!;
+    const image = read.quote!.parts[1]!;
+    if (image.kind !== "file") throw new Error("Expected a quoted image");
+    expect(image.ref.locator).toEqual({ messageId: "message", fileId: "image" });
+    expect(await collect(f.context.files.open(image.ref))).toEqual(png);
+    const { parts, files } = await f.input();
+    const captured = parts.findIndex(part => part.kind === "file");
+    expect(files[captured]).toEqual(png);
+    expect(parts[captured]).toMatchObject({ mediaType: "image/png", ref: image.ref });
+    const texts = parts.flatMap(part => part.kind === "text" ? [part.text] : []);
+    expect(texts).toEqual(["Describe the quoted image", "Quoted content (unseen-original):", "Quoted caption", "End quoted content."]);
+    const projected = chatMessagesToModel([read]);
+    expect(projected.some(part => part.kind === "file")).toBe(false);
+    expect(projected.some(part => part.kind === "text" && part.text.includes('"messageId":"message"'))).toBe(true);
   });
   it("stops capture at the model file limit and keeps the reference with the reason", async () => {
     const f = await setup();

@@ -9,7 +9,10 @@ export const chatBindingSchema = conversationAddressSchema.extend({ connectionId
 export const Chat = builtin.resource("chat", chatBindingSchema);
 /** A platform attachment addressed through this Chat; the Chat's file provider fetches it when consumed. */
 export const chatFilePartSchema = messagingFilePartSchema.extend({ ref: fileRefSchema });
-export const chatMessageSchema = messageSchema.extend({ parts: z.array(z.discriminatedUnion("kind", [messagingTextPartSchema, chatFilePartSchema])) });
+const chatPartsSchema = z.array(z.discriminatedUnion("kind", [messagingTextPartSchema, chatFilePartSchema]));
+export const chatMessageSchema = messageSchema.extend({
+  parts: chatPartsSchema, quote: z.strictObject({ parts: chatPartsSchema }).optional(),
+});
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 export type ChatFilePart = z.infer<typeof chatFilePartSchema>;
 export const chatMessageListSchema = messageListSchema.extend({ messages: z.array(chatMessageSchema) });
@@ -20,7 +23,7 @@ export const chatImageSchema = chatFileLocatorSchema.extend({
 });
 export type ChatImage = z.infer<typeof chatImageSchema>;
 export const ChatMessageSent = defineRecord(builtin.name("chat.message-sent"), { schema: z.codec(
-  z.union([chatMessageSchema, messageSchema.omit({ parts: true }).extend({ text: z.string() })]), chatMessageSchema, {
+  z.union([chatMessageSchema, messageSchema.omit({ parts: true, quote: true }).extend({ text: z.string() })]), chatMessageSchema, {
     decode: value => "parts" in value ? value : (({ text, ...rest }) => ({ ...rest, parts: [{ kind: "text" as const, text }] }))(value),
     encode: value => chatMessageSchema.parse(value),
   }),
@@ -65,7 +68,7 @@ export const ConversationsList = defineImplementation({
 });
 export const chatReadTargetSchema = messageReadTargetSchema.nullable();
 export const ChatRead = defineImplementation({
-  ...builtin.data("chat.read", chatMessageListSchema.describe("Messages with attachment file references. ID queries return found messages in requested order, once per resolved message, and missingIds. Page queries return a reusable cursor.")),
+  ...builtin.data("chat.read", chatMessageListSchema.describe("Messages with attachment file references and any quoted content supplied with a reply. Quoted files belong to the enclosing reply's messageId. ID queries return found messages in requested order, once per resolved message, and missingIds. Page queries return a reusable cursor.")),
   resource: Chat, tool: Read, targetSchema: chatReadTargetSchema.describe("Null reads recent messages; since continues from a returned cursor. messageIds reads specific retained messages within this Chat's conversation and topic."),
   effect: "read", execution: "parallel",
 });

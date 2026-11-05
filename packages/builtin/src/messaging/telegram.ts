@@ -34,7 +34,8 @@ const mediaLabels: readonly (readonly [keyof Message, string])[] = [
   ["voice", "[Voice message]"], ["audio", "[Audio]"], ["sticker", "[Sticker]"], ["location", "[Location]"],
   ["venue", "[Venue]"], ["contact", "[Contact]"], ["poll", "[Poll]"], ["dice", "[Dice]"],
 ];
-function telegramAttachment(message: Message): MessagingFilePart | undefined {
+type TelegramMedia = Pick<Message, "photo" | "document" | "animation" | "video" | "audio" | "voice" | "video_note" | "sticker">;
+function telegramAttachment(message: TelegramMedia): MessagingFilePart | undefined {
   const photo = message.photo?.reduce((best, item) => item.width * item.height > best.width * best.height ? item : best);
   const value = photo ?? message.document ?? message.animation ?? message.video ?? message.audio ?? message.voice ?? message.video_note ?? message.sticker;
   if (!value) return;
@@ -45,6 +46,18 @@ function telegramAttachment(message: Message): MessagingFilePart | undefined {
   return { kind: "file", id: value.file_id, mediaType,
     filename: "file_name" in value && value.file_name ? value.file_name : photo ? "photo.jpg" : `attachment.${mediaType.split("/")[1]}`,
     ...(value.file_size === undefined ? {} : { size: value.file_size }) };
+}
+
+/** A selected text quote takes precedence over the original body; media stays addressable on the reply. */
+function telegramQuote(message: Message): MessagingMessage["quote"] {
+  const original = message.reply_to_message ?? message.external_reply;
+  const text = message.quote?.text ?? message.reply_to_message?.text ?? message.reply_to_message?.caption;
+  const file = original ? telegramAttachment(original) : undefined;
+  const parts: MessagingMessage["parts"] = [
+    ...(text ? [{ kind: "text" as const, text }] : []),
+    ...(file ? [file] : []),
+  ];
+  return parts.length ? { parts } : undefined;
 }
 
 /** Normalize a Telegram message; selfId is the bot's user ID, so messages it authored carry the self role. */
@@ -60,7 +73,7 @@ export function telegramMessage(message: Message, selfId: number): { conversatio
     name: ("title" in message.sender_chat ? message.sender_chat.title : message.sender_chat.first_name) ?? String(message.sender_chat.id), role }
     : message.from ? { id: String(message.from.id), name: [message.from.first_name, message.from.last_name].filter(Boolean).join(" "), role }
       : { id: String(chat.id), name: title, role };
-  const file = telegramAttachment(message), text = message.text ?? message.caption;
+  const file = telegramAttachment(message), text = message.text ?? message.caption, quote = telegramQuote(message);
   const threadId = message.message_thread_id === undefined ? undefined : String(message.message_thread_id);
   return {
     conversation: { conversationId: String(chat.id), ...(threadId ? { threadId } : {}),
@@ -72,7 +85,8 @@ export function telegramMessage(message: Message, selfId: number): { conversatio
     ],
       sentAt: new Date(message.date * 1000).toISOString(),
       ...(message.media_group_id ? { groupId: message.media_group_id } : {}),
-      ...(threadId ? { threadId } : {}), ...(message.reply_to_message ? { replyTo: String(message.reply_to_message.message_id) } : {}) },
+      ...(threadId ? { threadId } : {}), ...(message.reply_to_message ? { replyTo: String(message.reply_to_message.message_id) } : {}),
+      ...(quote ? { quote } : {}) },
   };
 }
 

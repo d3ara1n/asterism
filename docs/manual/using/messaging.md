@@ -22,6 +22,8 @@ Agents send external messages with the Chat's send tool. Their ordinary response
 
 Messages contain ordered text and file parts, and each attachment carries a FileRef. A new-message input attaches its images to model input within the application's file limits, so an Agent can inspect them directly while retaining the reference for saving or forwarding. An image that exceeds the limits or cannot be fetched stays a reference with a note explaining why. Chat reads and sends return references only; the Chat's `see` tool fetches an image by message ID and file ID when an Agent wants to look at it.
 
+Replies can also carry a `quote` containing text and file parts supplied with that reply. Quoted images accompany new-message input under the same limits, and reads of the reply return their file references. Use the enclosing reply's message ID and the quoted attachment's file ID with `see`. A quote is a supplied fragment; it does not establish the original message's author, time, or complete contents. The independent `replyTo` identifies an original message within the Chat when that address is available.
+
 Chat cards, Agent inputs, and message tool results show attachments, with consecutive files grouped together. Images within the model file size limit show a preview; click one to open it. **Save as…** opens the system file dialog for any attachment and saves to the location you choose. An Agent can instead use a linked Directory's `save` tool with a destination path and the attachment's FileRef.
 
 Images attached to an Agent input remain available with that input. References fetch the current platform content when consumed, so they require the Chat to exist on the current session path, its connection to be available, and the remote file to remain downloadable. Older text-only observations retain their original descriptions and do not acquire attachment identities retroactively.
@@ -35,6 +37,8 @@ Telegram Bot API does not provide a general conversation list or arbitrary chat-
 The integration preserves captions and attachment metadata, sends text and referenced files, supports replies by message ID, and preserves topic addresses. A single still image within Telegram's photo limit is sent as a photo and other files as documents; several files are sent as one album with the text as its caption, as documents unless all are photos. Telegram accepts at most 10 files per send and 50 MB per uploaded file.
 
 Telegram delivers an album as one message per item. Each item keeps its own message ID, body, and attachments, and items share a `groupId`. The connection waits briefly for the remaining items and delivers them together as one Agent input. Replies address individual items. Sending an album returns the first item's receipt; all sent items are available in Chat history. A received reply also retains its attached original message when that message was not previously observed, making it available to ID reads.
+
+Received replies include their supplied text and media in `quote`. A selected text quotation takes precedence over the attached original's full text or caption. Cross-chat and cross-topic replies retain text quotations and supported media supplied by Telegram, without treating an external message ID as a reply target in the current Chat. They do not create another Chat or a complete original message.
 
 Received photos select the largest available variant; downloads through Telegram's hosted Bot API are limited to 20 MB. Incoming edits update retained messages without emitting a new-message notification. Provider observations survive connection restarts and are shared across resources.
 
@@ -60,7 +64,7 @@ A conversation ID is `c2c:<user_openid>` for private chats or `group:<group_open
 
 The provider sends text. A reply uses the selected incoming message ID; sending without a reply target requests a proactive message. QQ controls reply validity, message quotas, and sending permissions, and its refusals appear as operation errors. Received attachments retain file references and can be opened while their platform URLs remain available. File sending and topics are unsupported by this provider.
 
-Incoming replies preserve their reference identifier. When the referenced message was observed, the provider resolves QQ's separate reference index to that message's ID. ID reads accept either identifier; unavailable originals appear in `missingIds`.
+Incoming replies preserve their reference identifier. When the referenced message was observed, the provider resolves QQ's separate reference index to that message's ID. ID reads accept either identifier; unavailable originals appear in `missingIds`. A reply also retains quoted text and attachments supplied by QQ in `quote`, independently of whether the original was observed.
 
 ## Observed conversations and connectivity
 

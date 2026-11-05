@@ -22,10 +22,10 @@ export function relativeTime(i18n: I18n, iso: string) {
   const { value, unit } = relativeUnit(Date.parse(iso), Date.now());
   return new Intl.RelativeTimeFormat(i18n.locale, { numeric: "auto", style: "short" }).format(value, unit);
 }
-export function chatFiles(message: ChatMessage): InputFile[] {
+export function chatFiles(message: Pick<ChatMessage, "parts">): InputFile[] {
   return message.parts.flatMap(part => part.kind === "file" ? [{ kind: "file-reference" as const, ref: part.ref, mediaType: part.mediaType,
     ...(part.filename ? { filename: part.filename } : {}), ...(part.size === undefined ? {} : { size: part.size }) }] : []);
 }
-export function chatTexts(message: ChatMessage): string[] {
+export function chatTexts(message: Pick<ChatMessage, "parts">): string[] {
   return message.parts.flatMap(part => part.kind === "text" && part.text ? [part.text] : []);
 }
