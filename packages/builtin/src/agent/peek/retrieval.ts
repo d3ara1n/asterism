@@ -8,7 +8,7 @@ const search = z.strictObject({
   limit: z.number().int().min(1).max(20).optional().describe("Maximum matching records, default 8."),
 });
 const read = z.strictObject({
-  id: z.string().min(1).describe("Saved record ID returned by the overview or search_records."),
+  id: z.string().min(1).describe("Saved record ID returned by the session record outline or search_records."),
   offset: z.number().int().nonnegative().optional().describe("UTF-16 text offset, default 0; nextOffset continues a previous read."),
   limit: z.number().int().min(1).max(16000).optional().describe("Maximum UTF-16 text length, default 8000."),
 });

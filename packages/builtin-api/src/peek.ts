@@ -4,10 +4,10 @@ import { builtin } from "./identity.ts";
 
 export const Peek = defineTool({
   id: builtin.name("tool.peek"), name: "peek",
-  description: "Investigate an Agent's saved timeline records and return a focused report using the utility model.",
+  description: "Investigate an Agent's saved timeline records and return a concise summary or explanation using the utility model.",
   guidelines: [
     "target selects an Agent according to the resource implementation's schema.",
-    "question describes the information to locate and includes context for follow-up questions.",
+    "question describes what to summarize or explain and includes context for follow-up questions.",
     "Each call reads a fresh, fixed snapshot of the selected Agent's current timeline, including records preceding context compression.",
     "includeThinking admits saved readable thinking into the investigation; its default is false.",
   ],

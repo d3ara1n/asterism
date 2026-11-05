@@ -4,7 +4,7 @@ import { sessionView } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
 import { agentSource, attached, call, event, message, node, text, thinking } from "../../../../../src/session/test-nodes.ts";
 import type { NewNode } from "../../../../../src/shared/session.ts";
-import { projectPeekRecords, peekOverview } from "./snapshot.ts";
+import { projectPeekRecords, peekOutline } from "./snapshot.ts";
 import { retrieve } from "./retrieval.ts";
 
 function snapshot(...values: NewNode[]) {
@@ -35,7 +35,25 @@ describe("peek record projection and retrieval", () => {
     expect(JSON.stringify(records)).not.toMatch(/Other agent|other attached|Private event/);
   });
 
-  it("Thinking is consistently excluded by default from overview, search, and reads; explicit inclusion still reads only public text", () => {
+  it("Includes long dialogue in full while leaving tool and thinking text for retrieval", () => {
+    const dialogue = "Long dialogue ".repeat(2000);
+    const records = projectPeekRecords(snapshot(
+      message("a", dialogue), text("a", "r", 0, "Assistant conclusion"), summary,
+      call("a", "r", 1, "c", { arguments: { path: "hidden-tool-argument" } }),
+      thinking("a", "r", 2, "hidden-thinking-body"),
+    ), "a", true);
+    const outline = peekOutline(records);
+    expect(outline).toContain(dialogue);
+    expect(outline).toContain("Assistant conclusion");
+    expect(outline).toContain("Compressed history");
+    expect(outline).toContain('"kind":"tool"');
+    expect(outline).toContain('"kind":"thinking"');
+    expect(outline).not.toMatch(/hidden-tool-argument|hidden-thinking-body/);
+    expect(retrieve(records, { name: "read_records", callId: "read", arguments: { id: "4" } }).result.outcome.data)
+      .toMatchObject({ text: "hidden-thinking-body" });
+  });
+
+  it("Thinking is consistently excluded by default from outline, search, and reads; explicit inclusion still reads only public text", () => {
     const view = snapshot(thinking("a", "r", 0, "Readable reasoning", {
       summary: "Thinking summary", continuation: { anthropic: { signature: "secret-signature" } },
     }));
@@ -48,9 +66,8 @@ describe("peek record projection and retrieval", () => {
     expect(JSON.stringify(admitted)).not.toContain("secret-signature");
   });
 
-  it("Content omitted from the overview remains enumerable and readable by page; out-of-bounds queries return typed errors", () => {
+  it("Paginates searches and record text, and rejects IDs outside the snapshot", () => {
     const records = projectPeekRecords(snapshot(message("a", "First evidence"), message("a", "Second EVIDENCE")), "a", false);
-    expect(peekOverview(records, 0)).toContain("Recent entries shown: 0");
     const first = retrieve(records, { name: "search_records", callId: "s1", arguments: { query: "evidence", limit: 1 } });
     expect(first.ids).toEqual(["0"]);
     expect(first.result.outcome.data).toMatchObject({ nextCursor: 1 });

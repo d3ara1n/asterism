@@ -41,7 +41,7 @@ describe("peek investigation stream", () => {
       yield { type: "part.start", part: { id: "report", kind: "text" } };
       yield { type: "part.delta", partId: "report", delta: "Final " };
       expect(updates.at(-1)).toBe("Final ");
-      yield { type: "part.delta", partId: "report", delta: "evidence [saved]" };
+      yield { type: "part.delta", partId: "report", delta: "summary" };
       yield { type: "part.end", partId: "report" };
       yield finish();
     };
@@ -49,7 +49,7 @@ describe("peek investigation stream", () => {
     const result = await collectPeekResponse(stream(), signal, {
       progress: (_phase, report) => updates.push(report), finish() {},
     });
-    expect(result.report).toBe("Final evidence [saved]");
+    expect(result.report).toBe("Final summary");
   });
 
   it("Publishes the report before model finalization; subsequent retrieval rounds replace the draft while preserving protocol pairing and measurements", async () => {
@@ -67,17 +67,19 @@ describe("peek investigation stream", () => {
       } else {
         const result = input.messages.find(item => item.kind === "result");
         expect(result).toMatchObject({ kind: "result", callId: "c1", outcome: { data: { text: "Original evidence" } } });
-        expect(JSON.stringify(input.messages)).not.toContain("New activity");
+        const transcript = JSON.stringify(input.system);
+        expect(transcript).toContain("Original evidence");
+        expect(transcript).not.toContain("New activity");
         expect(input.messages.find(item => item.kind === "output")).toMatchObject({
           scope: "test", adapter: "test/1", parts: [expect.objectContaining({ continuation: { openai: { phase: "final_answer" } } }), expect.objectContaining({ callId: "c1" })],
         });
-        yield* text("Final answer [saved]");
-        expect(updates.at(-1)?.report).toBe("Final answer [saved]");
+        yield* text("Final answer");
+        expect(updates.at(-1)?.report).toBe("Final answer");
         yield finish();
       }
     };
     const result = await investigateAgent(deps(stream), object, { question: "What happened?" }, new AbortController().signal, data => updates.push(data));
-    expect(result).toMatchObject({ kind: "succeeded", data: { phase: "done", report: "Final answer [saved]", snapshot: { nodeId: "saved" } } });
+    expect(result).toMatchObject({ kind: "succeeded", data: { phase: "done", report: "Final answer", snapshot: { nodeId: "saved" } } });
     expect(result.data?.requests).toHaveLength(2);
     expect(result.data?.queries).toEqual([{ tool: "read_records", arguments: { id: "saved" }, records: ["saved"] }]);
     expect(updates.some(data => data.report === "" && data.phase === "reading")).toBe(true);
@@ -125,6 +127,40 @@ describe("peek investigation stream", () => {
         error: { code: "peek_failed", message: "Connection reset" } });
   });
 
+  it("Rejects an oversized inline transcript before starting a model request", async () => {
+    const { object, nodes } = target();
+    nodes.push(node("long-dialogue", "saved", message("a", "Long conversation ".repeat(1000))));
+    const stream = vi.fn<ModelServices["stream"]>();
+    const limited = deps(stream);
+    limited.models.list = () => [{ ...model, contextWindow: 4096 }];
+
+    const result = await investigateAgent(limited, object, { question: "Summarize" }, new AbortController().signal, () => {});
+
+    expect(result).toMatchObject({ kind: "failed", error: { code: "peek_context_overflow" },
+      data: { round: 0, requests: [], queries: [] } });
+    expect(stream).not.toHaveBeenCalled();
+  });
+
+  it("Asks for a final summary on round 24 while preserving tools and retrieval history", async () => {
+    const { object } = target();
+    let rounds = 0;
+    const stream: ModelServices["stream"] = async function* (input) {
+      rounds++;
+      const lastInput = JSON.stringify(input.messages.at(-1));
+      if (rounds < 24) {
+        expect(lastInput).not.toContain("final investigation round");
+        yield* query(); yield finish("tool-calls");
+      } else {
+        expect(lastInput).toContain("final investigation round");
+        expect(input.messages.filter(item => item.kind === "result")).toHaveLength(23);
+        expect(input.tools?.map(tool => tool.name)).toContain("read_records");
+        yield* text("Conversation summary"); yield finish();
+      }
+    };
+    const result = await investigateAgent(deps(stream), object, { question: "Summarize" }, new AbortController().signal, () => {});
+    expect(result).toMatchObject({ kind: "succeeded", data: { round: 24, report: "Conversation summary" } });
+  });
+
   it("Fails explicitly when utility lacks tool capability, and ends the retrieval loop at the request limit", async () => {
     const { object } = target();
     const stream = vi.fn<ModelServices["stream"]>(async function* () { yield* query(); yield finish("tool-calls"); });
@@ -135,6 +171,6 @@ describe("peek investigation stream", () => {
     expect(stream).not.toHaveBeenCalled();
     const result = await investigateAgent(deps(stream), object, { question: "Investigate" }, new AbortController().signal, () => {});
     expect(result).toMatchObject({ kind: "failed", error: { code: "peek_request_limit" } });
-    expect(stream).toHaveBeenCalledTimes(6);
+    expect(stream).toHaveBeenCalledTimes(24);
   });
 });

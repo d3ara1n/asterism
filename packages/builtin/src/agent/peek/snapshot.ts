@@ -53,18 +53,12 @@ export function projectPeekRecords(snapshot: Pick<SessionSnapshot, "records">, a
   return result;
 }
 
-/** The bounded overview affects only initial input; all body text remains in this record set for retrieval. */
-export function peekOverview(records: readonly PeekRecord[], budget: number): string {
-  const rows: string[] = [];
-  let remaining = budget;
-  for (let index = records.length - 1; index >= 0; index--) {
-    const record = records[index]!;
+/** Dialogue and summaries are included in full; other admitted blocks retain retrieval labels. */
+export function peekOutline(records: readonly PeekRecord[]): string {
+  const rows = records.map(record => {
     const inline = record.kind === "user" || record.kind === "agent" || record.kind === "event" || record.kind === "assistant" || record.kind === "summary";
-    const excerpt = inline ? record.text.slice(0, 1200) : "";
-    const row = JSON.stringify({ id: record.id, kind: record.kind, at: record.at, status: record.status,
-      length: record.text.length, ...(inline ? { excerpt, remaining: record.text.length - excerpt.length } : {}) });
-    if (row.length > remaining) break;
-    rows.unshift(row); remaining -= row.length + 1;
-  }
-  return `Saved records: ${records.length}. Recent entries shown: ${rows.length}. Earlier entries and full text are available through search_records and read_records.\n${rows.join("\n")}`;
+    const label = JSON.stringify({ id: record.id, kind: record.kind, at: record.at, status: record.status, length: record.text.length });
+    return inline ? `${label}\n${record.text}` : label;
+  });
+  return `Saved records: ${records.length}. Dialogue and summaries are included in full; other blocks are represented by retrieval labels. Full saved text is available through search_records and read_records.\n\n${rows.join("\n\n")}`;
 }
