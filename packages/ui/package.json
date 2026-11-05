@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./code-view": "./src/code-view.tsx",
+    "./command-filter": "./src/command-filter.ts",
     "./error-display": "./src/error-display.ts",
     "./mcp-status": "./src/mcp-status.tsx",
     "./use-settings-action": "./src/use-settings-action.ts",

@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useRendererApplication } from "@asterism-app/sdk/renderer";
 import { createComposerVisibility } from "./composer-visibility";
 import { ScrollArea } from "./ScrollArea";
+import { AgentCommands } from "../command/AgentCommands";
 
 type RegionPosition = AgentOverlayPosition | "toolbar";
 interface CardUI {
@@ -32,6 +33,7 @@ export function AgentUI({ selection, children }: { selection: AgentSelection | n
   const [bottom, setBottom] = useState<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
   const [composer] = useState(createComposerVisibility);
+  const composerHidden = useSyncExternalStore(composer.subscribe, composer.getSnapshot);
   const { snapshot: configuration } = useSettingsConfiguration();
   const modelSelection = useMemo<AgentModelSelection>(() => ({
     selection,
@@ -44,13 +46,13 @@ export function AgentUI({ selection, children }: { selection: AgentSelection | n
     composer,
   }), [top, center, bottom, toolbar, composer]);
   return <Context.Provider value={value}><AgentUIRendererProvider value={renderer}><AgentModelSelectionProvider value={modelSelection}>
-    <div className="relative flex min-h-0 flex-1 flex-col [container-type:size]">
+    <AgentCommands composerHidden={composerHidden}>
       {children}
       <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
         <div ref={setCenter} className="flex max-h-full min-h-0 w-full flex-col gap-3 overflow-y-auto p-3 empty:hidden" />
       </div>
-    </div>
-    <Contributions />
+      <Contributions />
+    </AgentCommands>
   </AgentModelSelectionProvider></AgentUIRendererProvider></Context.Provider>;
 }
 

@@ -74,6 +74,14 @@ A resource integration must implement notification delivery to send event messag
 
 Agent Markdown supports standard footnotes with return links and external web links. Footnotes spanning separate paragraphs become available after the response finishes rendering.
 
+## Reuse saved text
+
+Manage reusable messages in **Saved text** in the built-in plugin settings. Each entry opens in its own island with a name and a body; the body can contain multiple paragraphs, lists, and code. Names can repeat, and editing preserves the body's whitespace and line breaks.
+
+With focus inside an Agent's content, press **Cmd+K / Ctrl+K** to open its command panel. The panel covers only that Agent view, including when the Agent is open in an island. Commands appear only when their conditions hold. In the **Saved text** group, **Insert saved text** appears when saved text exists and opens a nested list searchable by name; Backspace in an empty search or Escape returns to the previous level, and Escape at the top level closes the panel. **Save input as saved text** appears when the composer contains text and stores it immediately, named after its first non-blank line; rename it in settings.
+
+Choosing saved text first stores the current input and attachments in the draft box, then loads the selected body into the composer. Saving to the draft box uses the manual delivery mode (`none`), including while the Agent is running. Change a draft's delivery mode to queue it for execution. If saving the current input fails, the composer retains it.
+
 ## Reference resources and skills
 
 A reference is a Markdown link whose destination is a reference URL. Two schemes exist:

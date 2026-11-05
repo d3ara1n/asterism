@@ -4,6 +4,13 @@ import { builtin } from "@asterism-app/builtin-api/contracts";
 import { paradigmConfigurationSchema } from "../configuration/contract.ts";
 import { defaultParadigmConfiguration } from "../configuration/state.ts";
 
+const savedTextSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  content: z.string().min(1),
+});
+export type SavedText = z.infer<typeof savedTextSchema>;
+
 export const settingsMessages = builtin.messages("en", defineMessages({
   streaming: { id: "settings.streaming", defaultMessage: "Streaming previews" },
   streamingSummary: { id: "settings.streamingSummary", defaultMessage: "Control how streaming tool content expands and collapses." },
@@ -24,4 +31,5 @@ export const settingsMessages = builtin.messages("en", defineMessages({
 export const BuiltinSettings = builtin.config(z.object({
   autoExpand: z.boolean().default(true), autoCollapse: z.boolean().default(true),
   paradigm: paradigmConfigurationSchema.default(defaultParadigmConfiguration),
-}), { autoExpand: true, autoCollapse: true, paradigm: defaultParadigmConfiguration });
+  savedText: z.array(savedTextSchema).default([]),
+}), { autoExpand: true, autoCollapse: true, paradigm: defaultParadigmConfiguration, savedText: [] });

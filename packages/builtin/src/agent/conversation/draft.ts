@@ -3,6 +3,8 @@ import type { AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import type { RendererContentInput, ContentReader } from "@asterism-app/sdk/renderer";
 import { mediaMessages } from "../../messages/media.ts";
 
+export const composerTextLimit = 100_000;
+
 interface DraftFile { part: Exclude<AgentInputPart, { kind: "text" }>; size: number }
 interface DraftState { text: string; files: readonly DraftFile[]; uploading: boolean; locked: boolean; error: UiText | null }
 
@@ -75,9 +77,9 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
       change({ files: state.files.filter((_, i) => i !== index), error: null });
       if (!state.files.length) { void content?.close(); content = undefined; }
     },
-    accepted() {
+    accepted(text = "") {
       void content?.close(); content = undefined;
-      change({ text: "", files: [], error: null });
+      change({ text, files: [], error: null });
     },
     async close() {
       upload?.abort();

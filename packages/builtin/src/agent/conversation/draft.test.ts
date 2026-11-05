@@ -82,4 +82,20 @@ describe("Message file drafts", () => {
     expect(draft.getSnapshot().files).toHaveLength(1);
     await draft.close();
   });
+  it("Replacing an archived input preserves saved text formatting and releases the previous attachments while locked", async () => {
+    let closed = false;
+    const draft = createMessageDraft(() => ({ ...reader, stage: async () => ref, close: async () => { closed = true; } }));
+    draft.setText("Previous input");
+    await draft.add([new File(["image"], "shot.png", { type: "image/png" })]);
+    draft.lock(true);
+    draft.accepted("  Review the changes:\n\n- Check behavior\n- Check ownership\n");
+    expect(draft.getSnapshot()).toMatchObject({
+      text: "  Review the changes:\n\n- Check behavior\n- Check ownership\n",
+      files: [],
+      locked: true,
+    });
+    expect(closed).toBe(true);
+    draft.lock(false);
+    await draft.close();
+  });
 });

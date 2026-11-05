@@ -3,6 +3,7 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 export const conversationMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   earlierMessages: { id: "agent_conversation_earlierMessages", defaultMessage: "Load earlier messages" },
   historyReadFailed: { id: "agent_conversation_historyReadFailed", defaultMessage: "Conversation history could not be loaded." },
+  inputTooLong: { id: "agent_conversation_inputTooLong", defaultMessage: "Text exceeds the {limit, number}-character limit." },
   eventSource: { id: "agent_conversation_eventSource", defaultMessage: "Event · {name}" },
   executionProcess: { id: "agent_conversation_executionProcess", defaultMessage: "Execution process" },
   compressing: { id: "agent_conversation_compressing", defaultMessage: "Compacting context…" },

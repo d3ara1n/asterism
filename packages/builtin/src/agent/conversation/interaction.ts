@@ -3,7 +3,7 @@ import { SubmitAgentInput, ConfigureAgent, ContinueAgent, CancelAgent, type Agen
 import { createContext, useContext, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { SubmissionIdentity } from "./submission";
-import { createMessageDraft, copyDraft, type CopiedDraft } from "./draft";
+import { createMessageDraft, copyDraft, composerTextLimit, type CopiedDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
 import { DiscardAgentDraft, ExchangeAgentDraft, MoveAgentDraft, SaveAgentDraft, SetAgentDraftMode, type AgentDraft, type DraftMode } from "../drafts-contract";
 import { conversationMessages } from "../../messages/conversation";
@@ -84,6 +84,25 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
       return true;
     });
   };
+  /** Preserve the complete current input in the draft box with mode none before replacing it. */
+  const replaceInput = (text: string): Promise<boolean> => mutate(async () => {
+    if (text.length > composerTextLimit) {
+      toast.error(i18n.formatMessage(conversationMessages.inputTooLong, { limit: composerTextLimit }));
+      return false;
+    }
+    const latest = draft.getSnapshot();
+    if (latest.text.trim() || latest.files.length) {
+      const copied = await transfer("save", draft.parts(false), draft.content(), () => object.input(SaveAgentDraft));
+      const input = { parts: copied.parts };
+      const result = await object.invoke(SaveAgentDraft, {
+        ...input, submissionId: submission.forInput({ contract: SaveAgentDraft.id, input }),
+      }, { content: copied.content });
+      if (!accepted(result)) return false;
+      submission.accepted(); clearTransfers();
+    }
+    draft.accepted(text);
+    return true;
+  });
   return {
     draft, drafts, writable, editable, executionState, configurable: ready,
     pendingTake: current.exchange.pending !== null,
@@ -95,20 +114,8 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
     },
     async configure(selection: AgentSelection) { return accepted(await object.invoke(ConfigureAgent, { selection })); },
     send,
-    async save(): Promise<boolean> {
-      if (!state.text.trim() && !state.files.length) return false;
-      if (executionState === "running") return send();
-      return mutate(async () => {
-        const copied = await transfer("save", draft.parts(false), draft.content(), () => object.input(SaveAgentDraft));
-        const input = { parts: copied.parts };
-        const result = await object.invoke(SaveAgentDraft, {
-          ...input, submissionId: submission.forInput({ contract: SaveAgentDraft.id, input }),
-        }, { content: copied.content });
-        if (!accepted(result)) return false;
-        submission.accepted(); clearTransfers(); draft.accepted();
-        return true;
-      });
-    },
+    save: (): Promise<boolean> => replaceInput(""),
+    insertSavedText: replaceInput,
     async setMode(item: AgentDraft, mode: DraftMode) {
       if (!editable || mode === item.mode) return false;
       try { return accepted(await object.invoke(SetAgentDraftMode, { id: item.id, mode })); }

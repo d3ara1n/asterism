@@ -13,13 +13,12 @@ import { hasReferenceDrag, readReferenceDrag } from "@asterism-app/sdk/renderer"
 import { ReferenceChip } from "./reference-node";
 import { parseComposerInline, parseComposerText, referenceNodeName, referenceTriggerAllowedAfter, serializeDoc } from "./reference-serialization";
 import { ReferenceMenu, type ReferenceMenuHandle } from "./reference-menu";
+import { composerTextLimit } from "./draft";
 
 export interface ComposerEditorHandle {
   focus(): void;
 }
 
-/** Matches the submitted-text limit of the former textarea. */
-const maxLength = 100_000;
 const suggestionKey = new PluginKey("referenceSuggestion");
 
 /** Live callbacks, labels and menu state read by the editor's extensions, which are created once per editor. */
@@ -110,7 +109,7 @@ function createOptions(bridge: { current: EditorBridge }) {
   return {
     extensions: [
       Document, Paragraph, Text, HardBreak, UndoRedo, ReferenceChip,
-      CharacterCount.configure({ limit: maxLength }),
+      CharacterCount.configure({ limit: composerTextLimit }),
       Placeholder.configure({ placeholder: () => bridge.current.placeholder }),
       referenceSuggestion(bridge), submitOnEnter(bridge), referenceDrop,
     ],

@@ -1,4 +1,4 @@
-import { Bot, Cpu, TextSelect } from "lucide-react";
+import { Bot, Cpu, TextSelect, MessageSquare } from "lucide-react";
 import { useI18n, useRendererConfiguration, type PluginSettingsPage } from "@asterism-app/sdk/renderer";
 import { BuiltinSettings, settingsMessages as messages } from "./contract";
 import { Item, ItemContent, ItemTitle, ItemActions, ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
@@ -12,6 +12,8 @@ import { RolesSettings } from "../configuration/RolesSettings";
 import { AgentsSettings } from "../configuration/AgentsSettings";
 import { rolesMessages } from "../messages/roles";
 import { agentsMessages } from "../messages/agents";
+import { savedTextMessages } from "../messages/saved-text";
+import { SavedTextSettings } from "../saved-text/SavedTextSettings";
 
 /** Each page changes only its own configuration; services remain independent of the mounted page. */
 function StreamingSettingsPage() {
@@ -40,4 +42,5 @@ export const builtinSettingsPages: readonly PluginSettingsPage[] = [
   { id: "roles", title: rolesMessages.title, summary: rolesMessages.overviewSummary, icon: Cpu, Body: RolesSettings },
   { id: "agents", title: agentsMessages.agents, summary: agentsMessages.overviewSummary, icon: Bot, Body: AgentsSettings },
   { id: "streaming", title: messages.streaming, summary: messages.streamingSummary, icon: TextSelect, Body: StreamingSettingsPage },
+  { id: "saved-text", title: savedTextMessages.title, summary: savedTextMessages.summary, icon: MessageSquare, Body: SavedTextSettings },
 ];
