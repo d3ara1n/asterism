@@ -78,12 +78,14 @@ export const ResourceInspect = defineTool({
   name: "resource_inspect",
   description: "Inspect a linked resource's live state and available tools.",
   guidelines: [
-    "Inspect a linked resource to understand its state and how to use its available tools.",
-    "When revisiting a resource, use tools: [] to check its state without repeating known tool definitions, or supply previously discovered tool names when you need to clarify their usage or arguments.",
+    "Omitting tools returns all available tool definitions for the resource. tools: [] returns resource state without tool definitions.",
+    "A non-empty tools array selects exact tool names from a previously discovered catalog.",
+    "Resource state is read at inspection time. The tool catalog is captured for the request; resource state changes do not by themselves change tool definitions.",
+    "Previously returned definitions remain usable without another inspection. Links, configuration, and execution policy are captured at request boundaries.",
   ],
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
-    tools: z.array(z.string().min(1)).optional().describe("Tool names to include. Omit for all available tools; an empty array returns none."),
+    tools: z.array(z.string().min(1)).optional().describe("Exact names of previously discovered tools to include. Omit to discover all available tools; [] returns state only."),
     detail: z.enum(["full", "prompt", "schema"]).optional().describe("Defaults to full, which returns guidance and schemas. prompt returns only description and guidelines; schema returns only args and target schemas."),
   }).describe("Identify the linked resource, and optionally narrow which tool definitions and which part of each definition to return."),
 });
