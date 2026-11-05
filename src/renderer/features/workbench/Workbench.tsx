@@ -61,7 +61,7 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
   const canvas = useMemo<WorkbenchCanvas>(() => ({
     findPlacement: options => canvasRef.current?.findPlacement(options) ?? null,
     locateObjects: async (ids, options) => { await canvasRef.current?.locateObjects(ids, options); },
-    arrange: async () => { await canvasRef.current?.arrange(); },
+    arrange: async (strategy) => { await canvasRef.current?.arrange(strategy); },
   }), []);
   // Assemble the environment by field, notifying cards and panel islands only when fields actually change.
   const context = useMemo<WorkbenchView>(
