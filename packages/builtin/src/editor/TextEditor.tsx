@@ -18,11 +18,12 @@ import { editorMessages as messages } from "../messages/editor";
 export interface TextEditorHandle { find(): void }
 
 /** A text editing surface independent of files, resource identity, and island placement. */
-export function TextEditor({ ref, filename, initialText, readOnly = false, gitBase = null, onChange, onSave, onPosition, onLanguageError }: {
+export function TextEditor({ ref, filename, initialText, readOnly = false, lineWrapping = false, gitBase = null, onChange, onSave, onPosition, onLanguageError }: {
   ref?: Ref<TextEditorHandle>;
   filename: string;
   initialText: string;
   readOnly?: boolean;
+  lineWrapping?: boolean;
   gitBase?: string | null;
   onChange?(text: string): void;
   onSave?(): void;
@@ -95,12 +96,13 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, gitBa
 
   useEffect(() => {
     editor.current?.dispatch({ effects: settings.reconfigure([
+      lineWrapping ? EditorView.lineWrapping : [],
       EditorState.readOnly.of(readOnly),
       EditorView.editable.of(!readOnly),
       EditorView.contentAttributes.of(readOnly ? { tabindex: "0", "aria-readonly": "true" } : {}),
       EditorState.phrases.of(i18n.interfaceLocale === "zh-Hans" ? chinesePhrases : {}),
     ]) });
-  }, [readOnly, i18n.interfaceLocale, filename, initialText, settings]);
+  }, [readOnly, lineWrapping, i18n.interfaceLocale, filename, initialText, settings]);
 
   useEffect(() => {
     editor.current?.dispatch({ effects: setGitBaseline.of({ text: gitBase, labels: {

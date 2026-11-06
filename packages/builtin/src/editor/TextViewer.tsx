@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { IslandPanel, useI18n } from "@asterism-app/sdk/renderer";
-import { Search } from "lucide-react";
+import { Search, WrapText } from "lucide-react";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { TextEditor, type TextEditorHandle } from "./TextEditor";
 import { parseEditorText } from "./text-format";
 import { editorMessages as messages } from "../messages/editor";
@@ -13,11 +14,14 @@ export default function TextViewer({ path, text }: { path: string; text: string 
   const [initial] = useState(() => parseEditorText(text));
   const [position, setPosition] = useState({ line: 1, column: 1 });
   const [languageFailed, setLanguageFailed] = useState(false);
-  return <IslandPanel title={path} layout="fill" action={
+  const [lineWrapping, setLineWrapping] = useState(false);
+  return <IslandPanel title={path} layout="fill" action={<>
     <IconButton label={i18n.text(messages.searchText)} onClick={() => editor.current?.find()}><Search /></IconButton>
-  }>
+    <IconButton label={i18n.text(commonMessages.wordWrap)} aria-pressed={lineWrapping}
+      variant={lineWrapping ? "selected" : "ghost"} onClick={() => setLineWrapping(value => !value)}><WrapText /></IconButton>
+  </>}>
     {languageFailed && <Alert variant="destructive"><AlertDescription>{i18n.text(messages.languageFailed)}</AlertDescription></Alert>}
-    <TextEditor ref={editor} filename={path} initialText={initial.content} readOnly onPosition={setPosition}
+    <TextEditor ref={editor} filename={path} initialText={initial.content} lineWrapping={lineWrapping} readOnly onPosition={setPosition}
       onLanguageError={failure => {
         console.error("Viewer language support could not be loaded.", failure);
         setLanguageFailed(true);

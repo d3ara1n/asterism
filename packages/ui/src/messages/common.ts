@@ -197,6 +197,10 @@ export const commonMessages = pluginNamespace("asterism.host").messages("en", de
     id: "scrollToStart",
     defaultMessage: "Scroll to start",
   },
+  wordWrap: {
+    id: "wordWrap",
+    defaultMessage: "Word wrap",
+  },
   removeReference: {
     id: "removeReference",
     defaultMessage: "Remove reference",

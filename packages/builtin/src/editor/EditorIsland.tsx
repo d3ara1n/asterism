@@ -1,7 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { IslandPanel, useI18n, useRendererCloseGuard } from "@asterism-app/sdk/renderer";
 import type { UiText } from "@asterism-app/sdk/contracts";
-import { Save, Search } from "lucide-react";
+import { Save, Search, WrapText } from "lucide-react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
@@ -26,6 +26,7 @@ export function EditorIsland({ title, filename, text, onSave, gitBase = null, st
   const [content, setContent] = useState(initial);
   const [saved, setSaved] = useState(initial);
   const [saving, setSaving] = useState(false);
+  const [lineWrapping, setLineWrapping] = useState(false);
   const pending = useRef(false);
   const [error, setError] = useState<UiText | null>(null);
   const [position, setPosition] = useState({ line: 1, column: 1 });
@@ -46,12 +47,14 @@ export function EditorIsland({ title, filename, text, onSave, gitBase = null, st
   };
   return <IslandPanel title={title} dirty={dirty} layout="fill" action={<>
     <IconButton label={i18n.text(messages.find)} onClick={() => editor.current?.find()}><Search /></IconButton>
+    <IconButton label={i18n.text(commonMessages.wordWrap)} aria-pressed={lineWrapping}
+      variant={lineWrapping ? "selected" : "ghost"} onClick={() => setLineWrapping(value => !value)}><WrapText /></IconButton>
     <Button size="sm" disabled={!dirty || saving} aria-busy={saving} onClick={() => void save()}>
       {saving ? <Spinner data-icon="inline-start" /> : <Save data-icon="inline-start" />}{i18n.text(messages.save)}
     </Button>
   </>}>
     {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
-    <TextEditor ref={editor} filename={filename} initialText={initial} gitBase={gitBase}
+    <TextEditor ref={editor} filename={filename} initialText={initial} gitBase={gitBase} lineWrapping={lineWrapping}
       onChange={setContent} onSave={() => void save()} onPosition={setPosition}
       onLanguageError={failure => {
         console.error("Editor language support could not be loaded.", failure);

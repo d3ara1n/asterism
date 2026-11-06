@@ -746,6 +746,7 @@
   "loading": "正在加载",
   "scrollToEnd": "滚动到最新",
   "scrollToStart": "滚动到开头",
+  "wordWrap": "自动换行",
   "removeReference": "移除引用",
   "markdownImage": "查看图片",
   "markdownFootnotes": "脚注",
