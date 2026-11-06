@@ -98,7 +98,8 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
   const lead = primaryQuota(quotas);
   const leadShare = lead ? quotaRemaining(lead) : null;
   const others = quotas.filter(item => item !== lead);
-  const drained = quotas.some(item => quotaRemaining(item) < 0.25);
+  // The shell marks exhausted capacity; inner indicators retain their own remaining-share and query-error tones.
+  const exhausted = quotas.some(item => quotaRemaining(item) <= 0) || balances.some(item => item.remaining <= 0);
   const view = !empty ? "data"
     : !state || state.state === "loading" || refreshing ? "loading"
     : state.state === "waiting" ? "waiting"
@@ -110,8 +111,8 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
       <button type="button" onClick={refresh} aria-busy={refreshing} aria-disabled={refreshing}
         aria-label={i18n.text(messages.usageRefresh)}
         className={cn("relative z-10 flex min-h-7 items-center rounded-full border px-2 py-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", glyphScale,
-          drained ? "border-warning/60 bg-warning/10" : "border-border/70 bg-muted/40",
-          refreshing ? "cursor-wait" : cn("hover:bg-accent", drained ? "hover:border-warning" : "hover:border-border"))}>
+          exhausted ? "border-destructive/60 bg-destructive/10" : "border-border/70 bg-muted/40",
+          refreshing ? "cursor-wait" : cn("hover:bg-accent", exhausted ? "hover:border-destructive" : "hover:border-border"))}>
         <motion.span className="flex overflow-x-clip [overflow-clip-margin:2px]" style={{ width: capsule.width }}
           initial={false} animate={{ opacity: dimmed ? 0.4 : 1 }} transition={fadeTransition}>
           <span ref={capsule.content} className="grid w-max shrink-0 items-center justify-items-center">
