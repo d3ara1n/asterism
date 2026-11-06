@@ -24,8 +24,6 @@ export interface IslandSpec {
   /** False omits the shell; transparent retains its border, clipping, and focus highlight without a background fill. Defaults to a card surface. */
   surface?: boolean | "transparent";
   origin?: HTMLElement | null;
-  /** Fixed islands only: they own their visibility, and closing through their own controls calls this after the islands they opened close. */
-  onClose?: () => void;
   /** Ordinary islands only: serializable content from which the owner can rebuild this island; absent for islands that exist only while open. */
   restore?: IslandView;
 }
@@ -155,12 +153,12 @@ function mediumWidth(width: IslandWidth): number {
 }
 
 /**
- * One screen: fixed leading islands, the root, ordinary islands, and fixed trailing islands, left to right.
- * Fixed islands participate in layout and focus only; ordinary islands open at the right end, swap through the island menu, and close with the islands they opened.
+ * One Island viewport: the root followed by ordinary islands, left to right.
+ * Ordinary islands open at the right end, swap through the island menu, and close with the islands they opened.
  * When all min widths fit, distribute by grow and center without translation; otherwise fall back to min and let the viewport follow focus.
  */
-export function Screen({ label, root, leading, trailing, strip: external, className, ref }: {
-  label: string; root: IslandSpec; leading?: IslandSpec[]; trailing?: IslandSpec[]; className?: string;
+export function Screen({ label, root, strip: external, className, ref }: {
+  label: string; root: IslandSpec; className?: string;
   /** Owner-provided strip for persistence and outside observation; otherwise the screen keeps its own. */
   strip?: IslandStrip;
   ref?: Ref<ScreenHandle>;
@@ -173,11 +171,9 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
   const state = useSyncExternalStore(strip.subscribe, strip.getSnapshot);
   const [width, setWidth] = useState(0);
   const [offset, setOffset] = useState(0);
-  const fixed = useMemo(() => [...(leading ?? []), ...(trailing ?? [])], [leading, trailing]);
-  const islands = useMemo(() => [...(leading ?? []).map(spec => ({ spec, width: spec.width })), { spec: root, width: root.width },
-    ...state.islands.map(island => ({ spec: island.spec, width: islandWidth(island), island })),
-    ...(trailing ?? []).map(spec => ({ spec, width: spec.width }))] as { spec: IslandSpec; width: IslandWidth; island?: StripIsland }[],
-  [leading, root, trailing, state.islands]);
+  const islands = useMemo<{ spec: IslandSpec; width: IslandWidth; island?: StripIsland }[]>(() => [{ spec: root, width: root.width },
+    ...state.islands.map(island => ({ spec: island.spec, width: islandWidth(island), island }))],
+  [root, state.islands]);
   const focus = state.focus !== null && islands.some(item => item.spec.id === state.focus) ? state.focus : root.id;
   const gap = windowGeometry.gap;
 
@@ -197,8 +193,8 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
   useLayoutEffect(() => { setOffset(current => overflow ? follow(spans, focusIndex, width, current) : 0); }, [spans, focusIndex, width, overflow]);
 
   // Guards may asynchronously await confirmation while state changes: always decide using the latest state rather than the closure captured at initiation.
-  const latest = useRef({ root, fixed, order: islands.map(item => item.spec.id) });
-  latest.current = { root, fixed, order: islands.map(item => item.spec.id) };
+  const latest = useRef({ root, order: islands.map(item => item.spec.id) });
+  latest.current = { root, order: islands.map(item => item.spec.id) };
   const guards = useRef(new Map<string, Set<CloseGuard>>());
   const pending = useRef(false);
   const cancellations = useRef(new Map<string, { action: IslandCancel; pending: boolean }>());
@@ -234,15 +230,13 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
   // AnimatePresence completes the exit animation before unmounting.
   const close = async (id: string, force?: boolean, settle?: boolean) => {
     if (id === latest.current.root.id) return false;
-    const fixedSpec = latest.current.fixed.find(spec => spec.id === id);
     const ordinary = strip.getSnapshot().islands.find(island => island.id === id);
-    if (!fixedSpec && !ordinary) return false;
-    if (!(await release([...closure(strip.getSnapshot().islands, id), ...(fixedSpec ? [id] : [])], force))) return false;
+    if (!ordinary) return false;
+    if (!(await release(closure(strip.getSnapshot().islands, id), force))) return false;
     const removed = closure(strip.getSnapshot().islands, id);
-    if (!fixedSpec && !removed.includes(id)) return true;
-    remove(fixedSpec ? [...removed, id] : removed, settle);
-    fixedSpec?.onClose?.();
-    const origin = (fixedSpec ?? ordinary!.spec).origin;
+    if (!removed.includes(id)) return true;
+    remove(removed, settle);
+    const origin = ordinary.spec.origin;
     if (origin?.isConnected) requestAnimationFrame(() => origin.focus({ preventScroll: true }));
     return true;
   };

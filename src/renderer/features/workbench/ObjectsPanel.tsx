@@ -1,4 +1,4 @@
-import { IslandPanel } from "../../shared/weave/IslandPanel";
+import { Panel } from "../../shared/weave/Panel";
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -13,7 +13,7 @@ import { useWorkbench } from "./context";
 import { useModuleViews } from "../../modules/views";
 
 /** Each object appears once; the whole row locates it, while inline actions manage card visibility. */
-export function ObjectsPanel() {
+export function ObjectsPanel({ onClose }: { onClose: () => void }) {
   const i18n = useI18n();
   const { session, ready, canvas, run } = useWorkbench();
   const registry = useModuleViews();
@@ -23,7 +23,7 @@ export function ObjectsPanel() {
   const search = query.trim().toLocaleLowerCase(i18n.locale);
   const objects = session.objects.filter(object => !object.retiring && (!hiddenOnly || hidden.has(object.id))
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
-  return <IslandPanel title={i18n.formatMessage(objectsMessages.objects)} compact toolbar={<>
+  return <Panel onClose={onClose} title={i18n.formatMessage(objectsMessages.objects)} compact toolbar={<>
     <SearchInput value={query} onChange={setQuery} label={i18n.formatMessage(objectsMessages.searchObjects)} />
     <ToggleGroup type="single" size="sm" aria-label={i18n.formatMessage(objectsMessages.objects)} value={hiddenOnly ? "hidden" : "all"} onValueChange={next => { if (next) setHiddenOnly(next === "hidden"); }}>
       <ToggleGroupItem value="all">{i18n.formatMessage(commonMessages.all)}</ToggleGroupItem>
@@ -48,5 +48,5 @@ export function ObjectsPanel() {
         </IconButton>} />;
     })}
     {!objects.length && <p className="type-caption px-2 py-6 text-center">{session.objects.length ? i18n.formatMessage(commonMessages.noMatches) : i18n.formatMessage(objectsMessages.noObjects)}</p>}
-  </IslandPanel>;
+  </Panel>;
 }

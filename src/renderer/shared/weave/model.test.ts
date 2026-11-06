@@ -55,7 +55,7 @@ describe("ordinary islands", () => {
     // c was swapped left of its owner a; d is unrelated and stays.
     const islands = [island("c", "a"), island("d"), island("a", "root"), island("e", "c")];
     expect(closure(islands, "a")).toEqual(["e", "c", "a"]);
-    // The root and fixed islands are not ordinary: closing them removes only what they opened.
+    // The root is not ordinary: closing its descendants removes only what it opened.
     expect(closure(islands, "root")).toEqual(["e", "c", "a"]);
     expect(closure([island("x", "y"), island("y", "x")], "x")).toEqual(["y", "x"]);
   });
@@ -66,7 +66,7 @@ describe("ordinary islands", () => {
     expect(moveIsland(islands, "a", -1)).toBe(islands);
   });
   it("moves focus from a removed island to the nearest survivor, preferring the left", () => {
-    const order = ["nav", "root", "a", "b", "c"];
+    const order = ["root", "a", "b", "c"];
     expect(focusAfterClose(order, ["b"], "b", "root")).toBe("a");
     expect(focusAfterClose(order, ["a", "b"], "c", "root")).toBe("c");
     expect(focusAfterClose(["a", "b"], ["a"], "a", "root")).toBe("b");

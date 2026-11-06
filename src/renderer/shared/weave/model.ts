@@ -1,7 +1,7 @@
 /**
  * In-screen layout model for island weaving (weave); pure functions independent of React and DOM.
  *
- * Screen switches as a whole on the page strip. Within a Screen, fixed leading islands, the root, ordinary islands, and fixed trailing islands run left to right.
+ * Within a Screen, the root and ordinary islands run left to right; page-level sidebars are outside this layout.
  * Ordinary islands are independent windows: they open at the right end, keep their positions until the user swaps them, and close together with the islands they opened.
  * When the sum of all island min widths fits, distribute width by grow without translation; otherwise each falls back to min,
  * forming an overflowing strip within the screen, with the viewport smoothly following the focused island.
@@ -73,7 +73,7 @@ export function openIsland<T extends OwnedIsland>(islands: readonly T[], island:
 
 /**
  * Islands removed by closing id: the ordinary islands it opened, transitively, deepest first, followed by id itself when it is ordinary.
- * id may also be a fixed island or the root, which close only what they opened. Ownership cycles terminate.
+ * id may also name the root, which closes only what it opened. Ownership cycles terminate.
  */
 export function closure(islands: readonly OwnedIsland[], id: string): string[] {
   const result: string[] = [];
@@ -118,7 +118,7 @@ export function focusAfterClose(order: readonly string[], removed: readonly stri
 
 /**
  * Interpret an island list crossing a persistence boundary: drop repeated identities and detach owners
- * that are neither in the list nor among keep (fixed identities such as the root, which always exist).
+ * that are neither in the list nor among keep (persistent identities such as the root).
  */
 export function restoreIslands<T extends OwnedIsland>(islands: readonly T[], keep: ReadonlySet<string> = new Set()): T[] {
   const seen = new Set<string>();

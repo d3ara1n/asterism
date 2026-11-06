@@ -68,7 +68,11 @@ Opening an object in an island moves its content out of the canvas card into an 
 
 ## Islands
 
-The main screen runs, left to right: the navigation sidebar, the canvas, ordinary islands, and the panel opened from the titlebar. The sidebar, canvas, and panel are fixed: they take part in layout but keep their own visibility and are never reordered. The canvas is always first among working surfaces and cannot close.
+The main page places the session navigation sidebar, the central Island viewport, and an optional auxiliary panel side by side. The sidebar and auxiliary panel stay docked within the page while visible. They reserve width rather than overlaying content, and users explicitly hide or close them to return that width to the central viewport. Island overflow and focus following move only the central working surfaces, never the sidebars.
+
+Space switches the whole main page and settings as units. The main page remains mounted and inert while settings are active, retaining sidebar visibility, its auxiliary panel, and the Island arrangement. Switching sessions or returning Home closes the auxiliary panel after the current Islands accept navigation through their close guards.
+
+Screen coordinates the central root and ordinary Islands. In a session, the canvas is the root: it is always first and cannot close. Auxiliary panels share panel presentation with Island content but do not participate in Island ownership, arrangement, or focus following.
 
 Islands separate closing from cancelling an operation. Escape invokes a cancellation action only when the focused island explicitly declares one; it never closes a functional island merely because that island can close. A cancellation action owns its outcome and uses the normal close guards if it closes the island. Settings declares cancellation to return from a category to the overview, then from the overview to the main screen.
 

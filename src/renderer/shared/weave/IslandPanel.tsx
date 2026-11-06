@@ -1,12 +1,10 @@
-import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
-import { X } from "lucide-react";
-import { useState, type ReactNode, type Ref } from "react";
+import { useState } from "react";
 
-import { commonMessages } from "@asterism-app/ui/messages/common";
 import { formsMessages } from "@asterism-app/ui/messages/forms";
 import { useI18n } from "../i18n";
 import { IslandMenu } from "./IslandMenu";
+import { Panel, type PanelProps } from "./Panel";
 import { useCloseGuard, useIsland } from "./Screen";
 import type { IslandWidth } from "./model";
 import { useUnsavedChanges } from "./unsaved";
@@ -19,34 +17,20 @@ export const panelIslandWidth: IslandWidth = { min: 400, grow: 1, max: 620 };
  * The titlebar is fixed and the content area scrolls independently; primary action and close sit at the right of the titlebar, with no bottom action bar to avoid resembling a dialog.
  * Secondary actions sit with their corresponding content groups. When dirty is true, confirm discarding changes before closing this island, including closure through the island that opened it.
  */
-export function IslandPanel({ title, description, action, toolbar, dirty, compact, contentRef, layout = "padded", children }: {
-  title: string; description?: string; action?: ReactNode; toolbar?: ReactNode; dirty?: boolean;
-  layout?: "padded" | "fill";
-  compact?: boolean; contentRef?: Ref<HTMLDivElement>; children: ReactNode;
-}) {
+export function IslandPanel({ dirty, ...props }: Omit<PanelProps, "onClose" | "tools"> & { dirty?: boolean }) {
   const i18n = useI18n();
   const island = useIsland();
-  useUnsavedChanges(title, !!dirty);
+  useUnsavedChanges(props.title, !!dirty);
   const [asking, setAsking] = useState<((discard: boolean) => void) | null>(null);
   useCloseGuard(dirty ? () => new Promise<boolean>(resolve => setAsking(() => resolve)) : null);
   const answer = (discard: boolean) => { asking?.(discard); setAsking(null); };
-  return <div className="island-panel">
-    <header className="island-panel-header">
-      <div className="min-w-0 flex-1">
-        <h2 className="type-section truncate">{title}</h2>
-        {description && <p className="type-caption truncate">{description}</p>}
-      </div>
-      {action}
-      <IslandMenu />
-      <IconButton label={i18n.formatMessage(commonMessages.close)} onClick={() => void island.close()}><X /></IconButton>
-    </header>
-    {toolbar && <div className="shrink-0 space-y-2 border-b px-3 py-3">{toolbar}</div>}
-    <div ref={contentRef} data-layout={layout} className={`island-panel-content${compact ? " px-2 py-2" : ""}`}>{children}</div>
+  return <>
+    <Panel {...props} tools={<IslandMenu />} onClose={() => void island.close()} />
     <AlertDialog open={asking !== null} onOpenChange={open => { if (!open) answer(false); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{i18n.formatMessage(formsMessages.discardTitle)}</AlertDialogTitle>
-          <AlertDialogDescription>{i18n.formatMessage(formsMessages.discardDescription, { title })}</AlertDialogDescription>
+          <AlertDialogDescription>{i18n.formatMessage(formsMessages.discardDescription, { title: props.title })}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{i18n.formatMessage(formsMessages.keepEditing)}</AlertDialogCancel>
@@ -54,5 +38,5 @@ export function IslandPanel({ title, description, action, toolbar, dirty, compac
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  </div>;
+  </>;
 }

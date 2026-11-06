@@ -1,4 +1,4 @@
-import { IslandPanel } from "../../shared/weave/IslandPanel";
+import { Panel } from "../../shared/weave/Panel";
 import { Button } from "@asterism-app/ui/ui/button";
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { Popover, PopoverTrigger, PopoverContent } from "@asterism-app/ui/ui/popover";
@@ -28,7 +28,7 @@ import { useSession } from "../session/state";
 import { useWorkbench } from "./context";
 
 /** Authorization consumes real links; descriptions of in-flight requests do not stand in for the effective state of an individual link. */
-export function AccessPanel() {
+export function AccessPanel({ onClose }: { onClose: () => void }) {
   const i18n = useI18n();
   const { session } = useWorkbench();
   const registry = useModuleViews();
@@ -45,7 +45,7 @@ export function AccessPanel() {
   const search = query.trim().toLocaleLowerCase(i18n.locale);
   const targets = (byReceiver ? objects : receivers).filter(object => object.id !== selected?.id
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
-  return <IslandPanel title={i18n.formatMessage(accessMessages.accessLabel)} toolbar={<>
+  return <Panel onClose={onClose} title={i18n.formatMessage(accessMessages.accessLabel)} toolbar={<>
     <ToggleGroup type="single" size="sm" aria-label={i18n.formatMessage(accessMessages.accessLabel)} value={mode} onValueChange={next => { if (next) { setMode(next as typeof mode); setQuery(""); } }}>
       <ToggleGroupItem value="receiver">{i18n.formatMessage(accessMessages.byReceiver)}</ToggleGroupItem>
       <ToggleGroupItem value="resource">{i18n.formatMessage(accessMessages.byResource)}</ToggleGroupItem>
@@ -60,7 +60,7 @@ export function AccessPanel() {
     })}
     {(!selected || !targets.length) && <p className="type-caption py-6 text-center">{query ? i18n.formatMessage(commonMessages.noMatches) : i18n.formatMessage(accessMessages.accessEmpty)}</p>}
     <Separator className="mt-5 mb-4" /><div className="space-y-2"><p className="type-caption">{i18n.formatMessage(accessMessages.accessRequestBoundary)}</p><p className="type-caption">{i18n.formatMessage(accessMessages.accessRules)}</p></div>
-  </IslandPanel>;
+  </Panel>;
 }
 function ResourcePicker({ objects, selected, onSelect, label }: { objects: WorkbenchObject[]; selected?: WorkbenchObject; onSelect: (id: string) => void; label: string }) {
   const i18n = useI18n();

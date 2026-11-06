@@ -23,8 +23,8 @@ export type WorkbenchView = WorkbenchEnvironment & {
 };
 
 /**
- * Object and panel islands are rendered by Screen outside the workbench's React subtree;
- * the application holds a store, the current workbench writes its latest environment into it, and islands subscribe through WorkbenchScope.
+ * Object islands and the docked auxiliary panel live outside the workbench's React subtree;
+ * the application holds a store, the current workbench writes its latest environment into it, and consumers subscribe through WorkbenchScope.
  */
 export class WorkbenchStore {
   private value: WorkbenchView | null = null;
@@ -42,8 +42,8 @@ export class WorkbenchStore {
 export const WorkbenchContext = createContext<WorkbenchView | null>(null);
 
 /**
- * Islands are bound to their session: accept only that session's environment and retain the last one after switching sessions,
- * allowing exiting islands to continue showing their original content; render nothing until their session's environment is ready.
+ * Outlying views are bound to their session: accept only that session's environment and retain the last one after switching sessions,
+ * allowing exiting content to keep its original environment; render nothing until that environment is ready.
  */
 export function WorkbenchScope({ store, sessionId, children }: { store: WorkbenchStore; sessionId: string; children: ReactNode }) {
   const current = useSyncExternalStore(store.subscribe, store.get);

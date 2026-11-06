@@ -247,7 +247,14 @@
   }
   [data-slot$="-content"] * { window-drag: initial; }
 
-  /* App navigation and main content are neighboring islands; home inputs and template cards form surfaces while the rest expose window material. */
+  /* The main page docks navigation and auxiliary panels beside the Island viewport. Screen owns the gaps next to its contents and its overflow indicator. */
+  .main-page { @apply relative flex h-full min-h-0 min-w-0 overflow-clip; }
+  .main-sidebar { width: 224px; margin-left: var(--space-inset); }
+  .main-panel { width: 320px; margin-right: var(--space-inset); }
+  .dock { @apply relative min-h-0 min-w-0 shrink-0 outline-none; margin-bottom: var(--space-inset); }
+  .dock:focus-within > .island-backdrop { border-color: var(--ring); }
+  .dock-body { position: absolute; inset: 1px; overflow: hidden; border-radius: calc(var(--radius) - 1px); }
+  /* Home inputs and template cards form surfaces while the rest expose window material. */
   .app-sidebar { @apply flex h-full min-h-0 flex-col p-3; }
   .home-page { @apply flex h-full overflow-y-auto px-6 py-10; padding-inline: calc(1.5rem + var(--space-inset)); }
   .home-content { @apply m-auto w-full max-w-5xl shrink-0; }
@@ -268,7 +275,7 @@
   .island-body { @apply relative h-full overflow-x-hidden overflow-y-auto; }
   /* Surfaced islands inset content by one border width and clip to inner radii, keeping borders and focus highlights visible without corner leakage. */
   .island[data-surface] > .island-body { position: absolute; inset: 1px; height: auto; border-radius: calc(var(--radius) - 1px); }
-  /* Panel islands: fixed titlebar and independently scrolling content; content areas take over body scrolling. */
+  /* Panels in docks and Islands share a fixed titlebar and independently scrolling content. */
   .island-body:has(> .island-panel) { overflow: hidden; }
   .island-panel { @apply flex h-full min-h-0 flex-col; }
   .island-panel-header { @apply flex shrink-0 items-center gap-2 border-b py-2.5 pr-2.5 pl-5; }

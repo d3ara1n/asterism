@@ -43,9 +43,9 @@ The Linux native-titlebar switch is resolved when creating the window and requir
 
 Window owns titlebar and managed space. Screens move within that space; islands are columns within a screen. Descendants do not independently compensate for the titlebar.
 
-Settings sits to the left of the main screen. Home or the workbench is the main root island; the navigation sidebar leads it and the titlebar panel trails the ordinary islands as fixed islands. Navigation moves screens explicitly rather than intercepting system gestures.
+Settings sits to the left of the main page. The main page lays out the navigation sidebar, a central Island viewport, and an optional auxiliary panel as neighboring regions. Sidebars stay docked within the page while visible and reserve width from the central viewport; users hide or close them explicitly. Home or the workbench is the central root Island. Navigation switches whole pages, including their sidebars, rather than intercepting system gestures.
 
-Islands declare minimum width, growth weight, and optional maximum. When they fit, distribute space and center them. When they overflow, use minimum widths and reveal the focused island. Segment navigation makes completely displaced islands reachable.
+Islands declare minimum width, growth weight, and optional maximum. When they fit, distribute space and center them. When they overflow, use minimum widths and reveal the focused island within the Island viewport without moving the docked sidebars. Segment navigation makes completely displaced islands reachable.
 
 An ordinary island opens at the right end of the screen and belongs to the island that opened it; closing an island also closes the islands it opened. Escape invokes only an explicitly declared cancellation action on the focused island; closing capability does not imply cancellation. Local controls handle Escape first, and an island without a cancellation action does not delegate it to its owner. Closing restores the opener when available. Host-owned borders and focus highlights remain outside clipped content.
 

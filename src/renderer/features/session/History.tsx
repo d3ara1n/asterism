@@ -15,7 +15,7 @@ import { Popover, PopoverTrigger, PopoverContent } from "@asterism-app/ui/ui/pop
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@asterism-app/ui/ui/tabs";
-import { IslandPanel } from "../../shared/weave/IslandPanel";
+import { Panel } from "../../shared/weave/Panel";
 import type { SessionController } from "./controller";
 import { branchContains, historyBranches, branchForNode, type HistoryBranch } from "./history-branches";
 import { historyResourceViews, matchesHistoryView, historyEntry, type HistoryDirectory, type HistoryView, type HistoryEntry } from "./history-navigation";
@@ -34,7 +34,7 @@ import { recordNode } from "../../../plugins/records";
 const branchLabel = (branch: HistoryBranch) => branch.number === 0 ? getI18n().formatMessage(historyMessages.historyMainBranch) : getI18n().formatMessage(historyMessages.historyBranch, { number: branch.number });
 
 /** History navigates node by node; body reading and response aggregation belong to the agent card. */
-export function SessionHistoryPanel({ controller }: { controller: SessionController }) {
+export function SessionHistoryPanel({ controller, onClose }: { controller: SessionController; onClose: () => void }) {
   const i18n = useI18n();
   const { snapshot, state } = useSession(controller);
   const registry = useModuleViews();
@@ -92,7 +92,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
   useLayoutEffect(() => {
     tabs.current?.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [branch.id]);
-  if (!snapshot) return <IslandPanel title={i18n.formatMessage(historyMessages.history)}><p className="type-caption">{i18n.text(state.readError ?? historyMessages.historyLoadingBody)}</p></IslandPanel>;
+  if (!snapshot) return <Panel onClose={onClose} title={i18n.formatMessage(historyMessages.history)}><p className="type-caption">{i18n.text(state.readError ?? historyMessages.historyLoadingBody)}</p></Panel>;
   const selected = selectedRead.data;
   const selectedLabel = selected?.label ?? i18n.text(selectedId === null ? historyMessages.historyStart
     : selectedRead.error ? historyMessages.readFailed : commonMessages.loading);
@@ -103,7 +103,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
     onNavigate={target => navigate(target, nodeId, true)}
   />;
   return <Tabs value={branch.id} activationMode="manual" onValueChange={id => { const target = tree.branches.find(item => item.id === id); if (target) navigate(target); }} className="island-panel min-w-0 gap-0">
-    <IslandPanel title={i18n.formatMessage(historyMessages.history)} compact contentRef={list} action={<ContinueAction controller={controller} nodeId={selectedId} directory={directory.data} label={selectedLabel} />} toolbar={<>
+    <Panel onClose={onClose} title={i18n.formatMessage(historyMessages.history)} compact contentRef={list} action={<ContinueAction controller={controller} nodeId={selectedId} directory={directory.data} label={selectedLabel} />} toolbar={<>
       <div ref={tabs} className="overflow-x-auto pb-1"><TabsList variant="line" aria-label={i18n.formatMessage(historyMessages.historyBranches)}>
         {tree.branches.map(item => <TabsTrigger key={item.id} value={item.id}
           title={item.id === executionBranch.id ? `${branchLabel(item)} · ${i18n.formatMessage(historyMessages.historyExecutionBranch)}` : branchLabel(item)}>
@@ -138,7 +138,7 @@ export function SessionHistoryPanel({ controller }: { controller: SessionControl
         </Virtualizer>
         {!visible.length && !showStart && !matches.pending && !matches.failed && directory.status === "ready" && <p className="type-caption px-2 py-6 text-center">{i18n.formatMessage(commonMessages.noMatches)}</p>}
       </>}</TabsContent>)}
-    </IslandPanel>
+    </Panel>
   </Tabs>;
 }
 
