@@ -14,6 +14,8 @@ A session can be running, sleeping, or archived. Sleep and archive use the same 
 
 Automatic sleep starts a fresh inactivity interval at creation or explicit restoration; subsequent user opens renew it. Runtime messages and Agent work do not renew user attention. The currently viewed session is excluded, and overdue sessions wait until settled. A user open resets the inactivity timer before waking and reattaching resources; background access cannot wake them. The session's keep-awake flag prevents automatic sleep only.
 
+An automatic-sleep failure is logged and suspends further automatic attempts for that session until the user opens it again or the application restarts. Other sessions continue to follow their deadlines. Replanning or changing the sleep threshold does not retry the failed operation.
+
 Automatic-sleep and recycle-bin retention thresholds are independent application preferences; either can be disabled. Only archival starts recycle-bin retention. Startup collection permanently deletes expired archived sessions with their dependent rows and content roots. Sleeping sessions do not expire. Restoring an archived session clears its unavailability and reattaches resources; external instances initialize from saved state rather than resuming suspended processes.
 
 ## Folders

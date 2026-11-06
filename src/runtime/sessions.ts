@@ -522,6 +522,7 @@ export class SessionService {
       case "watch": {
         await this.deactivations.get(command.sessionId);
         const woke = this.tree.open(command.sessionId);
+        this.sleepPolicy?.opened(command.sessionId);
         // Protect the newly opened session before mounting resources can publish activity.
         this.watching.set(command.sessionId, { busyObjectIds: [], timelineBusy: false, live: [] });
         if (woke) {

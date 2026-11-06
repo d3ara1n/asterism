@@ -43,7 +43,6 @@ export interface NamingDependencies {
 /** Both entry points capture material, generate with utility, and append one host title assignment. */
 export function createSessionNaming(deps: NamingDependencies) {
   return async (session: SessionExecutor, snapshot: SessionSnapshot, trigger: AutomaticNamingTrigger | null, signal: AbortSignal): Promise<void> => {
-    if (trigger && namingState(snapshot).explicit) return;
     const turns = collectTurns(snapshot.records.all({ scope: "timeline" }));
     if (!turns.length) throw new PluginApiError("unavailable", "The session has no conversation to name.", undefined, namingMessages.noMaterial);
     const roles = deps.roles();

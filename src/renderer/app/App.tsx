@@ -344,6 +344,6 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}
       toastOptions={{ closeButtonAriaLabel: i18n.formatMessage(commonMessages.close) }} />
     {creation.element}
-    <ApplicationCommands open={commandsOpen} onOpenChange={setCommandsOpen} session={commandSession} ready={writable} returnFocus={commandFocus} />
+    <ApplicationCommands open={commandsOpen} onOpenChange={setCommandsOpen} session={commandSession} ready={commandSession !== null && writable} returnFocus={commandFocus} />
   </RendererSettingsNavigationProvider></FolderServicesProvider></UpdatesProvider></RendererCatalogProvider>;
 }

@@ -29,10 +29,14 @@ export interface SleepHost {
 export class SessionSleepPolicy {
   private cancel: (() => void) | undefined;
   private waiting = new Set<string>();
+  private readonly failed = new Set<string>();
   private closed = false;
   constructor(private readonly host: SleepHost) {}
 
-  due(now = Date.now()): string[] { return planSessionSleep(this.host.candidates(), this.host.sleepDays(), now).due; }
+  private candidates(): readonly SleepCandidate[] { return this.host.candidates().filter(candidate => !this.failed.has(candidate.id)); }
+  due(now = Date.now()): string[] { return planSessionSleep(this.candidates(), this.host.sleepDays(), now).due; }
+  /** A successful user open starts a new inactivity interval after a failed attempt. */
+  opened(sessionId: string): void { this.failed.delete(sessionId); }
   /** Overdue sessions held back by unsettled work; their settling is the only progress signal that matters here. */
   isWaiting(sessionId: string): boolean { return this.waiting.has(sessionId); }
 
@@ -40,7 +44,7 @@ export class SessionSleepPolicy {
     if (this.closed) return;
     this.cancel?.();
     this.cancel = undefined;
-    const now = Date.now(), candidates = this.host.candidates(), days = this.host.sleepDays();
+    const now = Date.now(), candidates = this.candidates(), days = this.host.sleepDays();
     this.waiting = new Set(planSessionSleep(candidates, days, now).due.filter(id => !this.host.settled(id)));
     const { nextAt } = planSessionSleep(candidates.filter(candidate => !this.waiting.has(candidate.id)), days, now);
     if (nextAt !== null) this.cancel = this.host.deadlines.schedule(nextAt, () => this.fire());
@@ -56,8 +60,13 @@ export class SessionSleepPolicy {
     this.cancel = undefined;
     if (this.closed) return;
     const ready = this.due().filter(id => this.host.settled(id));
-    for (const result of await Promise.allSettled(ready.map(id => this.host.sleep(id))))
-      if (result.status === "rejected") this.host.failed(result.reason);
+    const results = await Promise.allSettled(ready.map(id => this.host.sleep(id)));
+    for (const [index, result] of results.entries()) {
+      if (result.status === "rejected") {
+        this.failed.add(ready[index]!);
+        this.host.failed(result.reason);
+      }
+    }
     this.refresh();
   }
 }

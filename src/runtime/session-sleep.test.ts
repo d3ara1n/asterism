@@ -33,4 +33,40 @@ describe("session sleep deadlines", () => {
     expect(slept).toEqual(["overdue"]);
     expect(scheduled.at(-1)!.at).toBe(now + 7 * day);
   });
+
+  it("keeps failed sleep attempts paused across replanning without blocking other sessions", async () => {
+    const now = Date.now(), scheduled: { at: number; run: () => void | Promise<void> }[] = [];
+    const deadlines: DeadlineServices = { schedule: (at, run) => { scheduled.push({ at, run }); return () => {}; } };
+    const failure = new Error("Session storage failed."), failures: unknown[] = [], attempts: string[] = [];
+    const busy = new Set(["other"]), slept = new Set<string>();
+    const policy = new SessionSleepPolicy({
+      deadlines, sleepDays: () => 7, failed: error => { failures.push(error); },
+      candidates: () => [candidate("failed", now - 10 * day), candidate("other", now - 9 * day), candidate("recent", now)]
+        .filter(item => !slept.has(item.id)),
+      settled: id => !busy.has(id),
+      sleep: async id => {
+        attempts.push(id);
+        if (id === "failed") throw failure;
+        slept.add(id);
+      },
+    });
+    policy.refresh();
+    await scheduled.at(-1)!.run();
+    expect(failures).toEqual([failure]);
+    expect(scheduled.at(-1)!.at).toBe(now + 7 * day);
+    policy.refresh();
+    expect(policy.due()).toEqual(["other"]);
+    expect(scheduled.at(-1)!.at).toBe(now + 7 * day);
+
+    busy.clear();
+    policy.refresh();
+    await scheduled.at(-1)!.run();
+    expect(attempts).toEqual(["failed", "other"]);
+    expect(policy.due()).toEqual([]);
+    expect(scheduled.at(-1)!.at).toBe(now + 7 * day);
+
+    policy.opened("failed");
+    expect(policy.due()).toEqual(["failed"]);
+    policy.close();
+  });
 });

@@ -22,7 +22,7 @@ User-entered credentials beginning with `!` are shell commands; plugin secrets a
 
 ## Model discovery and parameter lookup
 
-Discovery uses the saved base address and its model-list endpoint, preserving the configured path. It uses the connection’s authentication and does not probe alternative addresses.
+Discovery seeks the provider’s model-list endpoint using the saved base address and connection authentication. It preserves the configured base path and tries two candidate request addresses in parallel by appending `/models` and `/v1/models`. The first candidate to return a complete valid catalog supplies the result; the other request is cancelled, and catalogs are not merged. Discovery does not change the configured inference address.
 
 List parsing follows recognized response structure rather than provider branding. Unknown or ambiguous containers and malformed recognized metadata fail. An empty recognized list is valid.
 
