@@ -49,6 +49,10 @@ Islands declare minimum width, growth weight, and optional maximum. When they fi
 
 An ordinary island opens at the right end of the screen and belongs to the island that opened it; closing an island also closes the islands it opened. Escape closes the focused closable island and restores its opener. Host-owned borders and focus highlights remain outside clipped content.
 
+Page-region cleanup releases only islands opened by that region. Sharing a containing island does not make another region's islands part of its lifetime.
+
+An island shell's border, clipping, and focus highlight are independent of its background fill. Content that paints its own background, such as the canvas, uses a transparent shell so entry and exit animations reveal the native window material rather than an unrelated card fill.
+
 Feature code requests island operations through the shared interface. Layout calculations remain independent of business components.
 
 ## Motion

@@ -261,6 +261,8 @@
     @apply surface pointer-events-none absolute inset-0;
     transition: border-color var(--motion-fast) var(--ease-out);
   }
+  /* Content such as the canvas paints its own background, including during enter and exit transitions. */
+  .island[data-surface="transparent"] > .island-backdrop { background-color: transparent; }
   .island[data-focused] > .island-backdrop { border-color: var(--ring); }
   /* Islands scroll vertically only; horizontal position belongs to the strip and its segment navigation. */
   .island-body { @apply relative h-full overflow-x-hidden overflow-y-auto; }

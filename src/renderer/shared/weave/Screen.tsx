@@ -21,8 +21,8 @@ export interface IslandSpec {
   width: IslandWidth;
   label: UiText;
   render: () => ReactNode;
-  /** When false, the island has no surface, and content sits directly on the window material. */
-  surface?: boolean;
+  /** False omits the shell; transparent retains its border, clipping, and focus highlight without a background fill. Defaults to a card surface. */
+  surface?: boolean | "transparent";
   origin?: HTMLElement | null;
   /** Fixed islands only: they own their visibility, and closing through their own controls or Esc calls this after the islands they opened close. */
   onClose?: () => void;
@@ -348,16 +348,17 @@ function Island({ ref, spec, width, x, settle, hidden, peek, focused, api, onFoc
   const latestFocus = useRef(onFocus);
   latestFocus.current = onFocus;
   const focusSelf = useCallback(() => latestFocus.current(), []);
+  const surface = spec.surface ?? true;
   // For islands partially outside the viewport, clicking the exposed portion brings them into view.
   // Expand in place: fade in from a slight offset left of the target position; Motion transitions position and width from their current values.
   return <motion.section ref={node => { element.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
     initial={{ opacity: 0, x: x - 16, scale: 0.98, width }} animate={{ opacity: 1, x, scale: 1, width }} exit={{ opacity: 0, scale: 0.98, transition: fadeTransition }}
     transition={settle ? settledTransition : islandTransition} data-island={spec.id} tabIndex={-1} aria-label={i18n.text(spec.label)}
     inert={hidden} aria-hidden={hidden || undefined} data-peek={peek || undefined} data-focused={focused || undefined}
-    data-surface={spec.surface !== false || undefined}
+    data-surface={surface || undefined}
     className="island"
     onFocusCapture={focusSelf} onPointerDownCapture={focusSelf}>
-    {spec.surface !== false && <div className="island-backdrop" aria-hidden="true" />}
+    {surface && <div className="island-backdrop" aria-hidden="true" />}
     <div className="island-body"><IslandContext.Provider value={stable}>{spec.render()}</IslandContext.Provider></div>
   </motion.section>;
 }

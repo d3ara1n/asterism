@@ -26,12 +26,18 @@ function pluginIslandSpec(pluginId: string, spec: RendererIslandSpec, restore?: 
 }
 
 /** restore tags the first island opened through this adapter: a resource opener shows its location there. */
-function pluginIsland(island: IslandApi, pluginId: string, restore?: IslandView): RendererIsland {
+function pluginIsland(island: IslandApi, pluginId: string, restore?: IslandView, owned?: Set<string>): RendererIsland {
   const prefix = `plugin-island:${pluginId}:`;
   let tag = restore;
   return {
     has: key => island.has(prefix + key),
-    open: spec => { const next = pluginIslandSpec(pluginId, spec, tag); tag = undefined; return island.open(next); },
+    open: async spec => {
+      const next = pluginIslandSpec(pluginId, spec, tag); tag = undefined;
+      const existing = island.has(next.id);
+      const opened = await island.open(next);
+      if (opened && !existing) owned?.add(next.id);
+      return opened;
+    },
     close: options => island.close(options),
     closeOwned: options => island.closeOwned(options),
     guard: guard => island.guard(guard),
@@ -91,7 +97,7 @@ export function PluginCallScope({ children }: { children: ReactNode }) {
 
 /**
  * Adapt the containing host island into a plugin island: identities are isolated by plugin, and the host standardizes width and shell.
- * Islands opened here belong to the containing island. page marks a settings page: when it unmounts, close the islands it opened (content is invalid, so skip guards).
+ * Islands opened here belong to the containing island. page closes only the islands newly opened by this region when it unmounts, skipping guards because its content is invalid.
  */
 export function PluginIslandProvider({ pluginId, page = false, children }: {
   pluginId: string; page?: boolean; children: ReactNode;
@@ -100,7 +106,9 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
   const registry = useModuleViews();
   const calls = useRendererCalls();
   const i18n = useI18n();
-  const adapter = useMemo(() => pluginIsland(island, pluginId), [island, pluginId]);
+  const opened = useRef(new Set<string>());
+  const owned = page ? opened.current : undefined;
+  const adapter = useMemo(() => pluginIsland(island, pluginId, undefined, owned), [island, pluginId, owned]);
   const navigation = useMemo<RendererResourceNavigation>(() => ({
     async open(target, location, options) {
       try {
@@ -117,18 +125,23 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
         if (!descriptor.open) { toast.error(i18n.text(objectsMessages.resourceOpenUnsupported)); return false; }
         const resource = { sessionId: target.sessionId, id: object.id, kind: object.kind };
         return await descriptor.open(location, { resource, calls, origin: options?.origin,
-          island: pluginIsland(island, pluginOf(object.kind)!, { kind: "resource", resourceId: object.id, location }) });
+          island: pluginIsland(island, pluginOf(object.kind)!, { kind: "resource", resourceId: object.id, location }, owned) });
       } catch (error) {
         console.error("Resource location could not be opened.", error);
         toast.error(i18n.text(failureDisplay(error, objectsMessages.resourceOpenFailed)));
         return false;
       }
     },
-  }), [island, registry, calls, i18n]);
+  }), [island, registry, calls, i18n, owned]);
   useEffect(() => {
-    if (!page) return;
-    return () => { void island.closeOwned({ force: true }); };
-  }, [page, island]);
+    if (!owned) return;
+    // Home and the workbench share a host island and overlap during page transitions.
+    // A departing region must not close islands restored by the incoming page.
+    return () => {
+      for (const target of owned) void island.closeOwned({ force: true, target });
+      owned.clear();
+    };
+  }, [owned, island]);
   return <RendererIslandProvider value={adapter}>
     <RendererResourceNavigationProvider value={navigation}>
       <RendererIslandPanelProvider value={IslandPanel}>{children}</RendererIslandPanelProvider>
