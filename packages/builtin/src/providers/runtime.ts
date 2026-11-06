@@ -2,6 +2,7 @@ import { defineModule } from "@asterism-app/sdk/runtime";
 import { modelProviderPresets } from "./presets.ts";
 import { createZhipuUsage } from "./zhipu.ts";
 import { createDeepSeekUsage } from "./deepseek.ts";
+import { createNewApiUsage } from "./new-api.ts";
 import { createMoonshotUsage } from "./moonshot.ts";
 import { createOpenRouterUsage } from "./openrouter.ts";
 import { createOpenCodeUsage } from "./opencode.ts";
@@ -12,7 +13,7 @@ export const createBuiltinUsageProviders = (transport: typeof fetch = fetch) => 
   openaiHeaderUsage, anthropicHeaderUsage, xaiHeaderUsage,
   createZhipuUsage(transport), createZhipuUsage(transport, "zai-plan"),
   createDeepSeekUsage(transport), createMoonshotUsage("kimi-cn", transport), createMoonshotUsage("kimi", transport),
-  createOpenRouterUsage(transport), createOpenCodeUsage(transport),
+  createOpenRouterUsage(transport), createOpenCodeUsage(transport), createNewApiUsage(transport),
   createKimiUsage("kimi-plan-cn", transport), createKimiUsage("kimi-plan", transport),
 ];
 
