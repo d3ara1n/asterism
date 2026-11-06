@@ -28,6 +28,7 @@ import { commandsMessages } from "../messages/commands";
 
 import { Space } from "../shared/weave/Space";
 import { Dock } from "../shared/weave/Dock";
+import { DockSlot } from "../shared/weave/DockSlot";
 import { SettingsPage, isSettingsCategory, type SettingsTarget } from "../features/settings/SettingsPage";
 import { SessionArchiveContext } from "../features/settings/SessionsSettings";
 import { settingsPageKey, usePluginSettingsRegistry } from "../modules/settings";
@@ -281,7 +282,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     onHome={goHome} onSession={openSession} onHide={hideSidebar}
     onRetry={() => { void controller.refresh(); }} />;
   // Docked beside Screen, but still inside the main page and bound to the current session.
-  const auxiliaryPanel = panel && view.kind === "conversation" && active ? <Dock key={panel.kind} className="main-panel"
+  const auxiliaryPanel = panel && view.kind === "conversation" && active ? <Dock key="auxiliary" contentKey={panel.kind}
     label={{ objects: i18n.formatMessage(objectsMessages.objects), history: i18n.formatMessage(historyMessages.history), access: i18n.formatMessage(accessMessages.accessLabel) }[panel.kind]}
     autoFocus={!!panel.origin}>
     <WorkbenchScope store={workbenchStore} sessionId={view.sessionId}>
@@ -333,11 +334,11 @@ export function App({ controller }: { controller: ApplicationController }) {
         { id: "main", label: mainTitle, surface: false,
           // Docked sidebars reserve width; Island overflow and focus following stay inside Screen.
           content: <div className="main-page">
-            <AnimatePresence initial={false} mode="popLayout">
-              {sidebarVisible && <Dock key="navigation" className="main-sidebar" label={i18n.formatMessage(appMessages.appNavigation)}>{sidebar}</Dock>}
-            </AnimatePresence>
+            <DockSlot side="left" className="main-sidebar">
+              {sidebarVisible ? <Dock key="navigation" label={i18n.formatMessage(appMessages.appNavigation)}>{sidebar}</Dock> : null}
+            </DockSlot>
             <Screen ref={mainScreen} strip={mainStrip} label={mainTitle} root={main} className="h-full flex-1" />
-            <AnimatePresence initial={false} mode="popLayout">{auxiliaryPanel}</AnimatePresence>
+            <DockSlot side="right" className="main-panel">{auxiliaryPanel}</DockSlot>
           </div> },
       ]} />
     </Window>

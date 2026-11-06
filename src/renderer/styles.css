@@ -57,6 +57,7 @@
   /* Managed space padding: align island tops with page tops. */
   --space-inset: 0px;
   --motion-fast: 200ms;
+  --motion-layout: 420ms;
   --motion-page: 560ms;
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   /* Screen transitions: exponential ease-out, fast initially with a slow settling tail and no overshoot. */
@@ -255,9 +256,14 @@
 
   /* The main page docks navigation and auxiliary panels beside the Island viewport. Screen owns the gaps next to its contents and its overflow indicator. */
   .main-page { @apply relative flex h-full min-h-0 min-w-0 overflow-clip; }
-  .main-sidebar { width: 224px; margin-left: var(--space-inset); }
-  .main-panel { width: 320px; margin-right: var(--space-inset); }
-  .dock { @apply relative min-h-0 min-w-0 shrink-0 outline-none; margin-bottom: var(--space-inset); }
+  .main-sidebar { --dock-width: 224px; }
+  .main-panel { --dock-width: 320px; }
+  /* Only the slot changes width; its fixed-size surface cannot cover the neighboring Screen. */
+  .dock-slot { @apply relative min-h-0 shrink-0 overflow-clip; transition: width var(--motion-layout) var(--ease-out); }
+  .dock-slot > .dock { position: absolute; top: 0; bottom: var(--space-inset); width: var(--dock-width); }
+  .dock-slot[data-side="left"] > .dock { left: var(--space-inset); }
+  .dock-slot[data-side="right"] > .dock { right: var(--space-inset); }
+  .dock { @apply relative min-h-0 min-w-0 outline-none; }
   .dock:focus-within > .island-backdrop { border-color: var(--ring); }
   .dock-body { position: absolute; inset: 1px; overflow: hidden; border-radius: calc(var(--radius) - 1px); }
   /* Home inputs and template cards form surfaces while the rest expose window material. */
@@ -267,8 +273,9 @@
 
   /* Settings: category cards sit on the material; details overlay the overview absolutely and fade/scale from the card origin. */
   /* Island weave: left-to-right islands center in columns when they fit, otherwise overflow and follow focus. */
-  .weave-viewport { @apply relative min-h-0 min-w-0 overflow-clip; }
-  .weave-strip { position: absolute; inset: 0 var(--space-inset) var(--space-inset); }
+  /* Horizontal spacing sits outside the clipping boundary, so overflowing Islands still leave a gap beside Docks. */
+  .weave-viewport { @apply relative min-h-0 min-w-0 overflow-clip; margin-inline: var(--space-inset); }
+  .weave-strip { position: absolute; inset: 0 0 var(--space-inset); }
   .island { @apply absolute top-0 left-0 h-full outline-none; }
   .island-backdrop {
     @apply surface pointer-events-none absolute inset-0;
@@ -290,7 +297,7 @@
   .island[data-peek] { cursor: pointer; }
   .island[data-peek] > .island-body { opacity: 0.6; transition: opacity var(--motion-fast); }
   /* Overflow segmented navigation fills bottom spacing with its hit area and centers visible bars; visible islands darken and focused islands are darkest. */
-  .weave-indicator { @apply absolute bottom-0; height: var(--space-inset); inset-inline: var(--space-inset); }
+  .weave-indicator { @apply absolute bottom-0; height: var(--space-inset); inset-inline: 0; }
   .weave-segment { @apply absolute inset-y-0 cursor-pointer rounded-full outline-none; }
   .weave-segment::before {
     @apply absolute inset-x-px top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-foreground/10 content-[''];

@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 
 import { createContext, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
 import type { UiText } from "@asterism-app/sdk/contracts";
@@ -9,7 +9,7 @@ import { cn } from "@asterism-app/ui/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 
 import { fadeTransition, islandTransition } from "./motion";
-import { closure, focusAfterClose, follow, layout, moveIsland, openIsland, removeIslands, type IslandWidth } from "./model";
+import { closure, focusAfterClose, follow, layout, moveIsland, openIsland, removeIslands, type IslandWidth, type Span } from "./model";
 
 /** Settled layout changes place islands immediately; opacity and scale keep their usual timing. */
 const settledTransition = { ...islandTransition, x: { duration: 0 }, width: { duration: 0 } };
@@ -170,7 +170,7 @@ export function Screen({ label, root, strip: external, className, ref }: {
   const strip = external ?? internal;
   const state = useSyncExternalStore(strip.subscribe, strip.getSnapshot);
   const [width, setWidth] = useState(0);
-  const [offset, setOffset] = useState(0);
+  const [scroll, setScroll] = useState<{ spans: readonly Span[] | null; focus: string; offset: number }>({ spans: null, focus: "", offset: 0 });
   const islands = useMemo<{ spec: IslandSpec; width: IslandWidth; island?: StripIsland }[]>(() => [{ spec: root, width: root.width },
     ...state.islands.map(island => ({ spec: island.spec, width: islandWidth(island), island }))],
   [root, state.islands]);
@@ -178,7 +178,7 @@ export function Screen({ label, root, strip: external, className, ref }: {
   const gap = windowGeometry.gap;
 
   useLayoutEffect(() => {
-    // Layout width uses the strip width after subtracting --space-inset; the viewport itself fills the container.
+    // The strip fills the viewport width; horizontal spacing sits outside the viewport's clipping boundary.
     const element = stripElement.current;
     if (!element) return;
     setWidth(element.clientWidth);
@@ -189,8 +189,11 @@ export function Screen({ label, root, strip: external, className, ref }: {
 
   const { spans, total, overflow } = useMemo(() => layout(islands.map(item => ({ id: item.spec.id, width: item.width })), width, gap), [islands, width, gap]);
   const focusIndex = Math.max(0, islands.findIndex(item => item.spec.id === focus));
-  // Follow focus only during overflow: stay still when visible and align to the edge when out of bounds; do not translate when everything fits.
-  useLayoutEffect(() => { setOffset(current => overflow ? follow(spans, focusIndex, width, current) : 0); }, [spans, focusIndex, width, overflow]);
+  // Apply new layout constraints before rendering Islands, so viewport resizing and focus following share one geometry update.
+  // Manual strip scrolling keeps its offset until the layout or focused island changes.
+  const followChanged = scroll.spans !== spans || scroll.focus !== focus;
+  const offset = followChanged ? (overflow ? follow(spans, focusIndex, width, scroll.offset) : 0) : scroll.offset;
+  if (followChanged) setScroll({ spans, focus, offset });
 
   // Guards may asynchronously await confirmation while state changes: always decide using the latest state rather than the closure captured at initiation.
   const latest = useRef({ root, order: islands.map(item => item.spec.id) });
@@ -282,7 +285,7 @@ export function Screen({ label, root, strip: external, className, ref }: {
   const onWheel = (event: React.WheelEvent) => {
     if (!overflow || Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
     if ((event.target as Element).closest(".island-body")) return; // Do not take over inside islands (including the canvas)
-    setOffset(current => Math.min(Math.max(current + event.deltaX, 0), total - width));
+    setScroll(current => ({ ...current, offset: Math.min(Math.max(current.offset + event.deltaX, 0), total - width) }));
   };
   const onKeyDown = async (event: React.KeyboardEvent) => {
     // Local controls handle Escape first. Portal events belong to their own surface, not the island strip.
@@ -311,7 +314,7 @@ export function Screen({ label, root, strip: external, className, ref }: {
         const hidden = overflow && (visibleRight <= 0 || visibleLeft >= width);
         const peek = overflow && !hidden && (visibleLeft < -1 || visibleRight > width + 1);
         const position = island ? ordinaries.indexOf(island) : -1;
-        return <Island key={spec.id} spec={spec} width={span.width} x={span.left + shift} settle={state.settle} hidden={hidden} peek={peek}
+        return <Island key={spec.id} spec={spec} width={span.width} x={span.left + shift} viewportWidth={width} settle={state.settle} hidden={hidden} peek={peek}
           focused={islands.length > 1 && spec.id === focus}
           api={{
             id: spec.id, has,
@@ -360,8 +363,8 @@ function useStableIsland(api: IslandApi): IslandApi {
   }), []);
 }
 
-function Island({ ref, spec, width, x, settle, hidden, peek, focused, api, onFocus }: {
-  ref?: React.Ref<HTMLElement>; spec: IslandSpec; width: number; x: number; settle: boolean; hidden: boolean; peek: boolean; focused: boolean; api: IslandApi; onFocus: () => void;
+function Island({ ref, spec, width, x, viewportWidth, settle, hidden, peek, focused, api, onFocus }: {
+  ref?: React.Ref<HTMLElement>; spec: IslandSpec; width: number; x: number; viewportWidth: number; settle: boolean; hidden: boolean; peek: boolean; focused: boolean; api: IslandApi; onFocus: () => void;
 }) {
   const i18n = useI18n();
   const element = useRef<HTMLElement>(null);
@@ -372,11 +375,17 @@ function Island({ ref, spec, width, x, settle, hidden, peek, focused, api, onFoc
   latestFocus.current = onFocus;
   const focusSelf = useCallback(() => latestFocus.current(), []);
   const surface = spec.surface ?? true;
+  const reducedMotion = useReducedMotion();
+  const [geometry, setGeometry] = useState({ x, width, viewportWidth, resized: false });
+  if (geometry.x !== x || geometry.width !== width || geometry.viewportWidth !== viewportWidth) {
+    // The viewport already moves continuously during Dock transitions and native resizing; do not animate behind it.
+    setGeometry({ x, width, viewportWidth, resized: geometry.viewportWidth !== viewportWidth });
+  }
   // For islands partially outside the viewport, clicking the exposed portion brings them into view.
-  // Expand in place: fade in from a slight offset left of the target position; Motion transitions position and width from their current values.
+  // Ordinary Island changes still interpolate from their current position and width.
   return <motion.section ref={node => { element.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
     initial={{ opacity: 0, x: x - 16, scale: 0.98, width }} animate={{ opacity: 1, x, scale: 1, width }} exit={{ opacity: 0, scale: 0.98, transition: fadeTransition }}
-    transition={settle ? settledTransition : islandTransition} data-island={spec.id} tabIndex={-1} aria-label={i18n.text(spec.label)}
+    transition={settle || geometry.resized || reducedMotion ? settledTransition : islandTransition} data-island={spec.id} tabIndex={-1} aria-label={i18n.text(spec.label)}
     inert={hidden} aria-hidden={hidden || undefined} data-peek={peek || undefined} data-focused={focused || undefined}
     data-surface={surface || undefined}
     className="island"
