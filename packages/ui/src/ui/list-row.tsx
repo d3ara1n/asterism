@@ -37,5 +37,5 @@ export function ListRow({ title, description, details, media, mediaVariant, lead
 /** Reveal row actions on hover or focus while retaining keyboard focusability. */
 export function ListRowAction({ className, ...props }: Omit<ComponentProps<typeof Button>, "variant" | "size">) {
   return <Button type="button" variant="ghost" size="icon-xs" {...props}
-    className={cn("w-0 overflow-hidden p-0 opacity-0 transition-none group-hover/list-row:w-6 group-hover/list-row:opacity-100 group-focus-within/list-row:w-6 group-focus-within/list-row:opacity-100 data-[state=open]:w-6 data-[state=open]:opacity-100", className)} />;
+    className={cn("w-0 overflow-hidden p-0 opacity-0 group-hover/list-row:w-6 group-hover/list-row:opacity-100 group-focus-within/list-row:w-6 group-focus-within/list-row:opacity-100 data-[state=open]:w-6 data-[state=open]:opacity-100", className)} />;
 }
