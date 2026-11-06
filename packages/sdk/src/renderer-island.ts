@@ -16,6 +16,8 @@ export interface RendererIslandSpec {
   size?: "panel" | "content";
   render: () => ReactNode;
 }
+/** Explicit cancellation action of an island; cancellation may close it through the usual close guards. */
+export type RendererIslandCancel = () => void | Promise<void>;
 /** Close guard: returning false (or resolving to false) aborts closing; may asynchronously wait for user confirmation. */
 export type RendererCloseGuard = () => boolean | Promise<boolean>;
 export interface RendererIsland {
@@ -29,6 +31,8 @@ export interface RendererIsland {
   closeOwned(options?: { force?: boolean }): Promise<boolean>;
   /** Register a close guard for this island and return an unregister function. Normally used through useRendererCloseGuard. */
   guard(guard: RendererCloseGuard): () => void;
+  /** Register the containing island's cancellation action. One owner declares this action; unregister on cleanup. */
+  onCancel(action: RendererIslandCancel): () => void;
 }
 /**
  * Panel island frame: the title bar stays fixed and the content scrolls independently; the primary action, island menu, and close control sit on the right of the title bar.
@@ -63,6 +67,17 @@ export function useRendererCloseGuard(guard: RendererCloseGuard | null) {
   const latest = useRef(guard);
   latest.current = guard;
   useEffect(() => island.guard(() => latest.current ? latest.current() : true), [island]);
+}
+/** Declare cancellation for an island owned by this content; null leaves it without an island-level Escape action.
+ * Escape targets only the focused island, after local controls; it does not fall back to the opening island.
+ * Declare one action per island. Closing capability and the panel frame do not imply cancellation.
+ */
+export function useRendererIslandCancel(action: RendererIslandCancel | null) {
+  const island = useRendererIsland();
+  const latest = useRef(action);
+  latest.current = action;
+  const enabled = action !== null;
+  useEffect(() => enabled ? island.onCancel(() => latest.current?.()) : undefined, [island, enabled]);
 }
 /** Host-rendered panel frame for use within islands opened by plugins. */
 export function IslandPanel(props: RendererIslandPanelProps) {

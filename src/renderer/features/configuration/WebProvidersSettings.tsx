@@ -5,7 +5,7 @@ import type { ProviderSetting, WebProviderType } from "@asterism-app/sdk/contrac
 import { webProviderMessages as messages } from "../../messages/web-providers";
 import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
-import { useIsland } from "../../shared/weave/Screen";
+import { useIsland, useIslandCancel } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -134,6 +134,8 @@ function WebProviderCreation() {
   const i18n = useI18n(), capabilities = useCapabilities();
   const { snapshot } = useSettingsConfiguration();
   const [picked, setPicked] = useState<string | null>(null);
+  const island = useIsland();
+  useIslandCancel(picked ? null : async () => { await island.close(); });
   if (picked) return <WebProviderEditor typeId={picked} />;
   const types = snapshot?.webProviderTypes ?? [];
   const added = new Set((snapshot?.webProviders ?? []).map(state => state.id));
@@ -177,6 +179,7 @@ function FetchScope({ patterns }: { patterns: readonly string[] }) {
 
 function WebProviderEditor({ typeId }: { typeId: string }) {
   const i18n = useI18n(), island = useIsland(), capabilities = useCapabilities();
+  useIslandCancel(async () => { await island.close(); });
   const { snapshot } = useSettingsConfiguration();
   const type = snapshot?.webProviderTypes.find(type => type.id === typeId);
   const saved = snapshot?.webProviders.find(state => state.id === typeId) ?? null;

@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { Plus } from "lucide-react";
-import { useI18n, useRendererIsland } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
@@ -53,6 +53,7 @@ function SavedTextEditor({ initialId }: { initialId: string | null }) {
   const nameId = useId(), contentId = useId(), countId = useId();
   const savedText = useSavedText();
   const island = useRendererIsland();
+  useRendererIslandCancel(async () => { await island.close(); });
   const { run, busy, error } = useSettingsAction(settingsMessages.saveFailed);
   const [id, setId] = useState(initialId);
   const stored = id === null ? undefined : savedText.items.find(item => item.id === id);

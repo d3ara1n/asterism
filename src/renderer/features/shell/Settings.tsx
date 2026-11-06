@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { CopyPlus, RefreshCw, Trash2 } from "lucide-react";
-import { IslandPanel, useI18n, useRendererCalls, useRendererIsland } from "@asterism-app/sdk/renderer";
+import { IslandPanel, useI18n, useRendererCalls, useRendererIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -131,6 +131,7 @@ export function ShellSettings({ value, disabled, save }: {
  */
 function ShellProfileEditor({ id: initialId, initial }: { id: string; initial: ShellProfile }) {
   const i18n = useI18n(), island = useRendererIsland(), fieldId = useId();
+  useRendererIslandCancel(async () => { await island.close(); });
   const [id, setId] = useState(initialId);
   const config = useShellConfiguration();
   const saved = config.value.profiles.find(item => item.id === id);

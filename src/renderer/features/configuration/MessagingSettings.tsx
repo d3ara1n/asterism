@@ -8,7 +8,7 @@ import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Empty, EmptyContent, EmptyHeader, EmptyDescription, EmptyMedia } from "@asterism-app/ui/ui/empty";
 import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
 import { useI18n } from "../../shared/i18n";
-import { useIsland } from "../../shared/weave/Screen";
+import { useIsland, useIslandCancel } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
 import { Editor, TextField, ChoiceField, ToggleField } from "./forms";
@@ -66,6 +66,7 @@ export function MessagingSettings() {
 
 function MessagingEditor({ initialId }: { initialId: string | null }) {
   const i18n = useI18n(), island = useIsland(), form = useId();
+  useIslandCancel(async () => { await island.close(); });
   const { snapshot } = useSettingsConfiguration(), action = useConfigurationAction("inline");
   const [id, setId] = useState(initialId);
   const saved = snapshot?.messagingConnections.find(connection => connection.id === id);

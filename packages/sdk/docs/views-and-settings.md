@@ -18,6 +18,8 @@ Resource card views, settings pages, and islands can use the renderer island cap
 
 Supply a plugin-local identity, accessible label, opening element, and content renderer. Choose a content surface for an editor or another view that needs more width. The host manages layout and focus. The opened view has an independent plugin region; pass its resource reference and other domain inputs explicitly rather than relying on the source component's React context or mount lifetime.
 
+Escape is not a general island close shortcut. For a cancellable task, its island owner declares one action with `useRendererIslandCancel`; pass null when the task has no cancellation action. Local controls handle Escape first, and an island without an action does not pass cancellation to its opening island. The callback owns the outcome: to dismiss the task, call the island's normal close operation so unsaved-change guards still apply. Functional windows and the shared panel frame do not declare cancellation automatically.
+
 Use the island panel for its title, actions, and close control. Its fill layout lets an editor own scrolling. Mark unsaved content as dirty so closing, closure through the opening island, session navigation, and application exit ask before discarding it. A close guard can also retain a view while a save is pending. Closing the island releases its view calls without ending independent backend services.
 
 ## Open resource locations

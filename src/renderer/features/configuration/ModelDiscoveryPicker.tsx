@@ -13,6 +13,7 @@ import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { toast } from "../../shared/toast";
 import { IslandPanel } from "../../shared/weave/IslandPanel";
+import { useIslandCancel } from "../../shared/weave/Screen";
 import { ConfigurationActionError } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 
@@ -37,6 +38,7 @@ function DiscoveryContent({ provider, discovery }: { provider: ModelProvider | u
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const running = discovery?.state === "running";
+  useIslandCancel(running && !busy ? async () => { await run({ type: "discovery.cancel", id: discovery.id }); } : null);
   const existing = new Set(snapshot?.models.filter(model => model.providerId === provider?.id).map(model => model.modelId));
   const selectedIds = [...selected].filter(id => !existing.has(id));
   const q = query.trim().toLowerCase();

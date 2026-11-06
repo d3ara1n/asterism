@@ -14,7 +14,7 @@ import { failureDisplay } from "@asterism-app/ui/error-display";
 import { networkPreferenceSchema, proxyAddress, type NetworkPreference, type NetworkState } from "../../../shared/network";
 import { networkMessages as messages } from "../../messages/network";
 import { useI18n } from "../../shared/i18n";
-import { useIsland } from "../../shared/weave/Screen";
+import { useIsland, useIslandCancel } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Editor, ReadStatus } from "../configuration/forms";
 import { Section } from "./layout";
@@ -64,6 +64,7 @@ export function NetworkSettings() {
 /** Edits a working copy of the saved preference; Save validates the whole preference and closes on success. */
 function ProxyEditor({ saved }: { saved: NetworkPreference }) {
   const i18n = useI18n(), island = useIsland(), id = useId();
+  useIslandCancel(async () => { await island.close(); });
   const [draft, setDraft] = useState(saved);
   const [serverInvalid, setServerInvalid] = useState(false);
   const { run, busy, error } = useSettingsAction(messages.saveFailed);

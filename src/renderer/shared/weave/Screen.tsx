@@ -24,7 +24,7 @@ export interface IslandSpec {
   /** False omits the shell; transparent retains its border, clipping, and focus highlight without a background fill. Defaults to a card surface. */
   surface?: boolean | "transparent";
   origin?: HTMLElement | null;
-  /** Fixed islands only: they own their visibility, and closing through their own controls or Esc calls this after the islands they opened close. */
+  /** Fixed islands only: they own their visibility, and closing through their own controls calls this after the islands they opened close. */
   onClose?: () => void;
   /** Ordinary islands only: serializable content from which the owner can rebuild this island; absent for islands that exist only while open. */
   restore?: IslandView;
@@ -65,6 +65,9 @@ export class IslandStrip {
   }
 }
 
+/** Explicit cancellation action of an island; independent of its ability to close. */
+export type IslandCancel = () => void | Promise<void>;
+
 /** Close guard: returning false (or resolving to false) cancels closing; can asynchronously await user confirmation. */
 export type CloseGuard = () => boolean | Promise<boolean>;
 
@@ -91,6 +94,8 @@ export interface IslandApi {
   closeOwned: (options?: { force?: boolean; target?: string }) => Promise<boolean>;
   /** Register a close guard for this island and return an unregister function. Usually used through useCloseGuard. */
   guard: (guard: CloseGuard) => () => void;
+  /** Register the island's cancellation action and return an unregister function. One owner declares this action. */
+  onCancel: (action: IslandCancel) => () => void;
   /** Present on ordinary islands only. */
   arrangement?: IslandArrangement;
 }
@@ -130,6 +135,15 @@ export function useCloseGuard(guard: CloseGuard | null) {
   const latest = useRef(guard);
   latest.current = guard;
   useEffect(() => island.guard(() => latest.current ? latest.current() : true), [island]);
+}
+
+/** Declare the containing island's cancellation action; null leaves it without an island-level Escape action. */
+export function useIslandCancel(action: IslandCancel | null) {
+  const island = useIsland();
+  const latest = useRef(action);
+  latest.current = action;
+  const enabled = action !== null;
+  useEffect(() => enabled ? island.onCancel(() => latest.current?.()) : undefined, [island, enabled]);
 }
 
 /** Effective width: a chosen size holds regardless of the window and may overflow into strip scrolling. */
@@ -187,6 +201,7 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
   latest.current = { root, fixed, order: islands.map(item => item.spec.id) };
   const guards = useRef(new Map<string, Set<CloseGuard>>());
   const pending = useRef(false);
+  const cancellations = useRef(new Map<string, { action: IslandCancel; pending: boolean }>());
   /** Consult guards in order (deepest first); any refusal cancels the operation. Ignore other close requests while consulting. */
   const release = async (ids: readonly string[], force?: boolean): Promise<boolean> => {
     if (force || ids.length === 0) return true;
@@ -252,6 +267,12 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
     set.add(fn); guards.current.set(id, set);
     return () => { set.delete(fn); if (!set.size) guards.current.delete(id); };
   };
+  const onCancel = (id: string, action: IslandCancel) => {
+    if (cancellations.current.has(id)) throw new Error(`Island ${id} already has a cancellation action.`);
+    const entry = { action, pending: false };
+    cancellations.current.set(id, entry);
+    return () => { cancellations.current.delete(id); };
+  };
   const setFocus = (id: string) => { if (strip.getSnapshot().focus !== id) strip.set({ focus: id }); };
   const has = (id: string) => strip.has(id);
   // An identity absent from the screen has nothing to close.
@@ -269,12 +290,18 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
     if ((event.target as Element).closest(".island-body")) return; // Do not take over inside islands (including the canvas)
     setOffset(current => Math.min(Math.max(current + event.deltaX, 0), total - width));
   };
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    // Esc closes the focused ordinary island, or a fixed island that declares closing; otherwise defer to the outer layer.
-    if (event.key !== "Escape" || event.defaultPrevented) return;
-    if (!strip.has(focus) && !fixed.some(spec => spec.id === focus && spec.onClose)) return;
+  const onKeyDown = async (event: React.KeyboardEvent) => {
+    // Local controls handle Escape first. Portal events belong to their own surface, not the island strip.
+    if (event.key !== "Escape" || event.defaultPrevented || event.nativeEvent.isComposing || event.repeat
+      || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey
+      || !event.currentTarget.contains(event.target as Node)) return;
+    const cancellation = cancellations.current.get(focus);
+    if (!cancellation) return;
     event.preventDefault(); event.stopPropagation();
-    void close(focus);
+    if (cancellation.pending) return;
+    cancellation.pending = true;
+    try { await cancellation.action(); }
+    finally { cancellation.pending = false; }
   };
   /** Segmented navigation: focus the target island so the viewport follows it; move DOM focus only after the target is no longer inert. */
   const moveTo = (id: string) => { setFocus(id); focusElement(id); };
@@ -298,6 +325,7 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
             close: options => close(spec.id, options?.force),
             closeOwned: options => closeOwned(spec.id, options?.force, options?.target),
             guard: fn => guard(spec.id, fn),
+            onCancel: action => onCancel(spec.id, action),
             arrangement: island && {
               size: island.size, medium: mediumWidth(island.spec.width),
               first: position === 0, last: position === ordinaries.length - 1,
@@ -334,6 +362,7 @@ function useStableIsland(api: IslandApi): IslandApi {
     has: id => latest.current.has(id),
     open: spec => latest.current.open(spec), close: options => latest.current.close(options),
     closeOwned: options => latest.current.closeOwned(options), guard: fn => latest.current.guard(fn),
+    onCancel: action => latest.current.onCancel(action),
   }), []);
 }
 

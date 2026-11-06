@@ -16,7 +16,7 @@ import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectSeparator, SelectLabel } from "@asterism-app/ui/ui/select";
 import { Switch } from "@asterism-app/ui/ui/switch";
 import { cn } from "@asterism-app/ui/utils";
-import { useRendererIsland as useIsland } from "@asterism-app/sdk/renderer";
+import { useRendererIsland as useIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
 import { Section } from "@asterism-app/ui/settings-layout";
 import { Editor, TextField, OverrideToggleField, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
@@ -114,6 +114,7 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
+  useRendererIslandCancel(async () => { await island.close(); });
   const [id, setId] = useState(initialId);
   const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.roles.find(role => role.id === id);

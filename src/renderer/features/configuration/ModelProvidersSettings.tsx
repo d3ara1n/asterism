@@ -19,7 +19,7 @@ import { Separator } from "@asterism-app/ui/ui/separator";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Switch } from "@asterism-app/ui/ui/switch";
 import { cn } from "@asterism-app/ui/utils";
-import { useIsland } from "../../shared/weave/Screen";
+import { useIsland, useIslandCancel } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
 import { ConfigurationActionError, Editor, EditorSection, TextField, NumberField } from "./forms";
@@ -181,6 +181,8 @@ function ProviderCreation() {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   const [picked, setPicked] = useState<{ value: ProviderValue; keyUrl?: string } | null>(null);
+  const island = useIsland();
+  useIslandCancel(picked ? null : async () => { await island.close(); });
   if (picked) return <ProviderEditor initialId={null} initialValue={picked.value} keyUrl={picked.keyUrl} />;
   return <Editor form="provider-form" title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false} busy={false} error={null}>
     <PresetPicker onPick={preset => setPicked(preset ? { keyUrl: preset.keyUrl, value: {
@@ -196,6 +198,7 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
   const { run, busy, error } = useConfigurationAction("inline");
   const discoveryAction = useConfigurationAction("inline");
   const island = useIsland();
+  useIslandCancel(async () => { await island.close(); });
   const [id, setId] = useState(initialId);
   const current = snapshot?.modelProviders.find(item => item.id === id);
   // Drafts omit enabled: enabling is an immediate action that always uses the snapshot, preventing mutual overwrites with the parent island's switch.
@@ -298,6 +301,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
+  useIslandCancel(async () => { await island.close(); });
   const quick = useQuickActions();
   const [id, setId] = useState(initialId);
   const current = snapshot?.models.find(model => modelReference(model) === id);

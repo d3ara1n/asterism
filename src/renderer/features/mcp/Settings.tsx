@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { MoreHorizontal, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
-import { IslandPanel, useI18n, useRendererCalls, useRendererIsland } from "@asterism-app/sdk/renderer";
+import { IslandPanel, useI18n, useRendererCalls, useRendererIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Input } from "@asterism-app/ui/ui/input";
@@ -167,6 +167,7 @@ function McpSettingsBody() {
  */
 function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | null; initial?: McpServerConfig; onCreated(server: McpServerConfig): void }) {
   const i18n = useI18n(), calls = useRendererCalls(), island = useRendererIsland(), id = useId();
+  useRendererIslandCancel(async () => { await island.close(); });
   const servers = useMcpServers();
   const create = serverId === null;
   const saved = create ? undefined : servers.find(server => server.id === serverId);

@@ -25,7 +25,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { ArrowLeft, Info, Palette, PlugZap, Puzzle, BookOpen, Terminal, Network } from "lucide-react";
 import { ConfigurationReadStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";
-import { Screen, useIsland, type IslandSpec } from "../../shared/weave/Screen";
+import { Screen, useIsland, useIslandCancel, type IslandSpec } from "../../shared/weave/Screen";
 import { settingsMessages } from "../../messages/settings";
 import { useI18n } from "../../shared/i18n";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
@@ -59,7 +59,7 @@ const configurationPages = new Set<string>(["providers", "shell", "mcp"]);
  * reversing toward the same origin when closing. Animate only opacity/transform, without layout interpolation. Category content can open islands at the right end (such as provider details).
  */
 export type SettingsTarget = ({ category: SettingsCategoryId } | { pluginId: string; pageId: string; location?: string }) & { sequence: number };
-function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId: string | null; onOpen: (id: string) => void; onClosed: () => void; manager: PluginManager; location?: string }) {
+function SettingsRoot({ openId, onOpen, onClosed, onCancel, manager, location }: { openId: string | null; onOpen: (id: string) => void; onClosed: () => void; onCancel: () => void; manager: PluginManager; location?: string }) {
   const i18n = useI18n();
   const island = useIsland();
   const stage = useRef<HTMLDivElement>(null);
@@ -90,9 +90,12 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
     onClosed();
   };
 
-  return <div ref={stage} className="settings-stage" onKeyDown={event => {
-    if (event.key === "Escape" && open && !event.defaultPrevented) { event.preventDefault(); event.stopPropagation(); close(); }
-  }}>
+  useIslandCancel(async () => {
+    if (open) await close();
+    else if (await island.closeOwned()) onCancel();
+  });
+
+  return <div ref={stage} className="settings-stage">
     <h1 className="sr-only">{i18n.formatMessage(settingsMessages.settings)}</h1>
     {/* Details are absolutely positioned over the overview, and both enter and exit simultaneously; the overview recedes slightly around the origin while details grow from the card position. */}
     <AnimatePresence initial={false}
@@ -138,7 +141,7 @@ function SettingsRoot({ openId, onOpen, onClosed, manager, location }: { openId:
 const pageMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0
   : parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--motion-page")) || 380;
 
-export function SettingsPage({ active, target }: { active: boolean; target: SettingsTarget | null }) {
+export function SettingsPage({ active, target, onCancel }: { active: boolean; target: SettingsTarget | null; onCancel: () => void }) {
   const i18n = useI18n();
   const configuration = useConfiguration(active);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -171,7 +174,7 @@ export function SettingsPage({ active, target }: { active: boolean; target: Sett
     // Center the overview according to content; opening a category requires a wider minimum width, overflowing alongside detail islands in narrow windows.
     width: openId ? { min: 440, grow: 1, max: 720 } : { min: 320, grow: 1, max: 768 },
     render: () => <SettingsRoot openId={openId} onOpen={id => { setLocation(undefined); setOpenId(id); }}
-      onClosed={() => { setLocation(undefined); setOpenId(null); }} manager={manager} location={location} />,
+      onClosed={() => { setLocation(undefined); setOpenId(null); }} onCancel={onCancel} manager={manager} location={location} />,
   };
   return <ConfigurationContext.Provider value={configuration}><Screen key={generation} label={i18n.formatMessage(settingsMessages.settings)} root={root} className="h-full" /></ConfigurationContext.Provider>;
 }

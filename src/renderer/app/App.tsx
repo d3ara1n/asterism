@@ -115,15 +115,12 @@ export function App({ controller }: { controller: ApplicationController }) {
     setPage(next);
     requestAnimationFrame(() => {
       if (next === "main" && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
-      else document.getElementById(`screen-${next}`)?.focus({ preventScroll: true });
+      else {
+        const screen = document.getElementById(`screen-${next}`);
+        (screen?.querySelector<HTMLElement>("[data-island]") ?? screen)?.focus({ preventScroll: true });
+      }
     });
   };
-  useEffect(() => {
-    if (!inSettings) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) go("main"); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
   const navigate = async (next: MainView): Promise<boolean> => {
     if (navigating.current) return false;
     navigating.current = true;
@@ -310,7 +307,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Window skipTarget={`screen-${page}`} titlebar={<Titlebar navigation={titleNavigation} actions={actions} actionsHidden={inSettings} />}>
       <Space active={page} screens={[
         { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content:
-          <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SettingsPage active={inSettings} target={settingsTarget} /></SessionArchiveContext.Provider> },
+          <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SettingsPage active={inSettings} target={settingsTarget} onCancel={() => go("main")} /></SessionArchiveContext.Provider> },
         { id: "main", label: mainTitle, surface: false,
           // Navigation closes the panel and ordinary islands before switching sessions.
           content: <Screen ref={mainScreen} strip={mainStrip} label={i18n.formatMessage(appMessages.appNavigation)} leading={sidebarVisible ? [sidebar] : undefined} root={main}

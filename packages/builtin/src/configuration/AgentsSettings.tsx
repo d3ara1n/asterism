@@ -17,7 +17,7 @@ import { StatusBadge } from "@asterism-app/ui/ui/status";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem, SelectSeparator } from "@asterism-app/ui/ui/select";
 import { Switch } from "@asterism-app/ui/ui/switch";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
-import { useRendererIsland as useIsland } from "@asterism-app/sdk/renderer";
+import { useRendererIsland as useIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
 import { Section } from "@asterism-app/ui/settings-layout";
 import { Editor, EditorSection, ModifiedNote, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
@@ -146,6 +146,7 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
+  useRendererIslandCancel(async () => { await island.close(); });
   const ids = { identity: useId(), description: useId(), prompt: useId(), subagent: useId(), role: useId(), requests: useId(), duration: useId() };
   const [id, setId] = useState(initialId);
   const [slug, setSlug] = useState(initialId ?? "");

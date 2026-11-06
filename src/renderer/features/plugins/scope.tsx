@@ -41,6 +41,7 @@ function pluginIsland(island: IslandApi, pluginId: string, restore?: IslandView,
     close: options => island.close(options),
     closeOwned: options => island.closeOwned(options),
     guard: guard => island.guard(guard),
+    onCancel: action => island.onCancel(action),
   };
 }
 
@@ -57,7 +58,7 @@ export async function resolveResourceIsland(registry: ViewRegistry, calls: Rende
   const capture: RendererIsland = {
     has: () => false,
     open: async spec => { captured ??= pluginIslandSpec(pluginId, spec, view); return true; },
-    close: async () => false, closeOwned: async () => true, guard: () => () => {},
+    close: async () => false, closeOwned: async () => true, guard: () => () => {}, onCancel: () => () => {},
   };
   try {
     await descriptor.open(view.location, { resource: { sessionId, id: object.id, kind: object.kind }, calls, island: capture });
