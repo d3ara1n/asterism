@@ -12,12 +12,28 @@ export class ModelDiscoveryError extends Error {
 export interface DiscoveryInput { provider: ModelProvider; apiKey: string; signal: AbortSignal }
 export type DiscoverModels = (input: DiscoveryInput) => Promise<DiscoveredModel[]>;
 
-/** Preserve connection paths and authentication conventions; an independent parser identifies the catalog response format. */
+/** Race complete catalogs at both suffixes without interpreting or changing the configured API base path. */
 export async function discoverModels({ provider, apiKey, signal }: DiscoveryInput, transport: typeof fetch = fetch): Promise<DiscoveredModel[]> {
   validateProviderTransport(provider);
-  const endpoint = new URL(`${provider.baseUrl.replace(/\/+$/, "")}/models`);
   if (provider.auth === "api_key" && !apiKey) throw new ModelDiscoveryError("credential");
+  signal.throwIfAborted();
+  const base = provider.baseUrl.replace(/\/+$/, "");
   const headers = modelProtocol(provider.protocol).discoveryHeaders(provider.auth, apiKey);
+  const controller = new AbortController();
+  const candidateSignal = AbortSignal.any([signal, controller.signal]);
+  try {
+    return await Promise.any(["/models", "/v1/models"].map(suffix =>
+      discoverModelList(new URL(`${base}${suffix}`), headers, candidateSignal, transport)));
+  } catch (error) {
+    signal.throwIfAborted();
+    // Keep the direct endpoint's diagnostic when neither candidate produces a valid complete catalog.
+    throw error instanceof AggregateError ? error.errors[0] : error;
+  } finally {
+    controller.abort();
+  }
+}
+
+async function discoverModelList(endpoint: URL, headers: Headers, signal: AbortSignal, transport: typeof fetch): Promise<DiscoveredModel[]> {
   const models = new Map<string, DiscoveredModel>();
   const cursors = new Set<string>();
   for (;;) {

@@ -28,6 +28,8 @@ describe("Model discovery protocols and transport boundaries", () => {
     const calls: string[] = [];
     const transport = vi.fn<typeof fetch>(async (url, init) => {
       calls.push(String(url));
+      if (new URL(url instanceof Request ? url.url : url).pathname.endsWith("/v1/v1/models"))
+        return new Response("", { status: 404 });
       const headers = new Headers(init?.headers);
       expect(headers.get("authorization")).toBeNull();
       expect(headers.get("x-api-key")).toBeNull();
@@ -40,7 +42,10 @@ describe("Model discovery protocols and transport boundaries", () => {
       } : { data: [{ id: "second" }], has_more: false });
     });
     const result = await discoverModels({ provider: { ...provider, protocol, auth: "none" }, apiKey: "must-not-send", signal: new AbortController().signal }, transport);
-    expect(calls).toEqual(["https://example.test/proxy/v1/models", "https://example.test/proxy/v1/models?after_id=first"]);
+    expect(calls).toEqual([
+      "https://example.test/proxy/v1/models", "https://example.test/proxy/v1/v1/models",
+      "https://example.test/proxy/v1/models?after_id=first",
+    ]);
     expect(result).toEqual([
       { modelId: "first", name: "First", contextWindow: 200000, reasoning: true, thinkingLevels: ["off", "low", "high"] },
       { modelId: "second", name: "second" },
@@ -60,7 +65,7 @@ describe("Model discovery protocols and transport boundaries", () => {
       { modelId: "glm-5.3", name: "GLM 5.3" },
       { modelId: "glm-5-turbo", name: "glm-5-turbo" },
     ]);
-    expect(transport).toHaveBeenCalledTimes(1);
+    expect(transport).toHaveBeenCalledTimes(2);
   });
 
   // Anthropic authentication is not Bearer; server error bodies may contain credentials and must not reach the UI.
@@ -83,7 +88,7 @@ describe("Model discovery protocols and transport boundaries", () => {
     expect(await discoverModels(input, async () => Response.json({ models: [] }))).toEqual([]);
     const repeated = vi.fn<typeof fetch>(async () => Response.json({ data: [{ id: "same" }], has_more: true, last_id: "same" }));
     await expect(discoverModels(input, repeated)).rejects.toMatchObject({ code: "protocol" });
-    expect(repeated).toHaveBeenCalledTimes(2);
+    expect(repeated).toHaveBeenCalledTimes(4);
   });
 
   // Guess only known structures: unknown, ambiguous, or corrupt responses cannot degrade to successful empty lists or partial catalogs.
@@ -96,7 +101,55 @@ describe("Model discovery protocols and transport boundaries", () => {
     const transport = vi.fn<typeof fetch>(async () => Response.json(body));
     await expect(discoverModels({ provider, apiKey: "test", signal: new AbortController().signal }, transport))
       .rejects.toMatchObject({ code: "protocol", message: "Model discovery failed: protocol." });
-    expect(transport).toHaveBeenCalledTimes(1);
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+
+  // Both suffixes are literal additions: paths containing v1 are neither removed nor interpreted.
+  it.each([
+    { baseUrl: "https://example.test", endpoints: ["https://example.test/models", "https://example.test/v1/models"] },
+    { baseUrl: "https://example.test/proxy///", endpoints: ["https://example.test/proxy/models", "https://example.test/proxy/v1/models"] },
+    { baseUrl: "https://example.test/proxy/v1/", endpoints: ["https://example.test/proxy/v1/models", "https://example.test/proxy/v1/v1/models"] },
+  ])("appends both candidates without rewriting $baseUrl", async ({ baseUrl, endpoints }) => {
+    const transport = vi.fn<typeof fetch>(async url => String(url) === endpoints[0]
+      ? Response.json({ data: [{ id: "direct" }] }) : new Response("", { status: 404 }));
+    expect(await discoverModels({ provider: { ...provider, baseUrl }, apiKey: "test", signal: new AbortController().signal }, transport))
+      .toEqual([{ modelId: "direct", name: "direct" }]);
+    expect(transport.mock.calls.map(([url]) => String(url))).toEqual(endpoints);
+  });
+
+  // HTTP success is not catalog success; failed parsing or incomplete pagination must not win the race.
+  it.each([
+    { label: "missing endpoint", response: () => new Response("", { status: 404 }) },
+    { label: "HTML with HTTP 200", response: () => new Response("<!doctype html><title>Gateway</title>", { headers: { "content-type": "text/html" } }) },
+    { label: "invalid model entry", response: () => Response.json({ data: [{ id: "partial" }, {}] }) },
+    { label: "invalid pagination", response: () => Response.json({ data: [{ id: "partial" }], has_more: true }) },
+  ])("uses the other complete catalog after $label", async ({ response }) => {
+    const transport = vi.fn<typeof fetch>(async url => String(url).endsWith("/v1/v1/models")
+      ? Response.json({ data: [{ id: "valid" }] }) : response());
+    expect(await discoverModels({ provider, apiKey: "test", signal: new AbortController().signal }, transport))
+      .toEqual([{ modelId: "valid", name: "valid" }]);
+  });
+
+  // Each candidate owns its cursor and model collection; a rejected later page cannot supply a partial result.
+  it("keeps pagination and models separate between candidates", async () => {
+    const transport = vi.fn<typeof fetch>(async url => {
+      const endpoint = new URL(String(url));
+      if (endpoint.searchParams.has("after_id")) return new Response("", { status: 500 });
+      return endpoint.pathname.endsWith("/v1/v1/models")
+        ? Response.json({ data: [{ id: "complete" }] })
+        : Response.json({ data: [{ id: "partial" }], has_more: true, last_id: "partial" });
+    });
+    expect(await discoverModels({ provider, apiKey: "test", signal: new AbortController().signal }, transport))
+      .toEqual([{ modelId: "complete", name: "complete" }]);
+  });
+
+  // Preserve a useful existing category instead of exposing Promise.any's generic AggregateError.
+  it("reports the direct endpoint failure when both candidates fail differently", async () => {
+    const transport = vi.fn<typeof fetch>(async url => new Response("", {
+      status: String(url).endsWith("/v1/v1/models") ? 404 : 401,
+    }));
+    await expect(discoverModels({ provider, apiKey: "test", signal: new AbortController().signal }, transport))
+      .rejects.toMatchObject({ code: "authentication" });
   });
 
   // Discovery and execution follow the same HTTPS rules; misconfiguration cannot send keys over remote plaintext connections.
