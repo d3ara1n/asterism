@@ -23,7 +23,7 @@ import type { ResourceRegistry } from "../resources/registry.ts";
 type PluginServices = Pick<PluginContext, "id" | "dir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
 /** Assemble plugin-facing capabilities; each domain adapter owns its data and execution boundaries. */
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,
-  calls: PluginCalls, topLevelTools: (caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean) => BoundTopLevelTool[],
+  calls: PluginCalls, topLevelTools: (caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean, resourceToolRestriction: (kind: string) => string | null) => BoundTopLevelTool[],
   resources: () => ResourceRegistry) {
   const scope = createSdkScope(internal.lifetime), { checkAvailable } = scope;
   const objects = bindObjects(internal.id, host, sessionRuns, eventScope, checkAvailable);

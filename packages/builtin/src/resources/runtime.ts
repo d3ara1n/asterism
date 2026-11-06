@@ -40,7 +40,12 @@ export default defineModule(plugin => ({
       argsSchema: z.strictObject({}).describe("No parameters."),
       resultSchema: CreationListResult.schema,
       effect: "read", execution: "parallel",
-      execute(_args, { signal }) { return attempt(signal, () => agentCreations.list(plugin)); },
+      execute(_args, { signal, resourceToolRestriction }) {
+        return attempt(signal, () => agentCreations.list(plugin).map(entry => {
+          const notice = resourceToolRestriction(entry.resourceKind);
+          return { ...entry, ...(notice ? { notice } : {}) };
+        }));
+      },
     }),
     defineTopLevelTool({
       id: CreationInspectResult.id, name: "creation_inspect",
@@ -49,7 +54,13 @@ export default defineModule(plugin => ({
       argsSchema: z.strictObject({ creation_id: id }).describe("The creation entry to inspect."),
       resultSchema: CreationInspectResult.schema,
       effect: "read", execution: "parallel",
-      execute(args, { signal }) { return attempt(signal, () => CreationInspectResult.schema.parse(agentCreations.inspect(plugin, args.creation_id))); },
+      execute(args, { signal, resourceToolRestriction }) {
+        return attempt(signal, () => {
+          const entry = agentCreations.inspect(plugin, args.creation_id);
+          const notice = resourceToolRestriction(entry.resourceKind);
+          return CreationInspectResult.schema.parse({ ...entry, ...(notice ? { notice } : {}) });
+        });
+      },
     }),
     defineTopLevelTool({
       id: ResourceCreateResult.id, name: "resource_create",

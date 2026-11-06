@@ -12,7 +12,7 @@ export interface BoundTopLevelTool {
   resolve(args: Json, callId: string, interactive?: boolean): Invocation | PreparedResult;
 }
 export interface RegisteredTopLevelTool { tool: TopLevelTool; sdk: SdkContext; runs: RunGroup }
-export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], requestInteractive: boolean): BoundTopLevelTool[] {
+export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], requestInteractive: boolean, resourceToolRestriction: (kind: string) => string | null): BoundTopLevelTool[] {
   const ref = caller.ref;
   return entries.filter(entry => policy(entry.tool.name)).map(({ tool, sdk, runs }) => ({
     tool,
@@ -38,7 +38,7 @@ export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ca
           };
           try {
             const result = await tool.execute(args, {
-              object: sdk.reader(ref, scope), caller, session: sdk.toolSession(ref, linked, scope, current), callId, signal: current, interactive: canInteract,
+              object: sdk.reader(ref, scope), caller, session: sdk.toolSession(ref, linked, scope, current), callId, signal: current, interactive: canInteract, resourceToolRestriction,
               publish(data) {
                 if (!scope.active) return;
                 latest = encode(data); publish?.(latest);

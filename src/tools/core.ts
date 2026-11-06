@@ -6,7 +6,7 @@ import { contractReferenceSchema, defineData } from "@asterism-app/sdk/contracts
 import { jsonArgumentHint } from "./validation.ts";
 
 export const ResourceListResult = defineData(coreId("resource-list"), z.strictObject({
-  resources: z.array(z.strictObject({ resource_id: z.string(), type: z.string(), title: z.string(), state: jsonSchema })),
+  resources: z.array(z.strictObject({ resource_id: z.string(), type: z.string(), title: z.string(), state: jsonSchema, notice: z.string().optional() })),
 }));
 export const ResourceInspectResult = defineData(coreId("resource-inspect"), z.strictObject({
   resource_id: z.string(),

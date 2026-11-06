@@ -12,6 +12,8 @@ export interface TopLevelToolContext<D extends Json = Json> {
   readonly callId: string;
   readonly signal: AbortSignal;
   readonly interactive: boolean;
+  /** Captured resource-type tool-call restriction, or null when calls are allowed; creation and discovery remain available. */
+  resourceToolRestriction(kind: string): string | null;
   publish(data: D): void;
 }
 /** Top-level tools declare their definition and implementation together, independently of resource support relationships. */

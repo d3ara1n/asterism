@@ -185,7 +185,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const eventScope = new PluginEventScope(events, id, lifecycle.group("event"));
       const sdk = createSdkContext({ id, lifetime, dir: storage.dir, log, config: contract => storage.config(contract),
         secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), lifecycle.group("action"), directory, eventScope,
-        calls.client(id, lifecycle.group("call")), (caller, policy, linked, interactive) => bindTopLevelTools(topLevelTools, caller, policy, linked, interactive),
+        calls.client(id, lifecycle.group("call")), (caller, policy, linked, interactive, resourceToolRestriction) => bindTopLevelTools(topLevelTools, caller, policy, linked, interactive, resourceToolRestriction),
         () => resourceRegistry);
       const resources: ResourceBackend[] = [], tools: ToolImplementation[] = [], observers: SessionObserver[] = [], preparers: CommandPreparer[] = [];
       const actions: ActionContract<unknown>[] = [];

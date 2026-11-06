@@ -89,7 +89,7 @@ describe("SDK session resource lifetimes", () => {
         argsSchema: z.strictObject({}).describe("No arguments.") }),
       targetSchema: z.null().describe("The whole resource."), effect: "read", execution: "parallel",
     });
-    let called = 0, role = "worker", changeDuringRequest = true;
+    let called = 0, role = "worker", changeDuringRequest = true, createOnRequest = false;
     const policy: { allow?: string[]; exclude?: string[] } = { exclude: [Item.kind] };
     let resource!: ResourceRef;
     const f = open({ plugins: [definePlugin({ namespace: extension, modules: [defineModule(() => ({
@@ -110,6 +110,9 @@ describe("SDK session resource lifetimes", () => {
         { name: "resource_inspect", args: { resource_id: resource.id } },
         { name: "resource_call", args: { resource_id: resource.id, tool: "resource_role" } },
         { name: "calling_role", args: {} },
+        { name: "creation_list", args: {} },
+        { name: "creation_inspect", args: { creation_id: ns.name("new") } },
+        ...(createOnRequest ? [{ name: "resource_create", args: { creation_id: ns.name("new"), input: { initial: 12 } } }] : []),
       ];
     }) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
@@ -117,7 +120,8 @@ describe("SDK session resource lifetimes", () => {
     const run = () => f.plugin.execution.run({ access: actor, agent: role, resources: policy, interactive: true, target,
       requestParentId: null, system: { blocks: [] }, messages: [], signal: new AbortController().signal, observer: { event() {} } });
     const first = await run();
-    expect(first.tools[0]!.data).toEqual({ resources: [{ resource_id: resource.id, type: Item.kind, title: "Item", state: { value: 8 } }] });
+    const notice = 'Agent role "worker" cannot call tools on this resource.';
+    expect(first.tools[0]!.data).toEqual({ resources: [{ resource_id: resource.id, type: Item.kind, title: "Item", state: { value: 8 }, notice }] });
     expect(first.tools[1]).toMatchObject({ kind: "succeeded", data: {
       resource_id: resource.id, state: { value: 8 }, tools: [{ name: "resource_role" }],
       notice: 'Agent role "worker" cannot call tools on this resource.',
@@ -126,12 +130,21 @@ describe("SDK session resource lifetimes", () => {
       message: 'Agent role "worker" cannot call tools on this resource.' } });
     expect(first.tools[3]).toMatchObject({ kind: "succeeded", data: "worker" });
     expect(called).toBe(0);
+    expect(first.tools[4]).toMatchObject({ kind: "succeeded", data: expect.arrayContaining([
+      { id: ns.name("new"), resourceKind: Item.kind, description: "Create an item.", notice },
+      { id: "asterism.builtin/note.create", resourceKind: "asterism.builtin/note", description: expect.any(String) },
+    ]) });
+    expect(first.tools[5]).toMatchObject({ kind: "succeeded", data: {
+      id: ns.name("new"), resourceKind: Item.kind, notice, input: { type: "object" },
+    } });
 
     const next = await run();
-    expect(next.tools[0]!.data).toEqual(first.tools[0]!.data);
+    expect(next.tools[0]!.data).toEqual({ resources: [{ resource_id: resource.id, type: Item.kind, title: "Item", state: { value: 8 } }] });
     expect(next.tools[1]!.data).not.toHaveProperty("notice");
     expect(next.tools[2]).toMatchObject({ kind: "succeeded", data: "explorer" });
     expect(next.tools[3]).toMatchObject({ kind: "succeeded", data: "explorer" });
+    expect(next.tools[4]!.data).toContainEqual({ id: ns.name("new"), resourceKind: Item.kind, description: "Create an item." });
+    expect(next.tools[5]!.data).not.toHaveProperty("notice");
     expect(called).toBe(1);
 
     policy.allow = []; delete policy.exclude;
@@ -143,6 +156,10 @@ describe("SDK session resource lifetimes", () => {
     delete policy.allow;
     expect((await run()).tools[2]).toMatchObject({ kind: "succeeded", data: "explorer" });
     expect(called).toBe(3);
+
+    policy.allow = []; createOnRequest = true;
+    const restrictedCreation = await run();
+    expect(restrictedCreation.tools[6]).toMatchObject({ kind: "succeeded", data: { type: Item.kind, title: "Item" } });
   });
 
   it.each(["cancel", "failure"] as const)("releases pending link holds when a captured request ends by %s", async mode => {

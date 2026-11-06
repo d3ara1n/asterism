@@ -14,7 +14,7 @@ interface ExecutionBinding {
   runs: RunGroup;
   objects: Pick<SdkObjects, "own" | "checkRef">;
   checkAvailable(): void;
-  topLevelTools(caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean): BoundTopLevelTool[];
+  topLevelTools(caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean, resourceToolRestriction: (kind: string) => string | null): BoundTopLevelTool[];
 }
 
 /** Resource access, request holds, content handoff, and optional presentation surround the generic runner. */
@@ -67,7 +67,7 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
         try {
           handover = host.content?.handover(ref.sessionId, ref.id);
           const capabilities = host.sessions.capabilities(linked, policy, caller, interactive, resourcePolicy);
-          const boundTools = topLevelTools(caller, policy, linkedRefs, interactive);
+          const boundTools = topLevelTools(caller, policy, linkedRefs, interactive, kind => capabilities.resourceToolRestriction(kind));
           const preparedSystem = host.sessions.context(linked).then(files => typeof system === "function" ? system(files) : system);
           return await host.models.run({ target, system: preparedSystem,
             messages, userAgent, sessionId: ref.sessionId, requestParentId,
