@@ -153,8 +153,10 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
           </Button>
         </PopoverTrigger>
       </TooltipTrigger>
+      {/* Keep the trigger easy to scan with a readable name; the tooltip adds the exact provider/model identity.
+          Information belongs here because it supports on-demand identification, not merely because it changes less often. */}
       <TooltipContent>
-        {values.agent} · {modelName} · {thinkingName} · {contextWindow}
+        {values.agent} · {resolved.reference ?? modelName} · {thinkingName} · {contextWindow}
       </TooltipContent>
     </Tooltip>
     <ConfigurationPopover wide={browsingModels} pageKey={pageKey} reducedMotion={!!prefersReducedMotion}
