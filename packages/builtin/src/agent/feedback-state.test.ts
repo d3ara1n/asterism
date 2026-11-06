@@ -1,10 +1,9 @@
 import { expect, it, vi } from "vitest";
 import type { ObjectExecutor } from "@asterism-app/sdk/runtime";
-import { AgentSoftwareFeedback } from "./feedback.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
 
-// Model results enter only the in-memory view, while software failures produce notifications only; multiple model failures can occur consecutively at the same processing position.
-it("Routes feedback by source, preserves its occurrence position, and cleans it up when the resource is released", () => {
+// Consecutive failures can share a position; changing diagnostic origin must not lose a notice or move it to a notification.
+it("Keeps model and software feedback at their occurrence positions and releases it with the resource", () => {
   let nodeId = "input";
   const publish = vi.fn(), commit = vi.fn();
   const object = {
@@ -13,17 +12,19 @@ it("Routes feedback by source, preserves its occurrence position, and cleans it 
   } as unknown as ObjectExecutor;
   const state = createAgentFeedback();
   const model = { origin: "model" as const, code: "provider_error", level: "error" as const, message: "HTTP 429" };
+  state.report(object, { ...model, origin: "software", code: "execution_failed", message: "fetch failed" }, true);
   state.report(object, model, true);
   state.report(object, { ...model, message: "HTTP 500" }, true);
   nodeId = "answer";
   const software = { ...model, origin: "software" as const, code: "event_delivery", message: "Disk unavailable" };
   state.report(object, software, true);
   expect(state.get(object).inline.map(item => [item.afterNodeId, item.message])).toEqual([
-    ["input", "HTTP 429"], ["input", "HTTP 500"],
+    ["input", "fetch failed"], ["input", "HTTP 429"], ["input", "HTTP 500"], ["answer", "Disk unavailable"],
   ]);
-  expect(new Set(state.get(object).inline.map(item => item.id)).size).toBe(2);
-  expect(state.get(object).interruptions).toEqual(["input", "input", "answer"]);
-  expect(publish).toHaveBeenCalledExactlyOnceWith(AgentSoftwareFeedback, software);
+  expect(new Set(state.get(object).inline.map(item => item.id)).size).toBe(4);
+  expect(state.get(object).interruptions).toEqual(["input", "input", "input", "answer"]);
+  expect(state.get(object).inline.at(-1)).toMatchObject(software);
+  expect(publish).not.toHaveBeenCalled();
   expect(commit).not.toHaveBeenCalled();
   state.delete(object.ref.id);
   expect(state.get(object)).toEqual({ inline: [], interruptions: [], compressions: [], activity: null });
@@ -37,7 +38,7 @@ it("Hands off compression activity according to outcome; successful retries do n
   const state = createAgentFeedback();
   const fail = state.beginCompression(object);
   expect(state.get(object).compressions.map(value => [value.afterNodeId, value.status])).toEqual([["input", "running"]]);
-  state.report(object, { origin: "model", code: "context_compression_failed", level: "warning", message: "Failed" });
+  state.report(object, { origin: "software", code: "context_compression_failed", level: "warning", message: "Failed" });
   fail("failed");
   nodeId = "next";
   state.beginCompression(object)("completed");

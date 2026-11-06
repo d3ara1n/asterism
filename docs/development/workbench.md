@@ -144,7 +144,9 @@ Reference costs derive from recorded request usage and current model prices. Acc
 
 ## Errors and question handling
 
-Provider, transport, truncation, empty-response, budget, and stop feedback appears inline at its actual conversation position. Software encoding, parsing, and persistence faults use application notifications. Tool business failures remain in tool results.
+Agent execution errors and warnings appear inline in the owning conversation at their actual occurrence position, including request preparation, sending, provider responses, encoding, parsing, persistence, compaction, and cancellation. Diagnostic origin identifies the failure source but does not choose its presentation. The same execution feedback is not repeated in a toast; when response termination metadata supplies a historical notice, it replaces the matching transient notice. Tool business failures remain in tool results.
+
+Independent interface commands, such as copying, saving, or opening a file, use toast notifications for operation failures. Rejected input submissions and configuration or draft changes remain command feedback, distinct from failures during Agent execution; a rejected submission leaves the unsent input in the editor. Field validation stays with its field. Feedback placement follows the operation it belongs to, not whether its underlying cause is local software or a remote service.
 
 Transient inline feedback survives view remount within its resource lifetime but does not enter history, model context, or usage totals. Original error details remain inspectable and copyable.
 

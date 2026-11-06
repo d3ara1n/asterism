@@ -93,7 +93,7 @@ Icon-only actions use the shared accessible tooltip control. Destructive entry p
 
 Every size-adjustment handle supports double-clicking to restore the affected surface's default geometry. Reset clears the user size override and uses the current default, subject to the surface's minimum and maximum dimensions. Handle hints describe both dragging and double-click reset. An explicit reset action also remains available through a keyboard-accessible control or menu.
 
-Status uses shared status components with text and icons. Field errors stay with fields; command progress stays at its entry; persistent failures use local alerts; transient feedback uses notifications.
+Status uses shared status components with text and icons. Feedback stays with the operation it belongs to: field errors stay with fields, command progress stays at its entry, and Agent execution errors and warnings stay inline in the owning conversation. Independent interface command failures use toast notifications. Diagnostic origin and transient lifetime do not determine placement; one execution failure is not repeated as both an inline alert and a toast.
 
 A workbench reread does not become a global saving badge or block ordinary interaction.
 

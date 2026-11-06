@@ -11,9 +11,9 @@ const conversationTimeline = (snapshot: SessionSnapshot, agentId: string, live: 
   withLive(savedTimeline(snapshot.records.all({ scope: "timeline" }), agentId, running), live);
 
 describe("Agent typed record views", () => {
-  it("restores one error notice and marks only partial context, preserving complete text in a failed response", () => {
+  it.each(["model", "software"] as const)("restores one %s error notice and marks only partial context, preserving complete text in a failed response", origin => {
     const completion = { usage: null, finishReason: null, rawFinishReason: null, providerResponseId: null,
-      termination: { reason: "failed" as const, origin: "model" as const, code: "provider_error", message: "Disconnected", retryable: true } };
+      termination: { reason: "failed" as const, origin, code: "provider_error", message: "Disconnected", retryable: true } };
     const path = [
       node("u", null, input("a", "Question")),
       node("text", "u", text("a", "r", 0, "Complete text", { requestParentId: "u" })),
@@ -21,12 +21,12 @@ describe("Agent typed record views", () => {
     ];
     const snapshot = sessionSnapshot(nodeView("s", "", path, "thinking"));
     const items = savedTimeline(snapshot.records.all({ scope: "timeline" }), "a", false, [{
-      id: "live-error", afterNodeId: "thinking", responseId: "r", origin: "model", level: "error", code: "provider_error", message: "Disconnected",
+      id: "live-error", afterNodeId: "thinking", responseId: "r", origin, level: "error", code: "provider_error", message: "Disconnected",
     }]).items;
     expect(items.find(item => item.kind === "text")).not.toHaveProperty("partialContext");
     expect(items.find(item => item.kind === "text")).not.toHaveProperty("failed");
     expect(items.find(item => item.kind === "thinking")).toMatchObject({ partialContext: true, failed: true });
-    expect(items.filter(item => item.kind === "notice")).toMatchObject([{ message: "Disconnected" }]);
+    expect(items.filter(item => item.kind === "notice")).toMatchObject([{ origin, message: "Disconnected" }]);
   });
 
   // A record update may precede its body read and the removal of its live block; preserve one item until the saved view catches up.

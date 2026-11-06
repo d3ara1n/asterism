@@ -1,5 +1,5 @@
 import type { ObjectExecutor, ObjectReader } from "@asterism-app/sdk/runtime";
-import { AgentSoftwareFeedback, type AgentFeedback, type InlineFeedback, type CompressionActivity, type AgentActivity } from "./feedback.ts";
+import type { AgentFeedback, InlineFeedback, CompressionActivity, AgentActivity } from "./feedback.ts";
 
 type FeedbackState = { inline: readonly InlineFeedback[]; interruptions: readonly (string | null)[]; compressions: readonly CompressionActivity[]; activity: AgentActivity | null };
 const empty: FeedbackState = { inline: [], interruptions: [], compressions: [], activity: null };
@@ -23,12 +23,10 @@ export function createAgentFeedback() {
       const previous = states.get(object.ref.id) ?? empty;
       states.set(object.ref.id, {
         ...previous,
-        inline: value.origin === "model"
-          ? [...previous.inline, { ...value, id: `feedback:${++nextId}`, afterNodeId }] : previous.inline,
+        inline: [...previous.inline, { ...value, id: `feedback:${++nextId}`, afterNodeId }],
         interruptions: interrupted ? [...previous.interruptions, afterNodeId] : previous.interruptions,
       });
       object.invalidate();
-      if (value.origin === "software") object.events.publish(AgentSoftwareFeedback, value);
     },
     beginCompression(object: ObjectExecutor) {
       const activity: CompressionActivity = { id: `compression:${++nextId}`,

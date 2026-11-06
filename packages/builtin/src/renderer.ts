@@ -1,6 +1,5 @@
 import { defineRendererPlugin, type RendererModule } from "@asterism-app/sdk/renderer";
 import { builtinSettingsPages } from "./settings/SettingsPage";
-import { agentFeedbackRenderer } from "./agent/feedback-renderer";
 import { ConversationEntry, prepareHomeEntry } from "./home/Entry";
 import { homeMessages } from "./messages/home";
 
@@ -24,7 +23,7 @@ import schedules from "./schedules/renderer";
 
 const builtinViews: readonly RendererModule[] = [agent, filesystem, manual, mcp, mesh, naming, notes, questions, resources, shell, skills, terminal, usage, web, subagents, messaging, schedules];
 export default defineRendererPlugin({
-  modules: [...builtinViews, agentFeedbackRenderer], settings: builtinSettingsPages, prepare: prepareHomeEntry,
+  modules: builtinViews, settings: builtinSettingsPages, prepare: prepareHomeEntry,
   sessionEntries: [{ id: "conversation", title: homeMessages.entryTitle, Body: ConversationEntry }],
 });
 

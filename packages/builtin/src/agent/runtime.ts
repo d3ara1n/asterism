@@ -17,7 +17,6 @@ import { agentExecutionState } from "./state.ts";
 import type { AgentTurnState } from "./state.ts";
 import type { ProviderUsage } from "@asterism-app/sdk/runtime";
 import { createPeekChannel, createPeekClient, createPeekTool } from "./peek/service.ts";
-import { AgentSoftwareFeedback } from "./feedback.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
 import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft, DiscardAgentDraft, MoveAgentDraft } from "./drafts-contract.ts";
 import { saveDraft, setDraftMode, exchangeDraft, discardDraft, moveDraft } from "./drafts.ts";
@@ -73,7 +72,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
         }
         return { sessionId };
       })],
-      events: [AgentSoftwareFeedback, AgentInputAccepted, AgentTurnEnded],
+      events: [AgentInputAccepted, AgentTurnEnded],
       tools: [createPeekTool(peekAgent), createSendTool(), createWaitTool(controller)],
       channels: [createPeekChannel(peekAgent)],
       resources: [implementResource(Agent, AgentView, {

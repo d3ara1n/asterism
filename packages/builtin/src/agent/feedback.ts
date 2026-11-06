@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { builtin } from "@asterism-app/builtin-api/contracts";
 import { errorDetailsSchema } from "@asterism-app/sdk/contracts";
 
 export const agentFeedbackSchema = z.strictObject({
@@ -24,13 +23,6 @@ export const agentActivitySchema = z.strictObject({
   attempt: z.number().int().positive(), max: z.number().int().positive(), resumeAt: z.number().nullable(),
 });
 export type AgentActivity = z.infer<typeof agentActivitySchema>;
-
-/** Software faults are delivered through live notifications; model feedback is delivered through the Agent's in-memory projection. */
-export const AgentSoftwareFeedback = builtin.event("agent.software-feedback", {
-  source: "resource",
-  semantics: { kind: "occurrence" },
-  schema: agentFeedbackSchema,
-});
 
 /** Model adapters explicitly mark the source; other local exceptions are software processing failures. */
 export function feedbackOrigin(error: unknown): AgentFeedback["origin"] {

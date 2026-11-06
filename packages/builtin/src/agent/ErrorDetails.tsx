@@ -8,7 +8,7 @@ import { Badge } from "@asterism-app/ui/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@asterism-app/ui/ui/dialog";
 import { errorDetailMessages as messages } from "../messages/errors";
 
-/** Transient feedback and historical notifications share details; response bodies are displayed verbatim, and copying includes the full cause chain. */
+/** Transient and historical inline feedback share details; response bodies are displayed verbatim, and copying includes the full cause chain. */
 export function ExecutionErrorDetails({ code, details }: { code: string; details: ErrorDetails }) {
   const i18n = useI18n();
   const [copying, setCopying] = useState(false);
