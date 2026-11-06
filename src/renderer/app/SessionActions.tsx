@@ -1,4 +1,4 @@
-import { Archive, Check, Undo2, LayoutTemplate, MoreHorizontal, Pencil } from "lucide-react";
+import { Archive, Check, Coffee, Undo2, LayoutTemplate, MoreHorizontal, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 import type { SessionResult } from "../../shared/session";
 import { RenameSession } from "../features/session/RenameSession";
@@ -14,20 +14,22 @@ import { useFolders } from "../features/folders/context";
 import { FolderDialog } from "../features/folders/FolderDialog";
 import { MoveToFolderMenu } from "../features/folders/menus";
 import { toast } from "../shared/toast";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 
 /** Session row menu: rename, folder membership, save as template, and archive; actions are independent of session navigation. */
-export function SessionActions({ sessionId, title, folderId, disabled, renameDisabled, onRename, onArchive, onTemplateSaved, completed, onCompletedChange }: {
-  sessionId: string; title: string; folderId: string | null; disabled: boolean; renameDisabled: boolean;
+export function SessionActions({ sessionId, title, folderId, disabled, sleeping, renameDisabled, onRename, onArchive, onTemplateSaved, completed, onCompletedChange, keepAwake, onKeepAwakeChange }: {
+  sessionId: string; title: string; folderId: string | null; disabled: boolean; sleeping: boolean; renameDisabled: boolean;
   onRename: (title: string) => Promise<SessionResult>;
   onArchive: () => Promise<SessionResult>;
   onTemplateSaved: () => void;
   completed: boolean; onCompletedChange: (completed: boolean) => Promise<void>;
+  keepAwake: boolean; onKeepAwakeChange: (keepAwake: boolean) => Promise<void>;
 }) {
   const i18n = useI18n();
   const { run } = useFolders();
   const trigger = useRef<HTMLButtonElement>(null);
+  const [togglingAwake, setTogglingAwake] = useState(false);
   const [marking, setMarking] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const [savingTemplate, setSavingTemplate] = useState(false);
@@ -36,7 +38,7 @@ export function SessionActions({ sessionId, title, folderId, disabled, renameDis
   const [confirming, setConfirming] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const warnings = useDisposalWarnings(sessionId, confirming ? "all" : null);
-  const cannotRename = disabled || renameDisabled;
+  const cannotRename = disabled || sleeping || renameDisabled;
   const move = async (target: string | null) => {
     const failure = await run({ type: "session.move", sessionId, folderId: target });
     if (failure) toast.error(i18n.text(failure));
@@ -45,6 +47,11 @@ export function SessionActions({ sessionId, title, folderId, disabled, renameDis
     setMarking(true);
     try { await onCompletedChange(!completed); }
     finally { setMarking(false); }
+  };
+  const setAwake = async (value: boolean) => {
+    setTogglingAwake(true);
+    try { await onKeepAwakeChange(value); }
+    finally { setTogglingAwake(false); }
   };
   const archive = async () => {
     setArchiving(true);
@@ -66,8 +73,12 @@ export function SessionActions({ sessionId, title, folderId, disabled, renameDis
         <DropdownMenuItem disabled={disabled || marking} onSelect={() => { void markCompleted(); }}>
           {completed ? <Undo2 /> : <Check />}{i18n.text(completed ? appMessages.unmarkCompleted : appMessages.markCompleted)}
         </DropdownMenuItem>
+        <DropdownMenuCheckboxItem checked={keepAwake} disabled={disabled || togglingAwake}
+          onCheckedChange={value => { void setAwake(value); }}>
+          <Coffee />{i18n.text(appMessages.keepAwake)}
+        </DropdownMenuCheckboxItem>
         <MoveToFolderMenu value={folderId} disabled={disabled} onMove={target => { void move(target); }} onCreate={() => setCreatingFolder(true)} />
-        <DropdownMenuItem disabled={disabled} onSelect={() => setSavingTemplate(true)}>
+        <DropdownMenuItem disabled={disabled || sleeping} onSelect={() => setSavingTemplate(true)}>
           <LayoutTemplate />{i18n.text(templateMessages.saveAs)}…
         </DropdownMenuItem>
         <DropdownMenuSeparator />

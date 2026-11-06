@@ -256,6 +256,10 @@ export function App({ controller }: { controller: ApplicationController }) {
       const failure = await controller.execute({ type: "session.set-completed", sessionId, completed });
       if (failure) toast.error(i18n.text(failure));
     }}
+    onKeepAwakeChange={async (sessionId, keepAwake) => {
+      const failure = await controller.execute({ type: "session.set-keep-awake", sessionId, keepAwake });
+      if (failure) toast.error(i18n.text(failure));
+    }}
     onTemplateSaved={() => { void controller.refresh({ quiet: true }); }}
     homeActive={view.kind === "home"}
     collapsed={collapsedGroups} onToggleGroup={toggleGroup}

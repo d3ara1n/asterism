@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { sessionSchemaSql, pendingRecordsIndexSql, folderSchemaSql, folderColumnSql, completedColumnSql } from "../session/schema.ts";
-import { applicationStorage, sessionRetentionMs } from "../shared/application.ts";
+import { sessionSchemaSql, pendingRecordsIndexSql, folderSchemaSql, folderColumnSql, completedColumnSql, keepAwakeColumnSql, sleepingColumnSql, lastOpenedColumnSql } from "../session/schema.ts";
+import { applicationStorage } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
 import { templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 import { mcpSchemaSql } from "../mcp/storage.ts";
 
-export const workspaceDatabaseVersion = 33;
+export const workspaceDatabaseVersion = 34;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
@@ -81,6 +81,13 @@ const islandsTableSql = `
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
     version: workspaceDatabaseVersion, migrations: {
+      // Existing sessions get a fresh inactivity baseline instead of inheriting their historical creation time.
+      33: db => {
+        db.exec(`ALTER TABLE sessions ADD COLUMN ${sleepingColumnSql};
+          ALTER TABLE sessions ADD COLUMN ${lastOpenedColumnSql} DEFAULT '';
+          ALTER TABLE sessions ADD COLUMN ${keepAwakeColumnSql};`);
+        db.prepare("UPDATE sessions SET last_opened_at = ?").run(new Date().toISOString());
+      },
       // The single focus island became an island arrangement; a focused object is not carried over as an island.
       32: db => { db.exec(`DROP TABLE workbench_focus; ${islandsTableSql}`); },
       31: db => { db.exec(`ALTER TABLE sessions ADD COLUMN ${completedColumnSql};`); },
@@ -92,7 +99,8 @@ export function workspaceStorage(root: string) {
     } });
 }
 /** Startup cleanup hard-deletes archived sessions past retention, cascades associated rows through foreign keys, and leaves orphan content for the subsequently constructed store. */
-export function collectExpiredSessions(db: DatabaseSync, now = Date.now()): number {
-  const cutoff = new Date(now - sessionRetentionMs).toISOString();
+export function collectExpiredSessions(db: DatabaseSync, now: number, retentionDays: number | null): number {
+  if (retentionDays === null) return 0;
+  const cutoff = new Date(now - retentionDays * 24 * 60 * 60 * 1000).toISOString();
   return Number(db.prepare("DELETE FROM sessions WHERE archived_at IS NOT NULL AND archived_at <= ?").run(cutoff).changes);
 }

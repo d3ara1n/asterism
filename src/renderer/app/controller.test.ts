@@ -101,7 +101,7 @@ describe("Application session list", () => {
     void controller.refresh();
     requests[0]!({ ok: true, snapshot });
     await Promise.resolve();
-    requests[1]!({ ok: true, snapshot: { ...snapshot, sessions: [{ id: "new", title: "New", created_at: "", folder_id: null, completed: false }] } });
+    requests[1]!({ ok: true, snapshot: { ...snapshot, sessions: [{ id: "new", title: "New", created_at: "", folder_id: null, completed: false, sleeping: false, keepAwake: false }] } });
     await first;
     expect(execute.mock.calls).toHaveLength(2);
     expect(controller.getSnapshot().snapshot?.sessions.map(session => session.id)).toEqual(["new"]);

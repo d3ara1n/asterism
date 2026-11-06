@@ -14,9 +14,9 @@ export interface SessionSummary { readonly id: string; readonly title: string; r
 export interface ArchivedSessionSummary extends SessionSummary { readonly archivedAt: string }
 /**
  * Read-only session catalog shared within the same host runtime instance; each read returns current summaries.
- * list contains only active sessions; archived lists sessions in the recycle bin. Session IDs absent from both have been deleted, allowing plugins to clean up their own per-session data.
+ * list contains only running sessions; sleeping lists saved sessions whose runtime objects are unloaded, and archived lists sessions in the recycle bin. Session IDs absent from all three have been deleted, allowing plugins to clean up their own per-session data.
  */
-export interface SessionDirectory { list(): readonly SessionSummary[]; archived(): readonly ArchivedSessionSummary[] }
+export interface SessionDirectory { list(): readonly SessionSummary[]; sleeping(): readonly SessionSummary[]; archived(): readonly ArchivedSessionSummary[] }
 /** Source: null means the application itself; plugin-originated sources always include plugin identity, and resource sources always belong to that plugin. Shared by records, events, and others. */
 export type Source = { readonly plugin: string; readonly resource: ResourceRef | null } | null;
 export interface ResourceSnapshot<S extends Json = Json> {

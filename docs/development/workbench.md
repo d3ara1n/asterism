@@ -16,7 +16,7 @@ Settings home contains application pages and plugin-declared configuration-page 
 
 A normal Plugins card opens a plain management list with plugin information and enablement controls. There is no separate plugin list beneath the settings home and no plugin-card route to configuration pages. Plugin management remains available when a plugin has no configuration page or fails to load.
 
-About owns version, update state, channel selection, and log access. The titlebar update indicator consumes the same state. General settings owns the session recycle-bin entry.
+About owns version, update state, channel selection, and log access. The titlebar update indicator consumes the same state. General settings owns automatic-sleep and recycle-bin retention preferences and the recycle-bin entry. Sleeping sessions remain in the sidebar, dimmed with a moon icon; opening one renews user attention before its resources attach. Keep-awake is a per-session menu setting that prevents automatic sleep only.
 
 ## Startup and failure presentation
 

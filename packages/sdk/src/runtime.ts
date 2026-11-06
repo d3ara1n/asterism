@@ -17,6 +17,7 @@ export type * from "./content-runtime.ts";
 export type * from "./runtime-files.ts";
 export type * from "./models.ts";
 export type * from "./runtime-execution.ts";
+export type * from "./runtime-deadlines.ts";
 export { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
 
 /** Stable plugin API error: code supports plugin branching, and message is used for logs. */

@@ -1,6 +1,8 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const appMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  keepAwake: { id: "sessions.keepAwake", defaultMessage: "Keep awake" },
+  sleeping: { id: "sessions.sleeping", defaultMessage: "Sleeping" },
   markCompleted: { id: "markCompleted", defaultMessage: "Mark as completed" },
   unmarkCompleted: { id: "unmarkCompleted", defaultMessage: "Unmark as completed" },
   appName: {

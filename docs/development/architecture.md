@@ -35,7 +35,7 @@ Model calls, terminal sessions, and MCP calls are composable capabilities. Built
 
 ## Sessions and entry ownership
 
-A session is the time and space of the user's work: its history and workbench. The host owns session identity, titles, history, resources, and static resource templates independently of conversations.
+A session is the time and space of the user's work: its history and workbench. The host owns session identity, titles, history, resources, static resource templates, automatic sleep, and recycle-bin retention independently of conversations. Its shared deadline service owns process-local absolute wakeups; plugins own durable schedule state and missed-occurrence behavior.
 
 Home hosts plugin-declared entry interfaces. The plugin owns its controls, business validation, preparation, and session assembly, including the initial title. Backend plugin operations perform that assembly through generic host capabilities. The host retains contract validation, authorization, persistence, and lifetime enforcement.
 

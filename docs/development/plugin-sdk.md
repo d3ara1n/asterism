@@ -84,11 +84,13 @@ The host tracks application, session, and object lifetimes. Plugin shared servic
 
 Ending a lifetime signals cancellation, waits for dependent work, and runs registered cleanup in reverse order. A signal alone does not prove completion. Cleanup failure is reported while remaining cleanup proceeds.
 
-Objects attach when they enter an active session's current resource set, including startup and cursor reconstruction. Card mounting is unrelated. Logical removal immediately changes discovery, closes frontend channels, and cancels the object's managed tasks and model requests. Captured request holds keep the instance available to borrowed tool operations until those users finish. Attachment lifetime termination and cleanup follow hold release. Reappearing objects initialize according to their resource implementation; history movement remains blocked while retirement is active.
+Objects attach when they enter a running session's current resource set, including startup, wake, restoration, and cursor reconstruction. Card mounting is unrelated. Logical removal immediately changes discovery, closes frontend channels, and cancels the object's managed tasks and model requests. Captured request holds keep the instance available to borrowed tool operations until those users finish. Attachment lifetime termination and cleanup follow hold release. Reappearing objects initialize according to their resource implementation; history movement remains blocked while retirement is active.
 
 Resource-owned busy work blocks session cursor changes and removal of that resource. Model requests capture resource capabilities and retain them through completion without automatically blocking history or making the access owner busy. The caller supplies a busy scope when its work depends on the timeline. These mechanisms do not determine domain execution state or sidebar notifications.
 
-Object-bound managed tasks protect the timeline by default. External runtime tasks can opt out of history occupancy while retaining object ownership, cancellation, and cleanup. Busy scopes and request holds remain until real completion. Directed request holds account for concurrent consumers independently of Agent ancestry. Read-only communication does not become busy merely because it references an object. Archival cancels session work and waits for resource retirement before recording the archive state.
+Object-bound managed tasks protect the timeline by default. External runtime tasks can opt out of history occupancy while retaining object ownership, cancellation, and cleanup. Busy scopes and request holds remain until real completion. Directed request holds account for concurrent consumers independently of Agent ancestry. Read-only communication does not become busy merely because it references an object.
+
+Automatic session sleep waits until settled; archival cancels session work. Both end resource lifetimes and wait for retirement before recording their separate lifecycle states. Saved resource data, history, configuration, and links remain. Runtime resource reads and calls reject either unavailable state without waking it. A user open renews the sleep timer before reattachment. The normal plugin session list contains running sessions only; saved sleeping and archived sessions have separate metadata directories. These metadata directories do not grant runtime resource access.
 
 Invalidating a projection publishes current domain state without creating a record or changing stored data. Within a transaction, publication follows successful commit.
 
@@ -110,11 +112,15 @@ Occurrence events preserve every event. Snapshot events may coalesce the latest 
 
 Consumers subscribe and then query domain state. The event bus does not retain current state or replay a disconnected interval.
 
-System resume is a host occurrence delivered through the same event bus. The main process supplies the operating-system notification, while each consuming plugin owns the meaning of elapsed time and any deadline recalculation.
+System resume is a host occurrence delivered through the same event bus. The main process supplies the operating-system notification. The shared host deadline service rechecks wall-clock time on resume; plugins retain responsibility for domain-specific elapsed-time and missed-occurrence behavior.
 
 Object channels support sustained bidirectional data. Opening validates current presence and plugin ownership. Closing, object disappearance, provider unavailability, or connection loss ends the channel. It neither writes history nor occupies the timeline by itself.
 
 The host trusts installed plugins. It protects identity, history, and its declared interfaces without adding speculative quotas, silent overflow, or automatic business recovery.
+
+## Absolute deadlines
+
+The host provides one-shot absolute deadlines and cancellable registrations. Registrations end with the plugin lifetime; an optional resource lifetime signal ends them with that attachment as well. Cancellation removes a pending callback rather than interrupting one already running. The service is process-local, not durable storage or cron. Consumers persist deadlines and restore registrations from saved state when their resources attach.
 
 ## Provider services
 

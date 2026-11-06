@@ -82,9 +82,9 @@ export class ApplicationController {
       }
       this.update({ status, ...(status === "unavailable" ? { error: commonMessages.runtimeStopped } : {}) });
     });
-    // Public title events update titles immediately; session commit notifications only coalesce rereads for list structure changes (additions and deletions).
+    // Public title events update titles immediately; session commits and lifecycle changes coalesce catalog rereads.
     const stopSessions = this.bridge.session.onChanged(event => {
-      if (event.kind !== "session.changed" || this.pending) return;
+      if ((event.kind !== "session.changed" && event.kind !== "session.lifecycle") || this.pending) return;
       this.pending = setTimeout(() => { this.pending = null; void this.refresh({ quiet: true }); }, this.settleMs);
     });
     if (read) void this.refresh();

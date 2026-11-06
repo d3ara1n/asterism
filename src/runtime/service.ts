@@ -44,9 +44,12 @@ export class ApplicationService {
     this.started = JSON.stringify(options.packageEntries ?? this.list.read());
     this.npmRoot = join(root, applicationStorage.pluginPackagesDirectory);
     try {
-      this.configuration = new ConfigurationService(root, options.onConfigurationChanged);
+      this.configuration = new ConfigurationService(root, () => {
+        this.sessions?.refreshSleep();
+        options.onConfigurationChanged?.();
+      });
       // Archive cleanup releases references first; session services then explicitly reclaim content.
-      collectExpiredSessions(this.db);
+      collectExpiredSessions(this.db, Date.now(), this.configuration.sessionLifecycle().retentionDays);
       this.sessions = new SessionService(this.db, root, this.configuration, {
         onChanged: options.onSessionChanged, adapterFactory: options.adapterFactory, plugins: options.plugins,
         configurationChanged: options.onPluginConfigurationChanged, preparedStorage: options.preparedStorage,
@@ -87,6 +90,7 @@ export class ApplicationService {
       else if (command.type === "folder.create") this.folders.create(command.id, command.name, command.color);
       else if (command.type === "folder.update") this.folders.update(command.id, command.name, command.color);
       else if (command.type === "folder.delete") this.folders.delete(command.id);
+      else if (command.type === "session.set-keep-awake") { this.sessions.tree.setKeepAwake(command.sessionId, command.keepAwake); this.sessions.refreshSleep(); }
       else if (command.type === "session.set-completed") this.sessions.tree.setCompleted(command.sessionId, command.completed);
       else if (command.type === "session.move") this.folders.moveSession(command.sessionId, command.folderId);
       else if (command.type === "template.move") this.folders.moveTemplate(command.templateId, command.folderId);
@@ -97,7 +101,7 @@ export class ApplicationService {
     }
     const workspace = this.db.prepare("SELECT * FROM workspace LIMIT 1").get();
     const membership = this.folders.sessionFolders();
-    const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, completed: session.completed, folder_id: membership.get(session.id) ?? null }));
+    const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, completed: session.completed, sleeping: session.sleeping, keepAwake: session.keepAwake, folder_id: membership.get(session.id) ?? null }));
     const archivedSessions = this.sessions.tree.archived().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, archived_at: session.archivedAt }));
     const current = this.list.read();
     const entries = [

@@ -20,6 +20,14 @@ Select a saved session from the sidebar. Its agent cards display conversations f
 
 Builtin's automatic naming uses its utility model when available. Rename the session explicitly when a specific title matters. An explicit user or agent title prevents builtin's subsequent automatic naming on that history path. Manual naming remains available with other paradigms or with builtin disabled.
 
+## Let inactive sessions sleep
+
+General settings offers automatic sleep after 7, 15, 30, or 90 days, or **Never**; the default is 30 days. Creation and explicit restoration start a fresh interval; opening the session renews it. Incoming messages and Agent work do not renew it. The session you are viewing does not automatically sleep. An overdue session waits for its work to settle before sleeping.
+
+Sleep ends resource runtime lifetimes, including subscriptions, Mesh membership, background jobs, and deadline registrations. It keeps saved state, history, configuration, and links; it does not delete the session. Opening a sleeping session resets its inactivity timer before reattaching resources. Background messages and resource access cannot wake it.
+
+Choose **Keep awake** in a session's menu to prevent automatic sleep. It does not prevent archiving or application shutdown. Sleeping sessions stay in the sidebar, dimmed with a moon icon.
+
 ## Explore another approach
 
 Open the history panel and select a position. Selection lets you inspect history without changing the workbench.
@@ -44,6 +52,6 @@ Select the template on **Home** to create a new session in the template's folder
 
 Archive a session from its menu when it is no longer active. Archiving ends its running resource instances and moves it to the recycle bin.
 
-Open the recycle bin from the session section in general settings to restore an archived session. Archived sessions become eligible for cleanup after the retention period; cleanup runs at application startup.
+Open the recycle bin from the session section in General settings to restore an archived session. Set recycle-bin retention to 7, 15, 30, or 90 days, or **Never**; the default is 30 days. Expired archived sessions are permanently deleted only at application startup. Sleeping sessions are not in the recycle bin and do not expire.
 
-Restoring makes saved objects available again. External processes start according to their resource implementation rather than resuming a suspended process.
+Restoring makes saved objects available again and starts a fresh inactivity interval. External processes start according to their resource implementation rather than resuming a suspended process.

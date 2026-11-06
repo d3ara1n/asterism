@@ -6,7 +6,7 @@ Mesh is a communication resource connecting agents across sessions. Each Mesh be
 
 Exposing a Mesh to an agent grants use of its supported tools. Exposing an agent to a Mesh adds that agent to the channel's reachable members. The two directions remain independent. Receiving a message neither creates a link nor grants a return route.
 
-The Mesh implementation captures its channel and member references at the model request boundary. Channel switches and membership changes affect subsequent requests. A captured reference still resolves through ordinary agent lifecycle validation: removal or archival can make the target unavailable. Mutable task descriptions are read at handling time from the captured exposure paths.
+The Mesh implementation captures its channel and member references at the model request boundary. Channel switches and membership changes affect subsequent requests. A captured reference still resolves through ordinary agent lifecycle validation: removal, session sleep, or archival can make the target unavailable. Sleeping and archived sessions have no runtime membership; wake or restoration rebuilds it from saved links. Mutable task descriptions are read at handling time from the captured exposure paths.
 
 Channel access does not grant direct access to the target agent's other resources. Mesh resolves targets before invoking public agent input or investigation capabilities. The Agent domain owns message admission, execution, and saved-record investigation.
 

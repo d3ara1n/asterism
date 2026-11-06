@@ -5,7 +5,7 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
-import { ChevronRight, Folder as FolderIcon, FolderPlus, House, MessageSquare, MoreHorizontal, PanelLeftClose, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, Moon, Folder as FolderIcon, FolderPlus, House, MessageSquare, MoreHorizontal, PanelLeftClose, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@asterism-app/ui/utils";
 
 import { appMessages } from "../messages/app";
@@ -29,13 +29,14 @@ type SessionSummary = AppSnapshot["sessions"][number];
 export const noFolderGroup = "none";
 
 /** Application navigation consumes only session summaries; after selecting a session, the application layer explicitly loads the workbench. */
-export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, collapsed, onToggleGroup, onHome, onSession, onRename, onArchive, onCompletedChange, onTemplateSaved, onHide, onRetry }: {
+export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, collapsed, onToggleGroup, onHome, onSession, onRename, onArchive, onCompletedChange, onKeepAwakeChange, onTemplateSaved, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
   resourceStatuses: readonly ResourceStatusMark[];
   renameDisabledSessionId: string | null; onRename: (sessionId: string, title: string) => Promise<SessionResult>;
   onArchive: (sessionId: string) => Promise<SessionResult>;
   onTemplateSaved: () => void;
   onCompletedChange: (sessionId: string, completed: boolean) => Promise<void>;
+  onKeepAwakeChange: (sessionId: string, keepAwake: boolean) => Promise<void>;
   /** Collapsed group keys: folder identities or `noFolderGroup`. */
   collapsed: ReadonlySet<string>; onToggleGroup: (key: string) => void;
   homeActive: boolean; onHome: () => void; onSession: (id: string) => void;
@@ -50,12 +51,16 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
   const row = (session: SessionSummary) => {
     const marks = resourceStatuses.filter(mark => mark.resource.sessionId === session.id);
     return <ListRow key={session.id} variant="navigation"
-      selected={selectedSessionId === session.id} disabled={disabled} onOpen={() => onSession(session.id)}
+      selected={selectedSessionId === session.id} disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
       buttonProps={{ title: session.title, "aria-current": selectedSessionId === session.id ? "page" : undefined }}
-      media={<MessageSquare className="text-muted-foreground" />} title={<span className={cn("block truncate", session.completed && "line-through")}>{session.title}</span>}
+      media={session.sleeping ? <Moon className="text-muted-foreground" /> : <MessageSquare className="text-muted-foreground" />}
+      title={<span className={cn("block truncate", session.completed && "line-through")}>
+        {session.title}{session.sleeping && <span className="sr-only">, {i18n.text(appMessages.sleeping)}</span>}
+      </span>}
       actions={<>
         <SessionStatus marks={marks} />
-        <SessionActions sessionId={session.id} title={session.title} folderId={session.folder_id} disabled={disabled}
+        <SessionActions sessionId={session.id} title={session.title} folderId={session.folder_id} disabled={disabled} sleeping={session.sleeping}
+          keepAwake={session.keepAwake} onKeepAwakeChange={value => onKeepAwakeChange(session.id, value)}
           completed={session.completed} onCompletedChange={completed => onCompletedChange(session.id, completed)}
           renameDisabled={renameDisabledSessionId === session.id}
           onRename={title => onRename(session.id, title)} onArchive={() => onArchive(session.id)} onTemplateSaved={onTemplateSaved} />

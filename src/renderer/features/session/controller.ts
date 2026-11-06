@@ -88,7 +88,7 @@ export class SessionController {
       }
       this.setActivity(event);
       this.progressListeners.forEach(listener => listener());
-    } else {
+    } else if (event.kind === "session.changed") {
       const current = this.state.data;
       if (!current) return;
       const objects = new Map(event.objects.map(object => [object.id, object]));

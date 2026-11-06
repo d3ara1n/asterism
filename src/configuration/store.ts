@@ -5,7 +5,7 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
 import { canEditModelProviderField, modelReference, modelSchema, modelProviderSchema, sessionEntrySelectionSchema,
-  type ModelProvider, type ProviderModel } from "../shared/configuration.ts";
+  defaultSessionLifecycle, sessionLifecycleSchema, type SessionLifecycle, type ModelProvider, type ProviderModel } from "../shared/configuration.ts";
 import { mcpSettingsSchema, defaultMcpSettings, shellSettingsSchema, defaultShellSettings, modelCostSchema, webProviderStateSchema, type WebProviderState, messagingConnectionSchema, type MessagingConnection } from "@asterism-app/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
@@ -13,7 +13,7 @@ import { jsonStorage } from "../storage/migrations.ts";
 import { migrateConfiguration13 } from "./credential-migration.ts";
 
 /** Global configuration format; increment on changes and append an n → n+1 migration to `configurationStorage`. */
-export const configurationVersion = 14;
+export const configurationVersion = 15;
 const storedProviderSchema = modelProviderSchema.strip();
 const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
 /** Models use `<providerId>/<modelId>` identities; other entries use id. */
@@ -28,6 +28,7 @@ const documentSchema = z.strictObject({
   messagingConnections: z.array(messagingConnectionSchema),
   modelProviders: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   sessionEntry: sessionEntrySelectionSchema.nullable(),
+  sessionLifecycle: sessionLifecycleSchema,
 }).superRefine((document, context) => {
   for (const key of ["modelProviders", "webProviders", "messagingConnections", "models"] as const) {
     const ids = new Set<string>();
@@ -52,7 +53,7 @@ type ConfigurationSave =
 
 function initialConfiguration(): ConfigurationDocument {
   return { version: configurationVersion, mcp: structuredClone(defaultMcpSettings), mcpAuthorizations: {},
-    shell: structuredClone(defaultShellSettings), messagingConnections: [], modelProviders: [], webProviders: [], models: [], sessionEntry: null };
+    shell: structuredClone(defaultShellSettings), messagingConnections: [], modelProviders: [], webProviders: [], models: [], sessionEntry: null, sessionLifecycle: structuredClone(defaultSessionLifecycle) };
 }
 /**
  * v12 web providers held one API key reference; v13 stores provider settings and secret references by setting key,
@@ -67,7 +68,8 @@ export function migrateConfiguration12(value: unknown): unknown {
 /** Append conversions for released formats here; business reads and writes always consume the current document. */
 export function configurationStorage(root: string, decrypt?: (ciphertext: string) => Promise<string>) {
   return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile), version: configurationVersion,
-    migrations: { 12: migrateConfiguration12, 13: value => migrateConfiguration13(root, value, decrypt) } });
+    migrations: { 12: migrateConfiguration12, 13: value => migrateConfiguration13(root, value, decrypt),
+      14: value => ({ ...(value as object), sessionLifecycle: structuredClone(defaultSessionLifecycle) }) } });
 }
 
 /** Locate by old identity and replace; reject new identities that conflict with other entries. */
@@ -107,6 +109,8 @@ export class ConfigurationStore {
   setMcp(value: z.infer<typeof mcpSettingsSchema>) { this.commit({ ...this.document, mcp: value }); }
   shell() { return structuredClone(this.document.shell); }
   setShell(value: z.infer<typeof shellSettingsSchema>) { this.commit({ ...this.document, shell: value }); }
+  sessionLifecycle(): SessionLifecycle { return structuredClone(this.document.sessionLifecycle); }
+  setSessionLifecycle(value: SessionLifecycle) { this.commit({ ...this.document, sessionLifecycle: value }); }
   sessionEntry() { return structuredClone(this.document.sessionEntry); }
   selectSessionEntry(value: z.infer<typeof sessionEntrySelectionSchema>) { this.commit({ ...this.document, sessionEntry: value }); }
   list<K extends ConfigurationKind>(kind: K): Entry[K][] {

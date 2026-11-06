@@ -59,6 +59,7 @@ export interface PluginContext {
   readonly secrets: PluginSecrets;
   db(): DatabaseSync;
   readonly tasks: PluginTasks;
+  readonly deadlines: import("./runtime-deadlines.ts").DeadlineServices;
   readonly models: ModelServices;
   readonly execution: import("./runtime-execution.ts").ExecutionServices;
   readonly content: import("./content-runtime.ts").ContentServices;

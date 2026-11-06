@@ -158,7 +158,7 @@ Child calls retain identity, timing, terminal outcome, and diagnostic summaries 
 
 ## Questions and communication
 
-`ask_user` waits after model response completion, without keeping the provider request open. User waiting has no default deadline. View unmount, sleep, and navigation do not answer or cancel it.
+`ask_user` waits after model response completion, without keeping the provider request open. User waiting has no default deadline. View unmount, operating-system sleep, and navigation do not answer or cancel it.
 
 Answers validate against the original question identities, types, options, and required fields. Optional skips are explicit. Recommendations do not create a default answer. Cancellation returns a cancelled tool outcome, while stopping the Agent cancels the enclosing work.
 

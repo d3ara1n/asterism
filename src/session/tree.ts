@@ -50,7 +50,7 @@ export class SessionTree {
     const row = this.db.prepare(`SELECT session_id AS sessionId, json_extract(payload, '$.data.type') AS kind
       FROM session_nodes WHERE json_extract(payload, '$.contract') = ?
       AND json_extract(payload, '$.data.id') = ?
-      AND EXISTS (SELECT 1 FROM sessions s WHERE s.id = session_nodes.session_id AND s.archived_at IS NULL) LIMIT 1`).get(ResourceCreated.id, id) as { sessionId: string; kind: string } | undefined;
+      AND EXISTS (SELECT 1 FROM sessions s WHERE s.id = session_nodes.session_id AND s.archived_at IS NULL AND s.sleeping_at IS NULL) LIMIT 1`).get(ResourceCreated.id, id) as { sessionId: string; kind: string } | undefined;
     if (!row) return null;
     const ref = { ...row, id };
     if (!this.db.isTransaction) this.identities.set(id, ref);
@@ -72,13 +72,43 @@ export class SessionTree {
   /** A non-null folder must exist; the membership is part of the session row created in the caller's transaction. */
   create(title: string, id: string = randomUUID(), folderId: string | null = null): string {
     requireFolder(this.db, folderId);
-    this.db.prepare("INSERT INTO sessions (id, title, initial_title, created_at, cursor, folder_id) VALUES (?, ?, ?, ?, NULL, ?)").run(id, title, title, new Date().toISOString(), folderId);
+    const now = new Date().toISOString();
+    this.db.prepare("INSERT INTO sessions (id, title, initial_title, created_at, last_opened_at, cursor, folder_id) VALUES (?, ?, ?, ?, ?, NULL, ?)")
+      .run(id, title, title, now, now, folderId);
     return id;
   }
-  /** Active session catalog; archived sessions are read only through archived. */
-  list(): { id: string; title: string; createdAt: string; completed: boolean }[] {
-    return (this.db.prepare("SELECT id, title, created_at, completed FROM sessions WHERE archived_at IS NULL ORDER BY created_at DESC, rowid DESC").all() as
-      { id: string; title: string; created_at: string; completed: number }[]).map(r => ({ id: r.id, title: r.title, createdAt: r.created_at, completed: r.completed === 1 }));
+  /** Host catalog includes sleeping sessions without making their runtime content available. */
+  list(): { id: string; title: string; createdAt: string; completed: boolean; sleeping: boolean; keepAwake: boolean; lastOpenedAt: string }[] {
+    return (this.db.prepare(`SELECT id, title, created_at, completed, sleeping_at, keep_awake, last_opened_at
+      FROM sessions WHERE archived_at IS NULL ORDER BY created_at DESC, rowid DESC`).all() as
+      { id: string; title: string; created_at: string; completed: number; sleeping_at: string | null; keep_awake: number; last_opened_at: string }[])
+      .map(r => ({ id: r.id, title: r.title, createdAt: r.created_at, completed: r.completed === 1,
+        sleeping: r.sleeping_at !== null, keepAwake: r.keep_awake === 1, lastOpenedAt: r.last_opened_at }));
+  }
+  /** Running sessions: the runtime catalog. */
+  active(): ReturnType<SessionTree["list"]> { return this.list().filter(session => !session.sleeping); }
+  sleeping(): ReturnType<SessionTree["list"]> { return this.list().filter(session => session.sleeping); }
+  /** Lifecycle of a nonarchived session; null when archived or absent. Reads catalog metadata only. */
+  lifecycle(sessionId: string): "running" | "sleeping" | null {
+    const row = this.db.prepare("SELECT sleeping_at FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as { sleeping_at: string | null } | undefined;
+    return row ? row.sleeping_at === null ? "running" : "sleeping" : null;
+  }
+  /** Enter sleep without changing saved history or cursor. The caller settles runtime objects first. */
+  sleep(sessionId: string, at = new Date().toISOString()): void {
+    this.requireAvailable(sessionId);
+    this.db.prepare("UPDATE sessions SET sleeping_at = ? WHERE id = ?").run(at, sessionId);
+    this.evict(sessionId);
+  }
+  /** Refresh the inactivity baseline on every explicit open; return whether runtime objects need waking. */
+  open(sessionId: string, at = new Date().toISOString()): boolean {
+    const state = this.lifecycle(sessionId);
+    if (!state) throw new SessionError("not_found", "Session not found.");
+    this.db.prepare("UPDATE sessions SET sleeping_at = NULL, last_opened_at = ? WHERE id = ?").run(at, sessionId);
+    return state === "sleeping";
+  }
+  setKeepAwake(sessionId: string, keepAwake: boolean): void {
+    if (!this.db.prepare("UPDATE sessions SET keep_awake = ? WHERE id = ? AND archived_at IS NULL").run(Number(keepAwake), sessionId).changes)
+      throw new SessionError("not_found", "Session not found.");
   }
   /** Completion is catalog metadata, independent of execution and historical positions. */
   setCompleted(sessionId: string, completed: boolean): void {
@@ -95,20 +125,26 @@ export class SessionTree {
   archive(sessionId: string, at = new Date().toISOString()): void {
     if (!this.db.prepare("UPDATE sessions SET archived_at = ? WHERE id = ? AND archived_at IS NULL").run(at, sessionId).changes)
       throw new SessionError("not_found", "Session not found.");
-    this.workbenches.delete(sessionId);
-    this.structures.delete(sessionId);
+    this.evict(sessionId);
+  }
+  /** Unavailable sessions drop reconstructible caches and resolved resource identities. */
+  private evict(sessionId: string): void {
+    this.releaseCache(sessionId);
     for (const [id, ref] of this.identities) if (ref.sessionId === sessionId) this.identities.delete(id);
   }
-  /** Unarchive by clearing the field only, without reading session contents. */
-  restore(sessionId: string): void {
-    if (!this.db.prepare("UPDATE sessions SET archived_at = NULL WHERE id = ? AND archived_at IS NOT NULL").run(sessionId).changes)
+  /** Restore availability and a fresh inactivity baseline without reading session contents. */
+  restore(sessionId: string, at = new Date().toISOString()): void {
+    if (!this.db.prepare("UPDATE sessions SET archived_at = NULL, sleeping_at = NULL, last_opened_at = ? WHERE id = ? AND archived_at IS NOT NULL").run(at, sessionId).changes)
       throw new SessionError("not_found", "Archived session not found.");
   }
-  cursor(sessionId: string): string | null {
-    const row = this.db.prepare("SELECT cursor FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as { cursor: string | null } | undefined;
+  /** Runtime content has one availability boundary, independent of catalog metadata access. */
+  requireAvailable(sessionId: string): { title: string; cursor: string | null } {
+    const row = this.db.prepare("SELECT title, cursor FROM sessions WHERE id = ? AND archived_at IS NULL AND sleeping_at IS NULL").get(sessionId) as
+      { title: string; cursor: string | null } | undefined;
     if (!row) throw new SessionError("not_found", "Session not found.");
-    return row.cursor;
+    return row;
   }
+  cursor(sessionId: string): string | null { return this.requireAvailable(sessionId).cursor; }
   nodes(sessionId: string): SessionNode[] {
     this.cursor(sessionId);
     return (this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? ORDER BY seq").all(sessionId) as { payload: string }[])
@@ -117,9 +153,7 @@ export class SessionTree {
 
   /** Capture unresolved bodies only; completed nodes stay immutable and can be read lazily at fixed endpoints. */
   view(sessionId: string): NodeView {
-    const row = this.db.prepare("SELECT title, cursor FROM sessions WHERE id = ? AND archived_at IS NULL").get(sessionId) as
-      { title: string; cursor: string | null } | undefined;
-    if (!row) throw new SessionError("not_found", "Session not found.");
+    const row = this.requireAvailable(sessionId);
     const upperSeq = this.head(sessionId);
     const pending = new Map((this.db.prepare("SELECT payload FROM session_nodes WHERE session_id = ? AND json_extract(payload, '$.pending') = 1")
       .all(sessionId) as { payload: string }[]).map(({ payload }) => {

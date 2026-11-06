@@ -446,6 +446,17 @@ describe("Host immutable content", () => {
     await f.service.content.execute({ type: "input.close", scopeId: opened.scopeId });
     expect(await f.object(id).content.read(sealed.ref)).toEqual(new Uint8Array());
   });
+  // Readers retained across archival share the session availability gate with sleep.
+  it("rejects retained content readers after archival without deleting content", async () => {
+    const f = fixture(), input = f.input();
+    const file = await f.store.writer({ scope: input }).stage(bytes("Saved resource content"));
+    const id = await f.create(file, input.id), reader = f.object(id).content;
+    await input.close();
+    await f.service.sessions.execute({ type: "archive", sessionId: f.sessionId });
+    await expect(async () => reader.read(file)).rejects.toMatchObject({ code: "not_found" });
+    await f.service.sessions.execute({ type: "restore", sessionId: f.sessionId });
+    expect(await f.object(id).content.read(file)).toEqual(bytes("Saved resource content"));
+  });
 });
 
 /** Expectations follow content authorization and request boundaries: files must be readable, and temporary input and requests retain separate holds. */

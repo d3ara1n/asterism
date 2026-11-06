@@ -31,6 +31,16 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const execution = bindExecution({ owner: internal.id, host, runs: modelRuns, objects, checkAvailable, topLevelTools });
   const shared = host.shared;
   const context: PluginContext = {
+    deadlines: {
+      schedule(at, callback, options) {
+        checkAvailable();
+        const signal = options?.signal ? AbortSignal.any([internal.lifetime.signal, options.signal]) : internal.lifetime.signal;
+        return shared.deadlines.schedule(at, async () => {
+          try { checkAvailable(); await callback(); }
+          catch (error) { internal.log.error("Deadline callback failed.", error); }
+        }, { signal });
+      },
+    },
     mcp: bindMcp(shared.mcp, sessionRuns, scope),
     shell: bindShellServices(shared.shell, sessionRuns, checkAvailable),
     ...bindWeb(shared.webProviders, sessionRuns, scope),

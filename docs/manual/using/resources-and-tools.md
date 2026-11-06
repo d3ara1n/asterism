@@ -155,7 +155,7 @@ The first agent with a name receives zero. Later agents with the same name recei
 
 Task descriptions belong to each Mesh resource and agent pair. `get_profile` with a null target reads your description on that Mesh; `set_profile` updates it using the caller's identity and accepts no named target. Names and configured agent types are read from the agents. A caller that is not exposed to the channel has a null profile ID. If multiple Mesh resources expose the same agent to one channel, listings show that agent once and combine its distinct descriptions.
 
-Switching a Mesh's channel keeps its workbench links and local task descriptions. Requests already in progress retain their captured channel and members; the next request uses the new selection. Hiding a card retains membership. Removing its last exposure path or archiving its session removes the member.
+Switching a Mesh's channel keeps its workbench links and local task descriptions. Requests already in progress retain their captured channel and members; the next request uses the new selection. Hiding a card retains membership. Removing its last exposure path, sleeping its session, or archiving its session removes the member. Waking or restoring the session rebuilds membership from its saved links.
 
 ## Schedule messages
 
@@ -167,7 +167,7 @@ An Alarm uses the computer's local clock and always repeats on its selected week
 
 Models inspect a linked schedule to discover its resource tools, then call them through `resource_call` or a resource script. Read operations return the current configuration and activation state. Setting replaces the complete configuration while inactive; starting or enabling is a separate operation. Tool results include the resulting state. Deadlines use Unix epoch milliseconds. For a running Timer, the deadline determines the remaining countdown; `remainingMs` describes the duration left while stopped.
 
-Schedules run in the backend while their session is active, including when its cards are hidden or another session is open. Sleep and application shutdown count toward the saved deadline. When execution resumes, every overdue resource triggers independently. A repeating timer then begins its next full interval; a repeating alarm selects its next future weekday occurrence. Archiving the session suspends scheduling until restoration.
+Schedules run in the backend while their session is running, including when its cards are hidden or another session is open. Session sleep and archival end runtime scheduling until the user wakes or restores the session; a deadline cannot wake it. Elapsed time during session sleep, operating-system sleep, or application shutdown still counts toward saved deadlines. When execution resumes, each overdue resource fires once, independently of the others, without replaying every missed occurrence. A repeating timer starts its next full interval from the actual fire time; an alarm selects its next future weekday occurrence. Use **Keep awake** on the session to prevent automatic session sleep when background scheduling must remain available.
 
 Each trigger sends the saved message to every directly linked Agent as a resource event, with the schedule's name as its source. Delivery uses steering: an idle Agent starts work, and a running Agent receives the message at its next request boundary. Schedules advance without waiting for delivery or a response.
 

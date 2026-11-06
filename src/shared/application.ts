@@ -41,6 +41,3 @@ export const applicationStorage = {
 
 /** Flat format version for main-process preference files; electron-store writes defaults with new files. UI state is an unversioned cache. */
 export const preferenceVersion = 1;
-
-/** Archived-session retention period, checked only during startup cleanup rather than scheduled work; the UI describes it as about a month. */
-export const sessionRetentionMs = 30 * 24 * 60 * 60 * 1000;

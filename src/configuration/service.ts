@@ -111,6 +111,7 @@ export class ConfigurationService {
     this.mcpListeners.add(listener);
     return () => { this.mcpListeners.delete(listener); };
   }
+  sessionLifecycle() { this.assertOpen(); return this.store.sessionLifecycle(); }
   shellSettings() { this.assertOpen(); return this.store.shell(); }
   current(): ConfigurationSnapshot { this.assertOpen(); return this.snapshot(); }
   async executionCredential(providerId: string, signal?: AbortSignal): Promise<string | null> {
@@ -135,6 +136,7 @@ export class ConfigurationService {
       mcp: this.store.mcp(),
       shell: this.store.shell(),
       sessionEntry: this.store.sessionEntry(),
+      sessionLifecycle: this.store.sessionLifecycle(),
       messagingProviderTypes: this.messaging.types(),
       messagingConnections: this.store.list("messaging").map(state => ({ ...state, runtime: runtime.find(connection => connection.id === state.id)! })),
       webProviders: this.store.list("webProvider"),
@@ -149,6 +151,7 @@ export class ConfigurationService {
     if (command.type === "messaging.save") return this.saveMessaging(command);
     if (command.type === "messaging.restart") { this.messaging.restart(command.id); return command.id; }
     if (command.type === "shell.set") { this.store.setShell(command.value); return null; }
+    if (command.type === "sessionLifecycle.set") { this.store.setSessionLifecycle(command.value); return null; }
     if (command.type === "sessionEntry.set") { this.store.selectSessionEntry(command.value); return null; }
     if (command.type === "webProvider.reorder") {
       this.store.reorderWebProviders(command.ids);

@@ -37,6 +37,27 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
 }
 
 describe("Real configuration and consumption boundaries", () => {
+  // The prior saved format has no lifecycle settings; migration must preserve its credentials and entry, and later reads must not reseed edited preferences.
+  it("upgrades v14 configuration without losing saved settings and preserves lifecycle edits across reopening", async () => {
+    const { root, service } = setup();
+    service.close();
+    const fixture = readFileSync(join(import.meta.dirname, "fixtures", "configuration-v14.json"), "utf8");
+    writeFileSync(join(root, "configuration.json"), fixture);
+    await configurationStorage(root).inspect()!.apply();
+    const migrated = new ConfigurationService(root);
+    cleanups.push(() => migrated.close());
+    expect(migrated.sessionLifecycle()).toEqual({ retentionDays: 30, sleepDays: 30 });
+    const saved = await migrated.execute({ type: "sessionLifecycle.set", value: { retentionDays: null, sleepDays: 7 } });
+    expect(saved.snapshot.sessionLifecycle).toEqual({ retentionDays: null, sleepDays: 7 });
+    migrated.close();
+    const reopened = new ConfigurationService(root);
+    cleanups.push(() => reopened.close());
+    expect(reopened.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 7 });
+    expect(reopened.current().sessionEntry).toEqual({ pluginId: "test.plugin", entryId: "home" });
+    expect(reopened.current().modelProviders[0]?.apiKey).toBe("example-saved-key");
+    expect(reopened.mcpAuthorization("example")).toEqual({ port: 62986 });
+    expect(configurationStorage(root).inspect()).toBeNull();
+  });
   it("keeps independently named messaging connections and multiple credentials separate", async () => {
     const { service, root } = setup(), life = new RunLifecycle(() => {});
     cleanups.push(() => life.stop());

@@ -86,10 +86,19 @@ export function createModelInput(providerId: string, model: DiscoveredModel): z.
   };
 }
 export const sessionEntrySelectionSchema = z.strictObject({ pluginId: z.string().min(1), entryId: z.string().min(1) });
+export const sessionLifecycleDays = [7, 15, 30, 90] as const;
+export const sessionLifecycleDaysSchema = z.union([...sessionLifecycleDays.map(days => z.literal(days)), z.null()]);
+export const sessionLifecycleSchema = z.strictObject({
+  retentionDays: sessionLifecycleDaysSchema,
+  sleepDays: sessionLifecycleDaysSchema,
+});
+export type SessionLifecycle = z.infer<typeof sessionLifecycleSchema>;
+export const defaultSessionLifecycle: SessionLifecycle = { retentionDays: 30, sleepDays: 30 };
 export const configurationSnapshotSchema = z.strictObject({
   mcp: mcpSettingsSchema,
   shell: shellSettingsSchema,
   sessionEntry: sessionEntrySelectionSchema.nullable(),
+  sessionLifecycle: sessionLifecycleSchema,
   messagingConnections: z.array(messagingConfigurationSchema),
   messagingProviderTypes: z.array(messagingProviderTypeSchema),
   webProviders: z.array(webProviderSchema),
@@ -109,6 +118,7 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("webProvider.reorder"), ids: z.array(z.string().min(1)) }),
   z.strictObject({ type: z.literal("read") }),
   z.strictObject({ type: z.literal("sessionEntry.set"), value: sessionEntrySelectionSchema }),
+  z.strictObject({ type: z.literal("sessionLifecycle.set"), value: sessionLifecycleSchema }),
   // Save targets the current ID; a different ID in value means rename.
   z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),

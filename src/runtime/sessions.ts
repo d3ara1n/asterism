@@ -1,3 +1,4 @@
+import { planSessionSleep, SessionSleepPolicy } from "./session-sleep.ts";
 import { createSharedServices } from "./shared-services.ts";
 import { SessionTitleAssigned, type Presentation, type Source, resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, type FileRef, ResourceStatusChanged, SessionTitleChanged, SystemResumed } from "@asterism-app/sdk/contracts";
 import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, type ManualSource, type PreparedCreation, PluginApiError } from "@asterism-app/sdk/runtime";
@@ -73,16 +74,20 @@ export class SessionService {
   private readonly closePlugins: () => Promise<void>;
   private readonly releasePlugins: LoadedPlugins["release"];
   private readonly restorePlugins: LoadedPlugins["restore"];
-  /** Entry pending: do not reenter archive cleanup for the same session while it is in progress. */
-  private readonly archiving = new Set<string>();
+  /** Entry pending: sleep or archive cleanup in progress; watch waits for it and the same session cannot reenter. */
+  private readonly deactivations = new Map<string, Promise<void>>();
+  /** Assigned after plugins initialize, because sleep candidates depend on plugin activity. */
+  private sleepPolicy: SessionSleepPolicy | undefined;
   private readonly prepare: LoadedPlugins["prepare"];
   private readonly afterCommit: LoadedPlugins["afterCommit"];
   private readonly pluginActivity: LoadedPlugins["activity"];
   private readonly retiring: LoadedPlugins["retiring"];
   private readonly holds: ResourceHolds;
-  constructor(private readonly db: DatabaseSync, dataRoot: string, configuration: ConfigurationService, options: SessionServiceOptions = {}) {
+  constructor(private readonly db: DatabaseSync, dataRoot: string, private readonly configuration: ConfigurationService, options: SessionServiceOptions = {}) {
     this.changed = options.onChanged ?? (() => {});
     this.tree = new SessionTree(db);
+    // Expired sessions remain unmounted at startup, rather than briefly exposing their resources.
+    for (const id of planSessionSleep(this.tree.active().filter(session => !session.keepAwake), configuration.sessionLifecycle().sleepDays, Date.now()).due) this.tree.sleep(id);
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(ResourceStatusChanged);
     this.events.declarePublic(SystemResumed);
@@ -95,11 +100,15 @@ export class SessionService {
       initialize: (owner, key, prepare, options) => this.initializeSession(owner, key, prepare, options),
       list: () => {
         if (this.writesClosed) throw new PluginApiError("unavailable", "The session service is closed.");
-        return this.tree.list();
+        return this.tree.active();
       },
       archived: () => {
         if (this.writesClosed) throw new PluginApiError("unavailable", "The session service is closed.");
         return this.tree.archived();
+      },
+      sleeping: () => {
+        if (this.writesClosed) throw new PluginApiError("unavailable", "The session service is closed.");
+        return this.tree.sleeping();
       },
       create: (sessionId, contract, input, options) => this.createFromPlugin(sessionId, contract, input, options),
       invoke: (sessionId, contract, target, input, options) => this.invokeFromPlugin(sessionId, contract, target, input, options),
@@ -110,7 +119,8 @@ export class SessionService {
       sequences: (sessionId, nodes) => this.tree.sequences(sessionId, nodes),
       timeline: sessionId => this.tree.timeline(sessionId),
       workbench: sessionId => this.tree.workbench(sessionId),
-      title: sessionId => this.tree.title(sessionId),
+      available: sessionId => { this.tree.requireAvailable(sessionId); },
+      title: sessionId => this.tree.requireAvailable(sessionId).title,
       setTitle: (sessionId, text, source, detail) => this.assignTitle(sessionId, text, source, detail),
       commit: (sessionId, work, objectId) => this.commit(sessionId, work, { objectId }),
       idle: (sessionId, objectId) => {
@@ -160,11 +170,22 @@ export class SessionService {
     this.workbench = new SessionWorkbench(db, this.tree, this.resources, this.content);
     this.templates = new TemplateStore(db, this.tree, this.workbench, this.content, this.resources);
     modules.initialize();
-    for (const session of this.tree.list()) if (this.settled(session.id)) this.tree.releaseCache(session.id);
+    for (const session of this.tree.active()) if (this.settled(session.id)) this.tree.releaseCache(session.id);
+    this.sleepPolicy = new SessionSleepPolicy({
+      deadlines: this.shared.deadlines,
+      sleepDays: () => this.configuration.sessionLifecycle().sleepDays,
+      candidates: () => this.tree.active().filter(session => !session.keepAwake && !this.watching.has(session.id) && !this.deactivations.has(session.id)),
+      settled: sessionId => this.settled(sessionId),
+      sleep: sessionId => this.deactivate(sessionId, "sleep"),
+      failed: error => console.error("Automatic session sleep failed.", error),
+    });
+    this.sleepPolicy.refresh();
   }
-  get running(): boolean { return this.tree.list().some(session => !this.settled(session.id)); }
+  /** Inputs to the sleep deadline changed: open state, keep-awake, creation, or the configured threshold. */
+  refreshSleep(): void { this.sleepPolicy?.refresh(); }
+  get running(): boolean { return this.tree.active().some(session => !this.settled(session.id)); }
   disposalWarnings() {
-    return this.tree.list().flatMap(session => this.tree.workbench(session.id).objects.flatMap(object => {
+    return this.tree.active().flatMap(session => this.tree.workbench(session.id).objects.flatMap(object => {
       const warning = this.resources.disposalWarning(object);
       return warning ? [{ title: object.title, warning }] : [];
     }));
@@ -287,6 +308,7 @@ export class SessionService {
       live: [...resources.flatMap(a => a.live), ...plugin.live].map(wireLive) };
   }
   private progressChanged(sessionId: string): void {
+    if (this.sleepPolicy?.isWaiting(sessionId) && this.settled(sessionId)) this.sleepPolicy.refresh();
     if (!this.watching.has(sessionId) && this.settled(sessionId)) this.tree.releaseCache(sessionId);
     const previous = this.watching.get(sessionId);
     if (!previous || this.closed) return;
@@ -492,11 +514,21 @@ export class SessionService {
       case "template.start": {
         const sessionId = randomUUID();
         this.commit(sessionId, () => this.templates.instantiate(command.templateId, sessionId), { workbench: true });
+        this.refreshSleep();
         return { kind: "accepted", sessionId };
       }
       case "read": return { kind: "view", data: this.current(command.sessionId) };
       case "records.read": return { kind: "records", nodes: this.tree.readRecords(command.sessionId, command.ids) };
       case "watch": {
+        await this.deactivations.get(command.sessionId);
+        const woke = this.tree.open(command.sessionId);
+        // Protect the newly opened session before mounting resources can publish activity.
+        this.watching.set(command.sessionId, { busyObjectIds: [], timelineBusy: false, live: [] });
+        if (woke) {
+          this.restorePlugins(command.sessionId);
+          this.changed({ kind: "session.lifecycle", sessionId: command.sessionId });
+        }
+        this.refreshSleep();
         const data = this.current(command.sessionId);
         this.watching.set(command.sessionId, data.progress);
         this.changed({ kind: "session.opened", sessionId: command.sessionId, data });
@@ -504,6 +536,7 @@ export class SessionService {
       }
       case "unwatch":
         this.watching.delete(command.sessionId);
+        this.refreshSleep();
         if (this.settled(command.sessionId)) this.tree.releaseCache(command.sessionId);
         return { kind: "accepted", sessionId: command.sessionId };
       case "select":
@@ -511,6 +544,7 @@ export class SessionService {
         this.commit(command.sessionId, () => this.tree.select(command.sessionId, command.nodeId), { workbench: true });
         return { kind: "accepted", sessionId: command.sessionId };
       case "disposal.warnings": {
+        if (this.tree.lifecycle(command.sessionId) === "sleeping") return { kind: "warnings", warnings: [] };
         const ids = command.objectIds ? new Set(command.objectIds) : null;
         return { kind: "warnings", warnings: this.tree.workbench(command.sessionId).objects.flatMap(object => {
           const warning = !ids || ids.has(object.id) ? this.resources.disposalWarning(object) : null;
@@ -518,11 +552,14 @@ export class SessionService {
         }) };
       }
       case "archive":
-        await this.archive(command.sessionId);
+        await this.deactivate(command.sessionId, "archive");
+        this.refreshSleep();
         return { kind: "accepted", sessionId: command.sessionId };
       case "restore":
         this.tree.restore(command.sessionId);
         this.restorePlugins(command.sessionId);
+        this.refreshSleep();
+        this.changed({ kind: "session.lifecycle", sessionId: command.sessionId });
         return { kind: "accepted", sessionId: command.sessionId };
       case "rename":
         try { this.assignTitle(command.sessionId, command.title, null); }
@@ -659,33 +696,40 @@ export class SessionService {
         }, initialContent);
         this.db.prepare("INSERT INTO session_submissions (id, session_id) VALUES (?, ?)").run(key, sessionId);
       }, { workbench: true });
+      this.refreshSleep();
       return sessionId;
     } finally {
       active = false;
       await Promise.all([...holds, initialContent].map(hold => hold.close()));
     }
   }
-  /** Shared archival/exit cleanup: abort in-flight creations, end all session object scopes, then mark archive time. */
-  private async archive(sessionId: string): Promise<void> {
-    this.tree.cursor(sessionId);
-    if (this.archiving.has(sessionId)) throw new SessionError("conflict", "This session is already being archived.");
-    this.archiving.add(sessionId);
-    // End view delivery before disposal invalidates resource instances used by projections.
+  /** Both reasons end object lifetimes; only archival starts the recycle-bin retention period. */
+  private async deactivate(sessionId: string, reason: "sleep" | "archive"): Promise<void> {
+    if (this.deactivations.has(sessionId)) throw new SessionError("conflict", "This session is already being deactivated.");
+    const state = this.tree.lifecycle(sessionId);
+    if (!state || (reason === "sleep" && state === "sleeping")) throw new SessionError("not_found", "Session not found.");
+    const work = this.releaseSession(sessionId, reason).finally(() => this.deactivations.delete(sessionId));
+    this.deactivations.set(sessionId, work);
+    return work;
+  }
+  private async releaseSession(sessionId: string, reason: "sleep" | "archive"): Promise<void> {
     this.watching.delete(sessionId);
     this.updates.delete(sessionId);
-    try {
-      for (const [key, controller] of this.creating) if (key.startsWith(`${sessionId}/`)) controller.abort();
-      const creations = [...this.pendingCreations.values()].filter(pending => pending.sessionId === sessionId);
-      for (const pending of creations) pending.controller.abort();
-      await Promise.allSettled(creations.map(pending => pending.done));
-      await this.releasePlugins(sessionId);
-      this.tree.archive(sessionId);
-    } finally { this.archiving.delete(sessionId); }
+    for (const [key, controller] of this.creating) if (key.startsWith(`${sessionId}/`)) controller.abort();
+    const creations = [...this.pendingCreations.values()].filter(pending => pending.sessionId === sessionId);
+    for (const pending of creations) pending.controller.abort();
+    await Promise.allSettled(creations.map(pending => pending.done));
+    await this.releasePlugins(sessionId);
+    if (reason === "archive") this.tree.archive(sessionId);
+    else this.tree.sleep(sessionId);
+    this.changed({ kind: "session.lifecycle", sessionId });
   }
   async close(): Promise<void> {
     this.closed = true;
+    this.sleepPolicy?.close();
     for (const pending of this.pendingCreations.values()) pending.controller.abort();
-    await this.closePlugins();
+    const closingPlugins = this.closePlugins();
+    await Promise.all([closingPlugins, ...this.deactivations.values()]);
     await this.shared.close();
     await Promise.allSettled([...this.pendingCreations.values()].map(pending => pending.done));
     await Promise.allSettled([...this.starting.values()]);

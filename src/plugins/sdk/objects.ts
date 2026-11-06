@@ -37,7 +37,7 @@ export function bindObjects(owner: string, host: PluginHostServices, sessionRuns
   };
   const readData = <T extends Json>(id: string, objectId: string | null, contract: DataContract<T>): T | null => {
     checkAvailable(); checkData(contract);
-    host.sessions.title(id);
+    try { host.sessions.available(id); } catch (error) { sessionError(error); }
     let raw: Json | undefined;
     try { raw = host.data.get(id, objectId, contract.id); }
     catch { throw new PluginApiError("unavailable", "The stored session data is unavailable."); }
@@ -62,6 +62,7 @@ export function bindObjects(owner: string, host: PluginHostServices, sessionRuns
       get scope() { return scope?.active ? scope.content : undefined; }, check: () => {
       checkAvailable();
       if (scope?.execution && !scope.active) throw new PluginApiError("unavailable", "The content execution is closed.");
+      if (established) { try { host.sessions.available(sessionId!); } catch (error) { sessionError(error); } }
     } };
   };
   const unavailable = async (): Promise<never> => { throw new PluginApiError("unavailable", "Content storage is unavailable."); };
@@ -244,7 +245,7 @@ export function bindObjects(owner: string, host: PluginHostServices, sessionRuns
       get(contract) {
         own(ref.kind); checkRef(ref, scope?.active && scope.provisional); checkData(contract);
         if (scope?.active && scope.provisional && !host.refOf(ref.id)) {
-          try { host.sessions.title(ref.sessionId); } catch { return null; }
+          try { host.sessions.available(ref.sessionId); } catch { return null; }
         }
         return readData(ref.sessionId, ref.id, contract);
       },

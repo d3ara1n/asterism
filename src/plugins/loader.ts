@@ -138,7 +138,7 @@ function initializationOrder(plugins: readonly PluginDefinition[], dependencies:
 export function loadPlugins(plugins: readonly PluginDefinition[], services: PluginHostServices): LoadedPlugins {
   const { agentCatalog, webProviders, messaging, extensions } = services.shared;
   const dependencies = services.pluginDependencies ?? new Map<string, readonly string[]>();
-  const directory = Object.freeze({ list: () => services.sessions.list(), archived: () => services.sessions.archived() });
+  const directory = Object.freeze({ list: () => services.sessions.list(), sleeping: () => services.sessions.sleeping(), archived: () => services.sessions.archived() });
   const events = services.events ?? new EventBus();
   events.declarePublic(ResourcePresenceChanged);
   const calls = new CallRegistry(services);

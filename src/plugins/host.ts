@@ -16,6 +16,7 @@ import type { ModelProviderExtensions } from "../configuration/provider-extensio
 export interface SharedServices {
   mcp: McpApplication;
   shell: ShellServices;
+  deadlines: import("@asterism-app/sdk/runtime").DeadlineServices;
   usage: ProviderUsage;
   agentCatalog: AgentCatalogService;
   modelProviders: ModelProviderServices;
@@ -37,6 +38,7 @@ export interface SessionHostWriter {
 }
 export interface SessionHost {
   list: SessionDirectory["list"];
+  sleeping: SessionDirectory["sleeping"];
   archived: SessionDirectory["archived"];
   initialize(owner: string, key: string, prepare: (context: SessionPreparation) => Promise<{
     title: string;
@@ -51,6 +53,8 @@ export interface SessionHost {
   sequences(sessionId: string, nodes: readonly SessionNode[]): number[];
   timeline(sessionId: string): SessionNode[];
   workbench(sessionId: string): FoldedState;
+  /** Throws unless runtime content is available: the session is neither sleeping nor archived. */
+  available(sessionId: string): void;
   title(sessionId: string): string;
   setTitle(sessionId: string, text: string, source: Source, detail?: Presentation): void;
   commit<T>(sessionId: string, work: (writer: SessionHostWriter) => T, objectId?: string): T;

@@ -39,7 +39,7 @@ export const sessionCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("rename"), sessionId: id, title: z.string().max(160).refine(value => value.trim().length > 0) }),
   // Archival: clean all session objects before marking archive time; subsequent business reads treat the session as absent.
   z.strictObject({ type: z.literal("archive"), sessionId: id }),
-  // Trash restoration clears archive time only and objects reenter the current set.
+  // Restoration clears archive and sleep times, refreshes the open time, and makes objects available again.
   z.strictObject({ type: z.literal("restore"), sessionId: id }),
   // Resource card behavior entry: route by object type to resource controllers, whose modules validate command.
   z.strictObject({ type: z.literal("resource.command"), sessionId: id, objectId: id, command: resourceCallSchema, contentScopeId: uuid.optional() }),
@@ -101,6 +101,7 @@ export const sessionResultSchema = z.discriminatedUnion("ok", [
 export type SessionResult = z.infer<typeof sessionResultSchema>;
 /** Session changes pushed in backend order; runtime is trusted and receivers do not revalidate. */
 export type SessionChanged =
+  | { kind: "session.lifecycle"; sessionId: string }
   | { kind: "session.opened"; sessionId: string; data: SessionData }
   | { kind: "session.changed"; sessionId: string; nodes: SessionNode[]; cursor: string | null; title: string;
       completed?: SessionNode[]; objects: WorkbenchSnapshot["objects"]; workbench?: WorkbenchSnapshot; layout?: WorkbenchLayout }

@@ -10,7 +10,7 @@ function context(id: string, sessions: SessionDirectory, catalog: AgentCatalog, 
 }
 describe("Agent request preparation", () => {
   it("composes preparers in registration order, keeps provenance, and isolates prepared results", () => {
-    const sessions: SessionDirectory = { list: () => [], archived: () => [] };
+    const sessions: SessionDirectory = { list: () => [], sleeping: () => [], archived: () => [] };
     const source = { id: "example.skills:main", plugin: "example.skills", directory: "/skills" };
     const catalog: AgentCatalog = {
       skills: () => [{ ...source, issues: [], skills: ["keep", "remove"].map(name => ({ name, description: name, directory: `/skills/${name}`, source })) }],

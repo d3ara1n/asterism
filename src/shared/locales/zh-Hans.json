@@ -816,7 +816,6 @@
   "conversations.count": "{count} 个会话",
   "conversations.archivedCount": "{count, plural, =0 {回收站为空} other {已归档 # 个会话}}",
   "conversations.recycleBin": "回收站",
-  "conversations.recycleBin.hint": "已归档的会话大约一个月后清除。",
   "conversations.recycleBin.empty": "没有已归档的会话。",
   "conversations.archivedAt": "归档于 {date}",
   "conversations.restore": "恢复",
@@ -932,5 +931,11 @@
   "folders.color.teal": "青色",
   "folders.color.blue": "蓝色",
   "folders.color.violet": "紫色",
-  "folders.color.pink": "粉色"
+  "folders.color.pink": "粉色",
+  "conversations.retentionDays": "归档后删除",
+  "conversations.sleepDays": "闲置后休眠",
+  "conversations.lifecycleDays": "{days} 天",
+  "conversations.lifecycleNever": "永不",
+  "sessions.keepAwake": "保持唤醒",
+  "sessions.sleeping": "休眠中"
 }

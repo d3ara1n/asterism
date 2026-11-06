@@ -68,7 +68,7 @@ async function configureModel(service: ApplicationService) {
   } });
   return { provider: "test", model: "test" };
 }
-function counter(options: { failCreate?: boolean; onCreate?: (object: ObjectExecutor) => void; afterCreate?: (object: ObjectExecutor) => void; afterAction?: (object: ObjectExecutor) => void; observe?: (record: SessionRecord, context: PluginContext) => void;
+function counter(options: { attach?: (signal: AbortSignal) => void; failCreate?: boolean; onCreate?: (object: ObjectExecutor) => void; afterCreate?: (object: ObjectExecutor) => void; afterAction?: (object: ObjectExecutor) => void; observe?: (record: SessionRecord, context: PluginContext) => void;
   prepare?: (signal: AbortSignal) => Promise<void>; execute?: (object: ObjectExecutor, signal: AbortSignal, amount: number) => Promise<void>;
 } = {}) {
   let context!: PluginContext;
@@ -76,6 +76,7 @@ function counter(options: { failCreate?: boolean; onCreate?: (object: ObjectExec
     context = plugin;
     return {
       resources: [implementResource(Counter, View, {
+        attach(_data, _object, lifetime) { options.attach?.(lifetime.signal); },
         records: [Changed],
         creation: implementCreation(CreateCounter, {
           create(value, object) {
@@ -1356,5 +1357,41 @@ describe("Pending operation records", () => {
     expect(updates.filter(event => event.kind === "session.changed" && event.completed?.length)).toEqual([]);
     session.commit(writer => { writer.complete(Operation, id, { report: "Committed" }); });
     expect(completed).toMatchObject([{ id, pending: false, data: { output: { report: "Committed" } } }]);
+  });
+});
+
+
+// Sleep and archive share one unavailability boundary; only explicit opens wake a sleeping session.
+describe("Session sleep", () => {
+  it("leaves idle sessions unmounted at startup, keeps keep-awake sessions running, and wakes on open", async () => {
+    const lifetimes: AbortSignal[] = [];
+    const c = counter({ attach: signal => lifetimes.push(signal) });
+    const { root, service, sessionId } = open([c.plugin]);
+    const id = await create(service, sessionId, 3);
+    const awake = service.sessions.tree.create("Background work");
+    await create(service, awake, 7);
+    service.sessions.tree.setKeepAwake(awake, true);
+    for (const session of [sessionId, awake]) service.sessions.tree.open(session, "2000-01-01T00:00:00.000Z");
+    await service.close();
+    services.splice(services.indexOf(service), 1);
+
+    const restarted = new ApplicationService(root, { plugins: [c.plugin] });
+    services.push(restarted);
+    const context = c.context();
+    expect(lifetimes).toHaveLength(3); // Only the keep-awake resource reattached.
+    expect(context.sessions.list().map(item => item.id)).toEqual([awake]);
+    expect(context.sessions.sleeping().map(item => item.id)).toEqual([sessionId]);
+    expect(() => context.session(sessionId)).toThrow();
+    expect(() => context.object(sessionId, Counter, id).get(State)).toThrow();
+
+    await restarted.sessions.execute({ type: "watch", sessionId });
+    expect(lifetimes).toHaveLength(4);
+    expect(context.object(sessionId, Counter, id).get(State)).toBe(3);
+    expect(context.sessions.sleeping()).toEqual([]);
+
+    await restarted.sessions.execute({ type: "archive", sessionId });
+    expect(lifetimes[3]!.aborted).toBe(true);
+    expect(context.sessions.archived().map(item => item.id)).toEqual([sessionId]);
+    await expect(restarted.sessions.execute({ type: "watch", sessionId })).rejects.toMatchObject({ code: "not_found" });
   });
 });

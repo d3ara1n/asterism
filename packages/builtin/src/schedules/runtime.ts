@@ -1,6 +1,6 @@
 import { nanoid } from "nanoid";
 import { Agent, SubmitAgentInput } from "@asterism-app/builtin-api/contracts";
-import { ResourcePresenceChanged, SystemResumed, type Json } from "@asterism-app/sdk/contracts";
+import type { DataContract, Json, ResourceContract } from "@asterism-app/sdk/contracts";
 import { defineModule, implementAction, implementCreation, implementResource, implementTool, PluginApiError,
   type CallResult, type Lifetime, type ObjectExecutor, type ObjectReader, type PluginContext, type ResourceRef, type ResourceSnapshot } from "@asterism-app/sdk/runtime";
 import { scheduleCard } from "../shared/card-appearance.ts";
@@ -8,7 +8,6 @@ import { Alarm, AlarmState, AlarmView, ConfigureAlarm, ConfigureTimer, ControlTi
   SetAlarmEnabled, Timer, TimerState, TimerView, AlarmGet, AlarmSet, AlarmEnable, AlarmDisable,
   TimerGet, TimerSet, TimerStart, TimerPause, TimerReset, type AlarmSettings, type TimerSettings } from "./contract.ts";
 import { configureTimer, controlTimer, expireAlarm, expireTimer, normalizeWeekdays, setAlarmEnabled } from "./time.ts";
-import { planWakeup } from "./deadlines.ts";
 import { scheduleMessages as messages } from "../messages/schedules.ts";
 
 function requireState<T>(state: T | null): T {
@@ -44,73 +43,46 @@ function deliver(plugin: PluginContext, source: ResourceSnapshot, recipients: re
   }
 }
 
-/** One backend timeout waits for the earliest deadline across all attached schedules. */
+/** Durable schedule state owns occurrence policy; the host owns deadline wakeups. */
 export default defineModule(plugin => {
-  const resources = new Map<string, { ref: ResourceRef; nextAt: number | null }>();
-  let clock: ReturnType<typeof setTimeout> | undefined;
-  let waitingFor: number | null = null;
-  const rearm = () => {
-    const { nextAt, delayMs } = planWakeup(resources.values(), Date.now());
-    if (clock !== undefined && waitingFor === nextAt) return;
-    if (clock !== undefined) clearTimeout(clock);
-    clock = undefined;
-    waitingFor = nextAt;
-    if (delayMs !== null) {
-      clock = setTimeout(wake, delayMs);
-      clock.unref();
-    }
-  };
+  /** Pending registration per attached schedule; the attachment signal also cancels it. */
+  const pending = new Map<string, { signal: AbortSignal; cancel?: () => void }>();
   const update = (ref: ResourceRef, nextAt: number | null) => {
-    resources.set(ref.id, { ref, nextAt });
-    rearm();
+    const entry = pending.get(ref.id);
+    if (!entry) return;
+    entry.cancel?.();
+    entry.cancel = nextAt === null ? undefined : plugin.deadlines.schedule(nextAt, () => wake(ref), { signal: entry.signal });
   };
   const attach = (_data: object, object: ObjectReader, lifetime: Lifetime) => {
     const nextAt = object.ref.kind === Timer.kind
       ? requireState(object.get(TimerState)).nextAt : requireState(object.get(AlarmState)).nextAt;
+    pending.set(object.ref.id, { signal: lifetime.signal });
     update(object.ref, nextAt);
-    lifetime.signal.addEventListener("abort", () => { resources.delete(object.ref.id); rearm(); }, { once: true });
+    lifetime.signal.addEventListener("abort", () => pending.delete(object.ref.id), { once: true });
   };
-  function wake() {
-    if (clock !== undefined) clearTimeout(clock);
-    clock = undefined;
-    waitingFor = null;
-    const now = Date.now();
-    const { due } = planWakeup(resources.values(), now);
-    for (const { ref } of due) {
-      // A failed occurrence leaves scheduling stopped for this resource; other resources keep their deadlines.
-      resources.set(ref.id, { ref, nextAt: null });
-      try {
-        const snapshot = plugin.session(ref.sessionId).snapshot();
-        const source = snapshot.resources.all().find(resource => resource.ref.id === ref.id);
-        if (!source) continue;
-        if (ref.kind === Timer.kind) {
-          const object = plugin.object(ref.sessionId, Timer, ref.id);
-          const state = requireState(object.get(TimerState)), next = expireTimer(state, now);
-          if (!next) { resources.set(ref.id, { ref, nextAt: state.nextAt }); continue; }
-          object.commit(writer => { writer.set(TimerState, next); });
-          resources.set(ref.id, { ref, nextAt: next.nextAt });
-          deliver(plugin, source, snapshot.resources.linkedTo(ref), state.message);
-        } else {
-          const object = plugin.object(ref.sessionId, Alarm, ref.id);
-          const state = requireState(object.get(AlarmState)), next = expireAlarm(state, now);
-          if (!next) { resources.set(ref.id, { ref, nextAt: state.nextAt }); continue; }
-          object.commit(writer => { writer.set(AlarmState, next); });
-          resources.set(ref.id, { ref, nextAt: next.nextAt });
-          deliver(plugin, source, snapshot.resources.linkedTo(ref), state.message);
-        }
-      } catch (error) {
-        plugin.log.error(`Schedule ${ref.id} could not be processed.`, error);
-      }
-    }
-    rearm();
+  /** Persist the next occurrence before delivering this one's message. */
+  function occur<S extends Json, T extends Json & { nextAt: number | null; message: string }>(
+    ref: ResourceRef, resource: ResourceContract<S>, contract: DataContract<T>, expire: (state: T, now: number) => T | null) {
+    const snapshot = plugin.session(ref.sessionId).snapshot();
+    const source = snapshot.resources.all().find(item => item.ref.id === ref.id);
+    if (!source) return;
+    const object = plugin.object(ref.sessionId, resource, ref.id);
+    const state = requireState(object.get(contract)), next = expire(state, Date.now());
+    if (!next) { update(ref, state.nextAt); return; }
+    object.commit(writer => { writer.set(contract, next); });
+    update(ref, next.nextAt);
+    deliver(plugin, source, snapshot.resources.linkedTo(ref), state.message);
   }
-  plugin.ipc.events.subscribe(SystemResumed, { signal: plugin.lifetime.signal }, wake);
-  plugin.ipc.events.subscribe(ResourcePresenceChanged, { signal: plugin.lifetime.signal }, ({ data }) => {
-    let removed = false;
-    for (const id of data.disappeared) removed = resources.delete(id) || removed;
-    if (removed) rearm();
-  });
-  plugin.lifetime.defer(() => { if (clock !== undefined) clearTimeout(clock); resources.clear(); });
+  function wake(ref: ResourceRef) {
+    // A failed occurrence leaves this resource stopped; other resources retain their deadlines.
+    try {
+      if (ref.kind === Timer.kind) occur(ref, Timer, TimerState, expireTimer);
+      else occur(ref, Alarm, AlarmState, expireAlarm);
+    } catch (error) {
+      plugin.log.error(`Schedule ${ref.id} could not be processed.`, error);
+    }
+  }
+  plugin.lifetime.defer(() => pending.clear());
   const saveTimerSettings = (object: ObjectExecutor, settings: TimerSettings) => {
     if (requireState(object.get(TimerState)).nextAt !== null)
       throw new PluginApiError("conflict", "Pause or reset the timer before configuring it.", undefined, messages.timerRunning);

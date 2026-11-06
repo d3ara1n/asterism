@@ -10,9 +10,11 @@ A session is the time and space of ongoing work: its history and workbench. Its 
 
 Each session owns one history tree and an execution cursor. Builtin conversations project that tree's current timeline rather than storing an independent message array. Other paradigms own their conversation representation. A session can exist without an agent.
 
-Archiving ends the session’s object lifetimes before marking it archived. Normal session and resource lookup then treats it as absent. A separate recycle-bin directory exposes archived sessions for restoration. Restoration clears the archive marker and reattaches objects.
+A session can be running, sleeping, or archived. Sleep and archive use the same resource-unavailability boundary with separate lifecycle reasons. Both end resource runtime lifetimes, including subscriptions, Mesh membership, background jobs, and deadline registrations, while retaining saved state, history, configuration, and links. Runtime resource reads and calls reject sleeping and archived sessions; management metadata remains separately available. The plugin session directory's normal list contains only running sessions, with sleeping and archived sessions in separate saved-session directories.
 
-Startup collection deletes sessions older than the retention threshold. It removes their dependent rows and content roots as a whole. The threshold is an implementation constant, and deletion timing depends on startup.
+Automatic sleep starts a fresh inactivity interval at creation or explicit restoration; subsequent user opens renew it. Runtime messages and Agent work do not renew user attention. The currently viewed session is excluded, and overdue sessions wait until settled. A user open resets the inactivity timer before waking and reattaching resources; background access cannot wake them. The session's keep-awake flag prevents automatic sleep only.
+
+Automatic-sleep and recycle-bin retention thresholds are independent application preferences; either can be disabled. Only archival starts recycle-bin retention. Startup collection permanently deletes expired archived sessions with their dependent rows and content roots. Sleeping sessions do not expire. Restoring an archived session clears its unavailability and reattaches resources; external instances initialize from saved state rather than resuming suspended processes.
 
 ## Folders
 
