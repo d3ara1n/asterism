@@ -10,19 +10,19 @@ export const configurationFieldMessages = pluginNamespace("asterism.host").messa
     defaultMessage: "Custom value",
   },
   notSet: {
-    id: "features_plugins_PluginConfigurations_1",
+    id: "configurationFields.notSet",
     defaultMessage: "Not set",
   },
   invalidJson: {
-    id: "features_plugins_PluginConfigurations_2",
+    id: "configurationFields.invalidJson",
     defaultMessage: "Enter a valid JSON value.",
   },
   leaveUnset: {
-    id: "features_plugins_PluginConfigurations_3",
+    id: "configurationFields.leaveUnset",
     defaultMessage: "Leave unset",
   },
   selectValue: {
-    id: "features_plugins_PluginConfigurations_5",
+    id: "configurationFields.selectValue",
     defaultMessage: "Select a value",
   },
 }));

@@ -2,23 +2,23 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const creationMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   workbenchNotReady: {
-    id: "features_creation_coordinator_1",
+    id: "creation.workbenchNotReady",
     defaultMessage: "The workbench is not ready. Try again.",
   },
   adding: {
-    id: "features_creation_coordinator_2",
+    id: "creation.adding",
     defaultMessage: "Adding {running_label}…",
   },
   text: {
-    id: "features_creation_coordinator_3",
+    id: "creation.input.text",
     defaultMessage: "Text",
   },
   addAs: {
-    id: "features_creation_coordinator_4",
+    id: "creation.typeChoice.title",
     defaultMessage: "Add as…",
   },
   rememberType: {
-    id: "features_creation_coordinator_5",
+    id: "creation.typeChoice.remember",
     defaultMessage: "Remember for this type",
   },
 }));

@@ -2,111 +2,111 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const rolesMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   title: {
-    id: "rolesTitle",
+    id: "roles.title",
     defaultMessage: "Roles",
   },
   overviewSummary: {
-    id: "features_settings_SettingsPage_5",
+    id: "settings.roles.summary",
     defaultMessage: "Reusable model roles",
   },
   model: {
-    id: "features_configuration_RolesSettings_7",
+    id: "roles.model",
     defaultMessage: "Model",
   },
   noModel: {
-    id: "features_configuration_RolesSettings_8",
+    id: "roles.model.unset",
     defaultMessage: "Not set",
   },
   unavailableModel: {
-    id: "features_configuration_RolesSettings_9",
+    id: "roles.model.unavailable",
     defaultMessage: "Unavailable model",
   },
   disabledSuffix: {
-    id: "features_configuration_RolesSettings_10",
+    id: "roles.model.disabledSuffix",
     defaultMessage: " (disabled)",
   },
   thinkingLevel: {
-    id: "features_configuration_RolesSettings_11",
+    id: "roles.thinkingLevel",
     defaultMessage: "Thinking level",
   },
   modelRole: {
-    id: "features_configuration_RolesSettings_13",
+    id: "roles.editorTitle",
     defaultMessage: "Model role",
   },
   modelRoles: {
-    id: "features_configuration_RolesSettings_14",
+    id: "roles.listTitle",
     defaultMessage: "Model roles",
   },
   summary: {
-    id: "features_configuration_RolesSettings_15",
+    id: "roles.summary",
     defaultMessage: "Default models and thinking levels for agents and features. Thinking uses the provider default when no level is set.",
   },
   addRole: {
-    id: "features_configuration_RolesSettings_16",
+    id: "roles.add",
     defaultMessage: "Add role",
   },
   internal: {
-    id: "features_configuration_RolesSettings_17",
+    id: "roles.internal",
     defaultMessage: "Internal",
   },
   enableRole: {
-    id: "features_configuration_RolesSettings_18",
+    id: "roles.enable",
     defaultMessage: "Enable {role_name}",
   },
   newRole: {
-    id: "features_configuration_RolesSettings_19",
+    id: "roles.newRole",
     defaultMessage: "New role",
   },
   builtinRole: {
-    id: "features_configuration_RolesSettings_20",
+    id: "roles.builtinRole",
     defaultMessage: "Built-in role",
   },
   deleteTitle: {
-    id: "features_configuration_RolesSettings_21",
+    id: "roles.delete.title",
     defaultMessage: "Delete this role?",
   },
   deleteDescription: {
-    id: "features_configuration_RolesSettings_22",
+    id: "roles.delete.description",
     defaultMessage: "“{current_name}” will be removed. Agents that reference it will fail until they choose another role.",
   },
   id: {
-    id: "features_configuration_RolesSettings_23",
+    id: "roles.id",
     defaultMessage: "ID",
   },
   purpose: {
-    id: "features_configuration_RolesSettings_24",
+    id: "roles.purpose",
     defaultMessage: "Purpose",
   },
   purposeHint: {
-    id: "features_configuration_RolesSettings_25",
+    id: "roles.purposeHint",
     defaultMessage: "Leave blank to use the built-in text.",
   },
   availableToAgents: {
-    id: "features_configuration_RolesSettings_26",
+    id: "roles.availableToAgents",
     defaultMessage: "Available to agents",
   },
   availableToAgentsHint: {
-    id: "features_configuration_RolesSettings_27",
+    id: "roles.availableToAgentsHint",
     defaultMessage: "Agents may pick this role on their own. Internal features can use it either way.",
   },
   usedBy: {
-    id: "features_configuration_RolesSettings_28",
+    id: "roles.usedBy",
     defaultMessage: "Used by",
   },
   agentsUsingRole: {
-    id: "features_configuration_RolesSettings_29",
+    id: "roles.agentsUsingRole",
     defaultMessage: "Agents using this role",
   },
   fallback: {
-    id: "features_configuration_RolesSettings_30",
+    id: "roles.fallback",
     defaultMessage: "Fallback",
   },
   noAgentsUsingRole: {
-    id: "features_configuration_RolesSettings_31",
+    id: "roles.noAgentsUsingRole",
     defaultMessage: "No agents reference this role.",
   },
   chooseModelHint: {
-    id: "features_configuration_RolesSettings_32",
+    id: "roles.chooseModelHint",
     defaultMessage: "Choose the model and thinking level in the list after saving.",
   },
 }));

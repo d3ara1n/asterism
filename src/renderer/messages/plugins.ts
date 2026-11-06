@@ -38,43 +38,43 @@ export const pluginsMessages = pluginNamespace("asterism.host").messages("en", d
   prepareStage: { id: "plugins.stage.prepare", defaultMessage: "Interface initialization" },
   moduleStage: { id: "plugins.stage.module", defaultMessage: "Module initialization" },
   loaded: {
-    id: "features_plugins_PluginsSettings_1",
+    id: "plugins.status.loaded",
     defaultMessage: "Loaded",
   },
   disabled: {
-    id: "features_plugins_PluginsSettings_2",
+    id: "plugins.status.disabled",
     defaultMessage: "Disabled",
   },
   invalidPackage: {
-    id: "features_plugins_PluginsSettings_3",
+    id: "plugins.status.invalidPackage",
     defaultMessage: "Invalid package",
   },
   failed: {
-    id: "features_plugins_PluginsSettings_4",
+    id: "plugins.status.failed",
     defaultMessage: "Failed",
   },
   restartRequired: {
-    id: "features_plugins_PluginsSettings_5",
+    id: "plugins.restartRequired",
     defaultMessage: "Takes effect after restart",
   },
   restartHint: {
-    id: "features_plugins_PluginsSettings_7",
+    id: "plugins.restartHint",
     defaultMessage: "Restart Asterism to apply plugin changes.",
   },
   enablePlugin: {
-    id: "features_plugins_PluginsSettings_21",
+    id: "plugins.enable",
     defaultMessage: "Enable {plugin_name}",
   },
   remove: {
-    id: "features_plugins_PluginsSettings_12",
+    id: "plugins.remove",
     defaultMessage: "Remove",
   },
   addPackage: {
-    id: "features_plugins_PluginsSettings_13",
+    id: "plugins.addPackage",
     defaultMessage: "Add package…",
   },
   settingsLoadFailed: {
-    id: "features_plugins_PluginsSettings_14",
+    id: "plugins.settingsLoadFailed",
     defaultMessage: "Plugin settings could not be loaded.",
   },
 }));

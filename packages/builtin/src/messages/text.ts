@@ -22,71 +22,71 @@ export const textMessages = pluginNamespace("asterism.builtin").messages("en", d
     defaultMessage: "Could not copy note",
   },
   toolTextCharacters: {
-    id: "toolTextCharacters",
+    id: "tools.text.characters",
     defaultMessage: "{count} chars",
   },
   toolTextEdits: {
-    id: "toolTextEdits",
+    id: "tools.text.edits",
     defaultMessage: "{count, plural, one {# edit} other {# edits}}",
   },
   toolTextMatches: {
-    id: "toolTextMatches",
+    id: "tools.text.matches",
     defaultMessage: "{count, plural, one {# match} other {# matches}}",
   },
   toolTextReplace: {
-    id: "toolTextReplace",
+    id: "tools.text.replace",
     defaultMessage: "Replace text",
   },
   toolTextLiteral: {
-    id: "toolTextLiteral",
+    id: "tools.text.literal",
     defaultMessage: "Literal text",
   },
   toolTextRegex: {
-    id: "toolTextRegex",
+    id: "tools.text.regex",
     defaultMessage: "Regular expression",
   },
   toolTextFind: {
-    id: "toolTextFind",
+    id: "tools.text.find",
     defaultMessage: "Find",
   },
   toolTextReplacement: {
-    id: "toolTextReplacement",
+    id: "tools.text.replacement",
     defaultMessage: "Replace with",
   },
   contentUnavailable: {
-    id: "contentUnavailable",
+    id: "note.contentUnavailable",
     defaultMessage: "Saved content is unavailable.",
   },
   toolTextRead: {
-    id: "toolTextRead",
+    id: "tools.text.read",
     defaultMessage: "Read text",
   },
   toolTextEdit: {
-    id: "toolTextEdit",
+    id: "tools.text.edit",
     defaultMessage: "Edit text",
   },
   toolTextWrite: {
-    id: "toolTextWrite",
+    id: "tools.text.write",
     defaultMessage: "Write text",
   },
   toolTextLines: {
-    id: "toolTextLines",
+    id: "tools.text.lines",
     defaultMessage: "{shown} / {total} lines",
   },
   toolTextMore: {
-    id: "toolTextMore",
+    id: "tools.text.continuation",
     defaultMessage: "More content remains from line {line}.",
   },
   toolTextNoFinalNewline: {
-    id: "toolTextNoFinalNewline",
+    id: "tools.text.noFinalNewline",
     defaultMessage: "No trailing newline.",
   },
   toolTextUnchanged: {
-    id: "toolTextUnchanged",
+    id: "tools.text.unchanged",
     defaultMessage: "Content is unchanged.",
   },
   toolTextPreviewOmitted: {
-    id: "toolTextPreviewOmitted",
+    id: "tools.text.previewOmitted",
     defaultMessage: "{count, plural, one {# additional line is omitted from this preview.} other {# additional lines are omitted from this preview.}}",
   },
 }));

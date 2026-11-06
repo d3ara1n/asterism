@@ -2,15 +2,15 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const homeMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   homePlaceholder: {
-    id: "homePlaceholder",
+    id: "home.taskPlaceholder",
     defaultMessage: "Describe what you have in mind…",
   },
   firstMessage: {
-    id: "firstMessage",
+    id: "home.firstMessage",
     defaultMessage: "Your first message",
   },
   startingConversation: {
-    id: "features_home_HomePage_8",
+    id: "home.startingConversation",
     defaultMessage: "Starting conversation…",
   },
   setupProvider: {

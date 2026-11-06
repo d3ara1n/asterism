@@ -10,11 +10,11 @@ export const workbenchMessages = pluginNamespace("asterism.host").messages("en",
   arranging: { id: "workbench.arranging", defaultMessage: "Arranging…" },
   arrangeFailed: { id: "workbench.arrangeFailed", defaultMessage: "Unable to arrange the cards. Try again." },
   emptyHint: {
-    id: "features_workbench_Workbench_1",
+    id: "workbench.emptyHint",
     defaultMessage: "Use Add, or drop content here.",
   },
   dropHint: {
-    id: "features_workbench_Workbench_2",
+    id: "workbench.dropHint",
     defaultMessage: "Drop to add as resources",
   },
   syncing: {

@@ -1,42 +1,42 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const markdownMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
-  markdownFootnotes: { id: "markdownFootnotes", defaultMessage: "Footnotes" },
-  markdownFootnoteBack: { id: "markdownFootnoteBack", defaultMessage: "Back to reference" },
+  markdownFootnotes: { id: "markdown.footnotes.label", defaultMessage: "Footnotes" },
+  markdownFootnoteBack: { id: "markdown.footnotes.backReference", defaultMessage: "Back to reference" },
   markdownImage: {
-    id: "markdownImage",
+    id: "markdown.image.view",
     defaultMessage: "View image",
   },
   markdownCopied: {
-    id: "markdownCopied",
+    id: "markdown.code.copied",
     defaultMessage: "Copied",
   },
   markdownCopyCode: {
-    id: "markdownCopyCode",
+    id: "markdown.code.copy",
     defaultMessage: "Copy code",
   },
   markdownCopyFailed: {
-    id: "markdownCopyFailed",
+    id: "markdown.code.copyFailed",
     defaultMessage: "Could not copy code",
   },
   markdownPlainText: {
-    id: "markdownPlainText",
+    id: "markdown.code.plainText",
     defaultMessage: "Plain text",
   },
   markdownImageFailed: {
-    id: "markdownImageFailed",
+    id: "markdown.image.loadFailed",
     defaultMessage: "Image could not be loaded. Open source",
   },
   markdownDiagram: {
-    id: "markdownDiagram",
+    id: "markdown.diagram.label",
     defaultMessage: "Mermaid diagram",
   },
   markdownDiagramRendering: {
-    id: "markdownDiagramRendering",
+    id: "markdown.diagram.rendering",
     defaultMessage: "Rendering diagram…",
   },
   markdownDiagramFailed: {
-    id: "markdownDiagramFailed",
+    id: "markdown.diagram.renderFailed",
     defaultMessage: "Could not render this diagram. The source is shown below.",
   },
 }));

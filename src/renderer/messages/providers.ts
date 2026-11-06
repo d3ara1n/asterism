@@ -41,239 +41,239 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   overrideCompatibility: { id: "compatibility.override", defaultMessage: "Override for this model" },
   restoreProviderCompatibility: { id: "compatibility.restoreProvider", defaultMessage: "Restore provider setting for {name}" },
   addCompatibility: {
-    id: "model_compatibility_add",
+    id: "compatibility.add",
     defaultMessage: "Add compatibility setting",
   },
   removeCompatibility: {
-    id: "model_compatibility_remove",
+    id: "compatibility.remove",
     defaultMessage: "Remove {name}",
   },
-  image: { id: "model_modality_image", defaultMessage: "Image" },
+  image: { id: "model.modality.image", defaultMessage: "Image" },
   invalidSettings: {
-    id: "features_configuration_ProvidersSettings_12",
+    id: "provider.test.invalidSettings",
     defaultMessage: "Check the provider and model settings.",
   },
   saveApiKey: {
-    id: "features_configuration_ProvidersSettings_13",
+    id: "provider.test.credentialRequired",
     defaultMessage: "Save an API key for this provider.",
   },
   keyRejected: {
-    id: "features_configuration_ProvidersSettings_14",
+    id: "provider.test.keyRejected",
     defaultMessage: "The key was rejected. Replace it in the provider connection.",
   },
   modelUnavailable: {
-    id: "features_configuration_ProvidersSettings_15",
+    id: "provider.test.modelUnavailable",
     defaultMessage: "Check the server model ID, or whether your account can access it.",
   },
   rateLimited: {
-    id: "features_configuration_ProvidersSettings_16",
+    id: "provider.test.rateLimited",
     defaultMessage: "Rate limited or out of quota. Try again later.",
   },
   networkUnavailable: {
-    id: "features_configuration_ProvidersSettings_17",
+    id: "provider.test.networkUnavailable",
     defaultMessage: "Can''t reach the server. Check the Base URL and your network or proxy.",
   },
   timeout: {
-    id: "features_configuration_ProvidersSettings_18",
+    id: "provider.test.timeout",
     defaultMessage: "The server took too long. Try again.",
   },
   unexpectedResponse: {
-    id: "features_configuration_ProvidersSettings_19",
+    id: "provider.test.unexpectedResponse",
     defaultMessage: "Unexpected response. Check that the protocol matches the service.",
   },
   serverError: {
-    id: "features_configuration_ProvidersSettings_20",
+    id: "provider.test.serverError",
     defaultMessage: "The provider returned a server error. Try again later.",
   },
   testCancelled: {
-    id: "features_configuration_ProvidersSettings_21",
+    id: "provider.test.cancelled",
     defaultMessage: "Test cancelled.",
   },
   provider: {
-    id: "features_configuration_ProvidersSettings_22",
+    id: "provider.label",
     defaultMessage: "Model provider",
   },
   connections: {
-    id: "features_configuration_ProvidersSettings_23",
+    id: "provider.connections.title",
     defaultMessage: "Model providers",
   },
   summary: {
-    id: "features_configuration_ProvidersSettings_24",
+    id: "provider.connections.summary",
     defaultMessage: "Connections, credentials, and the models they provide.",
   },
   addProvider: {
-    id: "features_configuration_ProvidersSettings_25",
+    id: "provider.add.action",
     defaultMessage: "Add model provider",
   },
   emptyConnections: {
-    id: "features_configuration_ProvidersSettings_26",
+    id: "provider.connections.empty",
     defaultMessage: "Add a connection to start using models.",
   },
   addFirstProvider: {
-    id: "features_configuration_ProvidersSettings_27",
+    id: "provider.add.emptyAction",
     defaultMessage: "Add model provider",
   },
   modelCount: {
-    id: "features_configuration_ProvidersSettings_28",
+    id: "provider.modelCount",
     defaultMessage: "{count} models",
   },
   enableProvider: {
-    id: "features_configuration_ProvidersSettings_29",
+    id: "provider.enable",
     defaultMessage: "Enable {provider_name}",
   },
   presetHint: {
-    id: "features_configuration_ProvidersSettings_33",
+    id: "provider.add.presetHint",
     defaultMessage: "Choose a provider and add your credentials. Use a custom connection for a different endpoint or connection settings.",
   },
   payAsYouGo: { id: "providerPreset.payAsYouGo", defaultMessage: "Pay as you go" },
   subscription: { id: "providerPreset.subscription", defaultMessage: "Subscription" },
   noBilling: { id: "providerPreset.noBilling", defaultMessage: "No billing" },
   searchProviders: {
-    id: "features_configuration_ProvidersSettings_34",
+    id: "provider.add.search",
     defaultMessage: "Search model providers",
   },
   searchProvidersLabel: {
-    id: "features_configuration_ProvidersSettings_35",
+    id: "provider.add.searchLabel",
     defaultMessage: "Search model providers",
   },
   noMatchingProvider: {
-    id: "features_configuration_ProvidersSettings_37",
+    id: "provider.add.noMatch",
     defaultMessage: "No matching provider.",
   },
   customConnection: {
-    id: "features_configuration_ProvidersSettings_38",
+    id: "provider.add.customConnection",
     defaultMessage: "Custom connection",
   },
   customConnectionHint: {
-    id: "features_configuration_ProvidersSettings_39",
+    id: "provider.add.customConnectionHint",
     defaultMessage: "Any compatible endpoint, relay, or local server",
   },
   confirmAddProvider: {
-    id: "features_configuration_ProvidersSettings_40",
+    id: "provider.add.title",
     defaultMessage: "Add model provider",
   },
   model: {
-    id: "features_configuration_ProvidersSettings_41",
+    id: "provider.model.label",
     defaultMessage: "Model",
   },
   newProvider: {
-    id: "features_configuration_ProvidersSettings_42",
+    id: "provider.add.new",
     defaultMessage: "New model provider",
   },
   deleteProviderTitle: {
-    id: "features_configuration_ProvidersSettings_44",
+    id: "provider.delete.title",
     defaultMessage: "Delete this provider?",
   },
   deleteProviderDescription: {
-    id: "features_configuration_ProvidersSettings_45",
+    id: "provider.delete.description",
     defaultMessage: "“{current_name}” and its {models_length} models will be removed, including the saved key.",
   },
   connection: {
-    id: "features_configuration_ProvidersSettings_47",
+    id: "provider.connection.title",
     defaultMessage: "Connection",
   },
   displayName: {
-    id: "features_configuration_ProvidersSettings_48",
+    id: "provider.name",
     defaultMessage: "Display name",
   },
   providerId: {
-    id: "features_configuration_ProvidersSettings_49",
+    id: "provider.id.label",
     defaultMessage: "Provider ID",
   },
   providerIdHint: {
-    id: "features_configuration_ProvidersSettings_50",
+    id: "provider.id.hint",
     defaultMessage: "Slug that identifies this provider; no ''/'' or spaces. Generated from the name; it does not need to match anything upstream.",
   },
   protocol: {
-    id: "features_configuration_ProvidersSettings_51",
+    id: "provider.protocol",
     defaultMessage: "Protocol",
   },
   httpsRequired: {
-    id: "features_configuration_ProvidersSettings_52",
+    id: "provider.httpsRequired",
     defaultMessage: "API keys require HTTPS, except on localhost or a loopback address.",
   },
   authentication: {
-    id: "features_configuration_ProvidersSettings_53",
+    id: "provider.authentication.label",
     defaultMessage: "Authentication",
   },
   noAuthenticationOption: {
-    id: "features_configuration_ProvidersSettings_54",
+    id: "provider.authentication.none",
     defaultMessage: "None",
   },
   getKey: {
-    id: "features_configuration_ProvidersSettings_55",
+    id: "provider.credential.getKey",
     defaultMessage: "Get a key",
   },
   credentialCommandHint: {
-    id: "features_configuration_ProvidersSettings_59",
+    id: "provider.credential.commandHint",
     defaultMessage: "Enter a value or a command such as !rbw get openai-api-key.",
   },
   models: {
-    id: "features_configuration_ProvidersSettings_63",
+    id: "provider.models.title",
     defaultMessage: "Models",
   },
   addModel: {
-    id: "features_configuration_ProvidersSettings_64",
+    id: "provider.models.add",
     defaultMessage: "Add model",
   },
   emptyModels: {
-    id: "features_configuration_ProvidersSettings_65",
+    id: "provider.models.empty",
     defaultMessage: "Add the first model to use this provider.",
   },
   testing: {
-    id: "features_configuration_ProvidersSettings_66",
+    id: "provider.test.running",
     defaultMessage: "Testing…",
   },
   testConnected: {
-    id: "features_configuration_ProvidersSettings_68",
+    id: "provider.test.connected",
     defaultMessage: "Connected",
   },
   cancelTestRequest: {
-    id: "features_configuration_ProvidersSettings_69",
+    id: "model.test.quickCancel",
     defaultMessage: "Cancel",
   },
   test: {
-    id: "features_configuration_ProvidersSettings_70",
+    id: "model.test.quickAction",
     defaultMessage: "Test",
   },
   enableModel: {
-    id: "features_configuration_ProvidersSettings_71",
+    id: "model.enable",
     defaultMessage: "Enable {model_name}",
   },
   newModel: {
-    id: "features_configuration_ProvidersSettings_72",
+    id: "model.add.new",
     defaultMessage: "New model",
   },
   deleteModelTitle: {
-    id: "features_configuration_ProvidersSettings_73",
+    id: "model.delete.title",
     defaultMessage: "Delete this model?",
   },
   deleteModelWithRolesDescription: {
-    id: "features_configuration_ProvidersSettings_74",
+    id: "model.delete.withRolesDescription",
     defaultMessage: "“{current_name}” will be removed. These roles will be unavailable until you choose another model: {roles}.",
   },
   deleteUnusedModelDescription: {
-    id: "features_configuration_ProvidersSettings_75",
+    id: "model.delete.unusedDescription",
     defaultMessage: "“{current_name}” will be removed. No roles use it.",
   },
   modelDisplayName: {
-    id: "features_configuration_ProvidersSettings_76",
+    id: "model.name",
     defaultMessage: "Display name",
   },
   serverModelId: {
-    id: "features_configuration_ProvidersSettings_77",
+    id: "model.serverId.label",
     defaultMessage: "Server model ID",
   },
   serverModelIdHint: {
-    id: "features_configuration_ProvidersSettings_78",
+    id: "model.serverId.hint",
     defaultMessage: "Must match the model name used by the provider''s API; may contain ''/'', no spaces. Generated from the name.",
   },
   capabilities: {
-    id: "features_configuration_ProvidersSettings_79",
+    id: "model.capabilities",
     defaultMessage: "Capabilities",
   },
   reasoning: {
-    id: "features_configuration_ProvidersSettings_80",
+    id: "model.reasoning",
     defaultMessage: "Reasoning",
   },
   availableThinkingLevels: {
@@ -289,55 +289,55 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     defaultMessage: "No levels selected for the menus. Existing selections still apply; requests without a level use the provider default.",
   },
   toolCalls: {
-    id: "features_configuration_ProvidersSettings_81",
+    id: "model.toolCalls",
     defaultMessage: "Tool calls",
   },
   usedBy: {
-    id: "features_configuration_ProvidersSettings_83",
+    id: "model.usedBy",
     defaultMessage: "Used by",
   },
   rolesUsingModel: {
-    id: "features_configuration_ProvidersSettings_84",
+    id: "model.roles.title",
     defaultMessage: "Roles using this model",
   },
   noRolesUsingModel: {
-    id: "features_configuration_ProvidersSettings_85",
+    id: "model.roles.empty",
     defaultMessage: "No roles use this model.",
   },
   parameters: {
-    id: "features_configuration_ProvidersSettings_95",
+    id: "model.parameters",
     defaultMessage: "Parameters",
   },
   contextWindow: {
-    id: "features_configuration_ProvidersSettings_87",
+    id: "model.contextWindow",
     defaultMessage: "Context window",
   },
   temperature: {
-    id: "features_configuration_ProvidersSettings_88",
+    id: "model.temperature",
     defaultMessage: "Temperature",
   },
   maximumOutputTokens: {
-    id: "features_configuration_ProvidersSettings_89",
+    id: "model.maximumOutputTokens",
     defaultMessage: "Maximum output tokens",
   },
   connectionTest: {
-    id: "features_configuration_ProvidersSettings_90",
+    id: "model.test.title",
     defaultMessage: "Connection test",
   },
   cancelTest: {
-    id: "features_configuration_ProvidersSettings_91",
+    id: "model.test.cancel",
     defaultMessage: "Cancel test",
   },
   testConnection: {
-    id: "features_configuration_ProvidersSettings_92",
+    id: "model.test.action",
     defaultMessage: "Test connection",
   },
   testHint: {
-    id: "features_configuration_ProvidersSettings_93",
+    id: "model.test.hint",
     defaultMessage: "Sends a short request with the saved settings. Provider charges may apply.",
   },
   saveBeforeTest: {
-    id: "features_configuration_ProvidersSettings_94",
+    id: "model.test.saveFirst",
     defaultMessage: "Save first to test your changes.",
   },
 }));

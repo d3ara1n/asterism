@@ -2,55 +2,55 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const commonMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   newConversation: {
-    id: "newConversation",
+    id: "conversation.new",
     defaultMessage: "New conversation",
   },
   model: {
-    id: "model",
+    id: "common.model",
     defaultMessage: "Model",
   },
   sendMessage: {
-    id: "sendMessage",
+    id: "conversation.sendMessage",
     defaultMessage: "Send message",
   },
   retry: {
-    id: "retry",
+    id: "common.retry",
     defaultMessage: "Try again",
   },
   statusUnavailable: {
-    id: "statusUnavailable",
+    id: "connection.unavailable",
     defaultMessage: "Connection unavailable",
   },
   unavailableTitle: {
-    id: "unavailableTitle",
+    id: "conversation.unavailable.title",
     defaultMessage: "This conversation could not be opened",
   },
   unavailableBody: {
-    id: "unavailableBody",
+    id: "conversation.unavailable.body",
     defaultMessage: "Try again or choose another conversation from the sidebar.",
   },
   kindAgent: {
-    id: "kindAgent",
+    id: "resources.kind.agent",
     defaultMessage: "Agent",
   },
   kindNote: {
-    id: "kindNote",
+    id: "resources.kind.note",
     defaultMessage: "Note",
   },
   name: {
-    id: "name",
+    id: "common.name",
     defaultMessage: "Name",
   },
   nameRequired: {
-    id: "nameRequired",
+    id: "common.nameRequired",
     defaultMessage: "Enter a name.",
   },
   content: {
-    id: "content",
+    id: "common.content",
     defaultMessage: "Content",
   },
   agent: {
-    id: "agent",
+    id: "common.agent",
     defaultMessage: "Agent",
   },
 }));

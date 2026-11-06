@@ -2,103 +2,103 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const formsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   default: {
-    id: "features_configuration_forms_1",
+    id: "forms.values.default",
     defaultMessage: "Default",
   },
   useBuiltin: {
-    id: "features_configuration_forms_2",
+    id: "forms.values.useBuiltin",
     defaultMessage: "Use built-in",
   },
   unavailable: {
-    id: "features_configuration_forms_3",
+    id: "forms.values.unavailable",
     defaultMessage: "Unavailable",
   },
   builtin: {
-    id: "features_configuration_forms_4",
+    id: "forms.values.builtin",
     defaultMessage: "Built-in",
   },
   modified: {
-    id: "features_configuration_forms_5",
+    id: "forms.state.modified",
     defaultMessage: "Modified",
   },
   restore: {
-    id: "features_configuration_forms_6",
+    id: "forms.values.restore",
     defaultMessage: "Restore",
   },
   customList: {
-    id: "features_configuration_forms_8",
+    id: "forms.list.custom",
     defaultMessage: "Custom list",
   },
   items: {
-    id: "features_configuration_forms_9",
+    id: "forms.list.itemsLabel",
     defaultMessage: "Items (one per line)",
   },
   restoreAll: {
-    id: "features_configuration_forms_10",
+    id: "forms.restoreAll.label",
     defaultMessage: "Restore all built-in values",
   },
   restoreAllLabel: {
-    id: "features_configuration_forms_11",
+    id: "forms.restoreAll.tooltip",
     defaultMessage: "Restore all built-in values",
   },
   deleteLabel: {
-    id: "features_configuration_forms_12",
+    id: "forms.delete.label",
     defaultMessage: "Delete",
   },
   deleteButton: {
-    id: "features_configuration_forms_13",
+    id: "forms.delete.tooltip",
     defaultMessage: "Delete",
   },
   saving: {
-    id: "features_configuration_forms_14",
+    id: "forms.state.saving",
     defaultMessage: "Saving…",
   },
   save: {
-    id: "features_configuration_forms_15",
+    id: "forms.actions.save",
     defaultMessage: "Save",
   },
   cancel: {
-    id: "features_configuration_forms_16",
+    id: "forms.actions.cancel",
     defaultMessage: "Cancel",
   },
   delete: {
-    id: "features_configuration_forms_17",
+    id: "forms.delete.action",
     defaultMessage: "Delete",
   },
   discardTitle: {
-    id: "features_configuration_forms_18",
+    id: "forms.discard.title",
     defaultMessage: "Discard unsaved changes?",
   },
   discardDescription: {
-    id: "features_configuration_forms_19",
+    id: "forms.discard.description",
     defaultMessage: "Changes in “{title}” have not been saved.",
   },
   keepEditing: {
-    id: "features_configuration_forms_20",
+    id: "forms.discard.keepEditing",
     defaultMessage: "Keep editing",
   },
   discard: {
-    id: "features_configuration_forms_21",
+    id: "forms.discard.confirm",
     defaultMessage: "Discard",
   },
   confirmDelete: {
-    id: "features_configuration_forms_22",
+    id: "forms.delete.confirm",
     defaultMessage: "Delete",
   },
   builtinRole: {
-    id: "features_configuration_forms_23",
+    id: "forms.roles.builtin",
     defaultMessage: "Built-in role",
   },
   restoreBuiltin: {
-    id: "features_configuration_forms_24",
+    id: "forms.values.restoreBuiltin",
     defaultMessage: "Restore built-in values",
   },
   reload: {
-    id: "features_configuration_forms_25",
+    id: "forms.actions.reload",
     defaultMessage: "Reload",
   },
   loading: {
-    id: "features_configuration_forms_26",
+    id: "forms.state.loading",
     defaultMessage: "Loading configuration…",
   },
 }));

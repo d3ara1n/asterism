@@ -24,11 +24,11 @@ export const configurationMessages = pluginNamespace("asterism.builtin").message
   unavailable: { id: "agent.configuration.unavailable", defaultMessage: "Unavailable" },
   selected: { id: "agent.configuration.selected", defaultMessage: "Selected" },
   unavailableAgent: {
-    id: "agent_conversation_ConfigurationPicker_1",
+    id: "agent.configuration.unavailableAgent",
     defaultMessage: "Unavailable agent",
   },
   nextRequestHint: {
-    id: "agent_conversation_ConfigurationPicker_8",
+    id: "agent.configuration.nextRequestHint",
     defaultMessage: "Changes apply to the next request",
   },
 }));

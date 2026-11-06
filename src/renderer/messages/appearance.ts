@@ -4,215 +4,215 @@ export const appearanceMessages = pluginNamespace("asterism.host").messages("en"
   loadFailed: { id: "appearance.loadFailed", defaultMessage: "Appearance settings could not be loaded." },
   saveFailed: { id: "appearance.saveFailed", defaultMessage: "Appearance settings could not be saved." },
   jade: {
-    id: "features_appearance_AppearanceSettings_1",
+    id: "appearance.accent.jade",
     defaultMessage: "Jade",
   },
   teal: {
-    id: "features_appearance_AppearanceSettings_2",
+    id: "appearance.accent.teal",
     defaultMessage: "Teal",
   },
   blue: {
-    id: "features_appearance_AppearanceSettings_3",
+    id: "appearance.accent.blue",
     defaultMessage: "Blue",
   },
   indigo: {
-    id: "features_appearance_AppearanceSettings_4",
+    id: "appearance.accent.indigo",
     defaultMessage: "Indigo",
   },
   violet: {
-    id: "features_appearance_AppearanceSettings_5",
+    id: "appearance.accent.violet",
     defaultMessage: "Violet",
   },
   crimson: {
-    id: "features_appearance_AppearanceSettings_6",
+    id: "appearance.accent.crimson",
     defaultMessage: "Crimson",
   },
   orange: {
-    id: "features_appearance_AppearanceSettings_7",
+    id: "appearance.accent.orange",
     defaultMessage: "Orange",
   },
   amber: {
-    id: "features_appearance_AppearanceSettings_8",
+    id: "appearance.accent.amber",
     defaultMessage: "Amber",
   },
   cyan: {
-    id: "accentCyan",
+    id: "appearance.accent.cyan",
     defaultMessage: "Cyan",
   },
   grass: {
-    id: "accentGrass",
+    id: "appearance.accent.grass",
     defaultMessage: "Grass",
   },
   tomato: {
-    id: "accentTomato",
+    id: "appearance.accent.tomato",
     defaultMessage: "Tomato",
   },
   plum: {
-    id: "accentPlum",
+    id: "appearance.accent.plum",
     defaultMessage: "Plum",
   },
   graphite: {
-    id: "accentGraphite",
+    id: "appearance.accent.graphite",
     defaultMessage: "Graphite",
   },
   neutral: {
-    id: "features_appearance_AppearanceSettings_9",
+    id: "appearance.gray.neutral",
     defaultMessage: "Neutral",
   },
   sage: {
-    id: "features_appearance_AppearanceSettings_10",
+    id: "appearance.gray.sage",
     defaultMessage: "Sage",
   },
   slate: {
-    id: "features_appearance_AppearanceSettings_11",
+    id: "appearance.gray.slate",
     defaultMessage: "Slate",
   },
   sand: {
-    id: "features_appearance_AppearanceSettings_12",
+    id: "appearance.gray.sand",
     defaultMessage: "Sand",
   },
   mauve: {
-    id: "features_appearance_AppearanceSettings_13",
+    id: "appearance.gray.mauve",
     defaultMessage: "Mauve",
   },
   olive: {
-    id: "grayOlive",
+    id: "appearance.gray.olive",
     defaultMessage: "Olive",
   },
   systemDefault: {
-    id: "features_appearance_AppearanceSettings_14",
+    id: "appearance.fonts.systemDefault",
     defaultMessage: "System default",
   },
   searchFonts: {
-    id: "features_appearance_AppearanceSettings_15",
+    id: "appearance.fonts.search",
     defaultMessage: "Search fonts",
   },
   noMatchingFonts: {
-    id: "features_appearance_AppearanceSettings_16",
+    id: "appearance.fonts.noMatch",
     defaultMessage: "No matching fonts.",
   },
   fontsUnavailable: {
-    id: "features_appearance_AppearanceSettings_17",
+    id: "appearance.fonts.unavailable",
     defaultMessage: "Installed fonts are unavailable.",
   },
   color: {
-    id: "features_appearance_AppearanceSettings_18",
+    id: "appearance.color.title",
     defaultMessage: "Color",
   },
   choosePalette: {
-    id: "features_appearance_AppearanceSettings_19",
+    id: "appearance.palette.open",
     defaultMessage: "Choose palette",
   },
   mode: {
-    id: "features_appearance_AppearanceSettings_20",
+    id: "appearance.mode.label",
     defaultMessage: "Mode",
   },
   modeHint: {
-    id: "features_appearance_AppearanceSettings_21",
+    id: "appearance.mode.hint",
     defaultMessage: "Window material follows this choice.",
   },
   modeLabel: {
-    id: "features_appearance_AppearanceSettings_22",
+    id: "appearance.mode.accessibilityLabel",
     defaultMessage: "Mode",
   },
   system: {
-    id: "features_appearance_AppearanceSettings_23",
+    id: "appearance.mode.system",
     defaultMessage: "System",
   },
   light: {
-    id: "features_appearance_AppearanceSettings_24",
+    id: "appearance.mode.light",
     defaultMessage: "Light",
   },
   dark: {
-    id: "features_appearance_AppearanceSettings_25",
+    id: "appearance.mode.dark",
     defaultMessage: "Dark",
   },
   accentColor: {
-    id: "features_appearance_AppearanceSettings_26",
+    id: "appearance.accent.label",
     defaultMessage: "Accent color",
   },
   accentColorLabel: {
-    id: "features_appearance_AppearanceSettings_27",
+    id: "appearance.accent.accessibilityLabel",
     defaultMessage: "Accent color",
   },
   gray: {
-    id: "features_appearance_AppearanceSettings_28",
+    id: "appearance.gray.label",
     defaultMessage: "Gray",
   },
   grayLabel: {
-    id: "features_appearance_AppearanceSettings_29",
+    id: "appearance.gray.accessibilityLabel",
     defaultMessage: "Gray",
   },
   shape: {
-    id: "features_appearance_AppearanceSettings_30",
+    id: "appearance.shape.title",
     defaultMessage: "Shape",
   },
   cornerRadius: {
-    id: "features_appearance_AppearanceSettings_31",
+    id: "appearance.cornerRadius.label",
     defaultMessage: "Corner radius",
   },
   cornerRadiusLabel: {
-    id: "features_appearance_AppearanceSettings_32",
+    id: "appearance.cornerRadius.accessibilityLabel",
     defaultMessage: "Corner radius",
   },
   square: {
-    id: "features_appearance_AppearanceSettings_33",
+    id: "appearance.cornerRadius.square",
     defaultMessage: "Square",
   },
   small: {
-    id: "features_appearance_AppearanceSettings_34",
+    id: "appearance.cornerRadius.small",
     defaultMessage: "Small",
   },
   medium: {
-    id: "features_appearance_AppearanceSettings_35",
+    id: "appearance.cornerRadius.medium",
     defaultMessage: "Medium",
   },
   large: {
-    id: "features_appearance_AppearanceSettings_36",
+    id: "appearance.cornerRadius.large",
     defaultMessage: "Large",
   },
   density: {
-    id: "features_appearance_AppearanceSettings_37",
+    id: "appearance.density.label",
     defaultMessage: "Density",
   },
   densityHint: {
-    id: "features_appearance_AppearanceSettings_38",
+    id: "appearance.density.hint",
     defaultMessage: "Scales spacing and text together.",
   },
   densityLabel: {
-    id: "features_appearance_AppearanceSettings_39",
+    id: "appearance.density.accessibilityLabel",
     defaultMessage: "Density",
   },
   compact: {
-    id: "features_appearance_AppearanceSettings_40",
+    id: "appearance.density.compact",
     defaultMessage: "Compact",
   },
   standard: {
-    id: "features_appearance_AppearanceSettings_41",
+    id: "appearance.density.standard",
     defaultMessage: "Standard",
   },
   comfortable: {
-    id: "features_appearance_AppearanceSettings_42",
+    id: "appearance.density.comfortable",
     defaultMessage: "Comfortable",
   },
   fonts: {
-    id: "features_appearance_AppearanceSettings_43",
+    id: "appearance.fonts.title",
     defaultMessage: "Fonts",
   },
   fontsHint: {
-    id: "features_appearance_AppearanceSettings_44",
+    id: "appearance.fonts.hint",
     defaultMessage: "Markdown uses the interface font for text and the code font for code.",
   },
   interfaceFont: {
-    id: "features_appearance_AppearanceSettings_45",
+    id: "appearance.fonts.interface.label",
     defaultMessage: "Interface font",
   },
   interfaceFontLabel: {
-    id: "features_appearance_AppearanceSettings_46",
+    id: "appearance.fonts.interface.accessibilityLabel",
     defaultMessage: "Interface font",
   },
   codeFont: {
-    id: "features_appearance_AppearanceSettings_47",
+    id: "appearance.fonts.code.label",
     defaultMessage: "Code font",
   },
   terminalFont: {
@@ -228,7 +228,7 @@ export const appearanceMessages = pluginNamespace("asterism.host").messages("en"
     defaultMessage: "Reset terminal font size",
   },
   codeFontSize: {
-    id: "features_appearance_AppearanceSettings_48",
+    id: "appearance.fonts.code.size",
     defaultMessage: "Code font size (px)",
   },
   resetCodeFontSize: {
@@ -236,23 +236,23 @@ export const appearanceMessages = pluginNamespace("asterism.host").messages("en"
     defaultMessage: "Reset code font size to automatic",
   },
   auto: {
-    id: "features_appearance_AppearanceSettings_49",
+    id: "appearance.fonts.code.autoSize",
     defaultMessage: "Auto",
   },
   codeFontLabel: {
-    id: "features_appearance_AppearanceSettings_50",
+    id: "appearance.fonts.code.accessibilityLabel",
     defaultMessage: "Code font",
   },
   showAllFonts: {
-    id: "features_appearance_AppearanceSettings_51",
+    id: "appearance.fonts.showAll",
     defaultMessage: "Show all fonts",
   },
   canvas: {
-    id: "features_appearance_AppearanceSettings_52",
+    id: "appearance.canvas.title",
     defaultMessage: "Canvas",
   },
   canvasHint: {
-    id: "features_appearance_AppearanceSettings_53",
+    id: "appearance.canvas.hint",
     defaultMessage: "Background texture and connection style of the workbench.",
   },
   edgeStyle: {
@@ -272,111 +272,111 @@ export const appearanceMessages = pluginNamespace("asterism.host").messages("en"
     defaultMessage: "Rounded",
   },
   canvasTexture: {
-    id: "features_appearance_AppearanceSettings_54",
+    id: "appearance.canvas.texture.label",
     defaultMessage: "Canvas texture",
   },
   dots: {
-    id: "features_appearance_AppearanceSettings_55",
+    id: "appearance.canvas.texture.dots",
     defaultMessage: "Dots",
   },
   grid: {
-    id: "features_appearance_AppearanceSettings_56",
+    id: "appearance.canvas.texture.grid",
     defaultMessage: "Grid",
   },
   crosses: {
-    id: "features_appearance_AppearanceSettings_57",
+    id: "appearance.canvas.texture.crosses",
     defaultMessage: "Crosses",
   },
   none: {
-    id: "features_appearance_AppearanceSettings_58",
+    id: "appearance.canvas.texture.none",
     defaultMessage: "None",
   },
   previewNote: {
-    id: "features_appearance_AppearanceSettings_59",
+    id: "appearance.preview.note",
     defaultMessage: "Note",
   },
   previewChecklist: {
-    id: "features_appearance_AppearanceSettings_60",
+    id: "appearance.preview.checklist",
     defaultMessage: "Launch checklist",
   },
   previewRead: {
-    id: "features_appearance_AppearanceSettings_61",
+    id: "appearance.preview.read",
     defaultMessage: "read",
   },
   previewReviewer: {
-    id: "features_appearance_AppearanceSettings_62",
+    id: "appearance.preview.reviewer",
     defaultMessage: "Reviewer",
   },
   previewReady: {
-    id: "features_appearance_AppearanceSettings_63",
+    id: "appearance.preview.ready",
     defaultMessage: "Ready",
   },
   previewResourceCount: {
-    id: "features_appearance_AppearanceSettings_64",
+    id: "appearance.preview.resourceCount",
     defaultMessage: "1 resource attached",
   },
   previewEdit: {
-    id: "features_appearance_AppearanceSettings_65",
+    id: "appearance.preview.edit",
     defaultMessage: "Edit",
   },
   previewRun: {
-    id: "features_appearance_AppearanceSettings_66",
+    id: "appearance.preview.run",
     defaultMessage: "Run",
   },
   paletteLabel: {
-    id: "features_appearance_AppearanceSettings_67",
+    id: "appearance.palette.title",
     defaultMessage: "Choose palette",
   },
   paletteHint: {
-    id: "features_appearance_AppearanceSettings_68",
+    id: "appearance.palette.hint",
     defaultMessage: "Sets the accent color and gray. You can still adjust each afterwards.",
   },
   paletteDusk: {
-    id: "paletteDusk",
+    id: "appearance.palette.dusk",
     defaultMessage: "Dusk",
   },
   paletteTundra: {
-    id: "paletteTundra",
+    id: "appearance.palette.tundra",
     defaultMessage: "Tundra",
   },
   paletteSky: {
-    id: "paletteSky",
+    id: "appearance.palette.sky",
     defaultMessage: "Clear sky",
   },
   paletteTerracotta: {
-    id: "paletteTerracotta",
+    id: "appearance.palette.terracotta",
     defaultMessage: "Terracotta",
   },
   paletteInk: {
-    id: "paletteInk",
+    id: "appearance.palette.ink",
     defaultMessage: "Indigo ink",
   },
   paletteGraphite: {
-    id: "paletteGraphite",
+    id: "appearance.palette.graphite",
     defaultMessage: "Graphite",
   },
   paletteLagoon: {
-    id: "paletteLagoon",
+    id: "appearance.palette.lagoon",
     defaultMessage: "Lagoon",
   },
   paletteCeladon: {
-    id: "paletteCeladon",
+    id: "appearance.palette.celadon",
     defaultMessage: "Celadon",
   },
   paletteMeadow: {
-    id: "paletteMeadow",
+    id: "appearance.palette.meadow",
     defaultMessage: "Meadow",
   },
   paletteHoney: {
-    id: "paletteHoney",
+    id: "appearance.palette.honey",
     defaultMessage: "Honey",
   },
   paletteCoral: {
-    id: "paletteCoral",
+    id: "appearance.palette.coral",
     defaultMessage: "Coral",
   },
   paletteRose: {
-    id: "paletteRose",
+    id: "appearance.palette.rose",
     defaultMessage: "Rose",
   },
 }));

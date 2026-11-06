@@ -5,70 +5,70 @@ export const appMessages = pluginNamespace("asterism.host").messages("en", defin
   sleeping: { id: "sessions.sleeping", defaultMessage: "Sleeping" },
   completed: { id: "sessions.completed", defaultMessage: "Completed" },
   appName: {
-    id: "appName",
+    id: "app.name",
     defaultMessage: "Asterism",
   },
   menu: {
-    id: "menu",
+    id: "app.menu.label",
     defaultMessage: "Asterism menu",
   },
   menuSettings: {
-    id: "menuSettings",
+    id: "app.menu.settings",
     defaultMessage: "Settings",
   },
   workspaceNavigation: {
-    id: "workspaceNavigation",
+    id: "app.navigation.workspace",
     defaultMessage: "Workspace navigation",
   },
   skipToContent: {
-    id: "skipToContent",
+    id: "app.navigation.skipToContent",
     defaultMessage: "Skip to content",
   },
   appNavigation: {
-    id: "appNavigation",
+    id: "app.navigation.application",
     defaultMessage: "Application navigation",
   },
   mainViews: {
-    id: "mainViews",
+    id: "app.navigation.mainViews",
     defaultMessage: "Main views",
   },
   showSidebar: {
-    id: "showSidebar",
+    id: "app.sidebar.show",
     defaultMessage: "Show sidebar",
   },
   hideSidebar: {
-    id: "hideSidebar",
+    id: "app.sidebar.hide",
     defaultMessage: "Hide sidebar",
   },
   sidebarView: { id: "sidebar.view", defaultMessage: "Conversation view" },
   sidebarViewFolders: { id: "sidebar.view.folders", defaultMessage: "Folders" },
   sidebarViewRecent: { id: "sidebar.view.recent", defaultMessage: "Recent" },
   noConversations: {
-    id: "noConversations",
+    id: "app.conversations.empty",
     defaultMessage: "Your conversations will appear here.",
   },
   loadingConversations: {
-    id: "loadingConversations",
+    id: "app.conversations.loading",
     defaultMessage: "Loading conversations…",
   },
   addToWorkbench: {
-    id: "app_App_1",
+    id: "workbench.add.label",
     defaultMessage: "Add to workbench",
   },
   add: {
-    id: "app_App_2",
+    id: "workbench.add.action",
     defaultMessage: "Add",
   },
   agents: {
-    id: "app_App_3",
+    id: "workbench.add.agents",
     defaultMessage: "Agents",
   },
   resources: {
-    id: "app_App_4",
+    id: "workbench.add.resources",
     defaultMessage: "Resources",
   },
   connectionLost: {
-    id: "app_App_5",
+    id: "conversation.connectionLost",
     defaultMessage: "The connection was lost. Retry the same message to recover the submitted conversation.",
   },
   renameConversation: {

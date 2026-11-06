@@ -1,7 +1,7 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const homeMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
-  homePrompt: { id: "homePrompt", defaultMessage: "What would you like to work on?" },
+  homePrompt: { id: "home.workPrompt", defaultMessage: "What would you like to work on?" },
   noEntry: { id: "home.noEntry", defaultMessage: "Enable an Agent paradigm plugin to start new work." },
   chooseEntry: { id: "home.chooseEntry", defaultMessage: "Choose how to start new work." },
   entryUnavailable: { id: "home.entryUnavailable", defaultMessage: "Your selected entry is unavailable. Choose another entry in General settings." },

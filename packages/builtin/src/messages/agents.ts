@@ -2,135 +2,135 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const agentsMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   overviewSummary: {
-    id: "features_settings_SettingsPage_7",
+    id: "settings.agents.summary",
     defaultMessage: "Role prompts, models, and subagent settings",
   },
   agent: {
-    id: "features_configuration_AgentsSettings_1",
+    id: "agents.label",
     defaultMessage: "Agent",
   },
   agents: {
-    id: "features_configuration_AgentsSettings_2",
+    id: "agents.title",
     defaultMessage: "Agents",
   },
   summary: {
-    id: "features_configuration_AgentsSettings_3",
+    id: "agents.summary",
     defaultMessage: "Shared definitions for every agent object. Changes apply from the next request.",
   },
   addAgent: {
-    id: "features_configuration_AgentsSettings_4",
+    id: "agents.add",
     defaultMessage: "Add agent",
   },
   default: {
-    id: "features_configuration_AgentsSettings_5",
+    id: "agents.default",
     defaultMessage: "Default",
   },
   noRole: {
-    id: "features_configuration_AgentsSettings_6",
+    id: "agents.modelRole.unset",
     defaultMessage: "No role",
   },
   unavailableRole: {
-    id: "features_configuration_AgentsSettings_7",
+    id: "agents.modelRole.unavailableStatus",
     defaultMessage: "Unavailable role",
   },
   enableAgent: {
-    id: "features_configuration_AgentsSettings_8",
+    id: "agents.enable",
     defaultMessage: "Enable {agent_name}",
   },
   none: {
-    id: "features_configuration_AgentsSettings_11",
+    id: "agents.modelRole.none",
     defaultMessage: "None",
   },
   unavailableRoleOption: {
-    id: "features_configuration_AgentsSettings_12",
+    id: "agents.modelRole.unavailableOption",
     defaultMessage: "Unavailable role",
   },
   disabledSuffix: {
-    id: "features_configuration_AgentsSettings_13",
+    id: "agents.modelRole.disabledSuffix",
     defaultMessage: " (disabled)",
   },
   internalSuffix: {
-    id: "features_configuration_AgentsSettings_14",
+    id: "agents.modelRole.internalSuffix",
     defaultMessage: " (internal, not available to agents)",
   },
   newAgent: {
-    id: "features_configuration_AgentsSettings_17",
+    id: "agents.new",
     defaultMessage: "New agent",
   },
   builtinAgent: {
-    id: "features_configuration_AgentsSettings_18",
+    id: "agents.builtin",
     defaultMessage: "Built-in agent",
   },
   deleteTitle: {
-    id: "features_configuration_AgentsSettings_19",
+    id: "agents.delete.title",
     defaultMessage: "Delete this agent?",
   },
   deleteBuiltinDescription: {
-    id: "features_configuration_AgentsSettings_20",
+    id: "agents.delete.builtinDescription",
     defaultMessage: "“{current_name}” will be removed and will not come back on its own. Conversations using it fail on their next request.",
   },
   deleteDescription: {
-    id: "features_configuration_AgentsSettings_21",
+    id: "agents.delete.description",
     defaultMessage: "“{current_name}” will be removed. Conversations using it fail on their next request.",
   },
   basics: {
-    id: "features_configuration_AgentsSettings_22",
+    id: "agents.basics",
     defaultMessage: "Basics",
   },
   id: {
-    id: "features_configuration_AgentsSettings_23",
+    id: "agents.id",
     defaultMessage: "ID",
   },
   description: {
-    id: "features_configuration_AgentsSettings_24",
+    id: "agents.description",
     defaultMessage: "Description",
   },
   modelRoles: {
-    id: "features_configuration_AgentsSettings_25",
+    id: "agents.modelRoles",
     defaultMessage: "Model roles",
   },
   defaultModelRole: {
-    id: "features_configuration_AgentsSettings_26",
+    id: "agents.defaultModelRole",
     defaultMessage: "Default model role",
   },
   defaultModelRoleHint: {
-    id: "features_configuration_AgentsSettings_27",
+    id: "agents.defaultModelRoleHint",
     defaultMessage: "When unset, the default role is used. Prefills the model when this agent is chosen; you can still pick another model per conversation.",
   },
   prompts: {
-    id: "features_configuration_AgentsSettings_29",
+    id: "agents.prompts",
     defaultMessage: "Prompts",
   },
   systemPrompt: {
-    id: "features_configuration_AgentsSettings_30",
+    id: "agents.rolePrompt",
     defaultMessage: "Role prompt",
   },
   systemPromptHint: {
-    id: "features_configuration_AgentsSettings_31",
+    id: "agents.rolePromptHint",
     defaultMessage: "Shared by workbench agents and subagents. Leave blank to use the default prompt shown above.",
   },
   taskExamples: {
-    id: "features_configuration_AgentsSettings_33",
+    id: "agents.taskExamples",
     defaultMessage: "Task examples",
   },
   example: {
-    id: "features_configuration_AgentsSettings_34",
+    id: "agents.taskExamples.indexedLabel",
     defaultMessage: "Example {index___1}",
   },
   removeExample: {
-    id: "features_configuration_AgentsSettings_35",
+    id: "agents.taskExamples.remove",
     defaultMessage: "Remove example",
   },
   addExample: {
-    id: "features_configuration_AgentsSettings_36",
+    id: "agents.taskExamples.add",
     defaultMessage: "Add example",
   },
   subagent: {
-    id: "features_configuration_AgentsSettings_56",
+    id: "agents.subagent.title",
     defaultMessage: "Subagent settings",
   },
   subagentHint: {
-    id: "features_configuration_AgentsSettings_57",
+    id: "agents.subagent.summary",
     defaultMessage: "Additional instructions and execution limits for delegated tasks.",
   },
   subagentInstructions: {
@@ -142,11 +142,11 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
     defaultMessage: "Appended to the shared role prompt for subagents. Leave blank to use the default instructions shown above.",
   },
   maximumRequests: {
-    id: "features_configuration_AgentsSettings_59",
+    id: "agents.subagent.maximumRequests",
     defaultMessage: "Maximum requests",
   },
   maximumDuration: {
-    id: "features_configuration_AgentsSettings_61",
+    id: "agents.subagent.maximumDuration",
     defaultMessage: "Maximum duration (seconds)",
   },
   resourceAccess: { id: "agents.resourceAccess", defaultMessage: "Resource access" },

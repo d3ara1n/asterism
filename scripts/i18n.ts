@@ -112,6 +112,8 @@ export function run(mode: string, packageRoot?: string): void {
         const declarations = extractMessages([file], scratch);
         for (const [id, message] of Object.entries(declarations)) {
           if (id.startsWith("__missing_explicit_id__") || !message.defaultMessage?.trim()) throw new Error(`A stable ID and default message are required: ${file}.`);
+          if (!packageRoot && !/^[a-z][A-Za-z0-9]*(?:\.[a-z][A-Za-z0-9]*)+$/u.test(id))
+            throw new Error(`Repository message IDs require dot-separated lowerCamelCase semantic segments: ${group.owner}/${id} (${file}).`);
           parse(message.defaultMessage);
           if (source[id] && JSON.stringify(source[id]) !== JSON.stringify(message)) throw new Error(`Conflicting declaration: ${group.owner}/${id}.`);
           source[id] = message;

@@ -1,89 +1,89 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const settingsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
-  languageLoadFailed: { id: "languageLoadFailed", defaultMessage: "The language preference could not be loaded." },
+  languageLoadFailed: { id: "settings.language.loadFailed", defaultMessage: "The language preference could not be loaded." },
   settings: {
-    id: "settings",
+    id: "settings.title",
     defaultMessage: "Settings",
   },
   allSettings: {
-    id: "allSettings",
+    id: "settings.all",
     defaultMessage: "All settings",
   },
   generalTitle: {
-    id: "generalTitle",
+    id: "settings.general.title",
     defaultMessage: "General",
   },
   generalSummary: {
-    id: "generalSummary",
+    id: "settings.general.summary",
     defaultMessage: "App preferences and management",
   },
   languageTitle: {
-    id: "languageTitle",
+    id: "settings.language.title",
     defaultMessage: "Language",
   },
   languageLabel: {
-    id: "languageLabel",
+    id: "settings.language.label",
     defaultMessage: "Interface language",
   },
   aboutTitle: {
-    id: "aboutTitle",
+    id: "settings.about.title",
     defaultMessage: "About",
   },
   aboutSummary: {
-    id: "aboutSummary",
+    id: "settings.about.summary",
     defaultMessage: "A personal AI workbench",
   },
   aboutIdentity: {
-    id: "aboutIdentity",
+    id: "settings.about.identity.label",
     defaultMessage: "Application ID",
   },
   aboutLogs: {
-    id: "aboutLogs",
+    id: "settings.about.logs.label",
     defaultMessage: "Logs",
   },
   aboutOpenLogs: {
-    id: "aboutOpenLogs",
+    id: "settings.about.logs.open",
     defaultMessage: "Open folder",
   },
   aboutCopyIdentity: {
-    id: "aboutCopyIdentity",
+    id: "settings.about.identity.copy",
     defaultMessage: "Copy application ID",
   },
   aboutIdentityCopied: {
-    id: "aboutIdentityCopied",
+    id: "settings.about.identity.copied",
     defaultMessage: "Application ID copied",
   },
   aboutIdentityCopyFailed: {
-    id: "aboutIdentityCopyFailed",
+    id: "settings.about.identity.copyFailed",
     defaultMessage: "Application ID could not be copied",
   },
   appearance: {
-    id: "features_settings_SettingsPage_1",
+    id: "settings.appearance.title",
     defaultMessage: "Appearance",
   },
   appearanceSummary: {
-    id: "features_settings_SettingsPage_2",
+    id: "settings.appearance.summary",
     defaultMessage: "Colors, density, and canvas",
   },
   providers: {
-    id: "features_settings_SettingsPage_3",
+    id: "settings.providers.title",
     defaultMessage: "Providers",
   },
   providersSummary: {
-    id: "features_settings_SettingsPage_4",
+    id: "settings.providers.summary",
     defaultMessage: "Model and web service connections",
   },
   languageSystem: {
-    id: "languageSystem",
+    id: "settings.language.system",
     defaultMessage: "System",
   },
   languageSummary: {
-    id: "languageSummary",
+    id: "settings.language.summary",
     defaultMessage: "Choose the interface language. Changes apply immediately.",
   },
   languageSaveFailed: {
-    id: "languageSaveFailed",
+    id: "settings.language.saveFailed",
     defaultMessage: "The language preference could not be saved.",
   },
   conversationsTitle: {
