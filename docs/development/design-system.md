@@ -111,6 +111,8 @@ Use Lucide icons. Chart category colors and folder colors are independent of sta
 
 Switches express immediate booleans, checkboxes express form or multi-selection, radios express explained single choices, tabs change content, and searchable choices use the shared command/popover combination.
 
+A two-state menu item is one checkbox item. Its identity icon sits in the shared leading column, a trailing switch-shaped indicator shows the state, and the label names the state rather than an action. Icon and label stay fixed across states, and the row contains no separately interactive control.
+
 List rows keep one hit surface with separate actions. Editors group related fields and operations in shared sections and expose reset where values override their baseline.
 
 ## Branding and implementation ownership

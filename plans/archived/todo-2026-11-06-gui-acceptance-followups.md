@@ -1,14 +1,14 @@
 # Resolve GUI acceptance findings before release
 
 Filed: 2026-11-06
-Status: Areas 1 and 2 implemented and accepted by the user. Area 3 remains deferred.
+Status: Areas 1, 2, and 3 implemented and accepted by the user. All findings have a disposition.
 Investigated source: `35a13161` on `main`.
 
 ## Scope and release status
 
 During manual acceptance of changes after `v1.0.0-prerelease.15`, the user reported three remaining problem areas: application-palette theme selection, Dock layout/animation, and the session menu's Keep awake control. The user reported the other checklist areas as acceptable. This is user feedback, not an automated GUI test result.
 
-The user initially deferred fixes so these areas could be addressed individually, including control replacement if warranted. The original investigation changed no implementation, installed no dependencies, launched no GUI, and performed no commit, push, or release action. The subsequent Area 2 trial and Area 1 replacement are recorded below. Release remains on hold pending disposition and manual acceptance of these findings.
+The user initially deferred fixes so these areas could be addressed individually, including control replacement if warranted. The original investigation changed no implementation, installed no dependencies, launched no GUI, and performed no commit, push, or release action. The subsequent Area 2 trial, Area 1 replacement, and Area 3 local composition are recorded below. Push and release still require explicit user authorization.
 
 Keep this work separate from `todo-2026-11-06-layout-terminology.md`: the present task concerns behavior and presentation, not renaming the layout concepts. No broad redesign, unrelated refactoring, new recovery mechanisms, or additional permission layers are in scope.
 
@@ -134,23 +134,25 @@ Keep awake has an extra icon/indentation compared with neighboring session-menu 
 - `packages/ui/src/ui/dropdown-menu.tsx:84–106` reserves an additional leading indicator column (`pl-8`) and inserts an absolute left-side Check icon for checked items. The supplied Coffee icon then occupies the content area. This explains the extra slot and duplicated leading-icon presentation.
 - The underlying Radix primitive already owns `role="menuitemcheckbox"`, `aria-checked`, and checked-state activation. This is not a lack of checked-state support.
 
-### Deferred work and decisions
+### Decisions and implementation — 2026-11-06
 
-- [ ] Choose the trailing state presentation with the user: a checkbox-style indicator retaining one menuitemcheckbox focus/activation target, or a genuinely independent toggle control in a container designed for nested controls.
-- [ ] Keep Coffee in the same leading icon column as neighboring menu items. Put state at the trailing edge; retain checked semantics and accessible labeling.
-- [ ] Choose the narrow ownership boundary: local session-menu composition versus an approved shared menu-component option. If a vendored registry component changes, update its local-change record in `AGENTS.md`.
-- [ ] Preserve busy/disabled behavior and state persistence. Avoid nesting a second independently interactive checkbox/switch without addressing focus, event handling, and accessibility semantics.
+The user chose a presentation-only trailing indicator on a single menuitemcheckbox row, implemented as local session-menu composition. The user also asked to give the completion action the same two-state form with a fixed identity icon, since the indicator carries the state.
 
-### Manual acceptance
+- [x] `SessionActions.tsx` composes a local two-state item over `DropdownMenuCheckboxItem`: the leading indicator column is removed, the identity icon sits in the same leading column and tone as neighboring rows, and a trailing switch-shaped indicator follows the row's checked state. The indicator is `aria-hidden` and not focusable; the row remains the only focus and activation target.
+- [x] Keep awake uses Coffee as its only leading icon.
+- [x] Completion becomes a two-state item with a fixed `ListChecks` icon and the state label "Completed" (`sessions.completed`), replacing the Check/Undo icon swap and the Mark/Unmark action labels, whose messages were removed.
+- [x] Busy/disabled handling and persistence are unchanged. The indicator's transitions are disabled under reduced motion.
+- [x] The shared vendored `dropdown-menu.tsx` is unchanged, so `AGENTS.md` needs no local-change record. The menu two-state convention is recorded in the design-system engineering document; promotion to `packages/ui` waits for a second real consumer.
 
-- [ ] Coffee is the only leading icon in both states, and label alignment matches neighboring rows.
-- [ ] The trailing control clearly distinguishes enabled/disabled state without being confused with the completion action.
-- [ ] Pointer, Enter/Space, menu navigation, busy/disabled state, and reopening behave consistently; one activation changes the value once.
-- [ ] The checked state is correctly announced by assistive technology and persists after reopening the menu/application.
+Validation passed: `npm run typecheck`, `npm run i18n:check`, and `npm run build`. The build reports the existing chunk-size warning. No GUI was launched by this validation.
+
+### Manual acceptance — 2026-11-06
+
+The user reviewed the result and reported it as accepted. This is user-reported acceptance, not automated GUI verification; the conversation does not establish separate results for keyboard activation, reopening persistence, or assistive-technology announcement. Area 3 is closed.
 
 ## Control-library boundary
 
-The original application palette used React Aria Components Autocomplete/GridList, while builtin's Agent palette used cmdk. The implemented replacement now uses cmdk for both command surfaces, without merging their keyboard scopes or feature ownership. The session menu still uses Radix DropdownMenu; its Keep awake presentation is a separate finding.
+The original application palette used React Aria Components Autocomplete/GridList, while builtin's Agent palette used cmdk. The implemented replacement now uses cmdk for both command surfaces, without merging their keyboard scopes or feature ownership. The session menu still uses Radix DropdownMenu; its two-state rows are local composition over the vendored checkbox item.
 
 The installed cmdk implementation renders arbitrary children, but its listbox/option model does not establish independently focusable nested-control support. The user deliberately removed that requirement: rows contain actions, nested-page entries, and read-only content. This is not a claim that changing libraries fixed the original inline-control composition or established a new native-control capability.
 

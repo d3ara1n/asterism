@@ -1,5 +1,5 @@
-import { Archive, Check, Coffee, Undo2, LayoutTemplate, MoreHorizontal, Pencil } from "lucide-react";
-import { useRef, useState } from "react";
+import { Archive, Coffee, LayoutTemplate, ListChecks, MoreHorizontal, Pencil } from "lucide-react";
+import { useRef, useState, type ReactNode } from "react";
 import type { SessionResult } from "../../shared/session";
 import { RenameSession } from "../features/session/RenameSession";
 import { SaveTemplate } from "../features/templates/SaveTemplate";
@@ -16,6 +16,20 @@ import { MoveToFolderMenu } from "../features/folders/menus";
 import { toast } from "../shared/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
+
+// Two-state rows keep their identity icon in the shared leading column and show state with a trailing switch-shaped indicator.
+// The row remains the single menuitemcheckbox target; the indicator is presentation only.
+function ToggleItem({ icon, label, checked, disabled, onCheckedChange }: {
+  icon: ReactNode; label: string; checked: boolean; disabled: boolean; onCheckedChange: (checked: boolean) => void;
+}) {
+  return <DropdownMenuCheckboxItem checked={checked} disabled={disabled} onCheckedChange={onCheckedChange}
+    className="group/toggle pl-2 [&>span:first-child]:hidden [&_svg:not([class*='text-'])]:text-muted-foreground">
+    {icon}{label}
+    <span aria-hidden className="ml-auto inline-flex h-3.5 w-6 shrink-0 items-center rounded-full p-px transition-colors motion-reduce:transition-none group-data-[state=checked]/toggle:bg-primary group-data-[state=unchecked]/toggle:bg-input dark:group-data-[state=unchecked]/toggle:bg-input/80">
+      <span className="block size-3 rounded-full bg-background transition-transform motion-reduce:transition-none group-data-[state=checked]/toggle:translate-x-2.5 dark:group-data-[state=checked]/toggle:bg-primary-foreground dark:group-data-[state=unchecked]/toggle:bg-foreground" />
+    </span>
+  </DropdownMenuCheckboxItem>;
+}
 
 /** Session row menu: rename, folder membership, save as template, and archive; actions are independent of session navigation. */
 export function SessionActions({ sessionId, title, folderId, disabled, sleeping, renameDisabled, onRename, onArchive, onTemplateSaved, completed, onCompletedChange, keepAwake, onKeepAwakeChange }: {
@@ -43,9 +57,9 @@ export function SessionActions({ sessionId, title, folderId, disabled, sleeping,
     const failure = await run({ type: "session.move", sessionId, folderId: target });
     if (failure) toast.error(i18n.text(failure));
   };
-  const markCompleted = async () => {
+  const markCompleted = async (value: boolean) => {
     setMarking(true);
-    try { await onCompletedChange(!completed); }
+    try { await onCompletedChange(value); }
     finally { setMarking(false); }
   };
   const setAwake = async (value: boolean) => {
@@ -70,13 +84,10 @@ export function SessionActions({ sessionId, title, folderId, disabled, sleeping,
         <DropdownMenuItem disabled={cannotRename} onSelect={() => setRenaming(true)}>
           <Pencil />{i18n.text(appMessages.renameConversation)}…
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={disabled || marking} onSelect={() => { void markCompleted(); }}>
-          {completed ? <Undo2 /> : <Check />}{i18n.text(completed ? appMessages.unmarkCompleted : appMessages.markCompleted)}
-        </DropdownMenuItem>
-        <DropdownMenuCheckboxItem checked={keepAwake} disabled={disabled || togglingAwake}
-          onCheckedChange={value => { void setAwake(value); }}>
-          <Coffee />{i18n.text(appMessages.keepAwake)}
-        </DropdownMenuCheckboxItem>
+        <ToggleItem icon={<ListChecks />} label={i18n.text(appMessages.completed)} checked={completed} disabled={disabled || marking}
+          onCheckedChange={value => { void markCompleted(value); }} />
+        <ToggleItem icon={<Coffee />} label={i18n.text(appMessages.keepAwake)} checked={keepAwake} disabled={disabled || togglingAwake}
+          onCheckedChange={value => { void setAwake(value); }} />
         <MoveToFolderMenu value={folderId} disabled={disabled} onMove={target => { void move(target); }} onCreate={() => setCreatingFolder(true)} />
         <DropdownMenuItem disabled={disabled || sleeping} onSelect={() => setSavingTemplate(true)}>
           <LayoutTemplate />{i18n.text(templateMessages.saveAs)}…

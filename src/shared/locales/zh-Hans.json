@@ -1,6 +1,4 @@
 {
-  "markCompleted": "标记为完成",
-  "unmarkCompleted": "取消完成标记",
   "history_searching": "正在搜索历史…",
   "history_readFailed": "无法加载历史记录。",
   "appearance.loadFailed": "无法加载外观设置。",
@@ -944,6 +942,7 @@
   "conversations.lifecycleDays": "{days} 天",
   "conversations.lifecycleNever": "永不",
   "sessions.keepAwake": "保持唤醒",
+  "sessions.completed": "已完成",
   "sessions.sleeping": "休眠中",
   "commands.title": "命令",
   "commands.search": "搜索命令…",
