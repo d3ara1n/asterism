@@ -262,7 +262,8 @@
     transition: border-color var(--motion-fast) var(--ease-out);
   }
   .island[data-focused] > .island-backdrop { border-color: var(--ring); }
-  .island-body { @apply relative h-full overflow-y-auto; }
+  /* Islands scroll vertically only; horizontal position belongs to the strip and its segment navigation. */
+  .island-body { @apply relative h-full overflow-x-hidden overflow-y-auto; }
   /* Surfaced islands inset content by one border width and clip to inner radii, keeping borders and focus highlights visible without corner leakage. */
   .island[data-surface] > .island-body { position: absolute; inset: 1px; height: auto; border-radius: calc(var(--radius) - 1px); }
   /* Panel islands: fixed titlebar and independently scrolling content; content areas take over body scrolling. */

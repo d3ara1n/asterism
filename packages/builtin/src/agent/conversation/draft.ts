@@ -1,16 +1,26 @@
-import { type UiText, fileMediaType, modelInputLimits } from "@asterism-app/sdk/contracts";
+import { type ContentRef, type UiText, fileMediaType, modelInputLimits } from "@asterism-app/sdk/contracts";
 import type { AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import type { RendererContentInput, ContentReader } from "@asterism-app/sdk/renderer";
 import { mediaMessages } from "../../messages/media.ts";
 
 export const composerTextLimit = 100_000;
 
-interface DraftFile { part: Exclude<AgentInputPart, { kind: "text" }>; size: number }
-interface DraftState { text: string; files: readonly DraftFile[]; uploading: boolean; locked: boolean; error: UiText | null }
+interface CopiedFile { part: Exclude<AgentInputPart, { kind: "text" }>; size: number }
+/** `id` is local to this editor and stable while the file stays attached; it identifies the file to views without depending on list position. */
+interface DraftFile extends CopiedFile { id: number }
+/** A file accepted into the current addition but not yet in the editor's hold; it keeps its `id` when it becomes a `DraftFile`. */
+export interface PendingFile { id: number; name: string; mediaType: string; size: number }
+/** `batch` changes whenever the file list is replaced as a whole (restore, send, close), as opposed to single additions and removals. */
+interface DraftState {
+  text: string; files: readonly DraftFile[]; uploads: readonly PendingFile[]; batch: number;
+  uploading: boolean; locked: boolean; error: UiText | null;
+}
+/** The running addition: cancellation stops later files, and `staging` is the one file currently being handed to the hold. */
+interface Upload { cancelled: boolean; staging: { id: number; controller: AbortController } | null }
 
 /** Hands attachments to the editor's own upload hold before removing the persistent root; failure closes the new hold and preserves the original content. */
 export async function copyDraft(parts: readonly AgentInputPart[], source: ContentReader, content: RendererContentInput) {
-  const copied: AgentInputPart[] = [], files: DraftFile[] = [];
+  const copied: AgentInputPart[] = [], files: CopiedFile[] = [];
   try {
     for (const part of parts) {
       if (part.kind === "text") { copied.push({ ...part }); continue; }
@@ -31,12 +41,18 @@ export type CopiedDraft = Awaited<ReturnType<typeof copyDraft>>;
 
 /** Drafts belong to the interaction module, independently of Composer mounting; content access eligibility travels only with the submission envelope. */
 export function createMessageDraft(createContent: () => RendererContentInput) {
-  let state: DraftState = { text: "", files: [], uploading: false, locked: false, error: null };
+  let state: DraftState = { text: "", files: [], uploads: [], batch: 0, uploading: false, locked: false, error: null };
+  let nextFileId = 0;
+  const attach = (file: CopiedFile): DraftFile => ({ ...file, id: nextFileId++ });
   let content: RendererContentInput | undefined;
-  let upload: AbortController | undefined;
+  let upload: Upload | undefined;
   const listeners = new Set<() => void>();
   const change = (value: Partial<DraftState>) => { state = { ...state, ...value }; for (const listener of listeners) listener(); };
   const input = () => content ??= createContent();
+  const cancelUpload = () => {
+    if (!upload) return;
+    upload.cancelled = true; upload.staging?.controller.abort();
+  };
   return {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
@@ -49,29 +65,50 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
     },
     restore(value: CopiedDraft) {
       void content?.close(); content = value.content;
-      change({ text: value.text, files: value.files, error: null });
+      change({ text: value.text, files: value.files.map(attach), batch: state.batch + 1, error: null });
     },
     async add(files: readonly File[]) {
       if (state.locked || state.uploading || !files.length) return;
-      const controller = new AbortController(); upload = controller;
-      change({ uploading: true, error: null });
+      // Admit the prefix that fits the limits up front, so every accepted file shows its card at once.
+      let count = state.files.filter(file => file.part.kind === "file").length;
+      let total = state.files.reduce((sum, file) => sum + file.size, 0);
+      const accepted: { entry: PendingFile; file: File }[] = [];
+      for (const file of files) {
+        if (count >= modelInputLimits.files || file.size > modelInputLimits.file || total + file.size > modelInputLimits.total) break;
+        count++; total += file.size;
+        // Label MIME accurately; the server decides how files are used.
+        accepted.push({ file, entry: { id: nextFileId++, name: file.name, mediaType: fileMediaType(file), size: file.size } });
+      }
+      const limit = accepted.length < files.length ? mediaMessages.limit : null;
+      if (!accepted.length) { change({ error: limit }); return; }
+      const current: Upload = { cancelled: false, staging: null }; upload = current;
+      change({ uploading: true, uploads: accepted.map(item => item.entry), error: limit });
       try {
-        for (const file of files) {
-          controller.signal.throwIfAborted();
-          // Label MIME accurately; the server decides how files are used.
-          const mediaType = fileMediaType(file);
-          if (state.files.filter(file => file.part.kind === "file").length >= modelInputLimits.files || file.size > modelInputLimits.file
-            || state.files.reduce((total, value) => total + value.size, file.size) > modelInputLimits.total) {
-            change({ error: mediaMessages.limit }); break;
-          }
-          const ref = await input().stage(file, { signal: controller.signal });
-          controller.signal.throwIfAborted();
-          change({ files: [...state.files, { size: file.size, part: { kind: "file", file: ref, mediaType, ...(file.name ? { filename: file.name } : {}) } }] });
+        for (const { entry, file } of accepted) {
+          if (current.cancelled) break;
+          if (!state.uploads.some(item => item.id === entry.id)) continue;
+          const controller = new AbortController(); current.staging = { id: entry.id, controller };
+          let ref: ContentRef;
+          try { ref = await input().stage(file, { signal: controller.signal }); }
+          catch (error) { if (controller.signal.aborted) continue; throw error; }
+          finally { current.staging = null; }
+          // A file removed or cancelled while staging does not enter the editor, even if staging finished anyway.
+          if (controller.signal.aborted) continue;
+          change({
+            files: [...state.files, { id: entry.id, size: entry.size, part: { kind: "file", file: ref, mediaType: entry.mediaType, ...(entry.name ? { filename: entry.name } : {}) } }],
+            uploads: state.uploads.filter(item => item.id !== entry.id),
+          });
         }
-      } catch { if (!controller.signal.aborted) change({ error: mediaMessages.failed }); }
-      finally { if (upload === controller) { upload = undefined; change({ uploading: false }); } }
+      } catch { if (!current.cancelled) change({ error: mediaMessages.failed }); }
+      finally { if (upload === current) { upload = undefined; change({ uploading: false, uploads: [] }); } }
     },
-    cancelUpload: () => upload?.abort(),
+    cancelUpload,
+    /** Withdraws one pending file: a queued file is skipped and the file being staged is aborted; the rest of the addition continues. */
+    removeUpload(id: number) {
+      if (state.locked) return;
+      if (upload?.staging?.id === id) upload.staging.controller.abort();
+      change({ uploads: state.uploads.filter(item => item.id !== id) });
+    },
     remove(index: number) {
       if (state.locked || state.uploading) return;
       change({ files: state.files.filter((_, i) => i !== index), error: null });
@@ -79,12 +116,12 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
     },
     accepted(text = "") {
       void content?.close(); content = undefined;
-      change({ text, files: [], error: null });
+      change({ text, files: [], batch: state.batch + 1, error: null });
     },
     async close() {
-      upload?.abort();
+      cancelUpload();
       await content?.close(); content = undefined;
-      change({ text: "", files: [], error: null });
+      change({ text: "", files: [], uploads: [], batch: state.batch + 1, error: null });
     },
   };
 }

@@ -13,6 +13,7 @@ import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { generating, type TimelineItem } from "./timeline";
 import { viewStateKeys } from "./view-state";
 import { blockShell } from "./block-shell";
+import { IconSwap } from "./IconSwap";
 
 type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
 
@@ -46,9 +47,9 @@ function ThinkingHeader({ streaming, startedAt, endedAt }: {
   const end = endedAt ?? (streaming ? now : null);
   const duration = end === null ? null : thinkingDuration(startedAt, end);
   return <>
-    <span className="inline-flex shrink-0" aria-hidden="true">
+    <IconSwap swapKey={streaming ? "spinner" : "brain"}>
       {streaming ? <Spinner className="size-3.5 motion-reduce:animate-none" /> : <Brain className="size-3.5" />}
-    </span>
+    </IconSwap>
     <span className="min-w-0 flex-1 truncate text-left">{streaming ? i18n.formatMessage(thinkingMessages.thinkingActive) : i18n.formatMessage(thinkingMessages.thinkingTitle)}</span>
     {duration && <span role="timer" aria-live="off" aria-label={i18n.formatMessage(thinkingMessages.thinkingElapsed, { duration: duration })} className="shrink-0 whitespace-nowrap type-caption tabular-nums">{duration}</span>}
   </>;

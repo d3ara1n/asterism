@@ -40,29 +40,19 @@ export function TemplateCards({ templates, ready, onStart, onChanged }: {
   </section>;
 }
 
-/** Kind-signature preview: shows unique resource type icons with per-kind counts. */
+/** Kind-signature preview: one icon per resource type; object counts belong to the details tooltip. */
 function TemplatePreview({ objects }: { objects: readonly TemplateObjectSummary[] }) {
   const registry = useModuleViews();
-  const groups = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const { kind } of objects) map.set(kind, (map.get(kind) ?? 0) + 1);
-    return [...map.entries()].map(([kind, count]) => ({ kind, count }));
-  }, [objects]);
-  const shown = groups.slice(0, KIND_PREVIEW_LIMIT);
-  const overflow = groups.length - shown.length;
+  const kinds = useMemo(() => [...new Set(objects.map(object => object.kind))], [objects]);
+  const shown = kinds.slice(0, KIND_PREVIEW_LIMIT);
+  const overflow = kinds.length - shown.length;
   if (!shown.length) {
     return <span className="flex flex-1 items-center justify-center">
       <LayoutTemplate className="size-8" strokeWidth={1} />
     </span>;
   }
   return <span className="flex flex-1 flex-wrap content-center items-center justify-center gap-x-3 gap-y-2 p-3">
-    {shown.map(({ kind, count }) => {
-      const descriptor = registry.resource(kind);
-      return <span key={kind} className="flex flex-col items-center gap-1">
-        <span className="[&_svg]:size-4">{descriptor.icon}</span>
-        {count > 1 && <span className="text-[10px] leading-none opacity-60">×{count}</span>}
-      </span>;
-    })}
+    {shown.map(kind => <span key={kind} className="[&_svg]:size-4">{registry.resource(kind).icon}</span>)}
     {overflow > 0 && <span className="text-xs opacity-50">+{overflow}</span>}
   </span>;
 }

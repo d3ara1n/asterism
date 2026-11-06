@@ -134,7 +134,8 @@ export function App({ controller }: { controller: ApplicationController }) {
         // Leaving a session clears its islands from view, not from its saved arrangement; a cancelled close resumes persistence.
         const scope = mainStrip.getSnapshot().scope;
         mainStrip.set({ scope: null });
-        const closed = (!panel || await mainScreen.current.close(`workbench-${panel.kind}`)) && await mainScreen.current.closeAll();
+        // The root's content is replaced at the same time, so the root takes its new width at once instead of reflowing the incoming view.
+        const closed = (!panel || await mainScreen.current.close(`workbench-${panel.kind}`, { settle: true })) && await mainScreen.current.closeAll({ settle: true });
         if (!closed) { mainStrip.set({ scope }); return false; }
       }
       navigation.current++;
@@ -271,7 +272,8 @@ export function App({ controller }: { controller: ApplicationController }) {
   const main: IslandSpec = {
     id: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation",
     // Home and workbench enter and exit simultaneously in both directions; exiting content leaves the layout flow so it does not occupy space alongside entering content.
-    render: () => <AnimatePresence mode="popLayout" initial={false}>
+    // The clip contains the scaled enter and exit frames, so they never give the island body a scroll range; each view scrolls itself.
+    render: () => <div className="relative h-full overflow-hidden"><AnimatePresence mode="popLayout" initial={false}>
       {view.kind === "home"
         ? <motion.div key="home" className="h-full" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 1.04 }} transition={islandTransition}>
@@ -284,7 +286,7 @@ export function App({ controller }: { controller: ApplicationController }) {
         : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
           {conversation}</motion.div>}
-    </AnimatePresence>,
+    </AnimatePresence></div>,
   };
   // The workbench persistently displays session read failures; the same entry handles backend unavailability while the workbench is visible.
   const unavailableInWorkbench = view.kind === "conversation" && !inSettings && phase === "unavailable";

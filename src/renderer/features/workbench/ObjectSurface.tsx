@@ -1,7 +1,7 @@
 import { RendererCardProvider, type CardPanelView, type RendererCard } from "@asterism-app/sdk/renderer";
-import { motion } from "motion/react";
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { PanelsTopLeft, X } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
@@ -11,6 +11,7 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { cn } from "@asterism-app/ui/utils";
 import { useObjectCollapse } from "./object-collapse";
+import { fadeTransition } from "../../shared/weave/motion";
 
 const noPanels: readonly CardPanelView[] = [];
 
@@ -31,6 +32,7 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
 }) {
   const i18n = useI18n();
   const collapse = useObjectCollapse(collapsed, expandedHeight, resizing);
+  const reducedMotion = useReducedMotion() === true;
   const [panelId, setPanelId] = useState<string | null>(null);
   const active = panels.find(panel => panel.id === panelId);
   const activeId = active?.id ?? null;
@@ -40,7 +42,6 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
   const returnFocus = useRef<HTMLElement | null>(null);
   const menuSelected = useRef(false);
   const wasOpen = useRef(false);
-  const headingId = useId();
   const openPanel = useCallback((id: string) => {
     if (!panels.some(panel => panel.id === id)) throw new Error(`Unknown card panel: ${id}`);
     if (!activeId) {
@@ -110,17 +111,32 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
           // Distinguish content surface and shell by background color alone, without a border; soft, faint shadows around the edges transition colors without a hard dividing line.
           className="nodrag nopan relative mx-1 mb-1 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg bg-card shadow-[0_1px_3px_0_rgb(0_0_0/0.06),0_0_2px_0_rgb(0_0_0/0.04)]">
           <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", active && "invisible @min-[52rem]/card:visible")}>{children}</div>
-          {active && <aside ref={panelElement} tabIndex={-1} aria-labelledby={headingId}
-            className="absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col bg-card outline-none @min-[52rem]/card:static @min-[52rem]/card:w-80 @min-[52rem]/card:shrink-0 @min-[52rem]/card:border-l">
-            <header className="flex shrink-0 items-center gap-2 border-b p-3">
-              <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4" aria-hidden="true">{active.icon}</span>
-              <h3 id={headingId} className="type-section min-w-0 flex-1 truncate">{i18n.text(active.label)}</h3>
-              <IconButton size="icon-xs" label={i18n.text(objectsMessages.closeAuxiliaryPanel)} onClick={closePanel}><X /></IconButton>
-            </header>
-            <div key={active.id} className="flex min-h-0 flex-1 flex-col overflow-auto">{active.body}</div>
-          </aside>}
+          {/* popLayout takes a leaving panel out of flow at once, so wide cards reclaim the column while it fades and switches crossfade in place. */}
+          <AnimatePresence initial={false} mode="popLayout">
+            {active && <AuxiliaryPanel key={active.id} panel={active} focusRef={panelElement} reducedMotion={reducedMotion} onClose={closePanel} />}
+          </AnimatePresence>
         </motion.div>}
       </div>
     </motion.div>
   </RendererCardProvider>;
+}
+
+/** One mounted auxiliary panel; a leaving panel is inert and releases the focus ref to its successor. */
+function AuxiliaryPanel({ panel, focusRef, reducedMotion, onClose }: {
+  panel: CardPanelView; focusRef: RefObject<HTMLElement | null>; reducedMotion: boolean; onClose(): void;
+}) {
+  const i18n = useI18n();
+  const present = useIsPresent();
+  const headingId = useId();
+  return <motion.aside ref={present ? focusRef : undefined} tabIndex={-1} aria-labelledby={headingId} inert={!present}
+    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    transition={reducedMotion ? { duration: 0 } : fadeTransition}
+    className="absolute inset-0 z-10 flex min-h-0 min-w-0 flex-col bg-card outline-none @min-[52rem]/card:static @min-[52rem]/card:w-80 @min-[52rem]/card:shrink-0 @min-[52rem]/card:border-l">
+    <header className="flex shrink-0 items-center gap-2 border-b p-3">
+      <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4" aria-hidden="true">{panel.icon}</span>
+      <h3 id={headingId} className="type-section min-w-0 flex-1 truncate">{i18n.text(panel.label)}</h3>
+      <IconButton size="icon-xs" label={i18n.text(objectsMessages.closeAuxiliaryPanel)} onClick={onClose}><X /></IconButton>
+    </header>
+    <div className="flex min-h-0 flex-1 flex-col overflow-auto">{panel.body}</div>
+  </motion.aside>;
 }

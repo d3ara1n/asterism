@@ -23,17 +23,23 @@ describe("Draft exchange acceptance confirmation", () => {
     const input = { submissionId: nanoid(16), id: nanoid(16), replacement: null };
     exchange.begin({ input, incoming, replacement: null });
     let committed: string | null = null, writes = 0;
+    const unconfirmedDuringAttempt: boolean[] = [];
     const invoke = async (value: { submissionId: string }) => {
+      unconfirmedDuringAttempt.push(exchange.unconfirmed);
       if (committed === value.submissionId) return { ok: true as const };
       committed = value.submissionId; writes++;
       return { ok: false as const, error: { code: "unavailable", message: "Receipt lost" } };
     };
     expect((await exchange.retry(invoke)).ok).toBe(false);
     expect(exchange.pending?.input).toBe(input);
+    expect(exchange.unconfirmed).toBe(true);
     expect(editor.getSnapshot()).toMatchObject({ text: "", locked: true });
     expect((await exchange.retry(invoke)).ok).toBe(true);
+    // The first attempt in flight is ordinary work; only a retry after an unknown receipt runs while unconfirmed.
+    expect(unconfirmedDuringAttempt).toEqual([false, true]);
     expect(writes).toBe(1);
     expect(exchange.pending).toBeNull();
+    expect(exchange.unconfirmed).toBe(false);
     expect(editor.parts(false)).toEqual(incoming.parts);
     expect(editor.getSnapshot().locked).toBe(false);
     await editor.close();

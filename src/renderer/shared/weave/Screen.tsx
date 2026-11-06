@@ -11,6 +11,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/too
 import { fadeTransition, islandTransition } from "./motion";
 import { closure, focusAfterClose, follow, layout, moveIsland, openIsland, removeIslands, type IslandWidth } from "./model";
 
+/** Settled layout changes place islands immediately; opacity and scale keep their usual timing. */
+const settledTransition = { ...islandTransition, x: { duration: 0 }, width: { duration: 0 } };
+
 /** Island declaration: width, accessible name, and content. origin is the element that opened it, used for expansion animation and focus restoration. */
 export interface IslandSpec {
   /** Identity within the screen: opening an existing ordinary identity locates that island instead of creating another. */
@@ -32,19 +35,23 @@ export interface StripIsland { id: string; owner: string | null; size: number | 
 /**
  * focus null means the root. scope names the context the islands belong to, such as a session;
  * an owner persists the arrangement only while the scope is its own, so clearing islands for navigation is not recorded.
+ * settle marks the latest change as a replacement of the root's content: remaining islands take their new place at once instead of moving.
  */
-export interface StripState { islands: readonly StripIsland[]; focus: string | null; scope: string | null }
+export interface StripState { islands: readonly StripIsland[]; focus: string | null; scope: string | null; settle: boolean }
+/** settle: remaining islands jump to their new layout, for closes that accompany replacing the root's content. */
+export interface CloseOptions { settle?: boolean }
 
 /** Ordinary island strip of one screen: an external store so cards and persistence can observe open identities without rerendering the screen's owner. */
 export class IslandStrip {
-  private state: StripState = { islands: [], focus: null, scope: null };
+  private state: StripState = { islands: [], focus: null, scope: null, settle: false };
   private screen: ((id: string, force: boolean) => Promise<boolean>) | null = null;
   private readonly listeners = new Set<() => void>();
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   readonly getSnapshot = () => this.state;
   has(id: string): boolean { return this.state.islands.some(island => island.id === id); }
+  /** Every change animates unless it says otherwise. */
   set(next: Partial<StripState>) {
-    this.state = { ...this.state, ...next };
+    this.state = { ...this.state, settle: false, ...next };
     for (const listener of this.listeners) listener();
   }
   /** Close an island and the islands it opened through the mounted screen; false when no screen shows this strip. */
@@ -91,9 +98,9 @@ const IslandContext = createContext<IslandApi | null>(null);
 const StripContext = createContext<IslandStrip | null>(null);
 export interface ScreenHandle {
   /** Close every ordinary island; any refusal cancels. */
-  closeAll(): Promise<boolean>;
+  closeAll(options?: CloseOptions): Promise<boolean>;
   /** Close an island of this screen as if through its own controls. */
-  close(id: string): Promise<boolean>;
+  close(id: string, options?: CloseOptions): Promise<boolean>;
 }
 /** Use within island content. */
 export function useIsland(): IslandApi {
@@ -194,11 +201,11 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
     viewport.current?.querySelector<HTMLElement>(`[data-island="${CSS.escape(id)}"]`)?.focus({ preventScroll: true }));
   const known = (id: string) => latest.current.order.includes(id);
   /** Remove ordinary islands and settle focus on the composed order before removal. */
-  const remove = (removed: readonly string[]) => {
+  const remove = (removed: readonly string[], settle = false) => {
     const current = strip.getSnapshot();
     const focused = current.focus !== null && known(current.focus) ? current.focus : latest.current.root.id;
     strip.set({ islands: removeIslands(current.islands, removed),
-      focus: focusAfterClose(latest.current.order, removed, focused, latest.current.root.id) });
+      focus: focusAfterClose(latest.current.order, removed, focused, latest.current.root.id), settle });
   };
   const open = async (owner: string, spec: IslandSpec) => {
     if (!known(owner)) return false;
@@ -210,7 +217,7 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
     return true;
   };
   // AnimatePresence completes the exit animation before unmounting.
-  const close = async (id: string, force?: boolean) => {
+  const close = async (id: string, force?: boolean, settle?: boolean) => {
     if (id === latest.current.root.id) return false;
     const fixedSpec = latest.current.fixed.find(spec => spec.id === id);
     const ordinary = strip.getSnapshot().islands.find(island => island.id === id);
@@ -218,7 +225,7 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
     if (!(await release([...closure(strip.getSnapshot().islands, id), ...(fixedSpec ? [id] : [])], force))) return false;
     const removed = closure(strip.getSnapshot().islands, id);
     if (!fixedSpec && !removed.includes(id)) return true;
-    remove(fixedSpec ? [...removed, id] : removed);
+    remove(fixedSpec ? [...removed, id] : removed, settle);
     fixedSpec?.onClose?.();
     const origin = (fixedSpec ?? ordinary!.spec).origin;
     if (origin?.isConnected) requestAnimationFrame(() => origin.focus({ preventScroll: true }));
@@ -234,10 +241,10 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
     remove(owned());
     return true;
   };
-  const closeAll = async () => {
+  const closeAll = async (settle?: boolean) => {
     const all = () => strip.getSnapshot().islands.map(island => island.id).reverse();
     if (!(await release(all()))) return false;
-    remove(all());
+    remove(all(), settle);
     return true;
   };
   const guard = (id: string, fn: CloseGuard) => {
@@ -248,7 +255,10 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
   const setFocus = (id: string) => { if (strip.getSnapshot().focus !== id) strip.set({ focus: id }); };
   const has = (id: string) => strip.has(id);
   // An identity absent from the screen has nothing to close.
-  useImperativeHandle(ref, () => ({ closeAll, close: id => known(id) ? close(id) : Promise.resolve(true) }));
+  useImperativeHandle(ref, () => ({
+    closeAll: options => closeAll(options?.settle),
+    close: (id, options) => known(id) ? close(id, false, options?.settle) : Promise.resolve(true),
+  }));
   const latestClose = useRef(close);
   latestClose.current = close;
   useEffect(() => strip.attach((id, force) => latestClose.current(id, force)), [strip]);
@@ -280,7 +290,7 @@ export function Screen({ label, root, leading, trailing, strip: external, classN
         const hidden = overflow && (visibleRight <= 0 || visibleLeft >= width);
         const peek = overflow && !hidden && (visibleLeft < -1 || visibleRight > width + 1);
         const position = island ? ordinaries.indexOf(island) : -1;
-        return <Island key={spec.id} spec={spec} width={span.width} x={span.left + shift} hidden={hidden} peek={peek}
+        return <Island key={spec.id} spec={spec} width={span.width} x={span.left + shift} settle={state.settle} hidden={hidden} peek={peek}
           focused={islands.length > 1 && spec.id === focus}
           api={{
             id: spec.id, has,
@@ -327,8 +337,8 @@ function useStableIsland(api: IslandApi): IslandApi {
   }), []);
 }
 
-function Island({ ref, spec, width, x, hidden, peek, focused, api, onFocus }: {
-  ref?: React.Ref<HTMLElement>; spec: IslandSpec; width: number; x: number; hidden: boolean; peek: boolean; focused: boolean; api: IslandApi; onFocus: () => void;
+function Island({ ref, spec, width, x, settle, hidden, peek, focused, api, onFocus }: {
+  ref?: React.Ref<HTMLElement>; spec: IslandSpec; width: number; x: number; settle: boolean; hidden: boolean; peek: boolean; focused: boolean; api: IslandApi; onFocus: () => void;
 }) {
   const i18n = useI18n();
   const element = useRef<HTMLElement>(null);
@@ -342,7 +352,7 @@ function Island({ ref, spec, width, x, hidden, peek, focused, api, onFocus }: {
   // Expand in place: fade in from a slight offset left of the target position; Motion transitions position and width from their current values.
   return <motion.section ref={node => { element.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
     initial={{ opacity: 0, x: x - 16, scale: 0.98, width }} animate={{ opacity: 1, x, scale: 1, width }} exit={{ opacity: 0, scale: 0.98, transition: fadeTransition }}
-    transition={islandTransition} data-island={spec.id} tabIndex={-1} aria-label={i18n.text(spec.label)}
+    transition={settle ? settledTransition : islandTransition} data-island={spec.id} tabIndex={-1} aria-label={i18n.text(spec.label)}
     inert={hidden} aria-hidden={hidden || undefined} data-peek={peek || undefined} data-focused={focused || undefined}
     data-surface={spec.surface !== false || undefined}
     className="island"

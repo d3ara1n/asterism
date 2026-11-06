@@ -105,7 +105,8 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
   });
   return {
     draft, drafts, writable, editable, executionState, configurable: ready,
-    pendingTake: current.exchange.pending !== null,
+    // Only an exchange whose receipt was unknown needs the user; an exchange still in its first attempt is ordinary work.
+    pendingTake: current.exchange.unconfirmed,
     canRetryTake: ready && !current.exchange.working,
     async retryTake(): Promise<boolean> {
       if (!ready || current.exchange.working || current.closed) return false;

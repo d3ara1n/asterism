@@ -82,6 +82,22 @@ describe("Message file drafts", () => {
     expect(draft.getSnapshot().files).toHaveLength(1);
     await draft.close();
   });
+  // A card must not remount when its upload completes, and a file withdrawn before staging must never reach the hold.
+  it("Accepted files appear as pending at once, keep their identity on completion, and a withdrawn queued file is never staged", async () => {
+    const staged: string[] = [];
+    let finish!: () => void;
+    const first = new Promise<void>(resolve => { finish = resolve; });
+    const draft = createMessageDraft(() => ({ ...reader, close: async () => {},
+      stage: async value => { staged.push((value as File).name); if (staged.length === 1) await first; return ref; } }));
+    const adding = draft.add([new File(["a"], "a.png", { type: "image/png" }), new File(["b"], "b.png", { type: "image/png" })]);
+    const [a, b] = draft.getSnapshot().uploads;
+    expect([a?.name, b?.name]).toEqual(["a.png", "b.png"]);
+    draft.removeUpload(b!.id);
+    finish(); await adding;
+    expect(staged).toEqual(["a.png"]);
+    expect(draft.getSnapshot()).toMatchObject({ uploading: false, uploads: [], files: [{ id: a!.id }] });
+    await draft.close();
+  });
   it("Replacing an archived input preserves saved text formatting and releases the previous attachments while locked", async () => {
     let closed = false;
     const draft = createMessageDraft(() => ({ ...reader, stage: async () => ref, close: async () => { closed = true; } }));

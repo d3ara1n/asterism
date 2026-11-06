@@ -10,10 +10,13 @@ interface Exchange { input: Input; incoming: CopiedDraft; replacement: CopiedDra
 export class DraftExchange {
   pending: Exchange | null = null;
   working = false;
+  /** An attempt ended without a definite outcome; the exchange now needs an explicit retry. An attempt still in flight is not unconfirmed. */
+  unconfirmed = false;
   constructor(private readonly editor: MessageDraft, private readonly release: (keep?: RendererContentInput) => void) {}
   begin(value: Exchange): void {
     if (this.pending) throw new Error("A draft exchange is awaiting confirmation.");
     this.pending = value;
+    this.unconfirmed = false;
     this.editor.lock(true);
   }
   async retry(invoke: (input: Input, content?: RendererContentInput) => Promise<RendererReceipt>): Promise<RendererReceipt> {
@@ -35,6 +38,7 @@ export class DraftExchange {
       return result;
     } finally {
       this.working = false;
+      this.unconfirmed = this.pending !== null;
       this.editor.lock(this.pending !== null);
     }
   }

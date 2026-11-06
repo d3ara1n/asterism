@@ -1,5 +1,6 @@
 import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
 import { ArrowDown } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
 import { ConversationNavigation, type ConversationNavigationHandle } from "./ConversationNavigation";
@@ -22,8 +23,8 @@ import { AgentDraftsPanel } from "./Drafts";
 import type { AgentExecutionState } from "../state";
 import type { AgentActivity, CompressionActivity, InlineFeedback } from "../feedback";
 import { useConversationProcesses } from "./use-conversation-processes";
-import { useReducedMotion } from "motion/react";
 import { useTimelinePresence } from "./timeline-presence";
+import { conversationTransition, immediateTransition } from "./motion";
 
 /** Execution status in the card title bar; history belongs to the session and is accessed from the window title bar. */
 export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
@@ -100,11 +101,17 @@ export function Conversation({ feedback, compressions, activity = null }: {
           {read.status === "ready" && !timeline.length && !running && <p className="type-caption pt-4">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>
-      {awayFromBottom && <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
-        <div className="surface-floating pointer-events-auto">
-          <Button variant="ghost" size="sm" onClick={latest}><ArrowDown />{i18n.formatMessage(conversationMessages.latestOutput)}</Button>
-        </div>
-      </div>}
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
+        <AnimatePresence>
+          {awayFromBottom && <motion.div className="surface-floating pointer-events-auto"
+            initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: reducedMotion ? 0 : 8 }}
+            transition={reducedMotion ? immediateTransition : conversationTransition}>
+            <Button variant="ghost" size="sm" onClick={latest}><ArrowDown />{i18n.formatMessage(conversationMessages.latestOutput)}</Button>
+          </motion.div>}
+        </AnimatePresence>
+      </div>
     </div>
     <AgentUIRegion position="bottom" />
     {!composerHidden && <AgentDraftsPanel onTake={() => composer.current?.focus()} />}

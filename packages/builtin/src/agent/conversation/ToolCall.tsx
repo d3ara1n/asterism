@@ -14,6 +14,7 @@ import { BuiltinSettings } from "../../settings/contract";
 import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { viewStateKeys } from "./view-state";
 import { blockShell } from "./block-shell";
+import { IconSwap } from "./IconSwap";
 
 /** The shell manages only lifecycle and expansion; the two content entry points fall back independently, and updates or persistence do not reset expansion. */
 export function ToolCall({ node }: { node: ToolCallNode }) {
@@ -39,8 +40,9 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     ? <motion.span className="inline-flex" animate={reducedMotion ? undefined : { opacity: [0.45, 1, 0.45] }} transition={{ duration: 1.4, repeat: Infinity }}><TextCursorInput className="size-3.5" /></motion.span>
     : state.phase === "executing" ? <StatusIcon tone="progress" className="size-3.5" />
       : view?.icon ?? <Wrench className="size-3.5" />;
+  const iconKey = state.phase === "input" ? "input" : state.phase === "executing" ? "executing" : "icon";
   const header = <>
-    <span className="inline-flex shrink-0" aria-hidden="true">{icon}</span>
+    <IconSwap swapKey={iconKey}>{icon}</IconSwap>
     <span className="min-w-0 flex-1 text-left">
       {view && (!filling || view.header !== undefined || view.body !== undefined || view.label !== undefined) ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
         : <ToolHeader label={state.phase === "incomplete" ? tools.label(node.name, node.invocation?.implementation?.id ?? null) ?? node.name : tools.preparation(node.name)} />}
