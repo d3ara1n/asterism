@@ -15,7 +15,7 @@ import { UpdateAction, UpdateNotesLink, UpdateStatus, UpdateVersions, useUpdateS
 /** The update entry stays visible while the popover is open, presenting checks and results after retries. */
 export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
   const i18n = useI18n();
-  const { state, failure } = useUpdates();
+  const { state, failure, installing } = useUpdates();
   const summary = useUpdateSummary();
   const [open, setOpen] = useState(false);
   const navigating = useRef(false);
@@ -55,7 +55,7 @@ export function UpdateIndicator({ onSettings }: { onSettings: () => void }) {
       }}>
       <h2 id={titleId} className="sr-only">{i18n.text(messages.title)}</h2>
       <UpdateVersions compact />
-      {status === "ready" ? <UpdateNotesLink /> : <UpdateStatus />}
+      {status === "ready" || (installing && !failure) ? <UpdateNotesLink /> : <UpdateStatus />}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button variant="ghost" size="sm" onClick={() => {
           navigating.current = true;
