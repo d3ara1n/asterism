@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineCreation, defineImplementation, defineTool, jsonSchema, modelInputPartsSchema, mcpServerStateSchema, type Json } from "@asterism-app/sdk/contracts";
+import { defineCreation, defineImplementation, defineTool, jsonSchema, modelInputPartsSchema, mcpServerStateSchema, type ToolInput } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 
 export const McpHost = builtin.resource("mcp", z.object({}));
@@ -11,7 +11,7 @@ const serverId = z.string().min(1).describe("Server ID returned by mcp_list or m
 const toolId = z.string().min(1).describe("Tool ID in the form server_id/tool_name, as returned by mcp_list or mcp_search.");
 const targetSchema = z.null().describe("The MCP Host resource selects the shared server collection.");
 const resultSchema = jsonSchema.describe("MCP directory entries, connection state, or operation result.");
-function tool<A extends Json>(name: string, description: string, argsSchema: z.ZodType<A>, effect: "read" | "write" = "read") {
+function tool<A extends ToolInput>(name: string, description: string, argsSchema: z.ZodType<A>, effect: "read" | "write" = "read") {
   return defineImplementation({ ...builtin.data(`mcp.${name}`, resultSchema), resource: McpHost,
     tool: defineTool({ id: builtin.name(`mcp.tool.${name}`), name: `mcp_${name}`, description, guidelines: [], argsSchema }),
     targetSchema, effect, execution: effect === "read" ? "parallel" : "sequential" });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+export type JsonObject = { [key: string]: Json };
+export type Json = null | boolean | number | string | Json[] | JsonObject;
 
 function isPlainObject(value: object): boolean {
   const prototype = Object.getPrototypeOf(value);

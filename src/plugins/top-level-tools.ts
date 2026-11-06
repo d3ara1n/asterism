@@ -1,4 +1,4 @@
-import { defaultToolModel, reference, type Json, type ResourceRef, type ToolContract } from "@asterism-app/sdk/contracts";
+import { defaultToolModel, reference, type Json, type ResourceRef, type ToolContract, type ToolInput } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type TopLevelTool, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { Invocation, PreparedResult } from "../tools/contract.ts";
 import type { SdkContext } from "./sdk-context.ts";
@@ -9,7 +9,7 @@ import { encodePluginData } from "./data-encoding.ts";
 export interface BoundTopLevelTool {
   tool: ToolContract;
   available: boolean;
-  resolve(args: Json, callId: string, interactive?: boolean): Invocation | PreparedResult;
+  resolve(args: ToolInput, callId: string, interactive?: boolean): Invocation | PreparedResult;
 }
 export interface RegisteredTopLevelTool { tool: TopLevelTool; sdk: SdkContext; runs: RunGroup }
 export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], requestInteractive: boolean, resourceToolRestriction: (kind: string) => string | null): BoundTopLevelTool[] {

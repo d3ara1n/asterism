@@ -116,7 +116,7 @@ Request occupancy prevents history cursor movement but does not itself mark the 
 
 Top-level tools register statically during assembly. Resource tools are discovered through the captured links, support relations, and agent policy. Resource changes do not mutate protocol tool declarations during a response.
 
-Arbitrary JSON values are validated without recursive schema structure, so every JSON Schema projection represents them as the open schema. Top-level parameter schemas are projected without references or definition tables for provider compatibility; recursive or named schemas fail projection rather than lose their constraints. Resource inspection returns complete, self-contained schemas with references where needed. Runtime argument validation uses the original contracts.
+Tool arguments and resource targets are JSON objects or null, with explicit root types in model-facing schemas. Each operation further constrains its fields and whether null is accepted. Object members and tool results may contain arbitrary JSON values; those values are validated without recursive schema structure and project as the open schema. Top-level parameter schemas are projected without references or definition tables for provider compatibility; recursive or named schemas fail projection rather than lose their constraints. Resource inspection returns complete, self-contained schemas with references where needed. Runtime argument validation uses the original contracts.
 
 The host reserves resource listing, inspection, invocation, and script orchestration. Inspection and execution share the captured capability view. A resource call validates target identity, captured access, tool support, target shape, and arguments.
 

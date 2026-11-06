@@ -1,7 +1,7 @@
 import { z } from "zod";
 import {
   defineCall, defineChannel, defineCreation, defineImplementation, defineOperationRecord, defineTool,
-  modelExpressionSchema, modelUsageSchema, modelBlockSchema, thinkingSchema, type Json,
+  modelExpressionSchema, modelUsageSchema, modelBlockSchema, thinkingSchema, type ToolInput, type Json,
 } from "@asterism-app/sdk/contracts";
 import { builtin, configurationIdSchema } from "@asterism-app/builtin-api/contracts";
 
@@ -72,8 +72,9 @@ export const waitEntrySchema = summarySchema.extend({
 });
 export const PoolView = builtin.data("subagent-pool.card", z.strictObject({ tasks: z.array(summarySchema) }));
 
+const taskTargetSchema = z.strictObject({ id: taskIdSchema }).describe('Select one task, for example {"id":"sub-1"}.');
 const empty = z.strictObject({}).describe("No operation parameters.");
-const define = <T extends Json, A extends Json, D extends Json>(
+const define = <T extends ToolInput, A extends ToolInput, D extends Json>(
   name: string, description: string, guidelines: string[], target: z.ZodType<T>, args: z.ZodType<A>, result: z.ZodType<D>, effect: "read" | "write",
 ) => defineImplementation({
   ...builtin.data(`subagent.${name}-result`, result), resource: SubagentPool,
@@ -92,20 +93,20 @@ export const Check = define("check",
   [
     "A running status, or the same activity across consecutive checks, means the task is still working.",
   ],
-  taskIdSchema, empty, snapshotSchema, "read");
+  taskTargetSchema, empty, snapshotSchema, "read");
 export const Wait = define("wait",
   "Block until all selected tasks end, then return each task's status and outcome. A failed task does not fail the wait. Cancelling the wait leaves the tasks running.",
   [
     "Reports are returned by subagent_check after the wait.",
   ],
-  z.array(taskIdSchema).min(1).describe("Task IDs to wait for, such as [\"sub-1\", \"sub-2\"]."), empty,
+  z.strictObject({ ids: z.array(taskIdSchema).min(1) }).describe('Select tasks to wait for, for example {"ids":["sub-1","sub-2"]}.'), empty,
   z.strictObject({ tasks: z.array(waitEntrySchema) }).describe("Status, recent process steps, and usage for each selected task."), "read");
 export const Steer = define("steer",
   "Append instructions or background to a queued or running task. The task receives its whole input queue at the next request boundary and keeps its progress. Steering that arrives after the final response began is returned as undelivered with the result.",
   [
     "Steering carries a concrete change to the task's requirements. A running status or consecutive checks without a report show that the task is still working, not that its direction is wrong.",
   ],
-  taskIdSchema, z.strictObject({ message: z.string().min(1).describe("The concrete correction or additional requirement.") }).describe("Material for the task's input queue."),
+  taskTargetSchema, z.strictObject({ message: z.string().min(1).describe("The concrete correction or additional requirement.") }).describe("Material for the task's input queue."),
   z.strictObject({ id: taskIdSchema, accepted: z.literal(true) }).describe("Confirmation that the material entered this task's input queue."), "write");
 export const Cancel = define("cancel",
   "Cancel a task in this shared pool.",
@@ -114,7 +115,7 @@ export const Cancel = define("cancel",
     "Its outcome becomes cancelled with the recorded reason; output produced so far remains available through subagent_check.",
     "A finished task is returned unchanged.",
   ],
-  taskIdSchema, z.strictObject({ reason: z.string().optional().describe("Why the task is no longer needed; recorded with its outcome.") }).describe("Optional reason for cancellation."),
+  taskTargetSchema, z.strictObject({ reason: z.string().optional().describe("Why the task is no longer needed; recorded with its outcome.") }).describe("Optional reason for cancellation."),
   summarySchema.describe("Final task state."), "write");
 export const CancelSubagent = defineCall(builtin.name("subagent.cancel"), {
   scope: "object", input: z.strictObject({ id: taskIdSchema }), output: z.null(),

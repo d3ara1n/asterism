@@ -106,7 +106,7 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
       tools: [
         { ...delegate(), capture: () => delegate(builtinConfiguration(plugin).agents) },
         implementTool(Check, { call(_data, target, _args, { object, signal }) {
-          return operation(signal, () => pool(object.ref).check(target));
+          return operation(signal, () => pool(object.ref).check(target.id));
         }, toModel: task => {
           const current = currentActivity(task);
           return JSON.stringify({
@@ -117,16 +117,16 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
           });
         } }),
         implementTool(Wait, { call(_data, targets, _args, { object, signal, publish }) {
-          return operation(signal, async () => ({ tasks: await pool(object.ref).wait(targets, signal, tasks => publish({ tasks })) }));
+          return operation(signal, async () => ({ tasks: await pool(object.ref).wait(targets.ids, signal, tasks => publish({ tasks })) }));
         }, toModel: ({ tasks }) => JSON.stringify({ tasks: tasks.map(task => ({
           id: task.id, role: task.role,
           status: task.status.phase === "running" ? { phase: task.status.phase } : task.status,
         })) }) }),
         implementTool(Steer, { call(_data, target, args, { object, signal }) {
-          return operation(signal, () => { pool(object.ref).steer(target, args.message); return { id: target, accepted: true as const }; });
+          return operation(signal, () => { pool(object.ref).steer(target.id, args.message); return { id: target.id, accepted: true as const }; });
         } }),
         implementTool(Cancel, { call(_data, target, args, { object, signal }) {
-          return operation(signal, () => pool(object.ref).cancel(target, args.reason));
+          return operation(signal, () => pool(object.ref).cancel(target.id, args.reason));
         } }),
       ],
       calls: [

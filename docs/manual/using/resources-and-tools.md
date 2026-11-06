@@ -6,7 +6,7 @@ Add a resource to the workbench, then link it to the agent that needs it. On the
 
 Link and detach notifications identify the affected resource. Models can list linked resources with `resource_list`, inspect a selected resource with `resource_inspect`, and invoke its tools through `resource_call`. Listing includes each resource's own current state without tool definitions. Inspection supplies that state and the tool definitions available for the selected resource.
 
-Use current descriptions for arguments and internal targets. Targets select content, scope, or a resource-specific view. Two resource types can support the same operation with different target shapes.
+Use current descriptions for arguments and internal targets. Both `target` and `args` are JSON objects or null, with their fields defined by the selected tool. For example, pass `target: { path: "README.md" }` and `args: {}`. Omitted `target` defaults to null and omitted `args` to `{}`; the selected tool determines whether those values are valid. Targets select content, scope, or a resource-specific view. Two resource types can support the same operation with different target shapes.
 
 Inspection returns guidance and schemas together. Its `tools` argument narrows the listing and an empty array returns none. Its `detail` argument selects `full`, `prompt` for guidance only, or `schema` for arguments and targets only, so a first inspection can cover the resource and later ones fetch just the part still needed. Descriptions define what an operation does; the result format is not published, because a call's own output is the accurate specification of what it returns.
 

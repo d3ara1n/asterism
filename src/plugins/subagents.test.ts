@@ -101,7 +101,7 @@ async function fixture(child: (input: ModelInput, signal: AbortSignal) => AsyncI
     return snapshotSchema.parse(result.data);
   };
   return { root, get app() { return app; }, get context() { return context; }, sessionId, actor, createPool, invoke, delegate,
-    async check(pool: ResourceRef, id: string): Promise<TaskSnapshot> { return snapshotSchema.parse((await invoke(pool, "check", id)).data); },
+    async check(pool: ResourceRef, id: string): Promise<TaskSnapshot> { return snapshotSchema.parse((await invoke(pool, "check", { id })).data); },
     async restart() {
       await app.close(); apps.splice(apps.indexOf(app), 1);
       app = new BuiltinApplicationService(root, options); apps.push(app);
@@ -131,7 +131,7 @@ describe("Shared Subagent Pool", () => {
     expect(await submit("reviewer")).toMatchObject({ kind: "rejected", error: { code: "not_found" } });
     expect(await submit("missing")).toMatchObject({ kind: "rejected", error: { code: "not_found" } });
     expect(await submit("explorer", "missing")).toMatchObject({ kind: "rejected", error: { code: "not_found" } });
-    await f.invoke(pool, "wait", ["sub-1", "sub-2", "sub-3"]);
+    await f.invoke(pool, "wait", { ids: ["sub-1", "sub-2", "sub-3"] });
   });
 
   it("uses the subagent's role for nested delegation and applies allowlist edits on its next request", async () => {
@@ -154,12 +154,12 @@ describe("Shared Subagent Pool", () => {
     f.context.session(f.sessionId).link(outer, inner);
     await configureBuiltin(f.app, { type: "agent.save", id: "explorer", value: { id: "explorer", delegates: ["researcher"] } });
     const task = await f.delegate(outer, "Outer");
-    await f.invoke(outer, "wait", [task.input.id]);
+    await f.invoke(outer, "wait", { ids: [task.input.id] });
     expect(outcomes).toHaveLength(2);
     expect(outcomes[0]).toMatchObject({ error: true });
     expect(outcomes[0]!.text).toContain('Agent role "explorer" cannot delegate tasks to Agent role "reviewer".');
     expect(outcomes[1]).toMatchObject({ error: false });
-    await f.invoke(inner, "wait", ["sub-1"]);
+    await f.invoke(inner, "wait", { ids: ["sub-1"] });
     expect(await f.check(inner, "sub-1")).toMatchObject({ input: { role: "reviewer" }, output: { result: "Nested report" } });
   });
 
@@ -175,9 +175,9 @@ describe("Shared Subagent Pool", () => {
     await configureBuiltin(f.app, { type: "agent.save", id: "explorer", value: { id: "explorer", subagent: { budget: { maxRequests: limit } } } });
     const task = await f.delegate(pool, "Initial task");
     await entered.promise;
-    expect((await f.invoke(pool, "steer", task.input.id, { message: "Additional requirement" })).kind).toBe("succeeded");
+    expect((await f.invoke(pool, "steer", { id: task.input.id }, { message: "Additional requirement" })).kind).toBe("succeeded");
     release.resolve();
-    await f.invoke(pool, "wait", [task.input.id]);
+    await f.invoke(pool, "wait", { ids: [task.input.id] });
     const completed = await f.check(pool, task.input.id);
     if (limit > 1) {
       expect(observed).toEqual([["Initial task"], ["Initial task", "Additional requirement"]]);
@@ -204,26 +204,26 @@ describe("Shared Subagent Pool", () => {
     expect(inputs).toHaveLength(4);
     expect((await f.check(pool, tasks[4]!.input.id)).status.phase).toBe("queued");
     expect(f.app.sessions.current(f.sessionId).progress.busyObjectIds).not.toContain(pool.id);
-    expect((await f.invoke(pool, "steer", tasks[4]!.input.id, { message: "Queued instruction" })).kind).toBe("succeeded");
+    expect((await f.invoke(pool, "steer", { id: tasks[4]!.input.id }, { message: "Queued instruction" })).kind).toBe("succeeded");
     // A queued task ends without execution: no model input, no audit, and its steering is reported undelivered.
-    expect((await f.invoke(pool, "steer", tasks[5]!.input.id, { message: "Never delivered" })).kind).toBe("succeeded");
-    expect(await f.invoke(pool, "cancel", tasks[5]!.input.id)).toMatchObject({ kind: "succeeded", data: { status: { outcome: "cancelled" } } });
+    expect((await f.invoke(pool, "steer", { id: tasks[5]!.input.id }, { message: "Never delivered" })).kind).toBe("succeeded");
+    expect(await f.invoke(pool, "cancel", { id: tasks[5]!.input.id })).toMatchObject({ kind: "succeeded", data: { status: { outcome: "cancelled" } } });
     expect((await f.check(pool, tasks[5]!.input.id)).output).toMatchObject({ undelivered: ["Never delivered"], usage: { requests: 0 } });
     expect(existsSync(join(f.root, "extensions", builtin.id, "subagent-audits", `${tasks[5]!.input.runId}.jsonl`))).toBe(false);
     const cancelledWait = new AbortController();
-    const waiting = f.invoke(pool, "wait", tasks.map(task => task.input.id), {}, cancelledWait.signal);
+    const waiting = f.invoke(pool, "wait", { ids: tasks.map(task => task.input.id) }, {}, cancelledWait.signal);
     cancelledWait.abort(); await waiting;
     expect((await f.check(pool, tasks[0]!.input.id)).status.phase).toBe("running");
     const other = await f.context.session(f.sessionId).create(CreateActor, {});
     f.context.session(f.sessionId).link(other, pool);
-    const cancelled = await f.invoke(pool, "cancel", tasks[0]!.input.id, { reason: "Work no longer needed" }, new AbortController().signal, other);
+    const cancelled = await f.invoke(pool, "cancel", { id: tasks[0]!.input.id }, { reason: "Work no longer needed" }, new AbortController().signal, other);
     expect(cancelled).toMatchObject({ kind: "succeeded", data: { status: { outcome: "cancelled", message: "Work no longer needed" } } });
     await fifth.promise;
     expect(inputs[4]).toEqual(["Explicit background", "Task 5", "Queued instruction"]);
     released.resolve();
     expect(inputs.flat()).not.toContain("Task 6");
     expect(inputs.flat().join(" ")).not.toContain("Private parent context");
-    expect((await f.invoke(pool, "wait", tasks.map(task => task.input.id))).kind).toBe("succeeded");
+    expect((await f.invoke(pool, "wait", { ids: tasks.map(task => task.input.id) })).kind).toBe("succeeded");
     const completed = await f.check(pool, tasks[4]!.input.id);
     expect(completed).toMatchObject({ status: { outcome: "succeeded" }, output: { result: "Task report", usage: { model: "test/test", requests: 1 } } });
   });
@@ -234,7 +234,7 @@ describe("Shared Subagent Pool", () => {
     const pool = await f.createPool();
     const before = f.context.session(f.sessionId).snapshot().position.nodeId;
     const task = await f.delegate(pool, "Inspect");
-    await f.invoke(pool, "wait", [task.input.id]);
+    await f.invoke(pool, "wait", { ids: [task.input.id] });
     const delegated = f.context.session(f.sessionId).snapshot().records.first(Delegation, { scope: "timeline" })!;
     expect(delegated.record.pending).toBe(false);
     const audit = readFileSync(join(f.root, "extensions", builtin.id, "subagent-audits", `${task.input.runId}.jsonl`), "utf8");
@@ -242,7 +242,7 @@ describe("Shared Subagent Pool", () => {
     expect(audit.trim().split("\n").map(line => JSON.parse(line)).find(entry => entry.type === "input").messages)
       .toEqual([{ kind: "input", parts: [{ kind: "text", text: "Inspect" }] }]);
     await f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: before });
-    expect((await f.invoke(pool, "check", task.input.id)).kind).toBe("rejected");
+    expect((await f.invoke(pool, "check", { id: task.input.id })).kind).toBe("rejected");
     await f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: delegated.record.id });
     expect((await f.check(pool, task.input.id)).output.result).toBe("Persistent report");
     f.app.sessions.tree.appendToTimeline(f.sessionId, {
@@ -268,12 +268,12 @@ describe("Shared Subagent Pool", () => {
     noteId = note.id;
     f.context.session(f.sessionId).link(f.actor, note);
     const task = await f.delegate(pool, "Inspect the note");
-    await f.invoke(pool, "wait", [task.input.id]);
+    await f.invoke(pool, "wait", { ids: [task.input.id] });
     expect(rejected).toBe(true);
     expect((await f.check(pool, task.input.id)).status).toMatchObject({ outcome: "succeeded" });
     await configureBuiltin(f.app, { type: "role.save", id: "default", value: { id: "default", model: null } });
     const failed = await f.delegate(pool, "No model");
-    expect((await f.invoke(pool, "wait", [failed.input.id])).kind).toBe("succeeded");
+    expect((await f.invoke(pool, "wait", { ids: [failed.input.id] })).kind).toBe("succeeded");
     expect((await f.check(pool, failed.input.id)).status).toMatchObject({ outcome: "failed", code: "model_unavailable" });
   });
 
@@ -302,7 +302,7 @@ describe("Shared Subagent Pool", () => {
       id: "explorer", excludeResources: ["asterism.builtin/note"],
     } });
     const task = await f.delegate(pool, "Read the note");
-    await f.invoke(pool, "wait", [task.input.id]);
+    await f.invoke(pool, "wait", { ids: [task.input.id] });
     expect(outcomes).toHaveLength(2);
     expect(outcomes[0]).toMatchObject({ error: true });
     expect(outcomes[0]!.text).toContain('Agent role "explorer" cannot call tools on this resource.');
@@ -317,7 +317,7 @@ describe("Shared Subagent Pool", () => {
       const results = input.messages.filter(message => message.kind === "result");
       if (inputText(input).includes("Outer")) {
         if (results.length === 0) yield* call(innerPool, "subagent_delegate", null, { role: "explorer", task: "Inner" });
-        else if (results.length === 1) yield* call(innerPool, "subagent_wait", ["sub-1"]);
+        else if (results.length === 1) yield* call(innerPool, "subagent_wait", { ids: ["sub-1"] });
         else yield* report("Outer report");
       } else {
         if (!results.length) yield* call(noteId, "read");
@@ -335,7 +335,7 @@ describe("Shared Subagent Pool", () => {
     f.context.session(f.sessionId).link(inner, note);
     await configureBuiltin(f.app, { type: "agent.save", id: "explorer", value: { id: "explorer", delegates: ["explorer"] } });
     const task = await f.delegate(outer, "Outer");
-    await f.invoke(outer, "wait", [task.input.id]);
+    await f.invoke(outer, "wait", { ids: [task.input.id] });
     expect((await f.check(outer, "sub-1")).output.result).toBe("Outer report");
     expect((await f.check(inner, "sub-1")).output.result).toBe("Inner report");
     expect(innerRead).toContain("Pool-authorized material");
@@ -349,14 +349,14 @@ describe("Shared Subagent Pool", () => {
         yield { type: "part.start", part: { id: "text", kind: "text" } };
         yield { type: "part.delta", partId: "text", delta: "Available findings" };
         yield { type: "part.end", partId: "text" };
-        yield* call(poolId, "subagent_check", "sub-999");
+        yield* call(poolId, "subagent_check", { id: "sub-999" });
       }
       else { entered.resolve(); await until(release, signal); yield* report("Finished"); }
     });
     const pool = await f.createPool(); poolId = pool.id;
     await configureBuiltin(f.app, { type: "agent.save", id: "explorer", value: { id: "explorer", subagent: { budget: { maxRequests: 1 } } } });
     const budget = await f.delegate(pool, "Budget");
-    await f.invoke(pool, "wait", [budget.input.id]);
+    await f.invoke(pool, "wait", { ids: [budget.input.id] });
     expect(await f.check(pool, budget.input.id)).toMatchObject({ status: { outcome: "partial", code: "budget_exceeded" }, output: { result: "Available findings" } });
     const running = await f.delegate(pool, "Long task");
     await entered.promise;

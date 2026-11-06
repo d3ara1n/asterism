@@ -108,8 +108,11 @@ describe("Tool/resource matching and authorization", () => {
     expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", args: {} })).toMatchObject({ kind: "succeeded" });
     expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: { path: 42 }, args: {} })).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
     expect(await invoke(scope([]), "resource_call", { resource_id: "d1", tool: "list", args: {} })).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
-    expect(await invoke(scope(), "resource_call", { resource_id: "d1", tool: "list", target: '{"path":"."}', args: "{}" }))
-      .toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
+    // Root values are validated by resource_call before resource lookup or implementation selection.
+    for (const field of ["target", "args"]) for (const value of ['{"path":"."}', "{}", 42, true, []]) {
+      expect(await invoke(scope(), "resource_call", { resource_id: "unlinked", tool: "list", [field]: value }))
+        .toMatchObject({ kind: "rejected", error: { code: "invalid_arguments", message: expect.stringContaining(`resource_call.${field}`) } });
+    }
   });
 
 

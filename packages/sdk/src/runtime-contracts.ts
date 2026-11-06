@@ -5,7 +5,7 @@ import type { ConfigContract } from "./config.ts";
 import type { DatabaseSync } from "node:sqlite";
 import type { Json } from "./json.ts";
 import type { PluginNamespace } from "./plugin.ts";
-import type { ResourceContract, ImplementationContract } from "./module-contract.ts";
+import type { ResourceContract, ImplementationContract, ToolInput } from "./module-contract.ts";
 import type { DataContract, Presentation } from "./presentation.ts";
 import type { RecordContract, SessionRecord } from "./records.ts";
 import type { EventContract, PluginEvents } from "./events.ts";
@@ -162,9 +162,10 @@ export interface ToolInvocation extends ToolInvocationInfo {
   toModel?(data: Json): ToolModelOutput;
 }
 export interface ToolContribution {
-  readonly contract: ImplementationContract<Json, Json, Json, Json>;
+  readonly contract: ImplementationContract<Json, ToolInput, ToolInput, Json>;
   /** Bind resource-specific access and configuration at the model request boundary. The returned contribution handles that request's calls. */
   capture?(resource: ResourceSnapshot, object: ObjectReader, caller: ToolCaller): ToolContribution;
+  /** Raw model inputs are validated against the target and argument contracts before execution. */
   prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json, caller: ToolCaller, interactive: boolean): ToolInvocation | PreparedResult;
 }
 export interface ModuleContribution {

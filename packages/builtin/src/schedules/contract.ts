@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineAction, defineCreation, defineImplementation, defineTool, type Json } from "@asterism-app/sdk/contracts";
+import { defineAction, defineCreation, defineImplementation, defineTool, type Json, type ToolInput } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 
 /** The wheel editor covers 0–23 hours; longer countdowns are outside this resource's range. */
@@ -69,7 +69,7 @@ export const SetAlarmEnabled = defineAction(Alarm, {
 const empty = z.strictObject({}).describe("No operation parameters.");
 const timerResult = TimerState.schema.describe("Timer configuration, expiration deadline, and remaining duration while stopped.");
 const alarmResult = AlarmState.schema.describe("Alarm configuration, enabled state, and next occurrence.");
-function scheduleTool<A extends Json, D extends Json>(
+function scheduleTool<A extends ToolInput, D extends Json>(
   resource: typeof Timer, name: string, description: string, args: z.ZodType<A>, result: z.ZodType<D>, effect: "read" | "write",
 ) {
   return defineImplementation({

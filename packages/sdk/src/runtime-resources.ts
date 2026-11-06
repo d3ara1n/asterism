@@ -2,7 +2,7 @@ import type { ActionContract, CreationContract } from "./commands.ts";
 import type { z } from "zod";
 import { jsonSchema, type Json } from "./json.ts";
 import { defaultToolModel, type ToolModelOutput } from "./tool-result.ts";
-import type { ResourceContract, ImplementationContract } from "./module-contract.ts";
+import type { ResourceContract, ImplementationContract, ToolInput } from "./module-contract.ts";
 import type { RecordContract } from "./records.ts";
 import { reference, present, type DataContract } from "./presentation.ts";
 import { PluginApiError } from "./runtime.ts";
@@ -67,7 +67,7 @@ export function implementResource<S extends Json, V extends Json>(
       attach(parse(resource.stateSchema, snapshot.data, "resource"), object, lifetime) } : {}),
   };
 }
-export function implementTool<S extends Json, T extends Json, A extends Json, D extends Json>(
+export function implementTool<S extends Json, T extends ToolInput, A extends ToolInput, D extends Json>(
   contract: ImplementationContract<S, T, A, D>, definition: {
     call(data: S, target: T, args: A, context: {
       object: ObjectExecutor; caller: ToolCaller; signal: AbortSignal; interactive: boolean; publish(data: NoInfer<D>): void;

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { coreId } from "../shared/core.ts";
-import { jsonSchema, toolInvocationSchema, toolCompletionSchema } from "@asterism-app/sdk/contracts";
+import { toolInputSchema, jsonSchema, toolInvocationSchema, toolCompletionSchema } from "@asterism-app/sdk/contracts";
 import { defineTool } from "@asterism-app/sdk/contracts";
 import { contractReferenceSchema, defineData } from "@asterism-app/sdk/contracts";
 import { jsonArgumentHint } from "./validation.ts";
@@ -105,7 +105,7 @@ export const ResourceCall = defineTool({
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
     tool: z.string().min(1).describe("An available resource tool name supplied by resource_inspect."),
-    target: jsonSchema.default(null).describe("A JSON value matching the resource tool's target schema. Objects and null retain their JSON types."),
-    args: jsonSchema.default({}).describe("A JSON value matching the tool's args schema. Objects retain their JSON type."),
+    target: toolInputSchema.default(null).describe("A JSON object or null matching the resource tool's target schema. Example: {\"path\":\"README.md\"}."),
+    args: toolInputSchema.default({}).describe("A JSON object or null matching the tool's args schema. Example: {\"title\":\"New title\"}."),
   }).describe("Select a linked resource and a tool, then supply its implementation-specific target and shared operation args."),
 });

@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { thinkingLevels, modelToolCallBlockSchema, toolOutcomeSchema } from "@asterism-app/sdk/contracts";
+import { thinkingLevels, modelToolCallBlockSchema, toolOutcomeSchema, type Json } from "@asterism-app/sdk/contracts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -398,9 +398,9 @@ describe("Host implementation of the workbench SDK", () => {
     const invoked: string[] = [];
     const previous = defineTopLevelTool({
       id: first.name("ask"), name: "ask_user", description: "First question UI.", guidelines: [],
-      argsSchema: z.number().describe("Question number."), resultSchema: z.number().describe("Answer number."),
+      argsSchema: z.strictObject({ number: z.number() }).describe("Question number."), resultSchema: z.number().describe("Answer number."),
       effect: "read", execution: "parallel",
-      async execute(value) { invoked.push(first.id); return { kind: "succeeded", data: value }; },
+      async execute(value) { invoked.push(first.id); return { kind: "succeeded", data: value.number }; },
     });
     const replacement = defineTopLevelTool({
       id: last.name("ask"), name: "ask_user", description: "Replacement question UI.", guidelines: [],
@@ -423,7 +423,7 @@ describe("Host implementation of the workbench SDK", () => {
         requests.push(input);
         return { async *stream() {
           yield { type: "part.start", part: { id: "q", kind: "toolcall", name: "ask_user", callId: "question" } };
-          yield { type: "part.end", partId: "q", arguments: state === "loaded" ? { prompt: "Hello" } : 42 };
+          yield { type: "part.end", partId: "q", arguments: (state === "loaded" ? { prompt: "Hello" } : { number: 42 }) as Json };
           yield { type: "finish", reason: "tool-calls", usage: null };
         } };
       },
@@ -437,7 +437,7 @@ describe("Host implementation of the workbench SDK", () => {
     const selected = state === "loaded" ? replacement : previous;
     expect(service.sessions.plugins.find(plugin => plugin.id === last.id)?.status).toBe(state === "loaded" ? "loaded" : "failed");
     expect(requests[0]!.tools.filter(tool => tool.name === "ask_user")).toMatchObject([{
-      description: selected.description, parameters: { type: state === "loaded" ? "object" : "number" },
+      description: selected.description, parameters: { type: "object" },
     }]);
     expect(result.tools[0]).toMatchObject({
       kind: "succeeded", implementation: { id: selected.id }, data: state === "loaded" ? "Hello" : 42,

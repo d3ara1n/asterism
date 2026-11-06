@@ -28,6 +28,8 @@ Choose a tool name for the operation's meaning. Reuse an existing tool declarati
 
 For model calls, `resource_id` selects the resource, `args` supplies the operation's shared parameters, and `target` selects content, scope, or a resource-specific view. A reading target can select a file, a line range, and whether its text includes edit anchors. Each implementation declares the selections it supports. The same tool preserves its meaning and `args` schema across resources. Inspection exposes the tools available on the selected resource with their argument and target schemas. A result schema defines how output is encoded for storage and transport, so it is not published to models; an actual outcome shows what an operation returns.
 
+Tool arguments and resource targets are JSON objects or null. Declare a named field for a scalar or collection, such as `{ title: string }` or `{ ids: string[] }`. Object members may contain any JSON value; each tool determines its fields and whether it accepts null. Resource calls default an omitted target to null and omitted arguments to `{}`. Direct calls and resource scripts use the same input shapes.
+
 Use a top-level tool for operations on the execution context or shared resource lifecycle, such as creation and renaming. The host supplies caller identity and execution scope.
 
 Both resource tools and top-level tools receive `caller`, containing the access owner's resource reference and title. When the executing paradigm supplies an Agent role name, it is available as `caller.agent`. The role identifies the executing configuration independently of the access owner; several roles can execute through one shared resource. Role identity carries no configuration object or additional resource access.

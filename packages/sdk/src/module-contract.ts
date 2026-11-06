@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Json } from "./json.ts";
+import type { Json, JsonObject } from "./json.ts";
 import { contractReferenceSchema, type ContractReference, type DataContract } from "./presentation.ts";
 
 export interface ResourceContract<S extends Json = Json> {
@@ -7,18 +7,25 @@ export interface ResourceContract<S extends Json = Json> {
   /** Decodes saved state; creation callbacks return S for encoding before persistence. State is arbitrary JSON, stored separately from host identity and title. */
   stateSchema: z.ZodType<S>;
 }
-export interface ToolContract<A extends Json = Json> extends ContractReference {
+/** Tool inputs are structured parameter objects or null; object members may contain any JSON value. */
+export type ToolInput = JsonObject | null;
+/** The transport supplies JSON values; this schema constrains only their root shape. */
+export const toolInputSchema = z.looseObject({}).nullable() as z.ZodType<ToolInput>;
+
+export interface ToolContract<A extends ToolInput = ToolInput> extends ContractReference {
   name: string;
   description: string;
   guidelines: readonly string[];
+  /** Structured parameters; a tool determines its fields and whether null is accepted. */
   argsSchema: z.ZodType<A>;
   /** Execution requires an endpoint that can receive user interaction. Output rendering alone does not require it. */
   requiresInteraction?: boolean;
 }
 /** Tool definitions fix selection descriptions, usage guidance, and args; implementations add only target/result and execution information. */
-export interface ImplementationContract<S extends Json, T extends Json, A extends Json, O extends Json> extends DataContract<O> {
+export interface ImplementationContract<S extends Json, T extends ToolInput, A extends ToolInput, O extends Json> extends DataContract<O> {
   resource: ResourceContract<S>;
   tool: ToolContract<A>;
+  /** Structured selection within the resource; each implementation determines whether null is accepted. */
   targetSchema: z.ZodType<T>;
   effect: "read" | "write";
   /** Sequential operations share submission order; parallel operations can overlap either lane. */
@@ -32,13 +39,13 @@ function requireDescription(schema: z.ZodType, subject: string): void {
   if (!schema.description?.trim()) throw new Error(`Missing schema description: ${subject}`);
   try { z.toJSONSchema(schema); } catch (error) { throw new Error(`Schema is not representable as JSON Schema: ${subject}`, { cause: error }); }
 }
-export function defineTool<A extends Json>(definition: ToolContract<A>): ToolContract<A> {
+export function defineTool<A extends ToolInput>(definition: ToolContract<A>): ToolContract<A> {
   if (!definition.name.trim() || !definition.description.trim()) throw new Error("Tool name and description must not be empty.");
   if (definition.guidelines.some(guideline => !guideline.trim())) throw new Error(`Empty tool guideline: ${definition.name}`);
   requireDescription(definition.argsSchema, `${definition.name}.args`);
   return { ...definition, ...contractReferenceSchema.parse({ id: definition.id }), guidelines: [...definition.guidelines] };
 }
-export function defineImplementation<S extends Json, T extends Json, A extends Json, O extends Json>(
+export function defineImplementation<S extends Json, T extends ToolInput, A extends ToolInput, O extends Json>(
   definition: ImplementationContract<S, T, A, O>,
 ): ImplementationContract<S, T, A, O> {
   requireDescription(definition.targetSchema, `${definition.id}.target`);

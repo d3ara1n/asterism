@@ -1,5 +1,6 @@
+import type { z } from "zod";
 import { jsonSchema, type Json, type ToolOutcome } from "../shared/model.ts";
-import { reference, toolInvocationSchema, type ToolInvocationInfo, type ToolContract, type ModelTools, type ModelToolCall, type ModelToolObserver } from "@asterism-app/sdk/contracts";
+import { reference, toolInvocationSchema, type ToolInvocationInfo, type ToolContract, type ToolInput, type ModelTools, type ModelToolCall, type ModelToolObserver } from "@asterism-app/sdk/contracts";
 import type { ToolDeclaration } from "../model/contract.ts";
 import type { CallResult, Invocation, PreparedResult } from "../tools/contract.ts";
 import { finishToolResult, resolveToolCompletion } from "../tools/result.ts";
@@ -23,7 +24,8 @@ interface DispatchContext {
 /** Fixed host operations share the same dispatcher as captured plugin top-level tools. */
 interface CoreAction {
   tool: ToolContract;
-  resolve(args: Json, capabilities: AgentCapabilities, context: DispatchContext): Invocation | PreparedResult;
+  /** Receives arguments already parsed by the dispatcher. */
+  resolve(args: ToolInput, capabilities: AgentCapabilities, context: DispatchContext): Invocation | PreparedResult;
 }
 const actions: readonly CoreAction[] = [
   { tool: ResourceList,
@@ -32,7 +34,7 @@ const actions: readonly CoreAction[] = [
     } }) },
   { tool: ResourceInspect,
     resolve(args, capabilities) {
-      const { resource_id, tools, detail } = ResourceInspect.argsSchema.parse(args);
+      const { resource_id, tools, detail } = args as z.infer<typeof ResourceInspect.argsSchema>;
       return { effect: "read", execution: "parallel", implementation: reference(ResourceInspectResult), ...capabilities.identity(resource_id),
         async execute() {
           const result = await capabilities.inspect(resource_id, { tools, detail });
@@ -41,12 +43,12 @@ const actions: readonly CoreAction[] = [
     } },
   { tool: ResourceCall,
     resolve(args, capabilities, context) {
-      const { resource_id, tool, target, args: inner } = ResourceCall.argsSchema.parse(args);
+      const { resource_id, tool, target, args: inner } = args as z.infer<typeof ResourceCall.argsSchema>;
       return capabilities.resolve(resource_id, tool, target, inner, context.interactive);
     } },
   { tool: ResourceScript,
     resolve(args, _capabilities, context) {
-      const input = ResourceScript.argsSchema.parse(args);
+      const input = args as z.infer<typeof ResourceScript.argsSchema>;
       return { effect: "write", execution: "parallel", implementation: reference(ResourceScriptResult), toModel: scriptToModel,
         execute: (signal, publish) => executeResourceScript({ ...input, ...context, signal, publish: publish ?? (() => {}) }) };
     } },

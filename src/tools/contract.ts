@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import type { Json, ToolModelOutput } from "@asterism-app/sdk/contracts";
 import type { ToolInvocationInfo } from "@asterism-app/sdk/contracts";
-import type { ToolContract } from "@asterism-app/sdk/contracts";
+import type { ToolContract, ToolInput } from "@asterism-app/sdk/contracts";
 import type { ContractReference } from "@asterism-app/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
@@ -22,7 +22,7 @@ export interface ToolImplementation {
   resourceKind: string;
   tool: ToolContract;
   effect: "read" | "write";
-  targetSchema: z.ZodType<Json>;
+  targetSchema: z.ZodType<ToolInput>;
   capture?(resource: FoldedObject, caller: ToolCaller): ToolImplementation;
   prepare(resource: FoldedObject, target: Json, args: Json, caller: ToolCaller, interactive?: boolean): Invocation | PreparedResult;
 }

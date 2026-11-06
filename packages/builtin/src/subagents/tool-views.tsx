@@ -38,11 +38,11 @@ export const delegateViews = {
 
 /* ---------- check: one task's snapshot ---------- */
 
-type CheckProps = ToolRenderProps<TaskSnapshot, string>;
+type CheckProps = ToolRenderProps<TaskSnapshot, { id: string }>;
 function CheckHeader({ phase, target, result }: CheckProps) {
   const i18n = useI18n();
   const status = result?.data?.status;
-  return <ToolHeader label={i18n.text(messages.check)} subject={phase === "input" ? undefined : target} monospace
+  return <ToolHeader label={i18n.text(messages.check)} subject={phase === "input" ? undefined : target.id} monospace
     meta={status && <TaskStateText status={status} />} />;
 }
 function CheckBody({ result }: CheckProps) {
@@ -68,16 +68,16 @@ export const checkViews = {
   input: { headerRenderer: CheckHeader },
   execution: { headerRenderer: CheckHeader },
   result: { headerRenderer: CheckHeader, bodyRenderer: CheckBody },
-} satisfies ToolRendererDefinition<TaskSnapshot, string>;
+} satisfies ToolRendererDefinition<TaskSnapshot, { id: string }>;
 
 /* ---------- wait: streaming status and process of several tasks ---------- */
 
-type WaitProps = ToolRenderProps<{ tasks: WaitEntry[] }, string[]>;
+type WaitProps = ToolRenderProps<{ tasks: WaitEntry[] }, { ids: string[] }>;
 function WaitHeader({ phase, target, result }: WaitProps) {
   const i18n = useI18n(), tasks = result?.data?.tasks;
   const finished = tasks?.filter(task => task.status.phase === "finished").length ?? 0;
   return <ToolHeader label={i18n.text(messages.wait)} monospace
-    subject={phase === "input" || !Array.isArray(target) ? undefined : target.join(", ")}
+    subject={phase === "input" ? undefined : target.ids.join(", ")}
     meta={tasks && i18n.formatMessage(messages.finished, { finished, total: tasks.length })} />;
 }
 function WaitBody({ phase, result }: WaitProps) {
@@ -96,13 +96,13 @@ export const waitViews = {
   input: { headerRenderer: WaitHeader },
   execution: { headerRenderer: WaitHeader, bodyRenderer: WaitBody, streaming: ({ result }) => !!result?.data?.tasks.length },
   result: { headerRenderer: WaitHeader, bodyRenderer: WaitBody },
-} satisfies ToolRendererDefinition<{ tasks: WaitEntry[] }, string[]>;
+} satisfies ToolRendererDefinition<{ tasks: WaitEntry[] }, { ids: string[] }>;
 
 /* ---------- steer and cancel ---------- */
 
-type SteerProps = ToolRenderProps<{ id: string; accepted: true }, string, { message: string }>;
+type SteerProps = ToolRenderProps<{ id: string; accepted: true }, { id: string }, { message: string }>;
 function SteerHeader({ phase, target }: SteerProps) {
-  return <ToolHeader label={useI18n().text(messages.steer)} subject={phase === "input" ? undefined : target} monospace />;
+  return <ToolHeader label={useI18n().text(messages.steer)} subject={phase === "input" ? undefined : target.id} monospace />;
 }
 function SteerBody({ phase, args }: SteerProps) {
   return phase === "input" ? null : <p className="type-body whitespace-pre-wrap break-words">{args.message}</p>;
@@ -112,12 +112,12 @@ export const steerViews = {
   input: { headerRenderer: SteerHeader },
   execution: { headerRenderer: SteerHeader, bodyRenderer: SteerBody },
   result: { headerRenderer: SteerHeader, bodyRenderer: SteerBody },
-} satisfies ToolRendererDefinition<{ id: string; accepted: true }, string, { message: string }>;
+} satisfies ToolRendererDefinition<{ id: string; accepted: true }, { id: string }, { message: string }>;
 
-type CancelProps = ToolRenderProps<TaskSummary, string, { reason?: string }>;
+type CancelProps = ToolRenderProps<TaskSummary, { id: string }, { reason?: string }>;
 function CancelHeader({ phase, target, result }: CancelProps) {
   const status = result?.data?.status;
-  return <ToolHeader label={useI18n().text(messages.cancel)} subject={phase === "input" ? undefined : target} monospace
+  return <ToolHeader label={useI18n().text(messages.cancel)} subject={phase === "input" ? undefined : target.id} monospace
     meta={status && <TaskStateText status={status} />} />;
 }
 function CancelBody({ phase, args }: CancelProps) {
@@ -128,4 +128,4 @@ export const cancelViews = {
   input: { headerRenderer: CancelHeader },
   execution: { headerRenderer: CancelHeader, bodyRenderer: CancelBody },
   result: { headerRenderer: CancelHeader, bodyRenderer: CancelBody },
-} satisfies ToolRendererDefinition<TaskSummary, string, { reason?: string }>;
+} satisfies ToolRendererDefinition<TaskSummary, { id: string }, { reason?: string }>;

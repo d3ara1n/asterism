@@ -11,4 +11,4 @@ export function validationMessage(error: z.ZodError, field: string): string {
   return format(error.issues);
 }
 
-export const jsonArgumentHint = "target and args are JSON values matching their schemas; objects and null retain their JSON types.";
+export const jsonArgumentHint = 'target and args are JSON objects or null matching their schemas. Example: target: {"path":"README.md"}, args: {}.';

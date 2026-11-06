@@ -1,11 +1,11 @@
 /** Executor tests need only resource data and tool handlers; validation and finalization still use real SDK implementations. */
 import { implementTool, type ObjectExecutor, type CallResult } from "@asterism-app/sdk/runtime";
-import { reference, type Json, type ImplementationContract, type ToolModelOutput } from "@asterism-app/sdk/contracts";
+import { reference, type Json, type ImplementationContract, type ToolInput, type ToolModelOutput } from "@asterism-app/sdk/contracts";
 import { resourceSnapshot } from "../plugins/records.ts";
 import type { ToolImplementation } from "./contract.ts";
 
 export const toolCaller = { ref: { sessionId: "test", id: "caller", kind: "test/agent" }, title: "Caller" };
-export function implement<S extends Json, T extends Json, A extends Json, D extends Json>(
+export function implement<S extends Json, T extends ToolInput, A extends ToolInput, D extends Json>(
   contract: ImplementationContract<S, T, A, D>,
   definition: { call(data: S, target: T, args: A, context: { signal: AbortSignal; publish(data: NoInfer<D>): void }): Promise<CallResult<NoInfer<D>>>; toModel?(data: D): ToolModelOutput },
 ): ToolImplementation {
