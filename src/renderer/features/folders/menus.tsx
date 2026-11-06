@@ -1,5 +1,6 @@
 import { createContext, useContext, useRef, useState } from "react";
-import { ChevronDown, Folder as FolderIcon, FolderInput, FolderPlus } from "lucide-react";
+import { Check, ChevronDown, Folder as FolderIcon, FolderInput, FolderPlus } from "lucide-react";
+import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
 import { folderMessages } from "../../../shared/folder-messages";
 import { useI18n } from "../../shared/i18n";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -14,15 +15,20 @@ import { FolderDot } from "./marks";
 
 // Radix radio values are strings; this value stands for the null membership.
 const none = "";
+// Folder dots and the default radio dot look alike, so choices drop the leading indicator slot and mark selection with a trailing check.
+const choiceClass = "pl-2 [&>span:first-child]:hidden";
+const selectedMark = <DropdownMenuPrimitive.ItemIndicator className="ml-auto flex"><Check /></DropdownMenuPrimitive.ItemIndicator>;
 
 /** Radio choices shared by the move submenu and the Home picker: no folder first, then folders in navigation order. */
 function FolderChoices({ value, onSelect }: { value: string | null; onSelect: (id: string | null) => void }) {
   const i18n = useI18n();
   const { folders } = useFolders();
   return <DropdownMenuRadioGroup value={existingFolder(folders, value)?.id ?? none} onValueChange={id => onSelect(id === none ? null : id)}>
-    <DropdownMenuRadioItem value={none}><FolderIcon className="text-muted-foreground" />{i18n.text(folderMessages.noFolder)}</DropdownMenuRadioItem>
-    {sortFolders(folders, i18n.locale).map(folder => <DropdownMenuRadioItem key={folder.id} value={folder.id}>
-      <FolderDot color={folder.color} className="mx-1" /><span className="truncate">{folder.name}</span>
+    <DropdownMenuRadioItem value={none} className={choiceClass}>
+      <FolderIcon className="text-muted-foreground" /><span className="truncate">{i18n.text(folderMessages.noFolder)}</span>{selectedMark}
+    </DropdownMenuRadioItem>
+    {sortFolders(folders, i18n.locale).map(folder => <DropdownMenuRadioItem key={folder.id} value={folder.id} className={choiceClass}>
+      <FolderDot color={folder.color} className="mx-1" /><span className="truncate">{folder.name}</span>{selectedMark}
     </DropdownMenuRadioItem>)}
   </DropdownMenuRadioGroup>;
 }
