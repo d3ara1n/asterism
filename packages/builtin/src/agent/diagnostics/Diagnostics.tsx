@@ -186,11 +186,11 @@ export function Diagnostics() {
       {!data.requests.length ? <p className="type-caption">{i18n.text(messages.noRequests)}</p>
         : <ItemGroup className="-mx-1">{data.requests.map((request, index) => <div key={request.id}>
           {index > 0 && <ItemSeparator />}
-          <ListRow className="px-1" title={<span className="break-all">{request.configuredModel?.name ?? request.model}</span>}
+          <ListRow className="items-start px-1" title={<span className="break-all">{request.configuredModel?.name ?? request.model}</span>}
             description={<>{i18n.text(request.kind === "compression" ? messages.compression : messages.conversation)} · {i18n.formatDate(Date.parse(request.createdAt), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</>}
             media={request.kind === "compression" ? <FileText className="size-4" /> : <MessagesSquare className="size-4" />}
             actions={<span className="flex flex-col items-end gap-0.5 text-right">
-              <span className="type-caption max-w-24 break-words tabular-nums">{formatEstimate(i18n, request.estimate.amount, request.estimate.status === "partial")}</span>
+              <span className="type-caption whitespace-nowrap tabular-nums">{formatEstimate(i18n, request.estimate.amount, request.estimate.status === "partial")}</span>
               {request.completion?.usage?.input != null && <span className="type-caption tabular-nums">{formatCount(request.completion.usage.input)}</span>}
               {requestTiming(request) && <span className="type-caption tabular-nums">{formatDuration(i18n, requestTiming(request)!.durationMs)}</span>}
             </span>}
