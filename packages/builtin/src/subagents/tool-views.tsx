@@ -7,13 +7,13 @@ import { TaskStateText, TaskStatus, Usage } from "./task-parts";
 import type { DelegateInput, TaskSnapshot, TaskSummary, WaitEntry } from "./contract";
 import { currentActivity } from "./activity";
 
-/** Status line identifying one task: ID, role, status, and the task's first line. Snapshots show the status as text. */
-function TaskLine({ task, snapshot = false }: { task: Pick<TaskSummary, "id" | "role" | "task" | "status">; snapshot?: boolean }) {
+/** One task: ID, role, first line, and optional status when it is not already shown in the header. */
+function TaskLine({ task, showStatus = true }: { task: Pick<TaskSummary, "id" | "role" | "task" | "status">; showStatus?: boolean }) {
   return <div className="flex min-w-0 items-center gap-2">
     <span className="shrink-0 font-mono">{task.id}</span>
     <span className="shrink-0 type-caption">{task.role}</span>
     <span className="min-w-0 flex-1 truncate" title={task.task}>{task.task}</span>
-    {snapshot ? <TaskStateText status={task.status} /> : <TaskStatus status={task.status} />}
+    {showStatus && <TaskStatus status={task.status} />}
   </div>;
 }
 
@@ -52,7 +52,7 @@ function CheckBody({ result }: CheckProps) {
   const current = currentActivity(task);
   const tool = current?.activity.startsWith("tool:") ? current.activity.slice(5) : "";
   return <div className="flex min-w-0 flex-col gap-3">
-    <TaskLine snapshot task={{ id: task.input.id, role: task.input.role, task: task.input.task.split("\n")[0]!, status }} />
+    <TaskLine showStatus={false} task={{ id: task.input.id, role: task.input.role, task: task.input.task.split("\n")[0]!, status }} />
     {current && <p className="type-caption">
       {i18n.formatMessage(messages.activity, { activity: tool ? "tool" : current.activity, tool })}
       {current.subject && <> · <span className="font-mono">{current.subject}</span></>}
