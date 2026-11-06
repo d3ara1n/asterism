@@ -297,7 +297,8 @@ function DraftRow({
 
   // Mode label text and styles
   const modeLabel = { none: messages.draftNone, steer: messages.draftSteer, follow: messages.draftFollow }[item.mode];
-  const modeTone = { none: "outline" as const, steer: "secondary" as const, follow: "default" as const }[item.mode];
+  // Steer lands within the running turn, so it carries the strongest tone; keep stays quiet.
+  const modeTone = { none: "secondary" as const, steer: "default" as const, follow: "outline" as const }[item.mode];
 
   return (
     <>
@@ -310,7 +311,7 @@ function DraftRow({
         onDragOver={onDragOver}
         onDrop={onDrop}
       >
-        {/* Drag handle */}
+        {/* Drag handle; zero width until the row is hovered or the handle is focused, so content starts at the row edge. The negative margin cancels the row gap while collapsed. */}
         <button
           ref={gripRef}
           type="button"
@@ -320,9 +321,9 @@ function DraftRow({
           onDragEnd={onDragEnd}
           onKeyDown={onGripKey}
           aria-label={`${i18n.text(messages.drafts)} ${index + 1} – Alt+↑/↓ ${i18n.text(messages.moveUp)}/${i18n.text(messages.moveDown)}`}
-          className="cursor-grab touch-none rounded p-0.5 text-muted-foreground opacity-0 outline-none transition-opacity group-hover/draft:opacity-60 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
+          className="-mr-1.5 flex w-0 shrink-0 cursor-grab touch-none items-center justify-center overflow-hidden rounded py-0.5 text-muted-foreground opacity-0 outline-none transition-[width,margin,opacity] duration-150 ease-out motion-reduce:transition-none group-hover/draft:mr-0 group-hover/draft:w-4 group-hover/draft:opacity-60 focus-visible:mr-0 focus-visible:w-4 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
         >
-          <GripVertical aria-hidden className="size-3" />
+          <GripVertical aria-hidden className="size-3 shrink-0" />
         </button>
 
         {/* Source, preview, and attachments turn over together when an exchange replaces the content */}
