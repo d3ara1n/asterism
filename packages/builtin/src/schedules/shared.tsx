@@ -49,7 +49,7 @@ export function MessageInput({ value, onChange, disabled }: { value: string; onC
   const i18n = useI18n();
   return <Textarea rows={2} maxLength={4000} disabled={disabled} value={value} onChange={event => onChange(event.target.value)}
     placeholder={i18n.text(messages.message)} aria-label={i18n.text(messages.message)}
-    className="field-sizing-fixed min-h-0 shrink-0 resize-none" />;
+    className="field-sizing-fixed min-h-0 flex-1 resize-none" />;
 }
 
 export function BackFooter({ disabled, canSubmit, onCancel }: { disabled: boolean; canSubmit: boolean; onCancel(): void }) {
