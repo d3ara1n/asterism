@@ -94,20 +94,6 @@ function DraftsBox({ drafts: current, pendingTake, open, onOpenChange, onTake }:
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
   const draggingId = useRef<string | null>(null);
   const contentId = useId();
-  // Locally initiated removals, recorded against the content they were made for; any other removal is a delivery.
-  const [intents, setIntents] = useState<ReadonlyMap<string, { kind: DraftIntent; signature: string }>>(() => new Map());
-  const markIntent = (item: AgentDraft, kind: DraftIntent) => {
-    const signature = draftSignature(item);
-    setIntents(map => new Map(map).set(item.id, { kind, signature }));
-    return () => setIntents(map => {
-      if (map.get(item.id)?.signature !== signature) return map;
-      const next = new Map(map); next.delete(item.id); return next;
-    });
-  };
-  const departure = (item: AgentDraft): DraftDeparture => {
-    const intent = intents.get(item.id);
-    return intent?.signature === draftSignature(item) ? intent.kind : "send";
-  };
   // A leaving box empties its list so the last row plays its own departure while the box folds.
   const drafts = present ? current : [];
 
@@ -193,23 +179,19 @@ function DraftsBox({ drafts: current, pendingTake, open, onOpenChange, onTake }:
               role="list">
               <AnimatePresence initial={false}>
                 {drafts.map((item, index) => (
-                  <motion.div key={item.id} className="overflow-hidden" {...rowMotion(item, departure(item), reducedMotion)}>
-                    <div className="pb-0.5">
-                      <DraftRow
-                        item={item}
-                        index={index}
-                        total={drafts.length}
-                        isDragOver={dragOverIndex === index}
-                        reducedMotion={reducedMotion}
-                        onTake={onTake}
-                        onIntent={kind => markIntent(item, kind)}
-                        onDragStart={e => onDragStart(e, item.id)}
-                        onDragOver={e => onDragOver(e, index)}
-                        onDrop={e => onDrop(e, index)}
-                        onDragEnd={onDragEnd}
-                      />
-                    </div>
-                  </motion.div>
+                  <AnimatedDraftRow
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    total={drafts.length}
+                    isDragOver={dragOverIndex === index}
+                    reducedMotion={reducedMotion}
+                    onTake={onTake}
+                    onDragStart={e => onDragStart(e, item.id)}
+                    onDragOver={e => onDragOver(e, index)}
+                    onDrop={e => onDrop(e, index)}
+                    onDragEnd={onDragEnd}
+                  />
                 ))}
               </AnimatePresence>
             </div>
@@ -235,10 +217,7 @@ function DraftContentSwap({ swapKey, reducedMotion, children }: { swapKey: strin
 
 // ─── Single draft row ────────────────────────────────────────────────────────────────
 
-function DraftRow({
-  item, index, total, isDragOver, reducedMotion, onTake, onIntent,
-  onDragStart, onDragOver, onDrop, onDragEnd,
-}: {
+type DraftRowProps = {
   item: AgentDraft; index: number; total: number; isDragOver: boolean; reducedMotion: boolean;
   onTake(): void;
   /** Records how this row is about to leave; the returned function withdraws it when the operation fails. */
@@ -247,7 +226,28 @@ function DraftRow({
   onDragOver(e: DragEvent): void;
   onDrop(e: DragEvent): void;
   onDragEnd(): void;
-}) {
+};
+
+/** Departure intent lives with the row through its exit, then unmounts with it instead of accumulating in the box. */
+function AnimatedDraftRow(props: Omit<DraftRowProps, "onIntent">) {
+  const signature = draftSignature(props.item);
+  const [intent, setIntent] = useState<{ kind: DraftIntent; signature: string } | null>(null);
+  // An exchange keeps the row identity but replaces its content; the old content's intent no longer applies.
+  if (intent && intent.signature !== signature) setIntent(null);
+  const onIntent = (kind: DraftIntent) => {
+    setIntent({ kind, signature });
+    return () => setIntent(current => current?.signature === signature ? null : current);
+  };
+  const departure = intent?.signature === signature ? intent.kind : "send";
+  return <motion.div className="overflow-hidden" {...rowMotion(props.item, departure, props.reducedMotion)}>
+    <div className="pb-0.5"><DraftRow {...props} onIntent={onIntent} /></div>
+  </motion.div>;
+}
+
+function DraftRow({
+  item, index, total, isDragOver, reducedMotion, onTake, onIntent,
+  onDragStart, onDragOver, onDrop, onDragEnd,
+}: DraftRowProps) {
   const i18n = useI18n();
   const interaction = useConversationInteraction();
   const [modePending, setModePending] = useState(false);

@@ -12,7 +12,7 @@ import { RendererCatalogProvider } from "../../modules/object-context";
 import { useModuleViews } from "../../modules/views";
 import { useI18n } from "../../shared/i18n";
 import { operationSucceeded } from "../../shared/toast";
-import { useIsland } from "../../shared/weave/Screen";
+import { useIsland, useIslandStrip } from "../../shared/weave/Screen";
 import { useAppearance, useScheme } from "../appearance/state";
 import type { DragKind } from "../creation/routing";
 import { dropCandidates } from "../creation/routing";
@@ -57,8 +57,9 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
     locateObjects: async (ids, options) => { await canvasRef.current?.locateObjects(ids, options); },
     arrange: async () => { await canvasRef.current?.arrange(); },
   }), []);
-  // Object islands are owned by the canvas island; the card that opened one closes it again.
+  // Newly opened object islands belong to the canvas; template-restored islands can be ownerless.
   const island = useIsland();
+  const strip = useIslandStrip();
   const latest = useRef({ session, onHome });
   latest.current = { session, onHome };
   const islands = useMemo<WorkbenchIslands>(() => ({
@@ -67,8 +68,8 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
       const object = session.objects.find(item => item.id === objectId);
       if (object) void island.open(objectIslandSpec({ store, sessionId: session.id, object, origin, onHome: () => latest.current.onHome() }));
     },
-    closeObject: objectId => { void island.closeOwned({ target: objectIslandId(objectId) }); },
-  }), [island, store]);
+    closeObject: objectId => { void strip.close(objectIslandId(objectId)); },
+  }), [island, strip, store]);
   // Assemble the environment by field, notifying cards and islands only when fields actually change.
   const context = useMemo<WorkbenchView>(
     () => ({ controller, session, ready, run, canvas, islands }),
