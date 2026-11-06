@@ -22,7 +22,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Card } from "@asterism-app/ui/ui/card";
 
 import { Button } from "@asterism-app/ui/ui/button";
-import { ArrowLeft, Info, Palette, PlugZap, Puzzle, BookOpen, Terminal, Network } from "lucide-react";
+import { ArrowLeft, Info, SlidersHorizontal, Palette, PlugZap, Puzzle, BookOpen, Terminal, Network } from "lucide-react";
 import { ConfigurationReadStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";
 import { Screen, useIsland, useIslandCancel, type IslandSpec } from "../../shared/weave/Screen";
@@ -43,7 +43,7 @@ type SettingsIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean 
 interface SettingsCategory { id: SettingsCategoryId; title: UiText; summary: UiText; icon: SettingsIcon; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
-  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: Info, content: () => <><LanguageSettings /><NetworkSettings /><HomeEntrySettings /><SessionsSettings /></> },
+  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: SlidersHorizontal, content: () => <><LanguageSettings /><NetworkSettings /><HomeEntrySettings /><SessionsSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /><MessagingSettings /></> },
   { id: "skills", title: skillsMessages.title, summary: skillsMessages.summary, icon: BookOpen, content: () => <SkillSettings /> },
