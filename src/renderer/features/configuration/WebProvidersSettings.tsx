@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Globe, GripVertical, Plus } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
 import type { ProviderSetting, WebProviderType } from "@asterism-app/sdk/contracts";
@@ -131,7 +131,7 @@ function SortableProvider({ id, label, disabled, onDragStart, onDragEnd, childre
 /* ---------- Service selection: every registered service, with added ones marked ---------- */
 
 function WebProviderCreation() {
-  const i18n = useI18n(), capabilities = useCapabilities();
+  const i18n = useI18n(), capabilities = useCapabilities(), form = useId();
   const { snapshot } = useSettingsConfiguration();
   const [picked, setPicked] = useState<string | null>(null);
   const island = useIsland();
@@ -140,7 +140,7 @@ function WebProviderCreation() {
   const types = snapshot?.webProviderTypes ?? [];
   const added = new Set((snapshot?.webProviders ?? []).map(state => state.id));
   const tile = "min-h-16 flex-col items-start justify-center gap-1 px-3 py-2 text-left";
-  return <Editor form="web-provider-creation" title={i18n.text(messages.add)} dirty={false} busy={false} error={null}>
+  return <Editor form={form} title={i18n.text(messages.add)} dirty={false} busy={false} error={null}>
     <div className="flex flex-col gap-5">
       <p className="type-caption">{i18n.text(messages.pickerHint)}</p>
       <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9rem, 1fr))" }}>
@@ -178,7 +178,7 @@ function FetchScope({ patterns }: { patterns: readonly string[] }) {
 }
 
 function WebProviderEditor({ typeId }: { typeId: string }) {
-  const i18n = useI18n(), island = useIsland(), capabilities = useCapabilities();
+  const i18n = useI18n(), island = useIsland(), capabilities = useCapabilities(), form = useId();
   useIslandCancel(async () => { await island.close(); });
   const { snapshot } = useSettingsConfiguration();
   const type = snapshot?.webProviderTypes.find(type => type.id === typeId);
@@ -190,11 +190,11 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
   const complete = !!type && settingsComplete(type.settings, values);
   const label = type ? i18n.text(type.label) : typeId;
   return <Editor title={label} description={type ? capabilities(type) : i18n.text(messages.unavailable)}
-    form="web-provider-editor" dirty={dirty} busy={action.busy} error={action.error} saveDisabled={!complete}
+    form={form} dirty={dirty} busy={action.busy} error={action.error} saveDisabled={!complete}
     remove={saved ? { title: i18n.text(messages.remove), description: i18n.text(messages.removeHint), onConfirm: async () => {
       if (await action.run({ type: "remove", kind: "webProvider", id: saved.id })) void island.close({ force: true });
     } } : undefined}>
-    <form id="web-provider-editor" onSubmit={async event => {
+    <form id={form} onSubmit={async event => {
       event.preventDefault();
       if (!type || !complete) return;
       // Enablement is an immediate list action; saving keeps the current value and new services start enabled.

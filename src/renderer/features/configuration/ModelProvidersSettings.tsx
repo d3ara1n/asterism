@@ -1,5 +1,5 @@
 import { Plus, Zap, Search, PlugZap } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 
 import { applyModelParameters, canEditModelProviderField, createModelInput, modelProviderComplete, modelProviderSchema, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ProviderModel, type TestError } from "../../../shared/configuration";
 import { modelProviderPresetDraft, type ModelProviderPreset, type ModelProviderDraft } from "../../../shared/provider-presets";
@@ -178,13 +178,13 @@ const blank: ProviderValue = { id: "", name: "", protocol: "openai-responses", b
 
 /** The selection entry generates configuration and editing rules; the editor receives only the key link and does not retain preset identity. */
 function ProviderCreation() {
-  const i18n = useI18n();
+  const i18n = useI18n(), form = useId();
   const { snapshot } = useSettingsConfiguration();
   const [picked, setPicked] = useState<{ value: ProviderValue; keyUrl?: string } | null>(null);
   const island = useIsland();
   useIslandCancel(picked ? null : async () => { await island.close(); });
   if (picked) return <ProviderEditor initialId={null} initialValue={picked.value} keyUrl={picked.keyUrl} />;
-  return <Editor form="provider-form" title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false} busy={false} error={null}>
+  return <Editor form={form} title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false} busy={false} error={null}>
     <PresetPicker onPick={preset => setPicked(preset ? { keyUrl: preset.keyUrl, value: {
       ...modelProviderPresetDraft(preset, snapshot?.modelProviders.map(provider => provider.id)), apiKey: "",
       name: `${preset.name} · ${presetDescription(preset)}`,
@@ -193,7 +193,7 @@ function ProviderCreation() {
 }
 
 function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId: string | null; initialValue?: ProviderValue; keyUrl?: string }) {
-  const i18n = useI18n();
+  const i18n = useI18n(), form = useId();
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const discoveryAction = useConfigurationAction("inline");
@@ -230,12 +230,12 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
   };
   const models = snapshot?.models.filter(model => model.providerId === id) ?? [];
 
-  return <Editor form="provider-form" title={current?.name ?? i18n.formatMessage(providersMessages.newProvider)} dirty={dirty} busy={busy} error={error} saveDisabled={!complete}
+  return <Editor form={form} title={current?.name ?? i18n.formatMessage(providersMessages.newProvider)} dirty={dirty} busy={busy} error={error} saveDisabled={!complete}
     description={canEditModelProviderField(value, "protocol") ? protocolLabel(value.protocol) : undefined}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteProviderTitle),
       description: i18n.formatMessage(providersMessages.deleteProviderDescription, { current_name: current.name, models_length: models.length }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "modelProvider", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
-    <form id="provider-form" onSubmit={async event => {
+    <form id={form} onSubmit={async event => {
       event.preventDefault();
       if (!complete) return;
       const result = await run({ type: "modelProvider.save", id, value: { ...value, enabled: current?.enabled ?? true } });
@@ -297,7 +297,7 @@ function ModelRow({ model, provider, selected, onOpen }: { model: ProviderModel;
 /* ---------- Model details: basic information, parameters, compatibility settings, and connection testing; parameter fetching belongs to the parameters section ---------- */
 
 function ModelEditor({ initialId, providerId }: { initialId: string | null; providerId: string }) {
-  const i18n = useI18n();
+  const i18n = useI18n(), form = useId();
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
@@ -316,12 +316,12 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const test = current && snapshot ? latestTest(snapshot, modelReference(current)) : undefined;
   const parameters = useModelParameters(value.modelId, busy, fetched => setValue(draft => applyModelParameters(draft, fetched)));
 
-  return <Editor form="model-form" title={current?.name ?? i18n.formatMessage(providersMessages.newModel)} description={provider?.name} dirty={dirty}
+  return <Editor form={form} title={current?.name ?? i18n.formatMessage(providersMessages.newModel)} description={provider?.name} dirty={dirty}
     busy={busy} error={error} disabled={parameters.pending}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteModelTitle),
       description: i18n.formatMessage(providersMessages.deleteUnusedModelDescription, { current_name: current.name }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "model", id: modelReference(current) }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
-    <form id="model-form" onSubmit={async event => {
+    <form id={form} onSubmit={async event => {
       event.preventDefault();
       const result = await run({ type: "model.save", id, value: { ...value, enabled: current?.enabled ?? true } });
       if (result?.ok) {
