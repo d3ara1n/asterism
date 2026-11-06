@@ -57,7 +57,7 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
     getSnapshot: () => state,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     setText: (text: string) => { if (!state.locked) change({ text }); },
-    lock: (locked: boolean) => change({ locked }),
+    lock: (locked: boolean) => { if (state.locked !== locked) change({ locked }); },
     content: input,
     parts(trim = true): AgentInputPart[] {
       const text = trim ? state.text.trim() : state.text;

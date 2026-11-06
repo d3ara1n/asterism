@@ -1,4 +1,4 @@
-import { useId, useState, useRef, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useState, useRef, useSyncExternalStore, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion, type MotionProps } from "motion/react";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { inputFileName } from "@asterism-app/builtin-api/contracts";
@@ -280,11 +280,10 @@ function DraftRow({
   };
 
   const { Icon: SenderIcon, surface } = messageAppearance[item.sender.kind];
-  const editorHasContent = (() => {
-    // Retrieval is an "exchange" when the editor is nonempty
+  const editorHasContent = useSyncExternalStore(interaction.draft.subscribe, () => {
     const state = interaction.draft.getSnapshot();
     return Boolean(state.text.trim() || state.files.length);
-  })();
+  });
 
   // Source marker
   const senderName = i18n.text(messageSenderLabel(item.sender));

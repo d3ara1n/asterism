@@ -124,6 +124,8 @@ Taking a draft into an empty composer removes it from drafts. Swapping with comp
 
 Lost receipts retain the submission identity and content needed for retry. Explicit failure preserves the original content. Restoration does not send drafts automatically.
 
+One object-retained input owner admits operations that submit or replace composer content, derives the editor lock, and publishes operation and exchange-recovery state explicitly. Draft content and upload state have their own notifications; an unchanged editor lock is not a signal for unrelated operation-state changes. View remounts preserve both input content and a pending exchange.
+
 Process folding groups the conversation by input, independently of execution turns and their measurements. Consecutive inputs share a group; an input after model content starts the next group, including when delivered as a steer within the same execution turn. The running tail remains available for interaction. Earlier groups and a stopped tail fold their thinking, tools, and intermediate replies behind separate summaries, preserving each group's final reply. A group with nothing to hide has no summary. Inputs, compaction markers, execution feedback, and turn measurements stay visible.
 
 Each conversation group's final reply is the complete body of its last response when that response completed normally. Failure does not promote an earlier intermediate reply into a final answer. Turn measurements and the turn's copy action retain the execution turn's scope.

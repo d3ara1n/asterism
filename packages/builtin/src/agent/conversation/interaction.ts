@@ -1,13 +1,12 @@
-import { useI18n, type RendererObjectContext, type RendererReceipt, type ContentReader, type RendererContentInput } from "@asterism-app/sdk/renderer";
-import { SubmitAgentInput, ConfigureAgent, ContinueAgent, CancelAgent, type AgentSelection, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
+import { useI18n, type RendererObjectContext, type RendererReceipt } from "@asterism-app/sdk/renderer";
+import { SubmitAgentInput, ConfigureAgent, ContinueAgent, CancelAgent, type AgentSelection } from "@asterism-app/builtin-api/contracts";
 import { createContext, useContext, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { SubmissionIdentity } from "./submission";
-import { createMessageDraft, copyDraft, composerTextLimit, type CopiedDraft } from "./draft";
+import { composerTextLimit } from "./draft";
 import type { AgentExecutionState } from "../state";
 import { DiscardAgentDraft, ExchangeAgentDraft, MoveAgentDraft, SaveAgentDraft, SetAgentDraftMode, type AgentDraft, type DraftMode } from "../drafts-contract";
 import { conversationMessages } from "../../messages/conversation";
-import { DraftExchange } from "./draft-exchange";
+import { ConversationInput } from "./conversation-input";
 
 const Interaction = createContext<ReturnType<typeof useAgentConversation> | null>(null);
 export const AgentConversationProvider = Interaction.Provider;
@@ -22,55 +21,24 @@ const interactionKey = "asterism.builtin/agent.interaction";
 export function useAgentConversation(object: RendererObjectContext, hasSelection: boolean, executionState: AgentExecutionState, drafts: readonly AgentDraft[]) {
   const i18n = useI18n();
   const current = object.retained.get(interactionKey,
-    () => {
-      const draft = createMessageDraft(() => object.input(SubmitAgentInput));
-      const transfers = new Map<string, { signature: string; value: CopiedDraft }>();
-      const clearTransfers = (keep?: RendererContentInput) => {
-        for (const item of transfers.values()) if (item.value.content !== keep) void item.value.content.close();
-        transfers.clear();
-      };
-      return { draft, submission: new SubmissionIdentity(), transfers, clearTransfers,
-        exchange: new DraftExchange(draft, clearTransfers), closed: false };
-    },
-    async entry => {
-      entry.closed = true;
-      await entry.draft.close();
-      await Promise.all([...entry.transfers.values()].map(item => item.value.content.close()));
-    });
+    () => new ConversationInput(() => object.input(SubmitAgentInput)),
+    input => input.close());
   const { draft, submission } = current;
-  const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
+  const phase = useSyncExternalStore(current.subscribe, current.getSnapshot);
   const accepted = (result: RendererReceipt) => {
     if (!result.ok) toast.error(i18n.text(result.error.display ?? result.error.message));
     return result.ok;
   };
   const { ready } = object.view;
-  const editable = ready && !state.locked;
+  const editable = ready && phase === "idle";
   const writable = editable && hasSelection;
-  const transfer = async (key: string, parts: readonly AgentInputPart[], source: ContentReader, input: () => RendererContentInput) => {
-    const signature = JSON.stringify(parts), existing = current.transfers.get(key);
-    if (existing?.signature === signature) return existing.value;
-    if (existing) { current.transfers.delete(key); await existing.value.content.close(); }
-    const value = await copyDraft(parts, source, input());
-    if (current.closed) { await value.content.close(); throw new Error("The message editor is closed."); }
-    current.transfers.set(key, { signature, value });
-    return value;
-  };
-  const { clearTransfers } = current;
-  const completeExchange = async () => {
-    const result = await current.exchange.retry((input, content) => object.invoke(ExchangeAgentDraft, input, { content }));
-    if (!accepted(result)) return false;
-    submission.accepted();
-    return true;
-  };
   const mutate = async (work: () => Promise<boolean>) => {
-    const latest = draft.getSnapshot();
-    if (!editable || latest.locked || latest.uploading || current.closed) return false;
-    draft.lock(true);
-    try { return await work(); }
+    if (!editable) return false;
+    try { return await current.mutate(work); }
     catch { toast.error(i18n.text(conversationMessages.draftTransferFailed)); return false; }
-    finally { draft.lock(current.exchange.pending !== null); }
   };
   const send = async (): Promise<boolean> => {
+    const state = draft.getSnapshot();
     if (!writable || (!state.text.trim() && !state.files.length)) return false;
     return mutate(async () => {
       // Execution state may change around acceptance; the same complete input always retains the same submission identity.
@@ -80,7 +48,7 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
         ...input, submissionId: submission.forInput({ contract: SubmitAgentInput.id, input }),
       }, { content: draft.content() });
       if (!accepted(result)) return false;
-      submission.accepted(); clearTransfers(); draft.accepted();
+      submission.accepted(); current.clearTransfers(); draft.accepted();
       return true;
     });
   };
@@ -92,13 +60,13 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
     }
     const latest = draft.getSnapshot();
     if (latest.text.trim() || latest.files.length) {
-      const copied = await transfer("save", draft.parts(false), draft.content(), () => object.input(SaveAgentDraft));
+      const copied = await current.transfer("save", draft.parts(false), draft.content(), () => object.input(SaveAgentDraft));
       const input = { parts: copied.parts };
       const result = await object.invoke(SaveAgentDraft, {
         ...input, submissionId: submission.forInput({ contract: SaveAgentDraft.id, input }),
       }, { content: copied.content });
       if (!accepted(result)) return false;
-      submission.accepted(); clearTransfers();
+      submission.accepted(); current.clearTransfers();
     }
     draft.accepted(text);
     return true;
@@ -106,12 +74,14 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
   return {
     draft, drafts, writable, editable, executionState, configurable: ready,
     // Only an exchange whose receipt was unknown needs the user; an exchange still in its first attempt is ordinary work.
-    pendingTake: current.exchange.unconfirmed,
-    canRetryTake: ready && !current.exchange.working,
+    pendingTake: phase === "unconfirmed" || phase === "retrying",
+    canRetryTake: ready && phase === "unconfirmed",
     async retryTake(): Promise<boolean> {
-      if (!ready || current.exchange.working || current.closed) return false;
-      try { return await completeExchange(); }
-      catch { toast.error(i18n.text(conversationMessages.draftExchangePending)); return false; }
+      if (!ready) return false;
+      try {
+        const result = await current.retryExchange((input, content) => object.invoke(ExchangeAgentDraft, input, { content }));
+        return result ? accepted(result) : false;
+      } catch { toast.error(i18n.text(conversationMessages.draftExchangePending)); return false; }
     },
     async configure(selection: AgentSelection) { return accepted(await object.invoke(ConfigureAgent, { selection })); },
     send,
@@ -135,15 +105,14 @@ export function useAgentConversation(object: RendererObjectContext, hasSelection
     async take(item: AgentDraft): Promise<boolean> {
       return mutate(async () => {
         // First establish an editor hold for the retrieved content, then atomically exchange the persistent item, and finally replace the visible editor.
-        const incoming = await transfer("take", item.parts, object.content, () => object.input(SubmitAgentInput));
-        const parts = draft.parts(false);
+        const incoming = await current.transfer("take", item.parts, object.content, () => object.input(SubmitAgentInput));
+        const parts = draft.parts(false), state = draft.getSnapshot();
         const replacement = state.text.trim() || state.files.length
-          ? await transfer("exchange", parts, draft.content(), () => object.input(ExchangeAgentDraft)) : null;
+          ? await current.transfer("exchange", parts, draft.content(), () => object.input(ExchangeAgentDraft)) : null;
         const input = { id: item.id, replacement: replacement?.parts ?? null };
-        current.exchange.begin({ input: {
+        return accepted(await current.exchange({ input: {
           ...input, submissionId: submission.forInput({ contract: ExchangeAgentDraft.id, input }),
-        }, incoming, replacement });
-        return completeExchange();
+        }, incoming, replacement }, (input, content) => object.invoke(ExchangeAgentDraft, input, { content })));
       });
     },
     async resume() { if (writable && executionState === "incomplete") accepted(await object.invoke(ContinueAgent, {})); },
