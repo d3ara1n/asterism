@@ -312,8 +312,7 @@ function DraftRow({
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="ghost" size="icon-xs"
               disabled={!interaction.editable}
-              aria-label={i18n.text(messages.draftMoreActions)}
-              className="opacity-0 transition-opacity group-hover/draft:opacity-100 focus:opacity-100 data-[state=open]:opacity-100">
+              aria-label={i18n.text(messages.draftMoreActions)}>
               <MoreHorizontal aria-hidden />
             </Button>
           </DropdownMenuTrigger>
