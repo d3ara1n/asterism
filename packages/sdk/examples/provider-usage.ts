@@ -17,9 +17,9 @@ const usage: UsageProvider = {
     if (!parsed.success) throw new UsageQueryError("protocol");
     const value = parsed.data;
     return [
-      { id: "wallet", type: "balance", scope: "account", label: "Balance", remaining: value.balance, currency: value.currency },
-      { id: "five-hours", type: "quota", scope: "plan", label: "5h", value: { type: "ratio", remaining: value.remainingRatio },
-        window: { mode: "rolling", durationMs: 18_000_000, resetAt: value.resetAt } },
+      { id: "wallet", type: "balance", scope: "account", label: "Balance", remaining: value.balance, unit: { type: "currency", code: value.currency } },
+      { id: "five-hours", type: "quota", scope: "plan", value: { type: "ratio", remaining: value.remainingRatio },
+        window: { mode: "rolling", periodSeconds: 18_000, resetAt: value.resetAt } },
     ] satisfies UsageItem[];
   },
 };

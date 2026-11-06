@@ -24,8 +24,8 @@ function open(plugins: PluginDefinition[], pluginDependencies?: ReadonlyMap<stri
   return { service, close, observer };
 }
 const items: UsageItem[] = [
-  { type: "quota", id: "5h", label: "5h", scope: "plan", value: { type: "ratio", remaining: 0.5 }, window: { mode: "rolling", durationMs: 18000000, resetAt: null } },
-  { type: "balance", id: "wallet", label: "Wallet", scope: "account", remaining: 3, currency: "USD" },
+  { type: "quota", id: "5h", label: "5h", scope: "plan", value: { type: "ratio", remaining: 0.5 }, window: { mode: "rolling", periodSeconds: 18000, resetAt: null } },
+  { type: "balance", id: "wallet", label: "Wallet", scope: "account", remaining: 3, unit: { type: "currency", code: "USD" } },
 ];
 const value = { id: "my-glm", name: "My GLM", protocol: "openai-chat" as const, auth: "api_key" as const,
   baseUrl: "https://example.test/v1", enabled: true, compatibility: [], usage: "test-usage" };

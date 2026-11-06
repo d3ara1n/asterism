@@ -1,4 +1,4 @@
-import type { QuotaItem, UiText, UsageItem } from "@asterism-app/sdk/contracts";
+import type { QuotaItem, UiText, UsageItem, UsageUnit } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
 import { UsageQueryError, type HeadersUsageProvider, type UsageHeadersContext } from "@asterism-app/sdk/runtime";
 import { usageMessages as messages } from "../messages/usage.ts";
@@ -22,7 +22,9 @@ const isoTime = (value: string | undefined): number | null => {
   const time = Date.parse(value!);
   return Number.isFinite(time) && time >= 0 ? time : null;
 };
-interface Metric { id: string; label: UiText; unit: UiText; limit: string; remaining: string; reset: string }
+const tokens: UsageUnit = { type: "count", label: "tokens" };
+const requests: UsageUnit = { type: "count", label: messages.requests };
+interface Metric { id: string; label: UiText; unit: UsageUnit; limit: string; remaining: string; reset: string }
 function parse(context: UsageHeadersContext, metrics: readonly Metric[], reset: (value: string | undefined, receivedAt: number) => number | null): UsageItem[] | null {
   const items: QuotaItem[] = [];
   for (const metric of metrics) {
@@ -34,28 +36,28 @@ function parse(context: UsageHeadersContext, metrics: readonly Metric[], reset: 
     items.push({ id: metric.id, label: metric.label, type: "quota", category: "rate_limit", scope: "connection",
       value: limit === 0 ? { type: "ratio", remaining: 0 } : { type: "quantity", limit, remaining, unit: metric.unit },
       // The reset countdown identifies when the bucket recovers; do not infer the full window length from it.
-      window: { mode: "unknown", durationMs: null,
+      window: { mode: "unknown", periodSeconds: null,
         resetAt: resetAt !== null && Number.isFinite(new Date(resetAt).getTime()) && resetAt >= 0 ? resetAt : null } });
   }
   return items.length ? items : null;
 }
 const openaiMetrics: Metric[] = [
-  { id: "tokens", label: messages.tokenRate, unit: "tokens", limit: "x-ratelimit-limit-tokens", remaining: "x-ratelimit-remaining-tokens", reset: "x-ratelimit-reset-tokens" },
-  { id: "requests", label: messages.requestRate, unit: messages.requests, limit: "x-ratelimit-limit-requests", remaining: "x-ratelimit-remaining-requests", reset: "x-ratelimit-reset-requests" },
+  { id: "tokens", label: messages.tokenRate, unit: tokens, limit: "x-ratelimit-limit-tokens", remaining: "x-ratelimit-remaining-tokens", reset: "x-ratelimit-reset-tokens" },
+  { id: "requests", label: messages.requestRate, unit: requests, limit: "x-ratelimit-limit-requests", remaining: "x-ratelimit-remaining-requests", reset: "x-ratelimit-reset-requests" },
 ];
 export const openaiHeaderUsage: HeadersUsageProvider = {
   id: "openai", label: "OpenAI", source: "headers",
   parseHeaders: context => parse(context, [...openaiMetrics,
-    { id: "project-tokens", label: messages.projectTokenRate, unit: "tokens", limit: "x-ratelimit-limit-project-tokens", remaining: "x-ratelimit-remaining-project-tokens", reset: "x-ratelimit-reset-project-tokens" },
+    { id: "project-tokens", label: messages.projectTokenRate, unit: tokens, limit: "x-ratelimit-limit-project-tokens", remaining: "x-ratelimit-remaining-project-tokens", reset: "x-ratelimit-reset-project-tokens" },
   ], (value, now) => { const ms = duration(value); return ms === null ? null : now + ms; }),
 };
 export const anthropicHeaderUsage: HeadersUsageProvider = {
   id: "anthropic", label: "Anthropic", source: "headers",
   parseHeaders: context => parse(context, [
-    { id: "tokens", label: messages.tokenRate, unit: "tokens", limit: "anthropic-ratelimit-tokens-limit", remaining: "anthropic-ratelimit-tokens-remaining", reset: "anthropic-ratelimit-tokens-reset" },
-    { id: "input-tokens", label: messages.inputTokenRate, unit: "tokens", limit: "anthropic-ratelimit-input-tokens-limit", remaining: "anthropic-ratelimit-input-tokens-remaining", reset: "anthropic-ratelimit-input-tokens-reset" },
-    { id: "output-tokens", label: messages.outputTokenRate, unit: "tokens", limit: "anthropic-ratelimit-output-tokens-limit", remaining: "anthropic-ratelimit-output-tokens-remaining", reset: "anthropic-ratelimit-output-tokens-reset" },
-    { id: "requests", label: messages.requestRate, unit: messages.requests, limit: "anthropic-ratelimit-requests-limit", remaining: "anthropic-ratelimit-requests-remaining", reset: "anthropic-ratelimit-requests-reset" },
+    { id: "tokens", label: messages.tokenRate, unit: tokens, limit: "anthropic-ratelimit-tokens-limit", remaining: "anthropic-ratelimit-tokens-remaining", reset: "anthropic-ratelimit-tokens-reset" },
+    { id: "input-tokens", label: messages.inputTokenRate, unit: tokens, limit: "anthropic-ratelimit-input-tokens-limit", remaining: "anthropic-ratelimit-input-tokens-remaining", reset: "anthropic-ratelimit-input-tokens-reset" },
+    { id: "output-tokens", label: messages.outputTokenRate, unit: tokens, limit: "anthropic-ratelimit-output-tokens-limit", remaining: "anthropic-ratelimit-output-tokens-remaining", reset: "anthropic-ratelimit-output-tokens-reset" },
+    { id: "requests", label: messages.requestRate, unit: requests, limit: "anthropic-ratelimit-requests-limit", remaining: "anthropic-ratelimit-requests-remaining", reset: "anthropic-ratelimit-requests-reset" },
   ], isoTime),
 };
 export const xaiHeaderUsage: HeadersUsageProvider = {

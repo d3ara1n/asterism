@@ -14,7 +14,7 @@ const usage: HeadersUsageProvider = {
     const value = balance.safeParse(amount), code = currency.safeParse(unit);
     if (!amount.trim() || !value.success || !code.success) throw new UsageQueryError("protocol");
     return [{ id: "wallet", type: "balance", scope: "account", label: "Account balance",
-      remaining: value.data, currency: code.data }] satisfies UsageItem[];
+      remaining: value.data, unit: { type: "currency", code: code.data } }] satisfies UsageItem[];
   },
 };
 export default definePlugin({ namespace: ns, setup: () => ({ usageProviders: [usage] }) });

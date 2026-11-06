@@ -4,6 +4,7 @@ import type { UiText } from "./i18n.ts";
 import type { CardAppearance } from "./card.ts";
 export type { CardAppearance } from "./card.ts";
 export * from "./renderer-i18n.ts";
+export * from "./renderer-usage.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { Json } from "./json.ts";
 import { reference, type ContractReference, type DataContract } from "./presentation.ts";

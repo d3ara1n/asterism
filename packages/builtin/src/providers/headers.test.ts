@@ -15,7 +15,7 @@ describe("rate-limit response headers", () => {
       "x-ratelimit-limit-requests": "10", "x-ratelimit-remaining-requests": "0", "x-ratelimit-reset-requests": "500ms",
     }));
     expect(usageItemsSchema.parse(result)).toMatchObject([
-      { id: "tokens", category: "rate_limit", scope: "connection", value: { type: "quantity", remaining: 750, limit: 1000 }, window: { durationMs: null, resetAt: context({}).receivedAt + 62500 } },
+      { id: "tokens", category: "rate_limit", scope: "connection", value: { type: "quantity", remaining: 750, limit: 1000 }, window: { periodSeconds: null, resetAt: context({}).receivedAt + 62500 } },
       { id: "requests", value: { remaining: 0 }, window: { resetAt: context({}).receivedAt + 500 } },
     ]);
   });

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Coins, CircleDashed } from "lucide-react";
 import { primaryQuota, quotaRemaining, type UsageItem } from "@asterism-app/sdk/contracts";
-import { useI18n } from "@asterism-app/sdk/renderer";
+import { formatUsageAmount, formatUsageQuantity, useI18n, usageItemLabel } from "@asterism-app/sdk/renderer";
 import { useProviderUsage } from "./use-usage";
 import { AgentToolbarItem, useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { Progress } from "@asterism-app/ui/ui/progress";
@@ -22,12 +22,14 @@ export function UsageToolbarItem() {
   }, []);
   if (!state || state.state === "disabled" || (!state.usage && !state.error)) return null;
   const primary = primaryQuota(state.items);
-  const balance = state.items.find(item => item.type === "balance");
+  const balances = state.items.filter(item => item.type === "balance");
   const title = primary?.category === "rate_limit" ? messages.rateLimits : messages.title;
   const percentage = (value: number) => i18n.formatNumber(value, { style: "percent", maximumFractionDigits: 0 });
   const amount = (item: UsageItem) => item.type === "balance"
-    ? i18n.formatNumber(item.remaining, { style: "currency", currency: item.currency }) : percentage(quotaRemaining(item));
-  const value = primary ? percentage(quotaRemaining(primary)) : balance ? amount(balance) : "—";
+    ? formatUsageAmount(i18n, item.remaining, item.unit) : percentage(quotaRemaining(item));
+  // Several balances (key and account) read side by side; a successful empty result is a quiet dash, not a warning.
+  const value = primary ? percentage(quotaRemaining(primary))
+    : balances.length ? balances.map(item => formatUsageAmount(i18n, item.remaining, item.unit, { compact: true })).join(" | ") : "—";
   const exhausted = state.items.some(item => item.type === "quota" && quotaRemaining(item) === 0);
   const stale = state.updatedAt !== null && (state.state === "error" || now - state.updatedAt > 120_000);
   const countdown = (reset: number) => {
@@ -36,23 +38,27 @@ export function UsageToolbarItem() {
     const hours = Math.floor(minutes / 60);
     return hours < 24 ? `${hours}h ${minutes % 60}m` : `${Math.floor(hours / 24)}d ${hours % 24}h`;
   };
+  const hasData = primary !== null || balances.length > 0;
   return <AgentToolbarItem><MetricCard label={i18n.text(title)} value={value}
     icon={<>
       {primary ? <Progress className="h-1.5 w-14" value={quotaRemaining(primary) * 100}
-        aria-label={i18n.text(primary.label)} aria-valuetext={i18n.formatMessage(messages.remaining, { value })} />
-        : balance ? <Coins /> : state.state === "loading" ? <Spinner /> : state.state === "waiting" ? <CircleDashed /> : <AlertCircle />}
-      {(state.error || exhausted || stale) && (primary || balance) && <AlertCircle className="size-3.5 text-warning" />}
+        aria-label={usageItemLabel(i18n, primary)} aria-valuetext={i18n.formatMessage(messages.remaining, { value })} />
+        : balances.length ? <Coins />
+        : state.state === "loading" ? <Spinner />
+        : state.state === "waiting" ? <CircleDashed />
+        : state.error ? <AlertCircle /> : null}
+      {(state.error || exhausted || stale) && hasData && <AlertCircle className="size-3.5 text-warning" />}
     </>}>
     <h4 className="type-label">{i18n.text(title)}</h4>
     {state.items.map(item => <div key={item.id} className="space-y-1">
       <div className="flex items-baseline justify-between gap-4">
-        <span>{i18n.text(item.label)}</span><span className={cn("tabular-nums", item.type === "quota" && quotaRemaining(item) === 0 && "text-warning")}>
+        <span>{usageItemLabel(i18n, item)}</span><span className={cn("tabular-nums", item.type === "quota" && quotaRemaining(item) === 0 && "text-warning")}>
           {i18n.formatMessage(messages.remaining, { value: amount(item) })}</span>
       </div>
       {item.type === "quota" && <>
-        <Progress className={cn("h-1", quotaRemaining(item) === 0 && "bg-warning/25")} value={quotaRemaining(item) * 100} aria-label={i18n.text(item.label)} />
+        <Progress className={cn("h-1", quotaRemaining(item) === 0 && "bg-warning/25")} value={quotaRemaining(item) * 100} aria-label={usageItemLabel(i18n, item)} />
         {item.value.type === "quantity" && <p className="type-caption tabular-nums">
-          {i18n.formatNumber(item.value.remaining)} / {i18n.formatNumber(item.value.limit)} {i18n.text(item.value.unit)}
+          {formatUsageQuantity(i18n, item.value.remaining, item.value.limit, item.value.unit)}
         </p>}
         <p className="type-caption tabular-nums">{item.window.resetAt === null ? i18n.text(messages.resetUnknown)
           : item.window.resetAt <= now ? i18n.text(messages.resetPending)

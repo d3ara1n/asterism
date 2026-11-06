@@ -7,7 +7,8 @@ const response = z.object({ code: z.literal(0), status: z.literal(true), data: z
 /** Moonshot returns no currency; the selected regional query defines it. available_balance is already the total available amount. */
 export function parseMoonshotBalance(raw: unknown, currency: "CNY" | "USD"): UsageItem[] {
   const { data } = parseUsageResponse(response, raw);
-  return [{ id: "balance", type: "balance", scope: "account", label: messages.balance, remaining: data.available_balance, currency }];
+  return [{ id: "balance", type: "balance", scope: "account", label: messages.balance, remaining: data.available_balance,
+    unit: { type: "currency", code: currency } }];
 }
 export const createMoonshotUsage = (id: "kimi-cn" | "kimi", transport: typeof fetch = fetch) => jsonUsage({
   id, label: id === "kimi-cn" ? "Kimi (CN)" : "Kimi", path: "/v1/users/me/balance",

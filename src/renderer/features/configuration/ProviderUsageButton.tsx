@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { AlertCircle, CircleDashed, Coins } from "lucide-react";
 import { animate, AnimatePresence, motion, useMotionValue, useReducedMotion } from "motion/react";
-import { useI18n, useRendererCalls, useRendererEvents } from "@asterism-app/sdk/renderer";
+import { formatUsageAmount, formatUsageQuantity, useI18n, usageItemLabel, useRendererCalls, useRendererEvents } from "@asterism-app/sdk/renderer";
 import { primaryQuota, quotaRemaining, ReadUsage, UsageChanged, type ProviderUsageState, type QuotaItem } from "@asterism-app/sdk/contracts";
 import { Progress } from "@asterism-app/ui/ui/progress";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
@@ -93,7 +93,6 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
   if (state?.state === "disabled") return null;
   const quotas = state?.items.filter((item): item is QuotaItem => item.type === "quota") ?? [];
   const balances = state?.items.filter(item => item.type === "balance") ?? [];
-  const money = (value: number, currency: string) => i18n.formatNumber(value, { style: "currency", currency, maximumFractionDigits: 2 });
   const percent = (value: number) => i18n.formatNumber(value, { style: "percent", maximumFractionDigits: 0 });
   const empty = !quotas.length && !balances.length;
   const lead = primaryQuota(quotas);
@@ -117,13 +116,14 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
           initial={false} animate={{ opacity: dimmed ? 0.4 : 1 }} transition={fadeTransition}>
           <span ref={capsule.content} className="grid w-max shrink-0 items-center justify-items-center">
             <AnimatePresence initial={false}>
-              {view !== "empty" && <motion.span key={view} className="col-start-1 row-start-1 flex items-center gap-2"
+              <motion.span key={view} className="col-start-1 row-start-1 flex items-center gap-2"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1, transition: { ...fadeTransition, delay: view === "data" && !reducedMotion ? 0.16 : 0 } }}
                 exit={{ opacity: 0, transition: fadeTransition }}>
                 {view === "loading" ? <Spinner className="size-3.5" />
                   : view === "waiting" ? <CircleDashed className="text-muted-foreground" />
                   : view === "error" ? <AlertCircle className="text-warning" />
+                  : view === "empty" ? <span className="text-xs leading-none text-muted-foreground" aria-hidden="true">—</span>
                   : <>
                     {state?.state === "waiting" && <CircleDashed className="text-muted-foreground" />}
                     {leadShare !== null && <span className="flex items-center gap-1.5">
@@ -136,13 +136,16 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
                       {others.map(item => <span key={item.id}
                         className={cn("size-1.5 rounded-full", tone(quotaRemaining(item)).dot, quotaRemaining(item) === 0 && "ring-1 ring-background")} />)}
                     </span>}
-                    {balances.map(item => <span key={item.id} className="flex items-center gap-1 text-xs font-medium tabular-nums">
-                      <Coins className={cn("text-muted-foreground", item.remaining <= 0 && "text-destructive")} aria-hidden="true" />
-                      {money(item.remaining, item.currency)}
-                    </span>)}
+                    {balances.length > 0 && <span className="flex items-center gap-1 text-xs font-medium tabular-nums">
+                      <Coins className={cn("text-muted-foreground", balances.some(item => item.remaining <= 0) && "text-destructive")} aria-hidden="true" />
+                      {balances.map((item, index) => <span key={item.id} className="flex items-center gap-1">
+                        {index > 0 && <span className="h-3 w-px bg-border" aria-hidden="true" />}
+                        <span className={cn(item.remaining <= 0 && "text-destructive")}>{formatUsageAmount(i18n, item.remaining, item.unit, { compact: true })}</span>
+                      </span>)}
+                    </span>}
                     {state?.error && <AlertCircle className="text-warning" aria-hidden="true" />}
                   </>}
-              </motion.span>}
+              </motion.span>
             </AnimatePresence>
           </span>
         </motion.span>
@@ -158,10 +161,9 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
       className="w-64 max-w-[calc(100vw-1rem)] space-y-2.5 text-left">
       {state?.items.map(item => <div key={item.id} className="space-y-1">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="truncate">{i18n.text(item.label)}</span>
-          <span className="shrink-0 tabular-nums">{item.type === "balance" ? money(item.remaining, item.currency)
-            : item.value.type === "quantity"
-              ? `${i18n.formatNumber(item.value.remaining)} / ${i18n.formatNumber(item.value.limit)} ${i18n.text(item.value.unit)}`
+          <span className="truncate">{usageItemLabel(i18n, item)}</span>
+          <span className="shrink-0 tabular-nums">{item.type === "balance" ? formatUsageAmount(i18n, item.remaining, item.unit)
+            : item.value.type === "quantity" ? formatUsageQuantity(i18n, item.value.remaining, item.value.limit, item.value.unit)
               : percent(quotaRemaining(item))}</span>
         </div>
         {item.type === "quota" && <Progress className="h-1" value={quotaRemaining(item) * 100} aria-hidden="true" />}

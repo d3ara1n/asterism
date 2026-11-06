@@ -10,7 +10,7 @@ const response = z.object({ balance_infos: z.array(z.object({
 export function parseDeepSeekBalance(raw: unknown): UsageItem[] {
   return parseUsageResponse(response, raw).balance_infos.map(info => ({
     id: `balance-${info.currency}`, type: "balance", scope: "account", label: messages.balance,
-    remaining: info.total_balance, currency: info.currency,
+    remaining: info.total_balance, unit: { type: "currency", code: info.currency },
   }));
 }
 export const createDeepSeekUsage = (transport: typeof fetch = fetch) => jsonUsage({

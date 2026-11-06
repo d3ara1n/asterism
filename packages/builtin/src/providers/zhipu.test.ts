@@ -11,11 +11,11 @@ describe("Zhipu Coding Plan queries", () => {
   it("maps remaining ratios for token/credit windows, keeps weekly periods independent of number variations, and excludes other tool budgets", () => {
     const result = parseZhipuQuota(sample);
     expect(result).toHaveLength(2);
-    expect(result[0]).toMatchObject({ type: "quota", value: { type: "ratio", remaining: 0.8 }, window: { durationMs: 604800000, resetAt: 1790000000000 } });
-    expect(result[1]).toMatchObject({ value: { type: "ratio", remaining: 0.25 }, window: { durationMs: 18000000 } });
-    expect(parseZhipuQuota({ data: { limits: [{ ...sample.data.limits[0], number: 1 }] } })[0]).toMatchObject({ window: { durationMs: 604800000 } });
+    expect(result[0]).toMatchObject({ type: "quota", value: { type: "ratio", remaining: 0.8 }, window: { periodSeconds: 604800, resetAt: 1790000000000 } });
+    expect(result[1]).toMatchObject({ value: { type: "ratio", remaining: 0.25 }, window: { periodSeconds: 18000 } });
+    expect(parseZhipuQuota({ data: { limits: [{ ...sample.data.limits[0], number: 1 }] } })[0]).toMatchObject({ window: { periodSeconds: 604800 } });
     expect(parseZhipuQuota({ data: { limits: [{ type: "TOKENS_LIMIT", unit: 99, percentage: 100 }] } })[0])
-      .toMatchObject({ value: { remaining: 0 }, window: { durationMs: null, resetAt: null } });
+      .toMatchObject({ value: { remaining: 0 }, window: { periodSeconds: null, resetAt: null } });
     expect(() => parseZhipuQuota({ data: { limits: [{ type: "TOKENS_LIMIT" }] } })).toThrow();
   });
   // Explicitly selected queries follow the current connection origin; authentication is independent of the inference protocol, and redirects must not forward the key.

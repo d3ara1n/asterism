@@ -4,7 +4,7 @@ import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, ty
 import { waitForUsage, ProviderUsageService } from "./usage.ts";
 
 const items: UsageItem[] = [{ id: "quota", label: "Quota", scope: "connection", type: "quota", category: "rate_limit",
-  value: { type: "ratio", remaining: 0.4 }, window: { mode: "unknown", durationMs: null, resetAt: null } }];
+  value: { type: "ratio", remaining: 0.4 }, window: { mode: "unknown", periodSeconds: null, resetAt: null } }];
 function setup(provider: UsageProvider) {
   let connection: ModelProviderInfo = { id: "p", name: "P", protocol: "openai-chat", baseUrl: "https://example.test/v1",
     auth: "api_key", enabled: true, compatibility: [], usage: provider.id };

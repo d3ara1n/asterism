@@ -26,7 +26,7 @@ describe("Provider contribution catalog", () => {
   it("queries preserve class method receivers", async () => {
     class Balance implements QueryUsageProvider {
       id = "balance"; label = "Balance"; #remaining = 12;
-      async query(): Promise<UsageItem[]> { return [{ id: "wallet", type: "balance", scope: "account", label: "Wallet", remaining: this.#remaining, currency: "USD" }]; }
+      async query(): Promise<UsageItem[]> { return [{ id: "wallet", type: "balance", scope: "account", label: "Wallet", remaining: this.#remaining, unit: { type: "currency", code: "USD" } }]; }
     }
     const registry = new ModelProviderExtensions(), lifecycle = new RunLifecycle(() => {});
     try {
