@@ -38,7 +38,7 @@ function ListHeader({ target, invocation, result }: ListProps) {
   const i18n = useI18n(), data = result?.data;
   const connectionId = inputText(target, "connectionId"), since = inputText(target, "since") !== undefined;
   return <ToolHeader label={i18n.text(messages.conversations)}
-    subject={[invocation.resource?.title, connectionId].filter(Boolean).join(" / ")}
+    subject={[invocation.resource?.title, connectionId].filter(Boolean).join(": ")}
     meta={data && [since && i18n.text(messages.changes), data.kind === "connections"
       ? i18n.formatMessage(messages.connectionCount, { count: data.connections.length, truncated: data.truncated })
       : i18n.formatMessage(messages.conversationCount, { count: data.conversations.length, truncated: data.truncated })].filter(Boolean).join(" · ")} />;

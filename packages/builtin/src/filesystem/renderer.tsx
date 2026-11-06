@@ -27,7 +27,7 @@ type SeeProps = ToolRenderProps<z.infer<typeof DirectorySee.schema>>;
 function SeeHeader({ target, invocation }: SeeProps) {
   const i18n = useI18n();
   return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectorySee)} monospace
-    subject={[invocation.resource?.title, inputText(target, "path")].filter(Boolean).join(" / ")} />;
+    subject={[invocation.resource?.title, inputText(target, "path")].filter(Boolean).join(": ")} />;
 }
 function SeeBody({ result }: SeeProps) {
   const object = useRendererObject();

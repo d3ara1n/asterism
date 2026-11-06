@@ -18,7 +18,7 @@ function TextReadHeader({ target, invocation, result }: ToolRenderProps<TextRead
   const path = inputText(target, "path");
   const data = result?.data;
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextRead)} monospace={path !== undefined}
-    subject={[invocation.resource?.title, path].filter(Boolean).join(" / ")}
+    subject={[invocation.resource?.title, path].filter(Boolean).join(": ")}
     meta={data && i18n.formatMessage(textMessages.toolTextLines, { shown: data.rows.length, total: data.totalLines })} />;
 }
 function TextWriteHeader({ target, args, invocation, result }: ToolRenderProps<TextChange>) {
@@ -28,7 +28,7 @@ function TextWriteHeader({ target, args, invocation, result }: ToolRenderProps<T
   const count = useMemo(() => content === undefined ? undefined : characterCount(content), [content]);
   const data = result?.data;
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextWrite)} monospace={path !== undefined}
-    subject={[invocation.resource?.title, path].filter(Boolean).join(" / ")}
+    subject={[invocation.resource?.title, path].filter(Boolean).join(": ")}
     meta={<>{data && <>+{data.added} −{data.removed}{count !== undefined && " · "}</>}
       {count !== undefined && i18n.formatMessage(textMessages.toolTextCharacters, { count: formatCount(count) })}</>} />;
 }
@@ -38,7 +38,7 @@ function TextEditHeader({ target, args, invocation, result }: ToolRenderProps<Te
   const edits = inputField(args, "edits");
   const data = result?.data;
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextEdit)} monospace={path !== undefined}
-    subject={[invocation.resource?.title, path].filter(Boolean).join(" / ")}
+    subject={[invocation.resource?.title, path].filter(Boolean).join(": ")}
     meta={<>{data && <>+{data.added} −{data.removed}{Array.isArray(edits) && " · "}</>}
       {Array.isArray(edits) && i18n.formatMessage(textMessages.toolTextEdits, { count: edits.length })}</>} />;
 }
@@ -50,7 +50,7 @@ function TextReplaceHeader({ target, args, invocation, result }: ToolRenderProps
   const mode = i18n.formatMessage(inputField(args, "regex") === true ? textMessages.toolTextRegex : textMessages.toolTextLiteral);
   const flags = inputText(args, "flags");
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextReplace)} monospace={path !== undefined}
-    subject={[invocation.resource?.title, path].filter(Boolean).join(" / ")}
+    subject={[invocation.resource?.title, path].filter(Boolean).join(": ")}
     meta={<>{mode}{flags ? ` /${flags}` : ""}{data && <> · {i18n.formatMessage(textMessages.toolTextMatches, { count: data.matches })} · +{data.added} −{data.removed}</>}</>} />;
 }
 function TextReplaceBody(props: ToolRenderProps<TextReplace>) {

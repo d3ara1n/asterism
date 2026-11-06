@@ -33,7 +33,7 @@ const flagMessages = {
 function Header(props: Props & { grep?: boolean }) {
   const i18n = useI18n(), data = props.result?.data;
   const path = inputText(props.target, "path");
-  const scope = [props.invocation.resource?.title, path && path !== "." ? path : null].filter(Boolean).join(" / ");
+  const scope = [props.invocation.resource?.title, path && path !== "." ? path : null].filter(Boolean).join(": ");
   const counts = data && searchSummary(data);
   const truncated = counts ? !counts.complete : false;
   return <ToolHeader label={i18n.text(props.grep ? messages.toolDirectoryGrep : messages.toolDirectoryFind)} monospace

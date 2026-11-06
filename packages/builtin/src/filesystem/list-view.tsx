@@ -12,7 +12,7 @@ function ListHeader({ target, invocation, result }: ListProps) {
   const i18n = useI18n();
   const path = inputText(target, "path");
   return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectoryList)} monospace
-    subject={[invocation.resource?.title, path && path !== "." ? path : null].filter(Boolean).join(" / ")}
+    subject={[invocation.resource?.title, path && path !== "." ? path : null].filter(Boolean).join(": ")}
     meta={result?.data && i18n.formatMessage(filesystemMessages.toolEntryCount, { count: result.data.entries.length, truncated: result.data.truncated })} />;
 }
 function ListBody({ result }: ListProps) {
