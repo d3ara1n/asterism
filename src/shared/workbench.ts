@@ -32,6 +32,9 @@ export const sessionIslandSchema = z.strictObject({ id: islandId, owner: islandI
 export type SessionIsland = z.infer<typeof sessionIslandSchema>;
 export const sessionIslandsSchema = z.array(sessionIslandSchema).max(256);
 
+/** One object island per object, shared by initial layouts and renderer navigation. */
+export const objectIslandId = (objectId: string) => `object:${objectId}`;
+
 /**
  * Islands whose content still exists: drop islands naming objects outside live, then islands owned by dropped ones, transitively.
  * Owners that are not persisted islands (the root) do not invalidate an island.

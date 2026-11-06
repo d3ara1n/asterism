@@ -74,6 +74,8 @@ Ordinary islands behave like windows. A new island opens at the right end. Openi
 
 The arrangement of restorable islands, with order, owners, and sizes, is session layout state saved beside card views and the canvas viewport and outside history. Restorable islands are object islands and resource locations opened through resource navigation; other islands exist only while open. Switching sessions closes the current session's islands through their guards, and opening a session or restarting restores its arrangement. Islands whose object or resource leaves the current projection close without consulting guards, together with the islands they opened, and the projection omits them.
 
+Templates capture only the object islands of selected objects, in their current left-to-right order and with their chosen widths. New sessions restore those islands against newly created object identities. Resource-location islands and temporary panels remain outside template state; templates without a saved object-island layout open no islands.
+
 ## Content expansion
 
 Resource views can open content in an island from a canvas card or an object island. Expansion leaves the source in place. The new island belongs to the island containing its source and opens at the right end of the screen.

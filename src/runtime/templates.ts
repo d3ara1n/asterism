@@ -6,6 +6,7 @@ import { folderColumnSql } from "../session/schema.ts";
 import { SessionError, type SessionTree } from "../session/tree.ts";
 import { templateDataSchema, type TemplateSummary, type TemplateData } from "../shared/templates.ts";
 import { templateMessages } from "../shared/template-messages.ts";
+import { objectIslandId } from "../shared/workbench.ts";
 import type { SessionWorkbench } from "./workbench.ts";
 import type { ContentStore } from "./content-store.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
@@ -50,6 +51,7 @@ export class TemplateStore {
     const objects = state.objects.filter(object => selected.has(object.id));
     if (objects.length !== selected.size)
       throw new SessionError("not_found", "A selected template object is no longer present.", templateMessages.sourceChanged);
+    const layout = this.workbench.layout(sessionId);
     const value: TemplateData = {
       objects: objects.map(object => {
         const template = this.resources.template(object.kind);
@@ -59,7 +61,9 @@ export class TemplateStore {
         return { id: object.id, kind: object.kind, ...(!template?.createTitle ? { title: object.title } : {}), data: object.data, current };
       }),
       links: state.links.filter(link => selected.has(link.receiverId) && selected.has(link.resourceId)),
-      views: this.workbench.layout(sessionId).views.filter(view => selected.has(view.objectId)),
+      views: layout.views.filter(view => selected.has(view.objectId)),
+      islands: layout.islands.flatMap(island => island.view.kind === "object" && selected.has(island.view.objectId)
+        ? [{ objectId: island.view.objectId, size: island.size }] : []),
     };
     const id = randomUUID();
     this.db.prepare("INSERT INTO templates (id, title, created_at, data_json, folder_id) VALUES (?, ?, ?, ?, ?)").run(id, title, new Date().toISOString(), JSON.stringify(value), folderId);
@@ -91,6 +95,14 @@ export class TemplateStore {
     }
     for (const view of value.views) this.workbench.mutate({
       type: "view.set", sessionId, ...view, objectId: identities.get(view.objectId)!,
+    });
+    // Initial object islands are independent; source-session island ownership is not reusable.
+    this.workbench.mutate({
+      type: "islands.set", sessionId,
+      islands: value.islands.map(island => {
+        const objectId = identities.get(island.objectId)!;
+        return { id: objectIslandId(objectId), owner: null, size: island.size, view: { kind: "object", objectId } };
+      }),
     });
     for (const link of value.links) this.workbench.mutate({
       type: "link.set", sessionId, linked: true,

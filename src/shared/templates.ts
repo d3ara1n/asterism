@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { jsonSchema } from "@asterism-app/sdk/contracts";
-import { workbenchSnapshotSchema } from "./workbench.ts";
+import { sessionIslandSchema, workbenchSnapshotSchema } from "./workbench.ts";
 import { folderIdSchema } from "./folders.ts";
 
 const id = z.string().min(1).max(160);
@@ -12,7 +12,7 @@ export const templateSummarySchema = z.strictObject({
 export type TemplateObjectSummary = z.infer<typeof templateObjectSummarySchema>;
 export type TemplateSummary = z.infer<typeof templateSummarySchema>;
 
-/** Static object data and relationships; entry identities serve internal template association only. */
+/** Static object data, relationships, and initial layout; entry identities serve internal template association only. */
 export const templateDataSchema = z.strictObject({
   objects: z.array(templateObjectSummarySchema.extend({
     data: jsonSchema,
@@ -20,6 +20,8 @@ export const templateDataSchema = z.strictObject({
   })),
   links: workbenchSnapshotSchema.shape.links,
   views: workbenchSnapshotSchema.shape.views,
+  /** Only object islands are reusable; templates saved before this layout field open no islands. */
+  islands: z.array(z.strictObject({ objectId: id, size: sessionIslandSchema.shape.size })).default([]),
 });
 export type TemplateData = z.infer<typeof templateDataSchema>;
 export const templateCommands = [

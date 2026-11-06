@@ -2,14 +2,13 @@ import { Handle, NodeResizeControl, Position, useUpdateNodeInternals, type Node,
 import { Grip, PanelLeftClose, PanelRightOpen } from "lucide-react";
 import { memo, useCallback, useEffect } from "react";
 
-import { maximumCardDimension, type WorkbenchObject } from "../../../shared/workbench";
+import { maximumCardDimension, objectIslandId, type WorkbenchObject } from "../../../shared/workbench";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { defaultConnectionPorts, type ConnectionPort } from "./connections";
 import { useWorkbench } from "./context";
-import { objectIslandId } from "./ObjectIsland";
 import { useIslandOpen } from "../../shared/weave/Screen";
 import { minimumCardHeight, minimumCardWidth } from "./layout";
 import { ObjectActions } from "./ObjectActions";

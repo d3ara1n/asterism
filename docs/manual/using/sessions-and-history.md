@@ -36,9 +36,9 @@ A compaction marker identifies the summary and reading boundary. Compaction chan
 
 ## Reuse a workbench setup
 
-Save a template from the session menu and choose from the objects that support templates. Each resource defines its reusable data: for example, a note keeps its body and an agent keeps its configuration. The template also stores links and card arrangement. Its folder starts as the source session's folder; change it while saving or later from the template menu.
+Save a template from the session menu and choose from the objects that support templates. Each resource defines its reusable data: for example, a note keeps its body and an agent keeps its configuration. The template also stores links, card arrangement, and which selected objects are open in object islands, including their left-to-right order and widths. Resource-location islands such as editors and previews are not copied. Its folder starts as the source session's folder; change it while saving or later from the template menu.
 
-Select the template on **Home** to create a new session in the template's folder. A template card's preview carries its folder color, and its caption names the folder. The new session has fresh resource identities and no copied conversation history or running process instances. Agents receive newly generated random names, even if the source agents had custom names. Other resources retain their saved names unless their type also generates names for template instances. Referenced external locations still refer to the external world.
+Select the template on **Home** to create a new session in the template's folder. A template card's preview carries its folder color, and its caption names the folder. The new session has fresh resource identities and restores the saved object islands automatically, with no copied conversation history or running process instances. Templates saved without object islands leave their objects in the canvas. Agents receive newly generated random names, even if the source agents had custom names. Other resources retain their saved names unless their type also generates names for template instances. Referenced external locations still refer to the external world.
 
 ## Archive and restore
 

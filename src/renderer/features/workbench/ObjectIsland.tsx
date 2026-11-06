@@ -2,7 +2,7 @@ import { RendererNavigationProvider } from "@asterism-app/sdk/renderer";
 import { PanelLeftClose } from "lucide-react";
 import { useMemo } from "react";
 
-import type { WorkbenchObject } from "../../../shared/workbench";
+import { objectIslandId, type WorkbenchObject } from "../../../shared/workbench";
 import { objectsMessages } from "../../messages/objects";
 import { RendererCatalogProvider } from "../../modules/object-context";
 import { useI18n } from "../../shared/i18n";
@@ -14,15 +14,13 @@ import { useWorkbench, WorkbenchScope, type WorkbenchStore } from "./context";
 import { useObjectView } from "./object-view";
 import { ObjectSurface } from "./ObjectSurface";
 
+/** Shares the screen by default; size presets scale its 720px medium width. */
+const objectIslandWidth = { min: 480, grow: 1.5 };
+
 /**
  * Object island: one per object, holding the same object view as its card. While it is open, the card shows a notice instead of the content,
  * so the content mounts once. Its identity is derived from the object, so opening the object again locates this island.
  */
-export const objectIslandId = (objectId: string) => `object:${objectId}`;
-
-/** Shares the screen by default; size presets scale its 720px medium width. */
-const objectIslandWidth = { min: 480, grow: 1.5 };
-
 export function objectIslandSpec({ store, sessionId, object, origin, onHome }: {
   store: WorkbenchStore; sessionId: string; object: Pick<WorkbenchObject, "id" | "title">; origin: HTMLElement | null; onHome: () => void;
 }): IslandSpec {

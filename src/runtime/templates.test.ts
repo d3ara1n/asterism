@@ -135,6 +135,59 @@ it("saves declared reusable data and selected relationships; reuse excludes unde
   expect(app.execute({ type: "workspace.read" }).templates[0]?.objects.map(object => object.title)).toEqual(["A", "B", "Checklist", undefined]);
 });
 
+// Only selected object islands belong to a reusable layout; resource locations and their editor state do not.
+it("copies selected object islands in strip order with saved widths and fresh object identities", async () => {
+  const first = open();
+  const sessionId = first.app.sessions.tree.create("Source");
+  const session = first.plugin.session(sessionId);
+  const a = await session.create(Create, { title: "A", seed: "a" });
+  const b = await session.create(Create, { title: "B", seed: "b" });
+  const closed = await session.create(Create, { title: "Closed", seed: "closed" });
+  const excluded = await session.create(Create, { title: "Excluded", seed: "excluded" });
+  await first.app.sessions.execute({ type: "islands.set", sessionId, islands: [
+    { id: "object-b", owner: "main-view", size: 960, view: { kind: "object", objectId: b.id } },
+    { id: "editor", owner: "object-b", size: 1200, view: { kind: "resource", resourceId: b.id, location: "document.md" } },
+    { id: "excluded", owner: "main-view", size: 480, view: { kind: "object", objectId: excluded.id } },
+    { id: "object-a", owner: "main-view", size: null, view: { kind: "object", objectId: a.id } },
+  ] });
+  const templateId = await save(first.app, sessionId, [a, b, closed]);
+  // Later changes and a restart must not change the template's captured arrangement.
+  await first.app.sessions.execute({ type: "islands.set", sessionId, islands: [] });
+  await close(first.app);
+  const second = open(first.root);
+  const created = await start(second.app, templateId);
+  const workbench = second.app.sessions.current(created).workbench;
+  const newA = workbench.objects.find(object => object.title === "A")!;
+  const newB = workbench.objects.find(object => object.title === "B")!;
+  expect(workbench.islands).toEqual([
+    { id: `object:${newB.id}`, owner: null, size: 960, view: { kind: "object", objectId: newB.id } },
+    { id: `object:${newA.id}`, owner: null, size: null, view: { kind: "object", objectId: newA.id } },
+  ]);
+  expect(newA.id).not.toBe(a.id);
+  expect(newB.id).not.toBe(b.id);
+  await close(second.app);
+  const third = open(first.root);
+  expect(third.app.sessions.current(created).workbench.islands).toEqual(workbench.islands);
+});
+
+it("starts templates saved before object island layouts without opening islands", async () => {
+  const first = open();
+  const sessionId = first.app.sessions.tree.create("Source");
+  const item = await first.plugin.session(sessionId).create(Create, { title: "A", seed: "a" });
+  const templateId = await save(first.app, sessionId, [item]);
+  await close(first.app);
+  const db = openDatabase(first.root);
+  try {
+    const row = db.prepare("SELECT data_json FROM templates WHERE id = ?").get(templateId) as { data_json: string };
+    const data = JSON.parse(row.data_json);
+    delete data.islands;
+    db.prepare("UPDATE templates SET data_json = ? WHERE id = ?").run(JSON.stringify(data), templateId);
+  } finally { db.close(); }
+  const second = open(first.root);
+  const created = await start(second.app, templateId);
+  expect(second.app.sessions.current(created).workbench.islands).toEqual([]);
+});
+
 it("persists template renames for future conversations while preserving existing conversations and saved data", async () => {
   const first = open();
   const sourceId = first.app.sessions.tree.create("Source");

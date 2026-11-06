@@ -4,7 +4,7 @@ import { ReactFlowProvider, ReactFlow, useReactFlow, applyNodeChanges, applyEdge
 import { Crosshair, Maximize, Minus, Plus, RotateCcw } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 
-import { maximumViewportZoom, type Point, type WorkbenchSnapshot } from "../../../shared/workbench";
+import { maximumViewportZoom, objectIslandId, type Point, type WorkbenchSnapshot } from "../../../shared/workbench";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { workbenchMessages } from "../../messages/workbench";
@@ -22,7 +22,7 @@ import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
 import { layoutConnections, samePorts, type ConnectionEdge } from "./connections";
 import { handleSizeVariables, linkEdgeTypes, linkRoutingOptions } from "./LinkEdge";
 import { WorkbenchContext, useWorkbench, type WorkbenchEnvironment, type WorkbenchIslands, type WorkbenchStore, type WorkbenchView } from "./context";
-import { objectIslandId, objectIslandSpec } from "./ObjectIsland";
+import { objectIslandSpec } from "./ObjectIsland";
 import { useSessionIslands } from "./session-islands";
 import { workbenchNodes } from "./nodes";
 import { type ViewPatch } from "./ObjectCard";
