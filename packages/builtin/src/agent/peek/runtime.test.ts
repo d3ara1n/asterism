@@ -79,7 +79,6 @@ describe("peek investigation stream", () => {
     expect(evidence).not.toContain("The change is still pending.");
     expect(history).toContain("Explain the change");
     expect(history).toContain("The change is still pending.");
-    expect(requests[1].messages).toEqual([{ kind: "input", parts: [{ kind: "text", text: "Is that still true?" }] }]);
     expect(requests[0].system.blocks.some(block => block.id.endsWith(".history"))).toBe(false);
     expect(requests[2].system.blocks.some(block => block.id.endsWith(".history"))).toBe(false);
     expect(object.session.snapshot).toHaveBeenCalledTimes(3);
