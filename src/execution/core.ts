@@ -5,7 +5,7 @@ import type { ToolDeclaration } from "../model/contract.ts";
 import type { CallResult, Invocation, PreparedResult } from "../tools/contract.ts";
 import { finishToolResult, resolveToolCompletion } from "../tools/result.ts";
 import { declareTool } from "../tools/definition.ts";
-import { jsonArgumentHint, validationMessage } from "../tools/validation.ts";
+import { validationMessage } from "../tools/validation.ts";
 import { ResourceCall, ResourceInspect, ResourceList, ResourceScript, ResourceInspectResult, ResourceListResult, ResourceScriptResult } from "../tools/core.ts";
 import type { AgentCapabilities } from "./capabilities.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
@@ -104,7 +104,7 @@ class ToolDispatcher {
     else {
       const parsed = definition.argsSchema.safeParse(call.arguments);
       if (!parsed.success) result = { kind: "rejected", error: { code: "invalid_arguments",
-        message: `${validationMessage(parsed.error, call.name)}.${call.name === "resource_call" ? ` ${jsonArgumentHint}` : ""}` } };
+        message: `${validationMessage(parsed.error, call.name)}.` } };
       else result = action ? action.resolve(parsed.data, this.capabilities, {
         id: call.callId,
         tools: this.callableNames,

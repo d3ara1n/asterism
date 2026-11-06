@@ -7,7 +7,7 @@ import type { RecordContract } from "./records.ts";
 import { reference, present, type DataContract } from "./presentation.ts";
 import { PluginApiError } from "./runtime.ts";
 import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, ActionContribution, CommandPreparer, CreationPreparation, ActionPreparation, ExternalPreparation, ResourceContribution, ToolContribution, Preparation, CallResult, Lifetime } from "./runtime-contracts.ts";
-import { validationMessage, jsonArgumentHint } from "./tool-validation.ts";
+import { validationMessage } from "./tool-validation.ts";
 import type { ToolCaller } from "./runtime-contracts.ts";
 import { encodeJson } from "./data-encoding.ts";
 import type { ResourceSnapshot } from "./workspace.ts";
@@ -89,7 +89,6 @@ export function implementTool<S extends Json, T extends ToolInput, A extends Too
           `Invalid arguments for ${contract.resource.kind}/${contract.tool.name}.`,
           ...(!parsedTarget.success ? [validationMessage(parsedTarget.error, "target")] : []),
           ...(!parsedArgs.success ? [validationMessage(parsedArgs.error, "args")] : []),
-          jsonArgumentHint,
         ].join("\n") } };
       return {
         effect: contract.effect, execution: contract.execution, implementation: identity,
