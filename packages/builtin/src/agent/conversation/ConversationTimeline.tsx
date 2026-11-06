@@ -69,7 +69,7 @@ function TimelinePresenceItem({ itemKey, present, enter, overlayExit, reducedMot
   useLayoutEffect(() => onMount(itemKey), [itemKey, onMount]);
   return <div className="relative" inert={!present} aria-hidden={!present || undefined}>
     <AnimatePresence initial={animateEntrance} mode={overlayExit ? "popLayout" : "sync"} onExitComplete={() => onExitComplete(itemKey)}>
-      {present && <motion.div key={itemKey} className="px-4 pt-4"
+      {present && <motion.div key={itemKey} className="px-4 pt-2"
         initial={reducedMotion ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: reducedMotion ? 1 : 0, y: reducedMotion ? 0 : 6 }}
@@ -92,7 +92,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
   const shell = blockShell(node);
   switch (node.kind) {
     case "message": return <MessageNode node={node} content={object.content} />;
-    case "text": return <article className={cn("rounded-md outline-1 outline-offset-4 outline-transparent",
+    case "text": return <article className={cn("rounded-md py-1 outline-1 outline-offset-4 outline-transparent",
       shell.dashed && "outline-dashed outline-border", shell.failed && "outline-destructive")}>
       <Markdown streaming={streaming}>{node.text}</Markdown></article>;
     case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
