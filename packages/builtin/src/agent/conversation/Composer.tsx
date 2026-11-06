@@ -34,7 +34,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
       onSubmit={() => form.current?.requestSubmit()}
       label={i18n.formatMessage(conversationMessages.messagePlaceholder)}
       placeholder={running ? i18n.formatMessage(conversationMessages.draftPlaceholder) : i18n.formatMessage(conversationMessages.continuePlaceholder)} />
-    <InputGroupAddon align="block-end" className="min-w-0 gap-1">
+    <InputGroupAddon align="block-end" data-disabled={busy} className="min-w-0 gap-1 data-[disabled=true]:cursor-default">
       <AttachFiles draft={draft} disabled={busy || !ready} />
       <DraftFiles draft={draft} disabled={busy} />
       <Button type="button" size="sm" variant="ghost" disabled={busy || !ready || state.uploading || (!state.text.trim() && !state.files.length)}
