@@ -4,7 +4,6 @@ import { builtin } from "@asterism-app/builtin-api/contracts";
 export const questionMessages = builtin.messages("en", defineMessages({
   title: { id: "questions.title", defaultMessage: "Your input is needed" },
   answer: { id: "questions.answer", defaultMessage: "Submit answers" },
-  answerSingle: { id: "questions.answerSingle", defaultMessage: "Submit answer" },
   cancel: { id: "questions.cancel", defaultMessage: "Cancel questions" },
   submitFailed: { id: "questions.submitFailed", defaultMessage: "Your answer could not be submitted. Your input has been kept; try again." },
   waiting: { id: "questions.waiting", defaultMessage: "Waiting for your answer" },

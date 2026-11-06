@@ -35,7 +35,7 @@ export function QuestionForm({ questions, draft, update, answer, cancel, busy, f
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
     if (busy) return;
-    if (questions.length > 1 && !review) { navigate(questions.length); return; }
+    if (!review) { navigate(questions.length); return; }
     const invalid = questions.findIndex((question, index) => answerIssue(question, submission.answers[index]));
     if (invalid !== -1) {
       setInvalidId(questions[invalid]!.id); navigate(invalid);
@@ -57,7 +57,7 @@ export function QuestionForm({ questions, draft, update, answer, cancel, busy, f
       <AnswerSummary rows={submissionRows(questions, submission)} action={index =>
         <Button type="button" size="xs" variant="ghost" onClick={() => navigate(index)}><Pencil />{i18n.text(messages.edit)}</Button>} />
     </div>}
-    {(review || questions.length === 1) && (draft.messageOpen ? <Field>
+    {review && (draft.messageOpen ? <Field>
       <FieldLabel htmlFor={messageId}>{i18n.text(messages.message)}</FieldLabel>
       <FieldDescription>{i18n.text(messages.messageHint)}</FieldDescription>
       <Textarea id={messageId} rows={2} value={draft.message} onChange={event => update({ ...draft, message: event.target.value })} />
@@ -70,7 +70,7 @@ export function QuestionForm({ questions, draft, update, answer, cancel, busy, f
       if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); }
     }}>
       <fieldset disabled={busy} className="flex min-h-0 flex-col gap-3">
-        {questions.length > 1 && <AgentScrollArea axis="horizontal"><nav className="flex gap-1" aria-label={i18n.text(messages.navigation)}>
+        <AgentScrollArea axis="horizontal"><nav className="flex gap-1" aria-label={i18n.text(messages.navigation)}>
           {questions.map((item, index) => {
             const status = submission.answers[index]?.status === "skipped" ? "skipped" : answerIssue(item, submission.answers[index]) ? "pending" : "answered";
             return <Button key={item.id} type="button" size="xs" variant={index === draft.page ? "selected" : "ghost"}
@@ -83,7 +83,7 @@ export function QuestionForm({ questions, draft, update, answer, cancel, busy, f
           })}
           <Button type="button" size="xs" variant={review ? "selected" : "ghost"} aria-current={review ? "step" : undefined}
             onClick={() => navigate(questions.length)}>{i18n.text(messages.review)}</Button>
-        </nav></AgentScrollArea>}
+        </nav></AgentScrollArea>
         {expanded
           ? <AgentScrollArea ref={scroller} className="max-h-[60dvh]">{content}</AgentScrollArea>
           : <div className="min-w-0">{content}</div>}
@@ -98,15 +98,15 @@ export function QuestionForm({ questions, draft, update, answer, cancel, busy, f
             {question && !question.required && !draft.answers[draft.page]!.skipped && <Button type="button" size="sm" variant="ghost"
               onClick={() => { setInvalidId(null); update({ ...draft,
                 answers: draft.answers.map((answer, index) => index === draft.page ? { ...answer, skipped: true } : answer),
-                page: questions.length > 1 ? draft.page + 1 : draft.page,
+                page: draft.page + 1,
               }); }}>{i18n.text(messages.skip)}</Button>}
             {draft.page > 0 && <Button type="button" size="sm" variant="outline" onClick={() => navigate(draft.page - 1)}>
               <ArrowLeft />{i18n.text(messages.previous)}
             </Button>}
-            {questions.length > 1 && !review ? <Button type="button" size="sm" onClick={() => navigate(draft.page + 1)}>
+            {!review ? <Button type="button" size="sm" onClick={() => navigate(draft.page + 1)}>
               {i18n.text(draft.page === questions.length - 1 ? messages.review : messages.next)}<ArrowRight />
             </Button> : <Button type="button" size="sm" title="⌘ / Ctrl + Enter" onClick={() => submit()}>
-              {busy ? <Spinner /> : <Send />}{i18n.text(questions.length === 1 ? messages.answerSingle : messages.answer)}
+              {busy ? <Spinner /> : <Send />}{i18n.text(messages.answer)}
             </Button>}
           </div>
         </div>

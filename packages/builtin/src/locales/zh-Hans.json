@@ -490,7 +490,6 @@
   "questions.cancel": "取消提问",
   "questions.submitFailed": "未能提交回答，输入内容已保留，请重试。",
   "questions.waiting": "等待你的回答",
-  "questions.answerSingle": "提交回答",
   "questions.queued": "等待提问",
   "questions.cancelled": "已取消提问，未提交草稿答案",
   "questions.unanswered": "未提交回答",
