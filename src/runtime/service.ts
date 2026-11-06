@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import { ConfigurationService } from "../configuration/service.ts";
+import { applicationStorage } from "../shared/application.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot, packageSource, type PackageEntry } from "../plugins/packages.ts";
 import { applicationPackages, applicationManuals, bundledPackages } from "../plugins/distribution.ts";
@@ -41,7 +42,7 @@ export class ApplicationService {
     this.folders = new FolderStore(this.db);
     this.list = applicationPackages(root);
     this.started = JSON.stringify(options.packageEntries ?? this.list.read());
-    this.npmRoot = join(root, "plugins");
+    this.npmRoot = join(root, applicationStorage.pluginPackagesDirectory);
     try {
       this.configuration = new ConfigurationService(root, options.onConfigurationChanged);
       // Archive cleanup releases references first; session services then explicitly reclaim content.

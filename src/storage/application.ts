@@ -18,14 +18,14 @@ import type { PreparationProgress, PreparationResult } from "../shared/recovery.
 export const applicationDataPaths: readonly DataPath[] = [
   { path: applicationStorage.databaseDirectory },
   { path: applicationStorage.configurationFile },
-  { path: "plugins.json" },
+  { path: applicationStorage.pluginListFile },
   { path: `${applicationStorage.appearanceStore}.json` },
   { path: `${applicationStorage.languageStore}.json` },
   { path: `${applicationStorage.updatesStore}.json` },
   { path: `${applicationStorage.networkStore}.json` },
   { path: applicationStorage.credentialsDirectory },
-  { path: "extensions" },
-  { path: join(applicationStorage.contentDirectory, "sealed"), link: true },
+  { path: applicationStorage.pluginDataDirectory },
+  { path: join(applicationStorage.contentDirectory, applicationStorage.sealedContentDirectory), link: true },
 ];
 
 /** Main-process preferences are flat electron-store documents with `version` in defaults. */
@@ -38,7 +38,7 @@ export function hostStorages(root: string, decrypt?: (ciphertext: string) => Pro
 }
 
 export function pluginStorages(root: string, id: string, declarations: readonly PluginStorageDeclaration[]): StorageDefinition[] {
-  const directory = resolve(root, "extensions", id);
+  const directory = resolve(root, applicationStorage.pluginDataDirectory, id);
   return declarations.map(declaration => {
     const file = resolve(directory, declaration.path);
     if (!pathWithin(directory, file))
@@ -52,7 +52,7 @@ export function pluginStorages(root: string, id: string, declarations: readonly 
 
 /** Build and import storage entries only; task processes own plugin runtime and setup. */
 async function discoverPluginStorage(root: string, built: readonly BuiltPackage[]): Promise<PluginStorageGroup[]> {
-  const packages = await importPackages(built, join(root, "plugins", ".cache"), { runtime: false });
+  const packages = await importPackages(built, join(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory), { runtime: false });
   const groups: PluginStorageGroup[] = [];
   for (const item of packages) {
     if (!item.manifest?.storage || item.status === "disabled") continue;
@@ -70,8 +70,8 @@ export async function prepareApplicationData(root: string, version: string, onHo
   let pluginBuild: string | undefined;
   const result = await prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root, decrypt), onHost, onProgress,
     discover: async () => {
-      const cache = join(root, "plugins", ".cache");
-      const built = await buildPackages(applicationPackages(root), join(root, "plugins"), cache, [], [],
+      const cache = join(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory);
+      const built = await buildPackages(applicationPackages(root), join(root, applicationStorage.pluginPackagesDirectory), cache, [], [],
         id => onProgress?.({ stage: "dataPlugins", detail: id }));
       pluginBuild = savePluginBuild(cache, built);
       return discoverPluginStorage(root, built);

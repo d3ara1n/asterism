@@ -330,7 +330,7 @@ function createWindow(): void {
 // Plugin artifact protocol: read-only access to the plugin cache directory bundled at startup, with no access to other paths.
 protocol.registerSchemesAsPrivileged([{ scheme: "asterism-plugin", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 function servePluginArtifacts(root: string): void {
-  const cache = resolve(root, "plugins", ".cache");
+  const cache = resolve(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory);
   protocol.handle("asterism-plugin", request => {
     const url = new URL(request.url);
     const file = resolve(cache, url.hostname, `.${decodeURIComponent(url.pathname)}`);

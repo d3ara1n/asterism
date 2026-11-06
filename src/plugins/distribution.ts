@@ -1,4 +1,5 @@
 import { join } from "node:path";
+import { applicationStorage } from "../shared/application.ts";
 import { applicationDirectory as directory } from "./package-modules.ts";
 import { PackageList, type PackageEntry } from "./packages.ts";
 import type { ManualSource } from "@asterism-app/sdk/runtime";
@@ -8,7 +9,7 @@ export const bundledPackages = [{ source: { kind: "bundled", name: "builtin" }, 
 
 /** Distribution defaults use the ordinary package list and remain editable by the user. */
 export function applicationPackages(root: string): PackageList {
-  return new PackageList(join(root, "plugins.json"), bundledPackages);
+  return new PackageList(join(root, applicationStorage.pluginListFile), bundledPackages);
 }
 export const applicationManuals: readonly ManualSource[] = [
   { path: "app", directory: directory("docs/manual") },

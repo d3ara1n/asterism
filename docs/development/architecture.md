@@ -113,7 +113,7 @@ Application identity and data layout are centralized. Development and installed 
 | Recovery points | Data preparation service |
 | Chromium data | Electron session storage |
 
-Global configuration survives replacement of the session database. Secrets are not stored as plaintext configuration or serialized into task history.
+Global configuration survives replacement of the session database. Host connection credentials and MCP OAuth state are saved in configuration; plugin secrets are saved in plugin storage. Literal credentials and credential-command expressions remain with their owning entries. These files and their recovery points can contain sensitive data; they are not sanitized configuration exports.
 
 SQLite has one runtime writer, WAL, and foreign keys. Session deletion cascades its history, cursor selections, current data, views, and content roots. Templates own separate content roots. Folder deletion clears the membership of its sessions and templates.
 

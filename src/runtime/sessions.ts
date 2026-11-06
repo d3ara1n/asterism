@@ -140,7 +140,7 @@ export class SessionService {
     };
     const refOf = (objectId: string): ResourceRef | null => this.tree.resourceRef(objectId);
     const models = createModelServices(configuration, options.adapterFactory);
-    const modules = loadPlugins(options.plugins ?? [], { holds: this.holds, events: this.events, extensionsDirectory: join(dataRoot, "extensions"), data: new SessionDataStore(db), content: this.content, refOf,
+    const modules = loadPlugins(options.plugins ?? [], { holds: this.holds, events: this.events, extensionsDirectory: join(dataRoot, applicationStorage.pluginDataDirectory), data: new SessionDataStore(db), content: this.content, refOf,
       configurationChanged: options.configurationChanged, preparedStorage: options.preparedStorage,
       pluginDependencies: options.pluginDependencies, packages: options.packages, sessions: host, models, shared: this.shared });
     this.resources = modules.resources;

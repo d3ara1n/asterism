@@ -20,6 +20,12 @@ export const applicationStorage = {
   databaseDirectory: "db",
   databaseFile: "workspace.sqlite",
   contentDirectory: "content",
+  sealedContentDirectory: "sealed", // Within contentDirectory.
+  temporaryContentDirectory: "temporary", // Within contentDirectory.
+  pluginListFile: "plugins.json",
+  pluginPackagesDirectory: "plugins",
+  pluginCacheDirectory: ".cache", // Within pluginPackagesDirectory.
+  pluginDataDirectory: "extensions",
   credentialsDirectory: "credentials", // Legacy encrypted values retained for migration and recovery.
   configurationFile: "configuration.json",
   appearanceStore: "appearance",

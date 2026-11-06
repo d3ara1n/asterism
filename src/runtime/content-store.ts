@@ -3,6 +3,7 @@ import { mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { open, type FileHandle } from "node:fs/promises";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+import { applicationStorage } from "../shared/application.ts";
 import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type Json } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ContentReader, type ContentScope } from "@asterism-app/sdk/runtime";
 import { contentChunkSize, contentReadLimit, sameContentTarget, type ContentTarget } from "../shared/content.ts";
@@ -113,17 +114,18 @@ export class ContentStore {
   private collecting = false;
   private closed = false;
   constructor(private readonly db: DatabaseSync, private readonly root: string) {
-    mkdirSync(join(root, "sealed"), { recursive: true });
-    mkdirSync(join(root, "temporary"), { recursive: true });
+    mkdirSync(join(root, applicationStorage.sealedContentDirectory), { recursive: true });
+    mkdirSync(join(root, applicationStorage.temporaryContentDirectory), { recursive: true });
   }
   /** Called explicitly by application startup after data preparation and reference validation. */
   collectStartup(): void {
     const { db, root } = this;
-    rmSync(join(root, "temporary"), { recursive: true, force: true });
-    mkdirSync(join(root, "temporary"), { recursive: true });
+    rmSync(join(root, applicationStorage.temporaryContentDirectory), { recursive: true, force: true });
+    mkdirSync(join(root, applicationStorage.temporaryContentDirectory), { recursive: true });
     // Crashes can occur between sealing and indexing; clean up only files owned by this module.
     const known = new Set((db.prepare("SELECT id FROM contents").all() as { id: string }[]).map(row => row.id));
-    for (const name of readdirSync(join(root, "sealed"))) if (!known.has(name)) rmSync(join(root, "sealed", name), { force: true });
+    const sealed = join(root, applicationStorage.sealedContentDirectory);
+    for (const name of readdirSync(sealed)) if (!known.has(name)) rmSync(join(sealed, name), { force: true });
     for (const { id } of db.prepare(`SELECT id FROM contents
       WHERE NOT EXISTS (SELECT 1 FROM content_roots r WHERE r.content_id = contents.id)
       AND NOT EXISTS (SELECT 1 FROM template_content_roots r WHERE r.content_id = contents.id)`).all() as { id: string }[])
@@ -137,7 +139,7 @@ export class ContentStore {
       WHERE NOT EXISTS (SELECT 1 FROM content_roots r WHERE r.content_id = contents.id)
       AND NOT EXISTS (SELECT 1 FROM template_content_roots r WHERE r.content_id = contents.id)`).get() as { size: number }).size;
   }
-  private path(id: string): string { return join(this.root, "sealed", id); }
+  private path(id: string): string { return join(this.root, applicationStorage.sealedContentDirectory, id); }
   scope(target?: ContentTarget): ContentLease {
     if (this.closed) unavailable("The content store is closed.");
     if (this.leases.size >= contentLimits.scopes) invalid("Too many active content inputs.");
@@ -265,7 +267,7 @@ export class ContentStore {
   async begin(scope: ContentLease): Promise<string> {
     scope.check();
     if (this.uploads.size >= contentLimits.uploads) invalid("Too many content uploads.");
-    const id = randomUUID(), path = join(this.root, "temporary", id);
+    const id = randomUUID(), path = join(this.root, applicationStorage.temporaryContentDirectory, id);
     // Reserve slots so concurrent opens cannot exceed upload limits after awaiting.
     const upload = { id, scope, path, size: 0, hash: createHash("sha256"), tail: Promise.resolve(), sealed: false } as Upload;
     this.uploads.set(id, upload);

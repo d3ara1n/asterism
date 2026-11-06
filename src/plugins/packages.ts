@@ -1,4 +1,5 @@
 import { pathWithin } from "../storage/paths.ts";
+import { applicationStorage } from "../shared/application.ts";
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, relative, resolve, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -78,7 +79,7 @@ export type PackageEntry = z.infer<typeof packageEntrySchema>;
 const packageListVersion = 2;
 const listSchema = z.strictObject({ version: z.literal(packageListVersion), packages: z.array(packageEntrySchema) });
 export function packageListStorage(root: string) {
-  return jsonStorage({ id: "plugins", file: join(root, "plugins.json"), version: packageListVersion, migrations: {} });
+  return jsonStorage({ id: "plugins", file: join(root, applicationStorage.pluginListFile), version: packageListVersion, migrations: {} });
 }
 
 export class PluginPackageError extends Error {
