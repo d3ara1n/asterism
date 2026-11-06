@@ -139,6 +139,8 @@ Recovery points cover application data, including locally stored credentials and
 
 Main transfers a MessagePort between the renderer and runtime. Business requests and updates use that direct connection; main retains startup, supervision, and shutdown traffic.
 
+On macOS, closing the window destroys its renderer and disconnects its transport while main and the runtime keep running. Dock activation or relaunching the running application recreates the window and connects it to current runtime state. Unsaved frontend edits require confirmation before the renderer unloads. Explicit application quit stops the runtime through the normal shutdown flow. On Windows and Linux, closing the window initiates application quit.
+
 Commands validate at their owning boundary. Trusted runtime push frames use structured cloning and do not undergo redundant per-frame schema validation.
 
 A connection multiplexes commands, configuration, content transfer, events, calls, and object channels. Disconnection cancels its subscriptions and communication work and releases transfer state.

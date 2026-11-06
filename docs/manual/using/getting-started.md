@@ -22,4 +22,6 @@ The agent card shows the conversation and execution progress. Expand a tool entr
 
 Choose the session from the sidebar to resume working. Changing pages leaves background execution running. Exiting Asterism ends active work; reopening restores saved sessions and resource configuration.
 
+On macOS, closing the window leaves Asterism and background work running. Unsaved edits require confirmation before the window closes. Click its Dock icon or open Asterism again to restore the window with current state. Choose **Quit Asterism** or press **Cmd+Q** to stop background work and exit. On Windows and Linux, closing the window exits the application.
+
 For repeated setups, save a workbench template. For another approach to an existing task, use its history.

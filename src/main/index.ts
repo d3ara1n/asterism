@@ -146,7 +146,11 @@ function createWindow(): void {
     },
   });
   const current = window;
-  current.on("close", event => { if (!quitting) { event.preventDefault(); requestQuit(); } });
+  current.on("close", event => {
+    if (quitting || process.platform === "darwin") return;
+    event.preventDefault();
+    requestQuit();
+  });
   if (state.maximized) current.maximize();
   trackWindowState(current);
   const refreshAppearance = followWindowAppearance(current, titleBar);
@@ -372,6 +376,8 @@ if (!app.requestSingleInstanceLock()) {
   mkdirSync(sessionRoot, { recursive: true });
   app.setPath("sessionData", sessionRoot);
   app.on("second-instance", () => {
+    if (quitting) return;
+    if (process.platform === "darwin" && !window && app.isReady()) createWindow();
     if (window?.isMinimized()) window.restore();
     window?.focus();
   });
@@ -389,14 +395,18 @@ if (!app.requestSingleInstanceLock()) {
     servePluginArtifacts(dataRoot);
     // Development runs have no application bundle icon; explicitly use the production icon in the Dock.
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIconFile("asterism.png"));
+    app.on("activate", () => {
+      if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow();
+    });
     await startup.run();
-    app.on("activate", () => { if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow(); });
   }).catch(error => {
     console.error("Electron initialization failed.", error);
     dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
     app.quit();
   });
-  app.on("window-all-closed", () => app.quit());
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") app.quit();
+  });
   app.on("before-quit", event => {
     if (quitting) return;
     event.preventDefault();
