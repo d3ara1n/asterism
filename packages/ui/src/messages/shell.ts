@@ -2,7 +2,7 @@ import { defineMessages } from "@asterism-app/sdk/contracts";
 import { pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const shellMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
-  summary: { id: "shell.summary", defaultMessage: "Configure shell profiles and the default shell." },
+  summary: { id: "shell.summary", defaultMessage: "Configure shell profiles and the default shell" },
   reset: { id: "shell.reset", defaultMessage: "Restore defaults" },
   saveFailed: { id: "shell.saveFailed", defaultMessage: "Shell settings could not be saved." },
   title: { id: "shell.title", defaultMessage: "Shell" },

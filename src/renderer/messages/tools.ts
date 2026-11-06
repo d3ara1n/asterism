@@ -19,7 +19,7 @@ export const toolsMessages = pluginNamespace("asterism.host").messages("en", def
   },
   toolResourceScript: {
     id: "toolResourceScript",
-    defaultMessage: "Resource orchestration",
+    defaultMessage: "Orchestrate resources",
   },
   toolScriptQueued: {
     id: "toolScriptQueued",
@@ -55,7 +55,7 @@ export const toolsMessages = pluginNamespace("asterism.host").messages("en", def
   },
   toolResourceList: {
     id: "toolResourceList",
-    defaultMessage: "Available resources",
+    defaultMessage: "List resources",
   },
   toolResourceInspect: {
     id: "toolResourceInspect",
@@ -63,7 +63,7 @@ export const toolsMessages = pluginNamespace("asterism.host").messages("en", def
   },
   toolResourceCall: {
     id: "toolResourceCall",
-    defaultMessage: "Resource operation",
+    defaultMessage: "Operate resource",
   },
   toolResourceCount: {
     id: "toolResourceCount",

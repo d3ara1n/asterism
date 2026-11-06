@@ -2,7 +2,7 @@ import { defineMessages } from "@asterism-app/sdk/contracts";
 import { pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const mcpMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
-  summary: { id: "mcp.summary", defaultMessage: "Configure MCP servers and their connections." },
+  summary: { id: "mcp.summary", defaultMessage: "Configure MCP servers and their connections" },
   title: { id: "mcp.title", defaultMessage: "MCP Host" },
   settings: { id: "mcp.settings", defaultMessage: "MCP servers" },
   description: { id: "mcp.description", defaultMessage: "Plugins share these server configurations and connections." },

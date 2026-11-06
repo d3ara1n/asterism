@@ -51,7 +51,7 @@ export const filesystemMessages = pluginNamespace("asterism.builtin").messages("
   },
   toolDirectoryGrep: {
     id: "toolDirectoryGrep",
-    defaultMessage: "Search content",
+    defaultMessage: "Search text",
   },
   toolSearchFiles: {
     id: "toolSearchFiles",

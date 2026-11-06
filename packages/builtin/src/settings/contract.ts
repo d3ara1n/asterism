@@ -13,7 +13,7 @@ export type SavedText = z.infer<typeof savedTextSchema>;
 
 export const settingsMessages = builtin.messages("en", defineMessages({
   streaming: { id: "settings.streaming", defaultMessage: "Streaming previews" },
-  streamingSummary: { id: "settings.streamingSummary", defaultMessage: "Control how streaming tool content expands and collapses." },
+  streamingSummary: { id: "settings.streamingSummary", defaultMessage: "Control how streaming tool content expands and collapses" },
   reset: { id: "settings.reset", defaultMessage: "Restore defaults" },
   loading: { id: "settings.loading", defaultMessage: "Loading settings…" },
   invalid: { id: "settings.invalid", defaultMessage: "Saved settings could not be read. Default values are shown." },

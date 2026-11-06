@@ -4,7 +4,7 @@ export const pluginsMessages = pluginNamespace("asterism.host").messages("en", d
   application: { id: "settings.application", defaultMessage: "Application" },
   applicationSummary: { id: "settings.applicationSummary", defaultMessage: "Manage Asterism’s preferences and shared configuration." },
   plugins: { id: "settings.plugins", defaultMessage: "Plugins" },
-  pluginsSummary: { id: "settings.pluginsSummary", defaultMessage: "Manage installed plugins and their availability." },
+  pluginsSummary: { id: "settings.pluginsSummary", defaultMessage: "Manage installed plugins and their availability" },
   contributedBy: { id: "settings.contributedBy", defaultMessage: "From {plugin_name}" },
   search: { id: "plugins.search", defaultMessage: "Search plugins…" },
   filter: { id: "plugins.filter", defaultMessage: "Filter plugins" },

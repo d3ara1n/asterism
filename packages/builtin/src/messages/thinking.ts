@@ -3,7 +3,7 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 export const thinkingMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   thinkingTitle: {
     id: "thinkingTitle",
-    defaultMessage: "Thinking",
+    defaultMessage: "Thought",
   },
   thinkingActive: {
     id: "thinkingActive",

@@ -12,7 +12,7 @@ export const skillsMessages = pluginNamespace("asterism.host").messages("en", de
   refresh: { id: "skills.refresh", defaultMessage: "Refresh skills" },
   count: { id: "skills.count", defaultMessage: "{count, plural, one {# skill} other {# skills}}" },
   composition: { id: "skills.composition", defaultMessage: "Each Agent paradigm selects and combines skills from these sources." },
-  summary: { id: "skills.summary", defaultMessage: "Browse skill sources and refresh their contents." },
+  summary: { id: "skills.summary", defaultMessage: "Browse skill sources and refresh their contents" },
   search: { id: "skills.search", defaultMessage: "Search skills" },
   noMatch: { id: "skills.noMatch", defaultMessage: "No matching skills." },
   source: { id: "skills.source", defaultMessage: "Skill source" },
