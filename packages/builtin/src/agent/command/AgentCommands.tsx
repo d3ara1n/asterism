@@ -64,7 +64,7 @@ export function AgentCommands({ children, composerHidden }: { children: ReactNod
     onKeyDownCapture={event => {
       if (!event.currentTarget.contains(event.target as Node) || event.defaultPrevented || event.nativeEvent.isComposing
         || event.repeat || composerHidden || event.shiftKey || event.altKey
-        || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k") return;
+        || !event.ctrlKey || event.metaKey || event.key.toLowerCase() !== "k") return;
       event.preventDefault(); event.stopPropagation();
       if (open) close(); else show();
     }}>

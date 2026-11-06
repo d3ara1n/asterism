@@ -1,8 +1,8 @@
 import { runtime } from "../runtime";
 import { motion, AnimatePresence } from "motion/react";
-import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel } from "@asterism-app/ui/ui/dropdown-menu";
+import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuShortcut } from "@asterism-app/ui/ui/dropdown-menu";
 import { Button } from "@asterism-app/ui/ui/button";
-import { PanelLeft, ArrowLeft, ChevronDown, House, Settings, Plus, KeyRound, ListTree, History } from "lucide-react";
+import { PanelLeft, ArrowLeft, ChevronDown, House, Settings, Plus, KeyRound, ListTree, History, Command } from "lucide-react";
 
 import { BrandMark } from "@asterism-app/ui/ui/brand-mark";
 
@@ -22,6 +22,8 @@ import { RendererSettingsNavigationProvider } from "@asterism-app/sdk/renderer";
 import { Window, Titlebar } from "./Window";
 import { UpdateIndicator } from "./UpdateIndicator";
 import { UpdatesProvider } from "../features/updates/state";
+import { ApplicationCommands, applicationCommandsShortcut } from "../features/commands/ApplicationCommands";
+import { commandsMessages } from "../messages/commands";
 
 import { Space } from "../shared/weave/Space";
 import { Dock } from "../shared/weave/Dock";
@@ -72,6 +74,9 @@ export function App({ controller }: { controller: ApplicationController }) {
   const returnFocus = useRef<HTMLElement | null>(null);
   const sidebarToggle = useRef<HTMLButtonElement>(null);
   const [page, setPage] = useState<PageId>("main");
+  const [commandsOpen, setCommandsOpen] = useState(false);
+  const commandFocus = useRef<HTMLElement | null>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
   const [settingsTarget, setSettingsTarget] = useState<SettingsTarget | null>(null);
   const pluginSettings = usePluginSettingsRegistry();
   const [view, setView] = useState<MainView>({ kind: "home" });
@@ -103,6 +108,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const phase = workbenchPhase(state.status, sessionState);
   const writable = ready && !sessionBlocked && !!session;
   const inSettings = page === "settings";
+  const commandSession = useMemo(() => !inSettings ? active?.recordSnapshot() ?? null : null, [inSettings, active, sessionState]);
   const completed = view.kind === "conversation" && !!snapshot?.sessions.find(item => item.id === view.sessionId)?.completed;
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? i18n.formatMessage(commonMessages.conversation);
@@ -207,11 +213,14 @@ export function App({ controller }: { controller: ApplicationController }) {
       aria-expanded={sidebarVisible} aria-controls={sidebarVisible ? "app-sidebar" : undefined}
       onClick={() => setSidebarVisible(visible => !visible)}><PanelLeft /></IconButton>}
     {inSettings ? <Button variant="ghost" size="sm" onClick={() => go("main")}><ArrowLeft />{i18n.formatMessage(commonMessages.back)}</Button> :
-      <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button variant="ghost" size="sm" aria-label={i18n.formatMessage(appMessages.menu)}>
+      <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button ref={menuTrigger} variant="ghost" size="sm" aria-label={i18n.formatMessage(appMessages.menu)}>
         <BrandMark className="size-4 text-primary" /><span className="text-sm font-semibold text-primary-text">{i18n.formatMessage(appMessages.appName)}</span><ChevronDown className="text-muted-foreground" />
       </Button></DropdownMenuTrigger><DropdownMenuContent align="start">
         <DropdownMenuItem onSelect={goHome}><House />{i18n.formatMessage(commonMessages.home)}</DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => { commandFocus.current = menuTrigger.current; setCommandsOpen(true); }}>
+          <Command />{i18n.text(commandsMessages.title)}<DropdownMenuShortcut>{applicationCommandsShortcut}</DropdownMenuShortcut>
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => go("settings")}><Settings />{i18n.formatMessage(appMessages.menuSettings)}</DropdownMenuItem>
       </DropdownMenuContent></DropdownMenu>}
     <UpdateIndicator onSettings={() => {
@@ -329,5 +338,6 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Toaster position="bottom-center" containerAriaLabel={i18n.formatMessage(commonMessages.notifications)}
       toastOptions={{ closeButtonAriaLabel: i18n.formatMessage(commonMessages.close) }} />
     {creation.element}
+    <ApplicationCommands open={commandsOpen} onOpenChange={setCommandsOpen} session={commandSession} ready={writable} returnFocus={commandFocus} />
   </RendererSettingsNavigationProvider></FolderServicesProvider></UpdatesProvider></RendererCatalogProvider>;
 }

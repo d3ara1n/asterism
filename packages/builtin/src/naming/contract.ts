@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { defineCall } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 
 const titleResultSchema = z.strictObject({
@@ -7,3 +8,8 @@ const titleResultSchema = z.strictObject({
 
 export const SessionNameResult = builtin.data("session.name", titleResultSchema);
 export const SessionRenameResult = builtin.data("session.rename", titleResultSchema);
+
+/** Generate a name for a session without running an Agent. */
+export const GenerateSessionName = defineCall(builtin.name("session.generate-name"), {
+  scope: "plugin", input: z.strictObject({ sessionId: z.string().min(1) }), output: z.strictObject({}),
+});

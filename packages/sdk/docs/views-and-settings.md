@@ -54,6 +54,59 @@ Managed configuration suits schema-validated settings. Other plugin data can use
 
 Closing a page releases its view subscriptions. It does not end every service the plugin uses.
 
+## Contribute application commands
+
+Declare command groups in the renderer plugin's `commands` field. The application palette displays each group as **Plugin name · Group**, keeping groups separate even when different plugins use the same label. Group IDs are local to the plugin; command IDs are local to the group.
+
+Each group's `useCommands(context)` is a React hook, mounted in that plugin's calls and preferences scope while the palette is open. Call hooks unconditionally, then use `when: false` to hide commands that do not apply. `disabled: true` keeps an unavailable command visible. The context supplies the current session snapshot, or null outside a session, and whether that session is ready for operations. A session command can hide when no session exists and disable while it is not ready.
+
+An action uses `onAction`; it decides when to dismiss the palette through `context.close()`. For asynchronous work, retain pending and failure state in the hook, disable reentry, show feedback in `detail`, and close after success. Invoke backend work through ordinary typed plugin calls, passing session identity explicitly when needed. Renderer commands need no separate backend registry.
+
+A control uses `control` instead of `onAction`. It is a real interactive child, such as an input, switch, or select, rather than an action row that activates around it. Its component owns its interaction and may use plugin-scoped hooks. Compose controls from the plugin's own UI components; the command contract does not require a UI library.
+
+For example, a plugin can combine a persistent preference control with a reset action:
+
+```tsx
+import { useState } from "react";
+import { z } from "zod";
+import {
+  defineRendererPlugin, useRendererPreferences,
+  type RendererCommandGroup,
+} from "@asterism-app/sdk/renderer";
+
+function CompactRows() {
+  const preferences = useRendererPreferences();
+  const [compact, setCompact] = useState(
+    () => preferences.get("compactRows", z.boolean()) ?? false,
+  );
+  return <input type="checkbox" aria-label="Compact rows" checked={compact}
+    onChange={event => {
+      const next = event.currentTarget.checked;
+      preferences.set("compactRows", next);
+      setCompact(next);
+    }} />;
+}
+
+const appearance: RendererCommandGroup = {
+  id: "appearance", label: "Appearance",
+  useCommands({ close }) {
+    const preferences = useRendererPreferences();
+    return [
+      { id: "compact", label: "Compact rows", control: <CompactRows /> },
+      {
+        id: "reset", label: "Reset row spacing",
+        onAction() {
+          preferences.set("compactRows", null);
+          close();
+        },
+      },
+    ];
+  },
+};
+
+export default defineRendererPlugin({ commands: [appearance] });
+```
+
 ## Start work from Home
 
 A session entry supplies the complete starting interface for a plugin's workflow. It owns drafts, validation feedback, submission, and the initial title. Submit through a typed plugin call, prepare resources in the backend, and initialize the session atomically. Open the resulting session using the entry's host-provided callback.

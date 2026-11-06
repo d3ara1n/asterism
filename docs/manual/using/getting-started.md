@@ -25,3 +25,11 @@ Choose the session from the sidebar to resume working. Changing pages leaves bac
 On macOS, closing the window leaves Asterism and background work running. Unsaved edits require confirmation before the window closes. Click its Dock icon or open Asterism again to restore the window with current state. Choose **Quit Asterism** or press **Cmd+Q** to stop background work and exit. On Windows and Linux, closing the window exits the application.
 
 For repeated setups, save a workbench template. For another approach to an existing task, use its history.
+
+## Use application commands
+
+Choose **Commands** from the application menu, or press **Cmd+K** on macOS or **Alt+K** on Windows and Linux. Search by command, group, or plugin name. The **Settings** group offers light, dark, and system appearance modes, plus software update checks. Update download progress and the restart action appear in the same row as the update state changes. Software updates require an installed application.
+
+Plugin groups appear as **Plugin name · Group**. Commands that need a session appear only while viewing a session. Builtin contributes **Auto-rename** under **Asterism Essentials · Session**.
+
+Use the arrow keys to enter and navigate result rows. Press Enter to run an action or enter a row's control. Tab moves into interactive controls; their own keys, such as left and right for theme options, remain available. Escape closes the palette. The Agent's separate local command palette uses **Ctrl+K** within the Agent view.

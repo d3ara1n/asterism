@@ -1,4 +1,5 @@
 {
+  "command.session": "会话",
   "command.title": "命令",
   "command.placeholder": "搜索命令…",
   "command.empty": "无匹配结果",
@@ -427,6 +428,10 @@
   "filesystem_renderer_1": "目录",
   "filesystem_renderer_2": "目录",
   "recordSessionNamed": "会话命名为「{title}」",
+  "naming.autoRename": "自动重命名",
+  "naming.failed": "未能重命名会话。",
+  "naming.noMaterial": "没有可供命名的对话",
+  "naming.utilityUnavailable": "Utility 模型不可用",
   "naming.name": "会话名称",
   "naming.rename": "重命名会话",
   "context.window": "上下文窗口",

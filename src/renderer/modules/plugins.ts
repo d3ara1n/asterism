@@ -40,6 +40,16 @@ export function validateRendererPlugin(plugin: RendererPlugin | undefined): asse
       ids.add(entry.id);
     }
   }
+  if (plugin.commands !== undefined) {
+    if (!Array.isArray(plugin.commands)) throw new Error("Plugin commands must be an array of groups.");
+    const ids = new Set<string>();
+    for (const group of plugin.commands) {
+      if (!group || typeof group.id !== "string" || !group.id.trim() || group.id !== group.id.trim() || ids.has(group.id)
+        || group.label === undefined || typeof group.useCommands !== "function")
+        throw new Error("Command groups need unique non-empty trimmed IDs, labels, and useCommands hooks.");
+      ids.add(group.id);
+    }
+  }
   for (const module of plugin.modules ?? []) {
     if (!module || !Array.isArray(module.resources) || !Array.isArray(module.cards) || !Array.isArray(module.tools)
       || (module.creations !== undefined && !Array.isArray(module.creations))

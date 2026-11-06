@@ -23,6 +23,7 @@ import { pluginPreferences } from "./features/creation/preferences";
 import { preparePlugin } from "./app/startup";
 import { pluginName } from "../shared/plugin-name";
 import { PluginSettingsProvider, settingsPageKey, type RegisteredSettingsPage, type RegisteredSessionEntry } from "./modules/settings";
+import { PluginCommandsProvider, type RegisteredCommandGroup } from "./modules/commands";
 import { getI18n, useI18n } from "./shared/i18n";
 import { toast } from "./shared/toast";
 import { startupMessages } from "../shared/error-display";
@@ -92,6 +93,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
   const accepted = [workbenchRecordViews];
   const pages = new Map<string, RegisteredSettingsPage>();
   const sessionEntries: RegisteredSessionEntry[] = [];
+  const commandGroups: RegisteredCommandGroup[] = [];
   const cleanup: (() => Promise<void>)[] = [];
   signal.addEventListener("abort", () => { void (async () => {
     for (const close of cleanup.reverse()) {
@@ -106,6 +108,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
       const name = names.get(id) ?? id;
       for (const page of plugin.settings ?? []) pages.set(settingsPageKey(id, page.id), { ...page, pluginId: id, pluginName: name });
       for (const entry of plugin.sessionEntries ?? []) sessionEntries.push({ ...entry, pluginId: id, pluginName: name });
+      for (const group of plugin.commands ?? []) commandGroups.push({ ...group, pluginId: id, pluginName: name });
       return prepared.diagnostics;
     } });
   const moduleViews = new ViewRegistry(accepted);
@@ -127,7 +130,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
                     <ModuleViewsProvider registry={moduleViews}>
                       <RendererApplicationProvider value={applicationServices}>
                         <PluginSettingsProvider value={{ pages, sessionEntries, renderers: rendererPlugins.outcomes }}>
-                          <App controller={controller} />
+                          <PluginCommandsProvider groups={commandGroups}><App controller={controller} /></PluginCommandsProvider>
                           <StartupNotification />
                         </PluginSettingsProvider>
                       </RendererApplicationProvider>

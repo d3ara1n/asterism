@@ -1,4 +1,4 @@
-/** SDK renderer entry point: cards, tool views, and frontend capabilities bound to objects; React is shared by the host. */
+/** SDK renderer entry point: plugin views, application commands, and frontend capabilities; React is shared by the host. */
 import { createContext, createElement, useContext, type ComponentType, type ReactNode } from "react";
 import type { UiText } from "./i18n.ts";
 import type { CardAppearance } from "./card.ts";
@@ -13,6 +13,7 @@ export * from "./renderer-session.ts";
 export * from "./renderer-services.ts";
 export * from "./renderer-calls.ts";
 export * from "./renderer-creation.ts";
+export type * from "./renderer-commands.ts";
 export * from "./renderer-tools.ts";
 export * from "./renderer-records.ts";
 export * from "./renderer-card.ts";
@@ -27,6 +28,7 @@ import type { RendererContentInput, RendererInputOptions } from "./renderer-cont
 import type { ContentReader } from "./content-runtime.ts";
 export type { ContentReader } from "./content-runtime.ts";
 import type { CreationEntry } from "./renderer-creation.ts";
+import type { RendererCommandGroup } from "./renderer-commands.ts";
 import type { ToolRenderer } from "./renderer-tools.ts";
 import type { EventSubscriber } from "./events.ts";
 import type { PluginCalls } from "./calls.ts";
@@ -146,6 +148,8 @@ export interface PluginSessionEntry {
 export interface RendererPlugin {
   modules?: readonly RendererModule[];
   settings?: readonly PluginSettingsPage[];
+  /** Application palette groups, attributed to this plugin independently of resource views. */
+  commands?: readonly RendererCommandGroup[];
   sessionEntries?: readonly PluginSessionEntry[];
   prepare?(context: RendererPrepareContext): Promise<void>;
   closing?(): void | Promise<void>;

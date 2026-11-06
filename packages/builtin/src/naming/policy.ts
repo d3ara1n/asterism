@@ -1,5 +1,5 @@
-import { decodeExecution, inputSummary, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
-import type { SessionRecord, SessionSnapshot } from "@asterism-app/sdk/contracts";
+import { decodeExecution, inputSummary, AgentInputMessage, AutomaticSessionName } from "@asterism-app/builtin-api/contracts";
+import { SessionTitleAssigned, type SessionRecord, type SessionSnapshot } from "@asterism-app/sdk/contracts";
 
 const windowEdge = 4;
 const maxTitleLength = 50;
@@ -57,7 +57,7 @@ export function collectTurns(records: readonly SessionRecord[]): NamingTurn[] {
   return turns;
 }
 
-/** Title quality rules shared by automatic naming and the session_rename tool, so both naming paths follow one source. */
+/** Title quality rules shared by utility generation and the session_rename tool. */
 export const namingRules = [
   "Name the work the conversation actually did: user prompts give the direction, assistant replies carry the substance. Write the title in your own words.",
   "Reflect the overall topic; when early and recent turns cover different tasks, name the dominant one, the task most of the work is about.",
@@ -105,4 +105,32 @@ export function cleanTitle(raw: string): string {
     .replace(/^["'“「]+|["'”」。.]+$/gu, "").replace(/\s+/gu, " ").trim();
   const characters = Array.from(title);
   return characters.length > maxTitleLength ? characters.slice(0, maxTitleLength - 1).join("") + "…" : title;
+}
+
+export interface AutomaticNamingTrigger { level: "initial" | "refined"; messageId: string }
+
+/** Unrecognized title detail is explicit intent, including unreadable latest assignments. */
+export function namingState(snapshot: SessionSnapshot) {
+  const record = snapshot.records.last(SessionTitleAssigned, { scope: "timeline" });
+  if (!record) return { explicit: false, automatic: null };
+  const detail = record.status === "known" ? record.data.detail : undefined;
+  const automatic = detail?.contract.id === AutomaticSessionName.id
+    ? AutomaticSessionName.schema.safeParse(detail.data) : null;
+  return { explicit: !automatic?.success, automatic: automatic?.success ? automatic.data : null };
+}
+
+/** Background checkpoints depend on newly committed user input, not on generated titles or Agent output. */
+export function automaticNamingTrigger(snapshot: SessionSnapshot, records: readonly SessionRecord[]): AutomaticNamingTrigger | null {
+  const inputs = userMessages(snapshot, "timeline");
+  const latest = inputs.at(-1);
+  if (latest?.status !== "known" || !records.some(record => record.id === latest.record.id)) return null;
+  const named = namingState(snapshot);
+  if (named.explicit) return null;
+  const first = userMessages(snapshot, "session")[0];
+  const initial = first?.status === "known" && records.some(record => record.id === first.record.id);
+  const message = initial ? first : latest;
+  const level = initial ? "initial" : "refined";
+  if (level === "refined" && inputs.length !== 5 && inputs.length % 10 !== 0) return null;
+  if (named.automatic?.messageId === message.record.id) return null;
+  return { level, messageId: message.record.id };
 }

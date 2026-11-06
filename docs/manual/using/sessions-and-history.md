@@ -20,6 +20,8 @@ Select a saved session from the sidebar. Its agent cards display conversations f
 
 Builtin's automatic naming uses its utility model when available. Rename the session explicitly when a specific title matters. An explicit user or agent title prevents builtin's subsequent automatic naming on that history path. Manual naming remains available with other paradigms or with builtin disabled.
 
+With a session open, choose **Commands** from the application menu, or press **Cmd+K** on macOS or **Alt+K** on Windows and Linux, then choose **Auto-rename** under **Asterism Essentials · Session**. The utility model generates and applies a title from the current conversation; no title input is required. This command can replace an explicit title, and its result prevents later background renaming on that history path. The change appears in the timeline.
+
 ## Let inactive sessions sleep
 
 General settings offers automatic sleep after 7, 15, 30, or 90 days, or **Never**; the default is 30 days. Creation and explicit restoration start a fresh interval; opening the session renews it. Incoming messages and Agent work do not renew it. The session you are viewing does not automatically sleep. An overdue session waits for its work to settle before sleeping.

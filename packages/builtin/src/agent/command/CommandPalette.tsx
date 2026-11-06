@@ -5,6 +5,8 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@asterism-app/ui/ui/command";
 import { filterCommandLabels } from "@asterism-app/ui/command-filter";
+import { commandDetail, commandEmpty, commandHeading, commandRow } from "@asterism-app/ui/command-styles";
+import { cn } from "@asterism-app/ui/utils";
 import { commandMessages as messages } from "../../messages/command";
 
 export interface CommandEntry {
@@ -88,14 +90,16 @@ export function CommandPalette({ page, depth, disabled, search, onSearch, value,
       <motion.div key={page.id} className="p-1.5"
         initial={reducedMotion ? false : { opacity: 0, x: depth > 0 ? 10 : -10 }}
         animate={{ opacity: 1, x: 0 }} transition={pageTransition}>
-        <CommandEmpty className="type-caption py-8 text-center">{i18n.text(messages.empty)}</CommandEmpty>
-        {visibleGroups(page).map(group => <CommandGroup key={group.id} heading={group.heading} className="p-0">
+        <CommandEmpty className={commandEmpty}>{i18n.text(messages.empty)}</CommandEmpty>
+        {/* The heading element carries the shared style; cmdk's wrapper keeps only its accessible labelling. */}
+        {visibleGroups(page).map(group => <CommandGroup key={group.id} heading={group.heading && <div className={commandHeading}>{group.heading}</div>}
+          className="p-0 [&_[cmdk-group-heading]]:p-0">
           {group.entries.map(entry => <CommandItem key={entry.id} value={entry.id} keywords={[entry.label]}
             disabled={disabled || entry.disabled} onSelect={entry.onSelect}
-            className="h-9 gap-2.5 rounded-md px-2.5">
+            className={commandRow}>
             {entry.icon}
             <span className="min-w-0 shrink truncate">{entry.label}</span>
-            {entry.detail && <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{entry.detail}</span>}
+            {entry.detail && <span className={cn("min-w-0 flex-1 truncate", commandDetail)}>{entry.detail}</span>}
             {entry.submenu && <ChevronRight className="ml-auto" />}
           </CommandItem>)}
         </CommandGroup>)}
