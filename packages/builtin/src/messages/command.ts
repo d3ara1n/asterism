@@ -6,5 +6,4 @@ export const commandMessages = builtin.messages("en", defineMessages({
   title: { id: "command.title", defaultMessage: "Commands" },
   placeholder: { id: "command.placeholder", defaultMessage: "Search commands…" },
   empty: { id: "command.empty", defaultMessage: "No results" },
-  back: { id: "command.back", defaultMessage: "Back" },
 }));

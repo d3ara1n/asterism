@@ -1,17 +1,19 @@
 import { useRef, type ReactNode } from "react";
-import { motion, useReducedMotion } from "motion/react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@asterism-app/ui/ui/command";
 import { filterCommandLabels } from "@asterism-app/ui/command-filter";
-import { commandDetail, commandEmpty, commandHeading, commandRow } from "@asterism-app/ui/command-styles";
+import { CommandBack, isCommandBackKey, useCommandPageMotion } from "@asterism-app/ui/command-page";
+import { commandDetail, commandEmpty, commandHeading, commandListMotion, commandRow } from "@asterism-app/ui/command-styles";
 import { cn } from "@asterism-app/ui/utils";
 import { commandMessages as messages } from "../../messages/command";
 
 export interface CommandEntry {
   id: string;
   label: string;
+  /** Additional search aliases. */
+  keywords?: readonly string[];
   /** Secondary text shown after the label; excluded from search. */
   detail?: string;
   icon: ReactNode;
@@ -59,8 +61,6 @@ const visibleGroups = (page: CommandPage) => page.groups
 export const firstEntry = (page: CommandPage) =>
   visibleGroups(page).flatMap(group => group.entries).find(entry => !entry.disabled)?.id ?? "";
 
-const pageTransition = { duration: 0.16, ease: [0, 0, 0.2, 1] } as const;
-
 /** Command identity is independent of display names and search text; the owner keeps the page stack, search, and selection. */
 export function CommandPalette({ page, depth, disabled, search, onSearch, value, onValue, onBack }: {
   page: CommandPage; depth: number;
@@ -71,30 +71,22 @@ export function CommandPalette({ page, depth, disabled, search, onSearch, value,
   onBack(): void;
 }) {
   const i18n = useI18n();
-  const reducedMotion = useReducedMotion();
   const input = useRef<HTMLInputElement>(null);
+  const body = useCommandPageMotion<HTMLDivElement>(page.id, depth);
   return <Command label={i18n.text(messages.title)} filter={filterCommandLabels} value={value} onValueChange={onValue}
     className="h-auto min-h-0 bg-transparent **:data-[slot=command-input-wrapper]:h-12 **:data-[slot=command-input-wrapper]:px-4">
-    {page.title && <div className="flex items-center px-2 pt-2">
-      <button type="button" className="type-caption flex h-6 items-center gap-0.5 rounded-md pr-2 pl-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        aria-label={i18n.text(messages.back)} onMouseDown={event => event.preventDefault()}
-        onClick={() => { onBack(); input.current?.focus({ preventScroll: true }); }}>
-        <ChevronLeft className="size-3.5" />{page.title}
-      </button>
-    </div>}
+    {page.title && <CommandBack label={page.title} onBack={() => { onBack(); input.current?.focus({ preventScroll: true }); }} />}
     <CommandInput ref={input} value={search} onValueChange={onSearch} placeholder={page.placeholder} className="h-12"
       onKeyDown={event => {
-        if (event.key === "Backspace" && !search && page.title && !event.nativeEvent.isComposing) { event.preventDefault(); onBack(); }
+        if (page.title && isCommandBackKey(event, search)) { event.preventDefault(); onBack(); }
       }} />
-    <CommandList className="max-h-[min(24rem,calc(100cqh-9rem))] min-h-0 scroll-py-2 h-(--cmdk-list-height) transition-[height] duration-150 ease-out motion-reduce:transition-none">
-      <motion.div key={page.id} className="p-1.5"
-        initial={reducedMotion ? false : { opacity: 0, x: depth > 0 ? 10 : -10 }}
-        animate={{ opacity: 1, x: 0 }} transition={pageTransition}>
+    <CommandList className={`max-h-[min(24rem,calc(100cqh-9rem))] min-h-0 scroll-py-2 ${commandListMotion}`}>
+      <div ref={body} className="p-1.5">
         <CommandEmpty className={commandEmpty}>{i18n.text(messages.empty)}</CommandEmpty>
         {/* The heading element carries the shared style; cmdk's wrapper keeps only its accessible labelling. */}
         {visibleGroups(page).map(group => <CommandGroup key={group.id} heading={group.heading && <div className={commandHeading}>{group.heading}</div>}
           className="p-0 [&_[cmdk-group-heading]]:p-0">
-          {group.entries.map(entry => <CommandItem key={entry.id} value={entry.id} keywords={[entry.label]}
+          {group.entries.map(entry => <CommandItem key={entry.id} value={entry.id} keywords={[entry.label, group.heading ?? page.title ?? "", ...entry.keywords ?? []]}
             disabled={disabled || entry.disabled} onSelect={entry.onSelect}
             className={commandRow}>
             {entry.icon}
@@ -103,7 +95,7 @@ export function CommandPalette({ page, depth, disabled, search, onSearch, value,
             {entry.submenu && <ChevronRight className="ml-auto" />}
           </CommandItem>)}
         </CommandGroup>)}
-      </motion.div>
+      </div>
     </CommandList>
   </Command>;
 }

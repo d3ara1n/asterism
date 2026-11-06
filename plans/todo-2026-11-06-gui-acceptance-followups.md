@@ -1,51 +1,67 @@
 # Resolve GUI acceptance findings before release
 
 Filed: 2026-11-06
-Status: Area 2 implemented and accepted by the user. Areas 1 and 3 remain deferred.
+Status: Areas 1 and 2 implemented and accepted by the user. Area 3 remains deferred.
 Investigated source: `35a13161` on `main`.
 
 ## Scope and release status
 
 During manual acceptance of changes after `v1.0.0-prerelease.15`, the user reported three remaining problem areas: application-palette theme selection, Dock layout/animation, and the session menu's Keep awake control. The user reported the other checklist areas as acceptable. This is user feedback, not an automated GUI test result.
 
-The user explicitly deferred fixes so these areas can be addressed individually, including control replacement if warranted. The original investigation changed no implementation, installed no dependencies, launched no GUI, and performed no commit, push, or release action. The subsequent Area 2 trial is recorded below. Release remains on hold pending disposition and manual acceptance of these findings.
+The user initially deferred fixes so these areas could be addressed individually, including control replacement if warranted. The original investigation changed no implementation, installed no dependencies, launched no GUI, and performed no commit, push, or release action. The subsequent Area 2 trial and Area 1 replacement are recorded below. Release remains on hold pending disposition and manual acceptance of these findings.
 
 Keep this work separate from `todo-2026-11-06-layout-terminology.md`: the present task concerns behavior and presentation, not renaming the layout concepts. No broad redesign, unrelated refactoring, new recovery mechanisms, or additional permission layers are in scope.
 
-## 1. Make the current theme visibly selected on first palette open
+## 1. Replace the application palette with cmdk and nested action pages
 
 ### Reported symptom
 
-Opening the application command palette makes all three theme options appear unselected.
+On first opening the application command palette, all three theme options look unselected. The user reported that selecting another option with the mouse produces a clearly visible selection and initially identified this as missing runtime selection rather than a color issue. A subsequent user-supplied first-open Console snapshot showed mode `system`, with System `aria-checked="true"` and `data-state="on"`, and both other items false/off. The snapshot establishes that selection reaches the DOM in that captured state; the visual symptom remains unresolved.
 
-### Investigation
+### Original investigation before replacement
 
 Confirmed source facts:
 
 - `src/renderer/features/commands/settings.tsx:17–32` reads the shared appearance store, passes `appearance.mode` as the controlled ToggleGroup value, and declares matching System/Light/Dark values. Empty changes are ignored.
 - `src/renderer/features/appearance/state.ts` uses a module-level external store, not an appearance React provider that can be lost across collection rendering. The default configured mode is System; loading changes readiness rather than setting an empty mode.
 - `src/renderer/features/commands/ApplicationCommands.tsx:101–108,153–176` initially focuses search and marks the first enabled row as the default result. Theme is the first host command.
-- The default/focused row uses `bg-accent` and `text-accent-foreground` at `ApplicationCommands.tsx:49–50`. Selected toggles use those same tokens, while unselected outline toggles are transparent (`packages/ui/src/ui/toggle.tsx:9–15`). The row fill can therefore mask the selected toggle's main visual distinction.
+- The default/focused row uses `bg-accent` and `text-accent-foreground` at `ApplicationCommands.tsx:49–50`. Selected toggles use those same tokens, while unselected outline toggles are transparent (`packages/ui/src/ui/toggle.tsx:9–15`). This token overlap is a candidate explanation for the first-open visual symptom; computed styles in the affected state have not yet been captured.
 - React Aria renders collection contents separately from their declarations, but this complete ToggleGroup subtree is inside one GridListItem's rendered children (`ApplicationCommands.tsx:38–54`). The root and its items remain together; source tracing did not establish a broken Radix context.
 
-The strongest explanation is a row-highlight/selection styling collision. Actual first-open attributes and computed colors were not inspected, so an all-off runtime state has not been ruled out by GUI evidence.
+The investigation initially favored a row-highlight/selection styling collision, then pursued missing runtime selection after the user's clarification. The subsequent DOM snapshot resolves that distinction for the captured first-open state: System is selected semantically and has its on-state styling attribute. The report that no option looks selected remains valid, but missing initial selection is not supported by this snapshot.
 
-### Deferred work
+Follow-up source inspection traced the default and preload-normalized appearance value, the command contribution, collection leaf capture/update/render, and the installed Radix controlled-state implementation. The preload normalizes read and saved values through `parseAppearance`; the default mode is System. Radix derives the selected item during render by comparing the controlled group value with each item's value, and exposes `aria-checked` and `data-state` for this single-selection group. No click-dependent initialization was found. Collection relocation keeps the complete ToggleGroup subtree together, and these command sections do not use the dynamic item/render-function cache. Neither a broken Radix context nor a stale collection cache was established.
 
-- [ ] On first open, inspect whether exactly one option has `data-state="on"` and `aria-checked="true"`; compare the controlled mode and computed colors.
-- [ ] Check whether selection becomes visually distinct when default-row highlight, hover, or row focus moves away. This is diagnostic, not a permanent workaround.
-- [ ] Choose a local remedy after that distinction: a persistent selected treatment for this palette control, or adjustment of the row/control highlighting relationship.
-- [ ] Evaluate replacement only if the confirmed problem warrants it. Neither replacement of the collection library nor a new context bridge is justified by the current evidence. Any control/interaction change requires user approval; new dependencies require separate approval.
-- [ ] Implement the chosen correction without changing shared ToggleGroup styling for unrelated consumers unless explicitly approved.
+The first-open DOM snapshot is consistent with the source trace. Comparing row highlight/focus state and computed colors was the proposed next diagnostic, but was not carried out. The user subsequently chose replacement because the palette's interaction and selection behavior were unsatisfactory beyond this visual symptom. No implementation correction, forced remount, delay, or styling workaround was added.
 
-### Manual acceptance
+### Replacement decisions and implementation — 2026-11-06
 
-- [ ] Exactly one configured preference is visibly selected immediately, without clicking.
-- [ ] System denotes the configured preference even when the OS-resolved light/dark scheme changes.
-- [ ] Selection remains distinct under default-result highlighting, hover, row focus, control focus, and search filtering.
-- [ ] Changing an option updates the appearance and survives closing/reopening; selecting the current option never leaves an empty selection.
-- [ ] Loading/saving preserves the indicated selection while interaction is disabled.
-- [ ] Check light/dark appearance and the supported accent treatments.
+The user first requested native arbitrary-inline-control support. After reviewing alternatives, the user removed that requirement and selected the existing cmdk implementation for relevance sorting and nested command pages. Research and its disposition are preserved in `archived/ref-2026-11-06-command-palette-inline-controls.md`. The user approved the migration scope and requested implementation.
+
+- [x] Replace React Aria Autocomplete/GridList with the existing shared shadcn/cmdk components. Remove the default-row MutationObserver and custom search-to-row focus routing.
+- [x] Remove arbitrary interactive command content from the SDK contract. Entries execute an action or open nested children; supplementary content is read-only.
+- [x] Move theme selection to a nested System/Light/Dark page. A trailing check marks the saved value separately from cmdk's navigation highlight. Saving keeps the page open, disables descendant actions while pending, and retains appearance persistence.
+- [x] State each fact once: the root Theme row uses a fixed icon and names the saved mode as its detail; the nested page shows only its return control and options, without repeating the group heading or the parent's detail.
+- [x] Restore dialog open/close animation by keeping content mounted with the dialog's presence. Share the return control, empty-query Backspace handling, list-height transition, and depth-directed page entry motion with builtin's Agent palette through `@asterism-app/ui/command-page`; the page motion animates in place so rendered command state is not remounted.
+- [x] Preserve automatic naming as a plugin-owned asynchronous action: disabled reentry, spinner, failure feedback, and success-only dismissal. Manual session renaming remains in its existing dialog.
+- [x] Preserve update checks, read-only status/progress, and the explicit install action. Checking leaves the palette open, and closing does not cancel application-owned update work.
+- [x] Keep plugin contribution hooks, preferences, and call scopes mounted across filtering and page navigation. Closing releases plugin scopes. Command content renders in its owning provider subtree without collection-specific bridges.
+- [x] Use numeric fuzzy scores for relevance ranking. Labels, source/group attribution, and aliases are searchable; internal command identities are excluded.
+- [x] Remove `react-aria-components` and its unused dependency tree. No new dependency was added. Shared ToggleGroup consumers remain unchanged.
+
+Validation passed: `npm run typecheck`, `npm exec vitest run src/renderer/features/commands/model.test.ts` (5 cases), `npm run i18n:check`, and `npm run build`. The build reports a chunk-size warning; Vitest reports the configured esbuild/oxc option precedence. Tests cover nested identity resolution, unavailable paths, inherited disabling, and sibling identity conflicts, not UI rendering or interaction. No GUI was launched or accepted by this implementation validation.
+
+### Manual acceptance — 2026-11-06
+
+The user reported the replacement, including the follow-up page motion, nested-page deduplication, and shared Agent-palette page controls, as accepted. This is user-reported acceptance, not automated GUI verification; the conversation does not establish separate results for every item below. Area 1 is closed.
+
+- [x] Open the palette with the application menu and platform shortcut; search results rank by relevance without exposing internal IDs as aliases.
+- [x] Enter Theme, verify exactly one saved-choice check immediately, and distinguish it from the keyboard highlight under light/dark and supported accent treatments.
+- [x] Change each theme, verify persistence after reopening, and verify System remains the configured preference when the OS-resolved scheme changes. Activating the current choice does not clear it.
+- [x] Verify search and highlight reset on page navigation and reopening; use the return control and empty-query Backspace to navigate back. Escape closes and restores opener focus.
+- [x] Verify loading/saving disabling and error feedback. Automatic naming preserves busy/error behavior and closes only on success; manual rename remains unchanged.
+- [x] Verify update check/download feedback, no duplicate activation while busy, explicit install/restart activation, and continued application-owned work after closing the palette.
+- [x] Verify plugin attribution and session applicability, including a current page becoming unavailable. Plugin calls retain their scope across navigation/filtering and are cancelled when the palette closes.
 
 ## 2. Restore coordinated Dock and Screen geometry
 
@@ -83,7 +99,7 @@ The alternative of immediate flex allocation plus layout projection was not sele
 
 ### Manual acceptance — 2026-11-06
 
-The user accepted the sidebar animation and overflow-edge spacing result and requested that the plan be updated and the changes committed. This is user-reported visual acceptance, not automated GUI verification. Area 2 is closed; the plan remains active for Areas 1 and 3.
+The user accepted the sidebar animation and overflow-edge spacing result and requested that the plan be updated and the changes committed. This is user-reported visual acceptance, not automated GUI verification. Area 2 is closed.
 
 The original acceptance scope covered visible entrance/exit and continuous accommodation, settled auxiliary width, panel replacement without duplicate space or leftover overlays, both Docks alongside Island overflow/focus-following, focus restoration and page navigation, and reduced-motion behavior. The conversation does not establish separate test results for every combination in that scope.
 
@@ -134,9 +150,9 @@ Keep awake has an extra icon/indentation compared with neighboring session-menu 
 
 ## Control-library boundary
 
-The application command palette uses React Aria Components `Autocomplete`/`GridList`, not cmdk (`ApplicationCommands.tsx:2–4`). Builtin's Agent palette uses cmdk, and the session menu uses Radix DropdownMenu. These are separate surfaces; a session-menu presentation change does not require replacing the application palette.
+The original application palette used React Aria Components Autocomplete/GridList, while builtin's Agent palette used cmdk. The implemented replacement now uses cmdk for both command surfaces, without merging their keyboard scopes or feature ownership. The session menu still uses Radix DropdownMenu; its Keep awake presentation is a separate finding.
 
-The installed cmdk implementation renders arbitrary children, but its collection uses `listbox`/`option`, input-held active-descendant navigation, and row-level Enter selection. Being able to render a checkbox or ToggleGroup inside an option is not equivalent to supporting independently focusable nested controls with correct keyboard and accessibility behavior. It is therefore inaccurate both to say cmdk cannot render such content and to assume it provides the required composite interaction. Retain this distinction when evaluating future control changes; do not introduce bespoke keyboard workarounds merely to preserve a library choice.
+The installed cmdk implementation renders arbitrary children, but its listbox/option model does not establish independently focusable nested-control support. The user deliberately removed that requirement: rows contain actions, nested-page entries, and read-only content. This is not a claim that changing libraries fixed the original inline-control composition or established a new native-control capability.
 
 ## Completion and validation
 

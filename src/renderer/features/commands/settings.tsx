@@ -1,6 +1,5 @@
-import { Check, CircleArrowUp, Monitor, Moon, RefreshCw, Sun } from "lucide-react";
+import { Check, CircleArrowUp, Monitor, Moon, RefreshCw, Sun, SunMoon } from "lucide-react";
 import type { RendererCommand, RendererCommandContext, RendererCommandGroup } from "@asterism-app/sdk/renderer";
-import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { Progress } from "@asterism-app/ui/ui/progress";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { commandsMessages } from "../../messages/commands";
@@ -9,27 +8,31 @@ import { settingsMessages } from "../../messages/settings";
 import { updatesMessages } from "../../messages/updates";
 import { useI18n } from "../../shared/i18n";
 import { useAppearance, useAppearanceAction, useAppearanceReadState } from "../appearance/state";
-import type { Appearance } from "../../../shared/theme";
 import { useUpdates } from "../updates/state";
 import { useUpdateSummary } from "../updates/controls";
+
+const themeOptions = [
+  { mode: "system", label: appearanceMessages.system, Icon: Monitor },
+  { mode: "light", label: appearanceMessages.light, Icon: Sun },
+  { mode: "dark", label: appearanceMessages.dark, Icon: Moon },
+] as const;
 
 function useThemeCommand(): RendererCommand {
   const i18n = useI18n();
   const appearance = useAppearance();
   const { ready, error } = useAppearanceReadState();
   const { busy, save } = useAppearanceAction();
+  const current = themeOptions.find(option => option.mode === appearance.mode)!;
+  // The row names the setting; the detail states its saved value once, and the nested page marks it with a check.
   return {
     id: "theme", label: commandsMessages.theme,
-    icon: appearance.mode === "system" ? <Monitor /> : appearance.mode === "dark" ? <Moon /> : <Sun />, disabled: !ready || busy,
-    keywords: [appearanceMessages.mode, appearanceMessages.system, appearanceMessages.light, appearanceMessages.dark].map(message => i18n.text(message)),
-    detail: error ? <span className="text-destructive">{i18n.text(error)}</span> : undefined,
-    control: <ToggleGroup type="single" variant="outline" size="sm" value={appearance.mode}
-      disabled={!ready || busy} aria-label={i18n.text(commandsMessages.theme)}
-      onValueChange={mode => { if (mode) void save({ mode: mode as Appearance["mode"] }); }}>
-      <ToggleGroupItem value="system" className="px-2"><Monitor />{i18n.text(appearanceMessages.system)}</ToggleGroupItem>
-      <ToggleGroupItem value="light" className="px-2"><Sun />{i18n.text(appearanceMessages.light)}</ToggleGroupItem>
-      <ToggleGroupItem value="dark" className="px-2"><Moon />{i18n.text(appearanceMessages.dark)}</ToggleGroupItem>
-    </ToggleGroup>,
+    icon: busy ? <Spinner /> : <SunMoon />, disabled: !ready || busy,
+    keywords: [appearanceMessages.mode, ...themeOptions.map(option => option.label)].map(message => i18n.text(message)),
+    detail: error ? <span className="text-destructive">{i18n.text(error)}</span> : i18n.text(current.label),
+    children: themeOptions.map(({ mode, label, Icon }) => ({
+      id: mode, label, icon: <Icon />, current: appearance.mode === mode,
+      onAction: () => { if (mode !== appearance.mode) void save({ mode }); },
+    })),
   };
 }
 

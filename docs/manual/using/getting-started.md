@@ -28,8 +28,8 @@ For repeated setups, save a workbench template. For another approach to an exist
 
 ## Use application commands
 
-Choose **Commands** from the application menu, or press **Cmd+K** on macOS or **Alt+K** on Windows and Linux. Search by command, group, or plugin name. The **Settings** group offers light, dark, and system appearance modes, plus software update checks. Update download progress and the restart action appear in the same row as the update state changes. Software updates require an installed application.
+Choose **Commands** from the application menu, or press **Cmd+K** on macOS or **Alt+K** on Windows and Linux. Search by command, group, or plugin name; matching results are ranked by relevance. Open **Settings → Theme** to choose light, dark, or system appearance. A check marks the saved preference separately from the highlighted command. The **Settings** group also offers software update checks. Update download progress and the restart action appear in the same row as the update state changes. Software updates require an installed application.
 
 Plugin groups appear as **Plugin name · Group**. Commands that need a session appear only while viewing a session. Builtin contributes **Auto-rename** under **Asterism Essentials · Session**.
 
-Use the arrow keys to enter and navigate result rows. Press Enter to run an action or enter a row's control. Tab moves into interactive controls; their own keys, such as left and right for theme options, remain available. Escape closes the palette. The Agent's separate local command palette uses **Ctrl+K** within the Agent view.
+Use the arrow keys to highlight commands and Enter to run an action or open a nested page. Use the return control, or Backspace with an empty search, to return to the parent page. Escape closes the palette. Automatic renaming closes the palette on success and keeps failures visible. Update checks leave it open to show progress; closing the palette does not stop the download. The Agent's separate local command palette uses **Ctrl+K** within the Agent view.

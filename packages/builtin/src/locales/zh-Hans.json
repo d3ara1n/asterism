@@ -3,7 +3,6 @@
   "command.title": "命令",
   "command.placeholder": "搜索命令…",
   "command.empty": "无匹配结果",
-  "command.back": "返回",
   "savedText.title": "常用语",
   "savedText.summary": "可重复使用的消息",
   "savedText.add": "添加常用语",

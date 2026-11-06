@@ -947,6 +947,7 @@
   "sessions.sleeping": "休眠中",
   "commands.title": "命令",
   "commands.search": "搜索命令…",
+  "commands.current": "当前选项",
   "commands.empty": "无结果",
   "commands.pluginFailed": "命令不可用",
   "commands.theme": "主题"
