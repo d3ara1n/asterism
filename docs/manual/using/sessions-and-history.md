@@ -12,7 +12,7 @@ With several entries available, choose one in General settings. If that plugin b
 
 Folders group the sessions and templates that belong to the same work. Create one from the sidebar, from the folder control on Home, or from a session's **Move to folder** menu, and give it a name and a color. The folder chosen on Home receives the next session you start there; **No folder** is always available.
 
-The sidebar lists each folder as a collapsible group with its color, followed by sessions without a folder. Move a session from its menu at any time. Deleting a folder keeps its sessions and templates and moves them to **No folder**.
+The sidebar has two views. **Folders** lists each folder as a collapsible group with its color, followed by sessions without a folder. **Recent** lists every session together, newest first, with a dot in its folder's color; hover the dot to see the folder name. Asterism remembers the chosen view and which folders are collapsed. Move a session from its menu at any time. Deleting a folder keeps its sessions and templates and moves them to **No folder**.
 
 ## Continue work
 

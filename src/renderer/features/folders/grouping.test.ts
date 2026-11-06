@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Folder } from "../../../shared/folders";
+import { folderColors, type Folder } from "../../../shared/folders";
 import { groupByFolder, nextFolderColor } from "./grouping";
 
 const folder = (id: string, name: string, createdAt: string, color: Folder["color"] = "blue"): Folder =>
@@ -28,8 +28,7 @@ describe("folder grouping", () => {
   it("assigns the least-used palette color, earliest in palette order on ties", () => {
     expect(nextFolderColor([])).toBe("red");
     expect(nextFolderColor([folder("a", "A", "1", "red"), folder("b", "B", "2", "orange")])).toBe("amber");
-    const everyColorOnce = (["red", "orange", "amber", "green", "teal", "blue", "violet", "pink"] as const)
-      .map((color, i) => folder(String(i), color, String(i), color));
+    const everyColorOnce = folderColors.map((color, i) => folder(String(i), color, String(i), color));
     expect(nextFolderColor([...everyColorOnce, folder("x", "X", "9", "red")])).toBe("orange");
   });
 });

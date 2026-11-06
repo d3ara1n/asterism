@@ -7,8 +7,8 @@ import { coreChannel } from "./core.ts";
  * Register each key's schema and default here; validate on read and fall back only for corrupt entries. An unversioned cache without migration or recovery points, reset on file corruption.
  * Task viewports and card positions belong to task view events, not here; user-visible editable preferences belong to settings instead.
  */
-/** Preference keys allow only two host-defined prefixes; renderers cannot write other UI state. */
-export const preferenceKeySchema = z.string().min(1).max(512).regex(/^(?:creation-route|plugin)\/[\x21-\x7e]+$/u);
+/** Preference keys allow only host-defined prefixes; renderers cannot write other UI state. */
+export const preferenceKeySchema = z.string().min(1).max(512).regex(/^(?:creation-route|sidebar|plugin)\/[\x21-\x7e]+$/u);
 export const preferencesGetChannel = coreChannel("preferences:get");
 export const preferencesSetChannel = coreChannel("preferences:set");
 export const preferenceWriteSchema = z.strictObject({ key: preferenceKeySchema, value: jsonSchema.nullable() });
@@ -21,7 +21,8 @@ export const uiStateSchemas = {
     maximized: z.boolean(),
   }).nullable(),
   /**
-   * Controlled preference container: host route memory (`creation-route/...`) and plugin-isolated preferences (`plugin/<pluginId>/...`).
+   * Controlled preference container: host route memory (`creation-route/...`), sidebar navigation memory (`sidebar/...`),
+   * and plugin-isolated preferences (`plugin/<pluginId>/...`).
    * Hosts generate keys with JSON values; readers validate individual key semantics using their own schemas, falling back and optionally cleaning invalid values.
    */
   preferences: z.record(preferenceKeySchema, jsonSchema),

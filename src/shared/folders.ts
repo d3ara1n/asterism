@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /** Folder theme colors are palette tokens; each scheme resolves them through `--folder-<token>` CSS variables. */
-export const folderColors = ["red", "orange", "amber", "green", "teal", "blue", "violet", "pink"] as const;
+export const folderColors = ["red", "orange", "amber", "green", "teal", "cyan", "blue", "indigo", "violet", "plum", "pink", "brown"] as const;
 export const folderColorSchema = z.enum(folderColors);
 export type FolderColor = z.infer<typeof folderColorSchema>;
 

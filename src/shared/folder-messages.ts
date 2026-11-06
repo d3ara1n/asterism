@@ -23,4 +23,8 @@ export const folderMessages = pluginNamespace("asterism.host").messages("en", de
   colorBlue: { id: "folders.color.blue", defaultMessage: "Blue" },
   colorViolet: { id: "folders.color.violet", defaultMessage: "Violet" },
   colorPink: { id: "folders.color.pink", defaultMessage: "Pink" },
+  colorCyan: { id: "folders.color.cyan", defaultMessage: "Cyan" },
+  colorIndigo: { id: "folders.color.indigo", defaultMessage: "Indigo" },
+  colorPlum: { id: "folders.color.plum", defaultMessage: "Plum" },
+  colorBrown: { id: "folders.color.brown", defaultMessage: "Brown" },
 }));

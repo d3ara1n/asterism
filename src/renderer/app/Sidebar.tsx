@@ -5,6 +5,8 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { ChevronRight, Moon, Folder as FolderIcon, FolderPlus, House, MessageSquare, MoreHorizontal, PanelLeftClose, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@asterism-app/ui/utils";
 
@@ -23,13 +25,15 @@ import { useFolders } from "../features/folders/context";
 import { groupByFolder, type FolderGroup } from "../features/folders/grouping";
 import { FolderDot } from "../features/folders/marks";
 import { DeleteFolder, FolderDialog } from "../features/folders/FolderDialog";
+import { sidebarViews, type SidebarView } from "./sidebar-state";
 
 type SessionSummary = AppSnapshot["sessions"][number];
 /** Collapse key of the no-folder group; folder groups use their identity. */
 export const noFolderGroup = "none";
+const viewLabels = { folders: appMessages.sidebarViewFolders, recent: appMessages.sidebarViewRecent } as const;
 
 /** Application navigation consumes only session summaries; after selecting a session, the application layer explicitly loads the workbench. */
-export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, collapsed, onToggleGroup, onHome, onSession, onRename, onArchive, onCompletedChange, onKeepAwakeChange, onTemplateSaved, onHide, onRetry }: {
+export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, view, onViewChange, collapsed, onToggleGroup, onHome, onSession, onRename, onArchive, onCompletedChange, onKeepAwakeChange, onTemplateSaved, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
   resourceStatuses: readonly ResourceStatusMark[];
   renameDisabledSessionId: string | null; onRename: (sessionId: string, title: string) => Promise<SessionResult>;
@@ -37,6 +41,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
   onTemplateSaved: () => void;
   onCompletedChange: (sessionId: string, completed: boolean) => Promise<void>;
   onKeepAwakeChange: (sessionId: string, keepAwake: boolean) => Promise<void>;
+  view: SidebarView; onViewChange: (view: SidebarView) => void;
   /** Collapsed group keys: folder identities or `noFolderGroup`. */
   collapsed: ReadonlySet<string>; onToggleGroup: (key: string) => void;
   homeActive: boolean; onHome: () => void; onSession: (id: string) => void;
@@ -47,15 +52,36 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
   const [creating, setCreating] = useState(false);
   const createTrigger = useRef<HTMLButtonElement>(null);
   const disabled = busy || status !== "ready";
-  const groups = snapshot ? groupByFolder(folders, snapshot.sessions, session => session.folder_id, i18n.locale) : [];
+  // Without folders both arrangements are the same flat list, so the switch is omitted.
+  const grouped = folders.length > 0 && view === "folders";
+  const groups = snapshot && grouped ? groupByFolder(folders, snapshot.sessions, session => session.folder_id, i18n.locale) : [];
+  // The flat list marks folder membership with the folder's dot once folders exist.
+  const marked = folders.length > 0 && !grouped;
+  const folderById = new Map(folders.map(folder => [folder.id, folder]));
   const row = (session: SessionSummary) => {
     const marks = resourceStatuses.filter(mark => mark.resource.sessionId === session.id);
+    const folder = marked && session.folder_id !== null ? folderById.get(session.folder_id) : undefined;
+    const icon = session.sleeping ? <Moon className="text-muted-foreground" /> : <MessageSquare className="text-muted-foreground" />;
+    // Sessions without a folder keep the dot slot so titles align.
+    const media = !marked ? icon : <span className="flex items-center gap-1.5">
+      {folder ? <Tooltip>
+        <TooltipTrigger asChild>
+          {/* Above the row's open overlay so hovering reaches the tooltip; a click still opens the session. */}
+          <span className="relative z-10 -m-1 flex p-1" onClick={() => { if (!disabled) onSession(session.id); }}>
+            <FolderDot color={folder.color} />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="right">{folder.name}</TooltipContent>
+      </Tooltip> : <span aria-hidden="true" className="size-2 shrink-0" />}
+      {icon}
+    </span>;
     return <ListRow key={session.id} variant="navigation"
       selected={selectedSessionId === session.id} disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
       buttonProps={{ title: session.title, "aria-current": selectedSessionId === session.id ? "page" : undefined }}
-      media={session.sleeping ? <Moon className="text-muted-foreground" /> : <MessageSquare className="text-muted-foreground" />}
+      media={media}
       title={<span className={cn("block truncate", session.completed && "line-through")}>
-        {session.title}{session.sleeping && <span className="sr-only">, {i18n.text(appMessages.sleeping)}</span>}
+        {session.title}{folder && <span className="sr-only">, {folder.name}</span>}
+        {session.sleeping && <span className="sr-only">, {i18n.text(appMessages.sleeping)}</span>}
       </span>}
       actions={<>
         <SessionStatus marks={marks} />
@@ -79,14 +105,18 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
         <h2 id="conversation-list-title" className="type-label">{i18n.formatMessage(commonMessages.conversations)}</h2>
         <IconButton ref={createTrigger} size="icon-xs" label={i18n.text(folderMessages.create)} disabled={!ready} onClick={() => setCreating(true)}><FolderPlus /></IconButton>
       </div>
+      {folders.length > 0 && <ToggleGroup type="single" variant="outline" size="sm" className="mb-2 w-full" aria-label={i18n.text(appMessages.sidebarView)}
+        value={view} onValueChange={value => { if (value) onViewChange(value as SidebarView); }}>
+        {sidebarViews.map(item => <ToggleGroupItem key={item} value={item} className="h-7 flex-1">{i18n.text(viewLabels[item])}</ToggleGroupItem>)}
+      </ToggleGroup>}
       <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-2">
-        {folders.length === 0 ? snapshot?.sessions.map(row) : groups.map(group => {
+        {!grouped ? snapshot?.sessions.map(row) : groups.map(group => {
           const key = group.folder?.id ?? noFolderGroup;
           return <SidebarGroup key={key} group={group} open={!collapsed.has(key)} onToggle={() => onToggleGroup(key)}>
             {group.items.map(row)}
           </SidebarGroup>;
         })}
-        {snapshot?.sessions.length === 0 && folders.length === 0 && <p className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.noConversations)}</p>}
+        {snapshot?.sessions.length === 0 && !grouped && <p className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.noConversations)}</p>}
         {!snapshot && status !== "unavailable" && <p role="status" className="type-caption px-2 py-3">{i18n.formatMessage(appMessages.loadingConversations)}</p>}
         {status === "unavailable" && <p role="status" className="type-caption px-2 py-3">{i18n.formatMessage(commonMessages.statusUnavailable)}</p>}
         {!snapshot && !busy && status !== "unavailable" && <Button variant="ghost" size="sm" onClick={onRetry}>{i18n.formatMessage(commonMessages.retry)}</Button>}

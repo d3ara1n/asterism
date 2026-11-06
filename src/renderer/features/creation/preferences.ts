@@ -3,7 +3,7 @@ import type { RendererPreferences } from "@asterism-app/sdk/renderer";
 
 /**
  * Renderer cache of the controlled preferences container: read once at startup; writes update the cache before saving through the bridge.
- * Host routing memory and plugin preferences share one container, with ownership distinguished by key prefixes.
+ * Host routing memory, sidebar navigation memory, and plugin preferences share one container, with ownership distinguished by key prefixes.
  */
 let cache: Record<string, Json> = {};
 let loaded: Promise<void> | null = null;

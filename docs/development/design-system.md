@@ -107,7 +107,7 @@ Use the shared display, page, section, body, caption, label, and code roles. Int
 
 The host publishes typography through root CSS tokens. Plugin DOM content inherits those styles; renderers that require explicit font options consume the resolved tokens and apply changes to existing views. Interactive terminals and terminal images use the same font settings. Font changes recalculate terminal geometry without restarting the shell.
 
-Use Lucide icons. Chart category colors and folder colors are independent of status and accent colors. Pair each graphic with visible labels and values; colors alone do not encode meaning, so a folder color always appears with its folder name.
+Use Lucide icons. Chart category colors and folder colors are independent of status and accent colors. Pair each graphic with visible labels and values; colors alone do not encode meaning, so a folder color always appears with its folder name, either visibly or, for compact membership marks in a list, through a tooltip and the row's accessible name.
 
 Switches express immediate booleans, checkboxes express form or multi-selection, radios express explained single choices, tabs change content, and searchable choices use the shared command/popover combination.
 

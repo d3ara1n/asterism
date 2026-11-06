@@ -16,6 +16,7 @@ import { ObjectsPanel } from "../features/workbench/ObjectsPanel";
 import { AccessPanel } from "../features/workbench/AccessPanel";
 import { SessionHistoryPanel } from "../features/session/History";
 import { Sidebar } from "./Sidebar";
+import { readCollapsedGroups, readSidebarView, writeCollapsedGroups, writeSidebarView, type SidebarView } from "./sidebar-state";
 
 import { HomePage } from "../features/home/HomePage";
 import { RendererSettingsNavigationProvider } from "@asterism-app/sdk/renderer";
@@ -83,12 +84,16 @@ export function App({ controller }: { controller: ApplicationController }) {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   // Navigation memory kept across Home visits and sidebar hiding; it does not persist across restarts.
   const [homeFolderId, setHomeFolderId] = useState<string | null>(null);
-  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => new Set());
-  const toggleGroup = useCallback((key: string) => setCollapsedGroups(current => {
-    const next = new Set(current);
+  // Sidebar arrangement and folder collapse persist across restarts.
+  const [sidebarView, setSidebarView] = useState<SidebarView>(readSidebarView);
+  const changeSidebarView = useCallback((next: SidebarView) => { setSidebarView(next); writeSidebarView(next); }, []);
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(readCollapsedGroups);
+  const toggleGroup = useCallback((key: string) => {
+    const next = new Set(collapsedGroups);
     if (!next.delete(key)) next.add(key);
-    return next;
-  }), []);
+    setCollapsedGroups(next);
+    writeCollapsedGroups(next);
+  }, [collapsedGroups]);
   // Environment outlet for the current workbench: object islands and the auxiliary panel obtain the session environment through it.
   const [workbenchStore] = useState(() => new WorkbenchStore());
   const [panel, setPanel] = useState<{ kind: PanelKind; origin: HTMLElement | null } | null>(null);
@@ -271,6 +276,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     }}
     onTemplateSaved={() => { void controller.refresh({ quiet: true }); }}
     homeActive={view.kind === "home"}
+    view={sidebarView} onViewChange={changeSidebarView}
     collapsed={collapsedGroups} onToggleGroup={toggleGroup}
     onHome={goHome} onSession={openSession} onHide={hideSidebar}
     onRetry={() => { void controller.refresh(); }} />;

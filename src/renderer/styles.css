@@ -53,6 +53,7 @@
   /* Folder theme colors: decorative identity marks, independent of status, accent, and chart colors. */
   --folder-red: #e5484d; --folder-orange: #f76b15; --folder-amber: #e2a336; --folder-green: #30a46c;
   --folder-teal: #12a594; --folder-blue: #0090ff; --folder-violet: #6e56cf; --folder-pink: #d6409f;
+  --folder-cyan: #00a2c7; --folder-indigo: #3e63dd; --folder-plum: #ab4aba; --folder-brown: #ad7f58;
   /* Managed space padding: align island tops with page tops. */
   --space-inset: 0px;
   --motion-fast: 200ms;
@@ -82,6 +83,7 @@
     --canvas: #111111; --canvas-grid: #3a3a3a; --selection: #3a3a3a;
     --folder-red: #ec5d5e; --folder-orange: #ff801f; --folder-amber: #ffca16; --folder-green: #3dd68c;
     --folder-teal: #0bd8b6; --folder-blue: #3b9eff; --folder-violet: #9e8cfc; --folder-pink: #e66fb6;
+    --folder-cyan: #4ccce6; --folder-indigo: #5472e4; --folder-plum: #d19dff; --folder-brown: #dbb594;
   }
 }
 /* shadcn dark: classes bind to resolved light/dark mode; business code does not specify dark:. */
@@ -136,6 +138,10 @@
   --color-folder-blue: var(--folder-blue);
   --color-folder-violet: var(--folder-violet);
   --color-folder-pink: var(--folder-pink);
+  --color-folder-cyan: var(--folder-cyan);
+  --color-folder-indigo: var(--folder-indigo);
+  --color-folder-plum: var(--folder-plum);
+  --color-folder-brown: var(--folder-brown);
   /* Appearance settings write --app-font-sans / --app-font-mono to :root; these are pre-load fallbacks. */
   --font-sans: var(--app-font-sans, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif);
   --font-mono: var(--app-font-mono, ui-monospace, "SF Mono", Menlo, Consolas, "Cascadia Mono", "Noto Sans Mono CJK SC", monospace);
