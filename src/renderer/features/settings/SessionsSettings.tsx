@@ -57,7 +57,7 @@ export function SessionsSettings() {
       <Row label={i18n.formatMessage(settingsMessages.conversationCount, { count: snapshot?.sessions.length ?? 0 })}
         hint={i18n.formatMessage(settingsMessages.archivedCount, { count: archived })}>
         <Button size="sm" variant="outline" disabled={!snapshot} aria-pressed={island.has("recycle-bin")}
-          onClick={event => void island.open({ id: "recycle-bin", label: settingsMessages.recycleBin, width: panelIslandWidth,
+          onClick={event => void island.open({ key: "recycle-bin", label: settingsMessages.recycleBin, width: panelIslandWidth,
             origin: event.currentTarget, render: () => <RecycleBin /> })}>
           <Trash2 />{i18n.text(settingsMessages.recycleBin)}
         </Button>

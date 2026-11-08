@@ -170,7 +170,7 @@ export function SettingsPage({ active, target, onCancel }: { active: boolean; ta
     return () => window.clearTimeout(timer);
   }, [active]);
   const root: IslandSpec = {
-    id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false,
+    key: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false,
     // Center the overview according to content; opening a category requires a wider minimum width, overflowing alongside detail islands in narrow windows.
     width: openId ? { min: 440, grow: 1, max: 720 } : { min: 320, grow: 1, max: 768 },
     render: () => <SettingsRoot openId={openId} onOpen={id => { setLocation(undefined); setOpenId(id); }}

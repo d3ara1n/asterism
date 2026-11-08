@@ -5,7 +5,7 @@ import type { ProviderSetting, WebProviderType } from "@asterism-app/sdk/contrac
 import { webProviderMessages as messages } from "../../messages/web-providers";
 import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
-import { useIsland, useIslandCancel } from "../../shared/weave/Screen";
+import { useIsland, useIslandCancel, useIslandKey } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -22,6 +22,8 @@ import { Section } from "../settings/layout";
 import { ProviderKeyLink } from "./ProviderKeyLink";
 import { ProviderSettingFields } from "./ProviderSettingFields";
 import { settingValues, settingsComplete } from "./provider-settings";
+
+const webProviderIslandKey = (id: string | null) => id === null ? "web-provider:create" : `web-provider:item:${id}`;
 
 type SecretSetting = Extract<ProviderSetting, { kind: "secret" }>;
 function useCapabilities() {
@@ -64,7 +66,7 @@ export function WebProvidersSettings() {
     void saveOrder(ids);
   };
   const open = (id: string | null, origin: HTMLElement) => island.open({
-    id: `web-provider-${id ?? "new"}`, label: messages.edit, width: panelIslandWidth, origin,
+    key: webProviderIslandKey(id), label: messages.edit, width: panelIslandWidth, origin,
     render: () => id === null ? <WebProviderCreation /> : <WebProviderEditor key={id} typeId={id} />,
   });
   return <Section title={i18n.text(messages.title)} hint={i18n.text(messages.hint)}
@@ -94,7 +96,7 @@ export function WebProvidersSettings() {
             <ListRow leadingActions={handle} className="isolate rounded-none" disabled={busy} inactive={!state.enabled}
               mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{initial(label)}</span>}
               title={label} description={type && capabilities(type)}
-              selected={island.has(`web-provider-${state.id}`)} onOpen={origin => open(state.id, origin)}
+              selected={island.has(webProviderIslandKey(state.id))} onOpen={origin => open(state.id, origin)}
               actions={<>
                 {issue && <StatusBadge tone={issue.tone}>{issue.label}</StatusBadge>}
                 <Button variant="ghost" size="icon-sm" disabled={busy || index === 0}
@@ -183,6 +185,9 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
   const { snapshot } = useSettingsConfiguration();
   const type = snapshot?.webProviderTypes.find(type => type.id === typeId);
   const saved = snapshot?.webProviders.find(state => state.id === typeId) ?? null;
+  // Picking a service keeps the creation key until this editor has a stored entry.
+  const [id, setId] = useState(saved?.id ?? null);
+  useIslandKey(webProviderIslandKey(id));
   const [values, setValues] = useState(() => settingValues(type?.settings, saved?.settings ?? {}));
   const action = useConfigurationAction("inline");
   const savedValues = settingValues(type?.settings, saved?.settings ?? {});
@@ -201,7 +206,10 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
       const result = await action.run({ type: "webProvider.save", id: typeId, enabled: saved?.enabled ?? true, settings: values });
       if (result?.ok) {
         const persisted = result.snapshot.webProviders.find(state => state.id === result.savedId);
-        if (persisted) setValues(settingValues(type.settings, persisted.settings));
+        if (persisted) {
+          setValues(settingValues(type.settings, persisted.settings));
+          setId(persisted.id);
+        }
       }
     }}><fieldset disabled={action.busy} className="flex flex-col gap-6">
       {!type && <p className="type-body text-muted-foreground">{i18n.text(messages.unavailableHint)}</p>}

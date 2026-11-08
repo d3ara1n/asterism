@@ -25,7 +25,7 @@ export function objectIslandSpec({ store, sessionId, object, origin, onHome }: {
   store: WorkbenchStore; sessionId: string; object: Pick<WorkbenchObject, "id" | "title">; origin: HTMLElement | null; onHome: () => void;
 }): IslandSpec {
   return {
-    id: objectIslandId(object.id), label: object.title, width: objectIslandWidth, origin,
+    key: objectIslandId(object.id), label: object.title, width: objectIslandWidth, origin,
     restore: { kind: "object", objectId: object.id },
     render: () => <ObjectIsland store={store} sessionId={sessionId} objectId={object.id} onHome={onHome} />,
   };

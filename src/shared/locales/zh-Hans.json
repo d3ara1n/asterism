@@ -236,6 +236,7 @@
   "configurationFields.customValue": "自定义值",
   "objects.auxiliaryPanels": "辅助面板",
   "objects.closeAuxiliaryPanel": "关闭面板",
+  "islands.alreadyOpen": "已在另一个浮岛中打开",
   "islands.actions": "浮岛操作",
   "islands.size": "浮岛尺寸",
   "islands.sizeSmall": "小",

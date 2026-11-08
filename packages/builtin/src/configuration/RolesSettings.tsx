@@ -16,10 +16,12 @@ import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectSeparator, SelectLabel } from "@asterism-app/ui/ui/select";
 import { Switch } from "@asterism-app/ui/ui/switch";
 import { cn } from "@asterism-app/ui/utils";
-import { useRendererIsland as useIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
+import { useRendererIsland as useIsland, useRendererIslandCancel, useRendererIslandKey } from "@asterism-app/sdk/renderer";
 import { Section } from "@asterism-app/ui/settings-layout";
 import { Editor, TextField, OverrideToggleField, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
+
+const roleIslandKey = (id: string | null) => id === null ? "role:create" : `role:item:${id}`;
 
 const UNSET = "__unset";
 /** Remove overrides when role values equal built-in values; the UI shows only effective values. */
@@ -69,7 +71,7 @@ export function RolesSettings() {
   const { snapshot, readError, load } = useSettingsConfiguration();
   const island = useIsland();
   const open = async (id: string | null, origin?: HTMLElement | null) => {
-    const opened = await island.open({ key: `role-${id ?? "new"}`, label: rolesMessages.modelRole, origin,
+    const opened = await island.open({ key: roleIslandKey(id), label: rolesMessages.modelRole, origin,
       render: () => <RoleEditor key={id ?? "new"} initialId={id} /> });
     return opened;
   };
@@ -79,7 +81,7 @@ export function RolesSettings() {
     <ReadStatus loaded={!!snapshot} error={readError} onRetry={() => void load()} />
     {snapshot && <ItemGroup className="surface">{roles.map((role, index) =>
       <div key={role.id}>{index > 0 && <ItemSeparator />}
-        <RoleRow role={role} snapshot={snapshot} selected={island.has(`role-${role.id}`)} onOpen={origin => open(role.id, origin)} />
+        <RoleRow role={role} snapshot={snapshot} selected={island.has(roleIslandKey(role.id))} onOpen={origin => open(role.id, origin)} />
       </div>)}</ItemGroup>}
   </Section>;
 }
@@ -116,6 +118,7 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
   const island = useIsland();
   useRendererIslandCancel(async () => { await island.close(); });
   const [id, setId] = useState(initialId);
+  useRendererIslandKey(roleIslandKey(id));
   const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.roles.find(role => role.id === id);
   const stored = id ? snapshot?.overrides.roles[id] ?? {} : {};

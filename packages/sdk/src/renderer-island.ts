@@ -1,4 +1,4 @@
-import { createContext, createElement, useContext, useEffect, useRef, type ComponentType, type ReactNode } from "react";
+import { createContext, createElement, useContext, useEffect, useLayoutEffect, useRef, type ComponentType, type ReactNode } from "react";
 import type { UiText } from "./i18n.ts";
 
 /**
@@ -6,7 +6,7 @@ import type { UiText } from "./i18n.ts";
  * closing an island also closes the islands it opened. The host manages order, width, position, motion, and focus; plugins provide identity, an accessible name, and content.
  */
 export interface RendererIslandSpec {
-  /** Island identity unique within the plugin; the host isolates it by plugin identity. Opening an identity that is already open locates that island and keeps its content. */
+  /** Initial content lookup key unique within the plugin. Opening an already bound key locates that island and keeps its content. */
   key: string;
   /** The island's accessible name and overflow navigation hint. */
   label: UiText;
@@ -23,6 +23,10 @@ export type RendererCloseGuard = () => boolean | Promise<boolean>;
 export interface RendererIsland {
   /** Whether an island with this plugin key is open in the screen. */
   has(key: string): boolean;
+  /** Bind this island to a new content key without remounting or changing layout, ownership, focus, or close guards.
+   * An occupied key is reported by the host and returns false without changing either island; absent, host-managed, or other-plugin islands return false.
+   */
+  bindKey(key: string): boolean;
   /** Open an island owned by this one at the right end of the screen, or locate the open island with the same key. Resolves to whether it is shown. */
   open(spec: RendererIslandSpec): Promise<boolean>;
   /** Close this island and the islands it opened; has no effect on host-managed islands such as the one containing a plugin settings page. force skips guards. */
@@ -61,6 +65,11 @@ function required<T>(value: T | null, name: string): T {
 }
 /** Available within resource cards, plugin settings pages, and islands they open. Opened content has its own region; pass domain inputs explicitly. */
 export function useRendererIsland(): RendererIsland { return required(useContext(Island), "island"); }
+/** Keep an editor bound to its current persisted identity. Use a distinct creation key until the first successful save. */
+export function useRendererIslandKey(key: string) {
+  const island = useRendererIsland();
+  useLayoutEffect(() => { island.bindKey(key); }, [island, key]);
+}
 /** Register a close guard for the containing island; null guard permits closing, and the guard always uses the latest callback. */
 export function useRendererCloseGuard(guard: RendererCloseGuard | null) {
   const island = useRendererIsland();

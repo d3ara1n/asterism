@@ -17,7 +17,7 @@ import { StatusBadge } from "@asterism-app/ui/ui/status";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectItem, SelectSeparator } from "@asterism-app/ui/ui/select";
 import { Switch } from "@asterism-app/ui/ui/switch";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
-import { useRendererIsland as useIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
+import { useRendererIsland as useIsland, useRendererIslandCancel, useRendererIslandKey } from "@asterism-app/sdk/renderer";
 import { Section } from "@asterism-app/ui/settings-layout";
 import { Editor, EditorSection, ModifiedNote, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
@@ -26,6 +26,8 @@ import { DelegationFields } from "./DelegationFields";
 
 type Base = Omit<AgentConfiguration, "id" | "builtin">;
 type Budget = Base["subagent"]["budget"];
+const agentIslandKey = (id: string | null) => id === null ? "agent:create" : `agent:item:${id}`;
+
 const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : defaultAgentPreset]!;
@@ -70,7 +72,7 @@ export function AgentsSettings() {
   const { snapshot, readError, load } = useSettingsConfiguration();
   const island = useIsland();
   const open = async (id: string | null, origin?: HTMLElement | null) => {
-    const opened = await island.open({ key: `agent-${id ?? "new"}`, label: agentsMessages.agent, origin,
+    const opened = await island.open({ key: agentIslandKey(id), label: agentsMessages.agent, origin,
       render: () => <AgentEditor key={id ?? "new"} initialId={id} /> });
     return opened;
   };
@@ -80,7 +82,7 @@ export function AgentsSettings() {
     <ReadStatus loaded={!!snapshot} error={readError} onRetry={() => void load()} />
     {snapshot && <ItemGroup className="surface">{agents.map((agent, index) =>
       <div key={agent.id}>{index > 0 && <ItemSeparator />}
-        <AgentRow agent={agent} snapshot={snapshot} selected={island.has(`agent-${agent.id}`)} onOpen={origin => open(agent.id, origin)} />
+        <AgentRow agent={agent} snapshot={snapshot} selected={island.has(agentIslandKey(agent.id))} onOpen={origin => open(agent.id, origin)} />
       </div>)}</ItemGroup>}
   </Section>;
 }
@@ -149,6 +151,7 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
   useRendererIslandCancel(async () => { await island.close(); });
   const ids = { identity: useId(), description: useId(), prompt: useId(), subagent: useId(), role: useId(), requests: useId(), duration: useId() };
   const [id, setId] = useState(initialId);
+  useRendererIslandKey(agentIslandKey(id));
   const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.agents.find(agent => agent.id === id);
   // Enabling is an immediate row action; the draft does not hold it, preventing mutual overwrites.

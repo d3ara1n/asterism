@@ -19,7 +19,7 @@ import { Separator } from "@asterism-app/ui/ui/separator";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Switch } from "@asterism-app/ui/ui/switch";
 import { cn } from "@asterism-app/ui/utils";
-import { useIsland, useIslandCancel } from "../../shared/weave/Screen";
+import { useIsland, useIslandCancel, useIslandKey } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
 import { ConfigurationActionError, Editor, EditorSection, TextField, NumberField } from "./forms";
@@ -56,6 +56,10 @@ const testHints = (): Record<TestError, string> => ({
   cancelled: getI18n().formatMessage(providersMessages.testCancelled),
 });
 
+const providerIslandKey = (id: string | null) => id === null ? "provider:create" : `provider:item:${id}`;
+const modelIslandKey = (providerId: string, id: string | null) => id === null ? `model:create:${providerId}` : `model:item:${id}`;
+const discoveryIslandKey = (providerId: string) => `model-discovery:item:${providerId}`;
+
 /* ---------- Immediate actions: separate from edit drafts, writing to the same snapshot from any island ---------- */
 
 function useQuickActions() {
@@ -87,7 +91,7 @@ export function ModelProvidersSettings() {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   const island = useIsland();
-  const open = (id: string | null, origin?: HTMLElement | null) => island.open({ id: `provider-${id ?? "new"}`, label: providersMessages.provider, width: panelIslandWidth, origin,
+  const open = (id: string | null, origin?: HTMLElement | null) => island.open({ key: providerIslandKey(id), label: providersMessages.provider, width: panelIslandWidth, origin,
     render: () => id === null ? <ProviderCreation /> : <ProviderEditor key={id} initialId={id} /> });
   const providers = snapshot?.modelProviders ?? [];
   return <Section title={i18n.formatMessage(providersMessages.connections)} hint={i18n.formatMessage(providersMessages.summary)}
@@ -97,7 +101,7 @@ export function ModelProvidersSettings() {
       <EmptyContent><Button size="sm" variant="outline" onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addFirstProvider)}</Button></EmptyContent>
     </Empty> : snapshot && <ItemGroup className="surface">{providers.map((provider, index) => {
       return <div key={provider.id}>{index > 0 && <ItemSeparator />}
-        <ProviderRow provider={provider} snapshot={snapshot} selected={island.has(`provider-${provider.id}`)} onOpen={origin => open(provider.id, origin)} />
+        <ProviderRow provider={provider} snapshot={snapshot} selected={island.has(providerIslandKey(provider.id))} onOpen={origin => open(provider.id, origin)} />
       </div>;
     })}</ItemGroup>}
   </Section>;
@@ -200,6 +204,7 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
   const island = useIsland();
   useIslandCancel(async () => { await island.close(); });
   const [id, setId] = useState(initialId);
+  useIslandKey(providerIslandKey(id));
   const current = snapshot?.modelProviders.find(item => item.id === id);
   // Drafts omit enabled: enabling is an immediate action that always uses the snapshot, preventing mutual overwrites with the parent island's switch.
   const [value, setValue] = useState<ProviderValue>(() => current ? providerValue(current) : structuredClone(initialValue));
@@ -225,7 +230,7 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
   };
 
   const openModel = (modelId: string | null, origin?: HTMLElement | null) => {
-    if (id) island.open({ id: `model-${modelId ?? "new"}`, label: providersMessages.model, width: panelIslandWidth, origin,
+    if (id) island.open({ key: modelIslandKey(id, modelId), label: providersMessages.model, width: panelIslandWidth, origin,
       render: () => <ModelEditor key={modelId ?? "new"} initialId={modelId} providerId={id} /> });
   };
   const models = snapshot?.models.filter(model => model.providerId === id) ?? [];
@@ -258,13 +263,13 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
         <Button size="sm" variant="outline" disabled={busy || dirty || discoveryAction.busy} onClick={async event => {
           const origin = event.currentTarget;
           const result = await discoveryAction.run({ type: "discovery.start", providerId: current.id });
-          if (result?.ok) island.open({ id: `discover-${current.id}`, label: providersMessages.fetchModels, width: panelIslandWidth, origin,
+          if (result?.ok) island.open({ key: discoveryIslandKey(current.id), label: providersMessages.fetchModels, width: panelIslandWidth, origin,
             render: () => <ModelDiscoveryPicker providerId={current.id} /> });
         }}><Search />{i18n.text(providersMessages.fetchModels)}</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addModel)}</Button>
       </>}>
       {models.length ? <ItemGroup className="surface">{models.map((model, index) => <div key={modelReference(model)}>{index > 0 && <ItemSeparator />}
-        <ModelRow model={model} provider={current} selected={island.has(`model-${modelReference(model)}`)} onOpen={origin => openModel(modelReference(model), origin)} />
+        <ModelRow model={model} provider={current} selected={island.has(modelIslandKey(current.id, modelReference(model)))} onOpen={origin => openModel(modelReference(model), origin)} />
       </div>)}</ItemGroup>
         : <Empty className="border md:p-6"><EmptyHeader><EmptyDescription>{i18n.formatMessage(providersMessages.emptyModels)}</EmptyDescription></EmptyHeader></Empty>}
     </EditorSection>}
@@ -304,6 +309,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   useIslandCancel(async () => { await island.close(); });
   const quick = useQuickActions();
   const [id, setId] = useState(initialId);
+  useIslandKey(modelIslandKey(providerId, id));
   const current = snapshot?.models.find(model => modelReference(model) === id);
   const provider = snapshot?.modelProviders.find(item => item.id === providerId);
   const [value, setValue] = useState<ProviderModel>(() => current ? modelValue(current) : createModelInput(providerId, { name: "", modelId: "" }));

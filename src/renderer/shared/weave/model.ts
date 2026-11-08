@@ -15,6 +15,9 @@ export interface IslandSlot { id: string; width: IslandWidth }
 /** Ordinary island ownership: owner is the island that opened it, or null; ownership, not position, determines cascading closure. */
 export interface OwnedIsland { id: string; owner: string | null }
 
+/** A lookup key locates content independently of the stable island instance and ownership. */
+export interface KeyedIsland extends OwnedIsland { key: string }
+
 export interface Span { left: number; width: number }
 export interface ScreenLayout { spans: Span[]; total: number; overflow: boolean }
 
@@ -66,9 +69,19 @@ export function follow(spans: Span[], focusIndex: number, viewport: number, offs
   return Math.min(Math.max(next, 0), max);
 }
 
-/** Open or locate an ordinary island by identity: an existing identity stays in place; a new one appends at the right end. */
-export function openIsland<T extends OwnedIsland>(islands: readonly T[], island: T): { islands: readonly T[]; opened: boolean } {
-  return islands.some(item => item.id === island.id) ? { islands, opened: false } : { islands: [...islands, island], opened: true };
+/** Open or locate by content key; locating keeps the existing instance, owner, and content. */
+export function openIsland<T extends KeyedIsland>(islands: readonly T[], island: T): { islands: readonly T[]; island: T; opened: boolean } {
+  const existing = islands.find(item => item.key === island.key);
+  return existing ? { islands, island: existing, opened: false } : { islands: [...islands, island], island, opened: true };
+}
+
+/** Rebind an instance without changing its position, content, or ownership. An occupied key leaves both instances untouched. */
+export function bindIsland<T extends KeyedIsland>(islands: readonly T[], id: string, key: string):
+  { ok: true; islands: readonly T[] } | { ok: false; reason: "missing" | "occupied" } {
+  const island = islands.find(item => item.id === id);
+  if (!island) return { ok: false, reason: "missing" };
+  if (islands.some(item => item.id !== id && item.key === key)) return { ok: false, reason: "occupied" };
+  return { ok: true, islands: island.key === key ? islands : islands.map(item => item.id === id ? { ...item, key } : item) };
 }
 
 /**
@@ -117,11 +130,25 @@ export function focusAfterClose(order: readonly string[], removed: readonly stri
 }
 
 /**
- * Interpret an island list crossing a persistence boundary: drop repeated identities and detach owners
- * that are neither in the list nor among keep (persistent identities such as the root).
+ * Restore before currently open islands. Current instances win key collisions; owners of coalesced entries follow the surviving instance.
+ * Missing owners detach, except persistent identities such as the root supplied by keep.
  */
-export function restoreIslands<T extends OwnedIsland>(islands: readonly T[], keep: ReadonlySet<string> = new Set()): T[] {
-  const seen = new Set<string>();
-  const unique = islands.filter(island => !seen.has(island.id) && !!seen.add(island.id));
-  return unique.map(island => island.owner === null || seen.has(island.owner) || keep.has(island.owner) ? island : { ...island, owner: null });
+export function restoreIslands<T extends KeyedIsland>(islands: readonly T[], keep: ReadonlySet<string> = new Set(), current: readonly T[] = []): T[] {
+  const keys = new Map(current.map(island => [island.key, island.id]));
+  const ids = new Set(current.map(island => island.id));
+  const renamed = new Map<string, string>();
+  const restored: T[] = [];
+  for (const island of islands) {
+    const existing = keys.get(island.key);
+    if (existing !== undefined || ids.has(island.id)) {
+      renamed.set(island.id, existing ?? island.id);
+      continue;
+    }
+    keys.set(island.key, island.id); ids.add(island.id);
+    restored.push(island);
+  }
+  return [...restored.map(island => {
+    const owner = island.owner === null ? null : renamed.get(island.owner) ?? island.owner;
+    return { ...island, owner: owner !== null && (ids.has(owner) || keep.has(owner)) ? owner : null };
+  }), ...current];
 }

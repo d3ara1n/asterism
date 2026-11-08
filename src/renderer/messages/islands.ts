@@ -1,6 +1,7 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const islandsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  alreadyOpen: { id: "islands.alreadyOpen", defaultMessage: "Already open in another island" },
   actions: { id: "islands.actions", defaultMessage: "Island actions" },
   size: { id: "islands.size", defaultMessage: "Island size" },
   sizeSmall: { id: "islands.sizeSmall", defaultMessage: "Small" },

@@ -290,7 +290,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     </WorkbenchScope>
   </Dock> : null;
   const main: IslandSpec = {
-    id: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation" ? "transparent" : false,
+    key: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation" ? "transparent" : false,
     // Home and workbench enter and exit simultaneously in both directions; exiting content leaves the layout flow so it does not occupy space alongside entering content.
     // The clip contains the scaled enter and exit frames, so they never give the island body a scroll range; each view scrolls itself.
     render: () => <div className="relative h-full overflow-hidden"><AnimatePresence mode="popLayout" initial={false}>

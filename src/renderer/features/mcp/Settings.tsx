@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { MoreHorizontal, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
-import { IslandPanel, useI18n, useRendererCalls, useRendererIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
+import { IslandPanel, useI18n, useRendererCalls, useRendererIsland, useRendererIslandCancel, useRendererIslandKey } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Input } from "@asterism-app/ui/ui/input";
@@ -29,7 +29,7 @@ import type { UiText } from "@asterism-app/sdk/contracts";
 const blank = (taken: string[]): McpServerConfig => ({ id: slugifyServerId("", taken), name: "", enabled: true, mode: "lazy",
   idleSeconds: 300, transport: "stdio", command: "", args: [], cwd: "", url: "", auth: "none", env: {}, headers: {} });
 const summary = (server: McpServerConfig) => server.transport === "stdio" ? [server.command, ...server.args].filter(Boolean).join(" ") : server.url;
-const islandKey = (serverId: string | null) => `mcp:${serverId ?? "new"}`;
+const islandKey = (serverId: string | null) => serverId === null ? "mcp:create" : `mcp:server:${serverId}`;
 
 /** The settings page shows the shared read status; the body waits for the snapshot. */
 export function McpSettings() {
@@ -68,10 +68,8 @@ function McpSettingsBody() {
   const lifetime = useLifetimeSignal();
   const servers = useMcpServers();
 
-  /** After successful creation, reopens using the server identity in the same island used when clicking its row. */
-  const open = (serverId: string | null, origin?: HTMLElement | null, initial?: McpServerConfig) => island.open({ key: islandKey(serverId), label: messages.server, origin,
-    render: () => <McpServerEditor serverId={serverId} initial={initial}
-      onCreated={server => { void open(server.id, origin, server); }} /> });
+  const open = (serverId: string | null, origin?: HTMLElement | null) => island.open({ key: islandKey(serverId), label: messages.server, origin,
+    render: () => <McpServerEditor initialId={serverId} /> });
   const run = async (serverId: string, action: (signal: AbortSignal) => Promise<unknown>) => {
     const signal = lifetime();
     setPending(current => new Set(current).add(serverId));
@@ -161,33 +159,31 @@ function McpSettingsBody() {
 }
 
 /**
- * Server editor island: serverId is null for creation. It stays open after saving and uses the saved result as the new baseline.
- * After successful creation, onCreated reopens it using the server identity.
+ * A successful save normalizes the draft and binds this same island to the saved server identity.
+ * New servers become editable in place; subsequent saves retain the instance and its layout.
  * Closes the island if the server is removed elsewhere.
  */
-function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | null; initial?: McpServerConfig; onCreated(server: McpServerConfig): void }) {
+function McpServerEditor({ initialId }: { initialId: string | null }) {
   const i18n = useI18n(), calls = useRendererCalls(), island = useRendererIsland(), id = useId();
   useRendererIslandCancel(async () => { await island.close(); });
   const servers = useMcpServers();
+  const [serverId, setServerId] = useState(initialId);
+  useRendererIslandKey(islandKey(serverId));
   const create = serverId === null;
   const saved = create ? undefined : servers.find(server => server.id === serverId);
-  const source = saved ?? initial;
-  const [baseline, setBaseline] = useState<McpDraft>(() => draftOf(source ?? blank(servers.map(server => server.id)), create));
+  const [baseline, setBaseline] = useState<McpDraft>(() => draftOf(saved ?? blank(servers.map(server => server.id)), create));
   const [draft, setDraft] = useState(baseline);
   const [errors, setErrors] = useState<Partial<Record<McpField, McpFieldError>>>({});
   const [failure, setFailure] = useState<UiText | null>(null);
   const [saving, setSaving] = useState(false);
-  const [created, setCreated] = useState<McpServerConfig | null>(null);
 
-  // A server that was previously present and disappears is considered removed; configuration may not yet have arrived when reopening after creation, so render initial first.
-  const seen = useRef(false);
+  // A new server may be saved before its configuration snapshot arrives; close only after it was observed.
+  const seen = useRef(initialId !== null);
   useEffect(() => {
     if (create) return;
     if (saved) seen.current = true;
-    else if (seen.current || !initial) void island.close({ force: true });
-  }, [create, saved, initial, island]);
-  // Replace the island with one keyed by server identity after the baseline update takes effect, when there are no unsaved changes.
-  useEffect(() => { if (created) onCreated(created); }, [created]); // eslint-disable-line react-hooks/exhaustive-deps
+    else if (seen.current) void island.close({ force: true });
+  }, [create, saved, island]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
   const submit = async () => {
@@ -197,8 +193,8 @@ function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | 
     setErrors({}); setFailure(null); setSaving(true);
     try {
       await calls.invoke(SaveMcpServer, { server: result.server, create }, {});
-      if (create) { setBaseline(draft); setCreated(result.server); }
-      else { const next = draftOf(result.server, false); setBaseline(next); setDraft(next); }
+      const next = draftOf(result.server, false);
+      setServerId(result.server.id); setBaseline(next); setDraft(next);
     } catch (error) { setFailure(failureDisplay(error, messages.actionFailed)); }
     finally { setSaving(false); }
   };
@@ -227,8 +223,8 @@ function McpServerEditor({ serverId, initial, onCreated }: { serverId: string | 
       <SelectContent>{options.map(([value, label]) => <SelectItem key={value} value={value}>{i18n.text(messages[label])}</SelectItem>)}</SelectContent>
     </Select>;
   const form = `${id}-form`;
-  const title = create ? server.name || i18n.text(messages.add) : source?.name ?? server.name;
-  return <IslandPanel title={title} description={create ? i18n.text(messages.server) : source?.id} dirty={dirty}
+  const title = create ? server.name || i18n.text(messages.add) : saved?.name ?? server.name;
+  return <IslandPanel title={title} description={create ? i18n.text(messages.server) : serverId ?? undefined} dirty={dirty}
     action={<Button type="submit" form={form} size="sm" disabled={disabled || !dirty} aria-busy={saving}>{saving && <Spinner />}{i18n.text(messages.save)}</Button>}>
     <form id={form} className="flex flex-col gap-6" onSubmit={event => { event.preventDefault(); void submit(); }}>
       <FieldSet>

@@ -49,7 +49,7 @@ Islands declare minimum width, growth weight, and optional maximum. When they fi
 
 An ordinary island opens at the right end of the screen and belongs to the island that opened it; closing an island also closes the islands it opened. Escape invokes only an explicitly declared cancellation action on the focused island; closing capability does not imply cancellation. Local controls handle Escape first, and an island without a cancellation action does not delegate it to its owner. Closing restores the opener when available. Host-owned borders and focus highlights remain outside clipped content.
 
-Page-region cleanup releases only islands opened by that region. Sharing a containing island does not make another region's islands part of its lifetime.
+Page-region cleanup releases only island instances opened by that region. Rebinding an editor from a creation key to its saved-object key preserves the instance, arrangement, focus, and ownership. Sharing a containing island does not make another region's islands part of its lifetime.
 
 An island shell's border, clipping, and focus highlight are independent of its background fill. Content that paints its own background, such as the canvas, uses a transparent shell so entry and exit animations reveal the native window material rather than an unrelated card fill.
 

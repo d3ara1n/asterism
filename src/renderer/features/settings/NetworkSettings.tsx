@@ -52,7 +52,7 @@ export function NetworkSettings() {
         description={preference.mode === "custom" ? `${modeLabel} · ${preference.server}` : modeLabel}
         details={state.restartRequired ? i18n.text(messages.restartRequired) : undefined}
         selected={island.has(islandId)}
-        onOpen={origin => void island.open({ id: islandId, label: messages.proxy, width: panelIslandWidth, origin,
+        onOpen={origin => void island.open({ key: islandId, label: messages.proxy, width: panelIslandWidth, origin,
           render: () => <ProxyEditor saved={preference} /> })}
         actions={state.restartRequired && <Button size="sm" variant="outline" disabled={restarting} aria-busy={restarting} onClick={restart}>
           {restarting && <Spinner data-icon="inline-start" />}{i18n.text(messages.restartNow)}

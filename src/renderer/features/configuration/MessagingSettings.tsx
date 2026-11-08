@@ -8,7 +8,7 @@ import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Empty, EmptyContent, EmptyHeader, EmptyDescription, EmptyMedia } from "@asterism-app/ui/ui/empty";
 import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
 import { useI18n } from "../../shared/i18n";
-import { useIsland, useIslandCancel } from "../../shared/weave/Screen";
+import { useIsland, useIslandCancel, useIslandKey } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "../settings/layout";
 import { Editor, TextField, ChoiceField, ToggleField } from "./forms";
@@ -16,6 +16,8 @@ import { ProviderSettingFields } from "./ProviderSettingFields";
 import { settingValues, settingsComplete } from "./provider-settings";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { messagingMessages as messages } from "../../messages/messaging";
+
+const messagingIslandKey = (id: string | null) => id === null ? "messaging:create" : `messaging:item:${id}`;
 
 const statusTone: Record<MessagingConnectionStatus, StatusTone> = {
   connected: "success", connecting: "progress", reconnecting: "warning", failed: "error", disabled: "neutral", unavailable: "error",
@@ -28,7 +30,7 @@ export function MessagingSettings() {
   const action = useConfigurationAction("toast");
   const types = snapshot?.messagingProviderTypes ?? [];
   const open = (id: string | null, origin: HTMLElement) => island.open({
-    id: `messaging-${id ?? "new"}`, label: messages.edit, width: panelIslandWidth, origin,
+    key: messagingIslandKey(id), label: messages.edit, width: panelIslandWidth, origin,
     render: () => <MessagingEditor key={id ?? "new"} initialId={id} />,
   });
   const connections = snapshot?.messagingConnections ?? [];
@@ -50,7 +52,7 @@ export function MessagingSettings() {
         {index > 0 && <ItemSeparator />}
         <ListRow className="rounded-none" mediaVariant="icon" media={<MessageSquare />} title={connection.name}
           description={description} inactive={!connection.enabled}
-          selected={island.has(`messaging-${connection.id}`)} onOpen={origin => open(connection.id, origin)}
+          selected={island.has(messagingIslandKey(connection.id))} onOpen={origin => open(connection.id, origin)}
           actions={<>
             <StatusBadge tone={statusTone[status]}>{i18n.text(messages[status])}</StatusBadge>
             {restartable.has(status) && <Button variant="ghost" size="icon-sm" disabled={action.busy}
@@ -69,6 +71,7 @@ function MessagingEditor({ initialId }: { initialId: string | null }) {
   useIslandCancel(async () => { await island.close(); });
   const { snapshot } = useSettingsConfiguration(), action = useConfigurationAction("inline");
   const [id, setId] = useState(initialId);
+  useIslandKey(messagingIslandKey(id));
   const saved = snapshot?.messagingConnections.find(connection => connection.id === id);
   const [providerId, setProviderId] = useState(saved?.providerId ?? snapshot?.messagingProviderTypes[0]?.id ?? "");
   const type = snapshot?.messagingProviderTypes.find(type => type.id === providerId);

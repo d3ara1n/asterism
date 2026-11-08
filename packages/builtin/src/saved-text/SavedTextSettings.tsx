@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { Plus } from "lucide-react";
-import { useI18n, useRendererIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererIsland, useRendererIslandCancel, useRendererIslandKey } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
@@ -16,7 +16,7 @@ import { savedTextMessages as messages } from "../messages/saved-text";
 import { composerTextLimit } from "../agent/conversation/draft";
 import { useSavedText } from "./use-saved-text";
 
-const islandKey = (id: string | null) => `saved-text-${id ?? "new"}`;
+const islandKey = (id: string | null) => id === null ? "saved-text:create" : `saved-text:item:${id}`;
 
 export function SavedTextSettings() {
   const i18n = useI18n();
@@ -56,6 +56,7 @@ function SavedTextEditor({ initialId }: { initialId: string | null }) {
   useRendererIslandCancel(async () => { await island.close(); });
   const { run, busy, error } = useSettingsAction(settingsMessages.saveFailed);
   const [id, setId] = useState(initialId);
+  useRendererIslandKey(islandKey(id));
   const stored = id === null ? undefined : savedText.items.find(item => item.id === id);
   const [name, setName] = useState(stored?.name ?? "");
   const [content, setContent] = useState(stored?.content ?? "");

@@ -68,7 +68,7 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
       const object = session.objects.find(item => item.id === objectId);
       if (object) void island.open(objectIslandSpec({ store, sessionId: session.id, object, origin, onHome: () => latest.current.onHome() }));
     },
-    closeObject: objectId => { void strip.close(objectIslandId(objectId)); },
+    closeObject: objectId => { void strip.closeByKey(objectIslandId(objectId)); },
   }), [island, strip, store]);
   // Assemble the environment by field, notifying cards and islands only when fields actually change.
   const context = useMemo<WorkbenchView>(

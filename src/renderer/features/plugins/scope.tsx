@@ -20,7 +20,7 @@ import { pluginPreferences } from "../creation/preferences";
 
 /** Host spec for a plugin island; restore tags it as rebuildable from that view. */
 function pluginIslandSpec(pluginId: string, spec: RendererIslandSpec, restore?: IslandView): IslandSpec {
-  return { id: `plugin-island:${pluginId}:${spec.key}`, label: spec.label,
+  return { key: `plugin-island:${pluginId}:${spec.key}`, label: spec.label,
     width: spec.size === "content" ? { min: 560, grow: 2 } : panelIslandWidth, origin: spec.origin, restore,
     render: () => <PluginIslandContent pluginId={pluginId} spec={spec} /> };
 }
@@ -31,12 +31,12 @@ function pluginIsland(island: IslandApi, pluginId: string, restore?: IslandView,
   let tag = restore;
   return {
     has: key => island.has(prefix + key),
+    bindKey: key => island.key?.startsWith(prefix) ? island.bindKey(prefix + key) : false,
     open: async spec => {
       const next = pluginIslandSpec(pluginId, spec, tag); tag = undefined;
-      const existing = island.has(next.id);
       const opened = await island.open(next);
-      if (opened && !existing) owned?.add(next.id);
-      return opened;
+      if (opened?.opened) owned?.add(opened.id);
+      return opened !== null;
     },
     close: options => island.close(options),
     closeOwned: options => island.closeOwned(options),
@@ -56,7 +56,7 @@ export async function resolveResourceIsland(registry: ViewRegistry, calls: Rende
   const pluginId = pluginOf(object.kind)!;
   let captured: IslandSpec | null = null;
   const capture: RendererIsland = {
-    has: () => false,
+    has: () => false, bindKey: () => false,
     open: async spec => { captured ??= pluginIslandSpec(pluginId, spec, view); return true; },
     close: async () => false, closeOwned: async () => true, guard: () => () => {}, onCancel: () => () => {},
   };

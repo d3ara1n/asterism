@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { CopyPlus, RefreshCw, Trash2 } from "lucide-react";
-import { IslandPanel, useI18n, useRendererCalls, useRendererIsland, useRendererIslandCancel } from "@asterism-app/sdk/renderer";
+import { IslandPanel, useI18n, useRendererCalls, useRendererIsland, useRendererIslandCancel, useRendererIslandKey } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -24,7 +24,7 @@ interface Draft { profile: ShellProfile; env: string }
 
 const environmentText = (env: Record<string, string>) => Object.entries(env).map(([key, value]) => `${key}=${value}`).join("\n");
 const draftOf = (profile: ShellProfile): Draft => ({ profile: structuredClone(profile), env: environmentText(profile.env) });
-const islandKey = (id: string) => `shell:${id}`;
+const islandKey = (id: string) => `shell:item:${id}`;
 
 /** Default Shell, duplication, removal, and preset addition save immediately; clicking a profile edits it in an island to the right, and newly added profiles open immediately. */
 export function ShellSettings({ value, disabled, save }: {
@@ -133,6 +133,7 @@ function ShellProfileEditor({ id: initialId, initial }: { id: string; initial: S
   const i18n = useI18n(), island = useRendererIsland(), fieldId = useId();
   useRendererIslandCancel(async () => { await island.close(); });
   const [id, setId] = useState(initialId);
+  useRendererIslandKey(islandKey(id));
   const config = useShellConfiguration();
   const saved = config.value.profiles.find(item => item.id === id);
   const [baseline, setBaseline] = useState(() => draftOf(saved ?? initial));

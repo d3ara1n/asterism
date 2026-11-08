@@ -53,16 +53,18 @@ export function useSessionIslands({ session, run, store, onHome }: {
           if (cancelled) return;
         }
         if (!spec) continue;
-        renamed.set(entry.id, spec.id);
-        restored.push({ id: spec.id, owner: entry.owner, size: entry.size, spec });
+        const { key, ...content } = spec;
+        const id = crypto.randomUUID();
+        renamed.set(entry.id, id);
+        restored.push({ id, key, owner: entry.owner, size: entry.size, spec: content });
       }
       if (cancelled) return;
       // Islands opened while restoring stay after the restored arrangement.
       const current = strip.getSnapshot().islands;
-      const open = new Set(current.map(island => island.id));
-      const rebuilt = restored.filter(island => !open.has(island.id))
-        .map(island => island.owner === null ? island : { ...island, owner: renamed.get(island.owner) ?? island.owner });
-      strip.set({ islands: [...restoreIslands(rebuilt, new Set([root, ...open])), ...current], scope: sessionId });
+      const rebuilt = restored.map(island => ({ ...island,
+        owner: island.owner === null ? null : renamed.get(island.owner) ?? island.owner,
+      }));
+      strip.set({ islands: restoreIslands(rebuilt, new Set([root]), current), scope: sessionId });
     })();
     return () => { cancelled = true; };
   }, [strip, root, registry, calls, store]);
