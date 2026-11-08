@@ -9,11 +9,11 @@ import { McpList, McpSearch, McpInspect, McpConnect, McpCall, type McpCallData }
 import { connectionPhases } from "@asterism-app/sdk/contracts";
 import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
 import { textMessages } from "../messages/text";
-import { inputField, inputText, characterCount } from "../shared/tool-preview";
+import { inputField, inputText, characterCount, searchSubject } from "../shared/tool-preview";
 import { settledBodyViews } from "../shared/tool-views";
 import { FilePreview } from "../shared/attachments";
 import { extraStructured, displayText } from "./content";
-import { Instructions, PageNote, ServerLine, ToolList, type ServerSummaryData, type ToolEntryData } from "./views";
+import { Instructions, PageNote, ServerItem, ServerItems, ToolList, type ServerSummaryData, type ToolEntryData } from "./views";
 
 // --- Display parsing of saved results: permissive fields; unrecognized results retain only raw details ---
 
@@ -52,39 +52,46 @@ function Empty({ text }: { text: UiText }) {
   return <p className="type-caption text-muted-foreground">{useI18n().text(text)}</p>;
 }
 
-// --- Header: action name · action target · result count or progress on the right ---
+// --- Header: action name · server or `server: tool`; result count or progress on the right ---
 
-function ListHeader({ args, result }: ToolRenderProps) {
-  const i18n = useI18n(), data = parse(listSchema, result?.data);
-  return <ToolHeader label={i18n.text(messages.list)} subject={inputText(args, "server_id")} monospace
+/** Tool IDs read as `server: tool`, matching the `resource: path` headers of other tools. Every MCP Host shares one server collection, so its title adds nothing. */
+function toolSubject(id: string | undefined) {
+  const split = id?.indexOf("/") ?? -1;
+  return id && split > 0 ? `${id.slice(0, split)}: ${id.slice(split + 1)}` : id;
+}
+
+function ListHeader(props: ToolRenderProps) {
+  const i18n = useI18n(), data = parse(listSchema, props.result?.data), server = inputText(props.args, "server_id");
+  return <ToolHeader label={i18n.text(messages.list)} subject={server} monospace
     meta={data && i18n.formatMessage("server" in data ? messages.tools : messages.serverCount, { count: data.total })} />;
 }
-function SearchHeader({ args, result }: ToolRenderProps) {
-  const i18n = useI18n(), data = parse(searchSchema, result?.data);
-  const query = inputText(args, "query"), server = inputText(args, "server_id");
-  return <ToolHeader label={i18n.text(messages.search)} subject={query && server ? `${query} · ${server}` : query}
+function SearchHeader(props: ToolRenderProps) {
+  const i18n = useI18n(), data = parse(searchSchema, props.result?.data);
+  return <ToolHeader label={i18n.text(messages.search)}
+    subject={searchSubject(inputText(props.args, "server_id"), inputText(props.args, "query"))}
     meta={data && i18n.formatMessage(messages.matchCount, { count: data.matches.total })} />;
 }
-function InspectHeader({ args, result }: ToolRenderProps) {
-  const i18n = useI18n(), data = parse(inspectSchema, result?.data);
-  return <ToolHeader label={i18n.text(messages.inspect)} subject={inputText(args, "tool_id")} monospace
+function InspectHeader(props: ToolRenderProps) {
+  const i18n = useI18n(), data = parse(inspectSchema, props.result?.data), tool = inputText(props.args, "tool_id");
+  return <ToolHeader label={i18n.text(messages.inspect)} subject={toolSubject(tool)} monospace
     meta={data && i18n.formatMessage(messages.parameterCount, { count: Object.keys(data.inputSchema?.properties ?? {}).length })} />;
 }
-function ConnectHeader({ args, result }: ToolRenderProps) {
-  const i18n = useI18n(), data = parse(serverSchema, result?.data);
-  return <ToolHeader label={i18n.text(messages.connectTool)} subject={inputText(args, "server_id")} monospace
+function ConnectHeader(props: ToolRenderProps) {
+  const i18n = useI18n(), data = parse(serverSchema, props.result?.data), server = inputText(props.args, "server_id");
+  return <ToolHeader label={i18n.text(messages.connectTool)} subject={server} monospace
     meta={data?.indexed && i18n.formatMessage(messages.tools, { count: data.tool_count })} />;
 }
 
 /** Shows remote progress during execution; summarizes returned character and file counts after completion. The header always retains the called tool's handle. */
-function CallHeader({ args, phase, result }: ToolRenderProps<McpCallData>) {
-  const i18n = useI18n(), data = result?.data;
+function CallHeader(props: ToolRenderProps<McpCallData>) {
+  const { args, phase, result } = props;
+  const i18n = useI18n(), data = result?.data, tool = inputText(args, "tool_id");
   const progress = phase === "executing" ? data?.progress : undefined;
   const text = phase === "settled" && data ? data.parts.reduce((total, part) => total + (part.kind === "text" ? characterCount(part.text) : 0), 0) : 0;
   const files = phase === "settled" && data ? data.parts.filter(part => part.kind === "file").length : 0;
   const summary = [text > 0 && i18n.formatMessage(textMessages.toolTextCharacters, { count: formatCount(text) }),
     files > 0 && i18n.formatMessage(messages.fileCount, { count: files })].filter(Boolean).join(" · ");
-  return <ToolHeader label={i18n.text(messages.call)} subject={inputText(args, "tool_id")} monospace
+  return <ToolHeader label={i18n.text(messages.call)} subject={toolSubject(tool)} monospace
     meta={progress ? `${progress.completed}${progress.total !== undefined ? ` / ${progress.total}` : ""}` : summary || undefined} />;
 }
 
@@ -96,11 +103,11 @@ function ListBody({ result }: ToolRenderProps) {
   if (!("server" in data)) return data.items.length
     ? <div className="flex flex-col gap-1.5">
       <PageNote shown={data.items.length} total={data.total} />
-      <ul className="flex flex-col gap-1.5">{data.items.map((server, index) => <li key={index}><ServerLine server={toSummary(server)} /></li>)}</ul>
+      <ServerItems servers={data.items.map(server => toSummary(server))} />
     </div>
     : <Empty text={messages.empty} />;
   return <div className="flex flex-col gap-2">
-    <ServerLine server={toSummary(data.server)} />
+    <ServerItem server={toSummary(data.server)} />
     {!data.server.indexed ? <Empty text={messages.unindexedHint} />
       : data.items.length ? <>
         <PageNote shown={data.items.length} total={data.total} />
@@ -153,7 +160,7 @@ function InspectBody({ result }: ToolRenderProps) {
 
 function ConnectBody({ result }: ToolRenderProps) {
   const data = parse(serverSchema, result?.data);
-  return data ? <ServerLine server={toSummary(data)} /> : null;
+  return data ? <ServerItem server={toSummary(data)} /> : null;
 }
 
 // --- Call body: arguments, progress, and remotely returned content ---

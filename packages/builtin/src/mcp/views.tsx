@@ -1,6 +1,7 @@
 import { Virtualizer } from "virtua";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
+import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } from "@asterism-app/ui/ui/item";
 import { cn } from "@asterism-app/ui/utils";
 import type { ConnectionPhase } from "@asterism-app/sdk/contracts";
 import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
@@ -26,11 +27,31 @@ export function ServerError({ error, className }: { error: string | null; classN
   return error ? <p className={cn("type-caption truncate text-destructive", className)} title={error}>{error}</p> : null;
 }
 
-/** Server rows in tool results: disabled servers are dimmed, with errors indented beneath the name. */
-export function ServerLine({ server }: { server: ServerSummaryData }) {
-  return <div className={cn("flex min-w-0 flex-col gap-0.5", !server.enabled && "opacity-60")}>
-    <div className="flex min-w-0 items-center gap-1.5"><ServerSummary server={server} /></div>
-    <ServerError error={server.error} className="pl-5" />
+/** Compact outline item for tool results: status, name, and tool count on one row; an error adds one clipped line beneath the name. */
+export function ServerItem({ server, listItem = false }: { server: ServerSummaryData; listItem?: boolean }) {
+  const i18n = useI18n();
+  return <Item role={listItem ? "listitem" : undefined} variant="outline" size="sm"
+    className={cn("min-w-0 flex-nowrap gap-2 px-2.5 py-1.5", !server.enabled && "opacity-60")}>
+    <ItemMedia><StatusIcon tone={server.enabled ? phaseTone[server.connection] : "neutral"} className="size-3.5" /></ItemMedia>
+    <ItemContent className="min-w-0 gap-0">
+      <ItemTitle className="w-full min-w-0">
+        <span className="min-w-0 truncate" title={server.name}>{server.name}</span>
+        <span className="sr-only">{server.enabled ? i18n.formatMessage(messages.state, { state: server.connection }) : i18n.text(messages.disabled)}</span>
+      </ItemTitle>
+      {server.error && <ItemDescription className="type-caption line-clamp-1 break-all text-destructive" title={server.error}>{server.error}</ItemDescription>}
+    </ItemContent>
+    <span className="type-caption shrink-0 tabular-nums text-muted-foreground">
+      {server.indexed ? i18n.formatMessage(messages.tools, { count: server.toolCount }) : i18n.text(messages.unindexed)}
+    </span>
+  </Item>;
+}
+
+/** Server collections can be long: items flow into as many columns as the result width allows. */
+export function ServerItems({ servers }: { servers: readonly ServerSummaryData[] }) {
+  return <div className="@container/mcp-servers">
+    <ItemGroup className="grid grid-cols-1 gap-1.5 @min-[28rem]/mcp-servers:grid-cols-2 @min-[48rem]/mcp-servers:grid-cols-3">
+      {servers.map((server, index) => <ServerItem key={index} server={server} listItem />)}
+    </ItemGroup>
   </div>;
 }
 

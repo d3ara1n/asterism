@@ -8,7 +8,7 @@ import { cn } from "@asterism-app/ui/utils";
 import { CodeRows } from "@asterism-app/ui/code-view";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
-import { inputText } from "../shared/tool-preview";
+import { inputText, searchSubject } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { DirectoryFind, DirectoryGrep, type FindResult, type GrepResult, type SearchStopReason } from "./search-contract";
 import { searchSummary } from "./search-presentation";
@@ -37,7 +37,7 @@ function Header(props: Props & { grep?: boolean }) {
   const counts = data && searchSummary(data);
   const truncated = counts ? !counts.complete : false;
   return <ToolHeader label={i18n.text(props.grep ? messages.toolDirectoryGrep : messages.toolDirectoryFind)} monospace
-    subject={[inputText(props.args, "pattern"), scope].filter(Boolean).join(" · ")}
+    subject={searchSubject(scope || undefined, inputText(props.args, "pattern"))}
     meta={counts && [
       counts.matches !== null && i18n.formatMessage(messages.toolSearchMatches, { count: counts.matches, truncated }),
       i18n.formatMessage(messages.toolSearchFiles, { count: counts.files, truncated }),

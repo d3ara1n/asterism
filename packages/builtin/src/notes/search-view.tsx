@@ -4,7 +4,7 @@ import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { CodeRows } from "@asterism-app/ui/code-view";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
-import { inputText } from "../shared/tool-preview";
+import { inputText, searchSubject } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { SearchOptions } from "../filesystem/search-view";
 import { grepSegments } from "../filesystem/search-layout";
@@ -20,7 +20,7 @@ const stopMessages = {
 function Header({ args, invocation, result }: Props) {
   const i18n = useI18n(), data = result?.data;
   return <ToolHeader label={i18n.text(messages.toolDirectoryGrep)} monospace
-    subject={[inputText(args, "pattern"), invocation.resource?.title].filter(Boolean).join(" · ")}
+    subject={searchSubject(invocation.resource?.title, inputText(args, "pattern"))}
     meta={data && i18n.formatMessage(messages.toolSearchMatches, {
       count: data.rows.filter(row => row.match).length, truncated: data.stopReason !== null,
     })} />;

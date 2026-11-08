@@ -13,6 +13,10 @@ export function characterCount(text: string): number {
   for (const _character of text) count++;
   return count;
 }
+/** Search headers lead with the scope like other resource tools, then quote the pattern: `asterism: src "useI18n"`. */
+export function searchSubject(scope: string | undefined, pattern: string | undefined): string {
+  return [scope, pattern !== undefined && `"${pattern}"`].filter(Boolean).join(" ");
+}
 
 /** Visible excerpts of edit input serve both body rendering and preview-stage detection. */
 export function editPreviewText(args: Json): string {
