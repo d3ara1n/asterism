@@ -59,7 +59,7 @@ export function QuestionFields({ question, value, update, invalid }: {
       </FieldLabel>
     </div>)}
     <FieldLabel asChild className="w-full">
-      <InputGroup className="h-auto">
+      <InputGroup className="h-auto dark:bg-transparent">
         <Field orientation="horizontal">
           {question.type === "single"
             ? <RadioGroupItem id={`${id}-custom-choice`} value="custom" aria-label={i18n.text(messages.custom)}
@@ -71,7 +71,7 @@ export function QuestionFields({ question, value, update, invalid }: {
             <InputGroupTextarea rows={1} className="min-h-0 p-0 text-sm font-medium leading-snug" value={value.text}
               aria-label={i18n.text(messages.custom)} placeholder={i18n.text(messages.customPlaceholder)}
               aria-invalid={invalid && value.custom} aria-describedby={invalid && value.custom ? `${id}-error` : undefined}
-              onChange={event => patch({ text: event.target.value })}
+              onChange={event => patch({ text: event.target.value, custom: true })}
               onKeyDown={event => {
                 // Arrow keys used while editing text move the caret instead of triggering radio-group keyboard navigation.
                 if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) event.stopPropagation();
