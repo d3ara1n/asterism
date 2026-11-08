@@ -45,10 +45,6 @@ export const commonMessages = pluginNamespace("asterism.host").messages("en", de
     id: "common.notifications.label",
     defaultMessage: "Notifications",
   },
-  live: {
-    id: "common.status.live",
-    defaultMessage: "Live",
-  },
   statusBusy: {
     id: "common.status.saving",
     defaultMessage: "Saving…",
@@ -56,10 +52,6 @@ export const commonMessages = pluginNamespace("asterism.host").messages("en", de
   statusUnavailable: {
     id: "common.connection.unavailable",
     defaultMessage: "Connection unavailable",
-  },
-  unavailableTitle: {
-    id: "common.conversation.unavailableTitle",
-    defaultMessage: "This conversation could not be opened",
   },
   unavailableBody: {
     id: "common.conversation.unavailableDescription",

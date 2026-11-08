@@ -48,7 +48,6 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     id: "compatibility.remove",
     defaultMessage: "Remove {name}",
   },
-  image: { id: "model.modality.image", defaultMessage: "Image" },
   invalidSettings: {
     id: "provider.test.invalidSettings",
     defaultMessage: "Check the provider and model settings.",
@@ -248,10 +247,6 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     id: "model.delete.title",
     defaultMessage: "Delete this model?",
   },
-  deleteModelWithRolesDescription: {
-    id: "model.delete.withRolesDescription",
-    defaultMessage: "“{current_name}” will be removed. These roles will be unavailable until you choose another model: {roles}.",
-  },
   deleteUnusedModelDescription: {
     id: "model.delete.unusedDescription",
     defaultMessage: "“{current_name}” will be removed. No roles use it.",
@@ -291,18 +286,6 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   toolCalls: {
     id: "model.toolCalls",
     defaultMessage: "Tool calls",
-  },
-  usedBy: {
-    id: "model.usedBy",
-    defaultMessage: "Used by",
-  },
-  rolesUsingModel: {
-    id: "model.roles.title",
-    defaultMessage: "Roles using this model",
-  },
-  noRolesUsingModel: {
-    id: "model.roles.empty",
-    defaultMessage: "No roles use this model.",
   },
   parameters: {
     id: "model.parameters",

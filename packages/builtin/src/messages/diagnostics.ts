@@ -30,7 +30,6 @@ export const diagnosticMessages = pluginNamespace("asterism.builtin").messages("
   usage: { id: "diagnostics.usage", defaultMessage: "Reported usage" },
   input: { id: "diagnostics.input", defaultMessage: "Input" },
   output: { id: "diagnostics.output", defaultMessage: "Output" },
-  total: { id: "diagnostics.total", defaultMessage: "Total" },
   cacheRead: { id: "diagnostics.cacheRead", defaultMessage: "Cache read" },
   cacheWrite: { id: "diagnostics.cacheWrite", defaultMessage: "Cache write" },
   reasoning: { id: "diagnostics.reasoning", defaultMessage: "Reasoning" },

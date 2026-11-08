@@ -67,10 +67,6 @@ export const appMessages = pluginNamespace("asterism.host").messages("en", defin
     id: "workbench.add.resources",
     defaultMessage: "Resources",
   },
-  connectionLost: {
-    id: "conversation.connectionLost",
-    defaultMessage: "The connection was lost. Retry the same message to recover the submitted conversation.",
-  },
   renameConversation: {
     id: "conversation.rename",
     defaultMessage: "Rename conversation",
@@ -86,10 +82,6 @@ export const appMessages = pluginNamespace("asterism.host").messages("en", defin
   conversationActions: {
     id: "conversation.actions",
     defaultMessage: "Actions for {title}",
-  },
-  moreActions: {
-    id: "conversation.moreActions",
-    defaultMessage: "More actions",
   },
   archiveConversation: {
     id: "conversation.archive",

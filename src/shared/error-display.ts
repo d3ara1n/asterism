@@ -10,7 +10,6 @@ export const startupMessages = pluginNamespace("asterism.host").messages("en", d
   quitCancel: { id: "shutdown.cancel", defaultMessage: "Cancel" },
   quitFailed: { id: "shutdown.failed", defaultMessage: "Asterism could not finish quitting. Try quitting again; the logs contain more details." },
   windowLoadFailed: { id: "startup.windowLoadFailed", defaultMessage: "The application window could not be loaded." },
-  workspaceOpenFailed: { id: "startup.workspaceOpenFailed", defaultMessage: "The workspace could not be opened." },
   data: { id: "startup.data", defaultMessage: "Upgrading your data…" },
   dataCheck: { id: "startup.dataCheck", defaultMessage: "Checking your data…" },
   dataBackup: { id: "startup.dataBackup", defaultMessage: "Creating a recovery point…" },

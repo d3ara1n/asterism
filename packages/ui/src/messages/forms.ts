@@ -81,18 +81,6 @@ export const formsMessages = pluginNamespace("asterism.host").messages("en", def
     id: "forms.discard.confirm",
     defaultMessage: "Discard",
   },
-  confirmDelete: {
-    id: "forms.delete.confirm",
-    defaultMessage: "Delete",
-  },
-  builtinRole: {
-    id: "forms.roles.builtin",
-    defaultMessage: "Built-in role",
-  },
-  restoreBuiltin: {
-    id: "forms.values.restoreBuiltin",
-    defaultMessage: "Restore built-in values",
-  },
   reload: {
     id: "forms.actions.reload",
     defaultMessage: "Reload",

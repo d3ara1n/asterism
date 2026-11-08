@@ -23,7 +23,6 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
   draftSteerHint: { id: "conversation.drafts.steer.hint", defaultMessage: "Joins the next model request while the agent keeps working." },
   draftFollow: { id: "conversation.drafts.follow.label", defaultMessage: "Next turn" },
   draftFollowHint: { id: "conversation.drafts.follow.hint", defaultMessage: "Goes out when this run finishes, starting the next turn." },
-  draftSteerIdleNote: { id: "conversation.drafts.steer.idleNote", defaultMessage: "Takes effect while the agent is running." },
   draftSummaryFollow: { id: "conversation.drafts.follow.count", defaultMessage: "{count, plural, one {# next turn} other {# next turn}}" },
   draftSummarySteer: { id: "conversation.drafts.steer.count", defaultMessage: "{count, plural, one {# this turn} other {# this turn}}" },
   draftSummaryNone: { id: "conversation.drafts.held.count", defaultMessage: "{count, plural, one {# held} other {# held}}" },
@@ -36,10 +35,8 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
   discardDraftDescription: { id: "conversation.drafts.discardDescription", defaultMessage: "This draft will be permanently removed." },
   moveUp: { id: "conversation.drafts.moveEarlier", defaultMessage: "Move earlier" },
   moveDown: { id: "conversation.drafts.moveLater", defaultMessage: "Move later" },
-  previewDraft: { id: "conversation.drafts.preview", defaultMessage: "Preview full draft" },
   draftFilesOnly: { id: "conversation.drafts.attachmentCount", defaultMessage: "{count, plural, one {# attachment} other {# attachments}}" },
   draftTransferFailed: { id: "conversation.drafts.transferFailed", defaultMessage: "The draft could not be transferred. Its contents have been kept." },
-  draftUpdateFailed: { id: "conversation.drafts.updateFailed", defaultMessage: "The draft could not be updated." },
   modeUpdateFailed: { id: "conversation.drafts.sendTimingFailed", defaultMessage: "The send timing could not be changed." },
   draftExchangePending: { id: "conversation.drafts.exchangePending", defaultMessage: "The draft exchange is awaiting confirmation. Retry to finish restoring the editor." },
   retryTake: { id: "conversation.drafts.retryTake", defaultMessage: "Retry" },
@@ -63,10 +60,6 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
   continuePlaceholder: {
     id: "conversation.input.continuePlaceholder",
     defaultMessage: "Continue the conversation…",
-  },
-  keyboardHint: {
-    id: "conversation.input.keyboardHint",
-    defaultMessage: "Enter to send · Shift + Enter for a new line",
   },
   stop: {
     id: "conversation.stop",
