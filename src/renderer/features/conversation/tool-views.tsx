@@ -83,6 +83,7 @@ function ResourceInspectBody({ result }: InspectProps) {
             {!!tool.guidelines?.length && <ul className="list-disc space-y-1 pl-4 type-caption">{tool.guidelines.map((line, index) => <li key={index}>{line}</li>)}</ul>}
             {tool.args !== undefined && <><p className="type-label">{i18n.formatMessage(toolsMessages.toolArguments)}</p><JsonView value={tool.args} /></>}
             {tool.target !== undefined && <><p className="type-label">{i18n.formatMessage(toolsMessages.toolTarget)}</p><JsonView value={tool.target} /></>}
+            {tool.result !== undefined && <><p className="type-label">{i18n.formatMessage(toolsMessages.toolResultSchema)}</p><JsonView value={tool.result} /></>}
           </ToolDetails>
         </ItemContent>
       </Item>)}</ItemGroup>

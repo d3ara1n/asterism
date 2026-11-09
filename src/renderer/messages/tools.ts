@@ -101,4 +101,8 @@ export const toolsMessages = pluginNamespace("asterism.host").messages("en", def
     id: "tools.target",
     defaultMessage: "Target",
   },
+  toolResultSchema: {
+    id: "tools.resultSchema",
+    defaultMessage: "Result schema",
+  },
 }));

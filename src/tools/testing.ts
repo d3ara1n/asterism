@@ -12,7 +12,7 @@ export function implement<S extends Json, T extends ToolInput, A extends ToolInp
   const contribution = implementTool(contract, definition);
   return {
     reference: reference(contract), resourceKind: contract.resource.kind, tool: contract.tool,
-    effect: contract.effect, targetSchema: contract.targetSchema,
+    effect: contract.effect, targetSchema: contract.targetSchema, resultSchema: contract.schema,
     prepare(resource, target, args, caller, interactive = true) {
       const snapshot = resourceSnapshot({ sessionId: "test", id: resource.id, kind: resource.kind }, resource);
       // These pure execution test handlers do not use object capabilities; sdk-runtime.test.ts verifies real object binding.

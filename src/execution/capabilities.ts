@@ -11,8 +11,8 @@ import type { ToolCaller } from "@asterism-app/sdk/runtime";
 /** External tool policy; support relationships, resource links, and this policy are checked independently. */
 export type ToolPolicy = (name: string) => boolean;
 const denied = (): PreparedResult => ({ kind: "rejected", error: { code: "access_denied", message: "Resource access requires a link to the executing object." } });
-/** `full` returns guidance and schemas, `prompt` only guidance, `schema` only schemas. */
-export type InspectDetail = "full" | "prompt" | "schema";
+/** Inspection views: everyday guidance and inputs, guidance only, or input and result schemas. */
+export type InspectDetail = "default" | "prompt" | "schema";
 export interface InspectSelection { tools?: readonly string[]; detail?: InspectDetail }
 
 /** Per-request capability view: linked resources × tool support, filtered by external policy. Resource and tool catalogs are independent. */
@@ -45,19 +45,20 @@ export class AgentCapabilities {
     return (this.linked.get(id)?.tools ?? []).filter(implementation => this.interactive || !implementation.tool.requiresInteraction);
   }
 
-  /** Project tools for the model. `detail` chooses guidance, schemas, or both; `tools` narrows the listing and an empty selection returns none. */
+  /** Project the selected inspection view; `tools` narrows the listing and an empty selection returns none. */
   describe(id: string, selection: InspectSelection = {}): Json[] {
     return this.project(this.catalog(id), selection);
   }
 
-  private project(available: readonly ToolImplementation[], { tools, detail = "full" }: InspectSelection): Json[] {
+  private project(available: readonly ToolImplementation[], { tools, detail = "default" }: InspectSelection): Json[] {
     const chosen = tools ? available.filter(implementation => tools.includes(implementation.tool.name)) : available;
     return chosen.map((implementation): Json => {
       const { name, description, guidelines, args, requiresInteraction } = projectTool(implementation.tool);
       const tool: Record<string, Json> = { name, implementation: implementation.reference };
       if (detail !== "schema") { tool.description = description; tool.guidelines = guidelines; }
       if (detail !== "prompt") { tool.args = args; tool.target = schemaOf(implementation.targetSchema); }
-      // Availability is guidance for choosing a tool, so it survives both narrowed projections.
+      // Scripts receive encoded data, which is the decoding input of the result contract.
+      if (detail === "schema") tool.result = schemaOf(implementation.resultSchema, "input");
       if (requiresInteraction) tool.requiresInteraction = true;
       return tool;
     });

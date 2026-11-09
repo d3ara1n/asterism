@@ -18,6 +18,7 @@ export const ResourceInspectResult = defineData(coreId("resource-inspect"), z.st
     guidelines: z.array(z.string()).optional().describe("Present unless the inspection requested schemas only."),
     args: jsonSchema.optional().describe("Present unless the inspection requested guidance only."),
     target: jsonSchema.optional().describe("Present unless the inspection requested guidance only."),
+    result: jsonSchema.optional().describe("Schema for encoded result data, present only in the schema view."),
     requiresInteraction: z.boolean().optional().describe("True when this tool requires a user interaction surface."),
     implementation: contractReferenceSchema,
   })),
@@ -87,8 +88,8 @@ export const ResourceInspect = defineTool({
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
     tools: z.array(z.string().min(1)).optional().describe("Exact names of previously discovered tools to include. Omit to discover all available tools; [] returns state only."),
-    detail: z.enum(["full", "prompt", "schema"]).optional().describe("Defaults to full, which returns guidance and schemas. prompt returns only description and guidelines; schema returns only args and target schemas."),
-  }).describe("Identify the linked resource, and optionally narrow which tool definitions and which part of each definition to return."),
+    detail: z.enum(["default", "prompt", "schema"]).optional().describe("Inspection view. default (also when omitted) returns description, guidelines, args and target schemas; prompt returns description and guidelines; schema returns args, target and result data schemas."),
+  }).describe("Identify the linked resource, and optionally narrow which tool definitions and which view of each definition to return."),
 });
 
 export const ResourceCall = defineTool({

@@ -3,8 +3,8 @@ import { jsonSchema, type Json } from "@asterism-app/sdk/contracts";
 import type { ToolContract } from "@asterism-app/sdk/contracts";
 
 /** Model-facing schemas are embedded in larger payloads, so the root `$schema` dialect URL is dropped from each one. */
-export function schemaOf(schema: z.ZodType<Json>): Json {
-  const { $schema: _dialect, ...projected } = z.toJSONSchema(schema);
+export function schemaOf(schema: z.ZodType<Json>, io: "input" | "output" = "output"): Json {
+  const { $schema: _dialect, ...projected } = z.toJSONSchema(schema, { io });
   return jsonSchema.parse(projected);
 }
 

@@ -493,6 +493,7 @@
   "tools.usageDetails": "用法与参数",
   "tools.arguments": "参数",
   "tools.target": "目标",
+  "tools.resultSchema": "结果结构",
   "tools.output.empty": "此次操作没有产出内容。",
   "tools.outcome.succeeded": "已完成",
   "tools.outcome.partial": "部分完成",
