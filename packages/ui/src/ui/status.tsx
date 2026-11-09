@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { Circle, CircleAlert, CircleCheck, TriangleAlert, type LucideIcon } from "lucide-react";
+import { Circle, CircleAlert, CircleCheck, CircleDot, TriangleAlert, type LucideIcon } from "lucide-react";
 import { cn } from "../utils";
 import { Badge } from "./badge";
 import { Spinner } from "./spinner";
@@ -10,7 +10,7 @@ import { Spinner } from "./spinner";
  */
 export type StatusTone = "success" | "warning" | "error" | "progress" | "neutral";
 
-const icons: Record<Exclude<StatusTone, "progress">, LucideIcon> = { success: CircleCheck, warning: TriangleAlert, error: CircleAlert, neutral: Circle };
+const icons: Record<StatusTone, LucideIcon> = { success: CircleCheck, warning: TriangleAlert, error: CircleAlert, progress: CircleDot, neutral: Circle };
 const colors: Record<StatusTone, string> = {
   success: "text-success", warning: "text-warning", error: "text-destructive", progress: "text-primary-text", neutral: "text-muted-foreground",
 };
@@ -18,9 +18,12 @@ const badgeTones = {
   success: "success", warning: "warning", error: "destructive", progress: "default", neutral: "secondary",
 } as const satisfies Record<StatusTone, ComponentProps<typeof Badge>["variant"]>;
 
-/** Icons can be replaced for the domain, such as a hand icon when awaiting action; status still determines the color. */
-export function StatusIcon({ tone, icon, className }: { tone: StatusTone; icon?: LucideIcon; className?: string }) {
-  if (tone === "progress") return <Spinner aria-hidden="true" className={cn(colors[tone], "motion-reduce:animate-none", className)} />;
+/**
+ * Icons can be replaced for the domain, such as a hand icon when awaiting action; status still determines the color.
+ * Progress animates unless still is set; still status describes one moment, such as a snapshot read, rather than live work.
+ */
+export function StatusIcon({ tone, icon, still = false, className }: { tone: StatusTone; icon?: LucideIcon; still?: boolean; className?: string }) {
+  if (tone === "progress" && !still) return <Spinner aria-hidden="true" className={cn(colors[tone], "motion-reduce:animate-none", className)} />;
   const Icon = icon ?? icons[tone];
   return <Icon aria-hidden="true" className={cn(colors[tone], className)} />;
 }

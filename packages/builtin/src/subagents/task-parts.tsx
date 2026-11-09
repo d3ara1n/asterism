@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
+import { CircleDashed, CircleDot, CircleSlash, type LucideIcon } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
+import { StatusBadge, StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
 import { subagentMessages as messages } from "../messages/subagents";
 import type { TaskSnapshot, TaskSummary } from "./contract";
 
@@ -12,9 +13,23 @@ export function TaskStatus({ status }: { status: TaskSnapshot["status"] }) {
   const state = stateOf(status);
   return <StatusBadge tone={stateTones[state]}>{useI18n().formatMessage(messages.state, { state })}</StatusBadge>;
 }
-/** Status at one moment, such as a snapshot read; plain text so it does not read as live. */
+/** Static shapes for states whose tone default does not tell them apart; the remaining states use their tone's icon. */
+const stateIcons: Partial<Record<ReturnType<typeof stateOf>, LucideIcon>> = { queued: CircleDashed, running: CircleDot, cancelled: CircleSlash };
+/** Status at one moment, such as a snapshot read: a still icon and plain text, so it does not read as live. */
 export function TaskStateText({ status }: { status: TaskSnapshot["status"] }) {
-  return <span className="type-caption">{useI18n().formatMessage(messages.state, { state: stateOf(status) })}</span>;
+  const state = stateOf(status);
+  return <span className="type-caption inline-flex items-center gap-1.5">
+    <StatusIcon tone={stateTones[state]} icon={stateIcons[state]} still className="size-3 shrink-0" />
+    {useI18n().formatMessage(messages.state, { state })}
+  </span>;
+}
+/** The same still status as an icon alone, for one column of a task list; the state name is the tooltip and accessible text. */
+export function TaskStateIcon({ status }: { status: TaskSnapshot["status"] }) {
+  const state = stateOf(status), label = useI18n().formatMessage(messages.state, { state });
+  return <span className="inline-flex shrink-0" title={label}>
+    <StatusIcon tone={stateTones[state]} icon={stateIcons[state]} still className="size-3.5" />
+    <span className="sr-only">{label}</span>
+  </span>;
 }
 
 /** Elapsed time keeps counting between published updates while the task runs. */

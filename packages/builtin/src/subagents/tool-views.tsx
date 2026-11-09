@@ -1,15 +1,19 @@
+import type { ReactNode } from "react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ActivityTail, InstructionList } from "./ActivityTail";
 import { Markdown } from "@asterism-app/ui/markdown";
 import { subagentMessages as messages } from "../messages/subagents";
-import { TaskStateText, TaskStatus, Usage } from "./task-parts";
+import { TaskStateIcon, TaskStateText, TaskStatus, Usage } from "./task-parts";
 import type { DelegateInput, TaskSnapshot, TaskSummary, WaitEntry } from "./contract";
 import { currentActivity } from "./activity";
 
-/** One task: ID, role, first line, and optional status when it is not already shown in the header. */
-function TaskLine({ task, showStatus = true }: { task: Pick<TaskSummary, "id" | "role" | "task" | "status">; showStatus?: boolean }) {
+/** One task: optional leading marker, ID, role, first line, and optional status when it is not already shown elsewhere. */
+function TaskLine({ task, showStatus = true, leading }: {
+  task: Pick<TaskSummary, "id" | "role" | "task" | "status">; showStatus?: boolean; leading?: ReactNode;
+}) {
   return <div className="flex min-w-0 items-center gap-2">
+    {leading}
     <span className="shrink-0 font-mono">{task.id}</span>
     <span className="shrink-0 type-caption">{task.role}</span>
     <span className="min-w-0 flex-1 truncate" title={task.task}>{task.task}</span>
@@ -129,3 +133,30 @@ export const cancelViews = {
   execution: { headerRenderer: CancelHeader, bodyRenderer: CancelBody },
   result: { headerRenderer: CancelHeader, bodyRenderer: CancelBody },
 } satisfies ToolRendererDefinition<TaskSummary, { id: string }, { reason?: string }>;
+
+/* ---------- list: task summaries at one moment ---------- */
+
+type PoolListData = { tasks: TaskSummary[]; truncated: boolean };
+type ListProps = ToolRenderProps<PoolListData, null>;
+function ListHeader({ invocation, result }: ListProps) {
+  const i18n = useI18n(), tasks = result?.data?.tasks;
+  return <ToolHeader label={i18n.text(messages.list)} subject={invocation.resource?.title}
+    meta={tasks && i18n.formatMessage(messages.taskCount, { count: tasks.length })} />;
+}
+/** Newest first, as on the pool card; the status column uses still icons because the list reports one moment. */
+function ListBody({ result }: ListProps) {
+  const i18n = useI18n(), tasks = result?.data?.tasks;
+  if (!tasks) return null;
+  if (!tasks.length) return <p className="type-caption">{i18n.text(messages.noTasks)}</p>;
+  return <ul className="flex max-h-80 min-w-0 flex-col gap-1 overflow-y-auto">
+    {tasks.toReversed().map(task => <li key={task.id} className="min-w-0">
+      <TaskLine task={task} showStatus={false} leading={<TaskStateIcon status={task.status} />} />
+    </li>)}
+  </ul>;
+}
+export const listViews = {
+  label: messages.list,
+  input: { headerRenderer: ListHeader },
+  execution: { headerRenderer: ListHeader },
+  result: { headerRenderer: ListHeader, bodyRenderer: ListBody },
+} satisfies ToolRendererDefinition<PoolListData, null>;
