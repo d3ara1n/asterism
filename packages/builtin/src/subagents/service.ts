@@ -74,6 +74,7 @@ export class SubagentPoolRuntime {
     }
     throw new PluginApiError("unavailable", `Task ${entry.input.id} has no live execution or saved result.`);
   }
+  get taskCount(): number { return this.records("timeline").length; }
   list(): TaskSummary[] { return this.records("timeline").map(entry => summary(this.snapshot(entry))); }
   check(id: string): TaskSnapshot { return this.snapshot(this.require(id)); }
   process(id: string): ProcessFrame {

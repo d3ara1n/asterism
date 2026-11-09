@@ -10,7 +10,9 @@ The submitting Agent's resources are not automatically available to the pool. A 
 
 ## Delegate and collect
 
-Inspect the pool to see its tasks and operation schemas. `agent_list` provides available Agent roles, purposes, task examples, and each role's delegation allowlist. Submit a task with an Agent role and explicit instructions, adding background material when needed. The task has its own conversation. It does not inherit the submitting conversation.
+Inspect the pool to see its task count, parallelism, and operation schemas. Use `list` to enumerate task summaries on the current history path, including queued, running, and finished tasks.
+
+`agent_list` provides available Agent roles, purposes, task examples, and each role's delegation allowlist. Submit a task with an Agent role and explicit instructions, adding background material when needed. The task has its own conversation. It does not inherit the submitting conversation.
 
 The calling role's `delegates` configuration controls outgoing delegation for both workbench Agents and subagents. A null value allows any enabled role, an empty list allows none, and a list allows only those targets. A disallowed delegation is rejected before creating a task, with both calling and target roles named in the response. The target's own allowlist governs its subsequent delegations.
 

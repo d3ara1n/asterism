@@ -11,7 +11,7 @@ import type { SkillCatalog } from "../skills/catalog.ts";
 import { subagentPoolCard } from "../shared/card-appearance.ts";
 import { subagentMessages } from "../messages/subagents.ts";
 import {
-  SubagentPool, CreateSubagentPool, PoolView, Delegation, Delegate, Wait, Check, Steer, Cancel,
+  SubagentPool, CreateSubagentPool, PoolView, PoolList, Delegation, Delegate, Wait, Check, Steer, Cancel,
   CancelSubagent, SteerSubagent, PoolChannel, subagentParallelism, type TaskOutput,
 } from "./contract.ts";
 import { SubagentPoolRuntime } from "./service.ts";
@@ -95,7 +95,7 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
         },
         project: (_data, object) => ({ tasks: pool(object.ref).list() }),
         inspect: async (_data, object) => ({
-          tasks: pool(object.ref).list(),
+          tasks: pool(object.ref).taskCount,
           parallelism: subagentParallelism,
         }),
         disposalWarning: (_data, object) => pool(object.ref).working ? subagentMessages.runningWarning : null,
@@ -104,6 +104,9 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
         for (const resource of snapshot.resources.all()) if (resource.ref.kind === SubagentPool.kind) pools.get(resource.ref.id)?.changed();
       } }],
       tools: [
+        implementTool(PoolList, { call(_data, _target, _args, { object, signal }) {
+          return operation(signal, () => ({ tasks: pool(object.ref).list(), truncated: false }));
+        } }),
         { ...delegate(), capture: () => delegate(builtinConfiguration(plugin).agents) },
         implementTool(Check, { call(_data, target, _args, { object, signal }) {
           return operation(signal, () => pool(object.ref).check(target.id));

@@ -3,7 +3,7 @@ import {
   defineCall, defineChannel, defineCreation, defineImplementation, defineOperationRecord, defineTool,
   modelExpressionSchema, modelUsageSchema, modelBlockSchema, thinkingSchema, type ToolInput, type Json,
 } from "@asterism-app/sdk/contracts";
-import { builtin, configurationIdSchema } from "@asterism-app/builtin-api/contracts";
+import { builtin, configurationIdSchema, List } from "@asterism-app/builtin-api/contracts";
 
 export const SubagentPool = builtin.resource("subagent-pool", z.strictObject({}));
 export const subagentParallelism = 4;
@@ -71,6 +71,12 @@ export const waitEntrySchema = summarySchema.extend({
   steps: z.number().int().nonnegative().describe("Total process steps, including earlier ones not listed."),
 });
 export const PoolView = builtin.data("subagent-pool.card", z.strictObject({ tasks: z.array(summarySchema) }));
+export const PoolList = defineImplementation({
+  ...builtin.data("subagent-pool.list", z.strictObject({ tasks: z.array(summarySchema), truncated: z.boolean() })
+    .describe("Task summaries on this pool's current timeline, including queued, running, and finished tasks.")),
+  resource: SubagentPool, tool: List, targetSchema: z.null().describe("List the tasks in this pool."),
+  effect: "read", execution: "parallel",
+});
 
 const taskTargetSchema = z.strictObject({ id: taskIdSchema }).describe('Select one task, for example {"id":"sub-1"}.');
 const empty = z.strictObject({}).describe("No operation parameters.");
