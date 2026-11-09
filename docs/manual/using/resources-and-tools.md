@@ -99,7 +99,15 @@ A Directory card shows the directory as a file tree. Each directory is read when
 
 The filter field hides loaded paths that do not contain the text, ignoring case, while keeping the folders that lead to a match. A matching folder keeps its loaded contents visible. Filtering reads nothing new: a directory expanded while filtering is read normally and then filtered.
 
-In a Git working tree, rows show their Git state and the card header shows the staged and unstaged line changes against HEAD within the directory, such as `+114 −514`. Untracked files and binary files add no lines. The header shows nothing when there are no changes, the directory is outside Git, or Git is not installed. Git state is read with the tree and on Refresh. A failed subdirectory or Git read is reported above the tree and leaves the rest of the tree in place.
+In a Git working tree, rows show their Git state and the card header shows the staged and unstaged line changes against HEAD within the directory, such as `+114 −514`. Untracked files and binary files add no lines. The header shows nothing when there are no changes, the directory is outside Git, or Git is not installed. While the directory view is mounted in the open session, local file and Git metadata changes schedule a refresh after one second without another event. Leaving the session releases its directory watches and loaded browser data; reopening reads current state. Refresh is also available manually. A failed subdirectory, Git read, or watcher is reported above the tree.
+
+## Review directory changes
+
+Select **Changes** in a Directory card to browse its Git status within the resource root. The view contains only entries returned by Git and parent-directory groups inferred from their paths. Expand a group to show its changed children; unchanged files are absent. A wholly untracked directory appears as one terminal entry and is not expanded. Ignored files are absent unless Git already tracks them.
+
+Click a changed file, or focus it and press Enter, to open a read-only diff against HEAD. Untracked text files appear as additions, deleted files retain their removed content, and binary files have a binary-change label. Diff content loads only when opened and refreshes with the directory browser, including when a file remains modified without changing its status label. The comparison is the net working-tree change against HEAD, not separate staged and unstaged diffs; opposing changes can cancel in that comparison while Git status still lists the file. This view does not stage, revert, or commit changes.
+
+Select **Files** to return to directory browsing. Changes groups use the status paths already loaded; expanding them does not enumerate the filesystem. Both views retain their view/filter choices across remounts. The text editor's buffer and gutter baseline have their own read and save lifecycle.
 
 ## Open a directory file
 

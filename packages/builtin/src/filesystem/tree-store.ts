@@ -1,10 +1,13 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
+import { useIsPresent } from "motion/react";
 import { FileTree, type FileTreeDirectoryHandle } from "@pierre/trees";
 import type { z } from "zod";
-import { useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
+import { useRendererCalls, useRendererObject, type RendererObjectContext } from "@asterism-app/sdk/renderer";
 import type { ResourceRef, UiText } from "@asterism-app/sdk/contracts";
 import { failureDisplay } from "@asterism-app/ui/error-display";
-import type { DirectoryStatus } from "./contract.ts";
+import type { DirectoryStatus, DirectoryWatchEvent } from "./contract.ts";
+import { sameChanges } from "./changes-model.ts";
+import { ChangesTree } from "./changes-tree.ts";
 import { filesystemMessages as messages } from "../messages/filesystem.ts";
 import { childPath, diffPaths, filterPaths, loadedPaths, parentOf, type TreeEntry } from "./tree-model.ts";
 
@@ -15,11 +18,16 @@ type StatusData = z.infer<typeof DirectoryStatus.output>;
 export interface TreeSource {
   children(path: string, signal: AbortSignal): Promise<{ entries: TreeEntry[] }>;
   status?(signal: AbortSignal): Promise<StatusData>;
+  watch?(receive: (event: DirectoryWatchEvent) => void): () => void;
 }
 
 export interface TreeState {
   /** The first root read is in progress. */
   loading: boolean;
+  mode: "files" | "changes";
+  git: StatusData | undefined;
+  watchFailure: UiText | null;
+  changeNoMatches: boolean;
   refreshing: boolean;
   /** Root read failure; the tree has no content. */
   error: UiText | null;
@@ -46,7 +54,18 @@ const depth = (path: string) => path.split("/").length;
  */
 export class TreeStore {
   readonly model = new FileTree({ paths: [], initialExpansion: "closed", itemHeight: 28, icons: { set: "complete", colored: false } });
-  private state: TreeState = { loading: true, refreshing: false, error: null, failure: null, empty: false, noMatches: false, query: "", changes: null };
+  readonly changeTree: ChangesTree | undefined;
+  private readonly refreshListeners = new Set<() => void>();
+  private users = 0;
+  private disposed = false;
+  private stopWatch: (() => void) | undefined;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+  private refreshPending = false;
+  private state: TreeState = {
+    mode: "files", query: "", git: undefined, changes: null,
+    loading: true, refreshing: false, error: null, failure: null, watchFailure: null,
+    empty: false, noMatches: false, changeNoMatches: false,
+  };
   private children = new Map<string, readonly TreeEntry[]>();
   /** Directories the user left expanded, including ones currently hidden by the filter or a collapsed ancestor. */
   private readonly expanded = new Set<string>();
@@ -56,13 +75,15 @@ export class TreeStore {
   private failed = new Set<string>();
   private visible: string[] = [];
   private applying = false;
-  private readonly controller = new AbortController();
+  private controller: AbortController | null = null;
   private readonly listeners = new Set<() => void>();
   private readonly unsubscribe: () => void;
+  private source: TreeSource | undefined;
 
-  constructor(private readonly source: TreeSource) {
+  constructor(source: TreeSource) {
+    this.source = source;
+    this.changeTree = source.status ? new ChangesTree() : undefined;
     this.unsubscribe = this.model.subscribe(() => this.observe());
-    void this.refresh();
   }
 
   subscribe = (listener: () => void) => {
@@ -70,25 +91,93 @@ export class TreeStore {
     return () => { this.listeners.delete(listener); };
   };
   getState = () => this.state;
+  onRefresh(listener: () => void) { this.refreshListeners.add(listener); return () => { this.refreshListeners.delete(listener); }; }
+  setMode(mode: TreeState["mode"]) {
+    if (this.state.mode === mode) return;
+    this.setState({ mode });
+    if (mode === "files") void this.refresh();
+  }
+
+  /** Mounted card consumers share one watch. Retention preserves intent, not background work. */
+  acquire(source: TreeSource | undefined = this.source) {
+    if (this.disposed || !source) return () => {};
+    this.source = source;
+    this.users++;
+    if (!this.controller) {
+      this.controller = new AbortController();
+      if (source.watch) {
+        this.stopWatch = source.watch(event => {
+          if (!this.controller) return;
+          if (event.type === "ready") void this.refresh();
+          else if (event.type === "changed") this.requestRefresh();
+          else {
+            this.setState({ watchFailure: messages.directoryWatchFailed });
+            if (this.state.loading) void this.refresh();
+          }
+        });
+      } else void this.refresh();
+    }
+    return () => {
+      if (--this.users > 0) return;
+      // Moving a card into an island can synchronously replace its mounted consumers.
+      queueMicrotask(() => { if (this.users === 0 && !this.disposed) this.pause(); });
+    };
+  }
+
+  /** Every filesystem and metadata invalidation enters the same trailing debounce. */
+  requestRefresh() {
+    if (!this.controller) return;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => { this.timer = undefined; void this.refresh(); }, 1000);
+  }
+
+  private pause() {
+    if (!this.controller) return;
+    this.controller.abort();
+    this.controller = null;
+    this.stopWatch?.();
+    this.stopWatch = undefined;
+    this.source = undefined;
+    clearTimeout(this.timer);
+    this.timer = undefined;
+    this.refreshPending = false;
+    this.children.clear();
+    this.pending.clear();
+    this.failed.clear();
+    this.rendered.clear();
+    this.applying = true;
+    try {
+      this.model.resetPaths([]);
+      this.model.setGitStatus([]);
+    } finally { this.applying = false; }
+    this.changeTree?.clear();
+    this.visible = [];
+    this.setState({ loading: true, refreshing: false, git: undefined, changes: null, error: null, failure: null,
+      watchFailure: null, empty: false, noMatches: false, changeNoMatches: false });
+  }
 
   setFilter(query: string) {
     this.setState({ query });
     this.sync();
+    this.updateChangeFilter();
   }
 
-  /** Re-read every loaded directory and the git state; directories that no longer exist drop their subtrees. */
+  /** Refresh Git and, while Files is active, loaded directories; vanished directories drop their subtrees. */
   async refresh() {
-    if (this.state.refreshing) return;
+    const source = this.source;
+    if (!this.controller || !source) return;
+    if (this.state.refreshing) { this.refreshPending = true; return; }
     this.setState({ refreshing: true });
     const { signal } = this.controller;
-    const directories = ["", ...this.children.keys()].filter((path, index, all) => all.indexOf(path) === index)
-      .sort((a, b) => depth(a) - depth(b));
+    const directories = this.state.mode === "changes" ? []
+      : ["", ...this.children.keys()].filter((path, index, all) => all.indexOf(path) === index)
+        .sort((a, b) => depth(a) - depth(b));
     const [status, ...results] = await Promise.allSettled([
-      this.source.status?.(signal) ?? Promise.resolve(null),
-      ...directories.map(path => this.source.children(path || ".", signal)),
+      source.status?.(signal) ?? Promise.resolve(null),
+      ...directories.map(path => source.children(path || ".", signal)),
     ]);
     if (signal.aborted) return;
-    const next = new Map<string, readonly TreeEntry[]>();
+    const next = directories.length ? new Map<string, readonly TreeEntry[]>() : new Map(this.children);
     const failed = new Set<string>();
     let error: UiText | null = null, failure: UiText | null = null;
     directories.forEach((path, index) => {
@@ -104,22 +193,37 @@ export class TreeStore {
     let changes: TreeState["changes"] = null;
     if (status.status === "fulfilled") {
       const data = status.value;
-      this.model.setGitStatus(data?.files ?? []);
+      const files = data?.files ?? [];
+      if (!sameChanges(this.state.git?.files ?? [], files)) {
+        this.changeTree?.update(files);
+        this.model.setGitStatus(files);
+      }
+      this.setState({ git: data });
+      this.updateChangeFilter();
       if (data && (data.added > 0 || data.removed > 0)) changes = { added: data.added, removed: data.removed };
     } else {
-      this.model.setGitStatus([]);
       failure ??= failureDisplay(status.reason, messages.directoryStatusFailed);
     }
     this.children = next;
     this.failed = failed;
     this.setState({ loading: false, refreshing: false, error, failure, changes });
     this.sync();
+    // Diff content can change while status paths and classifications stay identical.
+    for (const listener of this.refreshListeners) listener();
+    if (this.refreshPending) { this.refreshPending = false; void this.refresh(); }
+  }
+
+  private updateChangeFilter() {
+    this.setState({ changeNoMatches: this.changeTree?.filter(this.state.query) ?? false });
   }
 
   dispose() {
-    this.controller.abort();
+    this.disposed = true;
+    this.pause();
     this.unsubscribe();
     this.model.cleanUp();
+    this.changeTree?.dispose();
+    this.refreshListeners.clear();
     this.listeners.clear();
   }
 
@@ -160,7 +264,7 @@ export class TreeStore {
    * a directory that just became rendered (added, revealed, or uncovered by its parent) takes the stored intent.
    */
   private observe() {
-    if (this.applying) return;
+    if (this.applying || !this.controller) return;
     this.applying = true;
     try {
       for (const path of this.visible) {
@@ -180,15 +284,20 @@ export class TreeStore {
         }
       }
     } finally { this.applying = false; }
-    for (const path of this.rendered)
-      if (this.expanded.has(path) && !this.children.has(path) && !this.pending.has(path) && !this.failed.has(path)) void this.load(path);
+    if (this.state.mode === "files") {
+      for (const path of this.rendered) {
+        if (this.expanded.has(path) && !this.children.has(path) && !this.pending.has(path) && !this.failed.has(path)) void this.load(path);
+      }
+    }
   }
 
   private async load(path: string) {
+    const source = this.source;
+    if (!this.controller || !source) return;
     const { signal } = this.controller;
     this.pending.add(path);
     let entries: TreeEntry[];
-    try { entries = (await this.source.children(path, signal)).entries; }
+    try { entries = (await source.children(path, signal)).entries; }
     catch (error) {
       if (signal.aborted) return;
       this.failed.add(path);
@@ -201,11 +310,14 @@ export class TreeStore {
   }
 }
 
-/** One store per card object; it survives card remounts and is disposed when the object leaves the session view. */
-export function useTreeStore(key: string, createSource: (calls: Calls, ref: ResourceRef) => TreeSource) {
+/** Retained UI intent survives session switches; effects own active reads and native subscriptions. */
+export function useTreeStore(key: string, createSource: (calls: Calls, ref: ResourceRef, object: RendererObjectContext) => TreeSource) {
   const object = useRendererObject();
   const calls = useRendererCalls();
-  const store = object.retained.get(key, () => new TreeStore(createSource(calls, object.ref)), value => value.dispose());
+  const store = object.retained.get(key, () => new TreeStore(createSource(calls, object.ref, object)), value => value.dispose());
+  const present = useIsPresent();
+  useEffect(() => present ? store.acquire(createSource(calls, object.ref, object)) : undefined,
+    [present, store, calls, object.ref.sessionId, object.ref.id, object.ref.kind, object.openChannel]);
   const state = useSyncExternalStore(store.subscribe, store.getState);
   return { store, state };
 }

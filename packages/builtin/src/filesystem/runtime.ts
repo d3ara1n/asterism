@@ -4,9 +4,9 @@ import { z } from "zod";
 import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join } from "node:path";
-import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementTool, implementCall, implementChannel, PluginApiError, type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { TextError, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
-import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryStatus } from "./contract.ts";
+import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryStatus, DirectoryWatch } from "./contract.ts";
 import { saveFileContent } from "./save.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { readImageFile } from "./image-io.ts";
@@ -19,6 +19,7 @@ import type { ShellExecution } from "@asterism-app/sdk/runtime";
 import { searchTools } from "./search.ts";
 import { listFiles, readMetadata, readFileContent, readChildren } from "./read.ts";
 import { readDirectoryStatus } from "./git-status.ts";
+import { watchDirectory } from "./watch.ts";
 import { fileFailure } from "./file-io.ts";
 import { editorCalls } from "./editor-runtime.ts";
 
@@ -177,6 +178,18 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
         { kind: "file", file: data.image, mediaType: data.mediaType, filename: basename(data.path) }],
     }),
   ],
+  channels: [implementChannel(DirectoryWatch, async channel => {
+    const fail = (error: unknown) => {
+      if (channel.signal.aborted) return;
+      plugin.log.warn(`Directory watch failed: ${String(error)}`);
+      channel.send({ type: "error" });
+      channel.close();
+    };
+    try {
+      await watchDirectory(rootOf(channel.object), channel.signal, event => channel.send(event), fail,
+        error => plugin.log.warn(`Directory watcher cleanup failed: ${String(error)}`));
+    } catch (error) { fail(error); }
+  })],
   calls: [
     ...editorCalls,
     implementCall(ReadDirectoryDefaults, async () => ({ path: homedir() })),

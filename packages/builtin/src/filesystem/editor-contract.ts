@@ -15,6 +15,15 @@ export const ReadDirectoryGitBase = defineCall(builtin.name("directory.file.git-
   input: z.strictObject({ path: z.string().min(1) }),
   output: z.strictObject({ text: z.string().nullable() }),
 });
+export const ReadDirectoryDiff = defineCall(builtin.name("directory.file.diff"), {
+  scope: "object",
+  input: z.strictObject({ path: z.string().min(1) }),
+  output: z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("patch"), patch: z.string() }),
+    z.strictObject({ kind: z.literal("binary") }),
+    z.strictObject({ kind: z.literal("empty") }),
+  ]),
+});
 export const SaveDirectoryText = defineCall(builtin.name("directory.editor.save"), {
   scope: "object",
   input: z.strictObject({ path: z.string().min(1), text: z.string() }),

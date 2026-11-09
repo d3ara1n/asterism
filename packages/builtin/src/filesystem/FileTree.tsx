@@ -1,12 +1,16 @@
-import type { CSSProperties } from "react";
-import { useI18n, useRendererResourceNavigation, useRendererObject } from "@asterism-app/sdk/renderer";
+import { lazy, Suspense, type CSSProperties } from "react";
+import { useI18n, useRendererResourceNavigation, useRendererObject, useRendererIsland, IslandPanel } from "@asterism-app/sdk/renderer";
 import { FileTree } from "@pierre/trees/react";
 import { RefreshCw } from "lucide-react";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { cn } from "@asterism-app/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
 import type { TreeState, TreeStore } from "./tree-store";
+
+const DirectoryDiff = lazy(() => import("./DirectoryDiff"));
 
 /** Header actions: working-tree line changes against HEAD, when any, and a refresh of loaded directories. */
 export function FileTreeActions({ store, state }: { store: TreeStore; state: TreeState }) {
@@ -55,23 +59,48 @@ export function FileTreeBody({ store, state }: {
   const i18n = useI18n();
   const navigation = useRendererResourceNavigation();
   const object = useRendererObject();
-  const { model } = store;
+  const island = useRendererIsland();
+  const changes = state.mode === "changes" ? store.changeTree : undefined;
+  const changing = changes !== undefined;
+  const model = changes?.model ?? store.model;
   const openFile = (path: string, origin: HTMLElement) => {
     if (model.getItem(path)?.isDirectory() !== false) return;
-    void navigation.open(object.ref, path, { origin });
+    if (changing) {
+      const entry = changes?.entry(path);
+      if (!entry || entry.path.endsWith("/")) return;
+      void island.open({ key: `diff:${object.ref.sessionId}:${object.ref.id}:${entry.path}`, label: entry.path, size: "content", origin,
+        render: () => <Suspense fallback={<IslandPanel title={entry.path}><Spinner /></IslandPanel>}>
+          <DirectoryDiff resource={object.ref} path={entry.path} store={store} />
+        </Suspense> });
+    } else void navigation.open(object.ref, path, { origin });
   };
-  const notice = state.error ? i18n.text(state.error)
-    : state.empty ? i18n.formatMessage(filesystemMessages.toolDirectoryEmpty)
-    : state.noMatches ? i18n.formatMessage(filesystemMessages.directoryNoMatches) : null;
+  const notice = changing
+    ? state.loading ? null
+      : state.git === null ? i18n.text(filesystemMessages.notRepository)
+      : state.git?.files.length === 0 ? i18n.text(filesystemMessages.noChanges)
+      : state.changeNoMatches ? i18n.text(filesystemMessages.directoryNoMatches) : null
+    : state.error ? i18n.text(state.error)
+      : state.empty ? i18n.text(filesystemMessages.toolDirectoryEmpty)
+      : state.noMatches ? i18n.text(filesystemMessages.directoryNoMatches) : null;
 
   return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
+    {store.changeTree && <div className="shrink-0 border-b px-2 py-1">
+      <ToggleGroup type="single" size="sm" value={state.mode} aria-label={i18n.text(filesystemMessages.viewLabel)}
+        onValueChange={value => { if (value === "files" || value === "changes") store.setMode(value); }}>
+        <ToggleGroupItem value="files">{i18n.text(filesystemMessages.filesView)}</ToggleGroupItem>
+        <ToggleGroupItem value="changes">{i18n.text(filesystemMessages.changesView)}
+          {state.git && <span className="tabular-nums text-muted-foreground">{state.git.files.length}</span>}
+        </ToggleGroupItem>
+      </ToggleGroup>
+    </div>}
     <div className="shrink-0 border-b">
       <SearchInput variant="inline" value={state.query} onChange={value => store.setFilter(value)}
         label={i18n.formatMessage(filesystemMessages.directorySearch)} />
     </div>
-    {state.failure && !state.error && <p className="type-caption shrink-0 px-2 pt-1 text-destructive">{i18n.text(state.failure)}</p>}
+    {state.watchFailure && <p role="status" className="type-caption shrink-0 px-2 pt-1 text-destructive">{i18n.text(state.watchFailure)}</p>}
+    {state.failure && (changing || !state.error) && <p className="type-caption shrink-0 px-2 pt-1 text-destructive">{i18n.text(state.failure)}</p>}
     <div className="relative min-h-0 flex-1 pt-1">
-      <div className={cn("h-full", notice && "invisible")}><FileTree model={model} style={treeStyle}
+      <div className={cn("h-full", notice && "invisible")}><FileTree key={state.mode} model={model} style={treeStyle}
         onClick={event => {
           if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           const row = event.nativeEvent.composedPath().find((node): node is HTMLElement => node instanceof HTMLElement && !!node.dataset.itemPath);

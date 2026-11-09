@@ -20,6 +20,7 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.15",
     "@lezer/highlight": "^1.2.5",
+    "@parcel/watcher": "2.6.0",
     "@perplexity-ai/perplexity_ai": "0.41.0",
     "@pierre/diffs": "1.6.2",
     "@slack/socket-mode": "3.1.1",
@@ -84,7 +85,8 @@
       "@asterism-app/builtin-api"
     ],
     "runtimeExternals": [
-      "@vscode/ripgrep"
+      "@vscode/ripgrep",
+      "@parcel/watcher"
     ]
   }
 }

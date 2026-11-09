@@ -1,6 +1,16 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const filesystemMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
+  filesView: { id: "filesystem.view.files", defaultMessage: "Files" },
+  changesView: { id: "filesystem.view.changes", defaultMessage: "Changes" },
+  viewLabel: { id: "filesystem.view.label", defaultMessage: "Directory view" },
+  noChanges: { id: "filesystem.changes.empty", defaultMessage: "No changes" },
+  notRepository: { id: "filesystem.changes.notRepository", defaultMessage: "Not a Git repository" },
+  directoryWatchFailed: { id: "filesystem.watch.failed", defaultMessage: "Directory watch unavailable" },
+  diffFailed: { id: "filesystem.diff.failed", defaultMessage: "Diff could not be read." },
+  diffEmpty: { id: "filesystem.diff.empty", defaultMessage: "No content changes against HEAD" },
+  diffBinary: { id: "filesystem.diff.binary", defaultMessage: "Binary file changed" },
+  diffBase: { id: "filesystem.diff.base", defaultMessage: "HEAD → Working tree" },
   directoryRefresh: {
     id: "filesystem.refresh",
     defaultMessage: "Refresh",

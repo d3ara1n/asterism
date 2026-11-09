@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, realpathSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { directoryRoot, withinDirectory, writableTarget } from "./paths.ts";
+import { directoryRoot, directoryEntryTarget, withinDirectory, writableTarget } from "./paths.ts";
 
 const roots: string[] = [];
 afterEach(() => { for (const base of roots.splice(0)) rmSync(base, { recursive: true, force: true }); });
@@ -52,6 +52,16 @@ describe("Directory path boundaries", () => {
     await expect(withinDirectory(root, "bad\0path")).rejects.toMatchObject(failure("invalid_path"));
     await expect(writableTarget(root, "file.txt/child")).rejects.toMatchObject(failure("not_directory"));
     await expect(withinDirectory(root, "missing")).rejects.toMatchObject(failure("path_not_found"));
+  });
+
+  it("resolves link entries without reading outside referents, while still confining parent traversal", async () => {
+    const { root } = setup();
+    symlinkSync("missing.txt", join(root, "dangling"));
+    expect(await directoryEntryTarget(root, "dangling")).toEqual({ root, path: join(root, "dangling") });
+    expect(await directoryEntryTarget(root, "AGENTS.md")).toEqual({ root, path: join(root, "AGENTS.md") });
+    expect(await directoryEntryTarget(root, "deleted/nested/file")).toEqual({ root, path: join(root, "deleted/nested/file") });
+    await expect(directoryEntryTarget(root, "external/secret.txt")).rejects.toMatchObject(failure("outside_resource"));
+    await expect(directoryEntryTarget(root, "../outside/secret.txt")).rejects.toMatchObject(failure("outside_resource"));
   });
 
   it("Distinguishes a missing root directory from a root path that has become a file", async () => {

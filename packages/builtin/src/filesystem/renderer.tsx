@@ -9,7 +9,7 @@ import { textMessages } from "../messages/text";
 import { prepareCodeView } from "@asterism-app/ui/code-view";
 import { textReadViews, textWriteViews, textEditViews, textReplaceViews } from "../text-view";
 import { inputText } from "../shared/tool-preview";
-import { Directory, CreateDirectory, DirectoryView, DirectoryChildren, DirectoryStatus, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee } from "./contract";
+import { Directory, CreateDirectory, DirectoryView, DirectoryChildren, DirectoryStatus, DirectoryWatch, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee } from "./contract";
 import { FilePreview } from "../shared/attachments";
 import { mediaMessages } from "../messages/media";
 import { DirectoryInput } from "./creation";
@@ -36,9 +36,18 @@ function SeeBody({ result }: SeeProps) {
 }
 const seeView = { headerRenderer: SeeHeader, bodyRenderer: SeeBody };
 
-const useDirectoryTree = () => useTreeStore("asterism.builtin/directory-tree", (calls, ref) => ({
+const useDirectoryTree = () => useTreeStore("asterism.builtin/directory-tree", (calls, ref, object) => ({
   children: (path, signal) => calls.invoke(DirectoryChildren, { path }, { object: ref, signal }),
   status: signal => calls.invoke(DirectoryStatus, {}, { object: ref, signal }),
+  watch: receive => {
+    const channel = object.openChannel(DirectoryWatch);
+    let stopped = false;
+    channel.onMessage(receive);
+    void channel.closed.then(end => {
+      if (!stopped && end.reason !== "closed") receive({ type: "error" });
+    });
+    return () => { stopped = true; channel.close(); };
+  },
 }));
 
 function DirectoryTreeActions() {

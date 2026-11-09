@@ -814,5 +814,15 @@
   "schedule.failed": "无法更新定时设置。",
   "schedule.timerRunning": "请先暂停或重置定时器再编辑。",
   "schedule.alarmEnabled": "请先关闭闹钟再编辑。",
-  "schedule.messageRequired": "请先设置消息。"
+  "schedule.messageRequired": "请先设置消息。",
+  "filesystem.view.files": "文件",
+  "filesystem.view.changes": "变更",
+  "filesystem.view.label": "目录视图",
+  "filesystem.changes.empty": "无变更",
+  "filesystem.changes.notRepository": "非 Git 仓库",
+  "filesystem.watch.failed": "目录监听不可用",
+  "filesystem.diff.failed": "无法读取差异。",
+  "filesystem.diff.empty": "相对 HEAD 无内容变更",
+  "filesystem.diff.binary": "二进制文件已变更",
+  "filesystem.diff.base": "HEAD → 工作区"
 }

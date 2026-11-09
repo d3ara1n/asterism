@@ -119,6 +119,7 @@
     "node-pty@1.1.0": true,
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": true,
-    "electron@45.1.0": true
+    "electron@45.1.0": true,
+    "@parcel/watcher@2.6.0": true
   }
 }

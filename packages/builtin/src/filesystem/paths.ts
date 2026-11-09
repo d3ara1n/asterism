@@ -1,5 +1,5 @@
 import { lstat, realpath, stat } from "node:fs/promises";
-import { isAbsolute, relative, resolve, sep, join } from "node:path";
+import { isAbsolute, relative, resolve, sep, join, dirname, basename } from "node:path";
 import { FilesystemError, failed, filesystemFailure, rejected } from "./errors.ts";
 
 export function insideDirectory(root: string, path: string): boolean {
@@ -55,4 +55,13 @@ export async function writableTarget(root: string, rel: string): Promise<{ root:
     }
   }
   return { root: base, path };
+}
+
+/** Resolve an entry's parents without following its final symlink; callers may read link metadata, not the referent. */
+export async function directoryEntryTarget(root: string, rel: string): Promise<{ root: string; path: string }> {
+  const base = await directoryRoot(root);
+  const candidate = relativeTarget(base, rel);
+  if (candidate === base) return { root: base, path: base };
+  const parent = await writableTarget(base, relative(base, dirname(candidate)) || ".");
+  return { root: base, path: join(parent.path, basename(candidate)) };
 }

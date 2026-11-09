@@ -98,6 +98,10 @@ Island content is frontend state outside history. Unsaved panels confirm discard
 
 The directory plugin dispatches file content to independent text and image surfaces. The host does not interpret file formats. The text editor reads current text and saves to the actual file. Its buffer belongs to the island, and later backend-processed writes win. Editing does not reinterpret or update earlier tool results. Git gutter marks compare the current buffer with a captured HEAD baseline; they do not add repository management operations.
 
+Directory browsing and change review are plugin-owned views of current external state. Files loads directory contents on expansion; Changes builds parent groups from Git status paths and treats Git's untracked-directory summaries as terminal entries. Selected diffs compare current content against HEAD and remain separate from editor buffers and recorded tool results.
+
+Directory observation belongs to mounted views, not resource attachment or background Agent execution. Shared view consumers acquire one object channel; releasing the last consumer closes native subscriptions and cancels pending browser reads. Retained UI state preserves view intent without retaining background observation or full loaded directory/status data. Reopening starts a fresh observation and read. Filesystem notifications invalidate state rather than establish Git status or record an operation history.
+
 ## Links and workbench panels
 
 Drag from a resource to a link-capable receiver to establish a directed link. Direction follows resource semantics, not card position. Two opposite links can render as one double-arrow edge while retaining separate stored relations.

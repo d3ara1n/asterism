@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineImplementation, defineCreation, defineCall, contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
+import { defineImplementation, defineCreation, defineCall, defineChannel, contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
 import { builtin, List, Metadata, Read, Edit, Write, Save, Replace, See, textReadSchema, textReadTargetSchema, textChangeSchema, textReplaceSchema } from "@asterism-app/builtin-api/contracts";
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
@@ -110,3 +110,10 @@ export const DirectoryStatus = defineCall(builtin.name("directory.status"), {
     removed: z.number().int().nonnegative(),
   }).nullable(),
 });
+
+/** View-owned filesystem and Git invalidation; the next read supplies current state. */
+export type DirectoryWatchEvent =
+  | { type: "ready" }
+  | { type: "changed" }
+  | { type: "error" };
+export const DirectoryWatch = defineChannel<null, DirectoryWatchEvent>(builtin.name("directory.watch"));
