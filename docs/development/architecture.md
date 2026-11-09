@@ -23,15 +23,19 @@ The main process resolves the login-shell environment before starting the runtim
 
 ## Composition boundaries
 
-The host and SDK must remain independent of Agent paradigms and import no builtin packages. Agent turns, role resolution, request composition, and conversation behavior belong to paradigm plugins. A paradigm can represent its Agent as a workbench resource or choose another representation.
+The host and SDK must remain independent of Agent paradigms and import no builtin packages. Agent turns, role resolution, request composition, and conversation behavior belong to their implementing plugins. A plugin can represent an Agent as a workbench resource or choose another representation.
 
 The built-in implementation uses the SDK and `@asterism-app/builtin-api`. External plugins use the SDK and their declared public dependencies. Public API packages do not import implementations, and the SDK imports no host implementation.
 
-Builtin supplies the official paradigm, Agent forms, and capability compositions as an ordinary bundled plugin. Users can disable it and develop or install another paradigm. Distribution alongside the application grants no special domain recognition, identity, validation, or lifecycle. Contributions use the same plugin mechanisms.
+Builtin supplies ordinary one-to-one user–Agent assistance as the main paradigm, together with Agent forms and composable capabilities. It is an ordinary bundled plugin that users can disable or replace. Distribution alongside the application grants no special domain recognition, identity, validation, or lifecycle. Contributions use the same plugin mechanisms.
 
 A capability belongs in the host when its meaning is independent of Agent paradigms and it has application-wide configuration or shared state. The host owns that configuration and state; the SDK defines domain types and capabilities; plugins own resources, tools, views, model-facing text, and capability composition. Stateless helpers remain library or plugin code. Interfaces follow current consumers rather than hypothetical feature sets.
 
 Model calls, terminal sessions, and MCP calls are composable capabilities. Builtin can build a conversation card from model calls; another plugin can combine model calls with a terminal in one resource. Shared services do not prescribe card types or a one-to-one relationship between services and resources. Skill and instruction catalogs retain raw contributions with plugin provenance; consuming paradigms determine effective request contents.
+
+Resource-centered composition is the common foundation across Agent paradigms. A paradigm describes a general interaction and organizational model; plugins provide implementation capabilities. Their relationship is not one-to-one. Builtin resources can realize Router–Worker coordination through assistant roles and direct Agent or Mesh communication without a new plugin or execution loop. Additional plugins supply additional capabilities, not a mandatory implementation boundary for every paradigm.
+
+A workflow is the user-defined arrangement of responsibilities, methods, handoffs, and completion criteria, expressed through assistant roles, skills, and workbench resource and link arrangements. It can apply or combine organizational models. The harness describes primitive contracts rather than prescribing workflows. Assigning a built-in Agent to supervise another composes existing capabilities; it does not add a host-owned hierarchy or grant the supervisor additional authority. Compositions spanning implementations use explicitly supported resource, tool, or public domain contracts.
 
 ## Sessions and entry ownership
 

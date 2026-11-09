@@ -2,13 +2,19 @@
 
 Asterism is a local workbench for working with agents. A session keeps the work together; resources supply material and capabilities; cards show the objects involved.
 
+## Paradigms and workflows
+
+An **Agent paradigm** describes a general model of interaction and organization. The main paradigm is ordinary one-to-one assistance between a user and an Agent. Resources form the shared foundation across paradigms. Plugins supply capabilities: builtin can support both one-to-one assistance and Router–Worker coordination through roles and communication resources. Paradigms and plugins are not one-to-one.
+
+A **workflow** is the user-defined arrangement of responsibilities, methods, handoffs, and completion criteria. Assistant roles, skills, and the workbench arrangement express it using available capabilities; a workflow can apply or combine organizational models. Harness text describes available primitives and execution contracts rather than prescribing workflows.
+
 ## Sessions and agents
 
-A **session** contains the inputs, objects, relationships, and history for a piece of work. Several agents can share a session. Each agent has its own conversation, derived from that session’s current history.
+A **session** contains the inputs, objects, relationships, and history for a piece of work. It can exist independently of an Agent conversation. In builtin, several Agents can share a session, each with its own conversation derived from that session’s current history.
 
-An **agent configuration** describes reusable behavior, including instructions, model selection, and execution budgets. An **agent** is a running workbench object created from a configuration. Changing which configuration an agent uses does not create a new session.
+In builtin, an **agent configuration** describes reusable behavior, including instructions, model selection, and subagent execution budgets. A workbench **Agent** is an execution object created from a configuration. Changing which configuration it uses does not create a new session.
 
-An Agent receives **messages** from three sources: the user, another Agent, or a resource reporting an event. Each carries ordinary readable content. Agent and event messages identify their source; event messages describe what happened so the Agent can act according to its configured responsibilities.
+A built-in Agent receives **messages** from three sources: the user, another Agent, or a resource reporting an event. Each carries ordinary readable content. Agent and event messages identify their source; event messages describe what happened so the Agent can act according to its configured responsibilities.
 
 ## Resources, links, and tools
 
