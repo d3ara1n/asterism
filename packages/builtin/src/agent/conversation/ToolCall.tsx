@@ -6,6 +6,7 @@ import { JsonView } from "@asterism-app/ui/json-view";
 import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
+import { cn } from "@asterism-app/ui/utils";
 import { toolOutcomeLabels, toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
 import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
@@ -54,7 +55,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     pending={state.phase === "input" || state.phase === "ready"}>
     <div className="space-y-3 [--code-font-size:var(--text-xs)]">
       {view && (view.body ?? (!filling && state.phase !== "incomplete" && <DefaultToolBody {...view.props} />))}
-      {diagnostic && <p className="type-caption whitespace-pre-wrap">{diagnostic}</p>}
+      {diagnostic && <p className={cn("type-caption whitespace-pre-wrap", "error" in result && "text-destructive")}>{diagnostic}</p>}
       {view?.details !== false && (state.phase === "settled" || state.phase === "incomplete") && <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
         { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails),
           render: () => <JsonView value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /> },

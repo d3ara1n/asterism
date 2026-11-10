@@ -28,11 +28,11 @@ function Body({ result }: Props) {
   return <div className="flex flex-col gap-2"><ItemGroup>{data.profiles.slice(0, TOOL_BODY_LINE_LIMIT).map(profile => <Item key={profile.id} size="sm" className="px-0">
     <ItemContent className="min-w-0">
       <ItemTitle className="flex-wrap">
-        <span className="inline-flex shrink-0" title={i18n.text(profile.available ? messages.installed : messages.notInstalled)}>
-          <StatusIcon tone={profile.available ? "success" : "warning"} still className="size-3.5" />
-          <span className="sr-only">{i18n.text(profile.available ? messages.installed : messages.notInstalled)}</span>
-        </span>
         {profile.id}
+        {profile.available ? <span className="inline-flex shrink-0" title={i18n.text(messages.installed)}>
+          <StatusIcon tone="success" still className="size-3.5" />
+          <span className="sr-only">{i18n.text(messages.installed)}</span>
+        </span> : <span className="sr-only">{i18n.text(messages.notInstalled)}</span>}
         {profile.id === data.resolvedProfile && <span className="type-caption font-normal text-muted-foreground">{i18n.text(messages.isDefault)}</span>}
       </ItemTitle>
       <ItemDescription className="line-clamp-none break-all font-mono">

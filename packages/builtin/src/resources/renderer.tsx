@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText, PenLine, Link } from "lucide-react";
-import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { toolRenderer, useI18n, useRendererResources, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { ToolDetails, useToolResourceTypeSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } from "@asterism-app/ui/ui/item";
+import { ItemGroup, Item, ItemContent, ItemTitle, ItemMedia } from "@asterism-app/ui/ui/item";
+import { StatusText } from "@asterism-app/ui/ui/status";
 import { Separator } from "@asterism-app/ui/ui/separator";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { resourceMessages as messages } from "../messages/resources";
@@ -91,18 +92,30 @@ function ListHeader({ result }: ListProps) {
   return <ToolHeader label={i18n.text(messages.list)}
     meta={result?.data && i18n.formatMessage(messages.count, { count: result.data.length })} />;
 }
+/** Entries carry only a type and a description, so cards keep the icon beside the text instead of stacking sections. */
+function CreationCard({ entry }: { entry: z.infer<typeof CreationListResult.schema>[number] }) {
+  const i18n = useI18n();
+  const resource = useRendererResources().get(entry.resourceKind);
+  return <Item role="listitem" variant="outline" size="sm" className="min-w-0 flex-nowrap items-start gap-3 px-3 py-2.5">
+    <ItemMedia variant="icon" className="text-muted-foreground">{resource.icon}</ItemMedia>
+    <ItemContent className="min-w-0 gap-0.5">
+      <ItemTitle className="w-full break-words">{i18n.text(resource.label)}</ItemTitle>
+      <p className="type-caption whitespace-pre-wrap break-words text-pretty text-muted-foreground">{entry.description}</p>
+      {entry.notice && <div className="mt-1" title={entry.notice}>
+        <StatusText tone="warning">{i18n.text(messages.restricted)}</StatusText>
+      </div>}
+    </ItemContent>
+  </Item>;
+}
 function ListBody({ result }: ListProps) {
   const i18n = useI18n();
   const entries = result?.data;
   if (!entries) return null;
   if (!entries.length) return <p className="type-caption">{i18n.text(messages.empty)}</p>;
-  return <div className="space-y-2">
-    <ItemGroup>{entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry => <Item key={entry.id} size="sm" className="px-0">
-      <ItemContent>
-        <ItemTitle><ResourceType kind={entry.resourceKind} /></ItemTitle>
-        <ItemDescription className="line-clamp-none whitespace-pre-wrap">{entry.description}</ItemDescription>
-      </ItemContent>
-    </Item>)}</ItemGroup>
+  return <div className="@container/creations space-y-2">
+    <ItemGroup className="grid grid-cols-1 items-stretch gap-2 @min-[36rem]/creations:grid-cols-2">
+      {entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry => <CreationCard key={entry.id} entry={entry} />)}
+    </ItemGroup>
     {entries.length > TOOL_BODY_LINE_LIMIT && <p className="type-caption text-muted-foreground">
       {i18n.formatMessage(messages.omitted, { count: entries.length - TOOL_BODY_LINE_LIMIT })}
     </p>}

@@ -15,6 +15,7 @@ export const resourceMessages = pluginNamespace("asterism.builtin").messages("en
   unexpose: { id: "resources.unexpose", defaultMessage: "Withdraw self-exposure" },
   count: { id: "resources.creationCount", defaultMessage: "{count, plural, one {# entry} other {# entries}}" },
   empty: { id: "resources.noCreations", defaultMessage: "No creation entries are available." },
+  restricted: { id: "resources.creationRestricted", defaultMessage: "Tools restricted" },
   directoryUnavailable: { id: "resources.directoryUnavailable", defaultMessage: "Resource types unavailable" },
   omitted: { id: "resources.creationsOmitted", defaultMessage: "{count, plural, one {# more entry in result details.} other {# more entries in result details.}}" },
   kind: { id: "resources.kind", defaultMessage: "Resource type" },
