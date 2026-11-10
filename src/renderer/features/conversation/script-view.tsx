@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { z } from "zod";
-import { CircleCheck, Ellipsis, Workflow, Wrench } from "lucide-react";
+import { CircleCheck, Ellipsis, Waypoints, Wrench } from "lucide-react";
 import { toolRenderer, useRendererTools, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { defaultToolModel, type Json } from "@asterism-app/sdk/contracts";
 import { CodeText } from "@asterism-app/ui/code-view";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { ToolDetailsSwitcher } from "@asterism-app/ui/tool-content";
+import { IconSummary } from "@asterism-app/ui/icon-summary";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { toolOutcomeLabels, toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
@@ -40,12 +41,23 @@ function useNow(active: boolean): number {
 /** Live progress counts settled calls against submitted calls; settled scripts show the total. Failures inside a successful script stay visible. */
 function Header(props: Props) {
   const i18n = useI18n();
-  const totals = scriptCallTotals(scriptCalls(props));
+  const tools = useRendererTools();
+  const calls = scriptCalls(props);
+  const totals = scriptCallTotals(calls);
+  const items = groupScriptCalls(calls, "tool").map(group => {
+    const implementation = group.call.implementation?.id ?? null;
+    return {
+      key: group.key,
+      icon: tools.icon(group.call.name, implementation) ?? <Wrench />,
+      label: tools.label(group.call.name, implementation) ?? group.call.tool ?? group.call.name,
+      count: group.count,
+    };
+  });
   const live = props.phase === "ready" || props.phase === "executing";
   const count = live ? `${totals.settled}/${totals.total}` : totals.total ? i18n.formatMessage(messages.toolScriptCalls, { count: totals.total }) : null;
-  return <ToolHeader label={i18n.text(messages.toolResourceScript)} meta={(count || totals.failed || totals.partial) ? <>
+  return <ToolHeader label={i18n.text(messages.toolResourceScript)} summary={items.length ? <IconSummary items={items} /> : undefined} meta={(count || totals.failed || totals.partial) ? <>
     {count}
-    {totals.failed > 0 && <span className="text-destructive"> · {i18n.formatMessage(messages.toolScriptFailedCount, { count: totals.failed })}</span>}
+    {totals.failed > 0 && <span> · {i18n.formatMessage(messages.toolScriptFailedCount, { count: totals.failed })}</span>}
     {totals.partial > 0 && <> · {i18n.formatMessage(messages.toolScriptPartialCount, { count: totals.partial })}</>}
   </> : undefined} />;
 }
@@ -128,7 +140,7 @@ function Body(props: Props) {
 
 /** Calls, logs, return value, and source replace the shell's raw argument and result details. */
 export const scriptToolRenderer = toolRenderer(ResourceScriptResult, {
-  label: messages.toolResourceScript, icon: <Workflow className="size-3.5" />, details: false,
+  label: messages.toolResourceScript, icon: <Waypoints className="size-3.5" />, details: false,
   input: { headerRenderer: Header, bodyRenderer: Body, streaming: props => scriptCode(props.args).length > 0 },
   execution: { headerRenderer: Header, bodyRenderer: Body, streaming: props => scriptCalls(props).length > 0 || (props.result?.data?.logs.length ?? 0) > 0 },
   result: { headerRenderer: Header, bodyRenderer: Body },

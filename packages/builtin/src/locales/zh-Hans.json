@@ -264,6 +264,7 @@
   "conversation.compression.failed": "上下文压缩失败",
   "conversation.compression.cancelled": "已取消上下文压缩",
   "conversation.process.title": "执行过程",
+  "conversation.process.text": "文本输出",
   "conversation.process.toolCount": "{count} 次工具调用",
   "conversation.process.failedCount": "{count} 个失败",
   "conversation.process.partialCount": "{count} 个部分完成",

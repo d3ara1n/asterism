@@ -17,7 +17,7 @@ export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "summary"; id: string; text: string }
   | { kind: "compression"; id: string; status: CompressionActivity["status"] | "completed" | "boundary" }
   | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null }
-  | { kind: "conversation-process"; id: string; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; incomplete: boolean; open: boolean }
+  | { kind: "conversation-process"; id: string; content: readonly ("text" | "thinking")[]; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; incomplete: boolean; open: boolean }
   | ({ kind: "notice" } & InlineFeedback);
 /** Saved and live model blocks; notices may carry a responseId but are not blocks. */
 export function isModelBlock(item: TimelineItem): item is SavedBlock | ModelLiveBlock {

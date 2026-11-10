@@ -18,6 +18,18 @@ describe("Script call grouping", () => {
     ]);
   });
 
+  it("combines resources in header summaries without merging distinct tool implementations", () => {
+    const groups = groupScriptCalls([
+      call({ resource: docs, implementation: { id: "directory.read" } }),
+      call({ resource: notes, implementation: { id: "directory.read" } }),
+      call({ implementation: { id: "note.read" } }),
+      call({ tool: "write", implementation: { id: "directory.write" } }),
+    ], "tool");
+    expect(groups.map(group => [group.call.implementation?.id, group.count])).toEqual([
+      ["directory.read", 2], ["note.read", 1], ["directory.write", 1],
+    ]);
+  });
+
   it("reports the most severe settled outcome and each distinct diagnostic once", () => {
     const [group] = groupScriptCalls([
       call({ resource: docs }),

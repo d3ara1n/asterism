@@ -32,9 +32,20 @@ describe("Conversation process folding by input groups", () => {
     expect(ids(grouped)).toEqual(["u", "conversation-process:final", "part1", "part2", "turn-metrics:u"]);
     expect(ids(grouped, [...grouped.processIds]))
       .toEqual(["u", "progress", "tool", "thinking", "conversation-process:final", "part1", "part2", "turn-metrics:u"]);
-    expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ tools: [{ name: "read" }], incomplete: false });
+    expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ tools: [{ name: "read" }], content: ["text", "thinking"], incomplete: false });
     expect(grouped.owners.get(JSON.stringify(["work", 1]))).toBe("conversation-process:final");
     expect(grouped.owners.has(JSON.stringify(["final", 1]))).toBe(false);
+  });
+
+  it("summarizes folded content once without including the visible final reply", () => {
+    const grouped = project([
+      node("u", null, message("a", "Work")),
+      node("reason1", "u", thinking("a", "work", 0, "First")),
+      node("reason2", "reason1", thinking("a", "work", 1, "Second")),
+      node("reply", "reason2", text("a", "final", 0, "Done", { completion })),
+    ]);
+    expect(grouped.items.find(item => item.kind === "conversation-process"))
+      .toMatchObject({ content: ["thinking"], tools: [] });
   });
 
   // Steer splits presentation without splitting execution measurements; errors retain their original position.

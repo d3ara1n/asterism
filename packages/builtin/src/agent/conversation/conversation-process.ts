@@ -28,6 +28,7 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
     const body: TimelineItem[] = [];
     let lastProcess = -1;
     let finalPosition = -1;
+    const content = new Set<"text" | "thinking">();
     const tools: Extract<TimelineItem, { kind: "toolcall" }>[] = [];
     for (const entry of pending) {
       if (entry.kind === "text" && completed && entry.responseId === lastBlock.responseId) {
@@ -40,6 +41,7 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
         owners.set(timelineKey(entry), id);
         lastProcess = body.length - 1;
         if (entry.kind === "toolcall") tools.push(entry);
+        else if ((entry.kind === "text" || entry.kind === "thinking") && entry.text.trim()) content.add(entry.kind);
       }
     }
     // Compression can follow the final reply; body text stays on its original side of the marker, and compression markers remain independently visible.
@@ -47,7 +49,7 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
     if (final.length) body.splice(Math.max(finalPosition, lastProcess + 1), 0, ...final);
     if (lastProcess >= 0) {
       processIds.add(id);
-      body.splice(lastProcess + 1, 0, { kind: "conversation-process", id, tools, incomplete: !completed, open: false });
+      body.splice(lastProcess + 1, 0, { kind: "conversation-process", id, tools, content: [...content], incomplete: !completed, open: false });
     }
     result.push(...body);
     pending = [];

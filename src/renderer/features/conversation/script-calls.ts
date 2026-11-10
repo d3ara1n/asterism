@@ -21,11 +21,11 @@ export interface ScriptCallGroup {
 
 const severity: Record<ToolOutcomeKind, number> = { failed: 5, rejected: 4, unknown: 3, partial: 2, cancelled: 1, succeeded: 0 };
 
-/** Calls with the same tool, implementation, and resource share one row in first-submission order. */
-export function groupScriptCalls(calls: readonly ScriptCall[]): ScriptCallGroup[] {
+/** Detail rows group by resource; header summaries combine resources under the same tool identity. */
+export function groupScriptCalls(calls: readonly ScriptCall[], scope: "resource" | "tool" = "resource"): ScriptCallGroup[] {
   const groups = new Map<string, ScriptCallGroup>();
   for (const call of calls) {
-    const key = JSON.stringify([call.name, call.tool ?? null, call.implementation?.id ?? null, call.resource?.id ?? null]);
+    const key = JSON.stringify([call.name, call.tool ?? null, call.implementation?.id ?? null, scope === "resource" ? call.resource?.id ?? null : null]);
     let group = groups.get(key);
     if (!group) groups.set(key, group = { key, call, count: 0, running: 0, queued: 0, settled: {}, worst: null, diagnostics: [] });
     group.count++;

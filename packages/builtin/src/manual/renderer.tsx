@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { BookOpen, FileSearch, ListTree, Search } from "lucide-react";
+import { BookOpen, FileSearch, ListTree, TextSearch } from "lucide-react";
 import { cardRenderer, creationEntry, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
 import { Manual, CreateManual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep, ManualChildren } from "./contract";
 import { manualMessages as messages } from "../messages/manual";
@@ -41,6 +41,6 @@ export default {
     toolRenderer(ManualList, { label: filesystemMessages.toolDirectoryList, icon: <ListTree className="size-3.5" />, ...listViews }),
     toolRenderer(ManualRead, { label: textMessages.toolTextRead, icon: <BookOpen className="size-3.5" />, ...textReadViews }),
     toolRenderer(ManualFind, { label: filesystemMessages.toolDirectoryFind, icon: <FileSearch className="size-3.5" />, ...findViews }),
-    toolRenderer(ManualGrep, { label: filesystemMessages.toolDirectoryGrep, icon: <Search className="size-3.5" />, ...grepViews }),
+    toolRenderer(ManualGrep, { label: filesystemMessages.toolDirectoryGrep, icon: <TextSearch className="size-3.5" />, ...grepViews }),
   ],
 } satisfies RendererModule;

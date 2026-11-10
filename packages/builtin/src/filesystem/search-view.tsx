@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ChevronRight, FileSearch, Search } from "lucide-react";
+import { ChevronRight, FileSearch, TextSearch } from "lucide-react";
 import { toolRenderer, useI18n, useRendererViewState, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -163,7 +163,7 @@ export const searchToolRenderers = [
     ...findViews,
   }),
   toolRenderer(DirectoryGrep, {
-    label: messages.toolDirectoryGrep, icon: <Search className="size-3.5" />,
+    label: messages.toolDirectoryGrep, icon: <TextSearch className="size-3.5" />,
     ...grepViews,
   }),
 ];
