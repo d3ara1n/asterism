@@ -6,6 +6,7 @@ import { fileReferencePartSchema, messagingText, type Json, type MessagingConnec
   type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { inputFileName } from "@asterism-app/builtin-api/contracts";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Marker, MarkerContent } from "@asterism-app/ui/ui/marker";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
@@ -179,9 +180,11 @@ function SendHeader({ phase, target, invocation, result }: SendProps) {
     meta={[replyTo && i18n.formatMessage(messages.replyToId, { id: replyTo }),
       phase === "settled" && result.kind === "succeeded" && i18n.text(messages.sent)].filter(Boolean).join(" · ")} />;
 }
-function SendBody({ args, result }: SendProps) {
+function SendBody({ args, result, phase }: SendProps) {
   const object = useRendererObject(), data = result?.data;
-  return data ? <MessageBody message={data} content={object.content} /> : <DraftParts args={args} />;
+  if (data) return <MessageBody message={data} content={object.content} />;
+  const draft = <DraftParts args={args} />;
+  return phase === "input" ? <StreamingPreview>{draft}</StreamingPreview> : draft;
 }
 function DraftParts({ args }: { args: Json }) {
   return <div className="flex min-w-0 flex-col gap-1.5">{partsOf(args).map((part, index) => {

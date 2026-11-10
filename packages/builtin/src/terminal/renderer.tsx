@@ -7,6 +7,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { Field, FieldLabel } from "@asterism-app/ui/ui/field";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism-app/ui/ui/select";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { CreationForm } from "../shared/creation-form";
 import { commonMessages } from "../messages/common";
 import { filesystemMessages } from "../messages/filesystem";
@@ -19,7 +20,7 @@ import type { z } from "zod";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { useRendererObject, useRendererApplication } from "@asterism-app/sdk/renderer";
 import { mediaMessages } from "../messages/media";
-import { inputField, inputText } from "../shared/tool-preview";
+import { inputField, inputText, toolTextTail } from "../shared/tool-preview";
 
 // Select's nonempty placeholder value is independent of actual profile IDs; all option values receive a prefix.
 const DEFAULT_PROFILE = "default";
@@ -110,8 +111,11 @@ function sentDisplay(args: ToolRenderProps["args"]): string | undefined {
   if (enter) display += "\u21b5";
   return display || undefined;
 }
-function InputBody({ args, result }: ToolRenderProps<z.infer<typeof TerminalInput.schema>>) {
+function InputBody({ args, result, phase }: ToolRenderProps<z.infer<typeof TerminalInput.schema>>) {
   const data = result?.data, display = sentDisplay(args);
+  if (phase === "input") return display !== undefined ? <StreamingPreview>
+    <pre className="type-code m-0 whitespace-pre-wrap break-all">{toolTextTail(display)}</pre>
+  </StreamingPreview> : null;
   if (display === undefined && !data) return null;
   return <div className="flex flex-col gap-3">
     {display !== undefined && <pre className="type-code m-0 max-h-48 overflow-auto whitespace-pre-wrap break-all">{display}</pre>}
@@ -128,7 +132,6 @@ function WaitBody({ result }: ToolRenderProps<z.infer<typeof TerminalWait.schema
 const header = (label: typeof terminalMessages.input) => function Header({ invocation }: ToolRenderProps) {
   const i18n = useI18n(); return <ToolHeader label={i18n.formatMessage(label)} subject={invocation.resource?.title} monospace />;
 };
-const inputHeader = { headerRenderer: header(terminalMessages.input) };
 const inputBody = { headerRenderer: header(terminalMessages.input), bodyRenderer: InputBody };
 const waitHeader = { headerRenderer: header(terminalMessages.wait) };
 const waitResult = { headerRenderer: header(terminalMessages.wait), bodyRenderer: WaitBody };
@@ -140,7 +143,7 @@ export default {
   cards: [cardRenderer(TerminalView, { ...appearance, Body: TerminalCard, Actions: TerminalActions })],
   creations: [creationEntry(CreateTerminal, { id: "asterism.builtin/terminal.local", label: terminalMessages.terminal, icon: <TerminalSquare className="size-4" />, group: "resources", InputView: TerminalCreation, triggers: { menu: {} } })],
   tools: [
-    toolRenderer(TerminalInput, { label: terminalMessages.input, icon: <Keyboard className="size-3.5" />, input: inputHeader, execution: inputBody, result: inputBody }),
+    toolRenderer(TerminalInput, { label: terminalMessages.input, icon: <Keyboard className="size-3.5" />, input: { ...inputBody, streaming: ({ args }) => !!sentDisplay(args) }, execution: inputBody, result: inputBody }),
     toolRenderer(TerminalWait, { label: terminalMessages.wait, icon: <Clock className="size-3.5" />, input: waitHeader, execution: waitHeader, result: waitResult }),
     toolRenderer(TerminalRead, { label: terminalMessages.read, icon: <BookOpen className="size-3.5" />, input: { headerRenderer: readView.headerRenderer }, execution: readView, result: readView }),
     toolRenderer(TerminalSee, { label: terminalMessages.see, icon: <Eye className="size-3.5" />, input: { headerRenderer: imageView.headerRenderer }, execution: { headerRenderer: imageView.headerRenderer }, result: imageView }),

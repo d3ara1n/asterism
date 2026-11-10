@@ -56,18 +56,32 @@ function TextReplaceHeader({ target, args, invocation, result }: ToolRenderProps
 function TextReplaceBody(props: ToolRenderProps<TextReplace>) {
   const i18n = useI18n();
   if (props.result?.data) return <TextChangeBody result={props.result} />;
+  const find = inputText(props.args, "find"), replacement = inputText(props.args, "replace");
+  if (props.phase === "input") return <StreamingPreview><div className="flex flex-col gap-2">
+    {find !== undefined && <>
+      <p className="type-caption text-muted-foreground">{i18n.formatMessage(textMessages.toolTextFind)}</p>
+      <InputTailRows text={find} />
+    </>}
+    {replacement !== undefined && <>
+      <p className="type-caption text-muted-foreground">{i18n.formatMessage(textMessages.toolTextReplacement)}</p>
+      <InputTailRows text={replacement} />
+    </>}
+  </div></StreamingPreview>;
   return <div className="space-y-2">
     <p className="type-caption text-muted-foreground">{i18n.formatMessage(textMessages.toolTextFind)}</p>
-    <TextBodyPreview text={inputText(props.args, "find") ?? ""} />
+    <TextBodyPreview text={find ?? ""} />
     <p className="type-caption text-muted-foreground">{i18n.formatMessage(textMessages.toolTextReplacement)}</p>
-    <TextBodyPreview text={inputText(props.args, "replace") ?? ""} />
+    <TextBodyPreview text={replacement ?? ""} />
   </div>;
 }
 
-function InputTail({ text, filename }: { text: string; filename?: string }) {
+function InputTailRows({ text, filename }: { text: string; filename?: string }) {
   const tail = toolTextTail(text).split("\n");
   const firstLine = text.split("\n").length - tail.length + 1;
-  return <StreamingPreview><CodeRows rows={tail.map((content, index) => ({ line: firstLine + index, content }))} filename={filename} /></StreamingPreview>;
+  return <CodeRows rows={tail.map((content, index) => ({ line: firstLine + index, content }))} filename={filename} />;
+}
+function InputTail(props: { text: string; filename?: string }) {
+  return <StreamingPreview><InputTailRows {...props} /></StreamingPreview>;
 }
 function EditPreview({ args }: { args: Json }) {
   return <InputTail text={editPreviewText(args)} />;

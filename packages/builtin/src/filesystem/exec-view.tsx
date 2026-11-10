@@ -7,7 +7,7 @@ import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { DirectoryExec } from "./exec-contract";
 import type { ExecResult } from "@asterism-app/sdk/contracts";
 import { shellMessages as messages } from "@asterism-app/ui/messages/shell";
-import { inputText } from "../shared/tool-preview";
+import { inputText, toolTextTail } from "../shared/tool-preview";
 import { useRendererApplication } from "@asterism-app/sdk/renderer";
 
 function Header({ phase, invocation, result }: ToolRenderProps<ExecResult>) {
@@ -31,6 +31,9 @@ function Body({ args, phase, result }: ToolRenderProps<ExecResult>) {
   const [opening, setOpening] = useState(false), [error, setError] = useState(false);
   const data = result?.data;
   const settled = phase === "settled", command = inputText(args, "command");
+  if (phase === "input") return command ? <StreamingPreview>
+    <pre className="type-code m-0 whitespace-pre-wrap break-all">{toolTextTail(command)}</pre>
+  </StreamingPreview> : null;
   if (!data && !settled) return null;
   return <div className="flex flex-col gap-3">
     {settled && command !== undefined && <section className="min-w-0 space-y-1 text-xs leading-relaxed">
@@ -64,7 +67,7 @@ function Body({ args, phase, result }: ToolRenderProps<ExecResult>) {
 }
 export const execToolRenderer = toolRenderer(DirectoryExec, {
   label: messages.exec, icon: <Terminal className="size-3.5" />,
-  input: { headerRenderer: Header },
+  input: { headerRenderer: Header, bodyRenderer: Body, streaming: ({ args }) => !!inputText(args, "command") },
   execution: { headerRenderer: Header, bodyRenderer: Body, streaming: ({ result }) => !!result?.data?.output },
   result: { headerRenderer: Header, bodyRenderer: Body },
 });

@@ -4,12 +4,13 @@ import { FileSearch, ListTree, Plug, Search, Zap } from "lucide-react";
 import { toolRenderer, useI18n, useRendererObject, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { McpList, McpSearch, McpInspect, McpConnect, McpCall, type McpCallData } from "./contract";
 import { connectionPhases } from "@asterism-app/sdk/contracts";
 import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
 import { textMessages } from "../messages/text";
-import { inputField, inputText, characterCount, searchSubject } from "../shared/tool-preview";
+import { inputField, inputText, characterCount, searchSubject, toolTextTail } from "../shared/tool-preview";
 import { settledBodyViews } from "../shared/tool-views";
 import { FilePreview } from "../shared/attachments";
 import { extraStructured, displayText } from "./content";
@@ -176,9 +177,11 @@ const codeBlock = "type-code m-0 max-h-96 overflow-auto whitespace-pre-wrap brea
 /** Arguments come from the call itself; results show text and files in part order, appending structured output only when the text contains no equivalent JSON. */
 function CallBody({ args, phase, result }: ToolRenderProps<McpCallData>) {
   const i18n = useI18n(), object = useRendererObject();
-  if (phase === "input") return null;
-  const data = result?.data, settled = phase === "settled";
   const callArguments = inputField(args, "arguments");
+  if (phase === "input") return callArguments !== undefined ? <StreamingPreview>
+    <pre className="type-code m-0 whitespace-pre-wrap break-all">{toolTextTail(JSON.stringify(callArguments, null, 2))}</pre>
+  </StreamingPreview> : null;
+  const data = result?.data, settled = phase === "settled";
   const progress = !settled ? data?.progress?.message : undefined;
   const extra = settled && data ? extraStructured(data) : null;
   return <div className="flex flex-col gap-3">
@@ -205,5 +208,5 @@ export const mcpToolRenderers = [
   toolRenderer(McpSearch, { label: messages.search, icon: <Search className="size-3.5" />, ...settledBodyViews(SearchHeader, SearchBody) }),
   toolRenderer(McpInspect, { label: messages.inspect, icon: <FileSearch className="size-3.5" />, ...settledBodyViews(InspectHeader, InspectBody) }),
   toolRenderer(McpConnect, { label: messages.connectTool, icon: <Plug className="size-3.5" />, ...settledBodyViews(ConnectHeader, ConnectBody) }),
-  toolRenderer(McpCall, { label: messages.call, icon: <Zap className="size-3.5" />, input: { headerRenderer: CallHeader }, execution: callView, result: callView }),
+  toolRenderer(McpCall, { label: messages.call, icon: <Zap className="size-3.5" />, input: { ...callView, streaming: ({ args }) => inputField(args, "arguments") !== undefined }, execution: callView, result: callView }),
 ];

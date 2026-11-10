@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
+import { inputText, toolTextTail } from "../shared/tool-preview";
 import { ActivityTail, InstructionList } from "./ActivityTail";
 import { Markdown } from "@asterism-app/ui/markdown";
 import { subagentMessages as messages } from "../messages/subagents";
@@ -30,12 +32,15 @@ function DelegateHeader({ phase, args, result }: DelegateProps) {
   return <ToolHeader label={i18n.text(messages.delegate)} subject={role} meta={result?.data?.input.id} />;
 }
 function DelegateBody({ args, phase }: DelegateProps) {
-  if (phase === "input") return null;
+  if (phase === "input") {
+    const task = inputText(args, "task");
+    return task ? <StreamingPreview><p className="type-body whitespace-pre-wrap break-words">{toolTextTail(task)}</p></StreamingPreview> : null;
+  }
   return <p className="type-body whitespace-pre-wrap break-words">{args.task}</p>;
 }
 export const delegateViews = {
   label: messages.delegate,
-  input: { headerRenderer: DelegateHeader },
+  input: { headerRenderer: DelegateHeader, bodyRenderer: DelegateBody, streaming: ({ args }) => !!inputText(args, "task") },
   execution: { headerRenderer: DelegateHeader, bodyRenderer: DelegateBody },
   result: { headerRenderer: DelegateHeader, bodyRenderer: DelegateBody },
 } satisfies ToolRendererDefinition<TaskSnapshot, null, DelegateInput>;
@@ -109,11 +114,15 @@ function SteerHeader({ phase, target }: SteerProps) {
   return <ToolHeader label={useI18n().text(messages.steer)} subject={phase === "input" ? undefined : target.id} monospace />;
 }
 function SteerBody({ phase, args }: SteerProps) {
-  return phase === "input" ? null : <p className="type-body whitespace-pre-wrap break-words">{args.message}</p>;
+  if (phase === "input") {
+    const message = inputText(args, "message");
+    return message ? <StreamingPreview><p className="type-body whitespace-pre-wrap break-words">{toolTextTail(message)}</p></StreamingPreview> : null;
+  }
+  return <p className="type-body whitespace-pre-wrap break-words">{args.message}</p>;
 }
 export const steerViews = {
   label: messages.steer,
-  input: { headerRenderer: SteerHeader },
+  input: { headerRenderer: SteerHeader, bodyRenderer: SteerBody, streaming: ({ args }) => !!inputText(args, "message") },
   execution: { headerRenderer: SteerHeader, bodyRenderer: SteerBody },
   result: { headerRenderer: SteerHeader, bodyRenderer: SteerBody },
 } satisfies ToolRendererDefinition<{ id: string; accepted: true }, { id: string }, { message: string }>;
