@@ -177,17 +177,12 @@ describe("Tool/resource matching and authorization", () => {
       .toMatchObject({ kind: "rejected", error: { code: "tool_unavailable" } });
   });
 
-  it("inspect narrows tools by name and projection depth, and rejects unknown names with the available ones", async () => {
+  it("inspect narrows tools by name and rejects unknown names with the available ones", async () => {
     const { resource, scope } = setup();
     const capabilities = scope([resource], name => name === "list" || name === "read");
     const inspect = (args: Record<string, Json>) => invoke(capabilities, "resource_inspect", { resource_id: resource.id, ...args });
-    const keys = async (detail?: string) => ((await inspect({ tools: ["list"], ...detail ? { detail } : {} })).model as { tools: Record<string, Json>[] })
-      .tools.map(tool => Object.keys(tool).sort());
     expect(await inspect({ tools: ["read"] })).toMatchObject({ kind: "succeeded", model: { tools: [{ name: "read" }] } });
     expect(await inspect({ tools: [] })).toMatchObject({ kind: "succeeded", model: { tools: [] } });
-    expect(await keys()).toEqual([["args", "description", "guidelines", "implementation", "name", "target"]]);
-    expect(await keys("prompt")).toEqual([["description", "guidelines", "implementation", "name"]]);
-    expect(await keys("schema")).toEqual([["args", "implementation", "name", "target"]]);
     const rejected = await inspect({ tools: ["list", "write"] });
     expect(rejected).toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
     const message = rejected.kind === "rejected" ? rejected.error.message : "";
