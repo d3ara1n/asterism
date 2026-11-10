@@ -112,6 +112,10 @@ Occurrence events preserve every event. Snapshot events may coalesce the latest 
 
 Consumers subscribe and then query domain state. The event bus does not retain current state or replay a disconnected interval.
 
+User-facing notifications and feedback belong to the feature that owns their meaning. Asterism does not provide a unified notification service that imposes a common form on them. Each feature chooses its presentation and lifecycle for its interaction and domain context, using session status, resource views, transient toasts, inline feedback, or another appropriate form.
+
+Shared UI controls and plugin frontend views may call the shared Sonner instance directly for local interaction feedback. The application shell mounts and configures the shared toast container; sharing that implementation does not impose a common notification model on features. The event bus carries domain communication, not a uniform user-notification model. Host-stamped event origin does not itself require a visible source label.
+
 System resume is a host occurrence delivered through the same event bus. The main process supplies the operating-system notification. The shared host deadline service rechecks wall-clock time on resume; plugins retain responsibility for domain-specific elapsed-time and missed-occurrence behavior.
 
 Object channels support sustained bidirectional data. Opening validates current presence and plugin ownership. Closing, object disappearance, provider unavailability, or connection loss ends the channel. It neither writes history nor occupies the timeline by itself.

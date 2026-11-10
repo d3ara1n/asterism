@@ -65,7 +65,7 @@ The earlier API-02 through API-06 labels are retained here as ownership referenc
 
 Future extensions may add contracts, services, or explicitly selected capabilities. Their implementation must decide how existing consumers continue to behave. An unimplemented extension is neither an existing public API nor evidence that a foundational rewrite is required.
 
-The implemented plugin paradigm layering (`plans/archived/ref-2026-10-28-plugin-paradigm-layering.md`) reclassifies prompt contributions, plugin-carried skills, MCP, manuals, roles, and Agent configuration. It changes published 0.x SDK contracts, including the model target and prompt blocks; those changes are intentional breaks before stable public interfaces. Explicit skill picking, notifications, broader content sharing, hot reload, separate plugin processes, and persistent jobs remain independently scoped work.
+The implemented plugin paradigm layering (`plans/archived/ref-2026-10-28-plugin-paradigm-layering.md`) reclassifies prompt contributions, plugin-carried skills, MCP, manuals, roles, and Agent configuration. It changes published 0.x SDK contracts, including the model target and prompt blocks; those changes are intentional breaks before stable public interfaces. Explicit skill picking, broader content sharing, hot reload, separate plugin processes, and persistent jobs remain independently scoped work. On 2026-11-10, the notification follow-up was closed with a decision not to build a unified notification service or impose a common notification form. Each feature owns its feedback form and lifecycle; existing frontend feedback does not require blanket migration.
 
 ## Validation record
 
