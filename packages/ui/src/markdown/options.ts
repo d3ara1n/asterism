@@ -6,7 +6,8 @@ import remarkMath from "remark-math";
 /** Historical and live content share standard Markdown plugins; body text and code are not rewritten before parsing. */
 export const markdownOptions = {
   skipHtml: true,
-  remarkPlugins: [remarkGfm, remarkMath],
+  // Single dollars are literal text (currency and shell variables); formulas use $$ delimiters.
+  remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }]],
   rehypePlugins: [[rehypeKatex, { trust: false }]],
   // Destinations pass through unchanged; the `a` and `img` components decide what each one becomes.
   urlTransform: (url: string) => url,

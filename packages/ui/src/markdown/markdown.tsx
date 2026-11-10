@@ -57,7 +57,7 @@ export const Markdown = memo(function Markdown({ children, streaming = false }: 
   return <MarkdownStreamingContext value={streaming}>
     <div data-markdown-root className="markdown-content type-body min-w-0 break-words [overflow-wrap:anywhere]">
       {live && !reducedMotion
-        ? <Streamdown {...options} components={components} content={children} latexGuard smoothing="balanced" granularity="word" remend={{ htmlTags: false }} />
+        ? <Streamdown {...options} components={components} content={children} smoothing="balanced" granularity="word" remend={{ htmlTags: false }} />
         : <CachedMarkdown {...options} components={components}>{children}</CachedMarkdown>}
     </div>
   </MarkdownStreamingContext>;
