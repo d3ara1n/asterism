@@ -1,8 +1,7 @@
 import { TerminalSquare } from "lucide-react";
 import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { Badge } from "@asterism-app/ui/ui/badge";
-import { StatusBadge } from "@asterism-app/ui/ui/status";
+import { StatusIcon } from "@asterism-app/ui/ui/status";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@asterism-app/ui/ui/item";
 import { shellMessages as messages } from "@asterism-app/ui/messages/shell";
 import { resourceMessages } from "../messages/resources";
@@ -26,12 +25,15 @@ function Body({ result }: Props) {
   const data = result?.data;
   if (!data) return null;
   if (!data.profiles.length) return <p className="type-caption">{i18n.text(messages.noProfiles)}</p>;
-  return <div className="space-y-2"><ItemGroup>{data.profiles.slice(0, TOOL_BODY_LINE_LIMIT).map(profile => <Item key={profile.id} size="sm" className="px-0">
+  return <div className="flex flex-col gap-2"><ItemGroup>{data.profiles.slice(0, TOOL_BODY_LINE_LIMIT).map(profile => <Item key={profile.id} size="sm" className="px-0">
     <ItemContent className="min-w-0">
       <ItemTitle className="flex-wrap">
+        <span className="inline-flex shrink-0" title={i18n.text(profile.available ? messages.installed : messages.notInstalled)}>
+          <StatusIcon tone={profile.available ? "success" : "warning"} still className="size-3.5" />
+          <span className="sr-only">{i18n.text(profile.available ? messages.installed : messages.notInstalled)}</span>
+        </span>
         {profile.id}
-        {profile.id === data.resolvedProfile && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}
-        <StatusBadge tone={profile.available ? "success" : "warning"}>{i18n.text(profile.available ? messages.installed : messages.notInstalled)}</StatusBadge>
+        {profile.id === data.resolvedProfile && <span className="type-caption font-normal text-muted-foreground">{i18n.text(messages.isDefault)}</span>}
       </ItemTitle>
       <ItemDescription className="line-clamp-none break-all font-mono">
         {profile.id} · {profile.resolvedExecutable ?? profile.executable}
