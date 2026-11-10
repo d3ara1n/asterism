@@ -124,10 +124,9 @@ export class TreeStore {
     };
   }
 
-  /** Every filesystem and metadata invalidation enters the same trailing debounce. */
+  /** Invalidations coalesce into one refresh at most a second after the first, so sustained writes still show progress. */
   requestRefresh() {
-    if (!this.controller) return;
-    clearTimeout(this.timer);
+    if (!this.controller || this.timer !== undefined) return;
     this.timer = setTimeout(() => { this.timer = undefined; void this.refresh(); }, 1000);
   }
 

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { parseStatus, sumNumstat } from "./git-status.ts";
+import { parseProbe, parseStatus, sumNumstat } from "./git-status.ts";
 
 it("re-roots repository paths at the resource prefix and skips the original path of renames", () => {
   const output = [
@@ -26,4 +26,11 @@ it("keeps paths unchanged at the repository root", () => {
 it("sums text line counts and ignores binary files", () => {
   expect(sumNumstat("3\t1\ta.ts\x00-\t-\timage.png\x0010\t0\tb.ts\x00")).toEqual({ added: 13, removed: 1 });
   expect(sumNumstat("")).toEqual({ added: 0, removed: 0 });
+});
+
+it("reads the combined rev-parse probe at the root, in a subdirectory, on an unborn branch and inside the Git directory", () => {
+  expect(parseProbe("true\n\nabc123\n")).toEqual({ prefix: "", head: "abc123" });
+  expect(parseProbe("true\na/b/\nabc123\n")).toEqual({ prefix: "a/b/", head: "abc123" });
+  expect(parseProbe("true\na/b/\n")).toEqual({ prefix: "a/b/", head: null });
+  expect(parseProbe("false\n\nabc123\n")).toBeNull();
 });

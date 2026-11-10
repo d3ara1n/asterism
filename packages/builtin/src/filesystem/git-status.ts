@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import type { DirectoryStatus, gitStatusValue } from "./contract.ts";
-import { git, GitExit, insideWorkTree } from "./git.ts";
+import { git, GitExit } from "./git.ts";
 
 type Status = z.infer<typeof gitStatusValue>;
 type Summary = NonNullable<z.infer<typeof DirectoryStatus.output>>;
@@ -42,14 +42,28 @@ export function sumNumstat(output: string): { added: number; removed: number } {
   return { added, removed };
 }
 
+/**
+ * Parse `rev-parse --is-inside-work-tree --show-prefix --verify --quiet HEAD`. An unborn branch omits the HEAD line;
+ * null means the directory is not inside a work tree (for example, inside the Git directory).
+ */
+export function parseProbe(output: string): { prefix: string; head: string | null } | null {
+  const [inside, prefix = "", head = ""] = output.split(/\r?\n/u);
+  return inside === "true" ? { prefix, head: head.trim() || null } : null;
+}
+
 /** Staged and unstaged changes against HEAD within `root`; null when `root` is outside a work tree or git is unavailable. */
 export async function readDirectoryStatus(root: string, signal: AbortSignal): Promise<Summary | null> {
-  if (!await insideWorkTree(root, signal)) return null;
-  const prefix = (await git(root, ["rev-parse", "--show-prefix"], signal)).replace(/\r?\n$/u, "");
-  const head = await git(root, ["rev-parse", "--verify", "--quiet", "HEAD"], signal).then(out => out.trim(), error => {
-    if (error instanceof GitExit && error.exitCode === 1) return null;
+  const probe = await git(root, ["rev-parse", "--is-inside-work-tree", "--show-prefix", "--verify", "--quiet", "HEAD"], signal).catch(error => {
+    signal.throwIfAborted();
+    if (!(error instanceof GitExit)) throw error;
+    // Exit 1 is the missing HEAD after the earlier fields were printed; 128 and ENOENT mean no work tree.
+    if (error.exitCode === 1) return error.stdout;
+    if (error.exitCode === 128 || error.exitCode === "ENOENT") return "";
     throw error;
   });
+  const location = parseProbe(probe);
+  if (!location) return null;
+  const { prefix, head } = location;
   // An unborn branch compares against the empty tree of the repository's object format.
   const base = head ?? (await git(root, ["hash-object", "-t", "tree", "--stdin"], signal)).trim();
   const [status, numstat] = await Promise.all([

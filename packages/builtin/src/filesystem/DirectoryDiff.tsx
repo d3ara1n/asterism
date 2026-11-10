@@ -13,6 +13,9 @@ import { ReadDirectoryDiff } from "./editor-contract";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import type { TreeStore } from "./tree-store";
 
+type DiffData = z.infer<typeof ReadDirectoryDiff.output>;
+const sameDiff = (a: DiffData, b: DiffData) => a.kind === b.kind && (a.kind !== "patch" || (b.kind === "patch" && a.patch === b.patch));
+
 /** A selected diff reloads after browser refresh, even when the status list itself did not change. */
 export default function DirectoryDiff({ resource, path, store }: { resource: ResourceRef; path: string; store: TreeStore }) {
   const i18n = useI18n();
@@ -27,25 +30,28 @@ export default function DirectoryDiff({ resource, path, store }: { resource: Res
     });
     return () => subscription.close();
   }, [events, island, resource.sessionId, resource.id]);
-  const [data, setData] = useState<z.infer<typeof ReadDirectoryDiff.output> | null>(null);
+  const [data, setData] = useState<DiffData | null>(null);
   const [error, setError] = useState<UiText | null>(null);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!present) return;
     let controller: AbortController;
-    const read = () => {
+    // Store refreshes reread in the background; an unchanged result keeps the current object and its parsed diff.
+    const read = (background: boolean) => {
       controller?.abort(); controller = new AbortController();
       const { signal } = controller;
-      setLoading(true); setError(null);
+      if (!background) { setLoading(true); setError(null); }
       void calls.invoke(ReadDirectoryDiff, { path }, { object: resource, signal }).then(value => {
-        if (!signal.aborted) { setData(value); setLoading(false); }
+        if (signal.aborted) return;
+        setData(previous => previous && sameDiff(previous, value) ? previous : value);
+        setError(null); setLoading(false);
       }, failure => {
         if (!signal.aborted) { setError(failureDisplay(failure, messages.diffFailed)); setLoading(false); }
       });
     };
-    read();
-    const unsubscribe = store.onRefresh(read);
+    read(false);
+    const unsubscribe = store.onRefresh(() => read(true));
     return () => { unsubscribe(); controller.abort(); };
   }, [present, calls, resource, path, store, attempt]);
   const parsed = useMemo(() => data?.kind === "patch" ? parseFileDiff(data.patch) : null, [data]);
