@@ -126,6 +126,37 @@ describe("Session-level flat tree", () => {
   });
 });
 
+describe("Resource identities learned from record reads", () => {
+  it("does not retain a creation read from a rolled-back transaction when its ID is reused", () => {
+    const { db, tree, s } = setup();
+    db.exec("BEGIN");
+    tree.appendToTimeline(s, created("reused", "Provisional", "example.plugin/provisional"));
+    tree.view(s).read({ scope: "timeline" });
+    db.exec("ROLLBACK");
+    expect(tree.resourceRef("reused")).toBeNull();
+    const committedSession = tree.create("Committed");
+    tree.appendToTimeline(committedSession, created("reused", "Committed", "example.plugin/committed"));
+    expect(tree.resourceRef("reused")).toEqual({ sessionId: committedSession, id: "reused", kind: "example.plugin/committed" });
+  });
+
+  it.each(["sleep", "archive"] as const)("a captured read after %s does not restore resource availability", action => {
+    const { tree, s } = setup();
+    const creation = tree.appendToTimeline(s, created("resource", "Resource"));
+    const captured = tree.view(s);
+    captured.read({ scope: "timeline" });
+    tree[action](s);
+    expect(captured.read({ scope: "timeline" }).map(({ node }) => node.id)).toEqual([creation.id]);
+    expect(tree.resourceRef("resource")).toBeNull();
+  });
+
+  it("preserves unreadable creation payloads for record consumers instead of failing during identity discovery", () => {
+    const { tree, s } = setup();
+    const payload = { version: 2, identity: { id: "future" } };
+    tree.appendToTimeline(s, event("resource_created", payload));
+    expect(tree.view(s).read({ scope: "timeline" }).map(({ node }) => node.data)).toEqual([payload]);
+  });
+});
+
 // The structural index serves timeline reads; it must not retain rolled-back rows or confuse branches sharing a prefix.
 describe("Timeline structure index", () => {
   const read = (tree: SessionTree, s: string, query: Parameters<ReturnType<SessionTree["view"]>["read"]>[0]) =>

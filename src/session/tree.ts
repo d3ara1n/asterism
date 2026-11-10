@@ -43,7 +43,7 @@ export class SessionTree {
     this.workbenches.delete(sessionId);
   }
 
-  /** Creation record identity is immutable; reuse after the first ID lookup without rereading historical bodies. */
+  /** Creation identity is immutable; reuse committed creation reads and resolved IDs without rereading historical bodies. */
   resourceRef(id: string): ResourceRef | null {
     const known = this.identities.get(id);
     if (known) return known;
@@ -213,7 +213,17 @@ export class SessionTree {
 
   private readView(sessionId: string, nodeId: string | null, upperSeq: number, query: NodeQuery, pending: ReadonlyMap<string, SessionNode>): SequencedNode[] {
     const selected = this.indexView(sessionId, nodeId, upperSeq, query, pending);
-    return this.readNodes(selected, pending).map((node, index) => ({ node, sequence: selected[index]!.sequence }));
+    const nodes = this.readNodes(selected, pending);
+    const creations = nodes.filter(node => node.contract === ResourceCreated.id && node.pending !== true);
+    // Learn identities from committed records already read for reconstruction.
+    // Captured reads after sleep or archival cannot restore resource availability.
+    if (creations.length && !this.db.isTransaction && this.lifecycle(sessionId) === "running") {
+      for (const node of creations) {
+        const created = ResourceCreated.schema.safeParse(node.data);
+        if (created.success) this.identities.set(created.data.id, { sessionId, id: created.data.id, kind: created.data.type });
+      }
+    }
+    return nodes.map((node, index) => ({ node, sequence: selected[index]!.sequence }));
   }
 
   private indexView(sessionId: string, nodeId: string | null, upperSeq: number, query: NodeQuery, pending: ReadonlyMap<string, SessionNode>): SessionNodeInfo[] {
