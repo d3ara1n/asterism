@@ -1,4 +1,3 @@
-import { Virtualizer } from "virtua";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
 import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } from "@asterism-app/ui/ui/item";
@@ -66,18 +65,9 @@ function ToolEntry({ name, title, description, server }: ToolEntryData) {
 }
 const toolKey = (tool: ToolEntryData, index: number) => `${tool.server ?? ""}/${tool.name}/${index}`;
 
-/** Tool entries in paginated results; the page size bounds the entry count, so they are rendered directly. */
+/** Tool entries flow with their containing card or paginated result, without a nested scroll area. */
 export function ToolList({ tools }: { tools: readonly ToolEntryData[] }) {
   return <ul className="flex flex-col gap-2">{tools.map((tool, index) => <li key={toolKey(tool, index)}><ToolEntry {...tool} /></li>)}</ul>;
-}
-
-/** A card's full cached catalog may contain hundreds of entries: virtualize within a bounded local scroll area, shrinking to fit when there are few entries. */
-export function VirtualToolList({ tools }: { tools: readonly ToolEntryData[] }) {
-  return <div className="max-h-72 overflow-y-auto">
-    <Virtualizer as="ul" item="li" data={tools}>
-      {(tool, index) => <div key={toolKey(tool, index)} className="pb-2"><ToolEntry {...tool} /></div>}
-    </Virtualizer>
-  </div>;
 }
 
 export function Instructions({ text }: { text: string }) {
