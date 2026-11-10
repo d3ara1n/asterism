@@ -1,5 +1,6 @@
 import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
-import { ArrowDown } from "lucide-react";
+import { ArrowDown, MessageSquare } from "lucide-react";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@asterism-app/ui/ui/empty";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
@@ -98,9 +99,14 @@ export function Conversation({ feedback, compressions, activity = null }: {
         <div className="px-4 pb-4">
           {running && !timeline.some(item => item.kind === "compression" && item.status === "running") &&
             <ExecutionStatus activity={activity} />}
-          {read.status === "ready" && !timeline.length && !running && <p className="type-caption pt-4">{i18n.formatMessage(conversationMessages.emptyHint)}</p>}
         </div>
       </div>
+      {read.status === "ready" && !timeline.length && !running && <Empty className="pointer-events-none absolute inset-0 p-6">
+        <EmptyHeader>
+          <EmptyMedia variant="icon"><MessageSquare /></EmptyMedia>
+          <EmptyTitle className="type-label">{i18n.formatMessage(conversationMessages.emptyHint)}</EmptyTitle>
+        </EmptyHeader>
+      </Empty>}
       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
         <AnimatePresence>
           {awayFromBottom && <motion.div className="surface-floating pointer-events-auto"
