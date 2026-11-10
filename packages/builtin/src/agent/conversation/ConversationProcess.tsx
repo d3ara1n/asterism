@@ -1,16 +1,17 @@
 import { useI18n, useRendererTools } from "@asterism-app/sdk/renderer";
-import { IconSummary, type IconSummaryItem } from "@asterism-app/ui/icon-summary";
-import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { thinkingMessages } from "../../messages/thinking";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Marker, MarkerContent, MarkerIcon } from "@asterism-app/ui/ui/marker";
 import { AlignLeft, Brain, ChevronRight, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import { conversationMessages } from "../../messages/conversation";
+import { thinkingMessages } from "../../messages/thinking";
 import type { TimelineItem } from "./timeline";
 import { conversationTransition, immediateTransition } from "./motion";
 import type { ToolCallNode } from "./tool-state";
 import { toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
+
+/** Distinct tools shown before the remainder collapses into a count. */
+const visibleTools = 5;
 
 function implementation(node: ToolCallNode): string | null {
   return ("outcome" in node ? node.outcome?.implementation?.id : undefined) ?? node.invocation?.implementation?.id ?? null;
@@ -40,38 +41,39 @@ export function ConversationProcess({ node, onToggle, onMount }: {
   const i18n = useI18n();
   const tools = useRendererTools();
   const reducedMotion = useReducedMotion();
-  const items: IconSummaryItem[] = [
-    ...node.content.map(kind => ({
-      key: kind,
-      icon: kind === "thinking" ? <Brain className="size-3.5" /> : <AlignLeft className="size-3.5" />,
-      label: i18n.text(kind === "thinking" ? thinkingMessages.thinkingTitle : conversationMessages.processText),
-    })),
-    ...toolGroups(node.tools).map(group => ({
-      key: group.key,
-      icon: tools.icon(group.node.name, implementation(group.node)) ?? <Wrench className="size-3.5" />,
-      label: tools.label(group.node.name, implementation(group.node)) ?? group.node.name,
-      count: group.count,
-    })),
-  ];
+  const groups = toolGroups(node.tools);
   const tones = node.tools.flatMap(call => { const kind = resultKind(call); return kind && kind !== "running" ? [toolOutcomeTone(kind)] : []; });
   const failed = tones.filter(tone => tone === "error").length;
   const partial = tones.filter(tone => tone === "warning").length;
   return <Marker variant="separator" asChild><Button type="button" variant="ghost" size="sm" aria-expanded={node.open} onClick={onToggle}
     ref={button => { if (button) onMount(node.id, button); }}
-    className="w-full gap-2 px-0 text-xs font-normal text-muted-foreground before:w-3 before:flex-none after:w-3 after:flex-none">
+    className="w-full gap-2 px-0 text-xs font-normal text-muted-foreground">
     <MarkerIcon className="size-3.5"><motion.span className="block" initial={false}
       animate={{ rotate: node.open ? -90 : 0 }} transition={reducedMotion ? immediateTransition : conversationTransition}>
       <ChevronRight className="size-3.5" />
     </motion.span></MarkerIcon>
-    <MarkerContent className="min-w-0 flex-1 group-data-[variant=separator]/marker:flex-1">
-      <ToolHeader label={i18n.text(conversationMessages.executionProcess)}
-        summary={items.length ? <IconSummary items={items} /> : undefined}
-        meta={<>
-          {node.tools.length > 0 && i18n.formatMessage(conversationMessages.processToolCount, { count: node.tools.length })}
-          {failed > 0 && <> · {i18n.formatMessage(conversationMessages.processFailedCount, { count: failed })}</>}
-          {partial > 0 && <> · {i18n.formatMessage(conversationMessages.processPartialCount, { count: partial })}</>}
-          {node.incomplete && <>{node.tools.length > 0 && " · "}{i18n.formatMessage(conversationMessages.incomplete)}</>}
-        </>} />
+    <MarkerContent className="flex min-w-0 items-center gap-1.5">
+      <span className="shrink-0">{i18n.formatMessage(conversationMessages.executionProcess)}</span>
+      {node.content.map(kind => <span key={kind} className="inline-flex shrink-0">
+        {kind === "thinking" ? <Brain aria-hidden="true" className="size-3.5" /> : <AlignLeft aria-hidden="true" className="size-3.5" />}
+        <span className="sr-only">{i18n.text(kind === "thinking" ? thinkingMessages.thinkingTitle : conversationMessages.processText)}</span>
+      </span>)}
+      {node.tools.length > 0 && <>
+        <span className="sr-only">{i18n.formatMessage(conversationMessages.processToolCount, { count: node.tools.length })}</span>
+        <span aria-hidden="true" className="flex min-w-0 items-center gap-2 overflow-hidden">
+          {groups.slice(0, visibleTools).map(group => {
+            const icon = tools.icon(group.node.name, implementation(group.node));
+            const label = tools.label(group.node.name, implementation(group.node)) ?? group.node.name;
+            return <span key={group.key} title={label} className="inline-flex shrink-0 items-center gap-0.5 tabular-nums [&_svg]:size-3.5">
+              {icon ?? <Wrench />}{group.count > 1 && group.count}
+            </span>;
+          })}
+          {groups.length > visibleTools && <span className="shrink-0 tabular-nums">+{groups.length - visibleTools}</span>}
+        </span>
+      </>}
+      {failed > 0 && <span className="shrink-0 text-destructive">· {i18n.formatMessage(conversationMessages.processFailedCount, { count: failed })}</span>}
+      {partial > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processPartialCount, { count: partial })}</span>}
+      {node.incomplete && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.incomplete)}</span>}
     </MarkerContent>
   </Button></Marker>;
 }

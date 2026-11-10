@@ -57,7 +57,7 @@ function Header(props: Props) {
   const count = live ? `${totals.settled}/${totals.total}` : totals.total ? i18n.formatMessage(messages.toolScriptCalls, { count: totals.total }) : null;
   return <ToolHeader label={i18n.text(messages.toolResourceScript)} summary={items.length ? <IconSummary items={items} /> : undefined} meta={(count || totals.failed || totals.partial) ? <>
     {count}
-    {totals.failed > 0 && <span> · {i18n.formatMessage(messages.toolScriptFailedCount, { count: totals.failed })}</span>}
+    {totals.failed > 0 && <span className="text-destructive"> · {i18n.formatMessage(messages.toolScriptFailedCount, { count: totals.failed })}</span>}
     {totals.partial > 0 && <> · {i18n.formatMessage(messages.toolScriptPartialCount, { count: totals.partial })}</>}
   </> : undefined} />;
 }
