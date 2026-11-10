@@ -49,6 +49,10 @@ export const toolsMessages = pluginNamespace("asterism.host").messages("en", def
     id: "tools.script.code",
     defaultMessage: "Code",
   },
+  toolScriptLogs: {
+    id: "tools.script.logs",
+    defaultMessage: "Logs",
+  },
   toolScriptValue: {
     id: "tools.script.returnValue",
     defaultMessage: "Return value",

@@ -20,13 +20,13 @@ export function createWaitTool(loop: AgentSettling) {
       });
       if (caller.ref.id === object.ref.id)
         return { kind: "failed", data: result(), error: { code: "agent_self_wait", message: "An Agent cannot wait for itself to settle." } };
-      const deadline = AbortSignal.timeout(args.timeout * 1000);
-      const bounded = AbortSignal.any([signal, deadline]);
+      const deadline = args.timeout === undefined ? undefined : AbortSignal.timeout(Math.ceil(args.timeout * 1000));
+      const waiting = deadline ? AbortSignal.any([signal, deadline]) : signal;
       try {
-        while (loop.running(object)) await loop.settled(object, bounded);
+        while (loop.running(object)) await loop.settled(object, waiting);
       } catch (error) {
         if (signal.aborted) throw error;
-        if (!deadline.aborted) throw error;
+        if (!deadline?.aborted) throw error;
         return { kind: "failed", data: result(), error: { code: "agent_timeout", message: "The Agent did not settle before the timeout. It continues running." } };
       }
       return { kind: "succeeded", data: result() };

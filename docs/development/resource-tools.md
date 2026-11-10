@@ -82,7 +82,7 @@ Read can return the parsed screen, retained history, or raw output. Raw output i
 
 See renders a captured backend screen snapshot into immutable image content through the frontend rendering service. It is independent of whether a terminal card is mounted; unavailable rendering fails explicitly.
 
-Wait ends when prompt readiness is observed or its own deadline/cancellation occurs. Ending a wait leaves the terminal running.
+Wait ends when prompt readiness is observed, cancellation occurs, or an explicitly supplied timeout expires. Omitting the timeout creates no deadline. Ending a wait leaves the terminal running.
 
 ## Terminal transport
 

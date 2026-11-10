@@ -229,7 +229,7 @@ export class ShellInstance {
   image() {
     return this.enqueue(() => this.screen.image());
   }
-  waitIdle(timeout: number, signal: AbortSignal): Promise<string> {
+  waitIdle(timeout: number | undefined, signal: AbortSignal): Promise<string> {
     const check = () => {
       const state = this.statusValue.state;
       if (state === "idle") return "idle";
@@ -245,7 +245,7 @@ export class ShellInstance {
       const cleanup = () => { clearTimeout(timer); this.waiters.delete(update); combined.removeEventListener("abort", abort); };
       const update = () => { const value = check(); if (value) { cleanup(); resolve(value); } };
       const abort = () => { cleanup(); reject(combined.reason); };
-      const timer = setTimeout(() => { cleanup(); resolve("timeout"); }, timeout * 1000);
+      const timer = timeout === undefined ? undefined : setTimeout(() => { cleanup(); resolve("timeout"); }, timeout * 1000);
       this.waiters.add(update); combined.addEventListener("abort", abort, { once: true });
     });
   }
@@ -438,7 +438,7 @@ export class SharedTerminal {
   }
   read(source: "screen" | "history" | "raw", offset?: number, limit?: number) { return this.require().read(source, offset, limit); }
   image() { return this.require().image(); }
-  async waitIdle(timeout: number, signal: AbortSignal) {
+  async waitIdle(timeout: number | undefined, signal: AbortSignal) {
     const started = performance.now();
     const reason = this.instance ? await this.instance.waitIdle(timeout, signal) : "inactive";
     return { reason, ...this.status, elapsedMs: Math.round(performance.now() - started) };

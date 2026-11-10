@@ -17,7 +17,7 @@ export interface InteractiveTerminal {
     cursor: { x: number; y: number }; offset: number; nextOffset: number; truncated: boolean;
   }>;
   image(): Promise<TerminalImage>;
-  waitIdle(timeout: number, signal: AbortSignal): Promise<TerminalStatus & { reason: string; elapsedMs: number }>;
+  waitIdle(timeout: number | undefined, signal: AbortSignal): Promise<TerminalStatus & { reason: string; elapsedMs: number }>;
 }
 export interface TerminalSessions {
   create(config: TerminalConfig, events: { failed(error: unknown): void; log(message: string, error: unknown): void }): InteractiveTerminal;

@@ -10,6 +10,7 @@ export const Exec = defineTool({
   guidelines: [
     "Each invocation starts a fresh non-interactive shell process in the directory resource. Shell syntax, cd, pipelines and redirection are interpreted by that shell.",
     "shell_profile_list reports the host platform, shared shell profiles, resolved executable paths, and the default selection used by directory exec.",
+    "Normally omit timeout and let the command finish or be cancelled. Specify it only when the task has an explicit time limit.",
     "Timeout and cancellation terminate the command's process group.",
     `If output exceeds ${OUTPUT_CHAR_LIMIT} Unicode characters, the result retains its tail and includes a truncation notice with the path to the temporary full output log, readable with subsequent shell commands.`,
   ],

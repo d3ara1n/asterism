@@ -4,7 +4,7 @@ import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { AgentWait, type AgentWaitResult } from "./contract";
 import { waitMessages as messages } from "../../messages/wait";
 
-type Props = ToolRenderProps<AgentWaitResult, null, { timeout: number }>;
+type Props = ToolRenderProps<AgentWaitResult, null, { timeout?: number }>;
 function Header({ invocation, result, phase }: Props) {
   const i18n = useI18n();
   const data = phase === "settled" ? result.data : null;

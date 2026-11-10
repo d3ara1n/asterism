@@ -113,12 +113,13 @@ export const See = defineTool({
 export const Wait = defineTool({
   id: builtin.name("tool.wait"),
   name: "wait",
-  description: "Wait until a resource reaches its resting state, up to a timeout.",
+  description: "Wait until a resource reaches its resting state, with an optional timeout.",
   guidelines: [
     "The resource implementation defines its resting state. A resource already at rest returns immediately.",
+    "Normally omit timeout and wait for completion or cancellation. Specify it only when the task has an explicit time limit.",
     "Timeout or cancellation ends only the wait; the resource continues its own work. The result reports the observed state.",
   ],
   argsSchema: z.strictObject({
-    timeout: z.number().positive().max(2147483).describe("Maximum wait in seconds."),
-  }).describe("A bounded wait."),
+    timeout: z.number().positive().max(2147483).optional().describe("Optional maximum wait in seconds; omitted means no timeout."),
+  }).describe("Wait with an optional time limit."),
 });

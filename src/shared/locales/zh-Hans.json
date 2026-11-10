@@ -481,6 +481,7 @@
   "tools.script.failedCount": "{count} 失败",
   "tools.script.partialCount": "{count} 部分完成",
   "tools.script.code": "代码",
+  "tools.script.logs": "日志",
   "tools.script.returnValue": "返回值",
   "tools.resources.list": "列出资源",
   "tools.resources.inspect": "查看资源",

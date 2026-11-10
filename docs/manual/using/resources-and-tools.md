@@ -14,6 +14,8 @@ Result schemas describe the encoded `data` in a tool outcome, not the outcome en
 
 Resource creation has its own discovery and inspection tools. The available creation entries determine which resources an agent can create. New links become available at the next model request.
 
+Asterism’s tool inputs express timeouts and durations in seconds, including fractional seconds where supported. Timeouts for waiting, command execution, and resource scripts are optional; omission sets no time limit. Normally omit them and let completion or cancellation end the operation. Specify a timeout when the task has an explicit time limit. Observed durations such as `elapsedMs` remain in milliseconds; epoch timestamps are a separate representation. External services exposed through MCP retain their own argument contracts.
+
 ## Organize calls with JavaScript
 
 `resource_script` accepts JavaScript as an async function body. Obtain a resource handle with `resources.get(resource_id)`, then invoke its tools as methods: `resource.read({ target, args })`. The handle binds the resource identity, the method name selects the tool, and `target` and `args` retain their ordinary contracts and defaults. Methods return the same structured outcomes as direct calls. Other top-level operations, such as listing, inspection, and creation, use `tools.<name>(args)`.
@@ -35,7 +37,7 @@ return {
 };
 ```
 
-`log(value)` accepts one JSON-serializable value and returns `undefined`. Each entry captures the value immediately, so later object changes leave earlier entries intact. Logs appear in the execution view as they arrive. The model receives them in emission order, followed by the return value, when the tool finishes. Concurrent branches log in their actual emission order. With no logs, the model receives the return value directly. Log serialization failures throw ordinary JavaScript exceptions that the script can catch; log content does not change the script's outcome.
+`log(value)` accepts one JSON-serializable value and returns `undefined`. Each entry captures the value immediately, so later object changes leave earlier entries intact. Log details update in the execution view as entries arrive. The model receives them in emission order, followed by the return value, when the tool finishes. Concurrent branches log in their actual emission order. With no logs, the model receives the return value directly. Log serialization failures throw ordinary JavaScript exceptions that the script can catch; log content does not change the script's outcome.
 
 Tool outcomes have six terminal kinds: `succeeded` means success, `partial` means partial success, `rejected` means the call was rejected, `failed` means execution failed, `cancelled` means the call was cancelled, and `unknown` means the operation's outcome is uncertain and effects may have occurred. `rejected` and `failed` carry `error: { code, message }`; `partial`, `cancelled`, and `unknown` carry `message`. `data` may be `null`, and its presence alone does not indicate success.
 
@@ -47,13 +49,13 @@ Getting a handle performs no tool call and grants no access. Method execution us
 
 Resource inspection includes each tool's `requiresInteraction` flag. Tools requiring user interaction, such as `ask_user`, use direct model calls. Script tool bindings exclude interaction-required top-level tools, and resource methods reject interaction-required operations. Tools supporting both modes receive a noninteractive execution context in scripts.
 
-Explicit logs and the final return value reach the model. Logs already received by the host remain available after an exception, timeout, or cancellation. History retains the code, child call identities, timing and outcome summaries, logs, and the returned value. Child arguments and outputs are temporary unless explicitly logged or returned. The execution title summarizes call progress and failures. The body lists calls grouped by tool and resource with repeat counts, timing, statuses, and diagnostics. Logs appear as muted text lines, with the return value and script code available separately.
+Explicit logs and the final return value reach the model. Logs already received by the host remain available after an exception, timeout, or cancellation. History retains the code, child call identities, timing and outcome summaries, logs, and the returned value. Child arguments and outputs are temporary unless explicitly logged or returned. The execution title summarizes call progress and failures. The body lists calls grouped by tool and resource with repeat counts, timing, statuses, and diagnostics. Logs, the return value, and script code are available in separate, initially collapsed details. Each log emission has its own numbered entry with plain monospaced text; multiline values remain grouped under that number.
 
 Each script runs in an isolated QuickJS environment with standard JavaScript built-ins, including `JSON`, `Math`, `Date`, `RegExp`, `Map`, `Set`, `Promise`, typed arrays, and URI encoding functions. `Date.now()` returns the current Unix epoch milliseconds, and `new Date().toISOString()` returns the current UTC time. Local `Date` methods use the host's local time zone.
 
 Application-provided globals are `resources`, `tools`, `text`, and `log`. Host APIs such as Node.js APIs, browser APIs, `console`, timers, `Intl`, and module loading are not provided. Filesystem, network, and process operations are available through tools, using the current request's captured access, configuration, and tool policy. Values passed to tools, logged, or returned follow JSON serialization rules.
 
-An optional `timeout_ms` covers the whole script, including tool calls; expiry produces `kind: "failed"` and `error.code: "script_timeout"`. External cancellation produces `kind: "cancelled"`. Completion, failure, timeout, or cancellation cancels outstanding child calls, waits for them to settle, and releases the script environment. Unawaited calls share this lifetime. Completed effects remain without rollback.
+An optional `timeout` in seconds covers the whole script, including tool calls; expiry produces `kind: "failed"` and `error.code: "script_timeout"`. External cancellation produces `kind: "cancelled"`. Completion, failure, timeout, or cancellation cancels outstanding child calls, waits for them to settle, and releases the script environment. Unawaited calls share this lifetime. Completed effects remain without rollback.
 
 ## Choose material and capabilities
 

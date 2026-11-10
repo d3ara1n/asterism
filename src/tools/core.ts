@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { coreId } from "../shared/core.ts";
 import { toolInputSchema, jsonSchema, toolInvocationSchema, toolCompletionSchema } from "@asterism-app/sdk/contracts";
-import { defineTool } from "@asterism-app/sdk/contracts";
+import { defineTool, MAX_TIMEOUT_SECONDS } from "@asterism-app/sdk/contracts";
 import { contractReferenceSchema, defineData } from "@asterism-app/sdk/contracts";
 import { jsonArgumentHint } from "./validation.ts";
 
@@ -55,12 +55,13 @@ export const ResourceScript = defineTool({
     "log(value) synchronously serializes one JSON-serializable value and returns undefined. Logs appear in the execution view as they arrive and precede the final return value in the model's tool result. Entries retain their values at the time of logging and their emission order, including concurrent branches. Child outputs reach the model through explicit log calls or the final return value. Log serialization failures throw JavaScript exceptions; log content does not change the execution outcome.",
     "Each script has an isolated QuickJS environment with standard JavaScript built-ins, including JSON, Math, Date, RegExp, Map, Set, Promise, typed arrays, and URI encoding functions. Date.now() and new Date() read the system clock; local Date methods use the host's local time zone.",
     "Application-provided globals are resources, tools, text, and log. Host APIs such as Node.js APIs, browser APIs, console, timers, Intl, and module loading are not provided. Filesystem, network, and process operations are available through tools. All calls use this request's captured resource access, configuration, and tool policy.",
-    "An uncaught JavaScript exception or return-value serialization failure ends the script with kind: \"failed\" and error.code: \"script_failed\". timeout_ms covers the whole script, including tool calls, and expiry produces error.code: \"script_timeout\". External cancellation produces kind: \"cancelled\".",
+    "Normally omit timeout and let the script finish or be cancelled. Specify it only when the task has an explicit time limit.",
+    "An uncaught JavaScript exception or return-value serialization failure ends the script with kind: \"failed\" and error.code: \"script_failed\". timeout covers the whole script, including tool calls, and expiry produces error.code: \"script_timeout\". External cancellation produces kind: \"cancelled\".",
     "Script completion, failure, timeout, or cancellation cancels outstanding child calls, waits for them to settle, and releases the script environment. Unawaited calls share this lifetime. Completed effects remain without rollback. History records nested call identities, timing, and outcome summaries, together with explicit logs and the returned value. Child arguments and outputs remain temporary unless explicitly logged or returned. Logs already received by the host remain available after failure, timeout, or cancellation.",
   ],
   argsSchema: z.strictObject({
     code: z.string().describe("JavaScript async function body. Use log(value) for intermediate output and return for the final data or text to send back to the model."),
-    timeout_ms: z.number().int().positive().optional().describe("Optional deadline for the whole script, including tool calls, in milliseconds."),
+    timeout: z.number().positive().max(MAX_TIMEOUT_SECONDS).optional().describe("Optional deadline for the whole script, including tool calls, in seconds; omitted means no timeout."),
   }).describe("JavaScript source and an optional execution deadline."),
 });
 

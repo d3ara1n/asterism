@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { z } from "zod";
 import { CircleCheck, Ellipsis, Waypoints, Wrench } from "lucide-react";
 import { toolRenderer, useRendererTools, type ToolRenderProps } from "@asterism-app/sdk/renderer";
-import { defaultToolModel, type Json } from "@asterism-app/sdk/contracts";
+import type { Json } from "@asterism-app/sdk/contracts";
 import { CodeText } from "@asterism-app/ui/code-view";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
@@ -114,6 +114,16 @@ function ResultScriptCode({ code }: { code: string }) {
   return <CodeText contents={formatted?.source === code ? formatted.contents : code} language={language} lineNumbers overflow="wrap" />;
 }
 
+/** Each entry is one log() emission; numbering keeps multiline values and repeated shapes distinct. */
+function ScriptLogs({ logs }: { logs: readonly Json[] }) {
+  return <ol className="flex min-w-0 max-h-80 flex-col gap-3 overflow-auto">
+    {logs.map((entry, index) => <li key={index} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
+      <span aria-hidden="true" className="font-mono text-xs leading-relaxed tabular-nums text-muted-foreground">#{index + 1}</span>
+      <JsonView value={entry} className="max-h-none overflow-visible" />
+    </li>)}
+  </ol>;
+}
+
 function Body(props: Props) {
   const i18n = useI18n();
   const code = scriptCode(props.args);
@@ -122,16 +132,12 @@ function Body(props: Props) {
   const value = props.phase === "settled" ? props.result.data?.value : undefined;
   return <div className="flex flex-col gap-3">
     <CallList calls={scriptCalls(props)} />
-    {logs.length > 0 && <div className="flex min-w-0 flex-col gap-1 type-caption text-muted-foreground">
-      {logs.map((entry, index) => {
-        const text = defaultToolModel(entry);
-        return <p key={index} className="truncate" title={text}>{text}</p>;
-      })}
-    </div>}
-    {(code || value !== undefined) && <ToolDetailsSwitcher stateKey="asterism/resource-script-details" items={[
+    {(code || logs.length > 0 || value !== undefined) && <ToolDetailsSwitcher stateKey="asterism/resource-script-details" items={[
       ...(code ? [{ value: "code", label: i18n.text(messages.toolScriptCode),
         render: () => props.phase === "settled" ? <ResultScriptCode code={code} />
           : <CodeText contents={code} language={language} lineNumbers overflow="wrap" /> }] : []),
+      ...(logs.length > 0 ? [{ value: "logs", label: i18n.text(messages.toolScriptLogs),
+        render: () => <ScriptLogs logs={logs} /> }] : []),
       ...(value !== undefined ? [{ value: "result", label: i18n.text(messages.toolScriptValue),
         render: () => <JsonView value={value} /> }] : []),
     ]} />}

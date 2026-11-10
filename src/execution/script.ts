@@ -9,7 +9,7 @@ type ScriptData = { calls: ScriptCall[]; logs: Json[]; value?: Json };
 interface ScriptOptions {
   id: string;
   code: string;
-  timeout_ms?: number;
+  timeout?: number;
   tools: string[];
   signal: AbortSignal;
   publish(data: Json): void;
@@ -65,9 +65,9 @@ export async function executeResourceScript(options: ScriptOptions): Promise<Cal
       };
       if (options.signal.aborted) { abort(); return; }
       options.signal.addEventListener("abort", abort, { once: true });
-      if (options.timeout_ms !== undefined) timer = setTimeout(() => stop({
-        kind: "failed", error: { code: "script_timeout", message: `Script execution exceeded ${options.timeout_ms} ms.` },
-      }), options.timeout_ms);
+      if (options.timeout !== undefined) timer = setTimeout(() => stop({
+        kind: "failed", error: { code: "script_timeout", message: `Script execution exceeded ${options.timeout} s.` },
+      }), options.timeout * 1000);
       const input: ScriptInput = { code: options.code, tools: options.tools, interrupt };
       worker = new Worker(new URL(import.meta.url.endsWith(".ts") ? "./script-worker.ts" : "./script-worker.js", import.meta.url), { workerData: input });
       worker.on("error", error => stop({ kind: "failed", error: {
