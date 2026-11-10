@@ -60,7 +60,7 @@ function FontSizeField({ kind, value }: { kind: "terminal" | "code"; value: numb
     }} />;
 }
 
-/** CSS illustrations of canvas textures, corresponding to the three React Flow Background variants; colors come from --canvas-grid. */
+/** CSS illustrations of the three workbench textures; colors come from --canvas-grid. */
 function texture(kind: Appearance["canvas"], gap = 12): CSSProperties {
   const c = "var(--canvas-grid)";
   if (kind === "dots") return { backgroundImage: `radial-gradient(circle, ${c} 1px, transparent 1.2px)`, backgroundSize: `${gap}px ${gap}px` };
