@@ -131,6 +131,6 @@ export class ApplicationService {
     return snapshotSchema.parse({ workspace, folders: this.folders.list(), sessions, templates: this.sessions.templates.list(), archivedSessions, plugins,
       catalogs: (this.options.catalogs ?? []).filter(catalog => this.sessions.packages.some(item => item.id === catalog.owner && item.status === "loaded")),
       restartRequired: JSON.stringify(current) !== this.started,
-      ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings() } : {}) });
+      ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings().map(({ title, warning }) => ({ title, warning })) } : {}) });
   }
 }

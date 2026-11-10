@@ -50,6 +50,7 @@ import type { WorkbenchOperation } from "../features/session/controller";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type { ApplicationController } from "./controller";
+import { useDesktopWindow } from "./window-state";
 
 import { useCreationCoordinator } from "../features/creation/coordinator";
 import { sessionController } from "../features/session/registry";
@@ -67,6 +68,7 @@ const noSession = () => null;
 
 export function App({ controller }: { controller: ApplicationController }) {
   const i18n = useI18n();
+  const { exiting } = useDesktopWindow();
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const workbench = useRef<WorkbenchHandle>(null);
   const mainScreen = useRef<ScreenHandle>(null);
@@ -106,12 +108,12 @@ export function App({ controller }: { controller: ApplicationController }) {
   useEffect(() => active?.connect(), [active]);
   const snapshot = state.snapshot;
   const session = sessionState?.data?.workbench ?? null;
-  const ready = state.status === "ready";
+  const ready = state.status === "ready" && !exiting;
   const folderServices: FolderServices = useMemo(() => ({ folders: snapshot?.folders ?? [], run: controller.execute, ready }),
     [snapshot?.folders, controller, ready]);
   const homeFolder = useMemo(() => ({ id: homeFolderId, select: setHomeFolderId }), [homeFolderId]);
   const sessionBlocked = !!sessionState && (sessionState.navigating || sessionState.status !== "ready");
-  const phase = workbenchPhase(state.status, sessionState);
+  const phase = exiting ? "stopping" : workbenchPhase(state.status, sessionState);
   const writable = ready && !sessionBlocked && !!session;
   const inSettings = page === "settings";
   const commandSession = useMemo(() => !inSettings ? active?.recordSnapshot() ?? null : null, [inSettings, active, sessionState]);
@@ -261,7 +263,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       ready={writable} run={run} store={workbenchStore}
       onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /></motion.div> : null}
   </WorkbenchSurface>;
-  const sidebar = <Sidebar snapshot={snapshot} status={state.status} busy={state.busy}
+  const sidebar = <Sidebar snapshot={snapshot} status={exiting ? "stopping" : state.status} busy={state.busy}
     resourceStatuses={state.resourceStatuses}
     selectedSessionId={view.kind === "conversation" ? view.sessionId : null}
     renameDisabledSessionId={active && !writable ? active.sessionId : null}
@@ -310,7 +312,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   // The workbench persistently displays session read failures; the same entry handles backend unavailability while the workbench is visible.
   const unavailableInWorkbench = view.kind === "conversation" && !inSettings && phase === "unavailable";
-  const appError = unavailableInWorkbench ? null : state.error;
+  const appError = exiting || unavailableInWorkbench ? null : state.error;
   useStateToast(appError ? i18n.text(appError) : null, {
     tone: "error",
     onDismiss: controller.clearError,

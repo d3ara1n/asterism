@@ -17,7 +17,7 @@ The project uses npm, electron-vite for compilation, electron-builder for packag
 | Startup renderer | Startup and recovery UI |
 | Application renderer | Deferred application composition and workbench UI |
 
-Backend work survives page navigation. Closing the last window shuts down the runtime before exiting. A runtime crash requires an application restart.
+Backend work survives page navigation. Application quit shuts down the runtime before exiting; on macOS, closing the last window alone keeps backend work running. A runtime crash requires an application restart.
 
 The main process resolves the login-shell environment before starting the runtime; Windows retains its inherited environment. Shells, terminals, MCP servers, and plugin child processes inherit the resulting environment. Failure is logged and retains the original environment.
 
@@ -144,6 +144,8 @@ Recovery points cover application data, including locally stored credentials and
 Main transfers a MessagePort between the renderer and runtime. Business requests and updates use that direct connection; main retains startup, supervision, and shutdown traffic.
 
 On macOS, closing the window destroys its renderer and disconnects its transport while main and the runtime keep running. Dock activation or relaunching the running application recreates the window and connects it to current runtime state. Unsaved frontend edits require confirmation before the renderer unloads. Explicit application quit stops the runtime through the normal shutdown flow. On Windows and Linux, closing the window initiates application quit.
+
+Quit, restart, and update installation publish an exiting state from the initial request through confirmation and runtime cleanup. The renderer disables its controls through the normal availability state and prevents other interaction without an overlay or native window disabling. Native confirmation dialogs remain interactive; cancellation or failure restores interaction. The window stays visible rather than fading or hiding. Intentional shutdown is separate from backend failure and does not display an unavailable-service warning. Main waits for the runtime's actual process exit without a forced shutdown deadline, and repeated quit requests cannot bypass unfinished cleanup. A stuck cleanup therefore requires external intervention rather than automatic termination.
 
 Commands validate at their owning boundary. Trusted runtime push frames use structured cloning and do not undergo redundant per-frame schema validation.
 

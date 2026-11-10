@@ -67,10 +67,7 @@ export function adaptResource(contribution: ResourceContribution, sdk: SdkContex
         object: sdk.reader(captured.ref, undefined, captured), signal: current,
       }), signal, { object: captured.ref, rejectOnAbort: true });
     } } : {}),
-    disposalWarning: object => {
-      const captured = snapshot(host, object);
-      return contribution.disposalWarning?.(captured, sdk.reader(captured.ref, undefined, captured)) ?? null;
-    },
+    disposalWarnings: contribution.disposalWarnings,
     ...(contribution.attach ? { attach: (captured: ResourceSnapshot, lifetime: Lifetime) =>
       synchronous(() => contribution.attach!(captured, sdk.reader(captured.ref, undefined, captured), lifetime)) } : {}),
     controller: {

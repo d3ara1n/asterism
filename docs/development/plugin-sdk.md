@@ -44,6 +44,8 @@ Plugins and their declared public API libraries can declare manual directories i
 
 Provider initialization precedes consumers. Shutdown waits for managed work, then cleans up in reverse dependency order. Public exports do not grant resource access or another plugin’s private state.
 
+Resource warning discovery belongs to each loaded backend, which enumerates warnings from its existing live instances. The host queries each backend once, selects the affected resource references, and resolves titles only for warnings on the current workbench. It does not reconstruct every saved resource or activate cold instances to ask whether they need cleanup. Removal, archival, and application exit share this discovery boundary; actual cleanup remains attached to owned lifetimes.
+
 ## Readers, executors, and snapshots
 
 Read interfaces expose bound identity, current data, and snapshot queries. Execution interfaces add controlled commits and operations. The tool session interface has a narrower scope based on the invoking object and captured request access.

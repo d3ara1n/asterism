@@ -17,7 +17,6 @@ import { initialWindowState, trackWindowState } from "./window-state.ts";
 import { initialTitleBar, serveDesktopWindow, titleBarMode } from "./window-titlebar.ts";
 import { servePreferences } from "./ui-state.ts";
 import { serveFileSaves } from "./file-save.ts";
-import { dismissWindow, restoreWindow } from "./window-exit.ts";
 import { serveLanguage, readLanguage } from "./language.ts";
 import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
@@ -38,7 +37,10 @@ import { desktopUnsavedChangesChannel, unsavedChangesSchema } from "../shared/de
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
 let quitting = false;
+/** Only the final handoff may pass before-quit while cleanup is in progress. */
+let quitAllowed = false;
 let quitRequest: Promise<boolean> | null = null;
+let publishDesktopWindow: (() => void) | null = null;
 let unsavedTitles: string[] = [];
 let updates: ApplicationUpdates | null = null;
 let network: ApplicationNetwork | null = null;
@@ -66,38 +68,41 @@ function unsavedPrompt(): Electron.MessageBoxOptions {
   };
 }
 
-/** Confirm unsaved views and live resources while the window is shown, then dismiss it and stop the runtime. */
+/** Block window interaction from the first exit request through confirmations and completed runtime cleanup. */
 function requestQuit(restart = false, installUpdate = false): Promise<boolean> {
   if (quitting || quitRequest) return Promise.resolve(false);
-  // The window dismissed for shutdown; a shutdown that does not complete brings it back.
-  let dismissed: BrowserWindow | null = null;
-  const bringBack = () => { if (dismissed) restoreWindow(dismissed); dismissed = null; };
+  const target = window;
+  const confirm = async (options: Electron.MessageBoxOptions) => {
+    const answer = target && !target.isDestroyed() ? await dialog.showMessageBox(target, options) : await dialog.showMessageBox(options);
+    return answer.response === 1;
+  };
+  const started = performance.now();
+  console.info(`Application exit requested. action=${installUpdate ? "update" : restart ? "restart" : "quit"}`);
   quitRequest = (async () => {
-    if (unsavedTitles.length && window && !window.isDestroyed()) {
-      if ((await dialog.showMessageBox(window, unsavedPrompt())).response !== 1) return false;
-    }
-    const result = await runtime.execute({ type: "workspace.prepare-close" });
-    const warnings = result.ok ? result.snapshot.disposalWarnings ?? [] : [];
+    if (unsavedTitles.length && target && !target.isDestroyed() && !await confirm(unsavedPrompt())) return false;
+    const result = runtime.ready ? await runtime.execute({ type: "workspace.prepare-close" }) : null;
+    if (result && !result.ok) throw new Error(result.error.message);
+    const warnings = result?.ok ? result.snapshot.disposalWarnings ?? [] : [];
+    console.info(`Application exit warnings prepared. count=${warnings.length} elapsedMs=${Math.round(performance.now() - started)}`);
     if (warnings.length) {
       const locale = () => readLanguage().locale;
-      const options: Electron.MessageBoxOptions = {
+      if (!await confirm({
         type: "warning", title: applicationBrand.en,
         message: startupText(startupMessages.quitTitle, locale),
         detail: startupText({ ...startupMessages.quitDescription, values: { resources: warnings.map(item => item.title).join("\n") } }, locale),
         buttons: [startupText(startupMessages.quitCancel, locale), startupText(startupMessages.quitConfirm, locale)],
         defaultId: 0, cancelId: 0,
-      };
-      const answer = window && !window.isDestroyed() ? await dialog.showMessageBox(window, options) : await dialog.showMessageBox(options);
-      if (answer.response !== 1) return false;
+      })) return false;
     }
     quitting = true;
-    // All confirmations are answered; nothing after this point opens a window-attached dialog.
-    if (window && await dismissWindow(window)) dismissed = window;
     await Promise.all([startup.stop(), runtime.stop()]);
+    console.info(`Application exit cleanup completed. elapsedMs=${Math.round(performance.now() - started)}`);
+    quitAllowed = true;
     if (installUpdate && updates) {
       updates.install(error => {
+        quitAllowed = false;
         quitting = false;
-        bringBack();
+        publishDesktopWindow?.();
         startup.publish({ status: "failed", reason: "runtime", detail: error.message });
         // The workbench has ended its startup subscription; re-enter startup to present failure and restart actions.
         if (window && !window.isDestroyed()) window.webContents.reload();
@@ -108,14 +113,18 @@ function requestQuit(restart = false, installUpdate = false): Promise<boolean> {
     app.quit();
     return true;
   })().catch(error => {
+    quitAllowed = false;
     quitting = false;
     console.error("Application shutdown failed.", error);
     // Update installation reports its failure through the caller's interface.
-    if (installUpdate) { bringBack(); throw error; }
-    if (dismissed) dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.quitFailed, () => readLanguage().locale));
-    bringBack();
+    if (installUpdate) throw error;
+    dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.quitFailed, () => readLanguage().locale));
     return false;
-  }).finally(() => { quitRequest = null; });
+  }).finally(() => {
+    quitRequest = null;
+    publishDesktopWindow?.();
+  });
+  publishDesktopWindow?.();
   return quitRequest;
 }
 
@@ -147,7 +156,9 @@ function createWindow(): void {
   });
   const current = window;
   current.on("close", event => {
-    if (quitting || process.platform === "darwin") return;
+    if (quitAllowed) return;
+    if (quitRequest || quitting) { event.preventDefault(); return; }
+    if (process.platform === "darwin") return;
     event.preventDefault();
     requestQuit();
   });
@@ -254,7 +265,8 @@ function createWindow(): void {
   };
   ipcMain.on(connectionRequestChannel, requestConnection);
   const stopAppearance = serveAppearance(current, trusted, () => refreshAppearance());
-  const stopDesktopWindow = serveDesktopWindow(current, titleBar, trusted);
+  const desktopWindow = serveDesktopWindow(current, titleBar, trusted, () => quitting || quitRequest !== null);
+  publishDesktopWindow = desktopWindow.publish;
   const stopPreferences = servePreferences(trusted);
   const stopLanguage = serveLanguage(current, trusted);
   let stopUpdates = () => {};
@@ -318,7 +330,8 @@ function createWindow(): void {
     stopFileSaves();
     unsavedTitles = [];
     ipcMain.removeListener(desktopUnsavedChangesChannel, updateUnsaved);
-    stopDesktopWindow();
+    desktopWindow.close();
+    publishDesktopWindow = null;
     ipcMain.removeListener(rendererFailureChannel, reportFailure);
     ipcMain.removeListener(connectionRequestChannel, requestConnection);
     for (const channel of [startupGetChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryPointChannel, startupRecoveryChannel, startupInitializedChannel, startupAcknowledgeMigrationChannel]) ipcMain.removeHandler(channel);
@@ -355,7 +368,7 @@ const startup = new StartupCoordinator({
   publish: state => {
     if (window && !window.isDestroyed()) window.webContents.send(startupChangedChannel, state);
   },
-  showWindow: () => { if (!quitting && !window) createWindow(); },
+  showWindow: () => { if (!quitting && !quitRequest && !window) createWindow(); },
   settingsReady: () => {
     enableSettings();
     network = new ApplicationNetwork();
@@ -376,13 +389,13 @@ if (!app.requestSingleInstanceLock()) {
   mkdirSync(sessionRoot, { recursive: true });
   app.setPath("sessionData", sessionRoot);
   app.on("second-instance", () => {
-    if (quitting) return;
+    if (quitting || quitRequest) return;
     if (process.platform === "darwin" && !window && app.isReady()) createWindow();
     if (window?.isMinimized()) window.restore();
     window?.focus();
   });
   app.whenReady().then(async () => {
-    if (quitting) return;
+    if (quitting || quitRequest) return;
     powerMonitor.on("resume", () => runtime.resume());
     // Permission checks and requests share one policy, allowing only trusted main-frame font enumeration and clipboard writes.
     // Determine trust from the window's current URL: file:// origins can be "null", so origin strings are insufficient.
@@ -396,7 +409,7 @@ if (!app.requestSingleInstanceLock()) {
     // Development runs have no application bundle icon; explicitly use the production icon in the Dock.
     if (process.platform === "darwin" && !app.isPackaged) app.dock?.setIcon(applicationIconFile("asterism.png"));
     app.on("activate", () => {
-      if (!quitting && BrowserWindow.getAllWindows().length === 0) createWindow();
+      if (!quitting && !quitRequest && BrowserWindow.getAllWindows().length === 0) createWindow();
     });
     await startup.run();
   }).catch(error => {
@@ -408,7 +421,7 @@ if (!app.requestSingleInstanceLock()) {
     if (process.platform !== "darwin") app.quit();
   });
   app.on("before-quit", event => {
-    if (quitting) return;
+    if (quitAllowed) return;
     event.preventDefault();
     requestQuit();
   });

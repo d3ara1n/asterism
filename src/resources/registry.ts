@@ -40,7 +40,12 @@ export class ResourceRegistry {
     }
     catch { throw new SessionError("invalid_request", `Saved state for ${kind} is invalid.`, templateMessages.invalidData); }
   }
-  disposalWarning(resource: FoldedObject) { return this.backends.get(resource.kind)?.disposalWarning?.(resource) ?? null; }
+  /** Ask each backend once for live-instance warnings; saved resources do not participate in discovery. */
+  disposalWarnings(scope?: { sessionId: string; objectIds?: readonly string[] }) {
+    const ids = scope?.objectIds ? new Set(scope.objectIds) : null;
+    return [...this.backends.values()].flatMap(backend => (backend.disposalWarnings?.() ?? []).filter(({ resource }) =>
+      !scope || resource.sessionId === scope.sessionId && (!ids || ids.has(resource.id))));
+  }
   receivesLinks(kind: string): boolean { return this.backends.get(kind)?.receivesLinks === true; }
   controller(kind: string): ResourceController | undefined { return this.backends.get(kind)?.controller; }
   /**

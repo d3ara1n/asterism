@@ -21,13 +21,14 @@ export function initialTitleBar(mode: TitleBarMode): BrowserWindowConstructorOpt
   };
 }
 
-/** Native fullscreen events are the window-state authority; reads serve initial load and refresh within fullscreen. */
+/** Main owns desktop state; reads serve initial load and notifications update existing pages. */
 export function serveDesktopWindow(
   window: BrowserWindow,
   mode: TitleBarMode,
   trusted: (event: Electron.IpcMainInvokeEvent) => boolean,
-): () => void {
-  const read = (): DesktopWindowState => ({ titleBar: mode, fullScreen: window.isFullScreen() });
+  exiting: () => boolean,
+): { publish(): void; close(): void } {
+  const read = (): DesktopWindowState => ({ titleBar: mode, fullScreen: window.isFullScreen(), exiting: exiting() });
   const publish = () => {
     if (!window.isDestroyed() && !window.webContents.isDestroyed())
       window.webContents.send(desktopWindowChangedChannel, read());
@@ -36,9 +37,9 @@ export function serveDesktopWindow(
   ipcMain.handle(desktopWindowGetChannel, event => trusted(event) ? read() : null);
   window.on("enter-full-screen", publish);
   window.on("leave-full-screen", publish);
-  return () => {
+  return { publish, close() {
     ipcMain.removeHandler(desktopWindowGetChannel);
     window.removeListener("enter-full-screen", publish);
     window.removeListener("leave-full-screen", publish);
-  };
+  } };
 }

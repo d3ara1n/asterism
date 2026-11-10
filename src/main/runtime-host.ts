@@ -107,11 +107,11 @@ export class RuntimeHost {
     this.requests?.close(`${applicationBrand.en} is shutting down.`);
     const child = this.child;
     if (!child) return Promise.resolve();
-    return new Promise(resolve => {
-      const timeout = setTimeout(() => { child.kill(); resolve(); }, 5_000);
-      child.once("exit", () => { clearTimeout(timeout); resolve(); });
+    return new Promise((resolve, reject) => {
+      const exited = () => resolve();
+      child.once("exit", exited);
       try { child.postMessage({ kind: "shutdown" }); }
-      catch { clearTimeout(timeout); child.kill(); resolve(); }
+      catch (error) { child.removeListener("exit", exited); reject(error); }
     });
   }
 }

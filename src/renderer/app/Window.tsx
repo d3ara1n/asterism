@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useLayoutEffect, type CSSProperties, type ReactNode } from "react";
 
 import { windowGeometry } from "../../shared/desktop";
 import { appMessages } from "../messages/app";
@@ -23,10 +23,23 @@ const geometry = {
 export function Window({ titlebar, children, skipTarget }: { titlebar: ReactNode; children: ReactNode; skipTarget: string }) {
   const i18n = useI18n();
   const state = useDesktopWindow();
-  return <main className="window" data-titlebar={state.titleBar} data-fullscreen={state.fullScreen} style={geometry}>
-    <a href={`#${skipTarget}`} className="skip-link">{i18n.formatMessage(appMessages.skipToContent)}</a>
-    {titlebar}
-    {children}
+  useLayoutEffect(() => {
+    if (!state.exiting) return;
+    // Include portaled menus and dialogs without adding a visual layer or disabling the native window.
+    document.body.inert = true;
+    const blockShortcut = (event: KeyboardEvent) => { event.preventDefault(); event.stopImmediatePropagation(); };
+    window.addEventListener("keydown", blockShortcut, true);
+    return () => {
+      document.body.inert = false;
+      window.removeEventListener("keydown", blockShortcut, true);
+    };
+  }, [state.exiting]);
+  return <main className="window" data-titlebar={state.titleBar} data-fullscreen={state.fullScreen} aria-busy={state.exiting || undefined} style={geometry}>
+    <fieldset disabled={state.exiting} className="contents">
+      <a href={`#${skipTarget}`} className="skip-link">{i18n.formatMessage(appMessages.skipToContent)}</a>
+      {titlebar}
+      {children}
+    </fieldset>
   </main>;
 }
 

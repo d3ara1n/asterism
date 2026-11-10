@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { isAbsolute } from "node:path";
 import { randomUUID } from "node:crypto";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, implementChannel, PluginApiError,
-  type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
+  type CallResult, type ObjectReader, type ResourceRef } from "@asterism-app/sdk/runtime";
 import { ResourceStatusChanged, type Json } from "@asterism-app/sdk/contracts";
 import { terminalMessages } from "../messages/terminal.ts";
 import { TerminalError, type InteractiveTerminal, type TerminalViewer } from "@asterism-app/sdk/runtime";
@@ -18,7 +18,7 @@ import { TerminalResource, CreateTerminal, TerminalView, TerminalInput, Terminal
  * it remains unopened after application restart, rewind, or session restoration. The instance ends with the object lifecycle (removal, leaving the current set, archival, exit).
  */
 export function createTerminalModule() { return defineModule(plugin => {
-  const terminals = new Map<string, InteractiveTerminal>();
+  const terminals = new Map<string, { ref: ResourceRef; terminal: InteractiveTerminal }>();
   /** Resources newly created in this run and awaiting an appearance notification; start automatically when they appear. */
   const pendingStart = new Set<string>();
   const images = new Map<string, { resolve(png: Uint8Array): void; reject(error: Error): void }>();
@@ -28,22 +28,22 @@ export function createTerminalModule() { return defineModule(plugin => {
     const terminal = terminals.get(id);
     if (!terminal) return Promise.resolve();
     terminals.delete(id);
-    return terminal.dispose();
+    return terminal.terminal.dispose();
   };
   function terminal(config: TerminalConfig, ref: ObjectReader["ref"]): InteractiveTerminal {
     const existing = terminals.get(ref.id);
-    if (existing) return existing;
+    if (existing) return existing.terminal;
     const created = plugin.shell.terminals.create(config, {
       // The session list marks only startup failures; individual interactive shell commands do not create completion or persistent-running markers.
       failed(error) {
-        if (plugin.lifetime.signal.aborted || terminals.get(ref.id) !== created) return;
+        if (plugin.lifetime.signal.aborted || terminals.get(ref.id)?.terminal !== created) return;
         plugin.log.warn(`Terminal startup failed: ${error instanceof Error ? error.message : String(error)}`);
         try { plugin.object(ref.sessionId, TerminalResource, ref.id).events.publish(ResourceStatusChanged, ResourceStatusChanged.schema.parse({ status: "failed", title: terminalMessages.terminal })); }
         catch { /* The resource has left the current set. */ }
       },
       log: (message, error) => plugin.log.error(message, error),
     });
-    terminals.set(ref.id, created);
+    terminals.set(ref.id, { ref, terminal: created });
     return created;
   }
   function get(object: ObjectReader): InteractiveTerminal {
@@ -51,7 +51,7 @@ export function createTerminalModule() { return defineModule(plugin => {
     if (!data) throw new TerminalError("terminal_removed", "The terminal is no longer available.");
     return terminal(TerminalResource.stateSchema.parse(data), object.ref);
   }
-  const statusOf = (object: ObjectReader) => terminals.get(object.ref.id)?.status ?? { ...inactiveStatus };
+  const statusOf = (object: ObjectReader) => terminals.get(object.ref.id)?.terminal.status ?? { ...inactiveStatus };
   plugin.lifetime.defer(() => {
     // The object scope releases terminal instances; the host waits for object cleanup before ending the plugin scope.
     for (const image of images.values()) image.reject(new TerminalError("renderer_unavailable", "The terminal image service is closing."));
@@ -106,10 +106,11 @@ export function createTerminalModule() { return defineModule(plugin => {
         void terminal(config, object.ref).start()
           .catch(error => { if (!lifetime.signal.aborted) plugin.log.warn(`Terminal startup failed: ${String(error)}`); });
       },
-      disposalWarning(_config, object) {
-        const state = statusOf(object).state;
-        return state === "running" ? terminalMessages.runningWarning : state === "unknown" || state === "starting" ? terminalMessages.unknownWarning : null;
-      },
+      disposalWarnings: () => [...terminals.values()].flatMap(({ ref, terminal }) => {
+        const state = terminal.status.state;
+        const warning = state === "running" ? terminalMessages.runningWarning : state === "unknown" || state === "starting" ? terminalMessages.unknownWarning : null;
+        return warning ? [{ resource: ref, warning }] : [];
+      }),
     })],
     channels: [implementChannel(TerminalChannel, channel => {
       const shared = get(channel.object);
@@ -127,7 +128,7 @@ export function createTerminalModule() { return defineModule(plugin => {
         }
         return null;
       }),
-      implementCall(CloseTerminal, async (_input, { object }) => { await terminals.get(object.ref.id)?.close(); return null; }),
+      implementCall(CloseTerminal, async (_input, { object }) => { await terminals.get(object.ref.id)?.terminal.close(); return null; }),
       implementCall(CompleteTerminalImage, async ({ id, png, error }) => {
         const pending = images.get(id);
         if (pending) {

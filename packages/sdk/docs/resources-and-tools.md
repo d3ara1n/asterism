@@ -8,6 +8,8 @@ Use a resource for something that belongs in a session and can be inspected or o
 
 The resource attaches when it becomes present in a session. Removal immediately ends discovery and cancels its managed tasks and model requests. Other owners' requests holding the resource can finish before its attachment lifetime ends and the instance is disposed. A hidden card does not imply that its backend instance should stop.
 
+Provide `disposalWarnings()` when the resource backend owns live instances whose termination needs confirmation. Enumerate only those live instances, returning their resource references and warning messages. The host selects the affected resources for removal, archival, or application exit and supplies their current titles. Saved resource data alone does not need an exit warning; do not restore instances to check them. Warning discovery does not perform cleanup, which remains owned by lifetimes.
+
 Creation supplies initial state. Actions change the object through typed application or plugin operations. Views present the resulting state.
 
 Implement `inspect` to expose model-facing resource state. The host includes this state in resource listings and individual inspection results; individual inspection also supplies available tool definitions. Link notifications contain identity only. Return the information needed to recognize and use the resource without relying on the host to interpret its saved state.

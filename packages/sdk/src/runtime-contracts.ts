@@ -12,7 +12,7 @@ import type { EventContract, PluginEvents } from "./events.ts";
 import type { ToolCompletion, ToolInvocationInfo, ToolModelOutput } from "./tool-result.ts";
 import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks } from "./runtime.ts";
 import type { ModelServices } from "./models.ts";
-import type { ResourceSnapshot, SessionSnapshot, SessionDirectory } from "./workspace.ts";
+import type { ResourceRef, ResourceSnapshot, SessionSnapshot, SessionDirectory } from "./workspace.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
 import type { ObjectReader, ObjectExecutor, SessionExecutor } from "./objects.ts";
 import type { ContentReader, ContentScope } from "./content-runtime.ts";
@@ -116,6 +116,11 @@ export interface ActionContribution {
   prepare?(input: Json, context: ActionPreparation): Preparation | Promise<Preparation>;
   execute(input: Json, object: ObjectExecutor, signal: AbortSignal): Promise<void>;
 }
+/** A live runtime instance whose termination needs user confirmation. */
+export interface ResourceDisposalWarning {
+  readonly resource: ResourceRef;
+  readonly warning: UiText;
+}
 export interface ResourceContribution {
   readonly resource: ResourceContract;
   /** Geometry declarations for backend placement, shared with ResourceDescription and cardRenderer. */
@@ -136,8 +141,11 @@ export interface ResourceContribution {
   context?(resource: ResourceSnapshot, object: ObjectReader): Promise<ContextFile[]>;
   /** Resolve a file address against this resource at consumption time; consumers need no link or registration of the reference. */
   openFile?(resource: ResourceSnapshot, locator: Json, context: { object: ObjectReader; signal: AbortSignal }): AsyncIterable<Uint8Array>;
-  /** Explanation presented to users before ending the current instance; does not block backend removal or wait for external cleanup. */
-  disposalWarning?(resource: ResourceSnapshot, object: ObjectReader): UiText | null;
+  /**
+   * Enumerate warnings from this backend's live instances without restoring saved resources.
+   * The host selects affected identities and resolves their current titles. Does not perform cleanup.
+   */
+  disposalWarnings?(): readonly ResourceDisposalWarning[];
   /**
    * Called synchronously when an object enters the current set through startup, creation, restoration, or rewinding.
    * Removal ends discovery and cancels owned tasks/model requests immediately; attachment lifetime cleanup follows captured request holds.

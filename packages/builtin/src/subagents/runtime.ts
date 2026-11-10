@@ -36,14 +36,14 @@ async function operation<T extends Json>(signal: AbortSignal, work: () => T | Pr
 
 export function createSubagentPoolModule(application: ApplicationIdentity, usage: ProviderUsage, skills: SkillCatalog) {
   return defineModule(plugin => {
-    const pools = new Map<string, SubagentPoolRuntime>();
+    const pools = new Map<string, { ref: ResourceRef; runtime: SubagentPoolRuntime }>();
     const prepare = createRequestAssembly(plugin, skills);
     const auditDirectory = join(plugin.dir, "subagent-audits");
     const pool = (ref: ResourceRef) => {
       if (ref.kind !== SubagentPool.kind) throw new PluginApiError("invalid_argument", "The target is not a Subagent Pool.");
       const runtime = pools.get(ref.id);
       if (!runtime) throw new PluginApiError("unavailable", "The subagent pool is unavailable.");
-      return runtime;
+      return runtime.runtime;
     };
     const delegate = (captured?: readonly AgentConfiguration[]) => implementTool(Delegate, {
       call(_data, _target, args, { object, caller, signal }) {
@@ -83,7 +83,7 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
             },
             failed: error => plugin.log.error("Subagent result could not be finalized.", error),
           });
-          pools.set(object.ref.id, runtime);
+          pools.set(object.ref.id, { ref: object.ref, runtime });
           runtime.restore();
           if (!plugin.tasks.start(`subagent-pool:${object.ref.id}`, signal => runtime.supervise(signal), { object: object.ref, affectsHistory: false }))
             throw new PluginApiError("unavailable", "The subagent pool could not start.");
@@ -98,10 +98,11 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
           tasks: pool(object.ref).taskCount,
           parallelism: subagentParallelism,
         }),
-        disposalWarning: (_data, object) => pool(object.ref).working ? subagentMessages.runningWarning : null,
+        disposalWarnings: () => [...pools.values()].flatMap(({ ref, runtime }) =>
+          runtime.working ? [{ resource: ref, warning: subagentMessages.runningWarning }] : []),
       })],
       observers: [{ id: builtin.name("subagent-pool.cursor"), cursorChanged({ snapshot }) {
-        for (const resource of snapshot.resources.all()) if (resource.ref.kind === SubagentPool.kind) pools.get(resource.ref.id)?.changed();
+        for (const resource of snapshot.resources.all()) if (resource.ref.kind === SubagentPool.kind) pools.get(resource.ref.id)?.runtime.changed();
       } }],
       tools: [
         implementTool(PoolList, { call(_data, _target, _args, { object, signal }) {

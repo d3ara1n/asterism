@@ -43,7 +43,7 @@ export interface ResourceBackend {
   inspect(resource: FoldedObject): Promise<Json>;
   context(resource: FoldedObject): Promise<ContextFile[]>;
   openFile?(resource: FoldedObject, locator: Json, signal: AbortSignal): AsyncIterable<Uint8Array>;
-  disposalWarning?(resource: FoldedObject): import("@asterism-app/sdk/contracts").UiText | null;
+  disposalWarnings?: import("@asterism-app/sdk/runtime").ResourceContribution["disposalWarnings"];
   /** Called by the host when an object enters the current set; lifetime end releases object-exclusive external instances. */
   attach?(resource: import("@asterism-app/sdk/contracts").ResourceSnapshot, lifetime: import("@asterism-app/sdk/runtime").Lifetime): void;
   controller?: ResourceController;

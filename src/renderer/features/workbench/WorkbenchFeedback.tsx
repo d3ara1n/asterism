@@ -13,7 +13,7 @@ export function WorkbenchFeedback({ phase, hasContent, error, onRetry }: {
   phase: WorkbenchPhase; hasContent: boolean; error: UiText | null; onRetry(): void;
 }) {
   const i18n = useI18n();
-  if (phase === "ready") return null;
+  if (phase === "ready" || phase === "stopping") return null;
   if (phase === "loading" || phase === "starting") return <div className="absolute inset-0 flex items-center justify-center" role="status">
     <StatusText tone="progress">{i18n.text(phase === "starting" ? messages.connecting : messages.syncing)}</StatusText>
   </div>;

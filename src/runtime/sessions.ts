@@ -184,11 +184,13 @@ export class SessionService {
   /** Inputs to the sleep deadline changed: open state, keep-awake, creation, or the configured threshold. */
   refreshSleep(): void { this.sleepPolicy?.refresh(); }
   get running(): boolean { return this.tree.active().some(session => !this.settled(session.id)); }
-  disposalWarnings() {
-    return this.tree.active().flatMap(session => this.tree.workbench(session.id).objects.flatMap(object => {
-      const warning = this.resources.disposalWarning(object);
-      return warning ? [{ title: object.title, warning }] : [];
-    }));
+  disposalWarnings(scope?: { sessionId: string; objectIds?: readonly string[] }) {
+    return this.resources.disposalWarnings(scope).flatMap(({ resource, warning }) => {
+      // Instances awaiting lifetime cleanup may already have left the current workbench.
+      if (this.tree.lifecycle(resource.sessionId) !== "running") return [];
+      const object = this.tree.workbench(resource.sessionId).objects.find(object => object.id === resource.id && object.kind === resource.kind);
+      return object ? [{ resource, title: object.title, warning }] : [];
+    });
   }
   private transaction<T>(work: () => T): T {
     this.db.exec("BEGIN IMMEDIATE");
@@ -546,11 +548,8 @@ export class SessionService {
         return { kind: "accepted", sessionId: command.sessionId };
       case "disposal.warnings": {
         if (this.tree.lifecycle(command.sessionId) === "sleeping") return { kind: "warnings", warnings: [] };
-        const ids = command.objectIds ? new Set(command.objectIds) : null;
-        return { kind: "warnings", warnings: this.tree.workbench(command.sessionId).objects.flatMap(object => {
-          const warning = !ids || ids.has(object.id) ? this.resources.disposalWarning(object) : null;
-          return warning ? [{ objectId: object.id, title: object.title, warning }] : [];
-        }) };
+        return { kind: "warnings", warnings: this.disposalWarnings(command).map(({ resource, title, warning }) =>
+          ({ objectId: resource.id, title, warning })) };
       }
       case "archive":
         await this.deactivate(command.sessionId, "archive");

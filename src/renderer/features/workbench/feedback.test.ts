@@ -9,5 +9,5 @@ it("presents initial reading, read errors, and backend unavailability separately
   expect(workbenchPhase("ready", { status: "ready" })).toBe("ready");
   expect(workbenchPhase("ready", { status: "error" })).toBe("read-error");
   expect(workbenchPhase("unavailable", { status: "ready" })).toBe("unavailable");
-  expect(workbenchPhase("stopping", { status: "error" })).toBe("unavailable");
+  expect(workbenchPhase("stopping", { status: "error" })).toBe("stopping");
 });

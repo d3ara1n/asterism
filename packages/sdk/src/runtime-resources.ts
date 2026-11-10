@@ -48,7 +48,7 @@ export function implementResource<S extends Json, V extends Json>(
     inspect(data: NoInfer<S>, object: ObjectReader): Promise<Json>;
     context?(data: NoInfer<S>, object: ObjectReader): Promise<ContextFile[]>;
     openFile?(data: NoInfer<S>, locator: Json, context: { object: ObjectReader; signal: AbortSignal }): AsyncIterable<Uint8Array>;
-    disposalWarning?(data: NoInfer<S>, object: ObjectReader): import("./i18n.ts").UiText | null;
+    disposalWarnings?: ResourceContribution["disposalWarnings"];
     /** Called when an object enters the current set; external instances owned exclusively by the object register cleanup with lifetime. */
     attach?(data: NoInfer<S>, object: ObjectReader, lifetime: Lifetime): void;
   },
@@ -62,7 +62,7 @@ export function implementResource<S extends Json, V extends Json>(
     context: async (snapshot, object) => definition.context?.(parse(resource.stateSchema, snapshot.data, "resource"), object) ?? [],
     ...(openFile ? { openFile: (snapshot: ResourceSnapshot, locator: Json, context: { object: ObjectReader; signal: AbortSignal }) =>
       openFile(parse(resource.stateSchema, snapshot.data, "resource"), locator, context) } : {}),
-    disposalWarning: (snapshot, object) => definition.disposalWarning?.(parse(resource.stateSchema, snapshot.data, "resource"), object) ?? null,
+    disposalWarnings: definition.disposalWarnings,
     ...(attach ? { attach: (snapshot: Parameters<NonNullable<ResourceContribution["attach"]>>[0], object: ObjectReader, lifetime: Lifetime) =>
       attach(parse(resource.stateSchema, snapshot.data, "resource"), object, lifetime) } : {}),
   };

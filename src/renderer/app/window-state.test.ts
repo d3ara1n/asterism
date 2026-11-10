@@ -14,13 +14,13 @@ it("subscribes before reading and directly adopts each received window state", a
     },
     onChanged: listener => { receive = listener; return unsubscribe; },
   });
-  receive({ titleBar: "macos", fullScreen: true });
+  receive({ titleBar: "macos", fullScreen: true, exiting: false });
   expect(getDesktopWindowState().fullScreen).toBe(true);
-  resolve({ titleBar: "macos", fullScreen: false });
+  resolve({ titleBar: "macos", fullScreen: false, exiting: false });
   const stop = await pending;
   try {
-    expect(getDesktopWindowState()).toEqual({ titleBar: "macos", fullScreen: false });
-    receive({ titleBar: "macos", fullScreen: true });
+    expect(getDesktopWindowState()).toEqual({ titleBar: "macos", fullScreen: false, exiting: false });
+    receive({ titleBar: "macos", fullScreen: true, exiting: false });
     expect(getDesktopWindowState().fullScreen).toBe(true);
   } finally { stop(); }
   expect(unsubscribe).toHaveBeenCalledOnce();
@@ -29,10 +29,10 @@ it("subscribes before reading and directly adopts each received window state", a
 // Refreshing in fullscreen does not guarantee another event; the initial read must establish the correct layout on its own.
 it("uses the current snapshot even without a change notification and releases the subscription on read failure", async () => {
   const stop = await startDesktopWindow({
-    get: async () => ({ titleBar: "overlay", fullScreen: true }),
+    get: async () => ({ titleBar: "overlay", fullScreen: true, exiting: false }),
     onChanged: () => () => {},
   });
-  try { expect(getDesktopWindowState()).toEqual({ titleBar: "overlay", fullScreen: true }); }
+  try { expect(getDesktopWindowState()).toEqual({ titleBar: "overlay", fullScreen: true, exiting: false }); }
   finally { stop(); }
   const unsubscribe = vi.fn();
   await expect(startDesktopWindow({

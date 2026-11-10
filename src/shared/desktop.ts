@@ -11,6 +11,7 @@ export const unsavedChangesSchema = z.array(z.string());
 export const desktopWindowStateSchema = z.strictObject({
   titleBar: z.enum(["macos", "overlay", "native"]),
   fullScreen: z.boolean(),
+  exiting: z.boolean(),
 });
 export type DesktopWindowState = z.infer<typeof desktopWindowStateSchema>;
 export type TitleBarMode = DesktopWindowState["titleBar"];
