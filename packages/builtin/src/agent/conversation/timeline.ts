@@ -15,7 +15,7 @@ type SavedBlock = Extract<z.infer<typeof Execution.schema>, { type: "block" }>["
 export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "message"; id: string; parts: readonly AgentInputPart[]; sender: AgentMessageSender; startsTurn?: boolean }
   | { kind: "summary"; id: string; text: string }
-  | { kind: "compression"; id: string; status: CompressionActivity["status"] | "completed" | "boundary" }
+  | { kind: "compression"; id: string; status: CompressionActivity["status"] | "completed" | "boundary"; details?: CompressionActivity["details"] }
   | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null }
   | { kind: "conversation-process"; id: string; content: readonly ("text" | "thinking")[]; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; incomplete: boolean; open: boolean }
   | ({ kind: "notice" } & InlineFeedback);
@@ -91,7 +91,7 @@ export function savedTimeline(path: readonly SessionRecord[], agentId: string, r
   }
   for (const value of options.compressions ?? []) {
     const items = after.get(value.afterNodeId) ?? [];
-    items.push({ kind: "compression", id: value.id, status: value.status });
+    items.push({ kind: "compression", id: value.id, status: value.status, ...(value.details ? { details: value.details } : {}) });
     after.set(value.afterNodeId, items);
   }
   for (const value of feedback) {

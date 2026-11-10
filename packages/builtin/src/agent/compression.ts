@@ -1,14 +1,13 @@
-import { thinkingLevels, describeError, formatModelExpression, type ModelItem, type ModelTarget, type ModelEvent } from "@asterism-app/sdk/contracts";
+import { thinkingLevels, describeError, formatModelExpression, type ErrorDetails, type ModelItem, type ModelTarget, type ModelEvent } from "@asterism-app/sdk/contracts";
 import type { ModelServices, ObjectExecutor } from "@asterism-app/sdk/runtime";
 import { decodeExecution, ContextSummary } from "@asterism-app/builtin-api/contracts";
-import { feedbackOrigin, type AgentFeedback } from "./feedback.ts";
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, projectAgentContext, type AgentContext } from "./projection.ts";
 
-import { COMPRESSION_KEEP_RECENT, COMPRESSION_MAX_OUTPUT, COMPRESSION_RESERVE } from "./context-budget.ts";
+import { COMPRESSION_KEEP_RECENT, COMPRESSION_RESERVE } from "./context-budget.ts";
 
 // Window reserve and recent-content retention budgets; tool results are excerpted only for the separate summary material.
-export { COMPRESSION_KEEP_RECENT, COMPRESSION_MAX_OUTPUT, COMPRESSION_RESERVE } from "./context-budget.ts";
+export { COMPRESSION_KEEP_RECENT, COMPRESSION_RESERVE } from "./context-budget.ts";
 
 /** Character-based estimates are used only for selection and triggering; they are not persisted as provider-reported measurements. */
 function estimateItems(items: readonly ModelItem[]): number {
@@ -63,8 +62,8 @@ export function planCompression(context: AgentContext): CompressionPlan | null {
 export async function compressContext(
   object: ObjectExecutor, target: ModelTarget, systemTokens: number,
   models: Pick<ModelServices, "stream" | "list">, signal: AbortSignal,
-  feedback: (value: AgentFeedback) => void, userAgent?: string,
-  onStart?: () => (status: "completed" | "failed" | "cancelled") => void,
+  userAgent?: string,
+  onStart?: () => (status: "completed" | "failed" | "cancelled", details?: ErrorDetails) => void,
 ): Promise<boolean> {
   signal.throwIfAborted();
   const model = formatModelExpression(target);
@@ -76,31 +75,32 @@ export async function compressContext(
   const plan = planCompression(context);
   if (!plan) return false;
   const end = onStart?.();
-  let completed = false;
+  let completed = false, failure: ErrorDetails | undefined;
   try {
-    const result = await summarizeContext(object, target, model, models, signal, feedback, plan, tokensBefore, userAgent);
-    completed = result;
-    return result;
+    failure = await summarizeContext(object, target, model, models, signal, plan, tokensBefore, userAgent);
+    completed = failure === undefined;
+    return completed;
   } finally {
-    end?.(completed ? "completed" : signal.aborted ? "cancelled" : "failed");
+    end?.(completed ? "completed" : signal.aborted ? "cancelled" : "failed", failure);
   }
 }
 
-/** Reports success only after the complete summary is saved; generation failure preserves the original model projection. */
+/** Returns undefined only after the complete summary is saved; a generation failure returns its details and preserves the original model projection. */
 async function summarizeContext(
   object: ObjectExecutor, target: ModelTarget, model: string,
-  models: Pick<ModelServices, "stream">, signal: AbortSignal, feedback: (value: AgentFeedback) => void,
+  models: Pick<ModelServices, "stream">, signal: AbortSignal,
   plan: CompressionPlan, tokensBefore: number, userAgent?: string,
-): Promise<boolean> {
+): Promise<ErrorDetails | undefined> {
   let text = "";
   const parts = new Map<string, { kind: "text" | "thinking"; ended: boolean }>();
   let finish: Extract<ModelEvent, { type: "finish" }> | undefined;
   try {
-    for await (const event of models.stream({ target: { ...target, thinking: "off" },
+    // Off omits reasoning parameters so models without a disabled mode use the upstream default; other levels encode like work requests.
+    for await (const event of models.stream({ target: target.thinking === "off" ? { provider: target.provider, model: target.model } : target,
       userAgent, sessionId: object.ref.sessionId,
       system: { blocks: [{ id: "context-summary", text: summarySystemPrompt }] },
       messages: [{ kind: "input", parts: [{ kind: "text", text: summaryPrompt(plan) }] }],
-      maxOutputTokens: COMPRESSION_MAX_OUTPUT, signal,
+      signal,
     })) {
       signal.throwIfAborted();
       if (finish) throw new Error("The summary stream continued after completion.");
@@ -122,10 +122,7 @@ async function summarizeContext(
       throw new Error("Context summarization did not produce a complete non-empty summary.");
   } catch (error) {
     signal.throwIfAborted();
-    const details = describeError(error);
-    feedback({ origin: feedbackOrigin(error), code: "context_compression_failed", level: "warning",
-      message: `Context compression failed; the existing context is unchanged. ${details.message}`, details });
-    return false;
+    return describeError(error);
   }
   // Let the agent loop report commit failures; persistence faults must not be disguised as recoverable summary failures.
   object.commit(writer => { writer.append(ContextSummary, {
@@ -133,5 +130,5 @@ async function summarizeContext(
     completion: { usage: finish.usage, finishReason: finish.reason, rawFinishReason: finish.rawFinishReason ?? null, providerResponseId: finish.responseId ?? null,
       ...(finish.timing ? { timing: finish.timing } : {}) },
   }); });
-  return true;
+  return undefined;
 }

@@ -1,3 +1,4 @@
+import type { ErrorDetails } from "@asterism-app/sdk/contracts";
 import type { ObjectExecutor, ObjectReader } from "@asterism-app/sdk/runtime";
 import type { AgentFeedback, InlineFeedback, CompressionActivity, AgentActivity } from "./feedback.ts";
 
@@ -34,10 +35,10 @@ export function createAgentFeedback() {
       const previous = states.get(object.ref.id) ?? empty;
       states.set(object.ref.id, { ...previous, compressions: [...previous.compressions, activity] });
       object.invalidate();
-      return (status: "completed" | "failed" | "cancelled") => {
+      return (status: "completed" | "failed" | "cancelled", details?: ErrorDetails) => {
         const current = states.get(object.ref.id) ?? empty;
         const compressions = current.compressions.flatMap(value => value.id !== activity.id ? [value]
-          : status === "completed" ? [] : [{ ...value, status }]);
+          : status === "completed" ? [] : [{ ...value, status, ...(details ? { details } : {}) }]);
         states.set(object.ref.id, { ...current, compressions });
         object.invalidate();
       };

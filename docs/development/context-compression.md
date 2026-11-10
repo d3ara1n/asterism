@@ -16,7 +16,7 @@ No legal summarizable prefix means no forced deletion of recent text.
 
 ## Summary request
 
-Use the same conversation model through a one-shot stream, explicit thinking off, and no tools. The summary system prompt is independent of the ordinary harness, Agent role, and linked context files.
+Use the same conversation model and its current thinking level through a one-shot stream with no tools. An off level omits reasoning parameters so the upstream default applies, because some models have no disabled mode; other levels use the same encoding and compatibility mappings as work requests. The output limit is the model's configured limit. The summary system prompt is independent of the ordinary harness, Agent role, and linked context files.
 
 Material distinguishes user messages, Agent messages, and resource event messages using the work request's source envelopes. It also identifies assistant replies, tool calls/results, and context. It omits private continuation data and thinking; file descriptions identify references without claiming to have read the files.
 
@@ -34,6 +34,6 @@ Compaction activity and failures are transient view feedback. The saved summary 
 
 ## Failure and cancellation
 
-Empty output, incomplete streams, truncation, unexpected tools, and model errors retain the original projection and report a transient warning. Cancellation does not commit a partial summary.
+Empty output, incomplete streams, truncation, unexpected tools, and model errors retain the original projection and mark the transient compaction activity as failed with the error details. Cancellation does not commit a partial summary.
 
 A persistence failure stops execution; it is not treated as a harmless summary-generation failure.

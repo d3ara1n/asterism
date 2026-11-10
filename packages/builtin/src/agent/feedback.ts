@@ -12,10 +12,11 @@ export const inlineFeedbackSchema = agentFeedbackSchema.extend({
 });
 export type InlineFeedback = z.infer<typeof inlineFeedbackSchema>;
 
-/** Compression activity is runtime feedback; a persistent summary record takes over on success. */
+/** Compression activity is runtime feedback; a persistent summary record takes over on success, and a failure carries its error details. */
 export const compressionActivitySchema = z.strictObject({
   id: z.string(), afterNodeId: z.string().nullable(),
   status: z.enum(["running", "failed", "cancelled"]),
+  details: errorDetailsSchema.optional(),
 });
 export type CompressionActivity = z.infer<typeof compressionActivitySchema>;
 /** Live retry state; resumeAt is set while waiting and null once the retried request is running. */

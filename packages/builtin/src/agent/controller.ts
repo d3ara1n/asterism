@@ -93,7 +93,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
         const { system } = deps.prepareRequest(deps.selection.agent(selection), target)();
         const tokens = Math.ceil(system.blocks.reduce((size, block) => size + block.text.length, 0) / 4);
         return compressContext(object, target, tokens, deps.models, signal,
-          value => deps.feedback.report(object, value), deps.userAgent, () => deps.feedback.beginCompression(object));
+          deps.userAgent, () => deps.feedback.beginCompression(object));
       };
       const publish = (status: ResourceStatus["status"]) => object.events.publish(ResourceStatusChanged, {
         title: object.snapshot()!.title, status,
