@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { inputText, toolTextTail } from "../shared/tool-preview";
 import { ActivityTail, InstructionList } from "./ActivityTail";
@@ -51,7 +52,7 @@ type CheckProps = ToolRenderProps<TaskSnapshot, { id: string }>;
 function CheckHeader({ phase, target, result }: CheckProps) {
   const i18n = useI18n();
   const status = result?.data?.status;
-  return <ToolHeader label={i18n.text(messages.check)} subject={phase === "input" ? undefined : target.id} monospace
+  return <ToolHeader label={i18n.text(messages.check)} subject={phase === "input" ? undefined : <span className="font-mono">{target.id}</span>}
     meta={status && <TaskStateText status={status} />} />;
 }
 function CheckBody({ result }: CheckProps) {
@@ -85,8 +86,8 @@ type WaitProps = ToolRenderProps<{ tasks: WaitEntry[] }, { ids: string[] }>;
 function WaitHeader({ phase, target, result }: WaitProps) {
   const i18n = useI18n(), tasks = result?.data?.tasks;
   const finished = tasks?.filter(task => task.status.phase === "finished").length ?? 0;
-  return <ToolHeader label={i18n.text(messages.wait)} monospace
-    subject={phase === "input" ? undefined : target.ids.join(", ")}
+  return <ToolHeader label={i18n.text(messages.wait)}
+    subject={phase === "input" ? undefined : <span className="font-mono" title={target.ids.join(", ")}>{target.ids.join(", ")}</span>}
     meta={tasks && i18n.formatMessage(messages.finished, { finished, total: tasks.length })} />;
 }
 function WaitBody({ phase, result }: WaitProps) {
@@ -111,7 +112,7 @@ export const waitViews = {
 
 type SteerProps = ToolRenderProps<{ id: string; accepted: true }, { id: string }, { message: string }>;
 function SteerHeader({ phase, target }: SteerProps) {
-  return <ToolHeader label={useI18n().text(messages.steer)} subject={phase === "input" ? undefined : target.id} monospace />;
+  return <ToolHeader label={useI18n().text(messages.steer)} subject={phase === "input" ? undefined : <span className="font-mono">{target.id}</span>} />;
 }
 function SteerBody({ phase, args }: SteerProps) {
   if (phase === "input") {
@@ -130,7 +131,7 @@ export const steerViews = {
 type CancelProps = ToolRenderProps<TaskSummary, { id: string }, { reason?: string }>;
 function CancelHeader({ phase, target, result }: CancelProps) {
   const status = result?.data?.status;
-  return <ToolHeader label={useI18n().text(messages.cancel)} subject={phase === "input" ? undefined : target.id} monospace
+  return <ToolHeader label={useI18n().text(messages.cancel)} subject={phase === "input" ? undefined : <span className="font-mono">{target.id}</span>}
     meta={status && <TaskStateText status={status} />} />;
 }
 function CancelBody({ phase, args }: CancelProps) {
@@ -149,7 +150,7 @@ type PoolListData = { tasks: TaskSummary[]; truncated: boolean };
 type ListProps = ToolRenderProps<PoolListData, null>;
 function ListHeader({ invocation, result }: ListProps) {
   const i18n = useI18n(), tasks = result?.data?.tasks;
-  return <ToolHeader label={i18n.text(messages.list)} subject={invocation.resource?.title}
+  return <ToolHeader label={i18n.text(messages.list)} subject={useToolResourceSubject(invocation.resource)}
     meta={tasks && i18n.formatMessage(messages.taskCount, { count: tasks.length })} />;
 }
 /** Newest first, as on the pool card; the status column uses still icons because the list reports one moment. */

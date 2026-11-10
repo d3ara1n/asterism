@@ -1,6 +1,7 @@
 import { List, Network, UserRound, UserRoundPen } from "lucide-react";
 import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { MeshCard } from "./MeshCard";
 import { CreateMesh, Mesh, MeshGetProfile, MeshList, MeshPeek, MeshSend, MeshSetProfile, MeshView } from "./contract";
 import { meshCard as appearance } from "../shared/card-appearance";
@@ -32,7 +33,7 @@ function ProfileUpdate({ args }: ToolRenderProps) {
   return description ? <p className="type-body whitespace-pre-wrap break-words">{description}</p> : null;
 }
 function ListHeader({ invocation }: ToolRenderProps) {
-  return <ToolHeader label={useI18n().text(messages.list)} subject={invocation.resource?.title} />;
+  return <ToolHeader label={useI18n().text(messages.list)} subject={useToolResourceSubject(invocation.resource)} />;
 }
 
 export default {

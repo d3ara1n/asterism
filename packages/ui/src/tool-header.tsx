@@ -1,20 +1,22 @@
 import type { ReactNode } from "react";
 import { cn } from "./utils";
+import { Badge } from "./ui/badge";
 
-/** Tool headers consistently use one line: names and paths yield space, while the trailing summary stays visible and right-aligned. */
-export function ToolHeader({ label, subject, summary, badge, meta, monospace = false }: {
+/** Optional rich-content slots provide defaults, not content restrictions: a subject badge, a shrinkable summary, and trailing metadata. */
+export function ToolHeader({ label, subject, summary, meta }: {
   label: string;
-  subject?: string;
+  subject?: ReactNode;
   summary?: ReactNode;
-  badge?: ReactNode;
   meta?: ReactNode;
-  monospace?: boolean;
 }) {
+  const hasSubject = subject != null && subject !== false && subject !== "";
   return <span className={cn("grid min-w-0 w-full items-baseline gap-x-2 text-left",
-    badge ? "grid-cols-[auto_auto_minmax(0,1fr)_auto]" : "grid-cols-[auto_minmax(0,1fr)_auto]")}>
+    hasSubject ? "grid-cols-[auto_auto_minmax(0,1fr)_auto]" : "grid-cols-[auto_minmax(0,1fr)_auto]")}>
     <span className="min-w-0 truncate" title={label}>{label}</span>
-    {badge && <span className="min-w-0 max-w-32 self-center">{badge}</span>}
-    <span className={cn("min-w-0", summary ? "overflow-hidden self-center" : "truncate", monospace && "font-mono")} title={subject}>{summary ?? subject}</span>
-    <span className="whitespace-nowrap text-right type-caption tabular-nums">{meta}</span>
+    {hasSubject && <Badge variant="secondary" className="min-w-0 max-w-48 self-center py-0 font-normal text-muted-foreground">
+      <span className="min-w-0 truncate" title={typeof subject === "string" ? subject : undefined}>{subject}</span>
+    </Badge>}
+    <span className="min-w-0 self-center truncate text-muted-foreground" title={typeof summary === "string" ? summary : undefined}>{summary}</span>
+    <span className="whitespace-nowrap text-right type-caption tabular-nums text-muted-foreground">{meta}</span>
   </span>;
 }

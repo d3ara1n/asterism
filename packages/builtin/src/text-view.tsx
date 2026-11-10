@@ -10,15 +10,16 @@ import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared
 import { displayText } from "./shared/text-row";
 import { CodeDiff, CodeRows } from "@asterism-app/ui/code-view";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 
-/** All three states reuse the summary structure, retaining existing paths and input counts through execution and completion. */
 function TextReadHeader({ target, invocation, result }: ToolRenderProps<TextRead>) {
   const i18n = useI18n();
   const path = inputText(target, "path");
   const data = result?.data;
-  return <ToolHeader label={i18n.formatMessage(textMessages.toolTextRead)} monospace={path !== undefined}
-    subject={[invocation.resource?.title, path].filter(Boolean).join(": ")}
+  return <ToolHeader label={i18n.formatMessage(textMessages.toolTextRead)}
+    subject={useToolResourceSubject(invocation.resource)}
+    summary={path && <span className="font-mono" title={path}>{path}</span>}
     meta={data && i18n.formatMessage(textMessages.toolTextLines, { shown: data.rows.length, total: data.totalLines })} />;
 }
 function TextWriteHeader({ target, args, invocation, result }: ToolRenderProps<TextChange>) {
@@ -27,8 +28,9 @@ function TextWriteHeader({ target, args, invocation, result }: ToolRenderProps<T
   const content = inputText(args, "content");
   const count = useMemo(() => content === undefined ? undefined : characterCount(content), [content]);
   const data = result?.data;
-  return <ToolHeader label={i18n.formatMessage(textMessages.toolTextWrite)} monospace={path !== undefined}
-    subject={[invocation.resource?.title, path].filter(Boolean).join(": ")}
+  return <ToolHeader label={i18n.formatMessage(textMessages.toolTextWrite)}
+    subject={useToolResourceSubject(invocation.resource)}
+    summary={path && <span className="font-mono" title={path}>{path}</span>}
     meta={<>{data && <>+{data.added} −{data.removed}{count !== undefined && " · "}</>}
       {count !== undefined && i18n.formatMessage(textMessages.toolTextCharacters, { count: formatCount(count) })}</>} />;
 }
@@ -37,8 +39,9 @@ function TextEditHeader({ target, args, invocation, result }: ToolRenderProps<Te
   const path = inputText(target, "path");
   const edits = inputField(args, "edits");
   const data = result?.data;
-  return <ToolHeader label={i18n.formatMessage(textMessages.toolTextEdit)} monospace={path !== undefined}
-    subject={[invocation.resource?.title, path].filter(Boolean).join(": ")}
+  return <ToolHeader label={i18n.formatMessage(textMessages.toolTextEdit)}
+    subject={useToolResourceSubject(invocation.resource)}
+    summary={path && <span className="font-mono" title={path}>{path}</span>}
     meta={<>{data && <>+{data.added} −{data.removed}{Array.isArray(edits) && " · "}</>}
       {Array.isArray(edits) && i18n.formatMessage(textMessages.toolTextEdits, { count: edits.length })}</>} />;
 }
@@ -49,8 +52,9 @@ function TextReplaceHeader({ target, args, invocation, result }: ToolRenderProps
   const data = result?.data;
   const mode = i18n.formatMessage(inputField(args, "regex") === true ? textMessages.toolTextRegex : textMessages.toolTextLiteral);
   const flags = inputText(args, "flags");
-  return <ToolHeader label={i18n.formatMessage(textMessages.toolTextReplace)} monospace={path !== undefined}
-    subject={[invocation.resource?.title, path].filter(Boolean).join(": ")}
+  return <ToolHeader label={i18n.formatMessage(textMessages.toolTextReplace)}
+    subject={useToolResourceSubject(invocation.resource)}
+    summary={path && <span className="font-mono" title={path}>{path}</span>}
     meta={<>{mode}{flags ? ` /${flags}` : ""}{data && <> · {i18n.formatMessage(textMessages.toolTextMatches, { count: data.matches })} · +{data.added} −{data.removed}</>}</>} />;
 }
 function TextReplaceBody(props: ToolRenderProps<TextReplace>) {

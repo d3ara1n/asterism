@@ -3,6 +3,7 @@ import { Globe, Search, Download } from "lucide-react";
 import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { webResponseSchema, type Json, type WebDocument, type WebResponse } from "@asterism-app/sdk/contracts";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract";
 import { webMessages as messages } from "../messages/web";
 import { Markdown } from "@asterism-app/ui/markdown";
@@ -64,13 +65,13 @@ function FetchBody({ result }: ToolRenderProps) {
     })}
   </ResponseFrame>;
 }
-function SearchHeader({ args, result }: ToolRenderProps) {
+function SearchHeader({ args, invocation, result }: ToolRenderProps) {
   const i18n = useI18n(), data = parseResponse(result?.data);
-  return <ToolHeader label={i18n.text(messages.search)} subject={field(args, "query")}
+  return <ToolHeader label={i18n.text(messages.search)} subject={useToolResourceSubject(invocation.resource)} summary={field(args, "query")}
     meta={data && i18n.formatMessage(messages.results, { count: data.documents.length })} />;
 }
-function FetchHeader({ args }: ToolRenderProps) {
-  return <ToolHeader label={useI18n().text(messages.fetch)} subject={field(args, "url")} />;
+function FetchHeader({ args, invocation }: ToolRenderProps) {
+  return <ToolHeader label={useI18n().text(messages.fetch)} subject={useToolResourceSubject(invocation.resource)} summary={field(args, "url")} />;
 }
 export default {
   resources: [{ kind: WebResource.kind, label: messages.title, icon: <Globe className="size-4" />, card: appearance }],

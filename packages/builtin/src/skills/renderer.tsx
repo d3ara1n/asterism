@@ -16,7 +16,7 @@ function SkillReadHeader({ args, result }: ReadProps) {
   const name = result?.data?.name ?? inputText(args, "name") ?? "";
   const path = result?.data?.path ?? inputText(args, "path") ?? "SKILL.md";
   const offset = inputField(args, "offset"), limit = inputField(args, "limit");
-  return <ToolHeader label={i18n.text(skillsMessages.read)} subject={[name, path].filter(Boolean).join(": ")} monospace
+  return <ToolHeader label={i18n.text(skillsMessages.read)} subject={name} summary={<span className="font-mono" title={path}>{path}</span>}
     meta={`offset ${typeof offset === "number" ? offset : 1} · limit ${typeof limit === "number" ? limit : 1000}`} />;
 }
 function SkillReadBody({ result }: ReadProps) {

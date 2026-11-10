@@ -3,14 +3,14 @@ import { previewArguments } from "../../../shared/partial-arguments";
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
-import { toolRenderer, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism-app/sdk/renderer";
+import { toolRenderer, useRendererResources, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism-app/sdk/renderer";
 
 import { ResourceCall, ResourceInspect, ResourceInspectResult, ResourceList, ResourceListResult, ResourceScript } from "../../../tools/core";
 import { toolsMessages } from "../../messages/tools";
 import { JsonView, useModuleViews } from "../../modules/views";
 import type { ViewRegistry } from "../../modules/registry";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { ToolDetails } from "@asterism-app/ui/tool-content";
+import { ToolDetails, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@asterism-app/ui/ui/item";
 import { Badge } from "@asterism-app/ui/ui/badge";
@@ -58,10 +58,11 @@ const list = toolRenderer(ResourceListResult, {
 type InspectProps = ToolRenderProps<z.infer<typeof ResourceInspectResult.schema>>;
 function ResourceInspectHeader({ invocation }: InspectProps) {
   const i18n = useI18n();
-  const registry = useModuleViews();
+  const resources = useRendererResources();
   const resource = invocation.resource;
-  return <ToolHeader label={i18n.formatMessage(toolsMessages.toolResourceInspect)} subject={resource?.title}
-    meta={resource && i18n.text(registry.resource(resource.kind).label)} />;
+  return <ToolHeader label={i18n.formatMessage(toolsMessages.toolResourceInspect)}
+    subject={useToolResourceSubject(resource)}
+    meta={resource && i18n.text(resources.get(resource.kind).label)} />;
 }
 function ResourceInspectBody({ result }: InspectProps) {
   const i18n = useI18n();

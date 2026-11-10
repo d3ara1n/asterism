@@ -1,6 +1,7 @@
 import { Send } from "lucide-react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { inputFileName, type SendResult } from "@asterism-app/builtin-api/contracts";
 import { fileReferencePartSchema, type Json } from "@asterism-app/sdk/contracts";
@@ -11,8 +12,9 @@ import { messageTarget } from "./message-target";
 
 type Props = ToolRenderProps<SendResult>;
 function Header({ invocation, result, phase, target }: Props) {
-  const i18n = useI18n();
-  return <ToolHeader label={i18n.text(messages.title)} subject={messageTarget(target) ?? invocation.resource?.title}
+  const i18n = useI18n(), recipient = messageTarget(target);
+  return <ToolHeader label={i18n.text(messages.title)} subject={useToolResourceSubject(invocation.resource)}
+    summary={recipient !== invocation.resource?.title ? recipient : undefined}
     meta={phase === "settled" && result.kind === "succeeded" ? i18n.text(messages.accepted) : undefined} />;
 }
 /** Message parts of send input; display-only, so unfinished input yields the parts it already has. */

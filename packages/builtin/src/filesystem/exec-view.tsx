@@ -3,6 +3,7 @@ import { Terminal, FileText } from "lucide-react";
 import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { DirectoryExec } from "./exec-contract";
 import type { ExecResult } from "@asterism-app/sdk/contracts";
@@ -22,7 +23,7 @@ function Header({ phase, invocation, result }: ToolRenderProps<ExecResult>) {
   const durationMs = phase === "executing" && invocation.startedAt !== undefined
     ? Math.max(0, now - invocation.startedAt) : data?.durationMs;
   const seconds = durationMs === undefined ? "" : (durationMs / 1000).toFixed(1);
-  return <ToolHeader label={i18n.text(messages.exec)} subject={invocation.resource?.title}
+  return <ToolHeader label={i18n.text(messages.exec)} subject={useToolResourceSubject(invocation.resource)}
     meta={durationMs !== undefined && i18n.formatMessage(messages.elapsed, { seconds })} />;
 }
 

@@ -2,13 +2,14 @@ import type { ReactNode } from "react";
 import { ChevronRight, FileSearch, TextSearch } from "lucide-react";
 import { toolRenderer, useI18n, useRendererViewState, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
 import { cn } from "@asterism-app/ui/utils";
 import { CodeRows } from "@asterism-app/ui/code-view";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
-import { inputText, searchSubject } from "../shared/tool-preview";
+import { inputText, searchHeaderSummary } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { DirectoryFind, DirectoryGrep, type FindResult, type GrepResult, type SearchStopReason } from "./search-contract";
 import { searchSummary } from "./search-presentation";
@@ -29,15 +30,15 @@ const flagMessages = {
   noIgnore: messages.toolSearchOptionNoIgnore,
 } satisfies Record<Extract<SearchOption, { kind: "flag" }>["flag"], typeof messages.toolSearchLimit>;
 
-/** The main text starts with the search pattern, followed by scope (resource and nonroot path); truncation prioritizes preserving the pattern. */
 function Header(props: Props & { grep?: boolean }) {
   const i18n = useI18n(), data = props.result?.data;
   const path = inputText(props.target, "path");
-  const scope = [props.invocation.resource?.title, path && path !== "." ? path : null].filter(Boolean).join(": ");
+  const summary = searchHeaderSummary(path && path !== "." ? path : undefined, inputText(props.args, "pattern"));
   const counts = data && searchSummary(data);
   const truncated = counts ? !counts.complete : false;
-  return <ToolHeader label={i18n.text(props.grep ? messages.toolDirectoryGrep : messages.toolDirectoryFind)} monospace
-    subject={searchSubject(scope || undefined, inputText(props.args, "pattern"))}
+  return <ToolHeader label={i18n.text(props.grep ? messages.toolDirectoryGrep : messages.toolDirectoryFind)}
+    subject={useToolResourceSubject(props.invocation.resource)}
+    summary={summary && <span className="font-mono" title={summary}>{summary}</span>}
     meta={counts && [
       counts.matches !== null && i18n.formatMessage(messages.toolSearchMatches, { count: counts.matches, truncated }),
       i18n.formatMessage(messages.toolSearchFiles, { count: counts.files, truncated }),

@@ -1,4 +1,4 @@
-import { type ToolRenderProps, useI18n, useRendererViewState } from "@asterism-app/sdk/renderer";
+import { type ToolRenderProps, useI18n, useRendererResources, useRendererViewState } from "@asterism-app/sdk/renderer";
 import { useId, type ReactNode } from "react";
 
 import { toolsMessages } from "./messages/tools";
@@ -31,9 +31,29 @@ export function ToolDetailsSwitcher({ items, stateKey = null }: {
     {selected && <div id={panelId} role="region" aria-labelledby={`${panelId}-${selected.value}`}>{selected.render()}</div>}
   </div>;
 }
+function resourceSubject(icon: ReactNode, title: string): ReactNode {
+  return <span className="inline-flex max-w-full items-center gap-1 align-middle [&_svg]:size-3 [&_svg]:shrink-0" title={title}>
+    {icon}<span className="truncate">{title}</span>
+  </span>;
+}
+
+/** Resource identity comes from the call; only its static kind icon comes from the current renderer catalog. */
+export function useToolResourceSubject(resource: ToolRenderProps["invocation"]["resource"]): ReactNode {
+  const resources = useRendererResources();
+  return resource && resourceSubject(resources.get(resource.kind).icon, resource.title);
+}
+
+/** Type-oriented operations use the registered kind label instead of an instance name. */
+export function useToolResourceTypeSubject(kind: string | undefined): ReactNode {
+  const resources = useRendererResources();
+  const i18n = useI18n();
+  const description = kind ? resources.get(kind) : undefined;
+  return description && resourceSubject(description.icon, i18n.text(description.label));
+}
+
 export function DefaultToolHeader({ props, label }: { props: ToolRenderProps; label?: import("@asterism-app/sdk/contracts").UiText }) {
   const i18n = useI18n();
-  return <ToolHeader label={label === undefined ? props.name : i18n.text(label)} subject={props.invocation.resource?.title} />;
+  return <ToolHeader label={label === undefined ? props.name : i18n.text(label)} subject={useToolResourceSubject(props.invocation.resource)} />;
 }
 export function DefaultToolBody({ result }: ToolRenderProps) {
   const i18n = useI18n();

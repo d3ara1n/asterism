@@ -6,6 +6,7 @@ import { fileReferencePartSchema, messagingText, type Json, type MessagingConnec
   type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { inputFileName } from "@asterism-app/builtin-api/contracts";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Marker, MarkerContent } from "@asterism-app/ui/ui/marker";
@@ -39,7 +40,7 @@ function ListHeader({ target, invocation, result }: ListProps) {
   const i18n = useI18n(), data = result?.data;
   const connectionId = inputText(target, "connectionId"), since = inputText(target, "since") !== undefined;
   return <ToolHeader label={i18n.text(messages.conversations)}
-    subject={[invocation.resource?.title, connectionId].filter(Boolean).join(": ")}
+    subject={useToolResourceSubject(invocation.resource)} summary={connectionId}
     meta={data && [since && i18n.text(messages.changes), data.kind === "connections"
       ? i18n.formatMessage(messages.connectionCount, { count: data.connections.length, truncated: data.truncated })
       : i18n.formatMessage(messages.conversationCount, { count: data.conversations.length, truncated: data.truncated })].filter(Boolean).join(" · ")} />;
@@ -96,7 +97,8 @@ function SubscribeHeader({ target, args, invocation, result }: SubscribeProps) {
   const requested = inputField(args, "enabled"), enabled = data?.enabled ?? (typeof requested === "boolean" ? requested : undefined);
   const StateIcon = enabled ? Bell : BellOff;
   return <ToolHeader label={i18n.text(messages.notification)}
-    subject={data?.title ?? inputText(target, "conversationId") ?? inputText(target, "connectionId") ?? invocation.resource?.title}
+    subject={useToolResourceSubject(invocation.resource)}
+    summary={data?.title ?? inputText(target, "conversationId") ?? inputText(target, "connectionId")}
     meta={enabled !== undefined && <span className="inline-flex items-center gap-1">
       <StateIcon aria-hidden="true" className="size-3" />{i18n.text(enabled ? messages.on : messages.off)}</span>} />;
 }
@@ -106,7 +108,7 @@ function SubscribeHeader({ target, args, invocation, result }: SubscribeProps) {
 type ReadProps = ToolRenderProps<z.infer<typeof ChatRead.schema>>;
 function ReadHeader({ invocation, result }: ReadProps) {
   const i18n = useI18n(), data = result?.data;
-  return <ToolHeader label={i18n.text(messages.read)} subject={invocation.resource?.title}
+  return <ToolHeader label={i18n.text(messages.read)} subject={useToolResourceSubject(invocation.resource)}
     meta={data && i18n.formatMessage(messages.messageCount, { count: data.messages.length, truncated: data.truncated })} />;
 }
 function ReadBody({ target, result }: ReadProps) {
@@ -176,7 +178,7 @@ function MessageBody({ message, content }: { message: ChatMessage; content: Cont
 type SendProps = ToolRenderProps<z.infer<typeof ChatSend.schema>>;
 function SendHeader({ phase, target, invocation, result }: SendProps) {
   const i18n = useI18n(), replyTo = inputText(target, "replyTo");
-  return <ToolHeader label={i18n.text(messages.send)} subject={invocation.resource?.title}
+  return <ToolHeader label={i18n.text(messages.send)} subject={useToolResourceSubject(invocation.resource)}
     meta={[replyTo && i18n.formatMessage(messages.replyToId, { id: replyTo }),
       phase === "settled" && result.kind === "succeeded" && i18n.text(messages.sent)].filter(Boolean).join(" · ")} />;
 }
@@ -205,7 +207,8 @@ type SeeProps = ToolRenderProps<z.infer<typeof ChatSee.schema>>;
 function SeeHeader({ target, invocation, result }: SeeProps) {
   const i18n = useI18n(), data = result?.data;
   return <ToolHeader label={i18n.text(mediaMessages.preview)}
-    subject={data?.filename ?? inputText(target, "fileId") ?? invocation.resource?.title}
+    subject={useToolResourceSubject(invocation.resource)}
+    summary={data?.filename ?? inputText(target, "fileId")}
     meta={data && formatFileSize(i18n, data.size)} />;
 }
 function SeeBody({ result }: SeeProps) {

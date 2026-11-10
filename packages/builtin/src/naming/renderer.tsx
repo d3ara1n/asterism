@@ -9,11 +9,11 @@ import { SessionNameResult, SessionRenameResult } from "./contract";
 type Props = ToolRenderProps<{ title: string }>;
 
 function NameHeader({ result }: Props) {
-  return <ToolHeader label={useI18n().text(namingMessages.name)} subject={result?.data?.title} />;
+  return <ToolHeader label={useI18n().text(namingMessages.name)} summary={result?.data?.title} />;
 }
 function RenameHeader({ args, result }: Props) {
   return <ToolHeader label={useI18n().text(namingMessages.rename)}
-    subject={result?.data?.title ?? inputText(args, "title")} />;
+    summary={result?.data?.title ?? inputText(args, "title")} />;
 }
 
 const nameView = { headerRenderer: NameHeader };

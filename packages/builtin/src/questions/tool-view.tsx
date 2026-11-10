@@ -26,7 +26,7 @@ function waitingRequest(props: ExecutionProps): string | null {
 
 function ExecutionHeader({ phase, args }: ExecutionProps) {
   const i18n = useI18n();
-  return <ToolHeader label={i18n.text(messages.navigation)} subject={questionTitles(args)[0]}
+  return <ToolHeader label={i18n.text(messages.navigation)} summary={questionTitles(args)[0]}
     meta={i18n.text(phase === "ready" ? messages.queued : messages.waiting)} />;
 }
 function ResultHeader({ args, result }: ResultProps) {
@@ -35,7 +35,7 @@ function ResultHeader({ args, result }: ResultProps) {
   const meta = data && "answers" in data
     ? i18n.formatMessage(messages.answeredCount, { done: data.answers.filter(answer => answer.status === "answered").length, total: data.answers.length })
     : undefined;
-  return <ToolHeader label={i18n.text(messages.navigation)} subject={questionTitles(args)[0]} meta={meta} />;
+  return <ToolHeader label={i18n.text(messages.navigation)} summary={questionTitles(args)[0]} meta={meta} />;
 }
 
 function Titles({ args }: { args: Json }) {

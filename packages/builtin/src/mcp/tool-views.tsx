@@ -10,7 +10,7 @@ import { McpList, McpSearch, McpInspect, McpConnect, McpCall, type McpCallData }
 import { connectionPhases } from "@asterism-app/sdk/contracts";
 import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
 import { textMessages } from "../messages/text";
-import { inputField, inputText, characterCount, searchSubject, toolTextTail } from "../shared/tool-preview";
+import { inputField, inputText, characterCount, toolTextTail } from "../shared/tool-preview";
 import { settledBodyViews } from "../shared/tool-views";
 import { FilePreview } from "../shared/attachments";
 import { extraStructured, displayText } from "./content";
@@ -53,33 +53,37 @@ function Empty({ text }: { text: UiText }) {
   return <p className="type-caption text-muted-foreground">{useI18n().text(text)}</p>;
 }
 
-// --- Header: action name · server or `server: tool`; result count or progress on the right ---
+// --- Headers: server subject, tool or query summary, and trailing counts or progress ---
 
-/** Tool IDs read as `server: tool`, matching the `resource: path` headers of other tools. Every MCP Host shares one server collection, so its title adds nothing. */
-function toolSubject(id: string | undefined) {
-  const split = id?.indexOf("/") ?? -1;
-  return id && split > 0 ? `${id.slice(0, split)}: ${id.slice(split + 1)}` : id;
+/** Every MCP Host shares one server collection; the server, rather than the host resource, identifies the target. */
+function ToolTargetHeader({ label, tool, meta }: { label: string; tool: string | undefined; meta?: ReactNode }) {
+  const split = tool?.indexOf("/") ?? -1;
+  const server = tool && split > 0 ? tool.slice(0, split) : undefined;
+  const name = tool && split > 0 ? tool.slice(split + 1) : tool;
+  return <ToolHeader label={label} subject={server && <span className="font-mono">{server}</span>}
+    summary={name && <span className="font-mono" title={tool}>{name}</span>} meta={meta} />;
 }
 
 function ListHeader(props: ToolRenderProps) {
   const i18n = useI18n(), data = parse(listSchema, props.result?.data), server = inputText(props.args, "server_id");
-  return <ToolHeader label={i18n.text(messages.list)} subject={server} monospace
+  return <ToolHeader label={i18n.text(messages.list)} subject={server && <span className="font-mono">{server}</span>}
     meta={data && i18n.formatMessage("server" in data ? messages.tools : messages.serverCount, { count: data.total })} />;
 }
 function SearchHeader(props: ToolRenderProps) {
   const i18n = useI18n(), data = parse(searchSchema, props.result?.data);
+  const server = inputText(props.args, "server_id"), query = inputText(props.args, "query");
   return <ToolHeader label={i18n.text(messages.search)}
-    subject={searchSubject(inputText(props.args, "server_id"), inputText(props.args, "query"))}
+    subject={server && <span className="font-mono">{server}</span>} summary={query}
     meta={data && i18n.formatMessage(messages.matchCount, { count: data.matches.total })} />;
 }
 function InspectHeader(props: ToolRenderProps) {
   const i18n = useI18n(), data = parse(inspectSchema, props.result?.data), tool = inputText(props.args, "tool_id");
-  return <ToolHeader label={i18n.text(messages.inspect)} subject={toolSubject(tool)} monospace
+  return <ToolTargetHeader label={i18n.text(messages.inspect)} tool={tool}
     meta={data && i18n.formatMessage(messages.parameterCount, { count: Object.keys(data.inputSchema?.properties ?? {}).length })} />;
 }
 function ConnectHeader(props: ToolRenderProps) {
   const i18n = useI18n(), data = parse(serverSchema, props.result?.data), server = inputText(props.args, "server_id");
-  return <ToolHeader label={i18n.text(messages.connectTool)} subject={server} monospace
+  return <ToolHeader label={i18n.text(messages.connectTool)} subject={server && <span className="font-mono">{server}</span>}
     meta={data?.indexed && i18n.formatMessage(messages.tools, { count: data.tool_count })} />;
 }
 
@@ -92,7 +96,7 @@ function CallHeader(props: ToolRenderProps<McpCallData>) {
   const files = phase === "settled" && data ? data.parts.filter(part => part.kind === "file").length : 0;
   const summary = [text > 0 && i18n.formatMessage(textMessages.toolTextCharacters, { count: formatCount(text) }),
     files > 0 && i18n.formatMessage(messages.fileCount, { count: files })].filter(Boolean).join(" · ");
-  return <ToolHeader label={i18n.text(messages.call)} subject={toolSubject(tool)} monospace
+  return <ToolTargetHeader label={i18n.text(messages.call)} tool={tool}
     meta={progress ? `${progress.completed}${progress.total !== undefined ? ` / ${progress.total}` : ""}` : summary || undefined} />;
 }
 

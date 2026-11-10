@@ -1,6 +1,7 @@
 import { useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { inputText } from "../shared/tool-preview";
@@ -11,8 +12,9 @@ type ListProps = ToolRenderProps<z.infer<typeof DirectoryList.schema>>;
 function ListHeader({ target, invocation, result }: ListProps) {
   const i18n = useI18n();
   const path = inputText(target, "path");
-  return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectoryList)} monospace
-    subject={[invocation.resource?.title, path && path !== "." ? path : null].filter(Boolean).join(": ")}
+  return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectoryList)}
+    subject={useToolResourceSubject(invocation.resource)}
+    summary={path && path !== "." && <span className="font-mono" title={path}>{path}</span>}
     meta={result?.data && i18n.formatMessage(filesystemMessages.toolEntryCount, { count: result.data.entries.length, truncated: result.data.truncated })} />;
 }
 function ListBody({ result }: ListProps) {

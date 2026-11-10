@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText, PenLine, Link } from "lucide-react";
-import { toolRenderer, useI18n, useRendererResources, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { JsonView } from "@asterism-app/ui/json-view";
-import { ToolDetails } from "@asterism-app/ui/tool-content";
+import { ToolDetails, useToolResourceTypeSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } from "@asterism-app/ui/ui/item";
 import { Separator } from "@asterism-app/ui/ui/separator";
@@ -16,10 +16,8 @@ import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCre
 import { useCreationDirectory, prepareCreationDirectory } from "./directory";
 
 function ResourceType({ kind }: { kind: string }) {
-  const resource = useRendererResources().get(kind);
-  const label = useI18n().text(resource.label);
-  return <Badge variant="secondary" className="max-w-full py-0 type-caption font-normal" title={label}>
-    {resource.icon}<span className="truncate">{label}</span>
+  return <Badge variant="secondary" className="max-w-full py-0 type-caption font-normal">
+    {useToolResourceTypeSubject(kind)}
   </Badge>;
 }
 
@@ -30,8 +28,8 @@ function CreationHeader({ label, creationId, kind, title }: {
   const directory = useCreationDirectory();
   const i18n = useI18n();
   const resourceKind = kind ?? (creationId ? directory.kinds.get(creationId) : undefined);
-  return <ToolHeader label={label} badge={resourceKind && <ResourceType kind={resourceKind} />}
-    subject={title} meta={creationId && !resourceKind && directory.failed ? i18n.text(messages.directoryUnavailable) : undefined} />;
+  return <ToolHeader label={label} subject={useToolResourceTypeSubject(resourceKind)}
+    summary={title} meta={creationId && !resourceKind && directory.failed ? i18n.text(messages.directoryUnavailable) : undefined} />;
 }
 
 function Field({ label, children, monospace = true }: { label: string; children: ReactNode; monospace?: boolean }) {
@@ -154,8 +152,9 @@ function CreateBody({ result }: CreateProps) {
 type RemoveProps = ToolRenderProps<z.infer<typeof ResourceRemoveResult.schema>>;
 function RemoveHeader({ args, result }: RemoveProps) {
   const i18n = useI18n();
-  return <ToolHeader label={i18n.text(messages.remove)} monospace
-    subject={result?.data?.resource_id ?? inputText(args, "resource_id")} />;
+  const id = result?.data?.resource_id ?? inputText(args, "resource_id");
+  return <ToolHeader label={i18n.text(messages.remove)}
+    subject={id && <span className="font-mono" title={id}>{id}</span>} />;
 }
 function RemoveBody({ result }: RemoveProps) {
   const i18n = useI18n();
@@ -168,16 +167,18 @@ function RemoveBody({ result }: RemoveProps) {
 }
 
 function RenameHeader({ args, result }: ToolRenderProps<z.infer<typeof ResourceRenameResult.schema>>) {
+  const id = result?.data?.resource_id ?? inputText(args, "resource_id");
   return <ToolHeader label={useI18n().text(messages.rename)}
-    subject={result?.data?.title ?? inputText(args, "title")}
-    meta={result?.data?.resource_id ?? inputText(args, "resource_id")} />;
+    subject={id && <span className="font-mono" title={id}>{id}</span>}
+    summary={result?.data?.title ?? inputText(args, "title")} />;
 }
 const renameView = { headerRenderer: RenameHeader };
 function ExposureHeader({ args, result }: ToolRenderProps<z.infer<typeof ResourceExposeResult.schema>>) {
   const exposed = result?.data?.exposed ?? inputField(args, "exposed");
+  const id = result?.data?.resource_id ?? inputText(args, "resource_id");
   const label = exposed === true ? messages.expose : exposed === false ? messages.unexpose : messages.exposure;
-  return <ToolHeader label={useI18n().text(label)} monospace
-    subject={result?.data?.resource_id ?? inputText(args, "resource_id")} />;
+  return <ToolHeader label={useI18n().text(label)}
+    subject={id && <span className="font-mono" title={id}>{id}</span>} />;
 }
 const exposureView = { headerRenderer: ExposureHeader };
 const listView = { headerRenderer: ListHeader, bodyRenderer: ListBody };

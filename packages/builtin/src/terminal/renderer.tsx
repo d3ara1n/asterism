@@ -7,6 +7,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { Field, FieldLabel } from "@asterism-app/ui/ui/field";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism-app/ui/ui/select";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { CreationForm } from "../shared/creation-form";
 import { commonMessages } from "../messages/common";
@@ -130,7 +131,7 @@ function WaitBody({ result }: ToolRenderProps<z.infer<typeof TerminalWait.schema
   </StatusRow>;
 }
 const header = (label: typeof terminalMessages.input) => function Header({ invocation }: ToolRenderProps) {
-  const i18n = useI18n(); return <ToolHeader label={i18n.formatMessage(label)} subject={invocation.resource?.title} monospace />;
+  const i18n = useI18n(); return <ToolHeader label={i18n.formatMessage(label)} subject={useToolResourceSubject(invocation.resource)} />;
 };
 const inputBody = { headerRenderer: header(terminalMessages.input), bodyRenderer: InputBody };
 const waitHeader = { headerRenderer: header(terminalMessages.wait) };

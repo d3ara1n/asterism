@@ -1,6 +1,7 @@
 import { ScanSearch } from "lucide-react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import type { PeekResult } from "@asterism-app/builtin-api/contracts";
 import { peekMessages as messages } from "../messages/peek";
@@ -8,11 +9,12 @@ import { Markdown } from "@asterism-app/ui/markdown";
 import { messageTarget } from "./message-target";
 
 function Header({ phase, invocation, result, target }: ToolRenderProps<PeekResult>) {
-  const i18n = useI18n();
+  const i18n = useI18n(), recipient = messageTarget(target);
   const status = phase === "input" ? messages.preparing : phase === "ready" ? messages.waiting
     : phase === "settled" ? result.kind === "succeeded" ? messages.done : null
       : messages[result?.data?.phase ?? "investigating"];
-  return <ToolHeader label={i18n.text(messages.title)} subject={messageTarget(target) ?? invocation.resource?.title}
+  return <ToolHeader label={i18n.text(messages.title)} subject={useToolResourceSubject(invocation.resource)}
+    summary={recipient !== invocation.resource?.title ? recipient : undefined}
     meta={status ? i18n.text(status) : undefined} />;
 }
 

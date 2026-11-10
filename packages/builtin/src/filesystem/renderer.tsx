@@ -4,6 +4,7 @@ import type { z } from "zod";
 import { Eye, Folder, BookOpen, FileDown, FilePenLine, FilePlus2, Info, ListTree, Replace } from "lucide-react";
 
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { prepareCodeView } from "@asterism-app/ui/code-view";
@@ -26,8 +27,10 @@ const DirectoryFile = lazy(() => import("./DirectoryFile"));
 type SeeProps = ToolRenderProps<z.infer<typeof DirectorySee.schema>>;
 function SeeHeader({ target, invocation }: SeeProps) {
   const i18n = useI18n();
-  return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectorySee)} monospace
-    subject={[invocation.resource?.title, inputText(target, "path")].filter(Boolean).join(": ")} />;
+  const path = inputText(target, "path");
+  return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectorySee)}
+    subject={useToolResourceSubject(invocation.resource)}
+    summary={path && <span className="font-mono" title={path}>{path}</span>} />;
 }
 function SeeBody({ result }: SeeProps) {
   const object = useRendererObject();
