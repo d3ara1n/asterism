@@ -87,8 +87,6 @@ Main aggregates its own diagnostics, renderer failures, and child-process output
 
 Utility-process fatal-error reports supplied by Electron are saved verbatim in a separate diagnostics directory under the application data root. Main writes each report before its supervision handler terminates the child and logs the source, process, failure location, and report path. Report files use owner-only permissions and remain outside log rotation until explicitly removed. They may contain sensitive runtime and environment data; capture does not upload them. A report-write failure is logged without interrupting process failure handling. This preserves reports delivered by Electron, not every possible process termination.
 
-Local runtime profiling is opt-in and independent of business execution. A development launch can expose the task process through a loopback-only Node Inspector; packaged launches ignore this development flag. An external collector reads V8 and Node process counters and checkpoints allocation samples without adding business-level instrumentation. Full heap snapshots are explicit operations because they pause the target and require extra memory. Capture files remain local, with completed samples written incrementally and interrupted snapshots marked partial. Inspector disconnect ends the capture rather than following another process.
-
 Fatal interface initialization and rendering errors report their JavaScript and component stacks through the trusted desktop bridge into the same log. Reporting these failures is independent of the business runtime connection.
 
 ## Plugin build artifacts and native tools

@@ -2,6 +2,10 @@
 
 Filed on 2026-11-10 after the installed release (1.0.0-prerelease.16) lost its task runtime with a V8 heap OOM. Closed and archived on 2026-11-11 after a local closed-lease retention defect was identified, repaired, and checked against a restarted development capture. The original installed crash has no heap snapshot, so exclusive attribution of that OOM remains unproven.
 
+## Diagnostic tooling retirement
+
+On 2026-11-11, the user retired the temporary Inspector startup entry, collector client, and their tests and usage documentation after completing the investigation. The commands and capture workflow below describe historical tooling, not current application capabilities. The closed-lease retention fix, application logging, and utility-process fatal-report capture remain in place. Existing exit logs showed one 4426 ms shutdown waiting for an attached debugger to disconnect; subsequent exits after debugger disconnection completed in 14–26 ms. No unconditional test delay was found in the exit path.
+
 ## Evidence
 
 Production log: `~/Library/Application Support/dev.dearain.asterism/logs/runtime.log`. The original crash report was `~/Library/Logs/DiagnosticReports/Asterism Helper-2026-11-10-160216.ips`; it was no longer present when checked on 2026-11-11. The copied crash facts below remain historical evidence.
