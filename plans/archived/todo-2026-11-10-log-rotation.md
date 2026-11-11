@@ -1,6 +1,6 @@
 # Runtime log rotation
 
-Filed on 2026-11-10. Implementation completed on 2026-11-11; installed-application GUI acceptance remains pending. The problem and measurements below describe the pre-change implementation.
+Filed on 2026-11-10. Implementation completed and archived on 2026-11-11. The problem and measurements below describe the pre-change implementation.
 
 ## Problem
 
@@ -44,8 +44,5 @@ Synchronous writes were an early implementation choice, not a durability guarant
 - An isolated temporary-directory integration check verified structured records, debug output, multiline renderer diagnostics, final unterminated child output, completed file writes, owner-only log permissions, and preservation of an existing legacy log. Temporary data was removed.
 - A separate temporary-directory file-open failure check verified stderr reporting and completed logging shutdown without an unhandled file error. Temporary data was removed.
 - The production dependency audit reported existing `exa-js`, `openai`, and `zod` advisories; none named the newly added logging dependencies. No unrelated dependency fixes were attempted.
-- No tests were added for library configuration, field-list assembly, Electron event forwarding, or timing. GUI startup/shutdown was not automated.
-
-## Remaining acceptance
-
-- [ ] In an installed application, confirm the new files appear in Open logs and that ordinary quit, restart, and update handoff finish normally. GUI acceptance remains user-operated; no claim of installed-app acceptance is made here.
+- No tests were added for library configuration, field-list assembly, Electron event forwarding, or timing.
+- No UI changed. Installed-application quit, restart, and update handoff were not exercised; the validation above covers typechecks, focused tests, temporary-directory logging checks, and the build.
