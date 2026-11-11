@@ -10,8 +10,16 @@ export const editorTheme = EditorView.theme({
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--foreground)" },
   ".cm-gutters": { backgroundColor: "var(--card)", color: "var(--muted-foreground)", border: "none" },
   ".cm-lineNumbers .cm-gutterElement": { padding: "0 8px 0 12px" },
-  ".cm-activeLine, .cm-activeLineGutter": { backgroundColor: "var(--accent)" },
-  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: "var(--selected)" },
+  ".cm-activeLine": { position: "relative", backgroundColor: "transparent" },
+  // The scroller's stacking context keeps this fill behind CodeMirror's selection layer (z-index: -2).
+  ".cm-activeLine::before": {
+    content: '""', position: "absolute", inset: "0", zIndex: -3,
+    backgroundColor: "var(--accent)", pointerEvents: "none",
+  },
+  ".cm-activeLineGutter": { backgroundColor: "var(--accent)" },
+  // Match the focused base selector's specificity so CodeMirror's default selection color cannot win.
+  ".cm-selectionBackground, &.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground": { backgroundColor: "var(--selection)" },
+  ".cm-content::selection, .cm-content ::selection": { backgroundColor: "var(--selection)" },
   ".cm-selectionMatch": { backgroundColor: "var(--accent)" },
   ".cm-searchMatch": { backgroundColor: "var(--accent)", outline: "1px solid var(--border)" },
   ".cm-searchMatch.cm-searchMatch-selected": { backgroundColor: "var(--selected)", outline: "1px solid var(--ring)" },
