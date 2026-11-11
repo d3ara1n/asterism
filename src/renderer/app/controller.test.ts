@@ -93,7 +93,7 @@ describe("Application session list", () => {
       expect(execute.mock.calls).toHaveLength(1);
     } finally { disconnect(); }
   });
-  it("rereads when refreshed again during a query, and a late creation can refresh the list without carrying any session position", async () => {
+  it("rereads when refreshed again during a query and applies the updated session list", async () => {
     const requests: Array<(result: CommandResult) => void> = [];
     const execute = vi.fn(() => new Promise<CommandResult>(resolve => requests.push(resolve)));
     const controller = new ApplicationController({ execute, onStatus: () => () => {}, session: { execute: vi.fn(), onChanged: () => () => {} } });
@@ -105,6 +105,5 @@ describe("Application session list", () => {
     await first;
     expect(execute.mock.calls).toHaveLength(2);
     expect(controller.getSnapshot().snapshot?.sessions.map(session => session.id)).toEqual(["new"]);
-    expect(controller.getSnapshot().snapshot).not.toHaveProperty("session");
   });
 });

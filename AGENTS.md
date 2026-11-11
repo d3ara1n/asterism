@@ -69,9 +69,11 @@ Documentation work requires semantic, terminology, language, and standalone-read
 
 UI and style work uses necessary typechecks and builds, not an unrelated full history/runtime suite. Visual configuration and rendering are manually accepted.
 
-Tests target deterministic logic with meaningful branches or calculations: parsing, patches, folding, matching, and formatting. Each case identifies a concrete failure mechanism and an independent expected result.
+Tests target deterministic logic with meaningful branches or calculations: parsing, patches, folding, matching, and formatting. Each case identifies a concrete failure mechanism and an independent expected result. Before adding an assertion, identify the defect a failure would expose; an expectation that only needs updating when a declaration or copy changes adds no behavioral check.
 
-Remove rather than add tests for constants, schemas, type-guaranteed facts, direct forwarding/assembly, implementation-mirroring assertions, UI rendering/interaction, real processes, and real or fake timing. Extract meaningful pure UI calculations when appropriate.
+Remove rather than add tests for constants, schemas, type-guaranteed facts, direct forwarding/assembly, implementation-mirroring assertions, UI rendering/interaction, and real or fake timing. Extract meaningful pure UI calculations when appropriate.
+
+Process-backed plugin build/load checks belong to the opt-in integration suite, separate from default unit tests. Run that suite for changes to plugin loading, build resolution, shared SDK/API identity, packaging, or their dependencies; unrelated changes use focused unit tests and the normal build checks.
 
 Cover a contract once at its owning boundary. Repeated downstream tests should reveal an encapsulation gap before adding duplication. Review comments are leads, not automatic requirements; speculative interleavings do not justify defensive mechanisms or tests. Test count and coverage are not goals.
 

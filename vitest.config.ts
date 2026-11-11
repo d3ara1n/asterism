@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import { testSourceGlob } from "./src/shared/runtime-modules.ts";
 import { sharedUiModules } from "./scripts/shared-ui-modules.ts";
 import { resolve } from "node:path";
@@ -10,5 +10,6 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src", "packages", "scripts"].map(directory => `${directory}/${testSourceGlob}`),
+    exclude: [...configDefaults.exclude, "**/*.integration.test.*"],
   },
 });

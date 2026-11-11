@@ -165,7 +165,6 @@ describe("Messaging connections", () => {
       },
     }], life.group("call"));
     await status(registry, "connection", "connected");
-    await new Promise(resolve => setTimeout(resolve, 0));
     expect(received).toEqual(["conversation.discovered", "conversation.discovered"]);
     expect(registry.connections()[0]?.status).toBe("connected");
   });

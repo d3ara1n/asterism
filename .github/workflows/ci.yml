@@ -2,6 +2,11 @@ name: CI
 
 on:
   workflow_dispatch:
+    inputs:
+      plugin_integration:
+        description: Run plugin build/load integration tests
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,5 +27,8 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - name: Plugin build/load integration tests
+        if: inputs.plugin_integration
+        run: npm run test:plugins
       - run: npm run i18n:check
       - run: npm run build

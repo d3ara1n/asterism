@@ -864,16 +864,10 @@ describe("Agent resource operation entries", () => {
       { resource_id: resourceId, type: Item.kind, title: "Renamed" },
     ] } });
   });
-  // Entries own domain input: resource lists are explicitly declared only on selected entries; generic creation arguments and note input retain their own structures.
-  it("agent entries declare resource lists while note entries create through their own schemas", async () => {
+  // Invalid resource lists leave history unchanged; successful note creation links the note to the requesting agent.
+  it("rejects resource lists in note creation and links a successfully created note", async () => {
     let calls: { name: string; args: Json }[] = [];
     const f = open({ adapter: adapter(() => calls) }), target = await model(f.app), actor = await f.session.create(Create, 0);
-    expect(agentCreations.inspect(f.plugin, "asterism.builtin/agent.create").input).toHaveProperty("properties.resources");
-    expect(agentCreations.inspect(f.plugin, "asterism.builtin/agent.create").input).toHaveProperty("properties.expose_self.type", "boolean");
-    expect(agentCreations.inspect(f.plugin, "asterism.builtin/note.create").input).toMatchObject({
-      type: "object", additionalProperties: false, properties: { title: { type: "string" }, content: { type: "string" } },
-    });
-    expect(agentCreations.inspect(f.plugin, "asterism.builtin/note.create").input).not.toHaveProperty("properties.resources");
     const input = { title: "A note", content: "Note text" }, creation_id = "asterism.builtin/note.create";
     const run = runner(f, actor, target), before = f.session.snapshot().position.nodeId;
     calls = [{ name: "resource_create", args: { creation_id, input, resources: [] } }];

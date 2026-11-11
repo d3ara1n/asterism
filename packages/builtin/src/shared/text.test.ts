@@ -216,7 +216,6 @@ describe("text tool contracts", () => {
     expect(writeToModel(change).split("\n")).toHaveLength(1);
     expect(writeToModel(change)).not.toContain(change.diff);
     expect(writeToModel(change)).not.toContain("│");
-    expect(writeToModel(textChange(after, after, "text.txt"))).toEqual(expect.any(String));
     expect(applyPatch("", change.diff)).toBe(after);
   });
   it("the user body-preview budget does not limit content returned to the model by read", () => {

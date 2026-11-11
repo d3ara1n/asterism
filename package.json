@@ -13,6 +13,7 @@
   "scripts": {
     "postinstall": "install-electron && node scripts/prepare-native.mjs && node scripts/prepare-signing.mjs",
     "test": "vitest run",
+    "test:plugins": "vitest run --config vitest.plugins.config.ts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.renderer.json",
     "dev": "electron-vite dev",
     "build": "electron-vite build",

@@ -1,0 +1,366 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { PackageList, loadPackages, packageCandidates, runtimeDependencies } from "./packages.ts";
+import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
+import { ApplicationService } from "../runtime/service.ts";
+import { pathToFileURL } from "node:url";
+import type { PluginDefinition } from "@asterism-app/sdk/runtime";
+
+const roots: string[] = [];
+afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
+function temp() { const r = mkdtempSync(join(tmpdir(), "plugin-pkg-")); roots.push(r); return r; }
+function pkg(root: string, asterism: object | undefined, source?: string) {
+  mkdirSync(join(root, "src"), { recursive: true });
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", version: "1.0.0", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` },
+    ...(asterism && { asterism: { displayName: "Test plugin", ...asterism } }) }));
+  if (source) writeFileSync(join(root, "src", "runtime.ts"), source);
+}
+const runtime = (id: string) => `import { pluginNamespace } from "@asterism-app/sdk/contracts";
+import { definePlugin, defineModule } from "@asterism-app/sdk/runtime";
+const ns = pluginNamespace(${JSON.stringify(id)});
+export default definePlugin({ namespace: ns, modules: [defineModule(() => ({}))] });`;
+
+describe("Plugin packages", () => {
+  // Runtime binding follows available SDK exports; absent or older peer ranges do not change the same working API.
+  it.each([undefined, "^0.1.0"])("loads actual SDK imports with peer declaration %s", async range => {
+    const dir = temp(), data = temp();
+    pkg(dir, { id: "acme.x", runtime: "src/runtime.ts" }, runtime("acme.x"));
+    const metadata = JSON.parse(readFileSync(join(dir, "package.json"), "utf8"));
+    metadata.peerDependencies["@asterism-app/sdk"] = range;
+    writeFileSync(join(dir, "package.json"), JSON.stringify(metadata));
+    const list = new PackageList(join(data, "plugins.json"));
+    list.add({ source: { kind: "path", path: dir } }, data);
+    const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
+    expect(loaded!.status, loaded!.diagnostic?.message).toBe("ready");
+    expect(loaded!.definition!.namespace.id).toBe("acme.x");
+  });
+  it("esbuild bundles and imports source packages with the host SDK instance; disabled and duplicate IDs do not load", async () => {
+    const data = temp(); const a = temp(); const b = temp(); const c = temp();
+    pkg(a, { id: "acme.a", runtime: "src/runtime.ts" }, runtime("acme.a"));
+    pkg(b, { id: "acme.b", runtime: "src/runtime.ts" }, runtime("acme.b"));
+    pkg(c, { id: "acme.b", runtime: "src/runtime.ts" }, runtime("acme.b"));
+    const list = new PackageList(join(data, "plugins.json"));
+    list.add({ source: { kind: "path", path: a } }, data);
+    list.add({ source: { kind: "path", path: b } }, data);
+    expect(() => list.add({ source: { kind: "path", path: c } }, data)).toThrow();
+    list.setEnabled(1, false);
+    const loaded = await loadPackages(list, data, join(data, "cache"), ["asterism.builtin"]);
+    expect(loaded.map(item => [item.manifest?.id, item.status])).toEqual([["acme.a", "ready"], ["acme.b", "disabled"]]);
+    expect(loaded[0]!.definition?.namespace.id).toBe("acme.a");
+  });
+  it("bundles extensionless JavaScript imports ending in .node instead of treating them as native binaries", async () => {
+    const root = temp(), data = temp();
+    pkg(root, { id: "acme.platform", runtime: "src/runtime.ts" },
+      `import { identity } from "./bridge.cjs";\n${runtime("acme.platform")}\nif (identity !== "javascript") throw new Error("Wrong platform module.");`);
+    writeFileSync(join(root, "src/bridge.cjs"), 'exports.identity = require("./platform.node").identity;');
+    writeFileSync(join(root, "src/platform.node.js"), 'exports.identity = "javascript";');
+    const list = new PackageList(join(data, "plugins.json"));
+    list.add({ source: { kind: "path", path: root } }, data);
+    const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
+    expect(loaded!.status, loaded!.diagnostic?.message).toBe("ready");
+  });
+  it("rejects imported test sources before executing them while loading unrelated plugins", async () => {
+    const data = temp(), broken = temp(), healthy = temp();
+    pkg(broken, { id: "acme.test-import", runtime: "src/runtime.ts" },
+      `import "./helper.test.ts";\n${runtime("acme.test-import")}`);
+    writeFileSync(join(broken, "src/helper.test.ts"), 'throw new Error("Test module was executed.");');
+    pkg(healthy, { id: "acme.healthy", runtime: "src/runtime.ts" }, runtime("acme.healthy"));
+    const list = new PackageList(join(data, "plugins.json"));
+    for (const path of [broken, healthy]) list.add({ source: { kind: "path", path } }, data);
+    const loaded = await loadPackages(list, data, join(data, "cache"), []);
+    expect(loaded.map(item => item.status)).toEqual(["failed", "ready"]);
+    expect(loaded[0]!.diagnostic?.message).toContain("Runtime entry imports a test module");
+    expect(loaded[0]!.diagnostic?.message).toContain("helper.test.ts");
+  });
+  it("source packages provide real resources using only the public SDK without host-internal factories", async () => {
+    const data = temp(); const root = temp();
+    pkg(root, { id: "acme.sdk", runtime: "src/runtime.ts" }, `
+      import { z } from "zod";
+      import { pluginNamespace, defineCreation, defineAction } from "@asterism-app/sdk/contracts";
+      import { definePlugin, defineModule, implementResource, implementCreation, implementAction } from "@asterism-app/sdk/runtime";
+      const ns = pluginNamespace("acme.sdk");
+      const resource = ns.resource("label", z.object({ label: z.string() }));
+      const content = ns.data("content", z.string());
+      const rename = defineAction(resource, { id: ns.name("rename"), schema: z.string() });
+      export default definePlugin({ namespace: ns, modules: [defineModule(() => ({
+        resources: [implementResource(resource, ns.data("view", z.string()), {
+          creation: implementCreation(defineCreation(resource, { id: ns.name("create"), schema: z.string() }), { create: label => ({ title: label, data: { label } }) }),
+          actions: [implementAction(rename, { async execute(input, object) { object.commit(writer => { writer.set(content, input); }); } })],
+          project: (data, object) => object.get(content) ?? data.label, inspect: async data => data,
+        })],
+      }))] });
+    `);
+    const list = new PackageList(join(data, "plugins.json"));
+    list.add({ source: { kind: "path", path: root } }, data);
+    const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
+    expect(loaded!.status, loaded!.diagnostic?.message).toBe("ready");
+    const service = new ApplicationService(data, { plugins: [loaded!.definition!] });
+    try {
+      const sessionId = service.sessions.tree.create("SDK");
+      await service.sessions.execute({ type: "resource.create", sessionId, kind: "acme.sdk/label", creation: { id: "acme.sdk/create" }, input: "Hello", position: { x: 0, y: 0 } });
+      expect(service.sessions.current(sessionId).workbench.objects[0]!.presentation).toEqual({
+        contract: { id: "acme.sdk/view" }, data: "Hello",
+      });
+      const objectId = service.sessions.current(sessionId).workbench.objects[0]!.id;
+      await service.sessions.execute({ type: "resource.command", sessionId, objectId,
+        command: { id: "acme.sdk/rename", input: "Renamed" } });
+      expect(service.sessions.current(sessionId).workbench.objects[0]!.presentation.data).toBe("Renamed");
+    } finally { await service.close(); }
+  });
+});
+
+// Symlink entry source paths resolve; CSS ownership still follows output entries so class names and url() remain valid after relocation.
+it("preserves distinct CSS Module names, relocated assets, and stylesheet changes across builds", async () => {
+  const root = temp(), plain = temp(), other = temp(), broken = temp(), data = temp(), cache = join(data, "cache");
+  pkg(root, { id: "acme.styled", renderer: "src/renderer.ts" });
+  pkg(plain, { id: "acme.plain", renderer: "src/renderer.ts" });
+  pkg(other, { id: "acme.other", renderer: "src/renderer.ts" });
+  pkg(broken, { id: "acme.broken-style", renderer: "src/renderer.ts" });
+  writeFileSync(join(root, "src/entry.ts"), 'import "./base.css"; export { default as styles } from "./panel.module.css"; export default {};');
+  symlinkSync("entry.ts", join(root, "src/renderer.ts"));
+  writeFileSync(join(plain, "src/renderer.ts"), "export default {};");
+  writeFileSync(join(other, "src/renderer.ts"), 'export { default as styles } from "./panel.module.css"; export default {};');
+  writeFileSync(join(other, "src/panel.module.css"), ".card { color: #abcdef; }");
+  writeFileSync(join(broken, "src/renderer.ts"), 'import "./missing.css"; export default {};');
+  writeFileSync(join(root, "src/base.css"), '@font-face { font-family: Example; src: url("./font.woff"); }');
+  writeFileSync(join(root, "src/panel.module.css"), '.card { color: #123456; background-image: url("./image.webp"); }');
+  writeFileSync(join(root, "src/font.woff"), "font-fixture");
+  writeFileSync(join(root, "src/image.webp"), "image-fixture");
+  const list = new PackageList(join(data, "plugins.json"));
+  for (const path of [root, plain, other, broken]) list.add({ source: { kind: "path", path } }, data);
+  const load = () => loadPackages(list, data, cache, []);
+  const first = await load();
+  expect(first.map(item => item.status)).toEqual(["ready", "ready", "ready", "failed"]);
+  expect(first[3]!.diagnostic?.message).toContain("missing.css");
+  expect(first[1]!.stylesheet).toBeUndefined();
+  const stylesheet = join(cache, first[0]!.stylesheet!);
+  const css = readFileSync(stylesheet, "utf8");
+  const module = await import(pathToFileURL(join(cache, first[0]!.renderer!)).href) as { styles: { card: string } };
+  const otherModule = await import(pathToFileURL(join(cache, first[2]!.renderer!)).href) as { styles: { card: string } };
+  expect(otherModule.styles.card).not.toBe(module.styles.card);
+  expect(readFileSync(join(cache, first[2]!.stylesheet!), "utf8")).toContain(`.${otherModule.styles.card}`);
+  expect(module.styles.card).not.toBe("card");
+  expect(css).toContain(`.${module.styles.card}`);
+  expect(css).toContain("#123456");
+  const assets = [...css.matchAll(/url\(["']?([^"')]+)["']?\)/gu)].map(match =>
+    readFileSync(resolve(dirname(stylesheet), match[1]!), "utf8"));
+  expect(assets.sort()).toEqual(["font-fixture", "image-fixture"]);
+  writeFileSync(join(root, "src/panel.module.css"), ".card { color: #654321; }");
+  const updated = await load();
+  expect(updated[0]!.stylesheet).not.toBe(first[0]!.stylesheet);
+  expect(readFileSync(join(cache, updated[0]!.stylesheet!), "utf8")).toContain("#654321");
+});
+
+function publicFixture() {
+  const data = temp(), provider = temp(), consumer = temp();
+  pkg(provider, { id: "acme.provider", runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
+    import { pluginNamespace } from "@asterism-app/sdk/contracts";
+    import { Read, settings, Marker, events } from "./state.ts";
+    export default { namespace: pluginNamespace("acme.provider"),
+      probe: { Read, settings, Marker, events }, modules: [{ setup(plugin) {
+        events.push("provider"); settings.set("ready", 1);
+        plugin.lifetime.defer(async () => { events.push("close-provider"); });
+        return {};
+      } }] };
+  `);
+  const info = JSON.parse(readFileSync(join(provider, "package.json"), "utf8"));
+  writeFileSync(join(provider, "package.json"), JSON.stringify({ ...info, name: "@fixture/provider", exports: { "./public": "./src/public.ts" } }));
+  writeFileSync(join(provider, "src/state.ts"), `
+    import { defineTool } from "@asterism-app/sdk/contracts";
+    import { z } from "zod";
+    export const Read = defineTool({ id: "acme.provider/read", name: "read", description: "Read.", guidelines: [],
+      argsSchema: z.null().describe("No arguments.") });
+    export const settings = new Map();
+    export const events = [];
+    export class Marker {}
+  `);
+  writeFileSync(join(provider, "src/public.ts"), 'export { Read, settings, Marker, events } from "./state.ts";');
+  writeFileSync(join(provider, "src/renderer.ts"), 'export { Read, settings, Marker } from "./state.ts"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
+  pkg(consumer, { id: "acme.consumer", runtime: "src/runtime.ts", renderer: "src/renderer.ts" }, `
+    import { pluginNamespace, defineImplementation } from "@asterism-app/sdk/contracts";
+    import { implementTool } from "@asterism-app/sdk/runtime";
+    import { z } from "zod";
+    import { Read, settings, Marker, events } from "@fixture/provider/public";
+    const ns = pluginNamespace("acme.consumer");
+    const implementation = defineImplementation({ ...ns.data("read", z.null().describe("No result.")),
+      resource: ns.resource("thing", z.object({})), tool: Read, targetSchema: z.null().describe("Whole resource."),
+      effect: "read", execution: "parallel" });
+    export default { namespace: ns,
+      probe: { Read, settings, Marker, events }, modules: [{ setup(plugin) {
+        if (settings.get("ready") !== 1) throw new Error("Provider is not initialized.");
+        events.push("consumer");
+        plugin.lifetime.defer(async () => { events.push("close-consumer"); });
+        return { tools: [implementTool(implementation, { async call() { return { kind: "succeeded", data: null }; } })] };
+      } }] };
+  `);
+  const consumerInfo = JSON.parse(readFileSync(join(consumer, "package.json"), "utf8"));
+  writeFileSync(join(consumer, "package.json"), JSON.stringify({ ...consumerInfo, name: "@fixture/consumer", peerDependencies: { ...consumerInfo.peerDependencies, "@fixture/provider": "^1.0.0" } }));
+  writeFileSync(join(consumer, "src/renderer.ts"), 'export { Read, settings, Marker } from "@fixture/provider/public"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
+  const list = new PackageList(join(data, "plugins.json"));
+  list.add({ source: { kind: "path", path: consumer } }, data);
+  list.add({ source: { kind: "path", path: provider } }, data);
+  return { data, provider, consumer, list, cache: join(data, "cache") };
+}
+type Probe = { Read: object; settings: Map<string, number>; Marker: new () => object; events: string[] };
+describe("Public modules", () => {
+  // An unchanged public export remains usable across package versions; a removed export is an actual loading failure.
+  it("binds available public APIs across provider upgrades and rejects missing exports", async () => {
+    const fixture = publicFixture();
+    const load = () => loadPackages(fixture.list, fixture.data, fixture.cache, []);
+    expect((await load()).map(item => item.status)).toEqual(["ready", "ready"]);
+    const metadata = JSON.parse(readFileSync(join(fixture.provider, "package.json"), "utf8"));
+    metadata.version = "2.0.0";
+    writeFileSync(join(fixture.provider, "package.json"), JSON.stringify(metadata));
+    const upgraded = await load();
+    expect(upgraded.map(item => item.status)).toEqual(["ready", "ready"]);
+    const probes = upgraded.map(item => (item.definition as PluginDefinition & { probe: Probe }).probe);
+    expect(probes[0]!.Read).toBe(probes[1]!.Read);
+    writeFileSync(join(fixture.provider, "src/public.ts"), 'export { settings, Marker, events } from "./state.ts";');
+    const [consumer, provider] = await load();
+    expect(consumer!.status).toBe("failed");
+    expect(consumer!.definition).toBeUndefined();
+    expect(consumer!.diagnostic?.message).toContain('for import "Read"');
+    expect(provider!.status, provider!.diagnostic?.message).toBe("ready");
+  });
+  // Helper locations and their peer ranges must not create duplicate public declarations or lose initialization dependencies.
+  it.each(["nested", "symlink"] as const)("binds %s helpers to the active provider despite differing peer ranges", async mode => {
+    const fixture = publicFixture();
+    const metadata = JSON.parse(readFileSync(join(fixture.consumer, "package.json"), "utf8"));
+    delete metadata.peerDependencies["@fixture/provider"];
+    metadata.dependencies = { "@fixture/helper": "1.0.0" };
+    writeFileSync(join(fixture.consumer, "package.json"), JSON.stringify(metadata));
+    const helper = mode === "nested" ? join(fixture.consumer, "node_modules/@fixture/helper") : temp();
+    mkdirSync(helper, { recursive: true });
+    const helperMetadata = { name: "@fixture/helper", version: "1.0.0", type: "module", exports: "./index.js",
+      peerDependencies: { "@fixture/provider": "^1.0.0" } };
+    writeFileSync(join(helper, "package.json"), JSON.stringify(helperMetadata));
+    writeFileSync(join(helper, "index.js"), 'export * from "@fixture/provider/public";');
+    if (mode === "symlink") {
+      mkdirSync(join(fixture.consumer, "node_modules/@fixture"), { recursive: true });
+      symlinkSync(helper, join(fixture.consumer, "node_modules/@fixture/helper"), "dir");
+    }
+    for (const entry of ["runtime", "renderer"]) {
+      const source = join(fixture.consumer, `src/${entry}.ts`);
+      writeFileSync(source, readFileSync(source, "utf8").replace('"@fixture/provider/public"', '"@fixture/helper"'));
+    }
+    const load = () => loadPackages(fixture.list, fixture.data, fixture.cache, []);
+    const loaded = await load();
+    expect(loaded.map(item => item.status)).toEqual(["ready", "ready"]);
+    expect(loaded[0]!.runtimeDependencies).toEqual(["acme.provider"]);
+    const probes = loaded.map(item => (item.definition as PluginDefinition & { probe: Probe }).probe);
+    expect(probes[0]!.Read).toBe(probes[1]!.Read);
+    metadata.peerDependencies["@fixture/provider"] = "^1.0.0";
+    writeFileSync(join(fixture.consumer, "package.json"), JSON.stringify(metadata));
+    helperMetadata.peerDependencies["@fixture/provider"] = "^2.0.0";
+    writeFileSync(join(helper, "package.json"), JSON.stringify(helperMetadata));
+    const updated = await load();
+    expect(updated.map(item => item.status)).toEqual(["ready", "ready"]);
+    expect(updated[0]!.runtimeDependencies).toEqual(["acme.provider"]);
+  });
+  it("provider internal references, two consumers, and re-exports share real declarations, state, and class identity", async () => {
+    const fixture = publicFixture(), second = temp();
+    const metadata = JSON.parse(readFileSync(join(fixture.consumer, "package.json"), "utf8"));
+    pkg(second, { ...metadata.asterism, id: "acme.second", renderer: undefined },
+      readFileSync(join(fixture.consumer, "src/runtime.ts"), "utf8").replaceAll("acme.consumer", "acme.second"));
+    writeFileSync(join(second, "package.json"), JSON.stringify({ ...metadata, name: "@fixture/second",
+      asterism: { ...metadata.asterism, id: "acme.second", renderer: undefined } }));
+    fixture.list.add({ source: { kind: "path", path: second } }, fixture.data);
+    const packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
+    expect(packages.map(pkg => pkg.diagnostic?.message)).toEqual([undefined, undefined, undefined]);
+    const probes = packages.map(pkg => (pkg.definition as PluginDefinition & { probe: Probe }).probe);
+    for (const probe of probes) {
+      expect(probe.Read).toBe(probes[0]!.Read);
+      expect(probe.settings).toBe(probes[0]!.settings);
+      expect(new probe.Marker()).toBeInstanceOf(probes[0]!.Marker);
+    }
+    const service = new ApplicationService(fixture.data, { plugins: packages.map(pkg => pkg.definition!),
+      packages: packageCandidates(packages), pluginDependencies: runtimeDependencies(packages) });
+    try {
+      expect(service.sessions.plugins.every(pkg => pkg.status === "loaded")).toBe(true);
+      expect(service.sessions.plugins.filter(pkg => pkg.id.startsWith("acme."))
+        .flatMap(pkg => pkg.implementations).map(implementation => implementation.active)).toEqual([true, true]);
+    } finally { await service.close(); }
+  });
+  it("frontend artifacts share real exports while backend and frontend keep separate instances", async () => {
+    const fixture = publicFixture();
+    const packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
+    // Supply the frontend dependency table in an isolated test process to verify build artifacts directly without launching a GUI.
+    const globals = globalThis as Record<string, unknown>, previous = globals.__asterismRendererModules;
+    globals.__asterismRendererModules = { zod: await import("zod"), "@asterism-app/sdk/contracts": await import("@asterism-app/sdk/contracts") };
+    try {
+      const consumer = await import(pathToFileURL(join(fixture.cache, packages[0]!.renderer!)).href) as Probe;
+      const provider = await import(pathToFileURL(join(fixture.cache, packages[1]!.renderer!)).href) as Probe;
+      expect(consumer.Read).toBe(provider.Read);
+      expect(consumer.settings).toBe(provider.settings);
+      expect(new consumer.Marker()).toBeInstanceOf(provider.Marker);
+      expect(consumer.Read).not.toBe((packages[0]!.definition as PluginDefinition & { probe: Probe }).probe.Read);
+    } finally {
+      if (previous === undefined) delete globals.__asterismRendererModules;
+      else globals.__asterismRendererModules = previous;
+    }
+  });
+  it("disabled providers explicitly block consumers while unrelated broken plugins preserve the public module graph", async () => {
+    const fixture = publicFixture(), broken = temp();
+    pkg(broken, { id: "acme.broken", runtime: "src/runtime.ts" }, "invalid }");
+    fixture.list.add({ source: { kind: "path", path: broken } }, fixture.data);
+    let packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
+    expect(packages.map(pkg => pkg.status)).toEqual(["ready", "ready", "failed"]);
+    fixture.list.setEnabled(1, false);
+    packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
+    expect(packages.map(pkg => pkg.status)).toEqual(["failed", "disabled", "failed"]);
+    expect(packages[0]!.diagnostic?.message).toEqual(expect.any(String));
+  });
+  it("re-exports outside plugin roots register indirect dependencies and broken providers do not disrupt unrelated plugins", async () => {
+    const fixture = publicFixture(), outside = temp(), healthy = temp();
+    const helper = join(outside, "helper.ts");
+    writeFileSync(helper, 'export * from "@fixture/provider/public";');
+    const source = join(fixture.consumer, "src/runtime.ts");
+    writeFileSync(source, readFileSync(source, "utf8").replace('"@fixture/provider/public"', JSON.stringify(helper)));
+    const metadata = JSON.parse(readFileSync(join(fixture.consumer, "package.json"), "utf8"));
+    delete metadata.asterism.renderer;
+    writeFileSync(join(fixture.consumer, "package.json"), JSON.stringify(metadata));
+    pkg(healthy, { id: "acme.healthy", runtime: "src/runtime.ts" }, runtime("acme.healthy"));
+    fixture.list.add({ source: { kind: "path", path: healthy } }, fixture.data);
+    let packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
+    expect(packages[0]!.runtimeDependencies).toEqual(["acme.provider"]);
+    writeFileSync(join(fixture.provider, "src/runtime.ts"), "invalid }");
+    packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
+    expect(packages.map(pkg => pkg.status)).toEqual(["failed", "failed", "ready"]);
+  });
+  it("frontend reverse imports do not create backend initialization cycles", async () => {
+    const fixture = publicFixture();
+    const consumer = JSON.parse(readFileSync(join(fixture.consumer, "package.json"), "utf8"));
+    consumer.exports = { "./public": "./src/public.ts" };
+    writeFileSync(join(fixture.consumer, "package.json"), JSON.stringify(consumer));
+    writeFileSync(join(fixture.consumer, "src/public.ts"), "export const label = 'Consumer';");
+    const provider = JSON.parse(readFileSync(join(fixture.provider, "package.json"), "utf8"));
+    provider.peerDependencies = { ...provider.peerDependencies, "@fixture/consumer": "*" };
+    writeFileSync(join(fixture.provider, "package.json"), JSON.stringify(provider));
+    writeFileSync(join(fixture.provider, "src/renderer.ts"),
+      'export { label } from "@fixture/consumer/public"; export default { modules: [{ resources: [], cards: [], tools: [] }] };');
+    const packages = await loadPackages(fixture.list, fixture.data, fixture.cache, []);
+    expect(packages[0]!.runtimeDependencies).toEqual(["acme.provider"]);
+    expect(packages[1]!.runtimeDependencies).toEqual([]);
+    const service = new ApplicationService(fixture.data, { plugins: packages.map(pkg => pkg.definition!),
+      packages: packageCandidates(packages), pluginDependencies: runtimeDependencies(packages) });
+    try { expect(service.sessions.plugins.every(pkg => pkg.status === "loaded")).toBe(true); }
+    finally { await service.close(); }
+  });
+  it("disabled same-name packages do not affect enabled providers' valid private self-references", async () => {
+    const fixture = publicFixture(), disabled = temp();
+    const provider = JSON.parse(readFileSync(join(fixture.provider, "package.json"), "utf8"));
+    provider.exports["./internal"] = "./src/state.ts";
+    writeFileSync(join(fixture.provider, "package.json"), JSON.stringify(provider));
+    const source = join(fixture.provider, "src/runtime.ts");
+    writeFileSync(source, readFileSync(source, "utf8").replace('"./state.ts"', '"@fixture/provider/internal"'));
+    writeFileSync(join(disabled, "package.json"), JSON.stringify({ ...provider, asterism: { displayName: "Test plugin", id: "acme.disabled" } }));
+    const list = new PackageList(join(fixture.data, "other-plugins.json"));
+    list.add({ source: { kind: "path", path: disabled } }, fixture.data); list.setEnabled(0, false);
+    list.add({ source: { kind: "path", path: fixture.consumer } }, fixture.data);
+    list.add({ source: { kind: "path", path: fixture.provider } }, fixture.data);
+    const packages = await loadPackages(list, fixture.data, fixture.cache, []);
+    expect(packages.map(pkg => pkg.status)).toEqual(["disabled", "ready", "ready"]);
+  });
+});

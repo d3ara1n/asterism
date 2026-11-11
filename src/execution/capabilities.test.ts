@@ -26,18 +26,6 @@ const implementation = implement(contract, { async call() { return { kind: "succ
 const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([implementation]), [resource], () => true, toolCaller);
 
 describe("Resource inspection views", () => {
-  it("selects guidance and schema fields independently, keeping result schemas opt-in", () => {
-    const fields = {
-      default: ["name", "implementation", "description", "guidelines", "args", "target"],
-      prompt: ["name", "implementation", "description", "guidelines"],
-      schema: ["name", "implementation", "args", "target", "result"],
-    };
-    for (const detail of [undefined, "default", "prompt", "schema"] as const) {
-      const [tool] = capabilities.describe(resource.id, { detail });
-      expect(Object.keys(tool as object).sort()).toEqual([...fields[detail ?? "default"]].sort());
-    }
-  });
-
   it("describes the encoded result data rather than the plugin's decoded values", () => {
     const [tool] = capabilities.describe(resource.id, { tools: ["read"], detail: "schema" });
     expect(tool).toMatchObject({

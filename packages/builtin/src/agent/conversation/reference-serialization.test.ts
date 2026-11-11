@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { serializeDoc, parseComposerText, parseComposerInline, isReferenceHref, referenceTriggerAllowedAfter } from "./reference-serialization";
+import { serializeDoc, parseComposerText, parseComposerInline, referenceTriggerAllowedAfter } from "./reference-serialization";
 
 describe("Reference serialization", () => {
   it("serializes a doc with text and chips to markdown link text", () => {
@@ -73,12 +73,6 @@ describe("Reference serialization", () => {
     const parsed = parseComposerText(original);
     const serialized = serializeDoc(parsed);
     expect(serialized).toBe(original);
-  });
-
-  it("detects valid reference hrefs", () => {
-    expect(isReferenceHref("resource:Dir-1/file.md")).toBe(true);
-    expect(isReferenceHref("skill:pricing")).toBe(true);
-    expect(isReferenceHref("https://example.com")).toBe(false);
   });
 
   it("opens the @ trigger after line start, spaces, CJK text and chips, but not inside Latin words", () => {

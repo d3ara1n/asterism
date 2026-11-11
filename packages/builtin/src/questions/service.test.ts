@@ -13,11 +13,10 @@ const questions = askUserArgs.parse({ questions: [
 
 describe("structured question-and-answer contract", () => {
   // Identities must be unique, and recommendations must reference actual options; otherwise results cannot reliably associate with questions.
-  it("rejects ambiguous identities and nonexistent recommendations, and disallows choice parameters for text questions", () => {
+  it("rejects ambiguous identities and nonexistent recommendations", () => {
     expect(askUserArgs.safeParse({ questions: [questions[0], questions[0]] }).success).toBe(false);
     expect(askUserArgs.safeParse({ questions: [{ ...questions[0], options: [choices[0], choices[0]] }] }).success).toBe(false);
     expect(askUserArgs.safeParse({ questions: [{ ...questions[0], recommendation: { optionId: "other", reason: "Reason" } }] }).success).toBe(false);
-    expect(askUserArgs.safeParse({ questions: [{ ...questions[2], options: choices }] }).success).toBe(false);
   });
 
   // Return only after validating the whole set; titles come from the original questions, and selections, custom answers, and overall comments must not overwrite one another.

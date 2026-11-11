@@ -34,7 +34,6 @@ describe("current note body", () => {
     const { service, sessionId } = open();
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Note.kind, creation: { id: "asterism.builtin/note.create" }, input: {}, position: { x: 0, y: 0 } });
     const note = foldWorkbench(service.sessions.tree.timeline(sessionId).map(flat)).objects.find(object => object.kind === Note.kind)!;
-    expect(note.title).toBe("Untitled note");
     expect(data.get(sessionId, note.id, NoteContent.id)).toEqual({ text: "" });
     expect(modules.resources.project(note).data).toEqual({ text: "" });
     const call = async (name: string, args: Json) => {
@@ -45,7 +44,7 @@ describe("current note body", () => {
     for (const value of [null, { text: 42 }]) {
       data.set(sessionId, note.id, NoteContent.id, value);
       expect(modules.resources.project(note).data).toEqual({ text: null });
-      expect(await modules.resources.inspect(note)).toMatchObject({ title: "Untitled note", available: false, length: null });
+      expect(await modules.resources.inspect(note)).toMatchObject({ available: false, length: null });
       expect(await call("read", {})).toMatchObject({ kind: "rejected", error: { code: "note_unavailable" } });
       expect(await call("write", { content: "replacement" })).toMatchObject({ kind: "rejected", error: { code: "note_unavailable" } });
       expect(await call("replace", { find: "old", replace: "new" })).toMatchObject({ kind: "rejected", error: { code: "note_unavailable" } });

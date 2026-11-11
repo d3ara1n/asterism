@@ -1,4 +1,3 @@
-import { isValidElement } from "react";
 import { describe, expect, it } from "vitest";
 import { reference, type ModelLiveBlock } from "@asterism-app/sdk/contracts";
 import type { TimelineItem } from "./timeline";
@@ -29,7 +28,7 @@ describe("Tool call display projection", () => {
     expect(toolPreparation(name).length).toBeGreaterThan(0);
   });
 
-  it("Delegates input filling to an optional view and distinguishes waiting from execution through phase and output", () => {
+  it("Preserves partial input arguments and distinguishes waiting from execution through phase and output", () => {
     expect(toolCallState({ ...live, argumentsText: '{"tool":"list",', arguments: { tool: "list" } })).toMatchObject({
       phase: "input", props: { phase: "input", args: { tool: "list" }, result: null },
     });
@@ -39,18 +38,14 @@ describe("Tool call display projection", () => {
     });
   });
 
-  it("resource_call forwards arguments and results to the internal tool itself; the shell receives a single view", () => {
+  it("resource_call normalizes the internal tool name, target, arguments and result", () => {
     const registry = new ViewRegistry([filesystem]);
     const state = toolCallState({ ...live, state: "executing", arguments: args, invocation, result: { kind: "running", data } });
     const view = resolveToolView(state.props!, registry);
     expect(view.props).toMatchObject({ name: "list", target: { path: "src" }, args: {}, result: { kind: "running", data } });
-    expect(isValidElement<ToolRenderProps>(view.header) && view.header.props.invocation.resource?.title).toBe("Saved title");
-    expect(isValidElement<ToolRenderProps>(view.body) && view.body.props.result).toEqual({ kind: "running", data });
-    // Fixed top-level entry points do not depend on the module tool catalog.
-    expect(resolveToolView({ ...state.props!, phase: "settled", name: "resource_list", args: {}, invocation: {}, result: { kind: "succeeded", data: { resources: [] } } }, new ViewRegistry([])).body).toBeDefined();
   });
 
-  it("Cancelled history still reaches both internal tool renderers, with resource identity taken from the saved result", () => {
+  it("Preserves cancelled results, saved resource identity and incomplete history state", () => {
     const node: Extract<TimelineItem, { kind: "toolcall" }> = {
       id: "saved", createdAt: "2026-10-01", kind: "toolcall",
       responseId: "r", requestParentId: null, ordinal: 0, complete: true, source: { model: "p/m", adapter: "test", scope: "test" }, continuation: null,
@@ -59,27 +54,24 @@ describe("Tool call display projection", () => {
     };
     const state = toolCallState(node);
     expect(state).toMatchObject({ phase: "settled", props: { invocation, result: { kind: "cancelled", data } } });
-    const view = resolveToolView(state.props!, new ViewRegistry([filesystem]));
-    expect(isValidElement<ToolRenderProps>(view.body) && view.body.props.result?.kind).toBe("cancelled");
-    expect(isValidElement<ToolRenderProps>(view.header) && view.header.props.invocation.resource?.title).toBe("Saved title");
     expect(toolCallState({ ...node, complete: false, outcome: null, argumentsText: null, invocation })).toMatchObject({
       phase: "incomplete", props: { phase: "input", args, invocation, result: null },
     });
   });
 
-  it("Partial write arguments reach the input view, while subsequent phases retain that call's target and arguments", () => {
+  it("Normalizes partial write targets and arguments across input and subsequent phases", () => {
     const registry = new ViewRegistry([filesystem]);
     const props: ToolInputRenderProps = { phase: "input", name: "resource_call", target: null, result: null,
       invocation: { ...invocation, implementation: reference(DirectoryWrite) },
       args: { resource_id: "directory", tool: "write", target: { path: "src/comp" }, args: { content: "hello\nwor" } } };
     const view = resolveToolView(props, registry);
-    expect(isValidElement<ToolInputRenderProps>(view.header) && view.header.props.target).toEqual({ path: "src/comp" });
-    expect(isValidElement<ToolInputRenderProps>(view.body) && view.body.props.args).toEqual({ content: "hello\nwor" });
+    expect(view.props.target).toEqual({ path: "src/comp" });
+    expect(view.props.args).toEqual({ content: "hello\nwor" });
     for (const phase of ["ready", "executing", "settled"] as const) {
       const next = resolveToolView(phase === "settled"
         ? { ...props, phase, result: { kind: "succeeded", data: null } }
         : { ...props, phase }, registry);
-      expect(isValidElement<ToolInputRenderProps>(next.header) && next.header.props.target).toEqual({ path: "src/comp" });
+      expect(next.props.target).toEqual({ path: "src/comp" });
       expect(next.props.args).toEqual({ content: "hello\nwor" });
     }
     expect(resolveToolView({ ...props, invocation: {} }, registry).body).toBeUndefined();

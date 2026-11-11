@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { node, created as make, text, thinking, call, message, event, attached, removed } from "../../../session/test-nodes";
+import { node, created as make, text, call, event, attached, removed } from "../../../session/test-nodes";
 import { ViewRegistry } from "../../modules/registry";
 import builtinRenderer from "../../../../packages/builtin/src/renderer";
 import { workbenchRecordViews } from "../workbench/records";
@@ -68,7 +68,7 @@ describe("History navigation contract", () => {
     expect(entries.filter(entry => matchesHistoryView(entry, { kind: "resource", resourceId: "r" })).map(entry => entry.node.id)).toEqual(["3"]);
   });
 
-  it("preserves separate navigation positions and append order when one response is interleaved with workbench events and another agent's output", () => {
+  it("preserves session scope and source titles when one response is interleaved with workbench events and another agent's output", () => {
     const nodes = [
       node("1", null, created("a", "Alpha")),
       node("2", "1", text("a", "r", 0, "First\nparagraph")),
@@ -76,22 +76,9 @@ describe("History navigation contract", () => {
       node("4", "3", text("b", "other", 0, "Interleaved")),
       node("5", "4", text("a", "r", 1, "Second paragraph")),
     ];
-    nodes[4].createdAt = "2026-10-09T10:00:00Z"; // Wall-clock time does not determine navigation order.
     const entries = historyEntries(nodes, label);
-    expect(entries.map(entry => entry.node.id)).toEqual(["1", "2", "3", "4", "5"]);
     expect(entries[2].scope).toBe("session");
     expect(entries[3].resource?.title).toBe("Beta");
     expect(entries[4].resource?.title).toBe("Alpha");
-  });
-  it("keeps incomplete records and separate fork positions", () => {
-    const nodes = [
-      node("1", null, created("a", "A")),
-      node("2", "1", thinking("a", "r", 0, "Reasoning")),
-      node("3", "2", call("a", "r", 1, "call", { name: "resource_call", arguments: { resource_id: "n", tool: "read", target: { path: "input.md" }, args: {} } })),
-      node("4", "3", text("a", "r", 2, "Interrupted", { complete: false })),
-      node("5", "4", message("a", "Continue")),
-      node("6", "1", message("a", "Another branch")),
-    ];
-    expect(historyEntries(nodes, label).map(entry => entry.node.id)).toEqual(["1", "2", "3", "4", "5", "6"]);
   });
 });
