@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -10,7 +11,6 @@ import { applicationStorage } from "../shared/application.ts";
 import type { RendererFailure } from "../shared/renderer-failure.ts";
 
 let logger: winston.Logger | undefined;
-let transport: DailyRotateFile | undefined;
 let writeFailed = false;
 const startupId = randomUUID();
 const processOutput = new Set<Promise<void>>();
@@ -39,7 +39,7 @@ function record(source: string, level: LogLevel, message: string, pid: number | 
 export function initializeApplicationLog(root: string, version: string): void {
   try {
     const directory = join(root, applicationStorage.logsDirectory);
-    transport = new DailyRotateFile({
+    const transport = new DailyRotateFile({
       dirname: directory,
       filename: applicationStorage.runtimeLogPattern,
       auditFile: join(directory, applicationStorage.runtimeLogAuditFile),
@@ -49,8 +49,7 @@ export function initializeApplicationLog(root: string, version: string): void {
       options: { flags: "a", mode: 0o600 },
       eol: "\n",
     });
-    // DailyRotateFile 5 exposes its underlying stream separately from transport errors.
-    transport.logStream.on("error", logFailure);
+    transport.on("error", logFailure);
     logger = winston.createLogger({
       level: "debug",
       format: winston.format.printf(info => JSON.stringify({
@@ -79,26 +78,16 @@ export async function closeApplicationLog(): Promise<void> {
   // Process exit and pipe completion are separate events; include final unterminated output lines before draining.
   await Promise.all(processOutput);
   const current = logger;
-  const output = transport?.logStream;
   logger = undefined;
-  transport = undefined;
-  if (!current || !output) return;
+  if (!current) return;
   try {
     if (writeFailed) {
       current.close();
       return;
     }
-    await new Promise<void>(resolve => {
-      const done = () => {
-        current.removeListener("error", done);
-        output.removeListener("error", done);
-        resolve();
-      };
-      current.once("error", done);
-      output.once("error", done);
-      // Winston finish drains transport inputs; DailyRotateFile's file stream has its own completion callback.
-      current.end(() => output.end(done));
-    });
+    const completed = once(current, "finish");
+    current.end();
+    await completed;
   } catch (error) { logFailure(error); }
 }
 

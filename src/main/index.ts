@@ -395,7 +395,8 @@ if (!app.requestSingleInstanceLock()) {
     logClosing = true;
     void closeApplicationLog().then(() => {
       logClosed = true;
-      app.quit();
+      // Let Electron finish cancelling this will-quit event before requesting the final quit.
+      setImmediate(() => app.quit());
     });
   });
   const sessionRoot = join(dataRoot, applicationStorage.chromiumDirectory);
