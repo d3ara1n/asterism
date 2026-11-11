@@ -79,7 +79,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
       selected={selectedSessionId === session.id} disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
       buttonProps={{ title: session.title, "aria-current": selectedSessionId === session.id ? "page" : undefined }}
       media={media}
-      title={<span className={cn("block truncate", session.completed && "line-through")}>
+      title={<span className={cn("relative block truncate", session.completed && "line-through")}>
         {session.title}{folder && <span className="sr-only">, {folder.name}</span>}
         {session.sleeping && <span className="sr-only">, {i18n.text(appMessages.sleeping)}</span>}
       </span>}
@@ -109,7 +109,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
         value={view} onValueChange={value => { if (value) onViewChange(value as SidebarView); }}>
         {sidebarViews.map(item => <ToggleGroupItem key={item} value={item} className="h-7 flex-1">{i18n.text(viewLabels[item])}</ToggleGroupItem>)}
       </ToggleGroup>}
-      <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1 pb-2">
+      <div className="-mx-1 min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-1 pb-2">
         {!grouped ? snapshot?.sessions.map(row) : groups.map(group => {
           const key = group.folder?.id ?? noFolderGroup;
           return <SidebarGroup key={key} group={group} open={!collapsed.has(key)} onToggle={() => onToggleGroup(key)}>
