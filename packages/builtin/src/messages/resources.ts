@@ -21,6 +21,5 @@ export const resourceMessages = pluginNamespace("asterism.builtin").messages("en
   kind: { id: "resources.kind", defaultMessage: "Resource type" },
   resourceId: { id: "resources.resourceId", defaultMessage: "Resource ID" },
   guidelines: { id: "resources.guidelines", defaultMessage: "Usage guidelines" },
-  inputSchema: { id: "resources.inputSchema", defaultMessage: "Input schema" },
   removed: { id: "resources.removed", defaultMessage: "Removed from the session and all its links detached. History is preserved." },
 }));

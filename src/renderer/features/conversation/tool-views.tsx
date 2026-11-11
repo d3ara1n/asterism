@@ -1,33 +1,23 @@
-import { Boxes, ScanSearch, Wrench } from "lucide-react";
+import { Boxes, Check, ChevronRight, Minus, MousePointerClick, ScanSearch, TriangleAlert, Wrench } from "lucide-react";
 import { previewArguments } from "../../../shared/partial-arguments";
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
-import { toolRenderer, useRendererResources, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism-app/sdk/renderer";
+import { toolRenderer, useRendererResources, useRendererViewState, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism-app/sdk/renderer";
 
 import { ResourceCall, ResourceInspect, ResourceInspectResult, ResourceList, ResourceListResult, ResourceScript } from "../../../tools/core";
 import { toolsMessages } from "../../messages/tools";
-import { JsonView, useModuleViews } from "../../modules/views";
+import { useModuleViews } from "../../modules/views";
 import type { ViewRegistry } from "../../modules/registry";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { ToolDetails, useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { ItemGroup, Item, ItemMedia, ItemContent, ItemTitle, ItemDescription } from "@asterism-app/ui/ui/item";
 import { Badge } from "@asterism-app/ui/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { cn } from "@asterism-app/ui/utils";
 import { scriptToolRenderer } from "./script-view";
-
-/** State fields can come from any resource; ordinary scalars are read directly, while compound values retain complete data. */
-function ResourceFields({ value }: { value: Json }) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) return <JsonView value={value} />;
-  return <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 type-caption">
-    {Object.entries(value).map(([key, field]) => <Field key={key} name={key} value={field} />)}
-  </dl>;
-}
-function Field({ name, value }: { name: string; value: Json }) {
-  return <><dt className="break-all">{name}</dt><dd className="min-w-0 whitespace-pre-wrap break-words">
-    {value !== null && typeof value === "object" ? <JsonView value={value} /> : String(value ?? "—")}
-  </dd></>;
-}
+import { resourceStateFields, type StateField, type StateValue } from "./resource-state";
 
 type ListProps = ToolRenderProps<z.infer<typeof ResourceListResult.schema>>;
 function ResourceListHeader({ result }: ListProps) {
@@ -35,19 +25,34 @@ function ResourceListHeader({ result }: ListProps) {
   return <ToolHeader label={i18n.formatMessage(toolsMessages.toolResourceList)}
     meta={result?.data && i18n.formatMessage(toolsMessages.toolResourceCount, { count: result.data.resources.length })} />;
 }
+/** One row per resource: identity only, plus the tool restriction that explains why its tools may be unavailable. State stays in the raw result details. */
 function ResourceListBody({ result }: ListProps) {
   const i18n = useI18n();
   const registry = useModuleViews();
   if (!result?.data) return null;
-  return result.data.resources.length ? <ItemGroup>
+  if (!result.data.resources.length) return <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoResources)}</p>;
+  const restricted = i18n.formatMessage(toolsMessages.toolResourceRestricted);
+  return <TooltipProvider delayDuration={300}><ul className="flex flex-col">
     {result.data.resources.map(resource => {
       const description = registry.resource(resource.type);
-      return <Item key={resource.resource_id} size="sm">
-        <ItemMedia>{description.icon}</ItemMedia>
-        <ItemContent><ItemTitle className="break-all">{resource.title}</ItemTitle><ItemDescription>{i18n.text(description.label)}</ItemDescription></ItemContent>
-      </Item>;
+      return <li key={resource.resource_id} className="flex h-7 min-w-0 items-center gap-2 text-sm [&>svg]:size-4 [&>svg]:shrink-0">
+        {description.icon}
+        <span className="min-w-0 truncate" title={resource.title}>{resource.title}</span>
+        {resource.notice && <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0} className="inline-flex shrink-0 rounded-sm text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <TriangleAlert className="size-3.5" aria-label={restricted} />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs space-y-1 text-left">
+            <p className="font-medium">{restricted}</p>
+            <p>{resource.notice}</p>
+          </TooltipContent>
+        </Tooltip>}
+        <span className="ml-auto shrink-0 type-caption text-muted-foreground">{i18n.text(description.label)}</span>
+      </li>;
     })}
-  </ItemGroup> : <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoResources)}</p>;
+  </ul></TooltipProvider>;
 }
 const listView = { headerRenderer: ResourceListHeader, bodyRenderer: ResourceListBody };
 const list = toolRenderer(ResourceListResult, {
@@ -56,39 +61,113 @@ const list = toolRenderer(ResourceListResult, {
 });
 
 type InspectProps = ToolRenderProps<z.infer<typeof ResourceInspectResult.schema>>;
-function ResourceInspectHeader({ invocation }: InspectProps) {
-  const i18n = useI18n();
-  const resources = useRendererResources();
-  const resource = invocation.resource;
-  return <ToolHeader label={i18n.formatMessage(toolsMessages.toolResourceInspect)}
-    subject={useToolResourceSubject(resource)}
-    meta={resource && i18n.text(resources.get(resource.kind).label)} />;
+type InspectedTool = z.infer<typeof ResourceInspectResult.schema>["tools"][number];
+/** An explicit empty tools selection requests state only, so the result's empty tool list is not a resource fact. */
+function stateOnly(args: Json): boolean {
+  return !!args && typeof args === "object" && !Array.isArray(args) && Array.isArray(args.tools) && args.tools.length === 0;
 }
-function ResourceInspectBody({ result }: InspectProps) {
+function ResourceInspectHeader({ invocation, args, result }: InspectProps) {
+  const i18n = useI18n();
+  const tools = result?.data?.tools;
+  return <ToolHeader label={i18n.formatMessage(toolsMessages.toolResourceInspect)}
+    subject={useToolResourceSubject(invocation.resource)}
+    meta={tools && !stateOnly(args) && i18n.formatMessage(toolsMessages.toolCount, { count: tools.length })} />;
+}
+
+function StateFields({ fields, path }: { fields: readonly StateField[]; path: string }) {
+  return <dl className="grid grid-cols-[minmax(0,max-content)_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5 type-caption">
+    {fields.map(field => {
+      const key = `${path}/${field.key}`;
+      return field.value.kind === "prose"
+        ? <div key={key} className="col-span-2 min-w-0 space-y-0.5">
+          {field.label && <dt className="text-muted-foreground" title={field.key}>{field.label}</dt>}
+          <dd className="whitespace-pre-wrap break-words">{field.value.value}</dd>
+        </div>
+        : <div key={key} className="contents">
+          <dt className="truncate text-muted-foreground" title={field.key}>{field.label}</dt>
+          <dd className="min-w-0"><StateValueView value={field.value} path={key} /></dd>
+        </div>;
+    })}
+  </dl>;
+}
+function StateValueView({ value, path }: { value: StateValue; path: string }) {
+  const i18n = useI18n();
+  switch (value.kind) {
+    case "empty": return <span className="text-muted-foreground">—</span>;
+    case "flag": return value.value
+      ? <Check className="inline size-3.5 text-success" aria-label={i18n.formatMessage(toolsMessages.toolStateTrue)} />
+      : <Minus className="inline size-3.5 text-muted-foreground" aria-label={i18n.formatMessage(toolsMessages.toolStateFalse)} />;
+    case "number": return <span className="tabular-nums">{value.value}</span>;
+    case "token": return <span className="font-mono break-all">{value.value}</span>;
+    case "text": case "prose": return <span className="whitespace-pre-wrap break-words">{value.value}</span>;
+    case "list": return <span className="flex flex-wrap gap-1">
+      {value.values.map((item, index) => <Badge key={index} variant="secondary" className="max-w-full font-normal">
+        <span className="truncate" title={item}>{item}</span>
+      </Badge>)}
+    </span>;
+    case "group": return <div className="border-l pl-3"><StateFields fields={value.fields} path={path} /></div>;
+    case "items": return <StateItems items={value.items} path={path} />;
+  }
+}
+/** Arrays of compound values stay collapsed behind their count; scalar fields remain readable at a glance. */
+function StateItems({ items, path }: { items: readonly StateValue[]; path: string }) {
+  const i18n = useI18n();
+  const [open, setOpen] = useRendererViewState(`asterism/resource-state:${path}`, false);
+  return <Collapsible open={open} onOpenChange={setOpen}>
+    <CollapsibleTrigger className="inline-flex items-center gap-1 rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
+      {i18n.formatMessage(toolsMessages.toolStateItems, { count: items.length })}
+    </CollapsibleTrigger>
+    <CollapsibleContent>
+      <ul className="space-y-1.5 pt-1.5">{items.map((item, index) => <li key={index} className="rounded-md border px-2 py-1.5">
+        {item.kind === "group" ? <StateFields fields={item.fields} path={`${path}/${index}`} /> : <StateValueView value={item} path={`${path}/${index}`} />}
+      </li>)}</ul>
+    </CollapsibleContent>
+  </Collapsible>;
+}
+
+/** Tools appear by their registered display names; descriptions and model-facing names move to the tooltip, and contracts stay in the raw result details. */
+function ToolChips({ tools }: { tools: readonly InspectedTool[] }) {
+  const i18n = useI18n();
+  const registry = useModuleViews();
+  const interaction = i18n.formatMessage(toolsMessages.toolRequiresInteraction);
+  return <TooltipProvider delayDuration={300}><ul className="flex flex-wrap gap-1.5">
+    {tools.map(tool => {
+      const label = registry.toolLabel(tool.implementation.id);
+      return <li key={tool.name} className="min-w-0"><Tooltip>
+        <TooltipTrigger asChild>
+          <Badge variant="outline" tabIndex={0} className="max-w-full font-normal">
+            {registry.toolIcon(tool.implementation.id) ?? <Wrench />}
+            <span className="truncate">{label ? i18n.text(label) : tool.name}</span>
+            {tool.requiresInteraction && <MousePointerClick className="text-muted-foreground" aria-label={interaction} />}
+          </Badge>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs space-y-1 text-left">
+          <p className="font-mono">{tool.name}</p>
+          {tool.description && <p className="line-clamp-6">{tool.description}</p>}
+          {tool.requiresInteraction && <p className="opacity-70">{interaction}</p>}
+        </TooltipContent>
+      </Tooltip></li>;
+    })}
+  </ul></TooltipProvider>;
+}
+
+function ResourceInspectBody({ invocation, args, result }: InspectProps) {
   const i18n = useI18n();
   if (!result?.data) return null;
   const { state, notice, tools } = result.data;
-  return <div className="space-y-4">
-    <section className="space-y-2"><p className="type-label">{i18n.formatMessage(toolsMessages.toolResourceState)}</p><ResourceFields value={state} /></section>
+  const fields = resourceStateFields(state, invocation.resource);
+  const showTools = !stateOnly(args);
+  return <div className="space-y-4 select-text">
+    {fields.length > 0 && <section className="space-y-2">
+      <p className="type-label">{i18n.formatMessage(toolsMessages.toolResourceState)}</p>
+      <StateFields fields={fields} path="" />
+    </section>}
     {notice && <p className="type-caption">{notice}</p>}
-    <section className="space-y-2">
+    {showTools && <section className="space-y-2">
       <p className="type-label">{i18n.formatMessage(toolsMessages.toolAvailableTools)}</p>
-      {!tools.length && <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoTools)}</p>}
-      <ItemGroup>{tools.map(tool => <Item key={tool.name} size="sm" className="px-0">
-        <ItemContent>
-          <ItemTitle>{tool.name}{tool.requiresInteraction && <Badge variant="secondary">
-            {i18n.formatMessage(toolsMessages.toolRequiresInteraction)}
-          </Badge>}</ItemTitle>
-          {tool.description && <ItemDescription className="line-clamp-none">{tool.description}</ItemDescription>}
-          <ToolDetails label={i18n.formatMessage(toolsMessages.toolUsageDetails)} stateKey={`asterism/tool-usage:${tool.name}`}>
-            {!!tool.guidelines?.length && <ul className="list-disc space-y-1 pl-4 type-caption">{tool.guidelines.map((line, index) => <li key={index}>{line}</li>)}</ul>}
-            {tool.args !== undefined && <><p className="type-label">{i18n.formatMessage(toolsMessages.toolArguments)}</p><JsonView value={tool.args} /></>}
-            {tool.target !== undefined && <><p className="type-label">{i18n.formatMessage(toolsMessages.toolTarget)}</p><JsonView value={tool.target} /></>}
-            {tool.result !== undefined && <><p className="type-label">{i18n.formatMessage(toolsMessages.toolResultSchema)}</p><JsonView value={tool.result} /></>}
-          </ToolDetails>
-        </ItemContent>
-      </Item>)}</ItemGroup>
-    </section>
+      {tools.length ? <ToolChips tools={tools} /> : <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoTools)}</p>}
+    </section>}
   </div>;
 }
 const inspectView = { headerRenderer: ResourceInspectHeader, bodyRenderer: ResourceInspectBody };

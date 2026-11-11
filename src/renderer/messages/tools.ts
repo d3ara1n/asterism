@@ -73,6 +73,10 @@ export const toolsMessages = pluginNamespace("asterism.host").messages("en", def
     id: "tools.resources.count",
     defaultMessage: "{count, plural, one {# resource} other {# resources}}",
   },
+  toolResourceRestricted: {
+    id: "tools.resources.restricted",
+    defaultMessage: "Restricted",
+  },
   toolNoResources: {
     id: "tools.resources.empty",
     defaultMessage: "No resources are currently linked.",
@@ -93,20 +97,20 @@ export const toolsMessages = pluginNamespace("asterism.host").messages("en", def
     id: "tools.resources.noTools",
     defaultMessage: "No tools are available for this resource.",
   },
-  toolUsageDetails: {
-    id: "tools.usageDetails",
-    defaultMessage: "Usage and parameters",
+  toolCount: {
+    id: "tools.resources.toolCount",
+    defaultMessage: "{count, plural, one {# tool} other {# tools}}",
   },
-  toolArguments: {
-    id: "tools.arguments",
-    defaultMessage: "Arguments",
+  toolStateItems: {
+    id: "tools.resources.stateItems",
+    defaultMessage: "{count, plural, one {# item} other {# items}}",
   },
-  toolTarget: {
-    id: "tools.target",
-    defaultMessage: "Target",
+  toolStateTrue: {
+    id: "tools.resources.stateTrue",
+    defaultMessage: "Yes",
   },
-  toolResultSchema: {
-    id: "tools.resultSchema",
-    defaultMessage: "Result schema",
+  toolStateFalse: {
+    id: "tools.resources.stateFalse",
+    defaultMessage: "No",
   },
 }));

@@ -151,6 +151,10 @@ export const filesystemMessages = pluginNamespace("asterism.builtin").messages("
     id: "tools.filesystem.list.truncated",
     defaultMessage: "Showing the first 500 entries.",
   },
+  toolDirectoryShowMore: {
+    id: "tools.filesystem.list.showMore",
+    defaultMessage: "Show {count} more",
+  },
   browse: {
     id: "filesystem.creation.browse",
     defaultMessage: "Browse…",

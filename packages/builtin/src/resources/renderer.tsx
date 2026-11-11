@@ -2,8 +2,7 @@ import type { ReactNode } from "react";
 import type { z } from "zod";
 import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText, PenLine, Link } from "lucide-react";
 import { toolRenderer, useI18n, useRendererResources, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
-import { JsonView } from "@asterism-app/ui/json-view";
-import { ToolDetails, useToolResourceTypeSubject } from "@asterism-app/ui/tool-content";
+import { useToolResourceTypeSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ItemGroup, Item, ItemContent, ItemTitle, ItemMedia } from "@asterism-app/ui/ui/item";
 import { StatusText } from "@asterism-app/ui/ui/status";
@@ -140,7 +139,6 @@ function InspectBody({ result }: InspectProps) {
         {entry.guidelines.map((line, index) => <li key={index}>{line}</li>)}
       </ul>
     </section>}
-    <ToolDetails label={i18n.text(messages.inputSchema)} stateKey="asterism.builtin/inspect-schema"><JsonView value={entry.input} /></ToolDetails>
   </div>;
 }
 
