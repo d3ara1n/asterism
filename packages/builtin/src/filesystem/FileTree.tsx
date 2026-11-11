@@ -5,7 +5,7 @@ import { CircleCheck, GitCompare, RefreshCw } from "lucide-react";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@asterism-app/ui/ui/empty";
+import { Empty, EmptyHeader, EmptyMedia, EmptyDescription } from "@asterism-app/ui/ui/empty";
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { cn } from "@asterism-app/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
@@ -125,7 +125,7 @@ export function FileTreeBody({ store, state }: {
       {blank && <Empty className="pointer-events-none absolute inset-0 p-6">
         <EmptyHeader>
           <EmptyMedia variant="icon" className="text-muted-foreground">{blank.icon}</EmptyMedia>
-          <EmptyTitle className="type-label">{blank.label}</EmptyTitle>
+          <EmptyDescription className="text-xs">{blank.label}</EmptyDescription>
         </EmptyHeader>
       </Empty>}
       {notice && <p className={cn("type-caption absolute inset-x-0 top-0 px-2 py-2", state.error && "text-destructive")}>{notice}</p>}

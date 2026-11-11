@@ -1,6 +1,6 @@
 import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
 import { ArrowDown, MessageSquare } from "lucide-react";
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@asterism-app/ui/ui/empty";
+import { Empty, EmptyHeader, EmptyMedia, EmptyDescription } from "@asterism-app/ui/ui/empty";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
@@ -104,7 +104,7 @@ export function Conversation({ feedback, compressions, activity = null }: {
       {read.status === "ready" && !timeline.length && !running && <Empty className="pointer-events-none absolute inset-0 p-6">
         <EmptyHeader>
           <EmptyMedia variant="icon"><MessageSquare /></EmptyMedia>
-          <EmptyTitle className="type-label">{i18n.formatMessage(conversationMessages.emptyHint)}</EmptyTitle>
+          <EmptyDescription className="text-xs">{i18n.formatMessage(conversationMessages.emptyHint)}</EmptyDescription>
         </EmptyHeader>
       </Empty>}
       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
