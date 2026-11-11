@@ -42,6 +42,8 @@ The jump reconstructs resource presence, links, and the session title recorded o
 
 Long conversations can use a summary of older material in later model requests. Recent material remains in the model context, and the full recorded history remains available.
 
+Automatic compaction runs within conversation execution. To compact a stopped Agent manually, focus its content, press **Ctrl+K**, and choose **Compact conversation** in the **Conversation** group. Manual compaction does not resume the Agent; the composer’s **Stop** button cancels it without saving a partial summary.
+
 A compaction marker identifies the summary and reading boundary. Compaction changes the model’s input, not the original history or resource state.
 
 ## Reuse a workbench setup

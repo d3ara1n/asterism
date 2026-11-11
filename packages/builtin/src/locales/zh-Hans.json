@@ -1,5 +1,9 @@
 {
   "command.session": "会话",
+  "command.conversation": "对话",
+  "command.compact": "压缩当前对话",
+  "command.nothingToCompact": "没有可压缩的内容。",
+  "command.compactFailed": "无法压缩当前对话。",
   "command.title": "命令",
   "command.placeholder": "搜索命令…",
   "command.empty": "无匹配结果",

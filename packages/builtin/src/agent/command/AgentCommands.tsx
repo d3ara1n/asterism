@@ -2,12 +2,11 @@ import { useRef, useState, type ReactNode } from "react";
 import { Dialog } from "radix-ui";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { cn } from "@asterism-app/ui/utils";
 import { commandMessages } from "../../messages/command";
-import { usePeekCommands } from "../peek/commands";
 import { CommandPalette, firstEntry, type CommandHost, type CommandPage } from "./CommandPalette";
 import { useSavedTextCommands } from "./saved-text";
+import { useConversationCommands } from "./conversation";
 
 const panelTransition = { duration: 0.18, ease: [0.2, 0.8, 0.2, 1] } as const;
 const immediate = { duration: 0 } as const;
@@ -29,11 +28,11 @@ export function AgentCommands({ children, composerHidden }: { children: ReactNod
   const host: CommandHost = {
     openPage: id => navigate([...stack, id]),
     openPanel: id => setPanel(id),
-    close,
+    // Completed actions close independently of the dismissal guard captured while pending.
+    close: () => setOpen(false),
   };
-  const contributions = [usePeekCommands(host), useSavedTextCommands(host, composerHidden)];
+  const contributions = [useConversationCommands(host), useSavedTextCommands(host, composerHidden, open)];
   const busy = contributions.some(contribution => contribution.busy);
-  const error = contributions.find(contribution => contribution.error)?.error;
   const pages: Record<string, CommandPage> = Object.assign({
     root: { id: "root", placeholder: i18n.text(commandMessages.placeholder), groups: contributions.flatMap(contribution => contribution.groups) },
   }, ...contributions.map(contribution => contribution.pages));
@@ -102,9 +101,6 @@ export function AgentCommands({ children, composerHidden }: { children: ReactNod
                 <Dialog.Title className="sr-only">{i18n.text(commandMessages.title)}</Dialog.Title>
                 <CommandPalette page={page} depth={stack.length - 1} disabled={busy} search={search} onSearch={setSearch}
                   value={value} onValue={setValue} onBack={back} />
-                {error && <Alert variant="destructive" className="m-2 mt-0 w-auto">
-                  <AlertDescription>{i18n.text(error)}</AlertDescription>
-                </Alert>}
               </>}
             </motion.div>
           </div>

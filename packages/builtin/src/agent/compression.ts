@@ -2,7 +2,7 @@ import { thinkingLevels, describeError, formatModelExpression, type ErrorDetails
 import type { ModelServices, ObjectExecutor } from "@asterism-app/sdk/runtime";
 import { decodeExecution, ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
-import { contextMessages, projectAgentContext, type AgentContext } from "./projection.ts";
+import { contextMessages, type AgentContext } from "./projection.ts";
 
 import { COMPRESSION_KEEP_RECENT, COMPRESSION_RESERVE } from "./context-budget.ts";
 
@@ -58,25 +58,26 @@ export function planCompression(context: AgentContext): CompressionPlan | null {
   }
   return null;
 }
-/** Runs within an agent-managed task; only a fully successful summary is committed, in one operation, and cancellation follows the agent lifecycle. */
+/** Automatic triggering is separate from the compression operation; an unknown window never triggers automatically. */
+export function compressionDue(tokens: number, window: number | null | undefined): boolean {
+  return window != null && tokens > window - COMPRESSION_RESERVE;
+}
+
+export interface PreparedCompression { plan: CompressionPlan; tokensBefore: number }
+
+/** Runs in the caller's task and cancellation scope. The caller chooses when to compress and whether to continue afterward. */
 export async function compressContext(
-  object: ObjectExecutor, target: ModelTarget, systemTokens: number,
-  models: Pick<ModelServices, "stream" | "list">, signal: AbortSignal,
+  object: ObjectExecutor, target: ModelTarget, input: PreparedCompression,
+  models: Pick<ModelServices, "stream">, signal: AbortSignal,
   userAgent?: string,
   onStart?: () => (status: "completed" | "failed" | "cancelled", details?: ErrorDetails) => void,
 ): Promise<boolean> {
-  signal.throwIfAborted();
   const model = formatModelExpression(target);
-  const window = models.list().find(entry => entry.model === model)?.contextWindow;
-  if (!window) return false;
-  const context = projectAgentContext(object.session.snapshot(), object.ref.id);
-  const tokensBefore = estimateContext(context, object.ref.id, model, systemTokens);
-  if (tokensBefore <= window - COMPRESSION_RESERVE) return false;
-  const plan = planCompression(context);
-  if (!plan) return false;
+  const { plan, tokensBefore } = input;
   const end = onStart?.();
   let completed = false, failure: ErrorDetails | undefined;
   try {
+    signal.throwIfAborted();
     failure = await summarizeContext(object, target, model, models, signal, plan, tokensBefore, userAgent);
     completed = failure === undefined;
     return completed;

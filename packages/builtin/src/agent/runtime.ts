@@ -11,6 +11,8 @@ import {
 import { createSelection, selectionOf } from "./selection.ts";
 import { generateAgentName } from "./name.ts";
 import { createAgentController } from "./controller.ts";
+import { CompactAgentConversation } from "./compression-contract.ts";
+import { commandMessages } from "../messages/command.ts";
 import { createAdmission } from "./admission.ts";
 import { projectAgentTurnState } from "./state-projection.ts";
 import { agentExecutionState } from "./state.ts";
@@ -131,6 +133,10 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
               selection.validate(input.selection, current.selection);
               writer.set(AgentSelection, { selection: input.selection });
             });
+          } }),
+          implementAction(CompactAgentConversation, { async execute(_input, object) {
+            if (!controller.compact(object))
+              throw new PluginApiError("rejected", "There is no conversation content to compact.", "nothing_to_compact", commandMessages.nothingToCompact);
           } }),
           implementAction(CancelAgent, { async execute(_input, object) { controller.cancel(object); } }),
         ],

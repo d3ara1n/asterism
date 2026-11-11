@@ -1,7 +1,6 @@
 import { useRef, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import type { UiText } from "@asterism-app/sdk/contracts";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@asterism-app/ui/ui/command";
 import { filterCommandLabels } from "@asterism-app/ui/command-filter";
 import { CommandBack, isCommandBackKey, useCommandPageMotion } from "@asterism-app/ui/command-page";
@@ -43,14 +42,13 @@ export interface CommandHost {
   openPanel(id: string): void;
   close(): void;
 }
-/** One feature's commands: root groups, nested pages, full panels, and its pending operation and feedback. */
+/** One feature's commands and pending state; operation feedback belongs to the feature, outside the command list. */
 export interface CommandContribution {
   groups: readonly CommandGroupData[];
   pages?: Readonly<Record<string, CommandPage>>;
   panels?: Readonly<Record<string, () => ReactNode>>;
   /** A pending operation blocks every command and dismissal until it settles. */
   busy?: boolean;
-  error?: UiText | null;
 }
 
 /** Groups with their applicable entries; groups left empty are omitted. */

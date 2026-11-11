@@ -78,9 +78,17 @@ Agent Markdown supports standard footnotes with return links and external web li
 
 With focus inside an Agent's content, press **Ctrl+K** to open its command panel. The panel covers only that Agent view, including when the Agent is open in an island. Escape closes the panel from any level. In a nested list, Backspace in an empty search returns to the previous level.
 
-In the **Peek** group, choose **Explain current conversation** to replace the command list with a Peek panel that fills the Agent view. Enter what you want to understand and send it to start an investigation using the configured utility model. Continue with follow-up questions in the same panel; Peek keeps these exchanges as separate, temporary context. Each question reads a fresh snapshot of the main conversation, including saved records preceding context compression. While an investigation runs, the input area shows its current phase and a stop control and accepts no further input.
+In the **Conversation** group, choose **Explain current conversation** to replace the command list with a Peek panel that fills the Agent view. Enter what you want to understand and send it to start an investigation using the configured utility model. Continue with follow-up questions in the same panel; Peek keeps these exchanges as separate, temporary context. Each question reads a fresh snapshot of the main conversation, including saved records preceding context compression. While an investigation runs, the input area shows its current phase and a stop control and accepts no further input.
 
 Stop ends the current explanation and keeps text already received; incomplete or stopped answers carry their own marker. Closing the panel also stops an active investigation. Opening it again restores the temporary exchanges; they are not saved across application restarts. Peek does not add messages to the main conversation or interrupt its Agent. Mesh Peek remains a single-call investigation with no retained follow-up context.
+
+## Compact the current conversation
+
+With focus inside an Agent's content, press **Ctrl+K** and choose **Compact conversation** under **Conversation**. The command is available when the Agent has a model selection and no conversation or compaction task is running, including when a previous turn is incomplete.
+
+Manual compaction summarizes older context without waiting for the automatic usage threshold. It retains recent original material and leaves recorded history intact. If there is no eligible older content, an informational toast appears and the command panel closes without making a model request. Command submission failures appear as error toasts.
+
+The command panel closes when compaction starts. Follow its status in the conversation and use the composer's **Stop** button to cancel. Compaction does not resume the conversation or send queued drafts afterward. Cancellation keeps the original context and the preceding turn's completion state.
 
 ## Reuse saved text
 

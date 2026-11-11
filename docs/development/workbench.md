@@ -164,6 +164,8 @@ Agent execution errors and warnings appear inline in the owning conversation at 
 
 Independent interface commands, such as copying, saving, or opening a file, use toast notifications for operation failures. Rejected input submissions and configuration or draft changes remain command feedback, distinct from failures during Agent execution; a rejected submission leaves the unsent input in the editor. Field validation stays with its field. Feedback placement follows the operation it belongs to, not whether its underlying cause is local software or a remote service.
 
+The Agent command list owns search and navigation; its command features report operation outcomes through toasts rather than an inline feedback area. A launched Agent task reports subsequent progress and execution failures in the conversation.
+
 Transient inline feedback survives view remount within its resource lifetime but does not enter history, model context, or usage totals. Original error details remain inspectable and copyable.
 
 Structured questions appear in the tool’s execution body. Optional enlargement shares the same draft; closing it neither answers nor cancels. Required answers validate on submission, and optional skips remain explicit.

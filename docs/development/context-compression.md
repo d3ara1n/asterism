@@ -4,7 +4,7 @@ Compaction is built-in Agent policy. It summarizes an older input prefix while r
 
 ## Budget and boundaries
 
-The Agent checks its context budget between work requests and after a final response. Compaction remains part of the Agent task and cancellation scope, but does not consume its work-request count.
+The Agent checks its context budget between work requests and after a final response. Automatic triggering applies the configured window reserve; manual compaction bypasses that threshold, including when the window is unknown. Both paths use the same retention policy and summary operation. Compaction does not consume a work-request count.
 
 Budget estimation prefers the current model’s most recent eligible reported input usage, then estimates additions. After compaction, usage from before the summary is no longer an eligible anchor. Unknown windows do not trigger automatic compaction.
 
@@ -13,6 +13,14 @@ Reported input already includes cached tokens. Character estimates are not persi
 Select a retention boundary between complete projected units. Keep response blocks and their tool outcomes together, including interleaving created by projection. A long turn can retain from a complete response inside it.
 
 No legal summarizable prefix means no forced deletion of recent text.
+
+## Execution ownership
+
+Compaction is a context-only interlude. The summary operation neither starts an Agent loop nor controls turn boundaries. Automatic compaction runs inside the existing loop's task and cancellation scope; returning from it leaves continuation to that loop.
+
+The independent compaction entry requires a settled Agent, whether its last turn completed or remains incomplete. The controller checks that condition and registers its task synchronously, so the condition applies to backend callers as well as interface commands. An existing conversation or compaction task rejects another independent start. No eligible prefix is a normal no-op without a model request.
+
+Manual compaction owns a managed task and shares the Agent's busy state and stop action. It does not consume drafts, emit a turn-ended event, or resume conversation execution afterward. Input accepted during it remains queued. Success, failure, and cancellation preserve the preceding conversation's turn state; cancelling this interlude does not record a turn interruption.
 
 ## Summary request
 

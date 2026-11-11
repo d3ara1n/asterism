@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { Bookmark, BookmarkPlus, TextQuote } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@asterism-app/sdk/renderer";
@@ -10,17 +10,21 @@ import { useConversationInteraction } from "../conversation/interaction";
 import type { CommandContribution, CommandHost } from "./CommandPalette";
 
 /** Inserting and saving composer text; context conditions decide visibility, pending operations only disable. */
-export function useSavedTextCommands(host: CommandHost, composerHidden: boolean): CommandContribution {
+export function useSavedTextCommands(host: CommandHost, composerHidden: boolean, open: boolean): CommandContribution {
   const i18n = useI18n();
   const interaction = useConversationInteraction();
   const draft = useSyncExternalStore(interaction.draft.subscribe, interaction.draft.getSnapshot);
   const savedText = useSavedText();
-  const { run, busy, error } = useSettingsAction(settingsMessages.saveFailed);
+  const { run, busy } = useSettingsAction(settingsMessages.saveFailed, message => { toast.error(i18n.text(message)); });
+  const loadError = savedText.error ? i18n.text(savedText.error) : null;
+  // Cards mount independently of command use; report catalog failures only while this command surface is open.
+  useEffect(() => {
+    if (open && loadError) toast.error(loadError);
+  }, [open, loadError]);
   const canInsert = !composerHidden && interaction.configurable && savedText.ready;
   const pending = draft.locked || draft.uploading;
   return {
     busy,
-    error: error ?? savedText.error,
     groups: [{
       id: "saved-text", heading: i18n.text(savedTextMessages.title),
       entries: [{
