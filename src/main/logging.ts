@@ -1,33 +1,68 @@
 import { randomUUID } from "node:crypto";
-import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { format } from "node:util";
 import type { UtilityProcess } from "electron";
+import winston from "winston";
+import DailyRotateFile from "winston-daily-rotate-file";
 import { applicationStorage } from "../shared/application.ts";
 import type { RendererFailure } from "../shared/renderer-failure.ts";
 
-let file: string | undefined;
+let logger: winston.Logger | undefined;
+let transport: DailyRotateFile | undefined;
+let writeFailed = false;
 const startupId = randomUUID();
+const processOutput = new Set<Promise<void>>();
 
-/** Centralized main-process persistence; synchronous appends avoid waiting for stream drain on startup failure or process exit. */
-function record(source: string, level: string, message: string, pid: number | undefined): void {
-  if (!file) return;
+type LogLevel = "log" | "info" | "warn" | "error" | "debug" | "stdout" | "stderr";
+
+function logFailure(error: unknown): void {
+  writeFailed = true;
+  // Bypass the captured console so a failed transport cannot log into itself.
+  process.stderr.write(`Application log write failed: ${String(error)}\n`);
+}
+
+/** Main owns the file transport; renderer failures and child output enter the same asynchronous queue. */
+function record(source: string, level: LogLevel, message: string, pid: number | undefined): void {
+  if (!logger || writeFailed) return;
+  const severity = level === "stderr" ? "error" : level === "stdout" || level === "log" ? "info" : level;
   try {
-    appendFileSync(file, JSON.stringify({ time: new Date().toISOString(), startupId, source, pid, level, message }) + "\n", { mode: 0o600 });
-  } catch (error) {
-    process.stderr.write(`Application log write failed: ${String(error)}\n`);
-  }
+    logger.log({
+      level: severity, recordedLevel: level, time: new Date().toISOString(),
+      startupId, source, pid, message,
+    });
+  } catch (error) { logFailure(error); }
 }
 
 /** Connect after acquiring the single-instance lock and before starting any child process; retain existing main-process console output. */
 export function initializeApplicationLog(root: string, version: string): void {
-  try { mkdirSync(join(root, applicationStorage.logsDirectory), { recursive: true }); }
-  catch (error) {
-    process.stderr.write(`Application log initialization failed: ${String(error)}\n`);
+  try {
+    const directory = join(root, applicationStorage.logsDirectory);
+    transport = new DailyRotateFile({
+      dirname: directory,
+      filename: applicationStorage.runtimeLogPattern,
+      auditFile: join(directory, applicationStorage.runtimeLogAuditFile),
+      datePattern: "YYYY-MM-DD",
+      maxSize: "20m",
+      maxFiles: "15d",
+      options: { flags: "a", mode: 0o600 },
+      eol: "\n",
+    });
+    // DailyRotateFile 5 exposes its underlying stream separately from transport errors.
+    transport.logStream.on("error", logFailure);
+    logger = winston.createLogger({
+      level: "debug",
+      format: winston.format.printf(info => JSON.stringify({
+        time: info.time, startupId: info.startupId, source: info.source, pid: info.pid,
+        level: info.recordedLevel, message: info.message,
+      })),
+      transports: [transport],
+    });
+    logger.on("error", logFailure);
+  } catch (error) {
+    logFailure(error);
     return;
   }
-  file = join(root, applicationStorage.logsDirectory, applicationStorage.runtimeLogFile);
   for (const level of ["log", "info", "warn", "error", "debug"] as const) {
     const original = console[level].bind(console);
     console[level] = (...args: unknown[]) => {
@@ -36,6 +71,34 @@ export function initializeApplicationLog(root: string, version: string): void {
     };
   }
   console.info(`Application starting. version=${version} startupId=${startupId} pid=${process.pid}`);
+}
+
+/** Called only at final application exit, after resource cleanup and window closure. */
+export async function closeApplicationLog(): Promise<void> {
+  // Process exit and pipe completion are separate events; include final unterminated output lines before draining.
+  await Promise.all(processOutput);
+  const current = logger;
+  const output = transport?.logStream;
+  logger = undefined;
+  transport = undefined;
+  if (!current || !output) return;
+  try {
+    if (writeFailed) {
+      current.close();
+      return;
+    }
+    await new Promise<void>(resolve => {
+      const done = () => {
+        current.removeListener("error", done);
+        output.removeListener("error", done);
+        resolve();
+      };
+      current.once("error", done);
+      output.once("error", done);
+      // Winston finish drains transport inputs; DailyRotateFile's file stream has its own completion callback.
+      current.end(() => output.end(done));
+    });
+  } catch (error) { logFailure(error); }
 }
 
 export function recordRendererFailure(failure: RendererFailure, pid: number): void {
@@ -56,9 +119,16 @@ export function observeProcess(child: UtilityProcess, source: string): void {
     console.info(`Process spawned. source=${source} pid=${pid}`);
   });
   for (const [stream, level] of [[child.stdout, "stdout"], [child.stderr, "stderr"]] as const) {
-    if (stream) createInterface({ input: stream, crlfDelay: Infinity })
-      .on("line", line => record(source, level, line, pid))
-      .on("error", error => console.error(`Process log read failed. source=${source}`, error));
+    if (!stream) continue;
+    const reader = createInterface({ input: stream, crlfDelay: Infinity });
+    const completed = new Promise<void>(resolve => reader.once("close", resolve));
+    processOutput.add(completed);
+    void completed.then(() => processOutput.delete(completed));
+    reader.on("line", line => record(source, level, line, pid))
+      .on("error", error => {
+        console.error(`Process log read failed. source=${source}`, error);
+        reader.close();
+      });
   }
   child.once("exit", code => console.info(`Process exited. source=${source} pid=${pid} code=${code} elapsedMs=${Math.round(performance.now() - started)}`));
 }

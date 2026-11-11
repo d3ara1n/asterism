@@ -22,7 +22,7 @@ import { startupText } from "./startup-text.ts";
 import { startupMessages } from "../shared/error-display.ts";
 import { allowRendererPermission } from "./permissions.ts";
 import { StartupCoordinator } from "./startup-coordinator.ts";
-import { initializeApplicationLog, recordRendererFailure } from "./logging.ts";
+import { closeApplicationLog, initializeApplicationLog, recordRendererFailure } from "./logging.ts";
 import { rendererFailureChannel, rendererFailureSchema } from "../shared/renderer-failure.ts";
 import { ApplicationUpdates } from "./updates.ts";
 import { ApplicationNetwork } from "./network.ts";
@@ -385,6 +385,19 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   initializeApplicationLog(dataRoot, app.getVersion());
+  let logClosing = false;
+  let logClosed = false;
+  // Final quit follows resource cleanup and window closure; cancelled exits leave logging active.
+  app.on("will-quit", event => {
+    if (logClosed) return;
+    event.preventDefault();
+    if (logClosing) return;
+    logClosing = true;
+    void closeApplicationLog().then(() => {
+      logClosed = true;
+      app.quit();
+    });
+  });
   const sessionRoot = join(dataRoot, applicationStorage.chromiumDirectory);
   mkdirSync(sessionRoot, { recursive: true });
   app.setPath("sessionData", sessionRoot);

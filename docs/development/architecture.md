@@ -83,7 +83,7 @@ Network services started by plugin tasks can continue after Home appears. Their 
 
 Deadline values and process supervision belong to the coordinator implementation. A timeout ends its owning startup scope and surfaces failure rather than repeatedly extending a deadline on progress.
 
-Main aggregates logs from itself and child processes in `logs/runtime.log`. Records include startup identity, process, severity, and English diagnostics. Logging remains available during storage failures.
+Main aggregates its own diagnostics, renderer failures, and child-process output through one asynchronous file logger under the application log directory. Records include startup identity, process, severity, and English diagnostics. Files rotate daily and by size; managed archives expire after fifteen days as rotation creates new files. Logging is independent of business storage, and file logging failures report directly to stderr. Normal application exit waits for child output and queued file writes; this does not guarantee delivery after forced termination or durability across power loss.
 
 Fatal interface initialization and rendering errors report their JavaScript and component stacks through the trusted desktop bridge into the same log. Reporting these failures is independent of the business runtime connection.
 

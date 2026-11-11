@@ -36,7 +36,8 @@ export const applicationStorage = {
   chromiumDirectory: "chromium",
   logsDirectory: "logs",
   recoveryDirectory: "recovery",
-  runtimeLogFile: "runtime.log",
+  runtimeLogPattern: "runtime-%DATE%.log",
+  runtimeLogAuditFile: ".runtime-log-audit.json",
 } as const;
 
 /** Flat format version for main-process preference files; electron-store writes defaults with new files. UI state is an unversioned cache. */
