@@ -16,6 +16,8 @@
     "test:plugins": "vitest run --config vitest.plugins.config.ts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.renderer.json",
     "dev": "electron-vite dev",
+    "dev:diagnostics": "electron-vite dev -- --inspect-runtime=9230",
+    "diagnose:runtime": "node --experimental-strip-types scripts/runtime-diagnostics.ts",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "package": "npm run build && electron-builder --config electron-builder.config.ts --dir --publish never",

@@ -35,6 +35,7 @@ export const applicationStorage = {
   networkStore: "network",
   chromiumDirectory: "chromium",
   logsDirectory: "logs",
+  diagnosticsDirectory: "diagnostics",
   recoveryDirectory: "recovery",
   runtimeLogPattern: "runtime-%DATE%.log",
   runtimeLogAuditFile: ".runtime-log-audit.json",

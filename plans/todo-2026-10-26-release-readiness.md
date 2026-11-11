@@ -50,6 +50,10 @@ Confirmed SDK boundary defects and the template-copy participation boundary are 
 - [ ] Accept long-conversation continuation after automatic compaction.
 - [ ] Resolve remaining stale capability claims as their concrete behavior is accepted.
 
+## Release error collection
+
+- [ ] Integrate and accept Sentry error collection before stable promotion, including privacy decisions and installed-build attribution. Scope and acceptance are tracked in `plans/todo-2026-11-11-sentry-error-collection.md`.
+
 ## Platform and maintenance
 
 The user confirmed desktop build/platform behavior, cross-platform behavior, and storage/migration acceptance on 2026-10-31. These plans are archived. Earlier acceptance includes installed task execution and persistence, PTY/search execution, update progress/settings navigation, cancellation of exit with an update ready, and a format-changing installed update. Remaining installed-update scenarios are tracked separately in `plans/todo-2026-09-17-release-ci.md`.

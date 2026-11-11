@@ -11,6 +11,16 @@ import { synchronous } from "../synchronous.ts";
 import { SessionError } from "../../session/tree.ts";
 import { encodePluginData } from "../data-encoding.ts";
 
+/** Propagate upstream cancellation while the content lease is active. */
+export function linkAbort(lease: ContentLease | undefined, signal: AbortSignal): void {
+  if (!lease) return;
+  if (signal.aborted) lease.controller.abort();
+  else {
+    // Successful lease cleanup must also detach from an upstream signal that may never abort.
+    signal.addEventListener("abort", () => lease.controller.abort(), { once: true, signal: lease.controller.signal });
+  }
+}
+
 /** Object and session operations share identity checks, content authority, and synchronous write scopes. */
 export function bindObjects(owner: string, host: PluginHostServices, sessionRuns: RunGroup, eventScope: PluginEventScope, checkAvailable: () => void) {
   const records = new Map<string, RecordContract>();
@@ -68,12 +78,6 @@ export function bindObjects(owner: string, host: PluginHostServices, sessionRuns
   const unavailable = async (): Promise<never> => { throw new PluginApiError("unavailable", "Content storage is unavailable."); };
   const missing: ContentScope = Object.freeze({ read: unavailable, async *open() { await unavailable(); }, stage: unavailable });
   const readOnly = (source: ContentReader): ContentReader => Object.freeze({ read: source.read, open: source.open });
-  /** Propagate cancellation signals to content holds and abort waiting transfers. */
-  const linkAbort = (lease: ContentLease | undefined, signal: AbortSignal) => {
-    if (!lease) return;
-    if (signal.aborted) lease.controller.abort();
-    else signal.addEventListener("abort", () => lease.controller.abort(), { once: true });
-  };
   const content = (lease?: ContentLease, ref?: ResourceRef, signal?: AbortSignal): ContentScope => {
     if (signal) linkAbort(lease, signal);
     const context = access(ref?.sessionId, ref?.id, lease || ref ? { active: true, content: lease, provisional: !ref || !host.refOf(ref.id) } : undefined);

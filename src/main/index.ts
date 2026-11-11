@@ -10,6 +10,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { pickDirectoryChannel, openLocalFileChannel, openLogsChannel, localFilePathSchema, statusChannel } from "../shared/contracts.ts";
 import { connectionRequestChannel } from "../shared/connection.ts";
 import { RuntimeHost } from "./runtime-host.ts";
+import { runtimeInspectorPort } from "../shared/runtime-inspector.ts";
 import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage } from "../shared/application.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
 import { applyThemeSource, readAppearance, serveAppearance } from "./appearance.ts";
@@ -377,7 +378,7 @@ const startup = new StartupCoordinator({
   },
   startRuntime: async (failures, pluginBuild) => {
     await network?.apply();
-    await runtime.start(join(here, "runtime.js"), dataRoot, failures, pluginBuild);
+    await runtime.start(join(here, "runtime.js"), dataRoot, failures, pluginBuild, runtimeInspectorPort(process.argv, app.isPackaged));
     void updates?.check();
   },
 });

@@ -19,7 +19,7 @@ export function prepareDataProcess(entry: string, root: string, version: string,
   console.info(`Data preparation starting. action=${action.kind}`);
   return new Promise((resolve, reject) => {
     const child = utilityProcess.fork(entry, args, { serviceName: `${applicationBrand.en} data preparation`, stdio: "pipe" });
-    observeProcess(child, "preparation");
+    observeProcess(child, "preparation", root);
     let result: PreparationResult | undefined, failure: Error | undefined;
     let stopping = false;
     let timer: ReturnType<typeof setTimeout> | undefined;

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { format } from "node:util";
@@ -110,13 +111,26 @@ export function recordRendererFailure(failure: RendererFailure, pid: number): vo
   record("renderer", "error", detail, pid);
 }
 
-/** Collect child output by line; readline delivers the final fragment without a newline when the stream ends. */
-export function observeProcess(child: UtilityProcess, source: string): void {
+/** Collect child output and fatal reports; readline delivers the final fragment when the stream ends. */
+export function observeProcess(child: UtilityProcess, source: string, root: string): void {
   const started = performance.now();
   let pid: number | undefined;
   child.once("spawn", () => {
     pid = child.pid;
     console.info(`Process spawned. source=${source} pid=${pid}`);
+  });
+  child.on("error", (type, location, report) => {
+    const directory = join(root, applicationStorage.diagnosticsDirectory);
+    const path = join(directory, `${source}-${startupId}-${randomUUID()}.json`);
+    try {
+      // Save the original report before later error listeners terminate the child; it is independent of log rotation.
+      mkdirSync(directory, { recursive: true, mode: 0o700 });
+      writeFileSync(path, report, { encoding: "utf8", mode: 0o600, flag: "wx" });
+      console.error("Process diagnostic report saved.", { source, pid, type, location, path });
+    } catch (error) {
+      // Report capture failure must not interrupt the process supervisor's fatal-error handling.
+      console.error("Process diagnostic report write failed.", { source, pid, type, location, path, error });
+    }
   });
   for (const [stream, level] of [[child.stdout, "stdout"], [child.stderr, "stderr"]] as const) {
     if (!stream) continue;

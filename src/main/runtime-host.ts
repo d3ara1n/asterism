@@ -21,17 +21,20 @@ export class RuntimeHost {
   private setStatus(status: RuntimeStatus): void { this.status = status; this.onStatus(status); }
   get ready(): boolean { return this.status === "ready" && this.child !== null; }
 
-  start(entry: string, root: string, storageFailures: readonly PluginStorageFailure[], pluginBuild: string): Promise<void> {
+  start(entry: string, root: string, storageFailures: readonly PluginStorageFailure[], pluginBuild: string, inspectorPort?: number): Promise<void> {
     if (this.status !== "starting") return Promise.reject(new Error("Task runtime startup was cancelled."));
     let child: UtilityProcess;
     try {
-      child = utilityProcess.fork(entry, [root, JSON.stringify(storageFailures), pluginBuild], { serviceName: `${applicationBrand.en} task runtime`, stdio: "pipe" });
+      child = utilityProcess.fork(entry, [root, JSON.stringify(storageFailures), pluginBuild], {
+        serviceName: `${applicationBrand.en} task runtime`, stdio: "pipe",
+        execArgv: inspectorPort === undefined ? [] : [`--inspect=127.0.0.1:${inspectorPort}`],
+      });
     } catch (error) {
       this.setStatus("unavailable");
       return Promise.reject(error);
     }
     this.child = child;
-    observeProcess(child, "runtime");
+    observeProcess(child, "runtime", root);
     const requests = this.requests = new RuntimeRequests(message => child.postMessage(message));
     return new Promise((resolve, reject) => {
       const fail = (error: Error) => {

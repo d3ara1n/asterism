@@ -18,6 +18,8 @@ Input drafts bind to a typed creation or action contract. Each submission attemp
 
 Drafts and attempts retain their own leases. A failed attempt can leave its draft available for retry. Closing a draft prevents new uploads and attempts while existing attempts finish under their own lifetime.
 
+Cancellation bindings last only as long as their lease. Closing a lease aborts its own controller and detaches upstream cancellation listeners without cancelling the caller or other leases. Pending IO still settles before content holds and registrations are released.
+
 Backend creation and invocation capture references from a legitimate content reader. An explicit content option can transfer an eligible reader scope; copying a reference does not transfer that eligibility.
 
 The resource’s own preparer can stage content; an external preparer reads only. Preparation does not write object state or establish persistent roots. Replacement inputs pass through the owner’s schema and content checks.
