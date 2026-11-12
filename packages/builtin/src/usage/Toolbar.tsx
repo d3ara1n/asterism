@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Coins, CircleDashed } from "lucide-react";
-import { primaryQuota, quotaRemaining, type UsageItem } from "@asterism-app/sdk/contracts";
+import { primaryQuota, quotaRemaining, usageItemLevel, usageLevel, type UsageItem } from "@asterism-app/sdk/contracts";
 import { formatUsageAmount, formatUsageQuantity, useI18n, usageItemLabel } from "@asterism-app/sdk/renderer";
 import { useProviderUsage } from "./use-usage";
 import { AgentToolbarItem, useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { Progress } from "@asterism-app/ui/ui/progress";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { usageLevelTones } from "@asterism-app/ui/usage-level";
 import { cn } from "@asterism-app/ui/utils";
 import { MetricCard } from "../agent/conversation/MetricCard";
 import { usageMessages as messages } from "../messages/usage";
@@ -30,7 +31,7 @@ export function UsageToolbarItem() {
   // Several balances (key and account) read side by side; a successful empty result is a quiet dash, not a warning.
   const value = primary ? percentage(quotaRemaining(primary))
     : balances.length ? balances.map(item => formatUsageAmount(i18n, item.remaining, item.unit, { compact: true })).join(" | ") : "—";
-  const exhausted = state.items.some(item => item.type === "quota" && quotaRemaining(item) === 0);
+  const level = usageLevel(state.items);
   const stale = state.updatedAt !== null && (state.state === "error" || now - state.updatedAt > 120_000);
   const countdown = (reset: number) => {
     const minutes = Math.max(1, Math.ceil((reset - now) / 60_000));
@@ -41,22 +42,23 @@ export function UsageToolbarItem() {
   const hasData = primary !== null || balances.length > 0;
   return <AgentToolbarItem><MetricCard label={i18n.text(title)} value={value}
     icon={<>
-      {primary ? <Progress className="h-1.5 w-14" value={quotaRemaining(primary) * 100}
+      {primary ? <Progress className={cn("h-1.5 w-14", usageLevelTones[usageItemLevel(primary)].track, usageLevelTones[usageItemLevel(primary)].bar)} value={quotaRemaining(primary) * 100}
         aria-label={usageItemLabel(i18n, primary)} aria-valuetext={i18n.formatMessage(messages.remaining, { value })} />
         : balances.length ? <Coins />
         : state.state === "loading" ? <Spinner />
         : state.state === "waiting" ? <CircleDashed />
         : state.error ? <AlertCircle /> : null}
-      {(state.error || exhausted || stale) && hasData && <AlertCircle className="size-3.5 text-warning" />}
+      {level === "exhausted" ? <AlertCircle className="size-3.5 text-destructive" />
+        : (state.error || stale) && hasData && <AlertCircle className="size-3.5 text-warning" />}
     </>}>
     <h4 className="type-label">{i18n.text(title)}</h4>
     {state.items.map(item => <div key={item.id} className="space-y-1">
       <div className="flex items-baseline justify-between gap-4">
-        <span>{usageItemLabel(i18n, item)}</span><span className={cn("tabular-nums", item.type === "quota" && quotaRemaining(item) === 0 && "text-warning")}>
+        <span>{usageItemLabel(i18n, item)}</span><span className={cn("tabular-nums", usageItemLevel(item) !== "available" && usageLevelTones[usageItemLevel(item)].text)}>
           {i18n.formatMessage(messages.remaining, { value: amount(item) })}</span>
       </div>
       {item.type === "quota" && <>
-        <Progress className={cn("h-1", quotaRemaining(item) === 0 && "bg-warning/25")} value={quotaRemaining(item) * 100} aria-label={usageItemLabel(i18n, item)} />
+        <Progress className={cn("h-1", usageLevelTones[usageItemLevel(item)].track, usageLevelTones[usageItemLevel(item)].bar)} value={quotaRemaining(item) * 100} aria-label={usageItemLabel(i18n, item)} />
         {item.value.type === "quantity" && <p className="type-caption tabular-nums">
           {formatUsageQuantity(i18n, item.value.remaining, item.value.limit, item.value.unit)}
         </p>}

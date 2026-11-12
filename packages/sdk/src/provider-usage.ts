@@ -61,6 +61,27 @@ export function primaryQuota(items: readonly UsageItem[]): QuotaItem | null {
   return selected;
 }
 
+/**
+ * Availability that every usage consumer presents the same way. Exhausted means a request cannot succeed: a window at zero or a
+ * balance at or below zero. Low compares the bare number, so balance depletion reads the same whatever its unit.
+ */
+export type UsageLevel = "available" | "low" | "exhausted";
+const lowQuotaShare = 0.25, lowBalance = 10;
+const levelRank: Record<UsageLevel, number> = { available: 0, low: 1, exhausted: 2 };
+export function usageItemLevel(item: UsageItem): UsageLevel {
+  const [value, low] = item.type === "quota" ? [quotaRemaining(item), lowQuotaShare] : [item.remaining, lowBalance];
+  return value <= 0 ? "exhausted" : value < low ? "low" : "available";
+}
+/** The most constrained item decides; null when nothing is reported. */
+export function usageLevel(items: readonly UsageItem[]): UsageLevel | null {
+  let level: UsageLevel | null = null;
+  for (const item of items) {
+    const next = usageItemLevel(item);
+    if (!level || levelRank[next] > levelRank[level]) level = next;
+  }
+  return level;
+}
+
 export type UsagePeriodUnit = "year" | "month" | "week" | "day" | "hour" | "minute" | "second";
 const periodUnits: readonly [UsagePeriodUnit, number][] = [
   ["year", 31_536_000], ["month", 2_592_000], ["week", 604_800], ["day", 86_400], ["hour", 3_600], ["minute", 60],

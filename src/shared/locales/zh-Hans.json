@@ -352,6 +352,7 @@
   "sidebar.view": "会话视图",
   "sidebar.view.folders": "文件夹",
   "sidebar.view.recent": "最近",
+  "sidebar.usage": "用量",
   "app.conversations.empty": "会话将在这里显示。",
   "app.conversations.loading": "正在读取会话列表…",
   "home.workPrompt": "有什么想做的？",

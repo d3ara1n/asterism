@@ -43,6 +43,7 @@ export const appMessages = pluginNamespace("asterism.host").messages("en", defin
   sidebarView: { id: "sidebar.view", defaultMessage: "Conversation view" },
   sidebarViewFolders: { id: "sidebar.view.folders", defaultMessage: "Folders" },
   sidebarViewRecent: { id: "sidebar.view.recent", defaultMessage: "Recent" },
+  usagePanel: { id: "sidebar.usage", defaultMessage: "Usage" },
   noConversations: {
     id: "app.conversations.empty",
     defaultMessage: "Your conversations will appear here.",

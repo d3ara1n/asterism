@@ -2,21 +2,18 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { AlertCircle, CircleDashed, Coins } from "lucide-react";
 import { animate, AnimatePresence, motion, useMotionValue, useReducedMotion } from "motion/react";
 import { formatUsageAmount, formatUsageQuantity, useI18n, usageItemLabel, useRendererCalls, useRendererEvents } from "@asterism-app/sdk/renderer";
-import { primaryQuota, quotaRemaining, ReadUsage, UsageChanged, type ProviderUsageState, type QuotaItem } from "@asterism-app/sdk/contracts";
+import { primaryQuota, quotaRemaining, ReadUsage, UsageChanged, usageItemLevel, usageLevel, type ProviderUsageState, type QuotaItem } from "@asterism-app/sdk/contracts";
 import { Progress } from "@asterism-app/ui/ui/progress";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { useLifetimeSignal } from "@asterism-app/ui/use-lifetime";
+import { usageLevelTones } from "@asterism-app/ui/usage-level";
 import { cn } from "@asterism-app/ui/utils";
 import { providersMessages as messages } from "../../messages/providers";
 import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 
-/** Healthy above half, low below a quarter, exhausted at zero; the bar and dots carry the tone, the number stays quiet. */
-const tone = (share: number) => share >= 0.5
-  ? { track: "bg-success/25", bar: "[&>[data-slot=progress-indicator]]:bg-success", dot: "bg-success" }
-  : share >= 0.25
-    ? { track: "bg-warning/25", bar: "[&>[data-slot=progress-indicator]]:bg-warning", dot: "bg-warning" }
-    : { track: "bg-destructive/25", bar: "[&>[data-slot=progress-indicator]]:bg-destructive", dot: "bg-destructive" };
+/** The bar and dots carry the shared usage level; the number stays quiet. */
+const tone = (item: Parameters<typeof usageItemLevel>[0]) => usageLevelTones[usageItemLevel(item)];
 
 /** Every glyph in the capsule shares one size; a glyph's own `size-*` still wins over this fallback. */
 const glyphScale = "[&_svg:not([class*='size-'])]:size-3.5";
@@ -97,9 +94,10 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
   const empty = !quotas.length && !balances.length;
   const lead = primaryQuota(quotas);
   const leadShare = lead ? quotaRemaining(lead) : null;
+  const leadTone = lead ? tone(lead) : null;
   const others = quotas.filter(item => item !== lead);
   // The shell marks exhausted capacity; inner indicators retain their own remaining-share and query-error tones.
-  const exhausted = quotas.some(item => quotaRemaining(item) <= 0) || balances.some(item => item.remaining <= 0);
+  const exhausted = usageLevel(state?.items ?? []) === "exhausted";
   const view = !empty ? "data"
     : !state || state.state === "loading" || refreshing ? "loading"
     : state.state === "waiting" ? "waiting"
@@ -127,21 +125,21 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
                   : view === "empty" ? <span className="text-xs leading-none text-muted-foreground" aria-hidden="true">—</span>
                   : <>
                     {state?.state === "waiting" && <CircleDashed className="text-muted-foreground" />}
-                    {leadShare !== null && <span className="flex items-center gap-1.5">
-                      <Progress className={cn("h-1.5 w-10", tone(leadShare).track, tone(leadShare).bar)}
+                    {leadShare !== null && leadTone && <span className="flex items-center gap-1.5">
+                      <Progress className={cn("h-1.5 w-10", leadTone.track, leadTone.bar)}
                         value={leadShare * 100} aria-hidden="true" />
                       <span className="min-w-7 text-right text-[0.6875rem] leading-none text-muted-foreground tabular-nums">
                         {percent(leadShare)}</span>
                     </span>}
                     {others.length > 0 && <span className="flex items-center gap-[3px]" aria-hidden="true">
                       {others.map(item => <span key={item.id}
-                        className={cn("size-1.5 rounded-full", tone(quotaRemaining(item)).dot, quotaRemaining(item) === 0 && "ring-1 ring-background")} />)}
+                        className={cn("size-1.5 rounded-full", tone(item).dot)} />)}
                     </span>}
                     {balances.length > 0 && <span className="flex items-center gap-1 text-xs font-medium tabular-nums">
-                      <Coins className={cn("text-muted-foreground", balances.some(item => item.remaining <= 0) && "text-destructive")} aria-hidden="true" />
+                      <Coins className={cn("text-muted-foreground", usageLevel(balances) === "exhausted" && "text-destructive")} aria-hidden="true" />
                       {balances.map((item, index) => <span key={item.id} className="flex items-center gap-1">
                         {index > 0 && <span className="h-3 w-px bg-border" aria-hidden="true" />}
-                        <span className={cn(item.remaining <= 0 && "text-destructive")}>{formatUsageAmount(i18n, item.remaining, item.unit, { compact: true })}</span>
+                        <span className={cn(usageItemLevel(item) !== "available" && tone(item).text)}>{formatUsageAmount(i18n, item.remaining, item.unit, { compact: true })}</span>
                       </span>)}
                     </span>}
                     {state?.error && <AlertCircle className="text-warning" aria-hidden="true" />}

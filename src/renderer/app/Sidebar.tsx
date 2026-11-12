@@ -26,6 +26,7 @@ import { groupByFolder, type FolderGroup } from "../features/folders/grouping";
 import { FolderDot } from "../features/folders/marks";
 import { DeleteFolder, FolderDialog } from "../features/folders/FolderDialog";
 import { sidebarViews, type SidebarView } from "./sidebar-state";
+import { UsagePanel } from "../features/usage/UsagePanel";
 
 type SessionSummary = AppSnapshot["sessions"][number];
 /** Collapse key of the no-folder group; folder groups use their identity. */
@@ -122,6 +123,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
         {!snapshot && !busy && status !== "unavailable" && <Button variant="ghost" size="sm" onClick={onRetry}>{i18n.formatMessage(commonMessages.retry)}</Button>}
       </div>
     </section>
+    <UsagePanel active={status === "ready"} />
     {creating && <FolderDialog onClose={() => setCreating(false)} onRestoreFocus={() => createTrigger.current?.focus({ preventScroll: true })} />}
   </aside>;
 }

@@ -88,6 +88,8 @@ Usage items distinguish amount balance from quota windows and rate-limit headroo
 
 The host usage service shares state by connection. Query results and failures follow completion order; configuration changes invalidate the relevant state. Builtin explicitly supplies its received response headers and presents the shared state in its toolbar. Header refresh reads cached observations without making an artificial model request.
 
+Every consumer presents availability with the same levels. Exhausted, shown in red, means no request can succeed: any window at zero or any balance at or below zero. Low, shown in amber, marks a window under a quarter remaining or a balance under ten. The balance threshold compares the bare number regardless of unit, because how fast work drains a balance shows in its magnitude. Query failure is a separate mark, and an item list that has not yet reported stays neutral. Consumers read the shared cache independently; a read finding a fresh result reuses it, so a refresh by one consumer serves the others without coordination.
+
 The usage service preserves a previous successful result when refresh fails and labels it accordingly. A predicted reset time does not manufacture new quota. Precise refresh intervals and query paths belong to the service and provider implementations.
 
 ## Reference pricing

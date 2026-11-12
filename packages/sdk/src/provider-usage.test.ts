@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { primaryQuota, quotaRemaining, usageItemsSchema, usagePeriodParts, type QuotaItem } from "./provider-usage.ts";
+import { primaryQuota, quotaRemaining, usageItemLevel, usageItemsSchema, usageLevel, usagePeriodParts, type BalanceItem, type QuotaItem } from "./provider-usage.ts";
 
 const quota = (id: string, periodSeconds: number | null, resetAt: number): QuotaItem => ({
   id, label: id, type: "quota", scope: "plan", value: { type: "ratio", remaining: 0.6 },
@@ -27,6 +27,17 @@ describe("Public account usage results", () => {
     const { label: _, ...unlabeled } = item;
     expect(usageItemsSchema.safeParse([unlabeled]).success).toBe(true);
     expect(usageItemsSchema.safeParse([{ ...unlabeled, window: { ...item.window, periodSeconds: null } }]).success).toBe(false);
+  });
+  // A window at a quarter still reads available, ten balance units likewise; anything at zero blocks requests whatever the other items say.
+  it("grades windows by remaining share and balances by bare amount, letting the most constrained item decide", () => {
+    const share = (remaining: number) => usageItemLevel({ ...quota("q", 60, 0), value: { type: "ratio", remaining } });
+    const balance = (remaining: number): BalanceItem => ({ id: `b${remaining}`, type: "balance", scope: "account", label: "Balance",
+      unit: { type: "symbol", symbol: "M$" }, remaining });
+    expect([share(0.25), share(0.249), share(0)]).toEqual(["available", "low", "exhausted"]);
+    expect([balance(10), balance(9.99), balance(0), balance(-1)].map(usageItemLevel)).toEqual(["available", "low", "exhausted", "exhausted"]);
+    expect(usageLevel([quota("week", 604800, 0), balance(5)])).toBe("low");
+    expect(usageLevel([balance(0), quota("week", 604800, 0)])).toBe("exhausted");
+    expect(usageLevel([])).toBeNull();
   });
   // Exact multiples pick the largest unit; uneven lengths fall back to a smaller unit instead of rounding into a misleading fraction.
   it.each([
