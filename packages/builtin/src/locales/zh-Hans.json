@@ -164,6 +164,7 @@
   "usage.zhipu": "智谱 Coding Plan",
   "usage.balance": "账户余额",
   "usage.keyBalance": "API key 预算",
+  "usage.credits": "点数",
   "usage.planUnits": "额度单位",
   "usage.window": "额度窗口",
   "usage.remaining": "剩余 {value}",

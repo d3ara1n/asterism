@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
-import { ReferenceChipFace } from "@asterism-app/ui/reference-chip";
+import { useRendererObject } from "@asterism-app/sdk/renderer";
+import { ReferenceChip as ReferenceChipControl } from "@asterism-app/ui/reference-chip";
 import { referenceNodeName } from "./reference-serialization";
 
 /** A reference chip is an inline atom that leaves the editor as a markdown link. */
@@ -11,11 +12,14 @@ export interface ReferenceAttrs {
   href: string;
 }
 
+/** Node views render through the editor's React portals, so the Agent's object and skill reference contexts apply. */
 function ReferenceChipView({ node, selected, editor, deleteNode }: NodeViewProps) {
   const { label, href } = node.attrs as ReferenceAttrs;
+  const object = useRendererObject();
   return <NodeViewWrapper as="span" className="inline">
     {/* Editability is read at click time; node views do not re-render when the editor locks. */}
-    <ReferenceChipFace href={href} selected={selected} onRemove={() => { if (editor.isEditable) deleteNode(); }}>{label}</ReferenceChipFace>
+    <ReferenceChipControl href={href} sessionId={object.ref.sessionId} selected={selected}
+      onRemove={() => { if (editor.isEditable) deleteNode(); }}>{label}</ReferenceChipControl>
   </NodeViewWrapper>;
 }
 

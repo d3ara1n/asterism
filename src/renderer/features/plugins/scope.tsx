@@ -1,7 +1,7 @@
 import { Component, useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   RendererCallsProvider, RendererIslandPanelProvider, RendererIslandProvider, RendererPreferencesProvider, RendererResourceNavigationProvider, useRendererCalls,
-  type RendererIsland, type RendererIslandSpec, type RendererCalls, type RendererResourceNavigation,
+  type RendererIsland, type RendererIslandSpec, type RendererCalls, type RendererReceipt, type RendererResourceIdentity, type RendererResourceNavigation,
 } from "@asterism-app/sdk/renderer";
 import { pluginOf } from "@asterism-app/sdk/contracts";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
@@ -96,6 +96,17 @@ export function PluginCallScope({ children }: { children: ReactNode }) {
   return <RendererCallsProvider value={calls}>{children}</RendererCallsProvider>;
 }
 
+type ResourceRead = { ok: true; resource: RendererResourceIdentity | null } | Extract<RendererReceipt, { ok: false }>;
+
+/** Current identity and title at handling time; absent sessions and retiring resources both read as absent. */
+async function readResource(target: { sessionId: string; id: string }): Promise<ResourceRead> {
+  const result = await runtime.session.execute({ type: "read", sessionId: target.sessionId });
+  if (!result.ok) return result.error.code === "not_found" ? { ok: true, resource: null } : { ok: false, error: result.error };
+  if (result.reply.kind !== "view") throw new Error("Resource navigation requires a session view.");
+  const object = result.reply.data.workbench.objects.find(object => object.id === target.id && !object.retiring);
+  return { ok: true, resource: object ? { ref: { sessionId: target.sessionId, id: object.id, kind: object.kind }, title: object.title } : null };
+}
+
 /**
  * Adapt the containing host island into a plugin island: identities are isolated by plugin, and the host standardizes width and shell.
  * Islands opened here belong to the containing island. page closes only the islands newly opened by this region when it unmounts, skipping guards because its content is invalid.
@@ -111,22 +122,21 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
   const owned = page ? opened.current : undefined;
   const adapter = useMemo(() => pluginIsland(island, pluginId, undefined, owned), [island, pluginId, owned]);
   const navigation = useMemo<RendererResourceNavigation>(() => ({
+    async resolve(target) {
+      const read = await readResource(target);
+      if (!read.ok) throw Object.assign(new Error(read.error.message), read.error);
+      return read.resource;
+    },
     async open(target, location, options) {
       try {
-        const result = await runtime.session.execute({ type: "read", sessionId: target.sessionId });
-        if (!result.ok) {
-          if (result.error.code === "not_found") toast.error(i18n.text(objectsMessages.resourceMissing));
-          else operationSucceeded(result);
-          return false;
-        }
-        if (result.reply.kind !== "view") throw new Error("Resource navigation requires a session view.");
-        const object = result.reply.data.workbench.objects.find(object => object.id === target.id && !object.retiring);
-        if (!object) { toast.error(i18n.text(objectsMessages.resourceMissing)); return false; }
-        const descriptor = registry.resource(object.kind);
+        const read = await readResource(target);
+        if (!read.ok) { operationSucceeded(read); return false; }
+        if (!read.resource) { toast.error(i18n.text(objectsMessages.resourceMissing)); return false; }
+        const { ref: resource } = read.resource;
+        const descriptor = registry.resource(resource.kind);
         if (!descriptor.open) { toast.error(i18n.text(objectsMessages.resourceOpenUnsupported)); return false; }
-        const resource = { sessionId: target.sessionId, id: object.id, kind: object.kind };
         return await descriptor.open(location, { resource, calls, origin: options?.origin,
-          island: pluginIsland(island, pluginOf(object.kind)!, { kind: "resource", resourceId: object.id, location }, owned) });
+          island: pluginIsland(island, pluginOf(resource.kind)!, { kind: "resource", resourceId: resource.id, location }, owned) });
       } catch (error) {
         console.error("Resource location could not be opened.", error);
         toast.error(i18n.text(failureDisplay(error, objectsMessages.resourceOpenFailed)));

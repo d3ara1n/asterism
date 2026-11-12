@@ -2,15 +2,23 @@ import { defineModule, defineTopLevelTool, implementCall, PluginApiError } from 
 import { z } from "zod";
 import { TextError, readToModel } from "../shared/text.ts";
 import { filesystemFailure } from "../filesystem/errors.ts";
+import { fileFailure } from "../filesystem/file-io.ts";
 import type { SkillCatalog } from "./catalog.ts";
-import { SkillRead, SkillRefresh, SkillList, skillReadArgsSchema } from "./contract.ts";
+import { SkillRead, SkillRefresh, SkillList, ReadSkillFile, skillReadArgsSchema } from "./contract.ts";
 
 export function createSkillsModule(catalog: SkillCatalog) {
   return defineModule(() => {
     return {
       calls: [implementCall(SkillList, async (_input, { signal }) => {
         signal.throwIfAborted();
-        return catalog.skills().map(({ name, description }) => ({ name, description }));
+        return catalog.skills().map(({ name, description, source }) => ({ name, description, source: { id: source.id, plugin: source.plugin } }));
+      }), implementCall(ReadSkillFile, async ({ name, path }, { signal }) => {
+        try { return { text: await catalog.text(name, path, signal) }; }
+        catch (error) {
+          signal.throwIfAborted();
+          if (error instanceof PluginApiError) throw error;
+          return fileFailure(error);
+        }
       })],
       topLevelTools: [defineTopLevelTool({
         id: SkillRead.id,

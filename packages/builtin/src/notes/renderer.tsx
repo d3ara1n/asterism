@@ -11,6 +11,7 @@ import { Note, CreateNote, NoteView, NoteRead, NoteGrep, NoteEdit, NoteWrite, No
 import { noteGrepViews } from "./search-view";
 import { NoteInput } from "./creation";
 import { NoteActions } from "./NoteActions";
+import { SkillReferences } from "../skills/references";
 
 import { noteCard as appearance } from "../shared/card-appearance.ts";
 
@@ -21,7 +22,7 @@ export default {
     ...appearance,
     Actions: NoteActions,
     Body: ({ data }) => { const i18n = useI18n(); return <div className="min-h-0 flex-1 select-text overflow-auto p-3">
-      {data.text !== null ? <Markdown>{data.text}</Markdown>
+      {data.text !== null ? <SkillReferences><Markdown>{data.text}</Markdown></SkillReferences>
         : <p className="type-body text-muted-foreground">{i18n.formatMessage(textMessages.contentUnavailable)}</p>}
     </div>; },
   })],

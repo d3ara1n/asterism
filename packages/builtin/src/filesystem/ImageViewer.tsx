@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IslandPanel, useI18n } from "@asterism-app/sdk/renderer";
 import { Maximize, Minus, Plus } from "lucide-react";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -9,7 +9,7 @@ import { commonMessages } from "@asterism-app/ui/messages/common";
 import { editorMessages as messages } from "../messages/editor";
 
 /** An independent content surface using the same island shell as the text editor. */
-export default function ImageViewer({ path, mediaType, base64 }: { path: string; mediaType: string; base64: string }) {
+export default function ImageViewer({ path, mediaType, base64, source }: { path: string; mediaType: string; base64: string; source?: ReactNode }) {
   const i18n = useI18n();
   const viewport = useRef<HTMLDivElement>(null);
   const [area, setArea] = useState({ width: 0, height: 0 });
@@ -26,7 +26,7 @@ export default function ImageViewer({ path, mediaType, base64 }: { path: string;
   const fit = dimensions.width && dimensions.height
     ? Math.min(1, area.width / dimensions.width, area.height / dimensions.height) : 1;
   const scale = zoom ?? fit;
-  return <IslandPanel title={path} layout="fill" action={<>
+  return <IslandPanel title={path} source={source} layout="fill" action={<>
     <IconButton label={i18n.text(commonMessages.zoomOut)} disabled={scale <= 0.1} onClick={() => setZoom(Math.max(0.1, scale / 1.25))}><Minus /></IconButton>
     <Button size="sm" variant="ghost" aria-label={i18n.text(messages.actualSize)} onClick={() => setZoom(1)}>{Math.round(scale * 100)}%</Button>
     <IconButton label={i18n.text(commonMessages.zoomIn)} disabled={scale >= 8} onClick={() => setZoom(Math.min(8, scale * 1.25))}><Plus /></IconButton>

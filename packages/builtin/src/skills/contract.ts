@@ -22,9 +22,19 @@ export const SkillRead = builtin.data("skill.read", textReadSchema.extend({
   directory: z.string(),
 }).describe("Selected skill file lines, absolute skill directory, total line count, and nextOffset for remaining text."));
 
-/** Effective skills after override resolution, sorted by name. Available to the renderer for skill pickers. */
+/** Effective skills after override resolution, sorted by name, with the source each entry resolved from. */
 export const SkillList = defineCall(builtin.name("skill.list"), {
-  scope: "plugin", input: z.strictObject({}), output: z.array(skillMetadataSchema),
+  scope: "plugin", input: z.strictObject({}), output: z.array(skillMetadataSchema.extend({
+    /** Source ID as shown in skill settings: a user directory path or `<plugin>:<declaration>`; plugin is null for user directories. */
+    source: z.strictObject({ id: z.string(), plugin: z.string().nullable() }),
+  })),
+});
+export type SkillEntry = z.infer<typeof SkillList.output>[number];
+
+/** Current text of a package file of the effective skill, for the renderer's read-only preview. */
+export const ReadSkillFile = defineCall(builtin.name("skill.file.read"), {
+  scope: "plugin", input: z.strictObject({ name: z.string().min(1), path: z.string().min(1) }),
+  output: z.strictObject({ text: z.string() }),
 });
 
 const skillIssueSchema = z.strictObject({ file: z.string(), message: z.string() });

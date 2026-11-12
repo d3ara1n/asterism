@@ -15,6 +15,7 @@ export const usageMessages = builtin.messages("en", defineMessages({
   zhipu: { id: "usage.zhipu", defaultMessage: "Zhipu Coding Plan" },
   balance: { id: "usage.balance", defaultMessage: "Account balance" },
   keyBalance: { id: "usage.keyBalance", defaultMessage: "API key budget" },
+  credits: { id: "usage.credits", defaultMessage: "credits" },
   planUnits: { id: "usage.planUnits", defaultMessage: "quota units" },
   window: { id: "usage.window", defaultMessage: "Quota window" },
   remaining: { id: "usage.remaining", defaultMessage: "{value} remaining" },

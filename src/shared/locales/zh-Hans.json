@@ -740,6 +740,8 @@
   "common.scroll.toStart": "滚动到开头",
   "common.text.wordWrap": "自动换行",
   "common.references.remove": "移除引用",
+  "common.references.missing": "不存在",
+  "common.references.unavailable": "无法读取当前状态",
   "markdown.image.view": "查看图片",
   "markdown.footnotes.label": "脚注",
   "markdown.footnotes.backReference": "返回引用",

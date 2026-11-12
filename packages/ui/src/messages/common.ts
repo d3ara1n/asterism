@@ -197,4 +197,12 @@ export const commonMessages = pluginNamespace("asterism.host").messages("en", de
     id: "common.references.remove",
     defaultMessage: "Remove reference",
   },
+  referenceMissing: {
+    id: "common.references.missing",
+    defaultMessage: "Missing",
+  },
+  referenceUnavailable: {
+    id: "common.references.unavailable",
+    defaultMessage: "Current state unavailable",
+  },
 }));

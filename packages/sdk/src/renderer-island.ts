@@ -45,6 +45,8 @@ export interface RendererIsland {
 export interface RendererIslandPanelProps {
   title: string;
   description?: string;
+  /** What the content belongs to, shown before the title, such as a reference chip for its resource or skill. */
+  source?: ReactNode;
   /** Primary title bar action, such as save. */
   action?: ReactNode;
   /** Fixed toolbar below the title bar, such as search. */

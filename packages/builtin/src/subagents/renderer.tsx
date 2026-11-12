@@ -4,11 +4,12 @@ import { subagentPoolCard as appearance } from "../shared/card-appearance";
 import { subagentMessages as messages } from "../messages/subagents";
 import { SubagentPool, CreateSubagentPool, PoolView, PoolList, Delegation, Delegate, Check, Wait, Steer, Cancel } from "./contract";
 import { PoolCard } from "./PoolCard";
+import { SkillReferences } from "../skills/references";
 import { delegateViews, checkViews, listViews, waitViews, steerViews, cancelViews } from "./tool-views";
 
 export default {
   resources: [{ kind: SubagentPool.kind, label: messages.title, icon: <Boxes className="size-4" />, card: appearance }],
-  cards: [cardRenderer(PoolView, { ...appearance, Body: PoolCard })],
+  cards: [cardRenderer(PoolView, { ...appearance, Body: ({ data }) => <SkillReferences><PoolCard data={data} /></SkillReferences> })],
   creations: [creationEntry(CreateSubagentPool, { id: CreateSubagentPool.id, label: messages.title, icon: <Boxes className="size-4" />,
     group: "resources", triggers: { menu: { initialInput: {} } } })],
   records: [recordRenderer(Delegation, { icon: <Boxes className="size-4" />,

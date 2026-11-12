@@ -8,6 +8,7 @@ import { useI18n } from "../i18n";
 export interface PanelProps {
   title: string;
   description?: string;
+  source?: ReactNode;
   action?: ReactNode;
   toolbar?: ReactNode;
   tools?: ReactNode;
@@ -19,12 +20,15 @@ export interface PanelProps {
 }
 
 /** Shared panel presentation; its owner supplies closing and any container-specific tools. */
-export function Panel({ title, description, action, toolbar, tools, compact, contentRef, layout = "padded", onClose, children }: PanelProps) {
+export function Panel({ title, description, source, action, toolbar, tools, compact, contentRef, layout = "padded", onClose, children }: PanelProps) {
   const i18n = useI18n();
   return <div className="island-panel">
     <header className="island-panel-header">
       <div className="min-w-0 flex-1">
-        <h2 className="type-section truncate">{title}</h2>
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          {source && <span className="flex min-w-0 shrink-[2]">{source}</span>}
+          <h2 className="type-section min-w-0 truncate">{title}</h2>
+        </div>
         {description && <p className="type-caption truncate">{description}</p>}
       </div>
       {action}

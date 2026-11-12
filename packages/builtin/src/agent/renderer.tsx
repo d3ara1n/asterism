@@ -16,6 +16,7 @@ import { ConfigurationToolbarItem, ContextToolbarItem } from "./conversation/Too
 import { peekToolRenderer } from "./peek/view";
 import { sendToolRenderer } from "./send/view";
 import { waitToolRenderer } from "./wait/view";
+import { SkillReferences } from "../skills/references";
 
 import { agentCard as appearance } from "../shared/card-appearance.ts";
 
@@ -39,7 +40,7 @@ export default {
 function AgentBody({ data }: { data: z.infer<typeof AgentView.schema> }) {
   const object = useRendererObject();
   const interaction = useAgentConversation(object, data.selection !== null, data.executionState, data.drafts);
-  return <AgentConversationProvider value={interaction}>
+  return <SkillReferences><AgentConversationProvider value={interaction}>
     <AgentUI selection={data.selection}><Conversation feedback={data.feedback} compressions={data.compressions} activity={data.activity} /></AgentUI>
-  </AgentConversationProvider>;
+  </AgentConversationProvider></SkillReferences>;
 }

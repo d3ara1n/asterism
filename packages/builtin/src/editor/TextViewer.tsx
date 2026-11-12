@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { IslandPanel, useI18n } from "@asterism-app/sdk/renderer";
 import { Search, WrapText } from "lucide-react";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
@@ -8,14 +8,14 @@ import { TextEditor, type TextEditorHandle } from "./TextEditor";
 import { parseEditorText } from "./text-format";
 import { editorMessages as messages } from "../messages/editor";
 
-export default function TextViewer({ path, text }: { path: string; text: string }) {
+export default function TextViewer({ path, text, source }: { path: string; text: string; source?: ReactNode }) {
   const i18n = useI18n();
   const editor = useRef<TextEditorHandle>(null);
   const [initial] = useState(() => parseEditorText(text));
   const [position, setPosition] = useState({ line: 1, column: 1 });
   const [languageFailed, setLanguageFailed] = useState(false);
   const [lineWrapping, setLineWrapping] = useState(false);
-  return <IslandPanel title={path} layout="fill" action={<>
+  return <IslandPanel title={path} source={source} layout="fill" action={<>
     <IconButton label={i18n.text(messages.searchText)} onClick={() => editor.current?.find()}><Search /></IconButton>
     <IconButton label={i18n.text(commonMessages.wordWrap)} aria-pressed={lineWrapping}
       variant={lineWrapping ? "selected" : "ghost"} onClick={() => setLineWrapping(value => !value)}><WrapText /></IconButton>

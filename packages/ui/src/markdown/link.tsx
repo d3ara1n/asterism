@@ -1,8 +1,8 @@
-import { useState, type ComponentProps } from "react";
-import { parseResourceUrl, parseSkillUrl, type ResourceUrl } from "@asterism-app/sdk/contracts";
-import { useRendererObject, useRendererResourceNavigation } from "@asterism-app/sdk/renderer";
+import type { ComponentProps } from "react";
+import { parseResourceUrl, parseSkillUrl } from "@asterism-app/sdk/contracts";
+import { useRendererObject } from "@asterism-app/sdk/renderer";
 import { externalWebUrl } from "../links";
-import { ReferenceChipFace } from "../reference-chip";
+import { ReferenceChip } from "../reference-chip";
 
 type AnchorProps = ComponentProps<"a">;
 
@@ -16,23 +16,14 @@ export function MarkdownLink({ href, children, ...props }: AnchorProps) {
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: "nearest" });
   }}>{children}</a>;
-  // Skills have no navigation target; the chip keeps the reference recognizable in rendered messages.
-  if (href && parseSkillUrl(href)) return <ReferenceChipFace href={href}>{children}</ReferenceChipFace>;
-  const resource = href ? parseResourceUrl(href) : null;
-  if (resource) return <ResourceLocationLink {...props} href={href} destination={resource}>{children}</ResourceLocationLink>;
+  if (href && parseSkillUrl(href)) return <ReferenceChip href={href} openable>{children}</ReferenceChip>;
+  if (href && parseResourceUrl(href)) return <ResourceReference href={href}>{children}</ResourceReference>;
   const url = href ? externalWebUrl(href) : null;
   return url ? <a {...props} href={url} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>;
 }
 
-function ResourceLocationLink({ destination, children, ...props }: AnchorProps & { destination: ResourceUrl }) {
+/** Resource IDs are scoped to the session of the object rendering the message. */
+function ResourceReference({ href, children }: { href: string; children: AnchorProps["children"] }) {
   const object = useRendererObject();
-  const navigation = useRendererResourceNavigation();
-  const [pending, setPending] = useState(false);
-  return <a {...props} aria-disabled={pending || undefined} onAuxClick={event => event.preventDefault()} onClick={event => {
-    event.preventDefault();
-    if (pending) return;
-    setPending(true);
-    void navigation.open({ sessionId: object.ref.sessionId, id: destination.resourceId }, destination.location, { origin: event.currentTarget })
-      .finally(() => setPending(false));
-  }}>{children}</a>;
+  return <ReferenceChip href={href} sessionId={object.ref.sessionId} openable>{children}</ReferenceChip>;
 }

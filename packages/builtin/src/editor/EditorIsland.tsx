@@ -12,8 +12,9 @@ import { TextEditor, type TextEditorHandle } from "./TextEditor";
 import { editorMessages as messages } from "../messages/editor";
 
 /** The island owns the buffer; its caller supplies persistence and optional source metadata. */
-export function EditorIsland({ title, filename, text, onSave, gitBase = null, status, format }: {
+export function EditorIsland({ title, source, filename, text, onSave, gitBase = null, status, format }: {
   title: string;
+  source?: ReactNode;
   filename: string;
   text: string;
   onSave(text: string): Promise<void>;
@@ -45,7 +46,7 @@ export function EditorIsland({ title, filename, text, onSave, gitBase = null, st
       setError(failureDisplay(failure, messages.saveFailed));
     } finally { pending.current = false; setSaving(false); }
   };
-  return <IslandPanel title={title} dirty={dirty} layout="fill" action={<>
+  return <IslandPanel title={title} source={source} dirty={dirty} layout="fill" action={<>
     <IconButton label={i18n.text(messages.find)} onClick={() => editor.current?.find()}><Search /></IconButton>
     <IconButton label={i18n.text(commonMessages.wordWrap)} aria-pressed={lineWrapping}
       variant={lineWrapping ? "selected" : "ghost"} onClick={() => setLineWrapping(value => !value)}><WrapText /></IconButton>

@@ -21,11 +21,19 @@ export class SkillCatalog {
   refresh(signal: AbortSignal): void { this.catalog.refresh(signal); }
   summary() { return { count: this.skills().length, issues: this.catalog.skills().flatMap(source => source.issues) }; }
   async read(args: SkillReadArgs, signal: AbortSignal) {
-    const skill = this.skills().find(skill => skill.name === args.name);
-    if (!skill) throw new PluginApiError("rejected", `Skill "${args.name}" is absent from the current catalog.`, "skill_not_found");
+    const skill = this.find(args.name);
     const text = await this.catalog.read(skill, args.path, signal);
     return { name: skill.name, path: args.path, directory: skill.directory,
       ...readText(text, false, { offset: args.offset, limit: args.limit, maxBytes: 64 * 1024 }) };
+  }
+  /** Whole current text of a package file, for the renderer preview. */
+  async text(name: string, path: string, signal: AbortSignal): Promise<string> {
+    return this.catalog.read(this.find(name), path, signal);
+  }
+  private find(name: string): AgentSkill {
+    const skill = this.skills().find(skill => skill.name === name);
+    if (!skill) throw new PluginApiError("rejected", `Skill "${name}" is absent from the current catalog.`, "skill_not_found");
+    return skill;
   }
 }
 

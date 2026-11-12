@@ -14,7 +14,12 @@ export interface RendererResourceOpenContext extends RendererResourceOpenOptions
 
 export type RendererResourceOpener = (location: string, context: RendererResourceOpenContext) => boolean | Promise<boolean>;
 
+/** Current identity and title of a present resource; kind selects its presentation through useRendererResources. */
+export interface RendererResourceIdentity { readonly ref: ResourceRef; readonly title: string }
+
 export interface RendererResourceNavigation {
+  /** Read the resource's current identity and title at call time; null when the session or resource is absent. Other failures reject. */
+  resolve(resource: Pick<ResourceRef, "sessionId" | "id">): Promise<RendererResourceIdentity | null>;
   /** Resolve current presence without model-request authorization. Failures are shown by the host; a cancelled open returns false. */
   open(resource: Pick<ResourceRef, "sessionId" | "id">, location: string, options?: RendererResourceOpenOptions): Promise<boolean>;
 }
