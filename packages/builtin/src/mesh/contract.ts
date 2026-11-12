@@ -28,9 +28,9 @@ export const MeshView = builtin.data("mesh.card", z.strictObject({
 export type MeshCardData = z.infer<typeof MeshView.schema>;
 
 export const meshTargetSchema = z.strictObject({
-  title: z.string().min(1).describe("Exact Agent title returned by list or get_profile."),
+  title: z.string().min(1).describe("Exact Agent title returned by list or mesh_get_profile."),
   id: z.number().int().nonnegative().optional().describe(
-    "Channel-local name disambiguator returned by list or get_profile. Omitted means 0, even when another ID is the only remaining Agent with this title. IDs stay fixed while a member remains; gaps are retained until all Agents with this title leave. This is not a permanent identity."),
+    "Channel-local name disambiguator returned by list or mesh_get_profile. Omitted means 0, even when another ID is the only remaining Agent with this title. IDs stay fixed while a member remains; gaps are retained until all Agents with this title leave. This is not a permanent identity."),
 }).describe("An Agent exposed to this Mesh channel, addressed by title and an optional numeric disambiguator.");
 export type MeshTarget = z.infer<typeof meshTargetSchema>;
 export const meshProfileSchema = z.strictObject({

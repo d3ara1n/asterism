@@ -49,17 +49,17 @@ export const sendResultSchema = z.strictObject({ name: z.string() })
 export type SendResult = z.infer<typeof sendResultSchema>;
 
 export const GetProfile = defineTool({
-  id: builtin.name("tool.get_profile"), name: "get_profile",
-  description: "Read an Agent's name, configured type, and task description through a resource.",
-  guidelines: ["Null target selects your own profile on this resource. Other targets follow the resource's addressing schema."],
+  id: builtin.name("tool.get_profile"), name: "mesh_get_profile",
+  description: "Read an Agent's name, configured type, and task descriptions through a Mesh resource.",
+  guidelines: ["Null target selects your own profile on this Mesh. Other targets follow the Mesh's channel-local addressing schema."],
   argsSchema: z.strictObject({}).describe("Empty parameter object."),
 });
 export const SetProfile = defineTool({
-  id: builtin.name("tool.set_profile"), name: "set_profile",
-  description: "Set your own task description on this resource.",
+  id: builtin.name("tool.set_profile"), name: "mesh_set_profile",
+  description: "Set your own task description on a Mesh resource.",
   guidelines: ["The runtime identifies the caller. Name and configured Agent type come from the Agent.",
-    "Descriptions belong to this resource. An empty description clears your description."],
+    "Descriptions belong to this Mesh resource. An empty description clears your description."],
   argsSchema: z.strictObject({
     description: z.string().trim().max(1000).describe("A brief description of your current task. Empty text clears it."),
-  }).describe("Your task description on this resource."),
+  }).describe("Your task description on this Mesh resource."),
 });

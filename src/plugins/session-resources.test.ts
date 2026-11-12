@@ -883,8 +883,8 @@ describe("Agent resource operation entries", () => {
   });
 
   // Discovery exposes each role's own delegation policy without leaking private prompts or budgets.
-  it("agent_list exposes selection fields while isolating system prompts and execution configuration", async () => {
-    const f = open({ adapter: adapter(() => [{ name: "agent_list", args: {} }]) });
+  it("list_agent exposes selection fields while isolating system prompts and execution configuration", async () => {
+    const f = open({ adapter: adapter(() => [{ name: "list_agent", args: {} }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
     await configureBuiltin(f.app, { type: "agent.save", id: "worker", value: { id: "worker",
       description: "Public purpose", examples: ["Public example"], delegates: ["explorer"],

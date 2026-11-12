@@ -19,7 +19,7 @@ export const modelOverrideSchema = z.strictObject({
   thinking: thinkingSchema.nullable().describe("Thinking level for this model. Null uses the provider default."),
 }).describe("Model and thinking level replacing the Agent role's model selection.");
 export const delegateSchema = z.strictObject({
-  role: configurationIdSchema.describe("Target Agent role ID from agent_list. The caller's delegates allowlist determines which roles it can delegate to."),
+  role: configurationIdSchema.describe("Target Agent role ID from list_agent. The caller's delegates allowlist determines which roles it can delegate to."),
   model: modelOverrideSchema.optional().describe("Optional model selection override. Other settings come from the Agent role."),
   task: z.string().min(1).describe("The work and the requested report. The task conversation receives only task and context, so every requirement and constraint appears in one of them."),
   context: z.string().optional().describe("Background material for the task, such as prior findings, selected code, or file lists; delivered separately from the instructions."),

@@ -55,7 +55,7 @@ async function call(capabilities: AgentCapabilities, mesh: ResourceRef, name: st
 const list = async (capabilities: AgentCapabilities, mesh: ResourceRef) =>
   MeshList.schema.parse((await call(capabilities, mesh, "list")).data).agents;
 const profile = async (capabilities: AgentCapabilities, mesh: ResourceRef, target: Json = null) =>
-  MeshGetProfile.schema.parse((await call(capabilities, mesh, "get_profile", target)).data);
+  MeshGetProfile.schema.parse((await call(capabilities, mesh, "mesh_get_profile", target)).data);
 
 describe("Mesh resource routing", () => {
   it("discovers only exposed Agents across sessions and does not grant the reverse link", async () => {
@@ -74,14 +74,14 @@ describe("Mesh resource routing", () => {
     const first = await f.mesh(s), second = await f.mesh(s);
     for (const mesh of [first, second]) { s.link(a, mesh); s.link(mesh, a); }
     const captured = f.capabilities(a);
-    await call(captured, first, "set_profile", null, { description: "Investigate login" });
-    await call(captured, second, "set_profile", null, { description: "Implement messaging" });
+    await call(captured, first, "mesh_set_profile", null, { description: "Investigate login" });
+    await call(captured, second, "mesh_set_profile", null, { description: "Implement messaging" });
     expect(await list(captured, first)).toEqual([
       { title: "Atlas", id: 0, type: "worker", descriptions: ["Investigate login", "Implement messaging"] },
     ]);
     expect((await profile(captured, first)).descriptions).toEqual(["Investigate login"]);
     expect((await profile(captured, second)).descriptions).toEqual(["Implement messaging"]);
-    expect(await call(captured, first, "set_profile", { title: "Other" }, { description: "Spoof" }))
+    expect(await call(captured, first, "mesh_set_profile", { title: "Other" }, { description: "Spoof" }))
       .toMatchObject({ kind: "rejected", error: { code: "invalid_arguments" } });
     await s.invoke(CreateMeshChannel, second, { title: "Implementation" });
     expect((await list(f.capabilities(a), first))[0]!.descriptions).toEqual(["Investigate login"]);

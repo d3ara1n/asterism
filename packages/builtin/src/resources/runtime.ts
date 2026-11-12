@@ -22,7 +22,7 @@ export default defineModule(plugin => ({
     agentCreations.list(plugin).map(({ id, resourceKind }) => ({ id, resourceKind })))],
   topLevelTools: [
     defineTopLevelTool({
-      id: AgentListResult.id, name: "agent_list",
+      id: AgentListResult.id, name: "list_agent",
       description: "List available agent configurations, their purposes, task examples, and delegation allowlists.",
       guidelines: ["Each entry's delegates field describes that role's allowed delegation targets: null allows any enabled role, [] allows none, and a list allows only those role IDs."],
       argsSchema: z.strictObject({}).describe("Empty parameter object."),

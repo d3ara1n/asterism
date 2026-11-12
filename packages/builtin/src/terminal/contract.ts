@@ -10,7 +10,7 @@ export const CreateTerminal = defineCreation(TerminalResource, {
   schema: z.strictObject({
     title: z.string().trim().min(1).max(160).optional().describe("Display name; defaults to Terminal."),
     cwd: z.string().min(1).max(4096).optional().describe("Initial absolute working directory; defaults to the user's home directory. Commands run with the current OS user's permissions."),
-    profile: z.string().min(1).optional().describe("Shell profile ID from shell_profile_list, or 'auto' for automatic selection; defaults to the currently selected profile."),
+    profile: z.string().min(1).optional().describe("Shell profile ID from shell_list_profile, or 'auto' for automatic selection; defaults to the currently selected profile."),
   }).describe("Create a shared interactive terminal. Its shell starts immediately and runs until the terminal is closed, removed or the application exits."),
 });
 /** Resource projection contains only configuration; terminal instance state is delivered through the terminal channel and stays out of session projection. */
