@@ -15,6 +15,17 @@ const zaiResponses = (baseUrl: string): ModelProviderPreset["connection"] => ({
   compatibility: [{ id: "responsesReasoning", value: { content: "object", encryptedContent: false, summary: false } }],
 });
 
+/** Billing entries share inference endpoints and the key-selected account usage implementation. */
+function commandCodePreset(id: string, billing: "usage" | "subscription", protocol: "openai-responses" | "anthropic"): ModelProviderPreset {
+  return {
+    id, name: protocol === "anthropic" ? "Command Code (Anthropic)" : "Command Code (Responses)", billing,
+    connection: { fixedFields, protocol, baseUrl: "https://api.commandcode.ai/provider/v1", auth: "api_key", compatibility: [], usage: "commandcode" },
+    keyUrl: "https://commandcode.ai/settings/keys",
+    sources: ["https://commandcode.ai/docs/provider", "https://commandcode.ai/docs/plans/goat", "https://commandcode.ai/docs/resources/usage-limits"],
+    verifiedOn: "2026-11-12", keywords: ["commandcode", "goat", "pro", "max", "coding", "provider"],
+  };
+}
+
 export const modelProviderPresets: readonly ModelProviderPreset[] = [
   {
     id: "openai", name: "OpenAI", billing: "usage",
@@ -93,6 +104,10 @@ export const modelProviderPresets: readonly ModelProviderPreset[] = [
     sources: ["https://opencode.ai/docs/go/"],
     verifiedOn: "2026-10-15", keywords: ["opencode", "go", "go plus", "console"],
   },
+  commandCodePreset("commandcode", "usage", "openai-responses"),
+  commandCodePreset("commandcode-anthropic", "usage", "anthropic"),
+  commandCodePreset("commandcode-plan", "subscription", "openai-responses"),
+  commandCodePreset("commandcode-plan-anthropic", "subscription", "anthropic"),
   {
     id: "kimi-cn", name: "Kimi", billing: "usage", region: presetMessages.mainlandChina,
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.moonshot.cn/v1", auth: "api_key", usage: "kimi-cn",

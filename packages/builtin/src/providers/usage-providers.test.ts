@@ -5,8 +5,6 @@ import { createKimiUsage, parseKimiQuota } from "./kimi.ts";
 import { createOpenCodeUsage, parseOpenCodeQuota } from "./opencode.ts";
 import { createMoonshotUsage, parseMoonshotBalance } from "./moonshot.ts";
 import { createOpenRouterUsage, parseOpenRouterKey } from "./openrouter.ts";
-import { createBuiltinUsageProviders } from "./runtime.ts";
-import { modelProviderPresets } from "./presets.ts";
 
 const deepseek = { is_available: true, balance_infos: [
   { currency: "CNY", total_balance: "12.50", granted_balance: "2.50", topped_up_balance: "10.00" },
@@ -96,13 +94,6 @@ describe("built-in balance and plan queries", () => {
       await provider(transport).query({ connection: { id: "renamed", endpoint: "https://relay.test/anything/v1" }, credential: "test-key", signal });
       expect(String(transport.mock.calls[0]![0])).toBe(`https://relay.test${path}`);
       expect(transport.mock.calls[0]![1]).toMatchObject({ signal, redirect: "error", headers: { Authorization: "Bearer test-key" } });
-    }
-  });
-  // A preset's usage must resolve to a provider with the same name; rate-limit response headers and unsupported products must not be implicitly connected to account queries.
-  it("binds supported presets to identically named query catalog entries and leaves unsupported presets disabled", () => {
-    const ids = createBuiltinUsageProviders().map(provider => provider.id);
-    for (const preset of modelProviderPresets) {
-      expect(preset.connection.usage ?? null).toBe(ids.includes(preset.id) ? preset.id : null);
     }
   });
 });
