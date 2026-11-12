@@ -39,8 +39,8 @@ export function WorkbenchBackground() {
 /** The link legend belongs to the host, independently of installed paradigms. */
 export function WorkbenchFooter({ children }: { children?: ReactNode }) {
   const i18n = useI18n();
-  return <Panel position="bottom-right" className="flex max-w-[calc(100%-2rem)] flex-col items-end gap-2" style={{ pointerEvents: "none" }}>
-    {children}
-    <p className="type-caption text-right">{i18n.formatMessage(workbenchMessages.linkLegend)}</p>
+  return <Panel position="bottom-right" className="flex max-w-[calc(100%-2rem)] items-end gap-3" style={{ pointerEvents: "none" }}>
+    <p className="type-caption min-w-0 text-right">{i18n.formatMessage(workbenchMessages.linkLegend)}</p>
+    {children && <div className="shrink-0">{children}</div>}
   </Panel>;
 }
