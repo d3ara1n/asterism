@@ -54,17 +54,41 @@ Organize tool guidance around purpose and data flow, call shape and result handl
 
 ## Documentation ownership
 
-The collections have distinct writing requirements:
+Choose a primary home by the question the information answers. A primary home owns the complete facts; another surface can explain their consequences for its audience without becoming a parallel reference.
 
-- `docs/manual/`: guides for users understanding and using Asterism and for authors designing plugins. Explain mental models, usage philosophy, design choices, and working principles. Models consult relevant topics on demand for those tasks; ordinary work does not depend on reading the manual. No localized editions or public documentation site.
-- `docs/development/`: internal software engineering principles, responsibility boundaries, and design constraints. These are not plugin-author or software-use guides.
-- `plans/`: deferred tasks (`todo`), research and reference material (`ref`), and review findings (`review`), archived when their work or use ends.
+| Information or question | Primary home |
+| --- | --- |
+| What resource can I create, what is it for, and what must I know before creating it? | Creation entry description, guidelines, and input schema |
+| What is this linked resource's current state? | Resource-owned discovery and inspection state |
+| How do I perform an operation, interpret its result, and understand its execution boundaries? | Owning tool description, guidelines, and input/output schemas |
+| What should the interface communicate at this point of use? | User-facing controls, labels, and contextual feedback |
+| When should I choose a resource, how should I relate it to other resources, and what tradeoffs matter? | Resource sections in the user manual |
+| Why does a resource behave this way, what should a user expect, and which caveats affect their work? | Resource sections in the user manual, grounded in current behavior |
+| How should a plugin author choose integration boundaries and use the public model? | Plugin-author manual and public-package guides; types and executable examples own concrete interfaces |
+| Which internal engineering principles and responsibility boundaries should implementation preserve? | `docs/development/`; local implementation rationale belongs in code comments |
+| What responsibilities, procedures, and completion criteria has the user selected? | Role instructions, skills, and task instructions |
+| What work is deferred, what was investigated, or what did a review find? | `plans/` tasks (`todo`), references (`ref`), and reviews (`review`) |
 
-Manual content stays within those user and plugin-author tasks, including public-package guides exposed through the Manual resource. Tool catalogs, introductions to individual tools, invocation recipes, parameter/output inventories, and execution-environment references belong in code and tool contracts, not manual chapters. Plugin guides explain integration choices and responsibility boundaries; public types and executable examples express concrete interfaces and implementation.
+### Manual scope
+
+`docs/manual/` serves users understanding and using Asterism and authors designing plugins, including public-package guides exposed through the Manual resource. Explain mental models, usage philosophy, design choices, and working principles. Models consult relevant topics on demand for those tasks; ordinary tool use is self-contained through discovery. There are no localized editions or public documentation site. Internal engineering documents serve maintainers, not plugin authors or application users.
+
+The user manual includes sections for individual resource types; related resources can share a chapter. Keep application resource topics in `docs/manual/using/resources/`, grouped by shared usage questions rather than by individual tools. Each section explains the resource's role in the work, when to choose it, meaningful relationships with other participants or material, and tradeoffs or common conceptual mistakes. Include user-relevant behavior, lifecycle caveats, and consequences that help explain an observed result or set expectations. These explanations are available on demand; they need not become always-loaded model instructions. Briefly identify the resource so the section stands alone, then contribute understanding beyond its creation description, inspection state, and tool contracts. Resource coverage is not a feature catalog or a reason to manufacture filler.
+
+Tool catalogs, introductions to individual tools, invocation recipes, parameter/output inventories, execution-environment references, control-by-control walkthroughs, and lists of defaults and limits belong in their owning contracts or interfaces. The manual can restate enough verified behavior to explain a caveat or answer why something happened; functional detail serves that explanation rather than cataloging operations. A manual example can illustrate a choice or relationship without reproducing an invocation sequence. Plugin guides explain integration choices and responsibility boundaries rather than maintaining a prose copy of public APIs.
 
 Manual and engineering pages are independently readable. Include enough context to explain each topic. Stable directory maps may describe organization and responsibilities. Keep these pages free of cross-document references, research-source trails, per-file source indexes, and API inventories. Models can search files and integrate information themselves.
 
-Documentation records what code cannot express: intent, rationale, mental models, tradeoffs, and principles for making choices. Source code, types, schemas, configuration, and executable examples own current interfaces and behavior. Do not maintain a prose copy through capability catalogs, control-by-control walkthroughs, or lists of defaults and limits. A code move or parameter change alone should not require a documentation update; a change in the underlying concept or design can. Verify claims while writing rather than promoting proposals or old acceptance records into current behavior.
+### Placement and completeness checks
+
+When adding, moving, or deleting explanatory content:
+
+1. **Classify the claim.** Separate current state, an executable contract, user-selected procedure, and conceptual guidance. Mixed paragraphs can need different homes. For example, a schedule operation's activation requirements belong in its tool contract; explaining how session sleep affects reminders also belongs in the manual as a user-facing caveat. Facts needed to use a tool correctly remain discoverable through its contract even when the manual explains their consequences.
+2. **Check the owner.** Read the current implementation and the relevant creation, resource, and tool projections. Verify what a reader can actually discover; neither missing manual prose nor the existence of a schema establishes a gap or adequate coverage. A model must be able to understand and call a tool without consulting the manual.
+3. **Keep the distinct contribution.** Ask what choice, expectation, or observed behavior the prose helps a reader understand beyond a bare statement of discoverable facts. Retain that explanation in the manual; place missing operational facts in the owning contract. Existing contract coverage does not by itself make a user-facing explanation redundant. A code move, parameter change, or new control alone should not require a manual update; a change in the underlying concept or design can.
+4. **Account for removals.** Identify whether removed material is redundant, obsolete, or still needed elsewhere. Before deleting unique, necessary guidance, preserve it at the appropriate home and verify that it is discoverable there. Review both duplication and omissions, including per-resource conceptual coverage; neither shorter prose nor one chapter per resource proves completeness.
+
+Verify claims while writing rather than promoting proposals or old acceptance records into current behavior. Source code, types, schemas, configuration, and executable examples own current interfaces and behavior; documentation adds intent, rationale, mental models, and principles for making choices.
 
 ## Plans
 

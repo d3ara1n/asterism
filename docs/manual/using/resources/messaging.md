@@ -1,6 +1,18 @@
-# Connect external conversations
+# Work with Conversations and Chat resources
 
 An external messaging connection represents an identity participating on another platform. Connecting that identity to an Agent brings outside conversations into a continuing work context. The important choices are who the Agent speaks for, which material it can see, and when it should answer outside Asterism.
+
+## Conversations: discover and choose what to follow
+
+A Conversations resource represents the configured messaging connections and the conversations they expose. Use it when an Agent should discover outside conversations or receive notifications about selected activity without giving every conversation its own working card.
+
+A subscription to a connection reports newly discovered conversations; it is not a subscription to every message in all its chats. Following a conversation is a separate choice, optionally narrowed to a thread. This distinction helps explain why an Agent can learn that a chat exists without receiving the discussion inside it.
+
+## Chat: work with one external conversation
+
+A Chat resource binds a particular external conversation, optionally narrowed to a thread. Use it when that conversation itself is part of the work: its messages, attachments, and reply destination belong together. Another Chat card for the same address reaches the same outside conversation, not a copied or private channel.
+
+Conversations subscriptions provide message metadata, while a Chat can deliver message content to its receiving Agents. Choose the route according to whether the Agent needs awareness of activity or the discussion itself. Neither resource supplies platform history or permissions that the configured connection lacks.
 
 ## Choose the identity and context
 
@@ -16,9 +28,13 @@ Interpret absence accordingly. An original message may be outside the bot's acce
 
 ## Separate receiving from replying
 
-Giving an Agent access to a conversation and routing incoming messages to it are independent choices. Receiving an event does not by itself define an obligation to reply, and an ordinary answer inside Asterism is not automatically an external message.
+Making a Chat or Conversations resource available to an Agent lets it use that resource. Making the Agent available to the resource establishes it as a notification recipient; Conversations also needs the relevant subscription. These directions are independent, so read and reply access alone does not arrange incoming notifications. Receiving an event does not by itself define an obligation to reply, and an ordinary answer inside Asterism is not automatically an external message.
 
 Define communication responsibilities in the Agent's role or task: which conversations it monitors, when it may reply independently, and when it should bring a question back to you. Consider the audience of an external message separately from the people who can see the workbench conversation.
+
+Notifications depend on the receiving session remaining available. Hiding a resource card does not unsubscribe its recipients, but sleeping or archiving the session ends those live resource routes. Later platform access does not guarantee that every event missed during the absence will be delivered.
+
+The configured connection's own outgoing messages are not echoed into Agent notifications. Agents sharing a Chat therefore do not automatically learn each other's external replies through that route, and a message sent from the Chat interface is not incoming Agent input. If collaborators need that context, they must read the conversation or communicate the result explicitly.
 
 Overlapping notification routes can bring the same outside activity into one context more than once. Choose routes according to the information the Agent needs, rather than treating every possible connection as another source of knowledge.
 
