@@ -2,6 +2,13 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const agentsMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   getState: { id: "agents.getState", defaultMessage: "Read Agent state" },
+  identity: { id: "agents.state.identity", defaultMessage: "Identity" },
+  thinking: { id: "agents.state.thinking", defaultMessage: "Thinking" },
+  usage: { id: "agents.state.usage", defaultMessage: "Balance and quota" },
+  usageUnavailable: { id: "agents.state.usageUnavailable", defaultMessage: "Unavailable" },
+  noUsage: { id: "agents.state.noUsage", defaultMessage: "No usage reported" },
+  quota: { id: "agents.state.quota", defaultMessage: "Quota" },
+  resetsAt: { id: "agents.state.resetsAt", defaultMessage: "Resets {time}" },
   overviewSummary: {
     id: "settings.agents.summary",
     defaultMessage: "Role prompts, models, and subagent settings",
