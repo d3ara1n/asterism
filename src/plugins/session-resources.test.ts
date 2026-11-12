@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { contentRefSchema, defineCreation, defineAction, defineRecord, defineImplementation, defineTool, pluginNamespace, thinkingLevels, type ContentRef, type Json, type ResourceRef } from "@asterism-app/sdk/contracts";
-import { definePlugin, defineModule, implementCreation, implementResource, implementPreparer, implementTool, type PluginContext, type PluginDefinition, type ObjectExecutor, type ToolSession, defineTopLevelTool } from "@asterism-app/sdk/runtime";
+import { definePlugin, defineModule, implementCreation, implementResource, implementPreparer, implementTool, type PluginContext, type PluginDefinition, type ObjectExecutor, type ToolSession, defineTopLevelTool, UsageQueryError } from "@asterism-app/sdk/runtime";
 import { agentCreations, defineAgentCreation } from "@asterism-app/builtin-api/runtime";
-import { CreateAgent, ReadAgentCreations } from "@asterism-app/builtin-api/contracts";
+import { CreateAgent, ReadAgentCreations, SubmitAgentInput, ConfigureAgent, AgentTurnEnded, decodeExecution } from "@asterism-app/builtin-api/contracts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
 import { ConfigureAlarm, ConfigureTimer, ControlTimer, SetAlarmEnabled } from "../../packages/builtin/src/schedules/contract.ts";
 import { BuiltinApplicationService as ApplicationService, configureBuiltin } from "../../packages/builtin/src/testing.ts";
@@ -880,6 +880,57 @@ describe("Agent resource operation entries", () => {
     expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: { type: CreateNote.resource.kind, title: "A note" } });
     const noteId = (result.tools[0]!.data as { resource_id: string }).resource_id;
     expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([{ receiverId: actor.id, resourceId: noteId }]);
+  });
+
+  it.each([false, true])("reports active Agent context and account balance despite a later selection edit (balance error=%s)", async balanceError => {
+    const done = latch();
+    let requests = 0, agent!: ResourceRef;
+    const f = open({ plugins: [definePlugin({ namespace: pluginNamespace("test.agent-balance"), setup: () => ({
+      usageProviders: [{ id: "test-balance", label: "Test balance", async query() {
+        if (balanceError) throw new UsageQueryError("network");
+        return [{ id: "balance", type: "balance" as const, scope: "account" as const, label: "Account balance", remaining: 12.5,
+          unit: { type: "currency" as const, code: "USD" } }];
+      } }],
+    }) })], adapter: { format: () => "test/1", validate() {}, prepare() {
+      const first = requests++ === 0;
+      return { async *stream() {
+        if (first) {
+          await f.session.invoke(ConfigureAgent, agent, { selection: { agent: "worker", model: "test/test", thinking: "low" } });
+          yield { type: "part.start", part: { id: "state", kind: "toolcall", callId: "state", name: "get_agent_state" } };
+          yield { type: "part.end", partId: "state", arguments: {} };
+        } else {
+          yield { type: "part.start", part: { id: "text", kind: "text" } };
+          yield { type: "part.delta", partId: "text", delta: "Done" };
+          yield { type: "part.end", partId: "text" };
+        }
+        yield { type: "finish", reason: first ? "tool-calls" : "stop", usage: {
+          input: 123, output: 5, total: 128, reasoning: null, cacheRead: 100, cacheWrite: null,
+        } };
+      } };
+    } } });
+    await model(f.app);
+    await f.app.configuration.execute({ type: "modelProvider.save", id: "test", value: {
+      id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true,
+      compatibility: [], apiKey: "", usage: "test-balance",
+    } });
+    await configureBuiltin(f.app, { type: "role.save", id: "default", value: { id: "default", model: "test/test", thinking: "high" } });
+    agent = await f.session.create(CreateAgent, { selection: { agent: "worker", model: null, thinking: null } });
+    f.plugin.ipc.events.subscribe(AgentTurnEnded, {}, event => { if (event.data.settled) done.release(); });
+    await f.session.invoke(SubmitAgentInput, agent, { submissionId: "self-state-input", parts: [{ kind: "text", text: "Read your state" }], mode: "follow", sender: { kind: "user" } });
+    await done.promise;
+    const call = f.session.snapshot().records.all({ scope: "timeline" }).map(decodeExecution).find(record =>
+      record?.status === "known" && record.data.block.kind === "toolcall" && record.data.block.name === "get_agent_state");
+    const block = call?.status === "known" ? call.data.block : null;
+    expect(block?.kind === "toolcall" ? block.outcome : null).toMatchObject({ kind: balanceError ? "partial" : "succeeded", data: {
+      role: "worker", model: "test/test", thinking: "high", context: { max: null, used: 123 },
+      balance: balanceError ? null : [{ name: "Account balance", remaining: 12.5, unit: "USD" }],
+    } });
+  });
+
+  it("rejects self-state requests from non-Agent resources", async () => {
+    const f = open({ adapter: adapter(() => [{ name: "get_agent_state", args: {} }]) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    expect((await runner(f, actor, target)()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "invalid_argument" } });
   });
 
   it("resolves complete model expressions without confusing provider or nested model IDs", async () => {

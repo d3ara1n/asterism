@@ -1,4 +1,5 @@
 {
+  "agents.getState": "读取助手状态",
   "models.list": "列出模型",
   "models.get": "读取模型",
   "command.session": "会话",

@@ -257,3 +257,18 @@ it("automatic compaction resumes the original conversation with the summary and 
   expect(f.turnEnds().map(([, value]) => value)).toEqual([expect.objectContaining({ reason: "completed", settled: true, inputId: "2" })]);
   expect(f.controller.running(f.object)).toBe(false);
 });
+
+// Selection changes during a request apply to the next request, not introspection of the active one.
+it.each([false, true])("retains the captured request selection and clears it after execution (failed=%s)", async fail => {
+  const f = fixture();
+  f.object.commit(writer => { writer.set(AgentDrafts, []); });
+  vi.mocked(f.execution.run).mockImplementation(async () => {
+    f.object.commit(writer => { writer.set(AgentSelection, { selection: { agent: "worker", model: "other/model", thinking: "high" } }); });
+    expect(f.controller.currentRequest(f.object)).toEqual({ role: "worker", model: "p/m", thinking: null });
+    if (fail) throw new Error("Model request failed");
+    return completedRun;
+  });
+  f.controller.start(f.object);
+  await f.driver.enter();
+  expect(f.controller.currentRequest(f.object)).toBeNull();
+});

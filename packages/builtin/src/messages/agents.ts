@@ -1,6 +1,7 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const agentsMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
+  getState: { id: "agents.getState", defaultMessage: "Read Agent state" },
   overviewSummary: {
     id: "settings.agents.summary",
     defaultMessage: "Role prompts, models, and subagent settings",

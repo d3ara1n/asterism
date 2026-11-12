@@ -11,6 +11,7 @@ import {
 import { createSelection, selectionOf } from "./selection.ts";
 import { generateAgentName } from "./name.ts";
 import { createAgentController } from "./controller.ts";
+import { createAgentStateTool } from "./self-state/runtime.ts";
 import { CompactAgentConversation } from "./compression-contract.ts";
 import { commandMessages } from "../messages/command.ts";
 import { createAdmission } from "./admission.ts";
@@ -75,6 +76,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
         return { sessionId };
       })],
       events: [AgentInputAccepted, AgentTurnEnded],
+      topLevelTools: [createAgentStateTool({ selection, currentRequest: controller.currentRequest, models: plugin.models, usage })],
       tools: [createPeekTool(peekAgent), createSendTool(), createWaitTool(controller)],
       channels: [createPeekChannel(peekAgent)],
       resources: [implementResource(Agent, AgentView, {

@@ -1,8 +1,10 @@
 import { AgentView } from "./data.ts";
-import { creationEntry, cardRenderer, useRendererObject, type RendererModule } from "@asterism-app/sdk/renderer";
+import { toolRenderer, creationEntry, cardRenderer, useRendererObject, type RendererModule } from "@asterism-app/sdk/renderer";
 import { Bot } from "lucide-react";
 import type { z } from "zod";
 
+import { GetAgentStateResult } from "./self-state/contract";
+import { agentsMessages } from "../messages/agents";
 import { commonMessages } from "../messages/common";
 import { Agent, builtin, CreateAgent } from "@asterism-app/builtin-api/contracts";
 import { agentUI } from "@asterism-app/builtin-api/renderer";
@@ -28,7 +30,8 @@ export default {
     Actions: ConversationActions,
     panels: agentPanels,
   })],
-  tools: [peekToolRenderer, sendToolRenderer, waitToolRenderer],
+  tools: [peekToolRenderer, sendToolRenderer, waitToolRenderer,
+    toolRenderer(GetAgentStateResult, { label: agentsMessages.getState, icon: <Bot className="size-3.5" />, input: {} })],
   records: agentRecordViews,
   creations: [creationEntry(CreateAgent, { id: "asterism.builtin/agent.configured", label: commonMessages.kindAgent, icon: <Bot className="size-4" />, group: "agents", InputView: AgentInput, triggers: { menu: {} } })],
   async prepare({ signal }) {

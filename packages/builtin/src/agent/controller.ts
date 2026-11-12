@@ -14,6 +14,7 @@ import { projectAgentTurnState } from "./state-projection.ts";
 import { deliverDrafts } from "./drafts.ts";
 import { turnStartRead } from "./input-message.ts";
 import { readRecords } from "../shared/record-reading.ts";
+import type { AgentRequestState } from "./self-state/contract.ts";
 
 interface AgentControllerDependencies {
   selection: AgentSelectionService;
@@ -29,7 +30,7 @@ interface AgentControllerDependencies {
 /** Bind the Agent loop to resource scheduling, timeline records, persistent drafts, and workbench feedback. */
 export function createAgentController(deps: AgentControllerDependencies) {
   // One owned task accepts inputs at a time; task cleanup remains tracked by the host lifecycle.
-  const active = new Map<string, { key: string; entered: boolean; end(reason: AgentTurnEndReason): void }>();
+  const active = new Map<string, { key: string; entered: boolean; request: AgentRequestState | null; end(reason: AgentTurnEndReason): void }>();
   const waiters = new Map<string, Set<() => void>>();
   // Conversation and compression exits both release callers waiting for this Agent to settle.
   const finish = (id: string) => {
@@ -64,7 +65,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
     work: (signal: AbortSignal) => Promise<AgentTurnEndReason>,
     ended: (reason: AgentTurnEndReason, entered: boolean) => () => void) => {
     const run = {
-      key: `agent:${object.ref.id}:${++execution}`, entered: false,
+      key: `agent:${object.ref.id}:${++execution}`, entered: false, request: null as AgentRequestState | null,
       end(reason: AgentTurnEndReason) {
         const notify = ended(reason, run.entered);
         finish(object.ref.id);
@@ -113,6 +114,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
   };
   return {
     running,
+    currentRequest: (object: ObjectReader) => active.get(object.ref.id)?.request ?? null,
     /** Waits for the current conversation or compression task to exit. Later input may start another task. */
     settled(object: ObjectReader, signal: AbortSignal): Promise<void> {
       signal.throwIfAborted();
@@ -194,8 +196,10 @@ export function createAgentController(deps: AgentControllerDependencies) {
               },
             };
             let result: ModelRunResult;
+            const run = active.get(object.ref.id)!;
             try {
               const target = deps.selection.target(selection);
+              run.request = { role: agent.id, model: formatModelExpression(target), thinking: target.thinking ?? null };
               const prepare = deps.prepareRequest(agent, target);
               let prepared: ReturnType<typeof prepare>;
               result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
@@ -207,7 +211,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
             } catch (error) {
               report(object, error, current, true);
               return { reason: current.aborted ? "cancelled" : "failed", hasTools: false };
-            }
+            } finally { run.request = null; }
             if (result.response) deps.usage?.consume(result.response);
             if (result.reason === "failed" && result.code === "event_delivery") {
               deps.feedback.report(object, { origin: "software", level: "error", code: "event_delivery",
