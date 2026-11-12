@@ -2,10 +2,10 @@ import type { RendererObjectContext } from "@asterism-app/sdk/renderer";
 import { PeekChannel, type PeekClient, type PeekEvent, type PeekResult } from "./peek.ts";
 
 /** Binds Peek to the displayed Agent. Stream completion carries the outcome; early iterator exit closes the channel. */
-export function createPeekClient(object: Pick<RendererObjectContext, "openChannel">): PeekClient {
+export function createPeekClient({ openChannel }: Pick<RendererObjectContext, "openChannel">): PeekClient {
   const stream: PeekClient["stream"] = async function* (input, { signal }) {
     signal.throwIfAborted();
-    const channel = object.openChannel(PeekChannel);
+    const channel = openChannel(PeekChannel);
     const abort = () => channel.close();
     signal.addEventListener("abort", abort, { once: true });
     let completed = false;

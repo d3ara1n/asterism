@@ -309,11 +309,14 @@ export class TreeStore {
   }
 }
 
+// Keep the retained disposer outside the hook's object and session closure scope.
+const disposeTreeStore = (store: TreeStore) => store.dispose();
+
 /** Retained UI intent survives session switches; effects own active reads and native subscriptions. */
 export function useTreeStore(key: string, createSource: (calls: Calls, ref: ResourceRef, object: RendererObjectContext) => TreeSource) {
   const object = useRendererObject();
   const calls = useRendererCalls();
-  const store = object.retained.get(key, () => new TreeStore(createSource(calls, object.ref, object)), value => value.dispose());
+  const store = object.retained.get(key, () => new TreeStore(createSource(calls, object.ref, object)), disposeTreeStore);
   const present = useIsPresent();
   useEffect(() => present ? store.acquire(createSource(calls, object.ref, object)) : undefined,
     [present, store, calls, object.ref.sessionId, object.ref.id, object.ref.kind, object.openChannel]);

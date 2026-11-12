@@ -18,11 +18,18 @@ export function useConversationInteraction() {
 
 /** Drafts, handoff holds, and submission identities survive card remounts; success completes the handoff together, while failure preserves retryability. */
 const interactionKey = "asterism.builtin/agent.interaction";
+
+/** Keep only the identity-bound input capability, not the view context and its captured session observation. */
+function createInteraction(input: RendererObjectContext["input"]) {
+  return new ConversationInput(() => input(SubmitAgentInput));
+}
+// Retention also owns the disposer; defining it here avoids retaining the hook's shared closure context.
+const closeInteraction = (input: ConversationInput) => input.close();
 export function useAgentConversation(object: RendererObjectContext, hasSelection: boolean, executionState: AgentExecutionState, drafts: readonly AgentDraft[]) {
   const i18n = useI18n();
   const current = object.retained.get(interactionKey,
-    () => new ConversationInput(() => object.input(SubmitAgentInput)),
-    input => input.close());
+    () => createInteraction(object.input),
+    closeInteraction);
   const { draft, submission } = current;
   const phase = useSyncExternalStore(current.subscribe, current.getSnapshot);
   const accepted = (result: RendererReceipt) => {

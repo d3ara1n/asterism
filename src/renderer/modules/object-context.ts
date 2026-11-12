@@ -1,4 +1,4 @@
-import { createElement, useCallback, useMemo, type ReactNode } from "react";
+import { createElement, useMemo, type ReactNode } from "react";
 import { RendererCatalogsProvider, RendererModelsProvider, RendererPreferencesProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@asterism-app/sdk/renderer";
 import { pluginOf, resourceCall, reference, ModelCatalog, ShellProfilesCatalog } from "@asterism-app/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
@@ -8,9 +8,8 @@ import { useConfiguration } from "../features/configuration/state";
 import { resolveToolView, toolIcon, toolLabel, toolPreparation } from "../features/conversation/tool-views";
 import { useModuleViews } from "./views";
 import { pluginPreferences } from "../features/creation/preferences";
-import { contentInput, contentReader, contentCommand } from "../features/creation/content";
-import { objectRetention } from "../features/session/retention";
-import { channels } from "../runtime";
+import { contentCommand } from "../features/creation/content";
+import { objectCapabilities } from "./object-capabilities";
 
 export function RendererCatalogProvider({ ready, children }: { ready: boolean; children: ReactNode }) {
   const configuration = useConfiguration(ready);
@@ -32,16 +31,11 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
   const { controller } = workbench;
   const { state } = useSession(controller);
   const records = controller.recordSnapshot();
-  const openChannel = useCallback<RendererObjectContext["openChannel"]>(contract =>
-    channels.open(contract, { sessionId: controller.sessionId, id: object.id, kind: object.kind }), [controller.sessionId, object.id, object.kind]);
-  const content = useMemo(() => contentReader(() => ({ sessionId: controller.sessionId, objectId: object.id })),
-    [controller.sessionId, object.id]);
-  const retained = useMemo(() => objectRetention.object(controller.sessionId, object.id), [controller.sessionId, object.id]);
+  // Build identity-only capabilities outside this hook's closure scope: retained drafts and clients may outlive the view.
+  const capabilities = useMemo(() => objectCapabilities(controller.sessionId, object.id, object.kind),
+    [controller.sessionId, object.id, object.kind]);
   return {
-    ref: { sessionId: controller.sessionId, id: object.id, kind: object.kind },
-    content,
-    input: contract => contentInput({ kind: "resource", sessionId: controller.sessionId, resourceKind: contract.resource.kind, contractId: contract.id,
-      ...(contract.kind === "action" ? { objectId: object.id } : {}) }),
+    ...capabilities,
     view: { ready: workbench.ready, error: state.readError, missing: state.missing },
     session: {
       snapshot: () => records, subscribe: controller.subscribe,
@@ -53,8 +47,6 @@ export function useObjectContext(object: WorkbenchObject): RendererObjectContext
     invoke: (contract, input, options) => contentCommand(options?.content,
       { kind: "resource", sessionId: controller.sessionId, objectId: object.id, resourceKind: contract.resource.kind, contractId: contract.id },
       contentScopeId => controller.execute({ type: "resource.command", sessionId: controller.sessionId, objectId: object.id, command: resourceCall(contract, input), contentScopeId })),
-    openChannel,
-    retained,
   };
 }
 

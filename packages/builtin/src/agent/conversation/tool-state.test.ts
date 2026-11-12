@@ -46,9 +46,9 @@ describe("Tool call display projection", () => {
   });
 
   it("Preserves cancelled results, saved resource identity and incomplete history state", () => {
-    const node: Extract<TimelineItem, { kind: "toolcall" }> = {
+    const node: Extract<TimelineItem, { kind: "toolcall"; createdAt: string }> = {
       id: "saved", createdAt: "2026-10-01", kind: "toolcall",
-      responseId: "r", requestParentId: null, ordinal: 0, complete: true, source: { model: "p/m", adapter: "test", scope: "test" }, continuation: null,
+      responseId: "r", ordinal: 0, complete: true,
       callId: "c", name: "resource_call", argumentsText: "", arguments: args,
       outcome: { ...invocation, finishedAt: 300, kind: "cancelled", data, model: [{ kind: "text", text: "Stopped" }], message: "Stopped." },
     };

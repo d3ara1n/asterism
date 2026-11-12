@@ -2,9 +2,9 @@ import { useCallback, useMemo, useState } from "react";
 import { useSessionRead, type RendererSessionSnapshot } from "@asterism-app/sdk/renderer";
 import type { ModelLiveBlock } from "@asterism-app/sdk/contracts";
 import type { CompressionActivity, InlineFeedback } from "../feedback";
-import { readConversation } from "../renderer-history";
+import { readConversation } from "./read-history";
 import type { ConversationHistoryWindow } from "./history-window";
-import { displayedTimeline, liveTimeline, savedTimeline, withLive } from "./timeline";
+import { displayedTimeline, liveTimeline, conversationTimeline, withLive } from "./timeline";
 
 /** Owns the reading window and the handoff from live output to saved records. */
 export function useConversationHistory(snapshot: RendererSessionSnapshot | null, agentId: string, window: ConversationHistoryWindow,
@@ -12,9 +12,8 @@ export function useConversationHistory(snapshot: RendererSessionSnapshot | null,
   const read = useSessionRead(snapshot,
     useCallback((snapshot, signal) => readConversation(snapshot, agentId, window, signal), [agentId, window]),
     { keepPrevious: true });
-  const saved = useMemo(() => read.data ? savedTimeline(read.data.path, agentId, running, feedback,
-    { boundary: read.data.boundary, from: read.data.from, compressions }) : null,
-  [read.data, agentId, running, feedback, compressions]);
+  const saved = useMemo(() => read.data ? conversationTimeline(read.data.projection, running, feedback, compressions) : null,
+  [read.data, running, feedback, compressions]);
   const retaining = read.status === "loading" && read.data !== null;
   const [observed, setObserved] = useState(() => liveTimeline(null, blocks, retaining));
   const output = liveTimeline(observed, blocks, retaining);

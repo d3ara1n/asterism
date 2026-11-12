@@ -3,15 +3,18 @@ import { useI18n, useRendererObject } from "@asterism-app/sdk/renderer";
 import { createPeekClient } from "@asterism-app/builtin-api/renderer";
 import { peekMessages } from "../../messages/peek";
 import type { CommandHost } from "../command/CommandPalette";
-import { createPeekConversation } from "./conversation";
+import { createPeekConversation, type PeekConversation } from "./conversation";
 import { PeekPanel } from "./PeekPanel";
+
+// A retained disposer must not share the hook context that owns the current object view.
+const stopPeekConversation = (conversation: PeekConversation) => conversation.stop();
 
 /** Temporary exchanges are retained per Agent; the panel stops an active investigation when it closes. */
 export function usePeekCommand(host: CommandHost) {
   const i18n = useI18n();
   const object = useRendererObject();
   const conversation = object.retained.get("asterism.builtin/agent.peek",
-    () => createPeekConversation(createPeekClient(object)), value => value.stop());
+    () => createPeekConversation(createPeekClient(object)), stopPeekConversation);
   return {
     entry: {
       id: "peek/explain", label: i18n.text(peekMessages.explain), icon: <ScanSearch />,

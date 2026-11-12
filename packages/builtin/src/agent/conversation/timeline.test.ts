@@ -61,7 +61,7 @@ describe("Agent typed record views", () => {
   it("Thinking blocks containing only a summary remain readable", () => {
     const saved = node("summary-only", null, thinking("a", "r", 0, "", { summary: "Saved reasoning summary" }));
     const timeline = conversationTimeline(sessionSnapshot(nodeView("s", "", [saved], saved.id)), "a", []);
-    expect(timeline[0]).toMatchObject({ kind: "thinking", text: "Saved reasoning summary", summary: "Saved reasoning summary" });
+    expect(timeline[0]).toMatchObject({ kind: "thinking", text: "Saved reasoning summary" });
     expect(saved.data).toMatchObject({ block: { text: "", summary: "Saved reasoning summary" } });
   });
   it("A block keeps its display identity when moving from memory to history, without duplicate display in transitional snapshots", () => {
