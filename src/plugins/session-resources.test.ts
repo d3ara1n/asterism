@@ -882,14 +882,16 @@ describe("Agent resource operation entries", () => {
     expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([{ receiverId: actor.id, resourceId: noteId }]);
   });
 
-  it.each([false, true])("reports active Agent context and account balance despite a later selection edit (balance error=%s)", async balanceError => {
+  it.each([false, true])("reports active Agent context, account balance, and quota despite a later selection edit (balance error=%s)", async balanceError => {
     const done = latch();
     let requests = 0, agent!: ResourceRef;
     const f = open({ plugins: [definePlugin({ namespace: pluginNamespace("test.agent-balance"), setup: () => ({
       usageProviders: [{ id: "test-balance", label: "Test balance", async query() {
         if (balanceError) throw new UsageQueryError("network");
         return [{ id: "balance", type: "balance" as const, scope: "account" as const, label: "Account balance", remaining: 12.5,
-          unit: { type: "currency" as const, code: "USD" } }];
+          unit: { type: "currency" as const, code: "USD" } },
+        { id: "rpm", type: "quota" as const, scope: "key" as const, category: "rate_limit" as const, label: "Requests",
+          value: { type: "ratio" as const, remaining: 0.5 }, window: { mode: "rolling" as const, periodSeconds: 60, resetAt: null } }];
       } }],
     }) })], adapter: { format: () => "test/1", validate() {}, prepare() {
       const first = requests++ === 0;
@@ -924,6 +926,7 @@ describe("Agent resource operation entries", () => {
     expect(block?.kind === "toolcall" ? block.outcome : null).toMatchObject({ kind: balanceError ? "partial" : "succeeded", data: {
       role: "worker", model: "test/test", thinking: "high", context: { max: null, used: 123 },
       balance: balanceError ? null : [{ name: "Account balance", remaining: 12.5, unit: "USD" }],
+      quota: balanceError ? null : [{ name: "Requests", category: "rate_limit", periodSeconds: 60, remaining: 0.5, amount: null, resetsAt: null }],
     } });
   });
 

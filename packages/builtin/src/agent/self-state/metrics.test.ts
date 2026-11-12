@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ModelCompletion, UsageItem } from "@asterism-app/sdk/contracts";
-import { accountBalances, agentContextUsage } from "./metrics.ts";
+import { accountBalances, accountQuotas, agentContextUsage } from "./metrics.ts";
 
 const completion: ModelCompletion = { finishReason: "stop", rawFinishReason: null, providerResponseId: null,
   usage: { input: 1200, output: 80, total: 1280, reasoning: null, cacheRead: 1000, cacheWrite: null } };
@@ -53,5 +53,29 @@ describe("Agent monetary balance", () => {
     expect(accountBalances({ state: "ready", items: [] })).toBeNull();
     expect(accountBalances({ state: "error", items: balances })).toBeNull();
     expect(accountBalances({ state: "disabled", items: [] })).toBeNull();
+  });
+});
+
+describe("Agent quota windows", () => {
+  const label = { kind: "message" as const, owner: "test", sourceLocale: "en", id: "rate", defaultMessage: "Request rate limit" };
+  const items: UsageItem[] = [...balances,
+    { id: "plan", type: "quota", scope: "plan", value: { type: "ratio", remaining: 0.25 },
+      window: { mode: "rolling", periodSeconds: 18_000, resetAt: Date.UTC(2026, 0, 1) } },
+    { id: "requests", type: "quota", scope: "connection", category: "rate_limit", label,
+      value: { type: "quantity", remaining: 30, limit: 120, unit: { type: "count", label } },
+      window: { mode: "unknown", periodSeconds: null, resetAt: null } },
+  ];
+
+  it("defaults uncategorized windows to allowance and derives the share from reported quantities", () => {
+    expect(accountQuotas({ state: "ready", items })).toEqual([
+      { name: null, category: "allowance", periodSeconds: 18_000, remaining: 0.25, amount: null, resetsAt: "2026-01-01T00:00:00.000Z" },
+      { name: "Request rate limit", category: "rate_limit", periodSeconds: null, remaining: 0.25,
+        amount: { remaining: 30, limit: 120, unit: { type: "count", label: "Request rate limit" } }, resetsAt: null },
+    ]);
+  });
+
+  it("reports no quotas when only balances exist or the query failed", () => {
+    expect(accountQuotas({ state: "ready", items: balances })).toBeNull();
+    expect(accountQuotas({ state: "error", items })).toBeNull();
   });
 });

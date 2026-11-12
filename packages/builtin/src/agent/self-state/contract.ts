@@ -18,4 +18,19 @@ export const GetAgentStateResult = builtin.data("agent.self-state", requestState
     remaining: z.number().describe("Reported money remaining; zero or negative amounts are preserved."),
     unit: z.string().describe("Currency code or the provider's monetary symbol."),
   })).nullable().describe("Monetary balances reported for the effective model's provider, kept separately. Null when unavailable. Quotas and request token usage are not money balances."),
-}).describe("Calling Agent's effective role, model, thinking level, context capacity/use, and available account or key balances."));
+  quota: z.array(z.strictObject({
+    name: z.string().nullable().describe("Provider quota label; null when the window period alone identifies it."),
+    category: z.enum(["allowance", "rate_limit"]).describe("allowance is plan or key usage; rate_limit is a short-term request or token rate bucket."),
+    periodSeconds: z.number().nullable().describe("Window length in seconds; null when unknown."),
+    remaining: z.number().describe("Remaining share of the window, from 0 to 1."),
+    amount: z.strictObject({
+      remaining: z.number(), limit: z.number(),
+      unit: z.discriminatedUnion("type", [
+        z.strictObject({ type: z.literal("currency"), code: z.string() }),
+        z.strictObject({ type: z.literal("symbol"), symbol: z.string() }),
+        z.strictObject({ type: z.literal("count"), label: z.string() }),
+      ]),
+    }).nullable().describe("Remaining and total quantity when the provider reports amounts rather than only a share."),
+    resetsAt: z.iso.datetime().nullable().describe("Next reset as a UTC ISO 8601 string; null when unknown."),
+  })).nullable().describe("Quota windows reported for the effective model's provider, in provider order. Null when unavailable."),
+}).describe("Calling Agent's effective role, model, thinking level, context capacity/use, and available account or key balances and quotas."));
