@@ -16,9 +16,9 @@ The harness is the model-facing description of the execution environment, includ
 
 ## The shared resource foundation
 
-The host supplies sessions, resource identity and links, history storage, execution capabilities, and the workbench. Plugins supply resources, tools, views, and domain behavior. Model calls, terminal sessions, and MCP operations are capabilities that implementations can compose.
+The shared foundation lets participants use explicit resources without requiring every implementation to adopt the same internal model. A plugin owns the behavior it adds; sharing the workbench does not erase that responsibility boundary.
 
-The builtin plugin provides conversational Agents as independently executing objects that can also be made available as resources. Agents can communicate through direct Agent links or Mesh channels. Subagent Pools provide task-scoped delegation and retained reports. These capabilities support more than the main one-to-one interaction model.
+The builtin plugin provides conversational Agents that can also participate as resources. Their independence and ability to communicate support more than the main one-to-one interaction model.
 
 A session can contain several Agents alongside directories, notes, terminals, and other resources. Each built-in Agent has its own conversation derived from the session's current history. Sharing a session does not imply sharing model context or resource access.
 
@@ -30,7 +30,7 @@ The main paradigm is the familiar interaction between a user and an Agent: the u
 
 There is no special coordination architecture implied by this interaction. Several such conversations can coexist on the workbench, with each Agent working from its own inputs and linked resources. The builtin plugin supplies this ordinary conversational experience together with capabilities that users can combine into other organizational models.
 
-Users, other Agents, and resource integrations can submit messages to built-in Agents with source attribution. Accepted input starts an idle Agent; inputs to a running Agent are queued for the applicable request or turn boundary. Receiving messages from other sources enables coordination without requiring a separate kind of Agent.
+An Agent can respond to the user while also receiving reports or resource events. Receiving information from other sources enables coordination without requiring a separate kind of Agent; its responsibilities determine what it should do with that information.
 
 ## Other organizational models using built-in capabilities
 
@@ -40,9 +40,9 @@ The following models can be arranged with builtin resources, assistant roles, an
 
 The user assigns one Agent the Router role and others Worker roles. The Router maintains the user-facing conversation, distributes tasks, collects reports, and returns questions or results. Workers handle their assigned work in separate conversations.
 
-The Router can communicate directly with linked Worker Agents or use Mesh to discover and contact participants, including across sessions. Return communication requires the corresponding route. Each Worker receives its own resource access; the Router's resources are not automatically inherited. A Subagent Pool is another option for bounded delegated tasks that do not need an ongoing workbench conversation.
+Choose communication routes that support both assignment and reporting. Each Worker needs its own resource access; the Router’s resources are not automatically inherited. A bounded investigation and an ongoing conversation have different continuity needs, even when both are called Worker tasks.
 
-This provides the Router–Worker organization associated with Super-agent-style systems without requiring a new plugin. The user defines dispatch responsibilities, reporting conventions, escalation, and completion criteria through roles, skills, and task instructions. Further properties of a particular Super-agent design, such as automatic crash recovery, are separate implementation claims rather than consequences of assigning these roles.
+The user defines dispatch responsibilities, reporting conventions, escalation, and completion criteria through roles, skills, and task instructions. Assigning these roles establishes an organizational agreement, not additional execution guarantees such as automatic recovery.
 
 ### Peer collaboration
 
@@ -82,6 +82,6 @@ A terminal running an Agent program is not automatically a structured integratio
 
 A user can combine one-to-one assistance, routing, peer discussion, and shared-material collaboration with built-in resources. For example, a user-facing Router can assign work to a group of peers and discuss their combined result with the user. The user defines the workflow that connects these arrangements.
 
-When a composition crosses implementation boundaries, resource tools or public domain APIs supply the supported interaction contracts. Sharing the host does not automatically make independently implemented systems interoperable. A plugin can expose task submission or result inspection without requiring the consuming Agent to adopt its internal representation.
+When a composition crosses implementation boundaries, agree on what participants exchange and what the exchange means. Sharing the host does not automatically make independently implemented systems interoperable. An integration can expose useful work and results without requiring every participant to adopt its internal representation.
 
 Multi-paradigm support therefore comes both from composing existing capabilities and from extending them. A plugin boundary is an implementation boundary, not a boundary around every possible way of organizing Agents.

@@ -13,13 +13,13 @@ An Agent paradigm describes a general interaction and organizational model; plug
 | Workbench arrangement | Participating Agents, material, capabilities, communication links, and views for following the work |
 | Task instructions | The current goal, scope, deliverables, completion criteria, and decisions reserved for the user |
 
-In builtin, an Agent configuration supplies reusable role instructions and model defaults. A role is distinct from a model role, which selects a model and thinking level. A workflow responsibility can also be assigned through task instructions without adding a reusable configuration.
+In builtin, an Agent configuration can carry a reusable assistant role. That responsibility is distinct from the model choice used to perform the work. A workflow responsibility can also be assigned through task instructions without adding a reusable configuration.
 
 Skills can describe detailed procedures because they are selected methods, not infrastructure contracts. A skill does not supply missing resources, executable capabilities, or permission to act.
 
 Workbench layout has two aspects. The resource and link arrangement determines who can use which objects and communication routes. Card placement and open views help the user follow the work. Putting a reviewer card beside an implementer does not schedule a review, and drawing a resource link does not establish execution order.
 
-A static workbench template can preserve supported resources, links, and layout for reuse. It is a starting arrangement, not a workflow executor or a saved running conversation.
+A workbench template is useful for a recurring starting arrangement. Reusing that arrangement does not establish the new task’s goal, schedule its handoffs, or continue the previous conversation.
 
 ## Supervisor workflow with built-in Agents
 
@@ -35,11 +35,11 @@ A user-defined setup can contain:
 
 - A supervisor Agent with the objective, acceptance criteria, and responsibility for following through.
 - A working Agent with the execution responsibility and the resources needed for its task.
-- A link making the working Agent available to the supervisor for supported communication and investigation operations.
-- A return communication route when the working Agent needs to send reports or questions to the supervisor. The opposite direction requires its own link; Mesh can also provide communication routes.
+- A communication route for assignments and follow-up questions.
+- A return route for the working Agent’s reports and questions. Communication in one direction does not establish the reverse route.
 - Notes or files for shared material when useful, linked separately to each participant that needs them.
 
-The supervisor does not inherit the working Agent's resources. If it needs to inspect the actual output, give it the corresponding resource access. A link to the worker can support investigation of saved conversation records, but is not equivalent to reading the underlying files or external service state.
+The supervisor does not inherit the working Agent’s resources. If it needs to inspect the actual output, give it the corresponding resource access. Reading the worker’s account of its work is not equivalent to examining the underlying files or external service state.
 
 ### Define the supervision agreement
 
@@ -57,15 +57,15 @@ For example, a user might choose:
 
 This is example user instruction, not a harness rule. The supervisor's name or role does not grant additional access or turn its messages into user approval.
 
-### Follow through using available operations
+### Define evidence and follow-through
 
-The supervisor can send the task, investigate progress through supported Agent operations, read accessible outputs, and send follow-up instructions. Input acceptance and task completion are separate facts: a successful send does not mean the worker finished, and a stopped response does not by itself establish that the deliverable meets the criteria.
+Input acceptance, task completion, and acceptance of the result are separate facts. A delivered assignment does not mean the worker finished, and a stopped response does not establish that the deliverable meets the criteria. Decide what evidence the supervisor should examine before declaring the work ready.
 
-The user chooses the follow-up method. Available mechanisms include explicit worker reports, supported wait or investigation operations, and messages from configured schedule resources. A role assignment alone does not install a watcher or periodic wakeup. Ongoing coordination also depends on the application and participating sessions remaining available.
+The user chooses the follow-up agreement: what the worker reports, who investigates missing progress, and when an unresolved question returns to the user. A role assignment alone does not install monitoring or recurring execution. Ongoing coordination depends on the availability of its participants and the capabilities chosen to support it.
 
 This workflow reduces the user's routine relay work. It does not transfer reserved approvals or guarantee independent validation of the result; the user defines the evidence and review responsibilities.
 
-## Other workflows with built-in resources
+## Other ways to divide responsibility
 
 Builtin resources support different organizational models without requiring a new plugin for each one. A workflow defines how those participants carry out a particular task. Examples include:
 
@@ -74,4 +74,4 @@ Builtin resources support different organizational models without requiring a ne
 - **Planner and executor:** one Agent proposes or maintains a plan while another performs approved steps, with user-defined boundaries for replanning.
 - **Peer collaboration:** Agents exchange findings directly without a permanent coordinator, using agreed responsibilities and a way to resolve open decisions.
 
-A Router–Worker arrangement can also use ordinary built-in Agents: assign a Router role, connect it to Worker Agents directly or through Mesh, and define task assignment and reporting in user instructions or skills. This changes the organization of the work without requiring a new execution loop. Additional plugins are useful when a composition needs additional capabilities, such as runtime-enforced graph dependencies, rather than merely because it adopts another paradigm.
+A Router–Worker arrangement gives one participant responsibility for dispatch and synthesis. Define assignment and reporting in user instructions or skills, and give each participant the resources its work requires. This changes the organization of the work without inherently requiring another implementation. Additional plugins become useful when the arrangement needs additional capabilities, such as enforced execution dependencies, rather than merely a different division of responsibility.

@@ -73,14 +73,14 @@ export const ChatRead = defineImplementation({
   effect: "read", execution: "parallel",
 });
 export const ChatSend = defineImplementation({
-  ...builtin.data("chat.send", chatMessageSchema.describe("The message accepted by the external messaging service.")),
+  ...builtin.data("chat.send", chatMessageSchema.describe("The message accepted by the external messaging service. Telegram album sends return the first item's receipt; all sent items remain available in Chat reads.")),
   resource: Chat, tool: Send,
   targetSchema: z.strictObject({ replyTo: z.string().min(1).optional() }).nullable().describe("Send to this conversation. Null sends a message; replyTo quotes a message ID."),
   effect: "write", execution: "sequential",
 });
 export const ChatSee = defineImplementation({
   ...builtin.data("chat.see", chatImageSchema.describe("The attachment's image content and its reusable file reference.")),
-  resource: Chat, tool: See, targetSchema: chatFileLocatorSchema.describe("Select an attachment by messageId and fileId."),
+  resource: Chat, tool: See, targetSchema: chatFileLocatorSchema.describe("Select an attachment by messageId and fileId. For a quoted attachment, messageId is the enclosing reply's ID."),
   effect: "read", execution: "parallel",
 });
 /** latest identifies the most recent observed event while the application runs; views reload their queries when it changes. */

@@ -1,35 +1,31 @@
 # Get started
 
-Begin with a model connection and a session for one piece of work. Asterism stores sessions locally and uses the configured provider for model requests.
+Start with one piece of work, one Agent, and the material needed to make progress. Asterism is a local workbench, but model requests use the provider you configure. Local session storage does not mean that everything the Agent reads stays on your computer.
 
-## Set up a model
+## Choose a bounded first task
 
-Open **Settings**, then the model providers section under **Providers**. Add a provider connection, enter its credentials, and add a model. A provider preset supplies connection defaults; model discovery can retrieve the models available through that connection.
+Give the Agent a goal, a scope, and a way to recognize a useful result. “Review these notes for unresolved decisions” is easier to assess than “organize my project.” Say whether you want advice, a proposed change, or changes applied to the underlying material.
 
-Check the model’s reasoning/tool settings and context size. Test the connection before starting work. Provider requests, including connection tests, may incur charges.
+Separate routine judgment from decisions you want to keep. For example, you might let an Agent investigate freely while reserving publication, purchases, or commits for your approval. Those instructions express your working agreement; they are not an operating-system permission boundary.
 
-Model roles make selections reusable. Configure a conversational role for agent work and the utility role for features such as automatic session naming.
+A model connection makes conversation possible. Choose a model suited to the task and check that the connection works before entrusting it with a longer assignment. Provider requests may incur charges, including requests made while checking a connection.
 
-## Start work
+## Give the Agent the right material
 
-On **Home**, choose an agent configuration and model, describe the task, and send it. Asterism creates a session and opens its workbench.
+Use a session to keep a coherent piece of work together. Link the resources the Agent needs rather than treating the session as a collection of everything you might eventually use. A note can hold an agreed brief; a directory can provide access to working files.
 
-Add resources for the work and link them to the agent that needs them. A directory resource enables file operations; a note can hold working material. Attachments sent with a message become part of that input and do not automatically create resource cards.
+A mention of a path or a reference to an object tells the Agent what you mean. It does not by itself give the Agent access. Likewise, objects visible to you on the workbench are not necessarily available to every Agent there.
 
-The agent card shows the conversation and execution progress. Expand a tool entry to inspect its operation or result. Stop an execution when needed; continuing uses the saved work.
+Choose between supplying material in a message and linking a resource according to the work. A supplied excerpt can anchor a discussion in what you saw at that moment. A resource is useful when the Agent needs to consult or act on the underlying object as the task develops. If freshness matters, ask it to inspect the current material.
 
-## Return to a session
+## Review progress against the goal
 
-Choose the session from the sidebar to resume working. Changing pages leaves background execution running. Exiting Asterism ends active work; reopening restores saved sessions and resource configuration.
+Treat the Agent's explanation, an operation's reported outcome, and the resulting material as different evidence. A plausible answer is not proof that a file changed; a successful operation is not proof that the change meets your intent. Ask for the evidence appropriate to the task.
 
-On macOS, closing the window leaves Asterism and background work running. Unsaved edits require confirmation before the window closes. Click its Dock icon or open Asterism again to restore the window with current state. Choose **Quit Asterism** or press **Cmd+Q** to stop background work and exit. On Windows and Linux, closing the window exits the application.
+Begin with ordinary conversation. Add another Agent when an independent context, a separate responsibility, or a continuing collaboration would help. More participants also create more handoffs and more work to reconcile their results.
 
-For repeated setups, save a workbench template. For another approach to an existing task, use its history.
+## Leave a useful continuation
 
-## Use application commands
+Before setting work aside, make the current decision, unresolved questions, and next step clear. Keep durable agreements in material you can revisit rather than relying on the Agent to infer them from a long exchange.
 
-Choose **Commands** from the application menu, or press **Cmd+K** on macOS or **Alt+K** on Windows and Linux. Search by command, group, or plugin name; matching results are ranked by relevance. Open **Settings → Theme** to choose light, dark, or system appearance. A check marks the saved preference separately from the highlighted command. The **Settings** group also offers software update checks. Update download progress and the restart action appear in the same row as the update state changes. Software updates require an installed application.
-
-Plugin groups appear as **Plugin name · Group**. Commands that need a session appear only while viewing a session. Builtin contributes **Auto-rename** under **Asterism Essentials · Session**.
-
-Use the arrow keys to highlight commands and Enter to run an action or open a nested page. Use the return control, or Backspace with an empty search, to return to the parent page. Escape closes the palette. Automatic renaming closes the palette on success and keeps failures visible. Update checks leave it open to show progress; closing the palette does not stop the download. The Agent's separate local command palette uses **Ctrl+K** within the Agent view.
+Navigating away from a session is not a stop instruction. Decide explicitly whether work should continue unattended. When returning, distinguish the saved conversation from the current state of files and services, especially if they may have changed elsewhere.

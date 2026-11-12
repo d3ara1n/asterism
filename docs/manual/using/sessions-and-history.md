@@ -1,61 +1,41 @@
-# Manage sessions and history
+# Organize sessions and use history
 
-A session keeps the history and resources for a piece of work. Continue the current approach, branch from an earlier point, or reuse the setup through a template.
+A session keeps the participants, resources, relationships, and history for a piece of work. Treat it as a working context rather than a container that must correspond to one conversation or one directory.
 
-## Start work
+## Choose a useful context boundary
 
-Home displays the selected plugin's starting interface. The builtin entry starts an Agent conversation; another plugin can start with a form, a terminal, or other resources. A session does not require a message or an Agent.
+Keep work together when it shares a goal, decisions, and material. Start a separate session when the assumptions or responsibilities need a clean boundary. Several Agents can share a session without sharing the same conversation or resource access.
 
-With several entries available, choose one in General settings. If that plugin becomes unavailable, choose another entry. Templates on Home work independently of this selection.
+Folders help you find related sessions and reusable setups. They are organizational labels, not shared context or access grants. Choose names that explain why you would return to the work rather than trying to encode every resource it uses.
 
-## Organize with folders
+Separate sessions do not isolate external effects. Two contexts can still refer to the same files or service. If their work overlaps, agree on ownership and handoffs rather than assuming that separate conversations prevent interference.
 
-Folders group the sessions and templates that belong to the same work. Create one from the sidebar, from the folder control on Home, or from a session's **Move to folder** menu, and give it a name and a color. The folder chosen on Home receives the next session you start there; **No folder** is always available.
+## Distinguish history, context, and current reality
 
-The sidebar has two views. **Folders** lists each folder as a collapsible group with its color, followed by sessions without a folder. **Recent** lists every session together, newest first, with a dot in its folder's color; hover the dot to see the folder name. Asterism remembers the chosen view and which folders are collapsed. Move a session from its menu at any time. Deleting a folder keeps its sessions and templates and moves them to **No folder**.
+History preserves what happened. The Agent's model context is the material selected for its next request. Current resource state is what files, notes, and services contain now. These can differ without any of them being wrong.
 
-## Continue work
+Long conversations can use summaries of earlier material. Compaction helps make a continuing conversation manageable; it does not replace the recorded history or undo changes. Keep important agreements explicit and revisit original evidence when a summary is not enough for the decision at hand.
 
-Select a saved session from the sidebar. Its agent cards display conversations for the current timeline. Stop and continue operate on an agent’s execution; switching sessions does not stop it.
+When resuming older work, ask what may have changed since the last observation. A recorded result remains evidence of that operation at that time, not a guarantee about the present.
 
-Builtin's automatic naming uses its utility model when available. Rename the session explicitly when a specific title matters. An explicit user or agent title prevents builtin's subsequent automatic naming on that history path. Manual naming remains available with other paradigms or with builtin disabled.
+## Explore alternatives without assuming rollback
 
-With a session open, choose **Commands** from the application menu, or press **Cmd+K** on macOS or **Alt+K** on Windows and Linux, then choose **Auto-rename** under **Asterism Essentials · Session**. The utility model generates and applies a title from the current conversation; no title input is required. This command can replace an explicit title, and its result prevents later background renaming on that history path. The change appears in the timeline.
+Browsing an earlier point lets you inspect it without changing the current work. Explicitly continuing from that point and adding work creates another continuation while preserving the previous one.
 
-## Let inactive sessions sleep
+Use branching to explore a different approach or return to an earlier decision. It changes the history path used for continuing work and reconstructs the session arrangement recorded there. It is not a general rollback mechanism for resource contents. Files, current note text, and external services retain their current values unless a resource supports restoration.
 
-General settings offers automatic sleep after 7, 15, 30, or 90 days, or **Never**; the default is 30 days. Creation and explicit restoration start a fresh interval; opening the session renews it. Incoming messages and Agent work do not renew it. The session you are viewing does not automatically sleep. An overdue session waits for its work to settle before sleeping.
+Before continuing an old approach, reconcile its assumptions with the present material. If comparing alternatives requires isolated files or reversible external actions, arrange that explicitly; a history branch alone does not provide it.
 
-Sleep ends resource runtime lifetimes, including subscriptions, Mesh membership, background jobs, and deadline registrations. It keeps saved state, history, configuration, and links; it does not delete the session. Opening a sleeping session resets its inactivity timer before reattaching resources. Background messages and resource access cannot wake it.
+## Reuse an arrangement, not a running past
 
-Choose **Keep awake** in a session's menu to prevent automatic sleep. It does not prevent archiving or application shutdown. Sleeping sessions stay in the sidebar, dimmed with a moon icon.
+Templates are useful for recurring combinations of participants, resources, and links. Save the parts of a setup that express how you want to begin similar work, then supply the new task's goal and material separately.
 
-## Explore another approach
+A template starts a new session rather than copying an ongoing conversation or suspending and resuming its processes. Each resource determines which setup data it can reuse. References to external locations still point into the external world, so review them before treating a new session as an independent copy.
 
-Open the history panel and select a position. Selection lets you inspect history without changing the workbench.
+## Decide what should remain active
 
-Use the explicit continue action to move execution to that position. Work that depends on the current timeline must finish before the jump. Adding records after the jump creates another continuation, preserving existing descendants.
+Switching sessions does not stop their work. Use an explicit stop when the intent is to stop execution, and distinguish that from merely putting a conversation out of sight.
 
-The jump reconstructs resource presence, links, and the session title recorded on that path. A path without a later title assignment uses the entry's initial title. Current file contents, note text, and external services keep their current state. Inspect relevant resources before continuing from older context.
+Sleep keeps saved work while ending its running resource lifetimes. Archiving sets a session aside and also ends its running resources. Restoring saved objects is not the same as resuming an external process from its previous instruction. If ongoing coordination depends on live participants, plan for their availability rather than relying on a session's presence in history.
 
-## Understand context compaction
-
-Long conversations can use a summary of older material in later model requests. Recent material remains in the model context, and the full recorded history remains available.
-
-Automatic compaction runs within conversation execution. To compact a stopped Agent manually, focus its content, press **Ctrl+K**, and choose **Compact conversation** in the **Conversation** group. Manual compaction does not resume the Agent; the composer’s **Stop** button cancels it without saving a partial summary.
-
-A compaction marker identifies the summary and reading boundary. Compaction changes the model’s input, not the original history or resource state.
-
-## Reuse a workbench setup
-
-Save a template from the session menu and choose from the objects that support templates. Each resource defines its reusable data: for example, a note keeps its body and an agent keeps its configuration. The template also stores links, card arrangement, and which selected objects are open in object islands, including their left-to-right order and widths. Resource-location islands such as editors and previews are not copied. Its folder starts as the source session's folder; change it while saving or later from the template menu.
-
-Select the template on **Home** to create a new session in the template's folder. A template card's preview carries its folder color, and its caption names the folder. The new session has fresh resource identities and restores the saved object islands automatically, with no copied conversation history or running process instances. Templates saved without object islands leave their objects in the canvas. Agents receive newly generated random names, even if the source agents had custom names. Other resources retain their saved names unless their type also generates names for template instances. Referenced external locations still refer to the external world.
-
-## Archive and restore
-
-Archive a session from its menu when it is no longer active. Archiving ends its running resource instances and moves it to the recycle bin.
-
-Open the recycle bin from the session section in General settings to restore an archived session. Set recycle-bin retention to 7, 15, 30, or 90 days, or **Never**; the default is 30 days. Expired archived sessions are permanently deleted only at application startup. Sleeping sessions are not in the recycle bin and do not expire.
-
-Restoring makes saved objects available again and starts a fresh inactivity interval. External processes start according to their resource implementation rather than resuming a suspended process.
+Treat permanent deletion as a separate decision from ending active work. Saved history may be valuable even when the original arrangement is no longer useful; neither keeping nor deleting that history undoes external effects.

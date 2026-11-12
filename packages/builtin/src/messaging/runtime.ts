@@ -258,7 +258,7 @@ export const messagingCreations = [
     toInput: ({ expose_self: _expose, ...input }) => input,
     toOptions: ({ expose_self }) => ({ exposeSelf: expose_self }),
     guidelines: [
-      "connectionId and conversationId identify the external conversation; threadId optionally narrows it to a thread. These IDs can come from list results, external events, or explicit user input.",
+      "connectionId and conversationId identify the external conversation; threadId optionally narrows it to a thread. These IDs can come from list results, external events, or explicit user input. QQ conversationId values use c2c:<user_openid> for private chats or group:<group_openid> for groups; QQ conversations have no threads.",
       "expose_self defaults to false. Setting it to true exposes you to the new resource so it can deliver incoming messages and their content to you. The Chat's binding determines which messages it delivers.",
     ] }),
 ];

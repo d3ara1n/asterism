@@ -12,15 +12,15 @@ A **workflow** is the user-defined arrangement of responsibilities, methods, han
 
 A **session** contains the inputs, objects, relationships, and history for a piece of work. It can exist independently of an Agent conversation. In builtin, several Agents can share a session, each with its own conversation derived from that session’s current history.
 
-In builtin, an **agent configuration** describes reusable behavior, including instructions, model selection, and subagent execution budgets. A workbench **Agent** is an execution object created from a configuration. Changing which configuration it uses does not create a new session.
+In builtin, an **agent configuration** describes reusable responsibility and behavior. A workbench **Agent** carries out work in its own conversation. Reusing a configuration does not mean sharing that conversation or its resource access.
 
-A built-in Agent receives **messages** from three sources: the user, another Agent, or a resource reporting an event. Each carries ordinary readable content. Agent and event messages identify their source; event messages describe what happened so the Agent can act according to its configured responsibilities.
+A message can be a user request, another Agent’s report, or an event from a resource. Its source matters when deciding how to interpret it: a report or event supplies information, not the user’s approval for a new scope of work.
 
 ## Resources, links, and tools
 
 A **resource** is an object with an identity and a type. A directory, note, terminal, or another agent can be a resource. A path or URL in a message is information; the corresponding capability comes from a resource.
 
-A **link** makes a resource available to a receiver, such as an agent. The arrow points from the resource to the receiver. Access in the opposite direction requires its own link.
+A **link** makes a resource available to a receiver, such as an agent. The relationship is directed: access in the opposite direction requires its own link. Sharing a session or working toward the same goal does not imply mutual access.
 
 A **tool** performs an operation. Available resource tools depend on the resource type, its link to the agent, and the execution environment. Tool visibility and card visibility do not establish access.
 

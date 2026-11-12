@@ -1,42 +1,29 @@
 # Use plugins and skills
 
-Plugins add executable capabilities and views. Skills supply instructions and supporting files that a model reads when the task needs them.
+Plugins extend what Asterism can do. Skills describe methods an Agent can read and apply. Choose between them by asking whether the missing piece is an executable capability or a way of working.
 
-## Add a plugin
+## Choose capabilities deliberately
 
-Open **Settings → Plugins** to add a local package directory. Select the package root containing its `package.json` and Asterism declaration.
+A plugin can introduce resources, operations, and views, or a different Agent experience. Installing a plugin is a trust decision: its code runs locally, and resource links are not an operating-system sandbox. Choose packages whose behavior and access to your environment you accept.
 
-The management list shows metadata, loading state, and enablement controls. A plugin's configuration pages appear separately on settings home and identify their contributor. Installation and enablement changes take effect after restarting Asterism.
+The bundled builtin plugin supplies the official conversational Agent experience. It is still a plugin, not the definition of every possible Asterism session. Another plugin can organize work differently while using the same resource-centered workbench.
 
-A startup failure prevents the plugin and its dependents from contributing capabilities. The management list identifies the failing stage and cause. An unavailable interface is a separate condition: accepted background services can remain running even when the interface cannot initialize. Partial interface initialization means some frontend modules failed while the plugin's views remain available.
+Add capabilities for a concrete need. A new division of responsibilities between existing Agents does not necessarily need a new plugin. Conversely, instructions alone cannot create an integration or enforce execution dependencies that the available capabilities do not implement.
 
-The bundled builtin plugin provides the official Agent experience and can be disabled or removed like another plugin. Removed bundled plugins remain listed as **Not added**, with their description and an **Add back** button. This recovery entry is also available when a bundled entry is removed directly from the plugin list file. Adding it back takes effect after restarting.
+Removing a plugin is not the same as undoing its work. Historical records and external effects can outlive the implementation that created them. Before relying on plugin removal as cleanup, distinguish saved material from active services and from changes made outside Asterism.
 
-Other plugins can supply their own Home entry. Choose among available entries in General settings. If the selected entry becomes unavailable, choose another; resource templates remain accessible independently.
+## Use skills for selected methods
 
-Plugins run as trusted local code. Install packages whose behavior you accept. Removing a plugin from the list does not erase its historical session records or automatically clean its private data.
+A skill is useful when you want to reuse a procedure, evaluation standard, or handoff convention. It can carry supporting material so the Agent can consult a method when relevant instead of burdening every task with its full instructions.
 
-## Add a skill
+Choose methods that fit the task. You can ask for a particular skill explicitly, or let the Agent identify a relevant one from the available descriptions. Installing a skill makes a method available; it does not mean that every task should follow it.
 
-Place each skill in its own directory under `~/.agents/skills/`. The package’s `SKILL.md` starts with YAML frontmatter containing a name and description:
+A skill supplies neither missing resources nor executable capabilities. It also does not grant approval for actions you have reserved. If a method calls for publication or an external change, the working agreement and available resources still matter.
 
-```markdown
----
-name: review-notes
-description: Review a collection of notes for unresolved decisions.
----
+## Make reusable instructions worth reusing
 
-Read the relevant notes and identify decisions that need follow-up.
-```
+Keep enduring expertise and responsibility in an Agent role. Use a skill for a method you may want across roles or only for particular tasks. Keep the current project's scope and acceptance criteria in its task or shared material.
 
-Supporting files belong inside the skill package. References to those files resolve from the package directory.
+When adapting a skill, preserve the purpose behind its steps rather than accumulating exceptions for unrelated tasks. A useful method explains the judgment it supports, what evidence matters, and when to stop or ask for a decision. Exact operation syntax belongs to the capability that implements the operation, not to a second catalog inside the skill.
 
-Refresh **Settings → Skills** after adding or changing packages. The page shows raw user and plugin sources, their provenance, discovered skills, and discovery problems. Each Agent paradigm decides which of those contributions enter its requests.
-
-## Read skills during work
-
-Builtin gives the model the names and descriptions selected for its request. User packages override plugin packages with the same name, and plugin packages override builtin packages. `skill_read` resolves a name in the current catalog and reads the skill or one of its supporting text files. `skill_refresh` updates discovery for later reads and model requests. Request preparation controls which skills appear in the prompt; it does not restrict reading installed skills.
-
-To point an agent at a particular skill, type `@` in the composer and choose it from the Skills category, or write `[label](skill:<name>)` directly. The message carries the skill reference as a Markdown link, and the agent reads it with `skill_read`.
-
-A skill describes a method. The resources and tools available to the agent determine which operations it can actually perform.
+For example, a review skill might ask the Agent to distinguish observations from assumptions and report unresolved decisions. It need not duplicate the file-reading operations available in the current workbench.

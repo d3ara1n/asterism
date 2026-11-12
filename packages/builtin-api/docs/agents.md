@@ -1,114 +1,69 @@
-# Extend built-in agents
+# Extend built-in Agents
 
-The built-in public API lets plugins submit messages to existing Agents and extend their preparation and presentation. The contributing plugin owns its integration and business state. Builtin owns input admission, conversation history, and Agent execution.
+The built-in public API lets plugins integrate with existing Agents without importing their implementation. The integration owns its business state and external relationships; builtin owns input admission, conversation history, and Agent execution.
 
-## Declare the dependency
+## Extend the domain you need
 
-Declare `@asterism-app/builtin-api` and `@asterism-app/sdk` in `peerDependencies` with `"*"`. The SDK is supplied by the host; the enabled builtin plugin provides its public API package. The host does not gate loading on dependency ranges. For local development, source-package dependencies supply editor types. Import public contracts from the domain package so every participant uses the same declarations. Disabling builtin also makes its dependent plugins unavailable.
+Use the public Agent boundary when the work belongs in an existing Agent conversation. A plugin that needs its own execution model can instead compose host capabilities without adopting that conversation model.
 
-Examples are TypeScript and TSX fragments for a plugin's backend or renderer. They use public packages; install additional libraries imported by the chosen example, such as Nano ID for submission identities, in the plugin project. A plugin still supplies its manifest and composition entry points.
+Import original contracts from the domain package. Shared declaration identity lets an extension participate in existing behavior; a copied schema or an implementation import is not an equivalent integration. Depending on the public API also means depending on its enabled implementation provider.
 
-## Messages and their sources
+## Make messages readable and attributable
 
-An Agent input is a message with ordered text, stored-file, or file-reference parts and a structured sender. All messages use the same submission action, history record, queue, and body renderer. The sender has three variants:
+Sender attribution explains where input came from independently of the Agent that receives it. It is not authority to access the source or a guarantee of a reply route. Preserve that distinction when bridging external systems or forwarding another Agent's message.
 
-| Source | Meaning | Attribution |
-| --- | --- | --- |
-| `user` | Input from the user | No additional sender fields; this is the default when sender is omitted |
-| `agent` | Communication from another Agent | Communication resource reference and Agent name, with optional Mesh channel addressing |
-| `event` | Facts reported by a resource | Emitting resource reference and its name when the message is constructed |
+Keep the body useful as ordinary readable text. For example, a pull-request notification can state the repository, change, author, and URL. The integration understands those facts and should explain them; the receiving Agent's instructions supply its responsibilities. A domain event does not need a private machine payload disguised as a message.
 
-Plugins supply sender attribution from their integration context. An Agent's Send tool obtains it from the bound caller. The saved input record belongs to the receiving Agent; its sender identifies the origin independently. Attribution itself grants no access to the source resource or reply route.
+Use retained attachments when the message must preserve submitted bytes. Use file references when the message should carry an address for later consumption. Forwarding an address does not mean its content has been read or captured.
 
-Keep the body useful as ordinary readable text. A resource reporting a pull request can include its repository, number, title, author, commit, and URL. The Agent's configured instructions supply its responsibilities. Event type names and domain facts belong in the body; no separate event payload schema or renderer is required.
+## Choose admission and scheduling intentionally
 
-Builtin preserves the submitted body and sender in history. Model projection wraps Agent and event messages in escaped source envelopes. The UI renders the original body with source identification: Agent messages use the Agent name, while event messages use the resource name, event icon, and blue surface. Names remain those recorded with the message even if the source is later renamed or removed.
+Successful submission means that input was accepted, not that the Agent completed the requested work. Design acknowledgements and external status updates around that distinction.
 
-## Submit and schedule messages
+Choose steering for information intended to affect current work and follow-up delivery for a subsequent task. An updated fact and a new independent review may deserve different scheduling even when they came from the same sender. Do not assume one submitted message corresponds to one model request or one turn.
 
-Obtain the target session executor from the plugin context and invoke `SubmitAgentInput` with the Agent resource reference. Each submission includes a 16-character Nano ID, parts, a delivery mode, and its sender. External callbacks can invoke the same action without a model tool call. Use a resource's attachment lifetime for an object-owned connection and pass its signal into ongoing submissions.
+Retain the complete submission for a retry, including its identity and attribution. A retry asks about the same work; changing the body or sender while keeping its identity obscures that meaning. New work needs a new submission identity.
 
-An idle Agent records accepted input and starts execution. When the Agent is running, accepted input enters its persistent drafts collection. Delivery mode is independent of sender:
+Cancellation of the submission and cancellation of the Agent's independent execution are different decisions. Bind an object-owned bridge to its resource lifetime, but do not treat the disappearance of a sending interface as an implicit request to stop the recipient.
 
-| Mode | Delivery while running |
-| --- | --- |
-| `steer` | At the next request boundary, after the current response and tool batch |
-| `follow` | At a turn boundary, together with other pending inputs eligible for the next turn |
+## Keep creation independent of input
 
-For example, a new independent review can use `follow`, while updated facts for the current task can use `steer`. A turn may consume a batch of messages; submission does not promise a separate turn for each message. Successful submission means acceptance, not completion of the Agent's response.
+Creating an Agent establishes an object; submitting input asks it to work. An integration can create an Agent now and submit ordinary input later. A starting interface may combine both in one transaction without inventing a separate first-message protocol.
 
-Construct the complete input once and retain it for retries, including the submission ID, sender name, mode, and body. An already accepted submission ID is ignored rather than accepted again. A new message needs a new ID.
+Put required initialization in creation or prepared initial work. Observe creation facts for reactions after commitment, not as a blocking initialization hook. Resource presence is a lifetime concern: reconstruction can make an existing Agent present again without creating a new Agent.
 
-Stored-file parts (`kind: "file"`) supply immutable content to the model and require the appropriate content reader when forwarded through an action. File-reference parts (`kind: "file-reference"`) carry a `FileRef` in `ref`, with optional `filename` and `mediaType`. They pass through actions, events, drafts, and history as ordinary JSON. Model projection presents their addresses as text; receiving or resending one does not read its bytes or require a content reader.
+## Route through explicit relationships
 
-Cancellation of a submission is separate from cancellation of the Agent's independent execution, which has its own public action. Stopping an Agent preserves pending drafts. Restoring drafts on application startup does not automatically send them.
+The publishing integration chooses recipients. A bridge can use its direct links to find Agents without obtaining their private state or inheriting their access to other resources. The reverse link is a separate relationship.
 
-## Creation and input
+An SDK event is a transient notification, not an Agent message. Translate it into readable input only when the integration's purpose calls for that. This keeps transport, recipient policy, and conversation meaning with the layer that understands each one.
 
-Agent creation and message submission are independent operations. Creating an Agent establishes an empty resource with its configuration; it does not require a message or start execution. Plugins can create the resource and submit ordinary input later.
+Communication resources should reuse public operation contracts when the semantics match while owning their own addressing and membership. Capture recipient authority at the request boundary; read mutable descriptions when handling the operation. A member directory informs routing without granting access beyond that scope.
 
-The builtin Home entry combines session creation, Agent creation, and acceptance of a user message in one transaction. It prepares the input before committing the new session, so rejected input leaves no empty session behind. The message uses the ordinary input contract, preparers, and acceptance notification. There is no separate first-message event or plugin lifecycle stage.
+## Distinguish admission, evidence, and execution
 
-Creation-related work belongs to resource creation or observation of the resulting creation fact, independently of incoming messages. In a session observer's `committed` callback, use the SDK's `ResourceCreated.decodeAll(records)` and select known entries whose `data.type` equals `Agent.kind`. The associated Agent ID is `data.id`; the host-created record's source is null. A creation observer sees the committed state; Home's creation and input may already be present together. Observation is not a blocking initialization hook. Resource-presence notifications and attachment lifetimes describe entry into the current resource set, including reconstruction, rather than only new creation.
+Use input preparation to inspect, replace, or reject a proposed submission. Keep it tied to a business rule and free of mutations that assume acceptance: preparation is not proof that the submission committed.
 
-## Resolve recipients
+Acceptance is useful for integrations that acknowledge received work. Conversation records are evidence of input actually delivered to history. Queued input can remain editable or be discarded, so those observation points answer different questions.
 
-The publishing plugin selects recipients and submits messages explicitly. A bridge resource can read a fresh session snapshot for resources directly linked to itself, select Agent references, and invoke their input action. Each link makes a resource available to its receiver; the reverse relationship is independent. Reading a link does not expose another plugin's private state.
+Turn-end notifications describe execution boundaries, not an immutable seal on the conversation or a promise of future idleness. Use the reported input and history position to identify the work rather than assuming the live session tip still represents that ending. Failure, cancellation, and normal completion should remain distinct in downstream status.
 
-The SDK event bus delivers typed transient notifications to subscribers. Publishing there does not submit an Agent message. A callback can translate a notification into a readable event message and submit it to selected Agents. This translation belongs to the integration that understands the notification.
+Transient notifications suit live reactions. Durable reconciliation needs saved evidence. An observer runs after facts have committed and cannot replace admission or take control of turn scheduling.
 
-## Implement communication resources
+## Investigate without continuing the target
 
-Use the public Send, Peek, GetProfile, and SetProfile tool declarations when a resource provides those operations. Each resource implementation owns its addressing schema and resolves targets within its authorized scope. A shared tool name does not grant direct access to the addressed Agent or its linked resources.
+A saved-conversation investigation explains evidence without starting a turn on the target Agent. It is useful for status or review questions that should not become new instructions to that Agent.
 
-Send accepts ordered `parts` containing text and file references. Each file-reference part carries a `FileRef` in `ref`; its optional `filename` specifies the name used for delivery. Agent and Mesh implementations forward these parts into Agent input without resolving the references. A consuming implementation can stream a referenced file through `plugin.files.open(ref, { signal })`. The original source resource remains in the reference across sessions and intermediate senders. The consuming operation determines how to use the bytes; support for references is explicit in each operation's contract.
+Keep the evidence snapshot separate from the caller's follow-up conversation. Each investigation can read fresh evidence while the caller retains earlier questions and reports as context. Preserve incomplete outcomes so a follow-up does not mistake a cancelled report for a complete account.
 
-For cross-session messaging, obtain the target session executor and submit through the same Agent input action. The public Agent service supplies an Agent's configured type and investigates its saved records without exposing private Agent state. Investigation captures a fixed record snapshot and does not start a turn on the target. Forward cancellation and investigation progress to the caller.
+## Prepare context without claiming authority
 
-Mesh messages retain their internal sender attribution in history. Model projection uses the channel name, Agent name, and numeric disambiguator; a sender not exposed to the channel is marked as not visible. Communication resources own their member directory and task descriptions. Resolve targets against the request's captured access scope. Read current task descriptions when handling an operation; identity resolution and mutable profile text have separate lifetimes.
+Request preparation changes the skills and instruction blocks presented to an Agent. Use it for integration-specific context, not as a replacement for authorization. Omitting information from a prompt is not an access restriction.
 
-## Investigate a conversation
+Keep preparation deterministic within the captured request environment. Changes to configuration or catalogs belong to later requests rather than altering the meaning of a request already being assembled.
 
-Peek uses the configured utility model to explain an Agent's saved records. Backend plugins obtain a client with `agentServices(plugin).peek(target)` after resolving an authorized Agent reference. Renderer contributions bind `createPeekClient(object)` to their displayed Agent. Both clients offer `run(input, { signal, onProgress })` for a final outcome and `stream(input, { signal })` for progress followed by a terminal result.
+## Extend presentation without owning execution
 
-Supply a `question` and optionally `includeThinking` to admit saved readable thinking. Each call captures fresh evidence from the target's current timeline and keeps that snapshot fixed throughout its retrieval rounds. Progress contains a complete report snapshot, which replaces the previous report rather than appending to it. The final outcome distinguishes success, partial output, cancellation, and failure. Breaking out of a stream cancels its investigation.
+Use presentation extensions for the integration's controls and business state while preserving builtin's conversation and execution ownership. A view closing does not complete or cancel waiting backend work. Reopening should read the current state rather than depend on an earlier component instance.
 
-For follow-ups, pass `history` containing earlier questions, reports, and their outcomes. This context belongs to the caller and is separate from the target's saved records. Keep incomplete reports marked with their actual outcome. The service does not retain conversations or write investigation exchanges to the target. Single-call tools, including Mesh Peek, supply no history; a conversational interface owns its temporary history and passes it explicitly on each call.
-
-## Prepare incoming input
-
-An external preparer can inspect, replace, or reject any of the three message sources using the original built-in action contract. Its replacement supplies raw action input that will be parsed again. Preparation applies to idle input, queued steering and follow-ups, and Home's initial input. It runs before acceptance, including on retries, so it is not an acceptance notification. Preparation has read capabilities and does not commit session mutations.
-
-Keep a preparer's scope tied to its business purpose. It does not replace the Agent implementation or acquire a private Agent executor.
-
-## Observe input and turn boundaries
-
-Input preparation, acceptance, and delivery are separate observation points. Use a preparer to modify or reject a submission. Subscribe to `AgentInputAccepted` to react after a new input commits. Its payload contains the final prepared `input`, including `submissionId`, and `queued`, which reports whether it entered drafts instead of being delivered immediately. Rejected inputs and retries of accepted submissions produce no new acceptance event. Home publishes acceptance after its complete session-creation transaction succeeds.
-
-Saving a held draft or changing an existing draft's mode is a draft-state operation, not a new input submission. These operations do not emit acceptance events; record observers still see the draft if it is delivered.
-
-Observe `AgentInputMessage` through `SessionObserver.committed` to see actual delivery to conversation history. Queued messages produce this record when consumed; idle inputs produce it during acceptance. Steering records do not start a new turn. These records and acceptance events use separate delivery mechanisms; an idle input's record is committed before its acceptance event is published. Acceptance does not guarantee that a queued message will reach a model request: pending drafts remain editable and can be discarded.
-
-Subscribe to `AgentTurnEnded` for execution boundaries. Every ending carries `reason` and `settled`. A normal turn followed by another queued batch reports `settled: false`; the last turn reports `settled: true` after the loop stops consuming. Failure and cancellation are reported with their own reasons rather than as successful completion. Steering joins the current turn and does not produce an ending by itself.
-
-The event's `inputId` identifies the turn-opening input record, and `position.nodeId` identifies its ending history position before any next-turn inputs. `inputId` can be null when execution has no recorded turn input. By the time a handler runs, the live session may contain later records; use these identities to locate the reported work instead of assuming the current tip is that ending. A stopped turn can be resumed explicitly and emit another ending for the same input. The event does not seal history or promise that the Agent will remain idle.
-
-Both events are transient occurrence notifications on `plugin.ipc.events`, with the receiving Agent as their resource source. Subscribe for all Agents or filter by session and resource identity, and bind subscriptions to the plugin lifetime. A plugin does not need its own resource to subscribe. Handlers run asynchronously and do not participate in input admission or turn scheduling. `settled` describes the consuming loop, while host task cleanup may still be tracked independently. Events are not replayed after restart.
-
-`SessionObserver.completed` concerns finalized operation records; it is not a turn-end callback. Resource status events describe coarse workbench status. Use the Agent's domain notifications when input identity, turn position, or the distinction between turn end and loop end matters.
-
-## Prepare model requests
-
-The host collects skill packages and instruction blocks with their registering plugin's provenance. Builtin selects its effective skills and builds structured instruction blocks for each request. User skills override plugin skills, which override builtin skills.
-
-Declare an Agent preparer to filter skills or remove, change, and append instruction blocks. Preparers run synchronously in plugin initialization order. Each request captures the catalog and preparer set before awaiting linked context, then uses the prepared result for its prompt. `skill_read` resolves names independently through the current flattened catalog. Removing a skill from the prompt does not restrict reading it; a catalog refresh affects later reads and model requests.
-
-## Extend presentation
-
-Agent history includes immutable model blocks and tool operations. Complete tool inputs are published before execution and their results fill the same record once. Read both through the public execution decoder when building a history projection; operation completion updates the existing record rather than appending a new tool position.
-
-Response termination metadata may describe generation failure or cancellation as well as success. It belongs to the response's last model-ordinal block and does not invalidate all earlier content. Errors before any output remain transient. Retry activity belongs to current execution state, not historical notices.
-
-Register Agent UI extensions during frontend preparation and bind registration to its cancellation signal. Extensions can present controls, supplemental content, overlays, or modal interaction using the built-in presentation components. Message sources already share the built-in body renderer and source presentation.
-
-The plugin supplies business state for the associated Agent and callbacks for user actions. A component becoming invisible does not complete or cancel waiting backend work. Remounting should reread current state, and each submission entry owns its pending and error state.
+When presenting history, distinguish immutable evidence from live progress and retry activity. A generation failure can coexist with useful earlier output or completed tool effects. Show what the evidence supports instead of assigning one blanket status to all preceding work.

@@ -1,21 +1,21 @@
 # Built-in public API
 
-This package exposes domain contracts and extension capabilities shared by Asterism's built-in implementation and external plugins.
+This package is the public domain boundary shared by Asterism's builtin implementation and external plugins. It lets an integration participate in existing Agent behavior without importing private implementation code.
 
-It lets a plugin interact with existing Agent behavior, offer creation capabilities, or contribute Agent presentation without importing the implementation.
+## Extend without taking ownership
 
-Public declarations retain their identity across consumers. The package is a shared domain boundary, not a second installed plugin and not a grant of private object access.
+Builtin owns its input admission, conversation history, and Agent execution. An extension owns its business state, external relationships, and presentation contributions. Use this boundary when extending that domain rather than treating the bundled paradigm as a mandatory model for all plugins.
 
-General hosting facilities belong to the SDK. Built-in-specific behavior belongs here only when it is intentionally public.
+Public declarations retain shared runtime identity across consumers. The package is not a second installed plugin and does not grant access to private objects. Generic hosting capabilities belong to the SDK; builtin-specific capabilities belong here when they are intentionally public.
 
-## Installation
+## Depend on the implementation provider
 
-Install with `npm install --save-dev --save-exact @asterism-app/sdk@latest @asterism-app/builtin-api@latest` to target the stable application, or use `@next` for both to target the preview application. Declare both packages as peer dependencies with `"*"` in the plugin package.
+Develop against compatible SDK and builtin API packages. Development dependencies supply declarations; peer dependencies express the shared provider relationship. Installing the API package does not install or update the builtin implementation that supplies behavior at runtime.
 
-The package ships TypeScript source. Asterism supplies the built-in public API at runtime, preserving shared declaration identity. Use development versions compatible with the target application; installing these packages does not install or update the built-in implementation.
+Import original contracts so extensions compose with the provider's operations rather than recreate them by convention. Validate the integration in an application with the intended provider enabled.
 
-## Authoring material
+## Explain integration choices
 
-The source package includes `docs/` for built-in domain development guides and `examples/` for agent input, input preparation, resource creation, and agent UI extensions. These examples are fragments to compose into a plugin with compatible SDK and built-in API dependencies. They participate in repository type checking.
+The package includes domain guides and source examples. Prose explains when to submit, prepare, observe, or present work and which participant owns each decision. Types and maintained examples express the concrete contracts and composition.
 
-The application's manual exposes these directories directly. Generic plugin development material and the complete starter package belong to `@asterism-app/sdk`.
+The manual supports users and plugin authors on demand. Tools remain understandable from their own descriptions, guidelines, and schemas without a separate documentation prerequisite.

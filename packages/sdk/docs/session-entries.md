@@ -1,31 +1,29 @@
-# Provide a session entry
+# Design a session starting point
 
-A session contains a history tree and a workbench. A plugin can start work with any supported resources, or with an empty workbench. An initial message and an Agent resource are optional domain choices.
+A session contains a history tree and a workbench. Its starting point can be an empty workspace or a set of resources prepared for a task. An Agent and an initial message are domain choices, not prerequisites for starting work.
 
-## Own the starting interface
+## Own the starting experience
 
-Declare a session entry in the renderer plugin. Its body owns the controls, draft, pending state, and error presentation. The host supplies readiness and an operation that opens the resulting session.
+A session entry owns the draft, validation feedback, submission state, and initial title for its workflow. The host owns opening the resulting session and the surrounding entry selection.
 
-Home displays a single available entry directly. Users choose among several entries in General settings. An explicit selection that becomes unavailable stays unresolved until the user chooses another entry. Resource templates remain available independently of the selected entry.
+Choose initial resources that make the submitted work useful. A research entry might create a workspace around a source document; a conversation entry might create an Agent and accept input. Keep the entry's purpose visible rather than asking users to configure unrelated host mechanisms.
 
-## Prepare and initialize
+## Separate preparation from commitment
 
-Use a typed plugin call for submission. Its backend implementation performs business validation and calls `plugin.createSession` with a retry key. Prepare each required resource through the supplied preparation context, using the original registered creation contract.
+Preparation can perform asynchronous validation and acquire what initialization needs. The final synchronous commit establishes the session and its initial facts together. A rejected submission should not leave an apparently valid but empty piece of work behind.
 
-Preparation can perform asynchronous work. It returns an initial title and a synchronous initializer. The initializer creates prepared resources and writes initial records or current data through authorized object handles. Session identity, resources, initial writes, and the retry receipt commit together. A failed preparation or initializer leaves no partial session.
+Use the original resource creation and action contracts when initial work has the same meaning as ordinary operations. This preserves their parsing and preparation rules instead of building a special first-use path that drifts from later use.
 
-When initial work uses an existing resource action contract, prepare that action against the resource token before initialization. This applies its parsing and registered preparers to the initial input as well. The pending resource has its final identity, but no persisted state yet. The owning plugin validates its initial business state and uses the prepared input in the initializer.
+Observation after commitment is not a blocking initialization hook. If a resource must have state before use, make that state part of preparation and initialization rather than relying on an observer to catch up.
 
-Reuse the key for a retry of the same accepted submission. Keys belong to the contributing plugin. A successful retry returns the existing session without repeating preparation or initialization. A new piece of work uses a new key.
+## Keep a submission's identity
 
-## Carry attachments
+Treat a retry as another attempt to learn the result of the same submission, not as new work. Retain its identity and draft until acceptance is known; give a genuinely new submission a new identity.
 
-Obtain a renderer content input for the submission call. Pass that input as the call's content option. The backend receives a content reader separately from business input and forwards it to session creation.
+This distinction matters when a response fails after the session was created. The user should be able to recover the accepted work without silently creating a duplicate session.
 
-Content IDs alone grant no access. Only authorized referenced bytes enter preparation and initial writes. Persisted references retain those bytes after the temporary draft closes.
+Carry attachments through their content ownership boundary, separately from the business input. A content identifier alone is not access to bytes. Transfer ownership to durable state before releasing a temporary draft.
 
-## Name the work
+## Name the work, not the entry
 
-The entry supplies the initial title. Later user or plugin title assignments append host history. Continuing from an older position restores that path's latest title, or the initial title when the path has no assignment.
-
-A paradigm can attach its own typed detail to a title assignment and implement automatic naming policy. The host preserves that detail and provides generic title operations.
+Use the initial title to identify the work being started. Later naming policy may reflect its development, but belongs to the plugin or paradigm that understands that work. The host preserves title history without deciding what the work means.

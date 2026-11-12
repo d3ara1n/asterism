@@ -1,11 +1,7 @@
 # Asterism manual
 
-This manual explains how Asterism works, how to use it, and how to develop plugins. Models read relevant topics on demand while helping users.
+This manual explains how to think about work in Asterism. It is for people using the workbench and authors deciding how their plugins should fit into it. Models consult relevant topics when helping with those tasks.
 
-Software-use topics cover Agent paradigms, user-defined workflows, models and agents, resources and tools, sessions and history, extensions, and troubleshooting. The manual also exposes plugin development guides and source examples maintained by their public packages, along with directories declared by loaded plugins.
+For users, the emphasis is on organizing work, choosing responsibilities, sharing material, and understanding the difference between recorded work and its effects. For plugin authors, it is on ownership, integration choices, and the reasons behind the public extension model.
 
-In the manual's virtual directory, `app/` contains application-use guides, `sdk/` contains generic plugin development material and a complete starter package, and `builtin-api/` contains guides and examples for extending built-in domains. `plugins/` groups each loaded plugin's declared directories by plugin ID. Files are read at their original locations; the manual creates no merged document copy.
-
-Each document stands on its own. Read the topics relevant to the task in any order. Concepts and examples explain working methods; the public packages' types describe the complete interfaces.
-
-The manual is maintained in English. A model can explain its contents in the user's language. It is ordinary reference material, not a system prompt or a skill package.
+Each topic stands on its own. Begin with the question or decision you are trying to resolve rather than following a required reading sequence. An assistant can explain a relevant topic in your language and relate it to your work.

@@ -10,7 +10,6 @@ Asterism is an object-centered, plugin-based personal agent workbench for organi
 - **History preserves facts.** Record identity, position, and input are fixed. Explicitly pending operations fill their result once; completed records are immutable. Asterism owns its records independently of provider or agent-framework session formats. Detach appends an event. History browsing does not change reality, and restoration requires resource support.
 - **Capture the environment at request boundaries.** A request and its tool batch use the captured path, configuration, credentials, and access until completion. Intervening changes take effect in the next request.
 - **Local operations follow processing order.** Later backend-processed writes win. Reads return current values at handling time. Pending prevents reentry at the same UI entry; cancellation scopes own asynchronous work. Runtime revisions, generations, precommit rechecks, and hypothetical conflict defenses are not the coordination model. Fixed storage, IPC, and API versions describe software formats.
-- **The harness describes primitives.** Host prompts, tool descriptions, and feedback use declarative input/output and infrastructure facts. Users compose workflows. Remove host-authored negative instructions, temporary missing-capability restrictions, and workflow prescriptions when maintaining harness text; preserve user instructions.
 - **Keep top-level context stable.** Host and plugin top-level tools register statically. Resource changes affect secondary tools and subsequent projection without interrupting one response.
 - **Trust plugins and allow failure.** Installed plugins are trusted. Protect identity, authorization contracts, and finalized records. Operations may fail visibly; reduced functionality or convenience is acceptable while those invariants remain intact. Failure does not by itself justify retries, fallback, or additional defensive machinery. Recovery requires a concrete application contract; retries also require a reason another attempt can succeed and safe repeat semantics. Prefer simple control flow and exposed failures over silently masking errors. Avoid speculative quotas and fairness layers.
 - **Trust the configured environment.** User-configured local paths, executables, and services are operational inputs, not an additional security boundary. Resolve them according to configuration and platform conventions, perform the requested operation, and expose actual failures. Validation protects explicit input contracts and application-owned invariants. Rely on standard library and operating system guarantees; additional preflight checks, recovery steps, or post-operation verification require an explicit application contract beyond what the underlying operation already provides.
@@ -45,17 +44,27 @@ Use English for code identifiers, comments, test descriptions, developer diagnos
 
 User-facing application copy remains bilingual, English first. Preserve the original language of user content, quotations, and test data whose language is relevant to the test. Runtime logs use English.
 
+## Model-facing harness text
+
+The harness describes primitives. Host prompts, tool descriptions, and feedback use declarative input/output and infrastructure facts. Users compose workflows. Remove host-authored negative instructions, temporary missing-capability restrictions, and workflow prescriptions when maintaining harness text; preserve user instructions.
+
+Runtime tool guidance belongs in the owning tool's description, guidelines, and input/output schemas, available through tool discovery. A model must be able to understand and call a tool without reading the manual. Explain relationships between outputs and later inputs where needed, rather than relying on field names or external guides.
+
+Organize tool guidance around purpose and data flow, call shape and result handling, then execution boundaries. Short examples illustrate contracts without prescribing a task workflow. Role instructions and skills carry user-selected responsibilities and procedures.
+
 ## Documentation ownership
 
 The collections have distinct writing requirements:
 
-- `docs/manual/`: concise guides for models helping users use Asterism or develop plugins. Explain purpose, concepts, and working methods. No localized editions or public documentation site.
+- `docs/manual/`: guides for users understanding and using Asterism and for authors designing plugins. Explain mental models, usage philosophy, design choices, and working principles. Models consult relevant topics on demand for those tasks; ordinary work does not depend on reading the manual. No localized editions or public documentation site.
 - `docs/development/`: internal software engineering principles, responsibility boundaries, and design constraints. These are not plugin-author or software-use guides.
 - `plans/`: deferred tasks (`todo`), research and reference material (`ref`), and review findings (`review`), archived when their work or use ends.
 
+Manual content stays within those user and plugin-author tasks, including public-package guides exposed through the Manual resource. Tool catalogs, introductions to individual tools, invocation recipes, parameter/output inventories, and execution-environment references belong in code and tool contracts, not manual chapters. Plugin guides explain integration choices and responsibility boundaries; public types and executable examples express concrete interfaces and implementation.
+
 Manual and engineering pages are independently readable. Include enough context to explain each topic. Stable directory maps may describe organization and responsibilities. Keep these pages free of cross-document references, research-source trails, per-file source indexes, and API inventories. Models can search files and integrate information themselves.
 
-Prefer stable meaning over implementation detail. A code move, parameter change, or edit to another document should not require updates here. Update a page when the concept or design it explains changes. Verify claims while writing; do not silently promote a proposal or old acceptance record into current behavior.
+Documentation records what code cannot express: intent, rationale, mental models, tradeoffs, and principles for making choices. Source code, types, schemas, configuration, and executable examples own current interfaces and behavior. Do not maintain a prose copy through capability catalogs, control-by-control walkthroughs, or lists of defaults and limits. A code move or parameter change alone should not require a documentation update; a change in the underlying concept or design can. Verify claims while writing rather than promoting proposals or old acceptance records into current behavior.
 
 ## Plans
 

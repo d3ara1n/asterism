@@ -5,6 +5,6 @@ export { sendResultSchema, type SendResult } from "@asterism-app/builtin-api/con
 
 export const AgentSend = defineImplementation({
   ...builtin.data("agent.send", sendResultSchema), resource: Agent, tool: Send,
-  targetSchema: z.null().describe("Null selects this Agent. The resource ID identifies the recipient."),
+  targetSchema: z.null().describe("Null selects this Agent. The resource ID identifies the recipient. File references in parts are forwarded into Agent input as addresses without reading their bytes."),
   effect: "write", execution: "sequential",
 });

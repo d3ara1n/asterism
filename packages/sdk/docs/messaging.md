@@ -1,21 +1,31 @@
-# Provide and consume messaging
+# Compose external messaging
 
-Messaging connects plugins to external conversation services through configured identities. A provider contribution declares its display name, settings, and asynchronous instance factory. Return it in a module's `messagingProviders` contribution. The host creates an instance for each enabled connection, supplies resolved settings and a connection identity, and manages receiving work.
+External messaging separates a platform connection from the workflows that use it. The provider owns platform communication; consumers decide what incoming information means for their resources and users.
 
-Settings use the shared provider setting kinds: text, choice, and secret. Secret values are supplied to the backend factory and remain absent from configuration snapshots. Required values are always present in the resolved settings, choices hold a declared option, and unset optional values are absent. A provider type may have several independently configured connections. The plugin owns any platform-specific state or persistent data used by those connections; declare `forget` to release a removed connection's data, which the host calls after that connection's receiver has ended.
+## Share transport, not workflow state
 
-An instance supplies its external identity, an ongoing receive operation, conversation listing, message reading, and sending. Receive accepts a cancellation signal and connection-state callbacks, and publishes typed conversation-discovered and messages-received events. A messages-received event contains an ordered, nonempty batch from one conversation; a single message uses a one-element batch. Call `ready` once the platform has accepted the receiver; the connection then reports connected and its retry backoff resets. A transport that restores its own protocol session calls `reconnecting(error)` during the interruption and `ready()` after recovery, preserving its active receiver. Queries and sends have their own signals. A send carries ordered text and file-reference parts plus an optional reply target. Platforms with a caption field combine the text and deliver the files in order. Resolve each reference with `plugin.files` before contacting the platform, so an unreadable source fails as invalid input without sending anything.
+Treat a configured connection as a shared service rather than creating a receiver for every card or session. Platform authentication, protocol recovery, and provider-specific persistence belong with the provider. Each consumer owns its subscriptions and releases them with its own lifetime.
 
-Received messages also have ordered text and file parts. File parts identify a platform attachment and describe its MIME type, filename, and known size. An instance's optional `openFile` operation streams the bytes selected by conversation, message, and file IDs. Verify that the selected file belongs to that address, refresh temporary platform URLs as needed, and preserve cancellation and download errors. Resource consumers create FileRefs with their own source identity; provider messages do not depend on a particular card or session.
+Keep conversation, message, and attachment identities tied to the platform. Several messages arriving together may be related without becoming one message. Preserving individual identity makes later replies, reads, and attachment access unambiguous.
 
-Keep each platform message's own identity and body. Messages sent together may share a `groupId`; providers can deliver them in one batch while keeping reads, replies, and attachments addressable by their individual message IDs. A read selects either recent messages and cursor continuation or a `messageIds` array. ID queries return found messages in requested order, once per resolved message, and identify unavailable requested IDs in `missingIds`, without returning a cursor. Both query forms respect the conversation and optional topic.
+A consumer's read position should not silently become a shared global position. Independent consumers may need different views of the same conversation; query continuation and business decisions about what has been handled are separate concerns.
 
-The host retries failed creation and receive calls. Throw `MessagingError` with `request_failed` for transient conditions such as network failures, rate limits, and server errors, and set `retryAfterMs` when the platform reports a delay. Errors other than `MessagingError` are also treated as transient. Use `unavailable` for conditions that retrying cannot fix, such as rejected credentials or a conflicting receiver; the connection then stays failed until the user changes its configuration or reconnects. Reject unsupported operations explicitly with `unsupported`.
+## Make platform differences explicit
 
-Use opaque strings for platform conversation, topic, and message identities. Give every sender a role relative to the connection: `self` for the connection's own identity, `participant` for another party, and `system` for content the platform produced rather than a party authored. Cursors are opaque, reusable query positions scoped by the provider. A query may compare changes with an earlier cursor, but it must not advance a shared read position. Cursor rejection should explain that the supplied position cannot be used.
+Translate platform behavior without pretending that every service has identical capabilities. Reject unsupported operations explicitly. Distinguish recoverable transport interruptions from conditions requiring user action, so recovery belongs to the layer that can actually perform it.
 
-Consumers access `plugin.messaging`. List connection identities, resolve a specific connection to an operation handle, and subscribe to external events and connection changes. Resolve at the consumer's request boundary when configuration must remain fixed across its operations. Each handle retains its captured instance; operations wait for a connection attempt in progress and fail with the attempt's error otherwise. Current external content remains current at handling time.
+Attachments need the same care as text. An address to a platform file is not a permanently available download URL. Resolve it through the provider that understands its identity, and preserve cancellation and download failures.
 
-Provider instances are shared across consumers. A plugin should not create a second receiver for each card or session. Its consumers own their subscriptions and release them with their lifetimes. A listener failure is logged and does not affect other listeners or the provider. Connection removal or provider unavailability prevents new resolutions; provider shutdown cancels its outstanding work.
+When sending has external effects, resolve required input before beginning delivery. If a platform turns one logical submission into several sends, expose failures honestly rather than implying that partial delivery was atomic.
 
-The service has no Agent semantics. A consumer chooses whether an external event updates a view, records a fact, or submits input through a paradigm's public API. Builtin resources use links to select recipients and expose tools. Other plugins may compose the same service differently.
+## Choose when configuration is captured
+
+Resolve a connection at the consumer's request boundary when related operations should use one configuration. Read current external content when handling the operation. Configuration identity and mutable conversation content need not have the same lifetime.
+
+Cancellation belongs to the work it controls. Cancelling one consumer's query should not end a receiver shared with other consumers. Conversely, ending the provider must release the work it owns.
+
+## Translate events deliberately
+
+A messaging event is not inherently an Agent message. A consumer may update a view, record a durable fact, or submit input through a paradigm's public API. The integration owns that choice and the readable explanation of the event.
+
+For example, an issue-tracker bridge can share one platform receiver across sessions while each resource chooses its recipients and records its own processing decisions. The provider understands the platform; the bridge understands the work.

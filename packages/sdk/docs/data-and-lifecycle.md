@@ -1,133 +1,61 @@
 # Manage data and lifecycle
 
-Choose storage from the meaning of the data. Latest values, historical facts, immutable bytes, and running processes have different lifetimes.
+Choose storage from the meaning of the data. Latest values, historical facts, immutable bytes, and running processes answer different questions and need different owners.
 
 ## Separate current state from history
 
-Current data records the latest session or object value. Historical records preserve facts needed to understand or reconstruct past work.
+Current data answers what is true now. History explains what happened. Saving a current value is not a promise that browsing history will restore it; restoration needs a domain operation with a defined meaning.
 
-Saving a current value does not automatically create history. Moving to an earlier history position does not restore that value. A resource that supports restoration defines the facts and operations that make restoration meaningful.
+For example, a counter can keep its latest value while recording each increment for explanation. A document editor may instead need a restorable body at each revision. Decide which experience the resource promises before choosing its records and current data.
 
-Plugin-wide private data belongs to the plugin. Temporary interface choices belong to a view or an object-retained view scope, according to how long they should survive.
+Keep plugin-wide private data with the plugin. Keep temporary interface choices with the view unless users need them to survive reopening. A running process is neither saved data nor a historical fact: it needs a live owner and cleanup.
 
-## Encode data at boundaries
+## Treat encoding as a domain boundary
 
-Data schemas describe the values used by plugin code and how they are decoded from stored or transported JSON. Writers, resource creation, tool results, and presentations accept the decoded value and encode it before storage or publication. Typed readers and views decode the saved value.
+Use a codec when the value plugin code works with differs from its stored representation. Keep conversion semantics with that declaration rather than scattering normalization through readers and writers. A one-way input transformation and a reversible storage conversion solve different problems.
 
-Use an ordinary Zod schema when both representations are the same. Use a synchronous `z.codec` when they differ. Both the domain value and its encoding remain JSON-compatible. One-way `.transform()` belongs in input preparation or an explicit conversion before writing; Zod cannot encode it in reverse.
+Check meaningful round trips for custom conversions. In particular, reading an old representation and writing a new one should preserve the domain value even when their JSON differs. Compatibility decoding can make an old fact readable without rewriting what was originally recorded.
 
-Resource creation returns a card title and plugin-owned `data`. State can be any JSON value, including arrays, scalars, or `null`; object fields such as `id`, `type`, and `title` retain their business meaning. The host stores resource identity and card title separately. Renaming a card changes its host title, and creating resources from a template gives them new host identities while preserving the encoded plugin state.
+Separate host identity and presentation from business state. A domain field named “title” need not be the card title, and a domain identifier need not be the host resource identity. Conflating them makes renaming and reuse surprising.
 
-Configuration defaults are complete decoded values. Reading an older configuration may fill absent fields through ordinary `.default()` declarations. Configuration updates receive decoded values, and saving an unchanged value preserves a correctly defined codec's domain value. The host handles encoding of configuration files and frontend responses.
+## Decide what a template can reuse
 
-Codecs own their conversion semantics. Verify meaningful round trips when supplying custom encoders, decoders, or normalization callbacks. Tool results reserve `null` for absent output, so a non-null tool value needs a non-null encoding.
+A data-copy template is appropriate when selected saved values remain meaningful under new host identities. A note can reuse its body; an Agent can reuse configuration without carrying pending work into a new session.
 
-## Reuse resources in templates
+Treat copying an address differently from cloning what it addresses. A resource that depends on an external account, embedded object identities, or private files may need an explicit domain-specific cloning operation instead of a data-copy template. Such an operation can explain what will be shared, copied, or reconnected.
 
-A resource opts into data-copy templates with `template: { current: [Settings, Content] }` in its implementation. The list contains existing data contracts owned by the resource's plugin. An empty list copies only the resource's creation state. Resources without this declaration remain available for ordinary use and do not appear in the template picker.
+Choose titles according to the same distinction. Preserving a descriptive source title can help users recognize a reusable setup; generating a title can make sense when each instance represents new work.
 
-Templates retain encoded creation state and the listed current values that exist at save time. Unlisted current data, history, private files, and running instances are excluded. Instantiation creates new host identities and remaps host links; it preserves domain values and content references without rewriting embedded resource IDs or duplicating external services. Creation callbacks are not rerun, and ordinary presence lifetimes apply to the new objects.
+## Commit facts, then observe them
 
-To give each template instance a new title, add a synchronous `createTitle(): string` function to the resource's `template` declaration. Saving then omits the source title, including a user-assigned title. The host calls the function once for each new object when instantiating a template, and uses its result even if an older template contains a title. Saving and previewing templates do not call it. Without this function, templates preserve source titles; a saved entry without a title requires the generator to remain available.
+Complete network and file processing outside synchronous transactions, then commit the resulting state. Keep the commit focused on the facts that must become visible together.
 
-Opt in when those copied values are reusable under new identities. For example, a note can retain its body, and an agent can retain its configuration while leaving submission receipts and drafts behind. Resources needing external cloning, reference mapping, or private-state reconstruction need an explicit domain operation. Historical observation does not perform restoration.
+Use a pending operation record when consumers need to know about work before its result exists. Its identity represents one operation from published input to final outcome. Keep progress transient unless it has lasting domain meaning, and assign responsibility for ending abandoned work to the owner that started it.
 
-The installed resource must still support templates and decode all saved state and selected current data when the template is used. Unsupported or invalid saved entries fail explicitly before a new session is created.
+A snapshot fixes the evidence being read; it does not redirect later writes into the past. Reuse one snapshot for related queries when their conclusions need a common basis. Obtain a fresh one when the question is about current state.
 
-## Commit and observe
+Notifications are prompts to observe, not substitutes for saved state. A state-driven consumer should subscribe and read the current value, then reread when notified. An occurrence-driven consumer must decide whether missing an event during downtime is acceptable or whether the domain needs durable records.
 
-Use the host's bound read and execution capabilities. Complete network and file processing outside synchronous transactions, then commit the resulting state.
+## Read history through its owner
 
-A historical snapshot fixes what is observed. A later write acts in the current execution context. Holding a snapshot does not redirect later writes into the past.
+Import the original public record contract rather than interpreting another domain's JSON by convention. Shared decoding keeps the meaning and compatibility policy with the author who owns the fact.
 
-For an operation that other consumers must discover before it finishes, declare an operation record with input and output schemas. Begin it in a synchronous commit to publish the input and obtain its record ID. Complete that ID in a later commit with the output. This fills the result at its original position without moving the cursor. The result can be filled once; input and record identity remain fixed.
+Unreadable evidence is different from absent evidence. Preserve that distinction when reporting or deciding whether to recover. A failed transfer is also not an empty query result. An interface should expose those differences rather than presenting an apparently complete account.
 
-The record's pending flag distinguishes an unresolved operation from a completed operation whose output is null. Existing snapshots keep their original pending observation; read a new snapshot for current results. Every timeline path containing the operation can read its result, even if another path was selected when it completed.
+Distinguish a creation fact from current presence. Reconstructing an object while browsing history does not mean it was just created. Use historical observation to react to committed facts and attachment lifetimes to own work while a resource is present.
 
-An object writer can complete that object's pending records. A session writer can finish records owned by its plugin after the emitting object leaves the current path. Completion emits a separate observer notification, not a new-record notification. Resource implementations retain responsibility for ending abandoned work rather than waiting for a runtime that no longer exists.
+## Choose between an address and preserved bytes
 
-Transient events announce change. A consumer needing current state establishes its subscription and reads the current value; later notifications prompt another read.
+A file reference is an address interpreted by its source resource. It is useful when a consumer should decide whether and when to read external content. Passing the address does not preserve a version of that content.
 
-The host publishes `SystemResumed` when the operating system resumes from sleep. Subscribe through `plugin.ipc.events` with the plugin lifetime signal when maintaining absolute deadlines or other state affected by elapsed sleep time. Re-evaluate against the current wall clock when handling the event. It is a transient occurrence and is not replayed after application startup.
+Retained immutable content is appropriate when a record, attachment, or export must continue to mean the same bytes. For example, a reference to a working file suits “review the current draft”; a retained attachment suits “explain the draft that was submitted.”
 
-Typed calls describe request and response values with ordinary Zod schemas. The caller supplies the input schema's input; the implementation receives its parsed output, including defaults. The implementation returns JSON accepted by the output schema, and the caller receives that schema's parsed output. These types are inferred from the shared declaration, so a conversion such as string to number does not require separate type annotations.
+Content identifiers alone are not ownership or access. Preserve retained references in the saved encoding, and transfer ownership before closing temporary content scopes. A reference synthesized only while decoding cannot preserve bytes that were never retained.
 
-## Read typed history
+## End work with its owner
 
-Public record contracts belong to the package that owns their meaning. The SDK exposes host resource creation, renaming, removal, and link changes. A paradigm's public API supplies its conversation records; a plugin's public package supplies its business records. Import the original contract to decode a record rather than interpreting its JSON fields yourself.
+Bind shared services to the plugin lifetime and object-owned work to the resource lifetime. Register cleanup when creating the work, while its ownership is clear. Pass cancellation into the I/O it controls and wait for actual completion before releasing dependencies that work still uses.
 
-Use `contract.decode(record)` for a single record and `contract.decodeAll(records)` for a commit batch. Batch decoding preserves the supplied order and omits records belonging to other contracts. A matching record returns either `known` with typed `data`, or `unknown` with the original `record` and an invalid-data reason. An unreadable matching record remains visible for reporting and recovery decisions.
+Use timeline activity tracking for work whose writes depend on the current history position. An external service may need to stop when its resource disappears without otherwise preventing history navigation. Choose based on that dependency, not merely on whether the operation is asynchronous.
 
-```ts
-import { ResourceCreated } from "@asterism-app/sdk/contracts";
-
-for (const created of ResourceCreated.decodeAll(records)) {
-  if (created.status === "unknown") {
-    reportUnreadable(created.record);
-    continue;
-  }
-  handleCreation(created.data, created.record.sessionId);
-}
-```
-
-For stored history, use `snapshot.records.query(ResourceCreated, { scope: "timeline" })`; it returns the same decoded result shape. `first` and `last` select the earliest or latest matching record and preserve `unknown` when that selected record is unreadable. `timeline` selects the snapshot's ancestor path; `session` includes other branches within its captured append bound. These reads retain original record identity and do not rewrite stored data.
-
-Use `records.index` when only identity, ancestry, order, contract, or provenance is needed. It returns metadata without reading bodies. Queries can combine contracts, record IDs, and an emitting resource ID. `source: null` selects records without an emitting resource. `from` includes its anchor and `before` excludes its anchor; both anchors must belong to the selected scope before filters are applied. `limit` selects a bounded page, and `edge: "last"` selects the last matches while still returning them in append order. A preceding page ends before the first record of the current page.
-
-Query filters intersect, including a typed reader's contract and any supplied contract filter. Repeating a contract or record identity does not duplicate results.
-
-Runtime snapshots read synchronously. Renderer snapshots share the same query semantics, with synchronous metadata and asynchronous body and resource reads. Await those reads before decoding or projecting data. React views can use `useSessionRead` with a memoized reader to distinguish loading, ready, and error states. Forward its cancellation signal to reads so closing a view stops further pages without cancelling other readers of the same body. A failed transfer is not an empty result or an unreadable record. Reuse the session snapshot across related queries; finalized bodies are shared across views, while pending bodies retain their original observation.
-
-The reading hook supplies `retry()` for rereading the current query. `keepPrevious` retains visible content while the same logical query refreshes along its timeline. A `key` identifies that query when the reader callback also depends on presentation inputs; changing the selected record or query scope uses a different key so content from the previous selection is not shown.
-
-A creation record separates resource identity, type, title, and encoded resource state. Its `type` is the resource kind. The nested `data` remains JSON because resource kinds have different state contracts; match the resource kind and decode that state with its resource contract when needed. To read a resource present in a snapshot, use `snapshot.resources.get(resourceContract, id)`. Private current-data entries remain owned by their declaring plugin.
-
-Creation records include new identities instantiated from templates. Moving through history may make an existing resource appear again without creating a new record. Record observers report committed facts; presence events and attachment lifetimes describe membership in the current resource set. A host-created resource record has a null source, with the associated resource identity in its payload.
-
-Public history contracts provide typed observation. Create, rename, remove, and link resources through the session operations; plugin record writers retain their existing ownership checks.
-
-## Retain file content
-
-Stage immutable bytes through the content service, then store their reference in persistent data or a record that owns them.
-
-A `ContentRef` identifies stored immutable content. Copying its identifier does not by itself grant access or retain the bytes. Pass it through the supported operation scope so ownership remains explicit.
-
-Retention follows references in the JSON actually saved. Preserve content references in that encoding when their bytes must remain available; synthesizing a reference during decoding does not retain content or grant access.
-
-When completing an operation with attachments from an independent temporary scope, supply that scope's content reader. The host validates access and retains those result references in the same transaction as completion. Input references remain retained. Close the temporary scope after completion has committed.
-
-## Pass resource file references
-
-Use a `FileRef` to pass an address without reading or retaining content. It contains the full source resource identity and a JSON locator interpreted by that resource. Construct it directly and include it in tool results, typed calls, events, or saved state. No registration, content scope, or consumer link is required.
-
-The source resource implements `openFile` to interpret its locator and produce an asynchronous byte stream. A consumer uses `plugin.files.open(ref, { signal })` and processes chunks as they arrive. Breaking iteration closes the stream. Forward an operation's cancellation signal so its consumption stops with that operation.
-
-Reuse `fileRefSchema` in contracts that return or accept these addresses. Its description supplies the shared meaning. Describe each operation's own use of the reference without coupling its instructions to particular producer or consumer resource types.
-
-Discovery returns addresses and descriptive metadata; it need not open files. Each consumption resolves the source anew across sessions, independently of open UI surfaces. The host does not cache bytes or freeze external files. Changed content is read as it exists at consumption, and missing resources, unavailable providers, or failed reads surface as errors. Persisting a file reference preserves its address, not the bytes it once identified. Use immutable content storage when a business operation needs to preserve a particular version.
-
-## End asynchronous work
-
-Bind shared services to the plugin lifetime and object-owned instances to the resource lifetime. Register cleanup when creating the owned work.
-
-Cancellation requests that work stop. Wait for actual completion before releasing what that work still uses.
-
-Timeline-dependent operations need the host's activity tracking so history changes and object removal can respect active work.
-
-## Evolve stored data
-
-Persistent file formats need explicit preparation when they change. Keep that preparation independent of ordinary service startup.
-
-Historical records retain their original payloads. Supporting an older shape through decoding is different from rewriting the original historical fact.
-
-A codec can accept old and current payload shapes while encoding new writes in the current shape:
-
-```ts
-const current = z.strictObject({ text: z.string() });
-const textSchema = z.codec(z.union([z.string(), current]), current, {
-  decode: value => typeof value === "string" ? { text: value } : value,
-  encode: value => value,
-});
-```
-
-This schema reads an old string as a current object. Plugin code writes the object; historical reads leave the original string untouched.
+Prepare changes to persistent file formats independently of ordinary service startup. Historical compatibility, current-state migration, and live service initialization have different failure consequences and should remain understandable separately.

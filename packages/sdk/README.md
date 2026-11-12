@@ -1,21 +1,21 @@
 # Asterism SDK
 
-The SDK defines the shared language between Asterism and plugins: contracts, host capabilities, and contributions.
+The SDK is the shared boundary between Asterism and plugins. It supplies generic hosting capabilities while plugins own the meaning of their resources and workflows. Agent conversation and other paradigm-specific behavior belong to the plugin that implements them.
 
-Pure declarations can be shared across execution environments. Backend interfaces support work and persistence; frontend interfaces support presentation and interaction.
+## Design against a shared boundary
 
-The SDK describes generic mechanisms. Agent conversation, naming, and other domain behavior belong to the plugin that implements them.
+Use public contracts to share meaning without importing another implementation. Their runtime identity matters as well as their TypeScript shape. Public abstractions should express capabilities consumers need, not reproduce internal decomposition.
 
-Public interfaces should express a capability an author needs. Internal decomposition is not itself a reason to expose another abstraction.
+Keep backend work and frontend presentation separate while making each capability's ownership understandable. The host composes contributions; it does not infer domain behavior from a plugin's private state.
 
-## Installation
+## Develop for the target application
 
-Install with `npm install --save-dev --save-exact @asterism-app/sdk@latest` to target the stable application, or `@next` to target the preview application. Declare `@asterism-app/sdk` as a peer dependency with `"*"` in the plugin package.
+Use a compatible SDK version for development and treat the running application as the runtime provider. Development dependencies supply declarations; peer dependencies express the host-provided relationship. Installing a newer SDK does not upgrade the application's capabilities.
 
-The package ships TypeScript source. Asterism compiles plugin entries and supplies its own SDK instance at runtime. Use declarations compatible with the target application; installing a newer SDK does not update the application's APIs.
+Validate both contract agreement and actual integration. Type checking cannot establish that a distributed plugin includes all required assets, works in the intended application, or releases the work it owns.
 
-## Authoring material
+## Keep authoring material purposeful
 
-The source package includes `docs/` for plugin development guides and `examples/` for public API usage. `examples/counter/` is a complete starter package; the other examples are focused fragments to compose into a plugin. The application's manual exposes these directories directly.
+The package includes prose guides and maintained source examples. Guides explain mental models, ownership, integration choices, and working principles; public declarations and examples carry concrete interfaces and assembly. The complete counter package provides a small design to adapt, not a required architecture for every plugin.
 
-Examples participate in repository type checking. Internal compile-time counterexamples live in `typechecks/` and are excluded from package contents and the manual. Built-in domain guides and examples belong to `@asterism-app/builtin-api`.
+These materials support software use and plugin development on demand. Runtime tool descriptions, guidelines, and schemas own tool invocation knowledge independently of the manual.

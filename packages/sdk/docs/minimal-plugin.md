@@ -1,35 +1,27 @@
-# Build a small plugin
+# Adapt a small plugin
 
-A counter plugin demonstrates the complete path from shared declarations to backend behavior and a resource card. The SDK includes it as an ordinary package directory under `examples/counter`, with source files, a package manifest, and a TypeScript configuration. Its code is the maintained example; this guide explains how to use and adapt it.
+The SDK's counter package in `examples/counter` is a complete plugin, not a specification for every plugin's structure. Its maintained source shows concrete assembly. Use it to understand ownership and then change the design to fit the capability you need.
 
-## Prepare the package
+## Follow one change through the system
 
-Copy the counter directory to a writable development location. Its development dependency selects the SDK version used by the example. Use an Asterism application that provides those APIs. The SDK peer dependency describes a host-provided package, and the host does not use its version range to gate loading. React, React Intl, and Zod are also shared public dependencies supplied by the host when the plugin runs.
+The counter separates a shared declaration, backend work, and a card that presents the result. Backend and frontend import the same contracts; sharing a name or copying a schema would not create the same runtime identity.
 
-Run `npm install` and `npm run typecheck` in the copied directory. The host compiles the TypeScript, TSX, and imported CSS entries, so a separate JavaScript build is optional. Add the package directory in Asterism's plugin settings and restart the application to load it.
+An increment updates the current value and records the change together. That is a deliberate product choice: current data supports use now, while the record explains what happened. The counter does not promise that browsing history restores its value. A different resource may need a different relationship between current state and history.
 
-## Follow the data
+The card initiates work without becoming its durable owner. This separation matters when a view closes, remounts, or fails while the resource remains present. UI pending state belongs to the interaction; committed results belong to the backend.
 
-Shared declarations identify the counter, its private current value, projected view, change record, creation entry, increment action, read tool, settings, and typed call. Backend and frontend code import the same declarations. Copying a declaration under the same name does not establish shared runtime identity.
+The model-facing read operation exposes an existing capability rather than inventing a second source of truth. Its registration does not itself grant access to the counter. Treat visibility, authorization, and presentation as separate choices.
 
-Creation establishes the object. Incrementing reads the configured step, saves the current value, and appends a historical change in one synchronous commit. The example keeps the latest counter value when browsing history; it does not implement restoration. Network and file work belongs outside synchronous commits.
+## Adapt ownership before adding features
 
-The card reads projected data and invokes the public increment action. Each button owns its pending state and displays failures. Actions return receipts that the view checks; typed calls and settings saves reject on failure. A settings page edits the step and reads it back through the backend call.
+Choose a distinct plugin identity for a new package. Keep shared contracts independent of executable implementations, but group a capability's code so its state transitions remain understandable together.
 
-The example also contributes a Home entry. It prepares a counter, then initializes a session containing it in one transaction. This entry works with the builtin paradigm disabled and requires no conversation input.
+Decide whether each new piece of state is a current value, a historical fact, a preference, or temporary interaction state. Decide who ends any new asynchronous work. A connection shared by all counters would belong to the plugin; a process meaningful only for one counter would belong to that resource.
 
-The model tool reads the same counter value through its resource implementation. Registering the tool does not grant access: an agent needs a link to the counter, and the operation must be available in its execution environment.
+A Home entry can start a session around the counter without introducing an Agent or a first message. Keep that independence when adapting the example unless conversation is part of the new plugin's domain.
 
-## Adapt the package
+## Check the adapted design
 
-Choose a distinct plugin identity before using the example as a new plugin. Keep shared declarations independent of backend and frontend implementations. Add resource behavior through actions and expose an operation as a model tool when the model needs to call it.
+Use a compatible application and public SDK for development. Type checking checks contract agreement; loading the package and exercising it checks the integration.
 
-Imported CSS Modules keep the counter's class names local. Host theme variables provide colors. The storage entry declares the managed configuration format; add consecutive migrations when that format changes. Credentials belong in the secret service, and retained file content uses the content service.
-
-Object-owned external connections belong to the resource's attachment lifetime. Register their cleanup when opening them. Shared services belong to the plugin lifetime. Managed tasks own asynchronous work and pass cancellation to their I/O.
-
-## Verify the result
-
-Open the plugin settings page, change the step, and read it back. Create a counter, increment it, and verify the card and history. Link the counter to an agent and use its read tool.
-
-After edits, run type checking and restart Asterism. Verify invalid input, failure messages, cleanup, and reopening saved objects. Type checking establishes interface consistency; loading and using the package establishes its behavior in the host.
+Trace one change from the initiating interface to saved state and history. Then check invalid input, visible failure, reopening saved objects, and cleanup. These checks should test promises your resource makes, not merely confirm that the copied example still has the same controls.

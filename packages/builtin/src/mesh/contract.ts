@@ -57,7 +57,8 @@ export const MeshSetProfile = defineImplementation({
   effect: "write", execution: "sequential",
 });
 export const MeshSend = defineImplementation({
-  ...builtin.data("mesh.send", sendResultSchema), resource: Mesh, tool: Send, targetSchema: meshTargetSchema,
+  ...builtin.data("mesh.send", sendResultSchema), resource: Mesh, tool: Send,
+  targetSchema: meshTargetSchema.describe("Select an Agent exposed to this channel by title and optional numeric disambiguator. File references in parts are forwarded into Agent input as addresses without reading their bytes."),
   effect: "write", execution: "sequential",
 });
 export const MeshPeek = defineImplementation({

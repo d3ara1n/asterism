@@ -1,47 +1,35 @@
-# Updates and troubleshooting
+# Diagnose problems and recover deliberately
 
-Use the failure shown by the application or tool to identify the affected connection, plugin, or operation. Saved history, current resource state, and temporary execution feedback are distinct sources of information.
+Start with the failed operation and the evidence it provides. A model connection, a resource integration, a plugin interface, and the underlying file or service are different places for a failure to occur. Changing unrelated settings can hide the original problem without explaining it.
 
-## Model connection failures
+## Separate availability from capability
 
-Check the selected connection, credentials, model ID, and input capabilities. Run a connection test and inspect its error details.
+When an Agent cannot use something, distinguish whether it has the intended resource, whether that resource offers the needed capability, and whether the operation itself failed. A visible card or a path mentioned in conversation is not proof of usable access.
 
-Provider messages distinguish authentication, model availability, quota, and request compatibility failures. An account quota display is supporting information, not a substitute for the failed request’s response.
+A report from another Agent is evidence of what it observed, not direct access to the underlying material. If verification matters, inspect the current file or service through an appropriate resource. Likewise, historical data can remain readable when the plugin that made it is unavailable; saved records do not prove that its live capabilities are running.
 
-After changing settings, start or continue a request so it captures the new configuration.
+## Use the service's response to understand connection failures
 
-## Network proxy
+For a model failure, identify the connection and request that failed before changing the model choice. Authentication, account availability, unsupported input, and transport failures call for different remedies. An account balance display or a successful earlier test cannot explain every failed request.
 
-Open **Settings → General → Network** and select the **Proxy** row to edit it. Choose the system proxy, a direct connection, or a custom HTTP, HTTPS, or SOCKS5 proxy. Custom addresses include the scheme and host, such as `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`. Proxy usernames and passwords are not supported.
+Network behavior can differ between Asterism and an external process. Do not assume that a successful terminal command establishes that an application connection works, or that changing application networking changes every external program's environment.
 
-Custom bypass rules accept comma-separated hosts, domain patterns, and IP ranges. Loopback addresses connect directly by default. Saved changes apply after Asterism restarts; the Proxy row offers a restart while changes are pending. Saving does not interrupt active requests.
+A running model request keeps the configuration it captured. Assess a changed model connection using a subsequent request rather than interpreting an earlier response as a test of your change.
 
-These settings cover updates, model connections, builtin web and usage providers, HTTP MCP, and application web requests. Terminals, external MCP processes, and plugins with independently configured network clients use their own proxy settings.
+## Establish what happened before retrying
 
-System mode follows OS proxy resolution, including automatic proxy rules. Runtime requests use the first resolved HTTP, HTTPS, or SOCKS5 proxy and report connection failures without trying alternate proxies.
+An interrupted response does not mean that no operation ran. A tool may have changed a file or contacted a service before the surrounding conversation stopped. Cancellation stops ongoing work where supported; it is not a promise to reverse completed effects.
 
-## Unavailable resource operations
+Before repeating work that could create duplicates or overwrite material, inspect the reported outcome and the current target. Retry when you understand what changed and why another attempt could succeed. If the outcome remains uncertain, preserve that uncertainty rather than treating a missing response as proof of failure.
 
-Check whether the resource still exists on the current timeline and is linked to the intended agent. Inspect the operations available for that resource.
+## Match recovery to what it restores
 
-For file operations, check the actual file and the directory resource’s root. For network tools, check the configured provider or MCP server. A visible card alone does not prove an operation is available.
+Application recovery concerns application data. It does not automatically restore external directories, reverse service actions, or recover the previous state of an independent process. Read a recovery confirmation in terms of the material it replaces and the work it may leave untouched.
 
-## Plugin loading failures
+History can explain how the session reached a state, but continuing from an earlier point is not a substitute for restoring resource contents. Keep an independent backup or use the resource's own recovery facilities when the material requires it.
 
-Open the plugin’s management entry for the reported failure. Check the selected package root, declared entries, dependencies, and compatibility with the installed host.
+## Preserve useful evidence
 
-Restart after changing plugin code or enablement. Missing plugin implementations can leave historical data visible through fallback views.
+Before resetting data, removing a plugin, or replacing a configuration, retain the error, the operation you attempted, and enough context to identify the affected component. Use available diagnostics and logs to narrow the problem. Avoid including credentials or unrelated private session material in a report.
 
-## Startup and data recovery
-
-Startup failures offer diagnostics and access to logs. Data preparation failures offer recovery actions, including retrying, restoring a recovery point, or starting with new data.
-
-Read the confirmation before restoring or resetting. Application recovery points cover application data; external directory contents and service side effects remain outside that recovery.
-
-## Update Asterism
-
-Open **Settings → About** to check the installed version and update status. The update channel controls whether prereleases are included.
-
-An available update downloads before the explicit restart-and-install action. Running resources use the application’s normal exit confirmation. Switching back to the stable channel keeps the installed version until a higher stable version is available.
-
-The About page also opens the log folder. Development runs use separate data and do not install application updates.
+A useful problem report distinguishes the intended result, the observed result, and the evidence supporting each. Note relevant recent changes without assuming they caused the failure. This makes it possible to investigate the cause rather than merely reproduce a sequence of guesses.

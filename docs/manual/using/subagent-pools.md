@@ -1,41 +1,35 @@
-# Work with subagent pools
+# Delegate bounded work
 
-A Subagent Pool runs independent tasks and keeps their reports for later retrieval. Several Agents can share a pool. Each task has a short ID such as `sub-1`; the same ID in another pool refers to a different task.
+A Subagent Pool is useful when a piece of work can be assigned independently and brought back as a report. Use continuing workbench Agents when the relationship itself needs an ongoing conversation. Delegation should reduce coordination effort, not make the task harder to account for.
 
-## Connect the pool
+## Choose an independent assignment
 
-Create a Subagent Pool from the workbench resource menu. Expose the pool to the Agents that should use it. Expose directories, notes, terminals, or other resources to the pool to make them available to its tasks.
+Good delegated tasks have a clear question, a useful stopping point, and an output the recipient of the report can evaluate. Parallel work helps when investigations can proceed independently. Work with tightly coupled edits or unresolved shared decisions may benefit more from one continuing context.
 
-The submitting Agent's resources are not automatically available to the pool. A pool exposed to another pool can be used by that pool's tasks for further delegation. Reciprocal links allow delegation in both directions.
+A task starts with the material supplied in its assignment, not the submitting Agent's entire conversation. Include the goal, relevant decisions, constraints, and expected evidence. A role supplies expertise and working standards; it does not supply missing task context.
 
-## Delegate and collect
+## Arrange access separately from responsibility
 
-Inspect the pool to see its task count, parallelism, and operation schemas. Use `list` to enumerate task summaries on the current history path, including queued, running, and finished tasks.
+The resources linked to the pool supply the material its tasks can use. The submitting Agent's access is not inherited simply because it assigned the work. Responsibility for investigating a directory and actual access to that directory are separate parts of the setup.
 
-`agent_list` provides available Agent roles, purposes, task examples, and each role's delegation allowlist. Submit a task with an Agent role and explicit instructions, adding background material when needed. The task has its own conversation. It does not inherit the submitting conversation.
+Delegation policy is another boundary. A role can be suitable for receiving an assignment without being allowed to delegate further. Decide whether nested delegation serves the task and which decisions remain with the original coordinator or user.
 
-The calling role's `delegates` configuration controls outgoing delegation for both workbench Agents and subagents. A null value allows any enabled role, an empty list allows none, and a list allows only those targets. A disallowed delegation is rejected before creating a task, with both calling and target roles named in the response. The target's own allowlist governs its subsequent delegations.
+A shared pool is a shared coordination surface. Agents with access can observe and guide its tasks, so use that arrangement when they should share responsibility for the work rather than assuming private ownership by the submitter.
 
-An optional model selection replaces the role's model and thinking level together. Otherwise the role's model role applies, and an empty model there uses the default ModelRole's model. Configure that default before delegating. Prompts and budgets come from the Agent role, not from delegation arguments.
+## Design the report before execution
 
-Submission returns immediately. Four tasks can execute in parallel; further tasks wait in the pool's queue. Use the returned ID to read status or the final report. Reading does not consume the result. To wait for several tasks, supply their IDs together as the wait target. Waiting has no timeout argument, and cancelling a wait leaves its tasks running.
+A useful report makes its scope, evidence, conclusions, and unresolved questions clear enough for someone outside the task's conversation to use. Define completion in terms of the work, not merely the existence of a final response. Independent execution does not automatically provide independent validation.
 
-Tasks can finish successfully, partially after exhausting a budget, with an error, or by cancellation. Read the task outcome separately from the success of the check or wait operation. Instructions that arrived too late to reach the task are listed as undelivered with its result.
+An execution budget bounds effort; it does not prove completeness. A partial report can contain valuable findings while still leaving the assignment unfinished. The coordinator decides whether to narrow the question, continue in another assignment, or return a decision to the user.
 
-## Observe and guide
+## Guide the work deliberately
 
-Task checks provide the same information to the model and the user: a current activity summary and usage while running, or the report, outcome, usage, and undelivered instructions after completion. A check is a snapshot taken at the time of the call.
+Additional instructions should change the task's goal, constraints, or available context for a concrete reason. A task that is still running or has not produced a new visible step is not by itself evidence that its direction is wrong. Consider whether a correction is needed before interrupting its existing reasoning.
 
-Waiting returns task states to the model. The wait view shows activity while tasks run, then replaces it with each task's completion status. Reports are retrieved with a check.
+Waiting for a task and owning its execution are different relationships. Ending a wait need not end the task, and a report can remain useful to several participants after execution finishes. Agree on who follows through rather than relying on the submitter's continued attention.
 
-Open a task from the pool card to see its input, background, submitter, and status. Queued and running tasks offer additional instructions and cancellation; cancellation asks for confirmation. Running tasks show usage and their live process: one line per thinking, text, or tool step, with instructions at the point they were delivered and instructions still waiting at the end. Finished tasks show their outcome, usage, and report, followed by the instructions the task received and any that arrived too late; the process is hidden. Additional instructions enter the task's message queue while it is queued or running and are delivered at request boundaries. A finished task cannot restart; a new delegation is a new task.
+## Keep reports distinct from effects
 
-Any Agent with access to the pool can observe, guide, or cancel its shared tasks. The pool card also provides steering and cancellation. Closing a task view does not stop its execution.
+A report is a retained account of work. Changes to files or external systems are effects on current resources. Revisiting a report through history does not rerun the task or undo those effects.
 
-## History and closing
-
-Submission is recorded immediately. Completion fills the result into that same Delegation record, so any selected history path containing the delegation can read its final result. A path before the delegation does not contain the task. Moving through history does not replay the task or undo its effects on resources.
-
-Completed reports survive application restart. Running conversations do not resume; pending records without a surviving execution are marked interrupted. Removing the pool or closing its session cancels its work and saves available results during cleanup.
-
-Process audits are retained separately for developer investigation. Ordinary task checks read the stored report, not the audit.
+Treat interrupted execution as something to assess, not automatically resume or repeat. Use the available report and current resource state to decide what work remains. A fresh assignment should state that remaining scope rather than silently assuming the earlier task did nothing.

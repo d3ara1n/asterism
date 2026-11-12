@@ -1,38 +1,23 @@
-# Expose plugin documentation
+# Publish useful plugin documentation
 
-A plugin can make its documentation and examples available through Asterism's Manual resource. The manual exposes the declared directories directly. The same files remain usable in an editor or another development environment.
+A plugin can expose documentation and source examples through Asterism's Manual resource. This makes authoring material available on demand while keeping the same files usable outside the application.
 
-## Declare directories
+## Choose what to publish
 
-Add a `manual` array to the plugin's existing `asterism` manifest:
+Expose directories intended for users learning the software or authors developing an integration. Include that material in the distributed package. Internal fixtures, private working notes, and credentials have different audiences and belong outside the published material.
 
-```json
-{
-  "asterism": {
-    "id": "example.bridge",
-    "manual": ["docs", "examples"]
-  }
-}
-```
+Keep documentation with the domain that owns its meaning. Generic hosting concepts belong to the SDK; a plugin's behavior and extension rationale belong to that plugin or its public API package. A separate public API library can own its authoring material without becoming another executable plugin.
 
-Each entry names an existing package-relative subdirectory using `/` separators. Entries must be normalized, must not overlap, and must resolve inside the package. Include those directories in the package's distributed files. A documentation declaration does not require a runtime entry.
+## Explain decisions that declarations cannot
 
-Declare only directories intended for readers. Source examples can be exposed alongside prose; internal test fixtures and credentials belong outside the declared directories.
+Use prose for mental models, responsibility boundaries, integration choices, and reasons to prefer one composition over another. Public types express concrete interfaces; maintained source examples demonstrate concrete assembly. Repeating either as a field list creates a second, weaker definition.
 
-A public API library named in the plugin's `asterism.publicPackages` can declare its own `asterism.manual` directories. The library needs no plugin identity or executable entry for this declaration. Its documentation remains inside its own package and is available while its implementation provider is loaded.
+An example is worth discussing when the explanation helps an author adapt it. Explain why a service is shared, why a record is durable, or why a view does not own a task. Let the example's source carry its exact syntax.
 
-## Read through the manual
+Write each article with enough context to stand alone. Organize it around an author or user question, not a tour of every available method. A reading sequence should not be necessary to understand a capability's purpose.
 
-When the plugin loads successfully, its directories appear under `plugins/<plugin-id>/`. For this example, an article at `docs/usage.md` appears as `plugins/example.bridge/docs/usage.md`. The manual supports directory listing, file discovery, content search, and reading selected lines.
+## Keep runtime guidance with tools
 
-Public-library directories appear under `plugins/<plugin-id>/public/<package-name>/`. The host exposes the same source catalog through the SDK for plugins that provide another documentation interface.
+Models consult the manual when helping with software use or plugin development. Ordinary tool use should not depend on reading it.
 
-The manual reads current files at their original locations. It creates no copied document tree or index. Source declarations follow the loaded package set: changes to declarations, enabling, disabling, or removing a plugin take effect after restart. Plugins with package, startup, or storage failures do not contribute documents.
-
-A search at a virtual parent covers the directories below it. Globs apply within each selected physical search directory. Results include the complete virtual path, so identical filenames in different plugins remain distinguishable. Reading a file or following an explicitly selected symbolic link remains within the declared directory.
-
-## Write independent articles
-
-Each article should explain its purpose, relevant concepts, prerequisites, and working method without depending on a reading sequence. Keep the context needed to understand the topic in the article itself. Use examples to clarify operations and leave complete interface definitions to the public types.
-
-Maintain documentation with the domain that owns its meaning. Generic host capabilities belong to the SDK; a plugin's resource behavior and domain extensions belong to that plugin or its public API package. Documentation is reference material and does not become a system instruction merely by appearing in the manual.
+A tool's descriptions, guidelines, and schemas own its complete invocation contract: purpose, input meaning, result interpretation, and execution boundaries. When a runtime misunderstanding appears, improve that contract rather than adding a manual recipe. Documentation can explain how an author designs such a contract without becoming a second place to maintain it.
