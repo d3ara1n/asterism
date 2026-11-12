@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { BookOpen, RefreshCw } from "lucide-react";
+import { BookOpen, FileText, RefreshCw } from "lucide-react";
 import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { CodeRows, prepareCodeView } from "@asterism-app/ui/code-view";
@@ -16,7 +16,11 @@ function SkillReadHeader({ args, result }: ReadProps) {
   const name = result?.data?.name ?? inputText(args, "name") ?? "";
   const path = result?.data?.path ?? inputText(args, "path") ?? "SKILL.md";
   const offset = inputField(args, "offset"), limit = inputField(args, "limit");
-  return <ToolHeader label={i18n.text(skillsMessages.read)} subject={name} summary={<span className="font-mono" title={path}>{path}</span>}
+  return <ToolHeader label={i18n.text(skillsMessages.read)}
+    subject={name && <span className="inline-flex max-w-full items-center gap-1 align-middle" title={name}>
+      <BookOpen className="size-3 shrink-0" aria-hidden="true" /><span className="truncate">{name}</span>
+    </span>}
+    summary={<span className="font-mono" title={path}>{path}</span>}
     meta={`offset ${typeof offset === "number" ? offset : 1} · limit ${typeof limit === "number" ? limit : 1000}`} />;
 }
 function SkillReadBody({ result }: ReadProps) {
@@ -42,7 +46,7 @@ export default {
   resources: [], cards: [],
   prepare: prepareCodeView,
   tools: [toolRenderer(SkillRead, {
-    label: skillsMessages.read, icon: <BookOpen className="size-3.5" />,
+    label: skillsMessages.read, icon: <FileText className="size-3.5" />,
     input: readHeader, execution: readHeader, result: { ...readHeader, bodyRenderer: SkillReadBody },
   }), toolRenderer(SkillRefresh, {
     label: skillsMessages.refresh, icon: <RefreshCw className="size-3.5" />,
