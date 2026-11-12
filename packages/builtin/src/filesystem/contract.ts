@@ -49,7 +49,7 @@ const fileTarget = z.strictObject({ path: filePath })
   .describe("Select one UTF-8 text file with {\"path\":\"relative/file.txt\"}. Content operations are limited to 8 MiB. edit and replace require an existing file; write can create missing parents inside the root.");
 export const directoryReadTargetSchema = textReadTargetSchema.extend({
   path: filePath,
-}).describe("Select file content, its line range, and reading view, e.g. {\"path\":\"src/main.ts\",\"offset\":100,\"limit\":80,\"anchored\":false}. Content is UTF-8 text; nextOffset marks the start of remaining lines.");
+}).describe('Select file content, its line range, and reading view, e.g. {"path":"src/main.ts","offset":100,"limit":80}. Content is UTF-8 text; nextOffset marks the start of remaining lines.');
 export const DirectoryRead = defineImplementation({
   ...builtin.data("directory.read", textReadSchema.extend({ path: filePath })
     .describe("Complete selected file lines with absolute line numbers, optional hashes, final-newline state and the next unread line.")),

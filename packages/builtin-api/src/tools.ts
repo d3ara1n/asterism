@@ -32,7 +32,7 @@ export const Metadata = defineTool({
 export const Read = defineTool({
   id: builtin.name("tool.read"),
   name: "read",
-  description: "Read the selected content as text.",
+  description: "Read the selected content as text. Where supported, text lines display per-line content hashes by default (LINE#HASH│content) for hashline-verified editing.",
   guidelines: [
     "target selects the content, range, and reading view according to the resource implementation's schema.",
     "The result reports positions and a continuation point where the implementation supports ranges.",
@@ -43,10 +43,10 @@ export const Read = defineTool({
 export const Edit = defineTool({
   id: builtin.name("tool.edit"),
   name: "edit",
-  description: "Apply a batch of line-anchored text edits to an existing target, and return the actual diff and fresh anchors.",
+  description: "Edit selected lines in existing text using hashline operations. LINE#HASH anchors come from the latest read, grep, edit, or replace result.",
   guidelines: [
     "target selects existing editable text according to the resource implementation's schema. args.edits contains the operations.",
-    "Anchors contain a line number and its content hash, as returned by read, grep, edit, or replace.",
+    'For a line shown as 12#ABCD│old, a single-line replacement is args.edits=[{"op":"replace","anchor":{"line":12,"hash":"ABCD"},"body":["new"]}].',
     "replace/delete affect the inclusive anchor..end range. An omitted end selects one line. Validation checks the cited endpoints.",
     "insert_before/insert_after preserve the anchor line. body contains the new lines.",
     "append/prepend take body. Each body item is one text line; an empty string represents a blank line.",

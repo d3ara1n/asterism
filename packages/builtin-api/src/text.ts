@@ -30,7 +30,7 @@ export type TextRow = z.infer<typeof textRowSchema>;
 export const textReadTargetSchema = z.strictObject({
   offset: z.number().int().positive().optional().describe("First line to read, 1-based in the complete text; defaults to 1."),
   limit: z.number().int().positive().max(2000).optional().describe("Maximum lines to read; defaults to 1000, maximum 2000. Output is also limited to 64 KiB of line text; lines longer than 16000 characters are returned as excerpts."),
-  anchored: z.boolean().optional().describe("Include LINE#HASH edit anchors; defaults to true. Anchors identify complete lines, including those displayed as excerpts. False returns text with line numbers only."),
+  anchored: z.boolean().optional().describe("Include per-line content hashes for edit (LINE#HASH│content); defaults to true. Hashes identify complete lines, including excerpts. False returns line-numbered text without edit anchors."),
 });
 export const textReadSchema = z.strictObject({
   totalLines: z.number().int().nonnegative().describe("Number of logical lines in the complete text; empty text has zero lines."),

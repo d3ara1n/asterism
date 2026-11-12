@@ -95,7 +95,7 @@ Directory and note reads include edit anchors by default. Select a line range wi
 
 Use `grep` to locate a pattern in a note's current body or in directory and manual files. Its arguments select the pattern, literal or regular-expression matching, case and word matching, surrounding context, and result limit. Directory and manual targets additionally select file globs, hidden and ignore-file filtering, and the output view: matching content, matching paths, or matching-line counts per file.
 
-Use `find` to locate files by glob pattern. Its arguments select the pattern and result limit. Directory and manual targets select the search path and the same hidden and ignore-file filtering as `grep`.
+Use `glob` to locate files by glob pattern. Its arguments select the pattern and result limit. Directory and manual targets select the search path and the same hidden and ignore-file filtering as `grep`.
 
 ## Browse a directory
 

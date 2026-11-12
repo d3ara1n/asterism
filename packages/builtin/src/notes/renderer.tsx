@@ -1,5 +1,5 @@
 import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
-import { FileText, BookOpen, FilePenLine, FilePlus2, Replace, TextSearch } from "lucide-react";
+import { FileText, FilePenLine, FilePlus2, Replace, TextSearch } from "lucide-react";
 
 import { Markdown } from "@asterism-app/ui/markdown";
 import { commonMessages } from "../messages/common";
@@ -31,7 +31,7 @@ export default {
       ...noteGrepViews,
     }),
     toolRenderer(NoteRead, {
-      label: textMessages.toolTextRead, icon: <BookOpen className="size-3.5" />,
+      label: textMessages.toolTextRead, icon: <FileText className="size-3.5" />,
       ...textReadViews,
     }),
     toolRenderer(NoteEdit, {

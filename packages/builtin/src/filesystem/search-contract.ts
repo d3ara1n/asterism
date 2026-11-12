@@ -14,10 +14,10 @@ export const directoryGrepTargetSchema = directoryFindTargetSchema.extend({
     .describe("Ripgrep file globs relative to the selected search directory. Patterns without '/' match filenames at any depth. Prefix exclusions with '!'; later globs take precedence. Positive globs override hidden and ignore rules; excluded directories are skipped with their descendants."),
   outputMode: z.enum(["content", "files", "count"]).optional()
     .describe("Result view; defaults to content. content returns matching and context lines grouped by file; files returns matching paths; count returns matching-line counts per file, rather than regex occurrences."),
-  anchored: z.boolean().optional().describe("Include LINE#HASH edit anchors in content mode; defaults to true. Anchors identify complete lines and are shared with read and edit. False returns text with line numbers only."),
+  anchored: z.boolean().optional().describe("Include LINE#HASH edit anchors in content mode; defaults to true. Anchors identify complete lines and are shared with read and edit. False returns line-numbered text without edit anchors."),
 });
 const target = directoryFindTargetSchema.nullable()
-  .describe("Null selects the resource root. find selects a directory; grep selects a directory or one file. Selected symbolic links resolve inside the resource root; recursive traversal skips symbolic links. Git metadata entries are excluded from search targets.");
+  .describe("Null selects the resource root. glob selects a directory; grep selects a directory or one file. Selected symbolic links resolve inside the resource root; recursive traversal skips symbolic links. Git metadata entries are excluded from search targets.");
 export const stopReasonSchema = z.enum(["limit", "output_bytes", "record_bytes"]).nullable()
   .describe("Null means the search completed. Otherwise it stopped at the requested limit of matching lines or files, the 64 KiB result budget, or the 1 MiB process-record limit. Total matching rows or files are unknown after an early stop.");
 const common = {

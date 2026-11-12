@@ -1,7 +1,7 @@
 import { lazy } from "react";
 import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
-import { Eye, Folder, BookOpen, FileDown, FilePenLine, FilePlus2, Info, ListTree, Replace } from "lucide-react";
+import { Eye, Folder, FileText, FileDown, FilePenLine, FilePlus2, Info, ListTree, Replace } from "lucide-react";
 
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
@@ -77,7 +77,7 @@ export default {
     ...searchToolRenderers,
     execToolRenderer,
     toolRenderer(DirectoryRead, {
-      label: textMessages.toolTextRead, icon: <BookOpen className="size-3.5" />,
+      label: textMessages.toolTextRead, icon: <FileText className="size-3.5" />,
       ...textReadViews,
     }),
     toolRenderer(DirectoryEdit, {

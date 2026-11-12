@@ -12,7 +12,7 @@ const globGuidelines = [
 ];
 
 export const Find = defineTool({
-  id: builtin.name("tool.find"), name: "find",
+  id: builtin.name("tool.find"), name: "glob",
   description: "Find files by glob pattern within a resource.",
   guidelines: [
     ...globGuidelines,
@@ -28,7 +28,7 @@ export const Grep = defineTool({
   id: builtin.name("tool.grep"), name: "grep",
   description: "Search text for a regular expression or literal pattern within a resource.",
   guidelines: [
-    "Results identify matching lines and surrounding context. Resource implementations define additional output views.",
+    "Matching and context lines carry LINE#HASH anchors usable directly in edit where supported. Resource implementations define additional output views.",
     "Regular expressions use ripgrep's default Rust regex syntax. Matching is line-oriented.",
     "target selects the search scope and resource-specific content view according to the resource implementation's schema.",
   ],

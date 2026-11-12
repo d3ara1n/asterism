@@ -18,7 +18,7 @@ export async function searchScope(rootPath: string, path: string, directoryOnly:
   const info = await stat(selected);
   if (directoryOnly ? !info.isDirectory() : !info.isDirectory() && !info.isFile()) {
     throw new FilesystemError(failed("invalid_search_target", directoryOnly
-      ? "find requires a directory target." : "grep requires a regular file or directory target."));
+      ? "glob requires a directory target." : "grep requires a regular file or directory target."));
   }
   const cwd = info.isDirectory() ? selected : dirname(selected);
   return { cwd, prefix: relative(root, cwd).split(sep).join("/"),
