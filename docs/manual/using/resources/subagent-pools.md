@@ -20,6 +20,16 @@ A pool made available to another pool can support further delegation when the ta
 
 A shared pool is a shared coordination surface. Agents with access can observe and guide its tasks, so use that arrangement when they should share responsibility for the work rather than assuming private ownership by the submitter.
 
+## Distinguish a task's role from its resource identity
+
+A subagent uses its selected role's instructions and additional subagent instructions, but it is not an independent Agent resource on the workbench. Its execution and resource access belong to the pool. A role identifies how the task should work; it does not give the task the same resource identity as a continuing Agent.
+
+This distinction matters for operations that inspect the caller itself. For example, an Agent self-state query is rejected when called by a pool-hosted subagent: there is no independent Agent resource to inspect. It does not return the submitting Agent's state instead. Seeing a tool in the available catalog does not establish that the current caller satisfies its requirements.
+
+Subagent tasks also run without direct user interaction and cannot create workbench resources. These are execution limits, separate from resource identity: giving the pool more links does not enable a task to ask the user a question. Arrange the working resources in advance, and use a continuing Agent for work that depends on direct user decisions during execution.
+
+A task still receives the shared environment instructions and skill catalog, together with context supplied by resources linked to the pool, such as a linked Directory's `AGENTS.md`. It does not inherit the submitting Agent's private resource environment. A suitable role does not supply missing background or resource links; the assignment and the pool's resource setup must provide them, subject to the role's resource restrictions.
+
 ## Design the report before execution
 
 A useful report makes its scope, evidence, conclusions, and unresolved questions clear enough for someone outside the task's conversation to use. Define completion in terms of the work, not merely the existence of a final response. Independent execution does not automatically provide independent validation.

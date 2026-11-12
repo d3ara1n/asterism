@@ -96,7 +96,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
   const compressionContext = (object: ObjectReader) => {
     const selection = selectionOf(object).selection;
     const target = deps.selection.target(selection);
-    const { system } = deps.prepareRequest(deps.selection.agent(selection), target)();
+    const { system } = deps.prepareRequest(deps.selection.agent(selection))();
     const systemTokens = Math.ceil(system.blocks.reduce((size, block) => size + block.text.length, 0) / 4);
     const context = projectAgentContext(object.session.snapshot(), object.ref.id);
     const tokensBefore = estimateContext(context, object.ref.id, formatModelExpression(target), systemTokens);
@@ -200,7 +200,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
             try {
               const target = deps.selection.target(selection);
               run.request = { role: agent.id, model: formatModelExpression(target), thinking: target.thinking ?? null };
-              const prepare = deps.prepareRequest(agent, target);
+              const prepare = deps.prepareRequest(agent);
               let prepared: ReturnType<typeof prepare>;
               result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
                 agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },

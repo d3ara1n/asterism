@@ -29,7 +29,10 @@ export function createAgentStateTool(deps: {
     resultSchema: GetAgentStateResult.schema, effect: "read", execution: "parallel",
     async execute(_args, { object, signal }) {
       signal.throwIfAborted();
-      if (object.ref.kind !== Agent.kind) return { kind: "rejected", error: { code: "invalid_argument", message: "get_agent_state requires an Agent caller." } };
+      if (object.ref.kind !== Agent.kind) return { kind: "rejected", error: {
+        code: "invalid_argument",
+        message: `get_agent_state reads an Agent resource's state, but the current execution owner has resource kind "${object.ref.kind}". Pool-hosted subagents execute under their Subagent Pool and have no independent Agent resource to query.`,
+      } };
       let effective = deps.currentRequest(object);
       if (!effective) {
         const selection = selectionOf(object).selection, target = deps.selection.target(selection);
