@@ -12,7 +12,6 @@ import { useI18n } from "../../shared/i18n";
 import { appMessages } from "../../messages/app";
 import { providersMessages } from "../../messages/providers";
 import { islandTransition } from "../../shared/weave/motion";
-import { useConfiguration } from "../configuration/state";
 import { resetCountdown } from "./countdown";
 import { leadingItem } from "./leading-item";
 import { SignalDot } from "./SignalDot";
@@ -36,10 +35,9 @@ const stateNote = (state: ProviderUsageState | undefined) => !state || state.sta
  * expanded lifts it into a floating panel over the conversation list with one meter per connection. Only the handle switches
  * arrangements. Reads follow mount and change notifications; expanded also polls, and its single refresh forces every query.
  */
-export function UsagePanel({ active }: { active: boolean }) {
+export function UsagePanel({ modelProviders }: { modelProviders: readonly ModelProvider[] }) {
   const i18n = useI18n();
-  const { snapshot } = useConfiguration(active);
-  const providers = snapshot?.modelProviders.filter(provider => provider.enabled && provider.usage) ?? [];
+  const providers = modelProviders.filter(provider => provider.enabled && provider.usage);
   const [open, setOpen] = useState(false);
   const usage = useProviderUsages(providers.map(provider => provider.id), open);
   if (!providers.length) return null;

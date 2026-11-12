@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
 import { BrandMark } from "@asterism-app/ui/ui/brand-mark";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -26,7 +26,9 @@ import { groupByFolder, type FolderGroup } from "../features/folders/grouping";
 import { FolderDot } from "../features/folders/marks";
 import { DeleteFolder, FolderDialog } from "../features/folders/FolderDialog";
 import { sidebarViews, type SidebarView } from "./sidebar-state";
-import { UsagePanel } from "../features/usage/UsagePanel";
+import { useConfiguration } from "../features/configuration/state";
+
+const UsagePanel = lazy(() => import("../features/usage/UsagePanel").then(module => ({ default: module.UsagePanel })));
 
 type SessionSummary = AppSnapshot["sessions"][number];
 /** Collapse key of the no-folder group; folder groups use their identity. */
@@ -50,6 +52,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
 }) {
   const i18n = useI18n();
   const { folders, ready } = useFolders();
+  const { snapshot: configuration } = useConfiguration(status === "ready");
   const [creating, setCreating] = useState(false);
   const createTrigger = useRef<HTMLButtonElement>(null);
   const disabled = busy || status !== "ready";
@@ -123,7 +126,9 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
         {!snapshot && !busy && status !== "unavailable" && <Button variant="ghost" size="sm" onClick={onRetry}>{i18n.formatMessage(commonMessages.retry)}</Button>}
       </div>
     </section>
-    <UsagePanel active={status === "ready"} />
+    {status === "ready" && configuration?.showUsage === true && <Suspense fallback={null}>
+      <UsagePanel modelProviders={configuration.modelProviders} />
+    </Suspense>}
     {creating && <FolderDialog onClose={() => setCreating(false)} onRestoreFocus={() => createTrigger.current?.focus({ preventScroll: true })} />}
   </aside>;
 }

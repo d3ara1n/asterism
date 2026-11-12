@@ -58,6 +58,24 @@ describe("Real configuration and consumption boundaries", () => {
     expect(reopened.mcpAuthorization("example")).toEqual({ port: 62986 });
     expect(configurationStorage(root).inspect()).toBeNull();
   });
+  it("upgrades v15 without resetting saved lifecycle settings and preserves a disabled usage panel across reopening", async () => {
+    const { root, service } = setup();
+    service.close();
+    const fixture = readFileSync(join(import.meta.dirname, "fixtures", "configuration-v15.json"), "utf8");
+    writeFileSync(join(root, "configuration.json"), fixture);
+    await configurationStorage(root).inspect()!.apply();
+    const migrated = new ConfigurationService(root);
+    cleanups.push(() => migrated.close());
+    expect(migrated.current().showUsage).toBe(true);
+    expect(migrated.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 7 });
+    await migrated.execute({ type: "showUsage.set", value: false });
+    migrated.close();
+    const reopened = new ConfigurationService(root);
+    cleanups.push(() => reopened.close());
+    expect(reopened.current().showUsage).toBe(false);
+    expect(reopened.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 7 });
+    expect(configurationStorage(root).inspect()).toBeNull();
+  });
   it("keeps independently named messaging connections and multiple credentials separate", async () => {
     const { service, root } = setup(), life = new RunLifecycle(() => {});
     cleanups.push(() => life.stop());

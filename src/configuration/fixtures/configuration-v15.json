@@ -1,0 +1,54 @@
+{
+  "version": 15,
+  "mcp": {
+    "servers": [
+      {
+        "id": "example",
+        "name": "Example",
+        "enabled": true,
+        "mode": "lazy",
+        "idleSeconds": 300,
+        "transport": "http",
+        "command": "",
+        "args": [],
+        "cwd": "",
+        "url": "https://mcp.example.test",
+        "auth": "oauth",
+        "headers": {},
+        "env": {}
+      }
+    ]
+  },
+  "shell": {
+    "selected": "auto",
+    "profiles": []
+  },
+  "webProviders": [],
+  "messagingConnections": [],
+  "modelProviders": [
+    {
+      "id": "example",
+      "name": "Example",
+      "protocol": "openai-chat",
+      "baseUrl": "https://example.test/v1",
+      "enabled": true,
+      "auth": "api_key",
+      "compatibility": [],
+      "apiKey": "example-saved-key"
+    }
+  ],
+  "models": [],
+  "sessionEntry": {
+    "pluginId": "test.plugin",
+    "entryId": "home"
+  },
+  "mcpAuthorizations": {
+    "example": {
+      "port": 62986
+    }
+  },
+  "sessionLifecycle": {
+    "retentionDays": null,
+    "sleepDays": 7
+  }
+}

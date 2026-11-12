@@ -13,7 +13,7 @@ import { jsonStorage } from "../storage/migrations.ts";
 import { migrateConfiguration13 } from "./credential-migration.ts";
 
 /** Global configuration format; increment on changes and append an n → n+1 migration to `configurationStorage`. */
-export const configurationVersion = 15;
+export const configurationVersion = 16;
 const storedProviderSchema = modelProviderSchema.strip();
 const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
 /** Models use `<providerId>/<modelId>` identities; other entries use id. */
@@ -29,6 +29,7 @@ const documentSchema = z.strictObject({
   modelProviders: z.array(storedProviderSchema), models: z.array(storedModelSchema),
   sessionEntry: sessionEntrySelectionSchema.nullable(),
   sessionLifecycle: sessionLifecycleSchema,
+  showUsage: z.boolean(),
 }).superRefine((document, context) => {
   for (const key of ["modelProviders", "webProviders", "messagingConnections", "models"] as const) {
     const ids = new Set<string>();
@@ -53,7 +54,8 @@ type ConfigurationSave =
 
 function initialConfiguration(): ConfigurationDocument {
   return { version: configurationVersion, mcp: structuredClone(defaultMcpSettings), mcpAuthorizations: {},
-    shell: structuredClone(defaultShellSettings), messagingConnections: [], modelProviders: [], webProviders: [], models: [], sessionEntry: null, sessionLifecycle: structuredClone(defaultSessionLifecycle) };
+    shell: structuredClone(defaultShellSettings), messagingConnections: [], modelProviders: [], webProviders: [], models: [],
+    sessionEntry: null, sessionLifecycle: structuredClone(defaultSessionLifecycle), showUsage: true };
 }
 /**
  * v12 web providers held one API key reference; v13 stores provider settings and secret references by setting key,
@@ -69,7 +71,8 @@ export function migrateConfiguration12(value: unknown): unknown {
 export function configurationStorage(root: string, decrypt?: (ciphertext: string) => Promise<string>) {
   return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile), version: configurationVersion,
     migrations: { 12: migrateConfiguration12, 13: value => migrateConfiguration13(root, value, decrypt),
-      14: value => ({ ...(value as object), sessionLifecycle: structuredClone(defaultSessionLifecycle) }) } });
+      14: value => ({ ...(value as object), sessionLifecycle: structuredClone(defaultSessionLifecycle) }),
+      15: value => ({ ...(value as object), showUsage: true }) } });
 }
 
 /** Locate by old identity and replace; reject new identities that conflict with other entries. */
@@ -111,6 +114,8 @@ export class ConfigurationStore {
   setShell(value: z.infer<typeof shellSettingsSchema>) { this.commit({ ...this.document, shell: value }); }
   sessionLifecycle(): SessionLifecycle { return structuredClone(this.document.sessionLifecycle); }
   setSessionLifecycle(value: SessionLifecycle) { this.commit({ ...this.document, sessionLifecycle: value }); }
+  showUsage(): boolean { return this.document.showUsage; }
+  setShowUsage(value: boolean) { this.commit({ ...this.document, showUsage: value }); }
   sessionEntry() { return structuredClone(this.document.sessionEntry); }
   selectSessionEntry(value: z.infer<typeof sessionEntrySelectionSchema>) { this.commit({ ...this.document, sessionEntry: value }); }
   list<K extends ConfigurationKind>(kind: K): Entry[K][] {

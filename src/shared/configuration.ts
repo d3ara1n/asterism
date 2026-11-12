@@ -99,6 +99,7 @@ export const configurationSnapshotSchema = z.strictObject({
   shell: shellSettingsSchema,
   sessionEntry: sessionEntrySelectionSchema.nullable(),
   sessionLifecycle: sessionLifecycleSchema,
+  showUsage: z.boolean(),
   messagingConnections: z.array(messagingConfigurationSchema),
   messagingProviderTypes: z.array(messagingProviderTypeSchema),
   webProviders: z.array(webProviderSchema),
@@ -119,6 +120,7 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("read") }),
   z.strictObject({ type: z.literal("sessionEntry.set"), value: sessionEntrySelectionSchema }),
   z.strictObject({ type: z.literal("sessionLifecycle.set"), value: sessionLifecycleSchema }),
+  z.strictObject({ type: z.literal("showUsage.set"), value: z.boolean() }),
   // Save targets the current ID; a different ID in value means rename.
   z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),

@@ -390,6 +390,8 @@
   "settings.title": "设置",
   "settings.all": "全部设置",
   "settings.general.title": "通用",
+  "settings.sidebar.title": "侧栏",
+  "settings.sidebar.showUsage": "显示用量",
   "settings.general.summary": "应用偏好与管理",
   "settings.language.title": "语言",
   "settings.language.label": "界面语言",

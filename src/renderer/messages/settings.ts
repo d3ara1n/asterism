@@ -14,6 +14,8 @@ export const settingsMessages = pluginNamespace("asterism.host").messages("en", 
     id: "settings.general.title",
     defaultMessage: "General",
   },
+  sidebarTitle: { id: "settings.sidebar.title", defaultMessage: "Sidebar" },
+  showUsage: { id: "settings.sidebar.showUsage", defaultMessage: "Show usage" },
   generalSummary: {
     id: "settings.general.summary",
     defaultMessage: "App preferences and management",

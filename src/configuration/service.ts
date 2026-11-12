@@ -137,6 +137,7 @@ export class ConfigurationService {
       shell: this.store.shell(),
       sessionEntry: this.store.sessionEntry(),
       sessionLifecycle: this.store.sessionLifecycle(),
+      showUsage: this.store.showUsage(),
       messagingProviderTypes: this.messaging.types(),
       messagingConnections: this.store.list("messaging").map(state => ({ ...state, runtime: runtime.find(connection => connection.id === state.id)! })),
       webProviders: this.store.list("webProvider"),
@@ -152,6 +153,7 @@ export class ConfigurationService {
     if (command.type === "messaging.restart") { this.messaging.restart(command.id); return command.id; }
     if (command.type === "shell.set") { this.store.setShell(command.value); return null; }
     if (command.type === "sessionLifecycle.set") { this.store.setSessionLifecycle(command.value); return null; }
+    if (command.type === "showUsage.set") { this.store.setShowUsage(command.value); return null; }
     if (command.type === "sessionEntry.set") { this.store.selectSessionEntry(command.value); return null; }
     if (command.type === "webProvider.reorder") {
       this.store.reorderWebProviders(command.ids);
