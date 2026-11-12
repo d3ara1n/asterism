@@ -4,9 +4,10 @@ import { cn } from "@asterism-app/ui/utils";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
 import { Item } from "@asterism-app/ui/ui/item";
+import { NoticeRipple } from "./NoticeRipple";
 
 /** Shared shell for thinking, tools, and summaries; the caller owns state, and outer padding does not shrink the clickable title area. */
-export function Disclosure({ header, children, open, onOpenChange, expandable = true, pending = false, dashed = false, failed = false }: {
+export function Disclosure({ header, children, open, onOpenChange, expandable = true, pending = false, dashed = false, failed = false, noticeAt }: {
   header: ReactNode;
   children: ReactNode;
   open: boolean;
@@ -15,9 +16,11 @@ export function Disclosure({ header, children, open, onOpenChange, expandable = 
   pending?: boolean;
   dashed?: boolean;
   failed?: boolean;
+  noticeAt?: number;
 }) {
   return <Collapsible open={open && expandable} onOpenChange={onOpenChange} asChild>
-    <Item variant="outline" size="sm" className={cn("block p-0", (pending || dashed) && "border-dashed", failed && "border-destructive")}>
+    <Item variant="outline" size="sm" className={cn("relative block p-0", (pending || dashed) && "border-dashed", failed && "border-destructive")}>
+      <NoticeRipple at={noticeAt} />
       {expandable ? <CollapsibleTrigger asChild>
         <Button variant="ghost" size="sm" className="h-auto w-full justify-start whitespace-normal px-3 py-2">
           {header}

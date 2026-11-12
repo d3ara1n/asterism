@@ -53,13 +53,14 @@ export class AgentCapabilities {
   private project(available: readonly ToolImplementation[], { tools, detail = "default" }: InspectSelection): Json[] {
     const chosen = tools ? available.filter(implementation => tools.includes(implementation.tool.name)) : available;
     return chosen.map((implementation): Json => {
-      const { name, description, guidelines, args, requiresInteraction } = projectTool(implementation.tool);
+      const { name, description, guidelines, args, requiresInteraction, requiresNotice } = projectTool(implementation.tool);
       const tool: Record<string, Json> = { name, implementation: implementation.reference };
       if (detail !== "schema") { tool.description = description; tool.guidelines = guidelines; }
       if (detail !== "prompt") { tool.args = args; tool.target = schemaOf(implementation.targetSchema); }
       // Scripts receive encoded data, which is the decoding input of the result contract.
       if (detail === "schema") tool.result = schemaOf(implementation.resultSchema, "input");
       if (requiresInteraction) tool.requiresInteraction = true;
+      if (requiresNotice) tool.requiresNotice = true;
       return tool;
     });
   }
@@ -109,6 +110,7 @@ export class AgentCapabilities {
     const canInteract = this.interactive && interactive;
     if (!canInteract && tool.tool.requiresInteraction) return { ...this.identity(id), ...interactionUnavailable() };
     if (!this.caller) throw new Error("Tool execution requires a bound caller.");
-    return { ...tool.prepare(target.resource, selector, args, this.caller, canInteract), ...this.identity(id) };
+    const result = tool.prepare(target.resource, selector, args, this.caller, canInteract);
+    return { ...result, ...this.identity(id), ...("execute" in result && tool.tool.requiresNotice ? { requiresNotice: true } : {}) };
   }
 }

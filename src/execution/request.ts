@@ -124,6 +124,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
         }, {
           prepared(call, info) { buffer.prepare(byCall.get(call.callId)!, info); progress(); },
           started(call, info) { buffer.start(byCall.get(call.callId)!, info); progress(); },
+          noticed(call) { buffer.notice(byCall.get(call.callId)!); progress(); },
           published(call, data) { buffer.publish(byCall.get(call.callId)!, data); progress(); },
         });
       // Deliver tool outcomes as feedback for the next request; the outer cancellation signal and controller manage the agent lifetime.

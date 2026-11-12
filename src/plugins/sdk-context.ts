@@ -28,7 +28,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   const scope = createSdkScope(internal.lifetime), { checkAvailable } = scope;
   const objects = bindObjects(internal.id, host, sessionRuns, eventScope, checkAvailable);
   const models = bindModels(internal.id, host, modelRuns, checkAvailable);
-  const execution = bindExecution({ owner: internal.id, host, runs: modelRuns, objects, checkAvailable, topLevelTools });
+  const execution = bindExecution({ owner: internal.id, host, events: eventScope, runs: modelRuns, objects, checkAvailable, topLevelTools });
   const shared = host.shared;
   const context: PluginContext = {
     deadlines: {

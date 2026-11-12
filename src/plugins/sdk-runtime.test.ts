@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { thinkingLevels, modelToolCallBlockSchema, toolOutcomeSchema, type Json } from "@asterism-app/sdk/contracts";
+import { thinkingLevels, modelToolCallBlockSchema, toolOutcomeSchema, ResourceStatusChanged, type EventEnvelope, type ResourceStatus, type Json } from "@asterism-app/sdk/contracts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -338,13 +338,14 @@ describe("Host implementation of the workbench SDK", () => {
   });
 
   // External providers use the same model tool catalog and read-only association facades; tool policy is captured at request start.
-  it("external top-level tools are declared from the first request, bind calling objects, and follow tool filtering", async () => {
+  it("external top-level tools bind callers, follow filtering, and attribute start notices to the calling resource", async () => {
     const c = counter(), other = pluginNamespace("test.questions");
     let invoked = 0;
     let emptyEncoding = false;
     const cached = { kind: "succeeded" as const, data: { answer: "Answer: Hello" } };
     const declaration = defineTopLevelTool({
       id: other.name("prompt"), name: "prompt", description: "Return an answer.", guidelines: [],
+      requiresNotice: true,
       argsSchema: z.strictObject({ text: z.string() }).describe("Question text."),
       resultSchema: z.codec(z.string().nullable(), z.object({ answer: z.string() }), {
         decode: answer => ({ answer: answer ?? "null" }), encode: value => value.answer === "null" ? null : value.answer,
@@ -371,6 +372,9 @@ describe("Host implementation of the workbench SDK", () => {
     } }));
     const target = await configureModel(service);
     const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
+    const notices: EventEnvelope<ResourceStatus>[] = [];
+    const subscription = c.context().ipc.events.subscribe(ResourceStatusChanged, {}, event => { notices.push(event); });
+    await subscription.ready;
     const run = (allow?: string[]) => c.context().execution.run({
       access: object, interactive: true, target, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
       system: { blocks: [] }, messages: [], tools: { allow }, signal: new AbortController().signal, observer: { event() {} },
@@ -381,15 +385,20 @@ describe("Host implementation of the workbench SDK", () => {
       model: [{ kind: "text", text: '{"answer":"Answer: Hello"}' }] });
     expect(cached.data).toEqual({ answer: "Answer: Hello" });
     expect(allowed.tools[0]).not.toHaveProperty("resource");
+    expect(notices).toMatchObject([{ source: { plugin: ns.id, resource: object }, data: { title: "Counter", status: "awaiting" } }]);
     const denied = await run([]);
     expect(requests[1]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "resource_script"]);
     expect(denied.tools[0]?.kind).toBe("rejected");
+    expect(notices).toHaveLength(1);
     expect(invoked).toBe(1);
     expect((await run(["prompt"])).tools[0]).toMatchObject({ kind: "succeeded", data: "Answer: Hello" });
     // Null means absent tool output; an unrepresentable final encoding fails while retaining the last valid progress value.
     emptyEncoding = true;
     const failed = await run(["prompt"]);
     expect(failed.tools[0]).toMatchObject({ kind: "failed", data: "Waiting" });
+    // Progress and completion do not publish replacement running/completed statuses for the caller.
+    expect(notices.map(event => event.data.status)).toEqual(["awaiting", "awaiting", "awaiting"]);
+    subscription.close();
   });
 
   // Top-level tools override complete declarations in user-list order; failed contributions reserve no names, and model declarations and execution identities share the same winner.

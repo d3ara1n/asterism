@@ -20,6 +20,12 @@ export interface ToolContract<A extends ToolInput = ToolInput> extends ContractR
   argsSchema: z.ZodType<A>;
   /** Execution requires an endpoint that can receive user interaction. Output rendering alone does not require it. */
   requiresInteraction?: boolean;
+  /**
+   * Each validated invocation requests user attention once when execution starts, independently of interaction endpoint requirements.
+   * The host publishes an awaiting reminder for the caller and exposes a transient live-call highlight. Viewing consumes the reminder;
+   * the notice does not change execution state or track unresolved business work.
+   */
+  requiresNotice?: boolean;
 }
 /** Tool definitions fix selection descriptions, usage guidance, and args; implementations add only target/result and execution information. */
 export interface ImplementationContract<S extends Json, T extends ToolInput, A extends ToolInput, O extends Json> extends DataContract<O> {

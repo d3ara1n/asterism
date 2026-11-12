@@ -20,6 +20,7 @@ export const ResourceInspectResult = defineData(coreId("resource-inspect"), z.st
     target: jsonSchema.optional().describe("Present unless the inspection requested guidance only."),
     result: jsonSchema.optional().describe("Schema for encoded result data, present only in the schema view."),
     requiresInteraction: z.boolean().optional().describe("True when this tool requires a user interaction surface."),
+    requiresNotice: z.boolean().optional().describe("True when starting this tool requests user attention once."),
     implementation: contractReferenceSchema,
   })),
 }));

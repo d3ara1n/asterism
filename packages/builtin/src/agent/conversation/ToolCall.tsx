@@ -52,7 +52,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     {state.phase === "settled" && settled === "succeeded" && <span className="sr-only">{i18n.text(toolOutcomeLabels.succeeded)}</span>}
   </>;
   return <Disclosure header={header} {...disclosure} {...blockShell(node)} expandable={!filling || hasInputBody}
-    pending={state.phase === "input" || state.phase === "ready"}>
+    pending={state.phase === "input" || state.phase === "ready"} noticeAt={"noticeAt" in node ? node.noticeAt : undefined}>
     <div className="space-y-3 [--code-font-size:var(--text-xs)]">
       {view && (view.body ?? (!filling && state.phase !== "incomplete" && <DefaultToolBody {...view.props} />))}
       {diagnostic && <p className={cn("type-caption whitespace-pre-wrap", "error" in result && "text-destructive")}>{diagnostic}</p>}

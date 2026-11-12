@@ -186,4 +186,6 @@ Creation entries coordinate menu and drop input through the same host creation p
 
 Tool input, execution, and result phases share presentation identity but consume different data. Streaming-preview declarations request ordinary automatic disclosure; attention declarations request one immediate disclosure for user handling.
 
+A tool can declare that each invocation needs user attention. The host raises that notice once when a validated call actually starts, independently of whether the tool requires an interaction endpoint. It attributes the session reminder to the execution owner, not the tool's target resource. Viewing consumes the session reminder; a live tool shell can briefly highlight the call even while its session is already visible. Disclosure attention remains a renderer choice; execution notices do not depend on a mounted view or a body renderer. The notice neither suspends execution nor represents an unresolved business condition. Progress, completion, and domain-specific pending interactions retain their own lifecycles. Notices remain transient and do not replay from history.
+
 Agent-specific toolbar, overlay, and modal composition belongs to `@asterism-app/builtin-api`, not a generic SDK slot system.

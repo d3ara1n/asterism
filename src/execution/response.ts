@@ -19,6 +19,7 @@ type BufferedBlock = {
   executing: boolean;
   invocation: ToolInvocationInfo | null;
   result: Extract<ToolResult, { kind: "running" }> | null;
+  noticeAt?: number;
 };
 export type LiveCall = BufferedBlock & { part: Extract<StreamPart, { kind: "toolcall" }> };
 
@@ -121,7 +122,7 @@ export class ResponseBuffer {
         responseId: this.identity.responseId, ordinal: block.ordinal };
       return block.part.kind === "toolcall"
         ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.endedAt !== null ? block.arguments : block.previewArguments,
-          state: block.executing ? "executing" : block.endedAt !== null ? "ready" : "input", invocation: block.invocation, result: block.result }
+          state: block.executing ? "executing" : block.endedAt !== null ? "ready" : "input", invocation: block.invocation, result: block.result, ...(block.noticeAt === undefined ? {} : { noticeAt: block.noticeAt }) }
         : block.part.kind === "thinking" ? { ...base, kind: "thinking", text: block.text || block.summary, startedAt: block.startedAt, endedAt: block.endedAt }
           : { ...base, kind: "text", text: block.text, endedAt: block.endedAt };
     });
@@ -139,6 +140,10 @@ export class ResponseBuffer {
     call.executing = true;
     call.invocation = info;
     call.result = { kind: "running", data: null };
+  }
+
+  notice(call: LiveCall): void {
+    call.noticeAt = Date.now();
   }
 
   publish(call: LiveCall, data: Json): void {

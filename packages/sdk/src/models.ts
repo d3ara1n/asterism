@@ -72,7 +72,9 @@ export type ModelLiveBlock = { id: string; responseId: string; ordinal: number }
   | { kind: "thinking"; text: string; startedAt: number; endedAt: number | null }
   /** During the input phase, arguments is a display preview parsed tolerantly and cannot be used for execution; other phases contain complete arguments. */
   | { kind: "toolcall"; name: string; argumentsText: string; arguments: Json; state: "input" | "ready" | "executing";
-      invocation: ToolInvocationInfo | null; result: Extract<ToolResult, { kind: "running" }> | null }
+      invocation: ToolInvocationInfo | null; result: Extract<ToolResult, { kind: "running" }> | null;
+      /** One-shot attention time, present only in live execution; history does not replay notices. */
+      noticeAt?: number }
 );
 export type ModelRunEvent =
   | { type: "block"; block: ModelBlock }
@@ -101,6 +103,8 @@ export interface ModelToolCall { callId: string; name: string; arguments: Json }
 export interface ModelToolObserver {
   prepared?(call: ModelToolCall, info: ToolInvocationInfo): void;
   started?(call: ModelToolCall, info: ToolInvocationInfo): void;
+  /** An accepted invocation requested attention at execution start, independently of its progress or completion. */
+  noticed?(call: ModelToolCall): void;
   published?(call: ModelToolCall, data: Json): void;
 }
 /** Executable tools supplied by the requesting paradigm or a host-bound request environment. */

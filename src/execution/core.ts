@@ -59,11 +59,11 @@ export function coreDeclarations(tools: readonly BoundTopLevelTool[] = []): Tool
 }
 
 /** Bind resource dispatch without making the model runner depend on a session or resource identity. */
-export function bindModelTools(capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = [], handover?: ContentLease): ModelTools {
+export function bindModelTools(capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = [], handover?: ContentLease, notice?: () => void): ModelTools {
   return {
     declarations: coreDeclarations(tools),
     preview: (name, args) => previewCoreCall(name, args, capabilities, tools),
-    execute: (calls, signal, settle, observer) => executeCoreBatch(calls, capabilities, signal, settle, observer, handover, tools),
+    execute: (calls, signal, settle, observer) => executeCoreBatch(calls, capabilities, signal, settle, observer, handover, tools, notice),
   };
 }
 
@@ -89,7 +89,7 @@ class ToolDispatcher {
   private readonly scheduler = new ToolScheduler();
   private readonly callableNames: string[];
   constructor(private readonly capabilities: AgentCapabilities, private readonly tools: readonly BoundTopLevelTool[],
-    private readonly handover?: ContentLease) {
+    private readonly handover?: ContentLease, private readonly notice?: () => void) {
     this.callableNames = [...actions, ...tools.filter(entry => entry.available)]
       .filter(entry => !entry.tool.requiresInteraction)
       .map(entry => entry.tool.name).filter(name => name !== ResourceScript.name && name !== ResourceCall.name);
@@ -111,6 +111,7 @@ class ToolDispatcher {
         interactive,
         execute: (child, signal, childObserver) => this.run(this.prepare(child, childObserver, false), signal, childObserver),
       }) : extension!.resolve(parsed.data, call.callId, interactive);
+      if ("execute" in result && definition.requiresNotice) result = { ...result, requiresNotice: true };
     }
     const info: ToolInvocationInfo = {
       ...(result.implementation ? { implementation: result.implementation } : {}),
@@ -134,6 +135,10 @@ class ToolDispatcher {
     if (!("execute" in result)) return complete(result);
     info = { ...info, startedAt: Date.now() };
     observer.started?.(call, toolInvocationSchema.parse(info));
+    if (result.requiresNotice) {
+      observer.noticed?.(call);
+      this.notice?.();
+    }
     let latest: Json = null;
     let active = true;
     let completion: CallResult;
@@ -158,8 +163,8 @@ class ToolDispatcher {
 /** Captured request capabilities and one scheduler cover the entire batch, including scripts' child operations. */
 export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities,
   signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
-  observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = []): Promise<void> {
-  const dispatcher = new ToolDispatcher(capabilities, tools, handover);
+  observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = [], notice?: () => void): Promise<void> {
+  const dispatcher = new ToolDispatcher(capabilities, tools, handover, notice);
   const prepared = calls.map(call => dispatcher.prepare(call, observer));
   const outcomes = await Promise.allSettled(prepared.map(async entry => settle(entry.call, await dispatcher.run(entry, signal, observer))));
   const failed = outcomes.find(outcome => outcome.status === "rejected");

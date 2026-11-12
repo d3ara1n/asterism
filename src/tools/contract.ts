@@ -11,6 +11,7 @@ export type { CallResult } from "@asterism-app/sdk/runtime";
 import type { CallResult } from "@asterism-app/sdk/runtime";
 export type PreparedResult = CallResult & ToolInvocationInfo;
 export interface Invocation extends ToolInvocationInfo {
+  requiresNotice?: boolean;
   effect: "read" | "write";
   execution: "parallel" | "sequential";
   execute(signal: AbortSignal, publish?: (data: Json) => void, handover?: ContentLease): Promise<CallResult>;

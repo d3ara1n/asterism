@@ -47,6 +47,31 @@ const write = defineImplementation({ ...defineData("example.resource/write", z.n
   targetSchema: z.null().describe("The whole item."), effect: "write", execution: "sequential" });
 
 describe("Stateless single model execution", () => {
+  // Attention metadata belongs to live execution only: progress must not retrigger it or persist a future replay into tool history.
+  it("keeps a tool notice in live progress without copying it into saved inputs or results", async () => {
+    const events: ModelRunEvent[] = [];
+    const request = input(events);
+    let noticeAt: number | undefined;
+    const declaration = { ...write, tool: { ...write.tool, requiresNotice: true } };
+    const tool = implement(declaration, { call: async (_state, _target, _args, { publish }) => {
+      const live = () => events.filter(event => event.type === "progress").at(-1)?.blocks[0];
+      const started = live();
+      expect(started).toMatchObject({ kind: "toolcall", state: "executing", noticeAt: expect.any(Number) });
+      if (started?.kind === "toolcall") noticeAt = started.noticeAt;
+      publish(1); publish(2);
+      expect(live()).toMatchObject({ noticeAt, result: { kind: "running", data: 2 } });
+      return { kind: "succeeded", data: 3 };
+    } });
+    const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => true, toolCaller);
+    const result = await execute(request, model(calls(["attention"], "resource_call", { resource_id: resource.id, tool: "write", args: {} })), capabilities);
+    expect(result.reason).toBe("completed");
+    const saved = events.filter(event => event.type === "tool.begin" || event.type === "tool.complete").map(event => event.block);
+    expect(saved).toHaveLength(2);
+    for (const block of saved) expect(block).not.toHaveProperty("noticeAt");
+    expect(result.tools[0]).not.toHaveProperty("noticeAt");
+    expect(events.filter(event => event.type === "progress").at(-1)?.blocks).toEqual([]);
+  });
+
   it.each(["error", "eof"])("retains closed Anthropic text and reported input usage when the stream ends with %s", async ending => {
     const frames: unknown[] = [
       { type: "message_start", message: { id: "upstream-id", type: "message", role: "assistant", model: "test",

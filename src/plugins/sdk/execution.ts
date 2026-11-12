@@ -1,3 +1,4 @@
+import { ResourceStatusChanged } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ExecutionServices, type ResourceRef, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../lifecycle.ts";
 import type { PluginHostServices } from "../loader.ts";
@@ -7,10 +8,12 @@ import { inputReferences } from "../../model/input.ts";
 import type { SdkObjects } from "./objects.ts";
 import { bindModelTools } from "../../execution/core.ts";
 import type { ContentLease } from "../../runtime/content-store.ts";
+import type { PluginEventScope } from "../event-scope.ts";
 
 interface ExecutionBinding {
   owner: string;
   host: PluginHostServices;
+  events: Pick<PluginEventScope, "publish">;
   runs: RunGroup;
   objects: Pick<SdkObjects, "own" | "checkRef">;
   checkAvailable(): void;
@@ -18,7 +21,7 @@ interface ExecutionBinding {
 }
 
 /** Resource access, request holds, content handoff, and optional presentation surround the generic runner. */
-export function bindExecution({ owner, host, runs, objects: { own, checkRef }, checkAvailable, topLevelTools }: ExecutionBinding) {
+export function bindExecution({ owner, host, events, runs, objects: { own, checkRef }, checkAvailable, topLevelTools }: ExecutionBinding) {
   const live = new Map<symbol, { ref: ResourceRef; blocks: LiveBlock[] }>();
   const execution: ExecutionServices = {
     async withProgress(resource, work) {
@@ -71,7 +74,9 @@ export function bindExecution({ owner, host, runs, objects: { own, checkRef }, c
           const preparedSystem = host.sessions.context(linked).then(files => typeof system === "function" ? system(files) : system);
           return await host.models.run({ target, system: preparedSystem,
             messages, userAgent, sessionId: ref.sessionId, requestParentId,
-            signal, tools: bindModelTools(capabilities, boundTools, handover),
+            signal, tools: bindModelTools(capabilities, boundTools, handover, () => {
+              events.publish(ResourceStatusChanged, { title: source.title, status: "awaiting" }, { plugin: owner, resource: ref });
+            }),
             completionExtensions: request.completionExtensions,
             content: values => options?.content
               ? host.content?.captureReader(inputReferences(values), options.content, owner)

@@ -29,6 +29,7 @@ export function projectTool(tool: ToolContract) {
     guidelines: [...tool.guidelines],
     args: schemaOf(tool.argsSchema),
     requiresInteraction: tool.requiresInteraction === true,
+    requiresNotice: tool.requiresNotice === true,
   };
 }
 
