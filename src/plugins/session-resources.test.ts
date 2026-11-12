@@ -882,6 +882,48 @@ describe("Agent resource operation entries", () => {
     expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([{ receiverId: actor.id, resourceId: noteId }]);
   });
 
+  it("resolves complete model expressions without confusing provider or nested model IDs", async () => {
+    const calls = [
+      { name: "get_model", args: { model: "test/nested/shared" } },
+      { name: "get_model", args: { model: "other/shared" } },
+      { name: "get_model", args: { model: "test/shared" } },
+    ];
+    const f = open({ adapter: adapter(() => calls) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    await f.app.configuration.execute({ type: "modelProvider.save", id: null, value: {
+      id: "other", name: "Other", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [], apiKey: "",
+    } });
+    for (const [providerId, modelId, name] of [["test", "nested/shared", "Nested"], ["other", "shared", "Other"]]) {
+      await f.app.configuration.execute({ type: "model.save", id: null, value: {
+        providerId, modelId, name, enabled: true, contextWindow: null, cost: null, compatibility: [],
+        capabilities: { tools: true, reasoning: false, thinkingLevels: [] },
+        generation: { temperature: null, topP: null, maxOutputTokens: 8192 },
+      } });
+    }
+    const result = await runner(f, actor, target)();
+    expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: { name: "Nested", model: "test/nested/shared", provider: "test" } });
+    expect(result.tools[1]).toMatchObject({ kind: "succeeded", data: { name: "Other", model: "other/shared", provider: "other" } });
+    expect(result.tools[2]).toMatchObject({ kind: "rejected", error: { code: "not_found" } });
+  });
+
+  it.each(["model", "provider"] as const)("excludes a disabled %s from model discovery and lookup", async disabled => {
+    const f = open({ adapter: adapter((): { name: string; args: Json }[] => [
+      { name: "list_models", args: {} }, { name: "get_model", args: { model: "other/hidden" } },
+    ]) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    await f.app.configuration.execute({ type: "modelProvider.save", id: null, value: {
+      id: "other", name: "Other", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: disabled !== "provider", compatibility: [], apiKey: "",
+    } });
+    await f.app.configuration.execute({ type: "model.save", id: null, value: {
+      providerId: "other", modelId: "hidden", name: "Hidden", enabled: disabled !== "model", contextWindow: null, cost: null, compatibility: [],
+      capabilities: { tools: true, reasoning: false, thinkingLevels: [] },
+      generation: { temperature: null, topP: null, maxOutputTokens: null },
+    } });
+    const result = await runner(f, actor, target)();
+    expect(result.tools[0]).toMatchObject({ kind: "succeeded", data: ["test/test"] });
+    expect(result.tools[1]).toMatchObject({ kind: "rejected", error: { code: "not_found" } });
+  });
+
   // Discovery exposes each role's own delegation policy without leaking private prompts or budgets.
   it("list_agent exposes selection fields while isolating system prompts and execution configuration", async () => {
     const f = open({ adapter: adapter(() => [{ name: "list_agent", args: {} }]) });

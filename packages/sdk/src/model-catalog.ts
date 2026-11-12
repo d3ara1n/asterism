@@ -9,6 +9,11 @@ export const catalogModelSchema = z.object({
   generation: z.object({ maxOutputTokens: z.number().nullable() }),
   capabilities: z.object({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema) }),
 });
+/** Enabled model metadata available to runtime consumers; model is the complete provider/model expression. */
+export const modelInfoSchema = catalogModelSchema.omit({ providerId: true, modelId: true, enabled: true }).extend({
+  provider: z.string(), model: z.string(),
+});
+export type ModelInfo = z.infer<typeof modelInfoSchema>;
 /** Configured model metadata for plugin selectors and diagnostics; credentials remain backend capabilities. */
 export const ModelCatalog = defineData("asterism.models/catalog", z.object({
   modelProviders: z.array(z.object({ id: z.string(), name: z.string(), enabled: z.boolean() })),

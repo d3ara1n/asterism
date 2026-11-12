@@ -99,7 +99,7 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
     }
   });
   const models: ModelServices = { stream, validate: vi.fn(), run: vi.fn(), list: () => options.window === undefined ? [] : [{
-    model: "p/m", provider: "p", name: "Model", contextWindow: options.window,
+    model: "p/m", provider: "p", name: "Model", contextWindow: options.window, cost: null, generation: { maxOutputTokens: null },
     capabilities: { reasoning: false, tools: true, thinkingLevels: [] },
   }] };
   const execution: ExecutionServices = {

@@ -2,7 +2,7 @@ import type { ConfigurationService } from "../configuration/service.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import { runModelRequest } from "../execution/request.ts";
-import { formatModelExpression, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest, type SystemPrompt } from "@asterism-app/sdk/contracts";
+import { formatModelExpression, modelInfoSchema, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest, type SystemPrompt } from "@asterism-app/sdk/contracts";
 import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
 import { PluginApiError } from "@asterism-app/sdk/runtime";
@@ -65,8 +65,8 @@ export function createModelServices(configuration: ConfigurationService, adapter
   const catalog = {
     models: () => {
       const config = current();
-      return config.models.filter(model => resolveProviderModel(config, modelReference(model))).map(model => ({ model: modelReference(model),
-        provider: model.providerId, name: model.name, contextWindow: model.contextWindow, capabilities: { ...model.capabilities } }));
+      return config.models.filter(model => resolveProviderModel(config, modelReference(model))).map(model =>
+        modelInfoSchema.parse({ ...model, model: modelReference(model), provider: model.providerId }));
     },
   };
   const capture = (messages: readonly ModelItem[], source?: HostInputOptions["content"]) => {

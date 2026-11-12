@@ -13,6 +13,7 @@ import questions from "./questions/runtime.ts";
 import resourceOperations from "./resources/runtime.ts";
 import { CreateNote } from "./notes/contract.ts";
 import providers from "./providers/runtime.ts";
+import models from "./models/runtime.ts";
 import { createShellModule } from "./shell/runtime.ts";
 import { createTerminalModule } from "./terminal/runtime.ts";
 import { CreateTerminal } from "./terminal/contract.ts";
@@ -48,7 +49,7 @@ export default definePlugin({ namespace: builtin,
             return { snapshot: resolveParadigmConfiguration(settings.get().paradigm), savedId: input.type === "remove" ? null : input.value.id };
           })],
         modules: [defineAgentInstructions([{ id: "environment", text: environment(application.name).text }]),
-        providers, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.shell), createNamingModule(application.userAgent), notes, questions,
+        providers, models, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.shell), createNamingModule(application.userAgent), notes, questions,
         resourceOperations, mcp, web, mesh, schedules, messaging, ...messagingCreations, createSubagentPoolModule(application, usage, skills),
         createManualModule(() => plugin.manual.sources(), application.name), createShellModule(), createTerminalModule(),
         defineAgentCreation({ id: CreateTimer.id, creation: CreateTimer,

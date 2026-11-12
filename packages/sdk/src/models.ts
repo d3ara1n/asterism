@@ -1,5 +1,6 @@
 /** Shared model protocol: independent of resource implementations, agent configuration, and host adapters. */
 import type { Json } from "./json.ts";
+import type { ModelInfo } from "./model-catalog.ts";
 import type { ModelInputPart } from "./model-input.ts";
 import type { ContentReader } from "./content-runtime.ts";
 import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.ts";
@@ -154,5 +155,6 @@ export interface ModelServices {
   stream(request: StreamRequest, options?: ModelInputOptions): AsyncIterable<ModelEvent>;
   /** One request and its tool batch; neither saves history nor drives the next request. */
   run(request: ModelRunRequest, options?: ModelInputOptions): Promise<ModelRunResult>;
-  list(): readonly { model: string; provider: string; name: string; contextWindow: number | null; capabilities: { reasoning: boolean; tools: boolean; thinkingLevels: readonly ThinkingLevel[] } }[];
+  /** Current configured metadata for models whose model and provider are enabled; listing does not probe credentials or connectivity. */
+  list(): readonly ModelInfo[];
 }

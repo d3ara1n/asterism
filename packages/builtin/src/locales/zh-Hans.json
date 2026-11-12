@@ -1,4 +1,6 @@
 {
+  "models.list": "列出模型",
+  "models.get": "读取模型",
   "command.session": "会话",
   "command.conversation": "对话",
   "command.compact": "压缩当前对话",

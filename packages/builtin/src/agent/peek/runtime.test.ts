@@ -22,7 +22,7 @@ function* query(): Generator<ModelEvent> {
   yield { type: "part.delta", partId: "call", delta: '{"id":' };
   yield { type: "part.end", partId: "call", arguments: { id: "saved" } };
 }
-const model = { model: "p/m", provider: "p", name: "Model", contextWindow: 65536,
+const model = { model: "p/m", provider: "p", name: "Model", contextWindow: 65536, cost: null, generation: { maxOutputTokens: null },
   capabilities: { reasoning: false, tools: true, thinkingLevels: [] } };
 const deps = (stream: ModelServices["stream"]) => ({
   models: { stream, list: () => [model] }, utility: () => ({ provider: "p", model: "m" }), userAgent: "Asterism/test",

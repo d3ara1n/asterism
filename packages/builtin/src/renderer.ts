@@ -9,6 +9,7 @@ import filesystem from "./filesystem/renderer";
 import manual from "./manual/renderer";
 import mcp from "./mcp/renderer";
 import mesh from "./mesh/renderer";
+import models from "./models/renderer";
 import naming from "./naming/renderer";
 import notes from "./notes/renderer";
 import questions from "./questions/renderer";
@@ -22,7 +23,7 @@ import web from "./web/renderer";
 import subagents from "./subagents/renderer";
 import schedules from "./schedules/renderer";
 
-const builtinViews: readonly RendererModule[] = [agent, filesystem, manual, mcp, mesh, naming, notes, questions, resources, shell, skills, terminal, usage, web, subagents, messaging, schedules];
+const builtinViews: readonly RendererModule[] = [agent, filesystem, manual, mcp, mesh, models, naming, notes, questions, resources, shell, skills, terminal, usage, web, subagents, messaging, schedules];
 export default defineRendererPlugin({
   modules: builtinViews, settings: builtinSettingsPages, prepare: prepareHomeEntry,
   commands: [sessionCommands],
