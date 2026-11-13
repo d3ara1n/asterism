@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseResourceUrl, parseSkillUrl, resourceUrl, skillUrl } from "./reference-urls.ts";
+import { modelUrl, parseModelUrl, parseResourceUrl, parseSkillUrl, resourceUrl, skillUrl } from "./reference-urls.ts";
 
 describe("Resource URLs", () => {
   it("encodes each location segment and keeps `/` as the separator", () => {
@@ -34,5 +34,23 @@ describe("Skill URLs", () => {
   it("rejects malformed addresses", () => {
     for (const value of ["resource:abc/path", "file:///etc/passwd", "", "skill:", "skill:/path", "skill:a/%XX"])
       expect(parseSkillUrl(value)).toBeNull();
+  });
+});
+
+describe("Model URLs", () => {
+  it("keeps nested model IDs after the first provider separator", () => {
+    expect(parseModelUrl("model:relay/vendor/model-v1")).toEqual({ provider: "relay", model: "vendor/model-v1" });
+  });
+
+  it("encodes individual segments and decodes reserved punctuation only once", () => {
+    expect(modelUrl("relay/vendor/a b#v1%20")).toBe("model:relay/vendor/a%20b%23v1%2520");
+    expect(parseModelUrl("model:relay/vendor/a%20b%23v1%2520")).toEqual({ provider: "relay", model: "vendor/a b#v1%20" });
+  });
+
+  it("rejects missing identity parts, malformed escapes, and unencoded URL delimiters", () => {
+    for (const value of ["model:", "model:relay", "model:/m", "model:relay/", "model://relay/m", "model:relay/m%XX",
+      "model:relay/m#section", "model:relay/m?q=1", "model:relay/a b", "skill:relay/m"]) {
+      expect(parseModelUrl(value)).toBeNull();
+    }
   });
 });

@@ -55,6 +55,21 @@ describe("Reference serialization", () => {
     ]);
   });
 
+  it("preserves model labels and nested model URLs through composer parsing and submission", () => {
+    const input = "Use [Model:long context](model:relay/vendor/model-v1) here";
+    const doc = parseComposerText(input);
+    expect(doc.content![0]!.content).toEqual([
+      { type: "text", text: "Use " },
+      { type: "referenceChip", attrs: { label: "Model:long context", href: "model:relay/vendor/model-v1" } },
+      { type: "text", text: " here" },
+    ]);
+    expect(serializeDoc(doc)).toBe(input);
+  });
+
+  it("keeps incomplete model references as literal text", () => {
+    expect(parseComposerInline("[Model](model:relay)")).toEqual([{ type: "text", text: "[Model](model:relay)" }]);
+  });
+
   it("leaves non-reference markdown links as literal text", () => {
     const result = parseComposerText("[google](https://google.com)");
     expect(result.content![0]!.content).toEqual([

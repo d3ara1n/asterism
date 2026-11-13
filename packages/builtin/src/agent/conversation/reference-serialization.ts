@@ -5,9 +5,9 @@ import { referenceKind } from "@asterism-app/ui/references";
 export const referenceNodeName = "referenceChip";
 
 /** Markdown link whose destination uses an app-defined reference scheme. */
-const referencePattern = /\[([^\]\r\n]*)\]\(((?:resource|skill):[^()\s]+)\)/gu;
+const referencePattern = /\[([^\]\r\n]*)\]\(((?:resource|skill|model):[^()\s]+)\)/gu;
 
-/** Whether a destination addresses a resource location or a skill. */
+/** Whether a destination addresses a resource location, skill, or configured model. */
 export function isReferenceHref(href: string): boolean {
   return referenceKind(href) !== null;
 }

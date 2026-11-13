@@ -1,6 +1,9 @@
+import { parseModelExpression, type ModelExpression } from "./model-selection.ts";
+
 /**
  * Reference URLs are plain strings that name something the model or the user can look up: `resource:` addresses a
- * location inside a session resource, `skill:` addresses a skill package through the skill catalog. A reference may
+ * location inside a session resource, `skill:` addresses a skill package through the skill catalog, and `model:`
+ * addresses a configured model by its provider/model expression. A reference may
  * name something that does not exist; parsing checks only the format.
  */
 
@@ -37,6 +40,17 @@ export function parseSkillUrl(value: string): SkillUrl | null {
     const name = decodeURIComponent(match[1]!);
     return name ? { name, path: match[2] === undefined ? undefined : decodePath(match[2]) } : null;
   } catch { return null; }
+}
+
+/** `model:<provider>/<model>`: model IDs may contain additional slash-separated segments. */
+export function modelUrl(expression: string): string {
+  return `model:${encodePath(expression)}`;
+}
+
+export function parseModelUrl(value: string): ModelExpression | null {
+  const match = /^model:([^?#\s]+)$/u.exec(value);
+  if (!match) return null;
+  try { return parseModelExpression(decodePath(match[1]!)); } catch { return null; }
 }
 
 /** The text form of a reference: a Markdown link whose label is display text and whose destination is the URL. */

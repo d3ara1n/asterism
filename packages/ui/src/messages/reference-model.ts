@@ -1,0 +1,25 @@
+import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
+
+export const referenceModelMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
+  context: { id: "references.model.context", defaultMessage: "Context window" },
+  outputLimit: { id: "references.model.outputLimit", defaultMessage: "Output limit" },
+  reasoning: { id: "references.model.reasoning", defaultMessage: "Reasoning" },
+  tools: { id: "references.model.tools", defaultMessage: "Tools" },
+  thinkingLevels: { id: "references.model.thinkingLevels", defaultMessage: "Thinking levels" },
+  supported: { id: "references.model.supported", defaultMessage: "Supported" },
+  unsupported: { id: "references.model.unsupported", defaultMessage: "Unsupported" },
+  disabled: { id: "references.model.disabled", defaultMessage: "Disabled" },
+  prices: { id: "references.model.prices", defaultMessage: "Reference prices · USD" },
+  noPrices: { id: "references.model.noPrices", defaultMessage: "No prices configured" },
+  basePrice: { id: "references.model.basePrice", defaultMessage: "Base price" },
+  input: { id: "references.model.input", defaultMessage: "Input" },
+  output: { id: "references.model.output", defaultMessage: "Output" },
+  cacheRead: { id: "references.model.cacheRead", defaultMessage: "Cache read" },
+  cacheWrite: { id: "references.model.cacheWrite", defaultMessage: "Cache write" },
+  text: { id: "references.model.text", defaultMessage: "Text" },
+  image: { id: "references.model.image", defaultMessage: "Image" },
+  audio: { id: "references.model.audio", defaultMessage: "Audio" },
+  video: { id: "references.model.video", defaultMessage: "Video" },
+  second: { id: "references.model.second", defaultMessage: "seconds" },
+  rate: { id: "references.model.rate", defaultMessage: "{amount} / {count} {unit}" },
+}));

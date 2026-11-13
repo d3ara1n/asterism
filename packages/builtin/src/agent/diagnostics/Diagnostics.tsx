@@ -98,7 +98,7 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
       <ul className="space-y-2.5">{estimate.lines.map(line => <li key={`${line.modality}/${line.item}`} className="space-y-0.5">
         <div className="flex items-baseline justify-between gap-3"><span className="type-body">{i18n.text(messages[line.item])}</span>
           <span className="type-body tabular-nums">{line.amount === null ? "—" : formatMoney(i18n, line.amount)}</span></div>
-        <p className="type-caption tabular-nums">{line.quantity === null ? "—" : formatQuantity(i18n, line.quantity, line.unit)} {i18n.text(messages[line.unit])}
+        <p className="type-caption tabular-nums">{line.quantity === null ? "—" : formatQuantity(i18n, line.quantity, line.unit)} {line.unit === "token" ? "toks" : i18n.text(messages[line.unit])}
           {line.price && <> · {formatPrice(i18n, line.price)}</>}</p>
         {line.issue && <p className="type-caption">{i18n.text(issueMessages[line.issue])}</p>}
       </li>)}</ul>

@@ -19,7 +19,7 @@ export function formatPrice(i18n: I18n, price: UnitPrice): string {
   return i18n.formatMessage(messages.rate, {
     amount: formatMoney(i18n, price.amount),
     count: formatQuantity(i18n, price.per, price.unit),
-    unit: i18n.text(messages[price.unit]),
+    unit: price.unit === "token" ? "toks" : i18n.text(messages[price.unit]),
   });
 }
 export function formatEstimate(i18n: I18n, amount: number | null, partial = false): string {

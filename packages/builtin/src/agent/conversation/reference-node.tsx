@@ -8,7 +8,7 @@ import { referenceNodeName } from "./reference-serialization";
 export interface ReferenceAttrs {
   /** Display label shown in the chip and used as the link text. */
   label: string;
-  /** App-defined URL: `resource:<id>/<path>` or `skill:<name>`. */
+  /** App-defined reference URL, such as `resource:<id>/<path>`, `skill:<name>`, or `model:<provider>/<model>`. */
   href: string;
 }
 

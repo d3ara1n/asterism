@@ -14,6 +14,8 @@ export const environment = (applicationName: string): AgentPromptBlock => ({
     "The user can link or detach resources. resource_attached and resource_detached notices identify the resource whose link changed.",
     "Resource IDs are opaque instance identifiers used by tool calls and resource URLs. Resource titles are display names.",
     "Any message can contain references: Markdown links whose destinations are reference URLs. [label](resource:<resource_id>/<location>) names a location the resource interprets; directory and manual locations are resource-relative file paths. [label](skill:<name>) or [label](skill:<name>/<package_path>) names a skill or a file in its package, read with skill_read. Location and path segments are percent-encoded and separated by /. A reference URL is text: it grants no access and can name a resource that is absent or not linked to you.",
+    "[label](model:<provider>/<model>) references a configured model using its provider/model expression. Model ID segments are percent-encoded and separated by /; the model ID can contain further slashes.",
+    "Reference labels can include a colon followed by supplementary information: [label:supplement](reference-url). Everything after the first colon is the supplement, such as a file name, line range, or section name; for example, [teach:SKILL.md#Description](skill:teach/SKILL.md).",
     "Footnotes use standard Markdown syntax.",
     inputMessageDescription,
     "Each model request and its tool batch use the resource scope captured at request start. Link changes take effect on the next request.",

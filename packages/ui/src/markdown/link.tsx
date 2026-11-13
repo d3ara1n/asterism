@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { parseResourceUrl, parseSkillUrl } from "@asterism-app/sdk/contracts";
+import { parseModelUrl, parseResourceUrl, parseSkillUrl } from "@asterism-app/sdk/contracts";
 import { useRendererObject } from "@asterism-app/sdk/renderer";
 import { externalWebUrl } from "../links";
 import { ReferenceChip } from "../reference-chip";
@@ -16,6 +16,7 @@ export function MarkdownLink({ href, children, ...props }: AnchorProps) {
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: "nearest" });
   }}>{children}</a>;
+  if (href && parseModelUrl(href)) return <ReferenceChip href={href}>{children}</ReferenceChip>;
   if (href && parseSkillUrl(href)) return <ReferenceChip href={href} openable>{children}</ReferenceChip>;
   if (href && parseResourceUrl(href)) return <ResourceReference href={href}>{children}</ResourceReference>;
   const url = href ? externalWebUrl(href) : null;
