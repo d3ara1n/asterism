@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { defineModule, implementResource, implementCreation, implementTool, implementAction, implementCall,
   MessagingError, type Lifetime, type ObjectExecutor, type ObjectReader, type ToolContribution, type MessagingHandle } from "@asterism-app/sdk/runtime";
 import type { ConnectionEvent, ConversationAddress, Json, MessagingConnectionInfo, MessagingMessage, ResourceRef } from "@asterism-app/sdk/contracts";
-import { Agent, SubmitAgentInput, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
+import { Agent, SubmitAgentInput, resourceEventText, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema, ConversationsView, ChatView,
   ConversationsList, ConversationsSubscribe, ConfigureSubscription, SubscriptionChanged, ChatRead, ChatSend,
@@ -21,20 +21,26 @@ import { conversationsCard, chatCard } from "../shared/card-appearance.ts";
 
 type ListTarget = { connectionId: string; since?: string } | null;
 const objectKey = (ref: ResourceRef) => JSON.stringify([ref.sessionId, ref.id]);
-const addressLines = (connectionId: string, address: ConversationAddress) => [
-  `connectionId: ${connectionId}`, `conversationId: ${address.conversationId}`,
-  ...(address.threadId ? [`threadId: ${address.threadId}`] : []),
-];
-const messageLines = (message: MessagingMessage) => [
-  `messageId: ${message.id}`, `sender: ${message.sender.name} (${message.sender.id}, ${message.sender.role})`, `sentAt: ${message.sentAt}`,
-  ...(message.replyTo ? [`replyTo: ${message.replyTo}`] : []),
-  ...(message.groupId ? [`groupId: ${message.groupId}`] : []),
-];
-/** Event metadata with addresses usable by tools; a Chat follows it with the message parts. */
-function eventText({ connectionId, event }: ConnectionEvent, includeMessages = true): string {
-  const location = [...addressLines(connectionId, event.conversation), `title: ${event.conversation.title}`, `kind: ${event.conversation.kind}`];
-  if (event.kind === "conversation.discovered") return ["Conversation discovered", ...location].join("\n");
-  return ["New messages", ...location, ...(includeMessages ? event.messages.flatMap(messageLines) : [])].join("\n");
+const messageMetadata = (message: MessagingMessage): Json => ({
+  id: message.id, sender: message.sender, sentAt: message.sentAt,
+  ...(message.replyTo ? { replyTo: message.replyTo } : {}), ...(message.groupId ? { groupId: message.groupId } : {}),
+});
+const escapeMarkdown = (text: string) => text.replace(/[\\*_`[\]<>#|]/gu, "\\$&");
+/**
+ * Frontmatter carries the addresses and message identities tools need; the body is what people read.
+ * A Conversations event summarizes who wrote; a Chat event has no body here and follows with each sender and message content.
+ */
+function eventText({ connectionId, event }: ConnectionEvent, chat: boolean): string {
+  const { conversation } = event;
+  const metadata = { event: event.kind, connectionId, conversationId: conversation.conversationId,
+    ...(conversation.threadId ? { threadId: conversation.threadId } : {}), kind: conversation.kind };
+  const title = `**${escapeMarkdown(conversation.title)}**`;
+  if (event.kind === "conversation.discovered") return resourceEventText(metadata, `New conversation ${title}`);
+  const messages = { messages: event.messages.map(messageMetadata) };
+  if (chat) return resourceEventText({ ...metadata, ...messages }, "");
+  const senders = [...new Set(event.messages.map(message => escapeMarkdown(message.sender.name)))].join(", ");
+  return resourceEventText({ ...metadata, ...messages },
+    `${title} · ${event.messages.length} new ${event.messages.length === 1 ? "message" : "messages"} from ${senders}`);
 }
 
 export default defineModule(plugin => {
@@ -107,10 +113,10 @@ export default defineModule(plugin => {
         if (recipient.ref.kind !== Agent.kind) continue;
         plugin.tasks.start(`messaging/${nanoid()}`, signal => plugin.content.withScope(async content => {
           const binding = source.kind === Chat.kind ? chatBinding(source) : null;
-          const parts: AgentInputPart[] = [{ kind: "text", text: eventText(event, !binding) }];
+          const parts: AgentInputPart[] = [{ kind: "text", text: eventText(event, !!binding) }];
           // Captured images are staged for this input only; its record retains them.
           if (binding && event.event.kind === "messages.received") parts.push(...await messageInputParts(event.event.messages.flatMap(message => [
-            { kind: "text" as const, text: messageLines(message).join("\n") }, ...chatMessageParts(chatMessage(source, message)),
+            { kind: "text" as const, text: `**${escapeMarkdown(message.sender.name)}**` }, ...chatMessageParts(chatMessage(source, message)),
           ]),
             async function* (part) { yield* openChatFile(await plugin.messaging.resolve(binding.connectionId, { signal }), binding, part.ref.locator, signal); },
             content, signal));

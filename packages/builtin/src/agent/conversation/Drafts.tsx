@@ -1,7 +1,7 @@
 import { useId, useState, useRef, useSyncExternalStore, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion, type MotionProps } from "motion/react";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { inputFileName } from "@asterism-app/builtin-api/contracts";
+import { displayInputParts, inputFileName } from "@asterism-app/builtin-api/contracts";
 import {
   GripVertical, Inbox, ChevronDown, Paperclip,
   ArrowDownToLine, ArrowLeftRight, Trash2, MoreHorizontal,
@@ -255,8 +255,9 @@ function DraftRow({
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const gripRef = useRef<HTMLButtonElement>(null);
 
-  const text = item.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
-  const files = item.parts.filter(p => p.kind !== "text");
+  const shown = displayInputParts(item);
+  const text = shown.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
+  const files = shown.filter(p => p.kind !== "text");
   const hasText = Boolean(text.trim());
 
   // Keyboard sorting (Alt+↑/↓ on grip)

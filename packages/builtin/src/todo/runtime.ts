@@ -6,7 +6,7 @@ import { defineModule, defineTopLevelTool, implementAction, implementCall, imple
   PluginApiError, type CallResult, type ObjectReader, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { Json, ResourceRef, ResourceSnapshot } from "@asterism-app/sdk/contracts";
 import { todoListCard } from "../shared/card-appearance.ts";
-import { TextError, readText, readToModel, editText, textChange, editToModel, writeToModel } from "../shared/text.ts";
+import { TextError, readText, editText, textChange, editToModel, writeToModel } from "../shared/text.ts";
 import { FilesystemError } from "../filesystem/errors.ts";
 import { BrowseTodoLists, CreateSharedTodoList, CreateTodoListResource, DeleteSharedTodoList, MutateTodo,
   ReadTodoItem, ReadTodoPage, TodoClaim, TodoComplete, TodoCreate, TodoDelete, TodoEdit, TodoGrep, TodoListItems,
@@ -15,7 +15,8 @@ import { actorKey, listCreationSchema, listDeletionSchema, todoListSchema, todoP
   type Actor, type TodoChange } from "./model.ts";
 import { TodoStore } from "./store.ts";
 import { grepTodos, todoGrepToModel } from "./search.ts";
-import { notificationRoutes, notificationText } from "./notifications.ts";
+import { notificationRoutes } from "./notifications.ts";
+import { listToModel, listsToModel, mutationToModel, notificationText, pageToModel, readTodoToModel } from "./format.ts";
 
 const user: Actor = { kind: "user" };
 const agent = (caller: ToolCaller): Actor => ({ kind: "agent", ref: { ...caller.ref }, title: caller.title });
@@ -122,13 +123,13 @@ export default defineModule(plugin => {
         id: BrowseTodoLists.id, name: "todo_lists", description: "List shared Todo lists available for connecting Todo List resources across sessions.",
         guidelines: ["Each list ID can be passed to the Todo List resource creation entry. Listing discovers external data; it does not connect a resource or grant that resource's tools."],
         argsSchema: z.strictObject({}).describe("Empty parameter object."), resultSchema: z.array(todoListSchema).describe("Existing shared lists with stable IDs, names, task counts, and completed-item retention settings."),
-        effect: "read", execution: "parallel", execute: (_args, { signal }) => result(signal, () => store.lists()),
+        effect: "read", execution: "parallel", execute: (_args, { signal }) => result(signal, () => store.lists()), toModel: listsToModel,
       }),
       defineTopLevelTool({
         id: CreateSharedTodoList.id, name: "todo_create_list", description: "Create a shared Todo list outside sessions and return its stable ID for resource connection.",
         guidelines: ["Creation does not create or connect a resource. Completed-item retention is opt-in: null retains all completed tasks. A configured count prunes oldest completions on task creation and completion, without Agent notifications."],
         argsSchema: listCreationSchema, resultSchema: todoListSchema.describe("The created shared list; its id can be used as listId when creating a Todo List resource."),
-        effect: "write", execution: "sequential", execute: (input, { signal }) => result(signal, () => store.createList(input)),
+        effect: "write", execution: "sequential", execute: (input, { signal }) => result(signal, () => store.createList(input)), toModel: listToModel,
       }),
       defineTopLevelTool({
         id: DeleteSharedTodoList.id, name: "todo_delete_list", description: "Delete a shared Todo list and its tasks, optionally transferring unfinished tasks to an existing list.",
@@ -136,18 +137,20 @@ export default defineModule(plugin => {
           "Connected resource entries retain their original binding and become unavailable, including in other sessions. Later operations fail with todo_list_not_found. Transfer is not task creation and sends no Agent notifications."],
         argsSchema: listDeletionSchema, resultSchema: DeleteSharedTodoList.output.describe("The deleted list ID and number of unfinished tasks transferred."),
         effect: "write", execution: "sequential", execute: (input, { signal }) => result(signal, () => store.deleteList(input)),
+        toModel: ({ deletedListId, transferred }) => `Deleted list ${deletedListId}${transferred ? `; transferred ${transferred} unfinished tasks` : ""}.`,
       }),
     ],
     tools: [
       implementTool(TodoListItems, {
         call: ({ listId }, target, _args, { caller, signal }) => result(signal, () => store.page(listId, target ?? todoPageSchema.parse({}), agent(caller))),
+        toModel: pageToModel,
       }),
       implementTool(TodoRead, {
         call: ({ listId }, { id, ...range }, _args, { signal }) => result(signal, () => {
           const { content, ...todo } = store.get(listId, id);
           return { todo, content: readText(content, range.anchored !== false, { offset: range.offset, limit: range.limit ?? 1000, maxBytes: 64 * 1024 }) };
         }),
-        toModel: ({ todo, content }) => `${JSON.stringify(todo)}\n\nContent\n${readToModel(content)}`,
+        toModel: readTodoToModel,
       }),
       implementTool(TodoWrite, {
         call: ({ listId }, { id }, { content }, { caller, signal }) => result(signal, () => {
@@ -179,12 +182,12 @@ export default defineModule(plugin => {
           return grepTodos(todos, args, target?.anchored !== false, signal);
         }), toModel: todoGrepToModel,
       }),
-      implementTool(TodoCreate, { call: ({ listId }, _target, input, { caller, signal }) => result(signal, () => store.create(listId, input, agent(caller))) }),
-      implementTool(TodoClaim, { call: ({ listId }, { id }, _args, { caller, signal }) => result(signal, () => store.claim(listId, id, agent(caller))) }),
-      implementTool(TodoRelease, { call: ({ listId }, { id }, _args, { caller, signal }) => result(signal, () => store.release(listId, id, agent(caller))) }),
-      implementTool(TodoComplete, { call: ({ listId }, { id }, { note }, { caller, signal }) => result(signal, () => store.complete(listId, id, note, agent(caller))) }),
-      implementTool(TodoReopen, { call: ({ listId }, { id }, _args, { caller, signal }) => result(signal, () => store.reopen(listId, id, agent(caller))) }),
-      implementTool(TodoDelete, { call: ({ listId }, { id }, _args, { signal }) => result(signal, () => store.delete(listId, id)) }),
+      implementTool(TodoCreate, { call: ({ listId }, _target, input, { caller, signal }) => result(signal, () => store.create(listId, input, agent(caller))), toModel: mutationToModel("Created") }),
+      implementTool(TodoClaim, { call: ({ listId }, { id }, _args, { caller, signal }) => result(signal, () => store.claim(listId, id, agent(caller))), toModel: mutationToModel("Claimed") }),
+      implementTool(TodoRelease, { call: ({ listId }, { id }, _args, { caller, signal }) => result(signal, () => store.release(listId, id, agent(caller))), toModel: mutationToModel("Released") }),
+      implementTool(TodoComplete, { call: ({ listId }, { id }, { note }, { caller, signal }) => result(signal, () => store.complete(listId, id, note, agent(caller))), toModel: mutationToModel("Completed") }),
+      implementTool(TodoReopen, { call: ({ listId }, { id }, _args, { caller, signal }) => result(signal, () => store.reopen(listId, id, agent(caller))), toModel: mutationToModel("Reopened") }),
+      implementTool(TodoDelete, { call: ({ listId }, { id }, _args, { signal }) => result(signal, () => store.delete(listId, id)), toModel: ({ deletedId }) => `Deleted ${deletedId}.` }),
     ],
   };
 });

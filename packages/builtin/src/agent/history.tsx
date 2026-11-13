@@ -1,7 +1,7 @@
 import { recordRenderer, useI18n, type RecordRenderer } from "@asterism-app/sdk/renderer";
 import { Brain, MessageSquareText, Wrench, Info } from "lucide-react";
 
-import { inputSummary, Execution, ToolExecution, AgentInputMessage, ContextSummary } from "@asterism-app/builtin-api/contracts";
+import { displayInputParts, inputSummary, Execution, ToolExecution, AgentInputMessage, ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { conversationMessages } from "../messages/conversation";
 import { messageAppearance, messageSenderLabel } from "./message-presentation";
@@ -31,7 +31,7 @@ export const agentRecordViews: RecordRenderer[] = [
       return <Icon className={data.sender.kind === "user" ? "size-4 text-primary-text" : "size-4"} />;
     },
     label: (data, context) => data.sender.kind === "user" ? inputSummary(data.parts)
-      : `${context.text(messageSenderLabel(data.sender))} · ${inputSummary(data.parts)}`,
+      : `${context.text(messageSenderLabel(data.sender))} · ${inputSummary(displayInputParts(data))}`,
     Row: ({ label }) => <RowText label={label} className="font-medium" />,
   }),
   recordRenderer(Execution, {

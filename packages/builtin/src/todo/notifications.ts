@@ -1,12 +1,6 @@
 import { Agent } from "@asterism-app/builtin-api/contracts";
 import type { ResourceSnapshot } from "@asterism-app/sdk/contracts";
-import { actorKey, type Actor, type TodoList, type TodoNotification } from "./model.ts";
-
-/** Resource events describe committed facts; recipients supply their own workflow. */
-export function notificationText(list: TodoList, { kind, todo, actor }: TodoNotification): string {
-  return JSON.stringify({ event: kind, list: { id: list.id, title: list.title },
-    todo: { id: todo.id, title: todo.title, status: todo.status, assignee: todo.assignee, completion: todo.completion }, actor });
-}
+import { actorKey, type Actor } from "./model.ts";
 
 /** One route per stable Agent identity, independent of titles or the number of exposed entrances. */
 export function notificationRoutes(

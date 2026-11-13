@@ -3,7 +3,7 @@ import type { VirtualizerHandle } from "virtua";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion, type Variants } from "motion/react";
 import { TableOfContents } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { inputFileName } from "@asterism-app/builtin-api/contracts";
+import { displayInputParts, inputFileName } from "@asterism-app/builtin-api/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@asterism-app/ui/ui/command";
@@ -77,8 +77,9 @@ export function ConversationNavigation({ timeline, scroll, list, onSelect, ref }
     const result: Chapter[] = [];
     timeline.forEach((item, index) => {
       if (item.kind !== "message") return;
-      const text = item.parts.filter(part => part.kind === "text").map(part => part.text).join("\n").trim();
-      const content = text || item.parts.filter(part => part.kind !== "text").map(inputFileName).join("\n");
+      const parts = displayInputParts(item);
+      const text = parts.filter(part => part.kind === "text").map(part => part.text).join("\n").trim();
+      const content = text || parts.filter(part => part.kind !== "text").map(inputFileName).join("\n");
       const number = result.length + 1;
       result.push({
         id: item.id, index, number,

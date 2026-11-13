@@ -14,6 +14,8 @@ Sender attribution explains where input came from independently of the Agent tha
 
 Keep the body useful as ordinary readable text. For example, a pull-request notification can state the repository, change, author, and URL. The integration understands those facts and should explain them; the receiving Agent's instructions supply its responsibilities. A domain event does not need a private machine payload disguised as a message.
 
+A resource event can separate the two audiences. Leading YAML frontmatter carries metadata of any shape for the receiving Agent, such as the event kind and the identifiers its tools accept; the Markdown after it is the message people read in the conversation, which hides the frontmatter. Put each fact where its reader needs it rather than repeating identifiers in prose or squeezing the readable summary into metadata. A body may be empty when the following parts already form the message, as when a chat event is followed by the received messages themselves.
+
 Use retained attachments when the message must preserve submitted bytes. Use file references when the message should carry an address for later consumption. Forwarding an address does not mean its content has been read or captured.
 
 ## Choose admission and scheduling intentionally

@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { cn } from "@asterism-app/ui/utils";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "@asterism-app/ui/markdown";
+import { displayInputParts } from "@asterism-app/builtin-api/contracts";
 import { ThinkingBlock } from "./ThinkingBlock";
 import { generating, mountedTimelineIndexes, timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";
@@ -111,8 +112,9 @@ function NodeContent({ node }: { node: TimelineItem }) {
 /** Attachments sit beside the text surface on the sender's side; a files-only message carries the landing highlight on its attachments. */
 function MessageNode({ node, content }: { node: Extract<TimelineItem, { kind: "message" }>; content: ContentReader }) {
   const user = node.sender.kind === "user";
-  const files = node.parts.filter((part): part is InputFile => part.kind !== "text");
-  const texts = node.parts.flatMap(part => part.kind === "text" && part.text ? [part.text] : []);
+  const parts = displayInputParts(node);
+  const files = parts.filter((part): part is InputFile => part.kind !== "text");
+  const texts = parts.flatMap(part => part.kind === "text" && part.text ? [part.text] : []);
   return <article data-conversation-message={node.id}
     className={cn("flex min-w-0 max-w-[92%] flex-col gap-1.5", user ? "ml-auto items-end" : "mr-auto items-start")}>
     <MessageSender sender={node.sender} />

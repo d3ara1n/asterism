@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { Agent, SubmitAgentInput } from "@asterism-app/builtin-api/contracts";
+import { Agent, SubmitAgentInput, resourceEventText } from "@asterism-app/builtin-api/contracts";
 import type { DataContract, Json, ResourceContract } from "@asterism-app/sdk/contracts";
 import { defineModule, implementAction, implementCreation, implementResource, implementTool, PluginApiError,
   type CallResult, type Lifetime, type ObjectExecutor, type ObjectReader, type PluginContext, type ResourceRef, type ResourceSnapshot } from "@asterism-app/sdk/runtime";
@@ -32,7 +32,9 @@ async function scheduleResult<T extends Json>(signal: AbortSignal, work: () => T
 }
 
 /** State advances before independent submissions; recipient execution and delivery outcomes do not control the schedule. */
-function deliver(plugin: PluginContext, source: ResourceSnapshot, recipients: readonly ResourceSnapshot[], message: string): void {
+function deliver(plugin: PluginContext, source: ResourceSnapshot, recipients: readonly ResourceSnapshot[], body: string, at: number): void {
+  // The configured message is the readable body; the frontmatter records which schedule fired and for which occurrence.
+  const message = resourceEventText({ event: source.ref.kind === Timer.kind ? "timer.expired" : "alarm.due", scheduledAt: new Date(at).toISOString() }, body);
   for (const recipient of recipients) {
     if (recipient.ref.kind !== Agent.kind) continue;
     plugin.tasks.start(`schedule:${source.ref.id}:${nanoid(16)}`, signal =>
@@ -71,7 +73,7 @@ export default defineModule(plugin => {
     if (!next) { update(ref, state.nextAt); return; }
     object.commit(writer => { writer.set(contract, next); });
     update(ref, next.nextAt);
-    deliver(plugin, source, snapshot.resources.linkedTo(ref), state.message);
+    deliver(plugin, source, snapshot.resources.linkedTo(ref), state.message, state.nextAt!);
   }
   function wake(ref: ResourceRef) {
     // A failed occurrence leaves this resource stopped; other resources retain their deadlines.

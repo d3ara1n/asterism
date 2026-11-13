@@ -48,6 +48,7 @@ export const todoPageResultSchema = z.strictObject({
 export type Actor = z.infer<typeof actorSchema>;
 export type ActorIdentity = z.infer<typeof actorIdentitySchema>;
 export type Todo = z.infer<typeof todoSchema>;
+export type TodoSummary = z.infer<typeof todoSummarySchema>;
 export type TodoList = z.infer<typeof todoListSchema>;
 export type TodoFilter = z.infer<typeof todoFilterSchema>;
 export type TodoPage = z.infer<typeof todoPageSchema>;

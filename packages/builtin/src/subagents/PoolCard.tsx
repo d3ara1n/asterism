@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
-import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { VList } from "virtua";
 import { ArrowLeft, CircleSlash, Send, Square } from "lucide-react";
 import { useI18n, useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
@@ -14,6 +14,7 @@ import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
 import { Markdown } from "@asterism-app/ui/markdown";
 import { Disclosure } from "../agent/conversation/Disclosure";
+import { SlidePage } from "../shared/slide-page";
 import { subagentMessages as messages } from "../messages/subagents";
 import { PoolChannel, CancelSubagent, SteerSubagent, type FinishedStatus, type TaskSnapshot, type TaskSummary, type ProcessFrame } from "./contract";
 import { ActivityList, InstructionList } from "./ActivityTail";
@@ -178,26 +179,6 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
   </div>;
 }
 
-const pageVariants = {
-  enter: (direction: number) => ({ opacity: 0, x: direction * 8 }),
-  center: { opacity: 1, x: 0, transition: { duration: 0.18, ease: [0, 0, 0.2, 1] } },
-  exit: (direction: number) => ({
-    opacity: 0, x: direction * -8, transition: { duration: 0.1, ease: [0.4, 0, 1, 1] },
-  } as const),
-} as const;
-
-function PoolPage({ children, direction, ref }: { children: ReactNode; direction: number; ref?: Ref<HTMLDivElement> }) {
-  const present = useIsPresent();
-  const reducedMotion = useReducedMotion();
-  return <motion.div ref={ref} inert={!present} custom={direction}
-    variants={pageVariants} initial={reducedMotion ? false : "enter"}
-    animate={reducedMotion ? { opacity: 1, x: 0, transition: { duration: 0 } } : "center"}
-    exit={reducedMotion ? { opacity: 0, x: 0, transition: { duration: 0 } } : "exit"}
-    className="flex min-h-0 min-w-0 flex-1 flex-col">
-    {children}
-  </motion.div>;
-}
-
 export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
   const object = useRendererObject(), i18n = useI18n();
   const retained = object.retained.get("asterism.builtin/subagent-selection", () => ({ id: null as string | null }));
@@ -213,7 +194,7 @@ export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
   const queued = data.tasks.filter(task => task.status.phase === "queued").length;
   return <div className="nodrag nopan relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     <AnimatePresence initial={false} mode="popLayout" custom={direction.current}>
-      <PoolPage key={selected ? `task:${selected}` : "list"} direction={direction.current}>
+      <SlidePage key={selected ? `task:${selected}` : "list"} direction={direction.current}>
         {selected ? <TaskDetail id={selected} back={() => select(null)} focus={opened} /> : <>
           <p className="type-caption px-3 py-2" role="status" aria-atomic="true">{i18n.formatMessage(messages.active, { running, queued })}</p>
           {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VList data={data.tasks.toReversed()}>{task =>
@@ -224,7 +205,7 @@ export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
                 actions={<TaskStatus status={task.status} />} />}</VList></ItemGroup>
             : <p className="type-caption p-3">{i18n.text(messages.empty)}</p>}
         </>}
-      </PoolPage>
+      </SlidePage>
     </AnimatePresence>
   </div>;
 }
