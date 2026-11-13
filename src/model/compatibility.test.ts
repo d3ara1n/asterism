@@ -10,6 +10,7 @@ import { projectSystemPrompt } from "./system-prompt.ts";
 import type { ModelInput } from "./contract.ts";
 import { mergeModelCompatibility, type ModelCompatibility } from "../shared/model-compatibility.ts";
 import { requestOptions } from "./request-options.ts";
+import { modelInputSchema } from "../shared/configuration.ts";
 
 function input(protocol: ModelInput["settings"]["provider"]["protocol"] = "openai-responses"): ModelInput {
   return {
@@ -133,15 +134,28 @@ describe("Reasoning level and budget mappings", () => {
     }
   });
 
-  // Reject excessive budgets before HTTP transmission and retain explicit host errors rather than misleading network errors.
-  it.each([{ limit: 8192, budget: 8192 }, { limit: 1000, budget: undefined }])(
-    "rejects sending when the Anthropic budget cannot fit output limit $limit", async ({ limit, budget }) => {
+  // Endpoint acceptance is not inferred from Anthropic's public budget rules, including on compatible services.
+  it.each([{ limit: 8192, budget: 8192, expected: 8192 }, { limit: 1000, budget: undefined, expected: 1024 }, { limit: 1000, budget: 128, expected: 128 }])(
+    "sends the manual budget unchanged with output limit $limit and budget $budget", async ({ limit, budget, expected }) => {
       const current = input("anthropic");
       current.settings.model.generation.maxOutputTokens = limit;
       if (budget !== undefined) current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: budget } }];
-      let sent = false;
-      await expect(request(current, () => { sent = true; })).rejects.toMatchObject({ code: "thinking_budget_unavailable" });
-      expect(sent).toBe(false);
+      current.settings.model = modelInputSchema.parse(current.settings.model);
+      expect(await request(current)).toMatchObject({ max_tokens: limit, thinking: { type: "enabled", budget_tokens: expected } });
+    });
+
+  // Exercise configuration validation and SDK serialization: neither may substitute common provider limits for explicit values.
+  it.each((["openai-responses", "openai-chat", "anthropic"] as const).flatMap(protocol =>
+    ([null, "off", "low"] as const).map(thinking => ({ protocol, thinking }))))(
+    "$protocol transmits configured sampling and million-token output limits with thinking=$thinking", async ({ protocol, thinking }) => {
+      const current = input(protocol);
+      current.settings.model.modelId = protocol === "anthropic" ? "claude-sonnet-4-5" : "gpt-5.1";
+      current.settings.model.generation = { temperature: 3, topP: 2, maxOutputTokens: 1_000_000 };
+      current.settings.model = modelInputSchema.parse(current.settings.model);
+      current.settings.thinking = thinking;
+      const body = await request(current);
+      expect(body).toMatchObject({ temperature: 3, top_p: 2 });
+      expect(body.max_output_tokens ?? body.max_completion_tokens ?? body.max_tokens).toBe(1_000_000);
     });
 
   // Streaming and non-streaming SDK calls share the budget contract; minimal connection probes do not enable reasoning.

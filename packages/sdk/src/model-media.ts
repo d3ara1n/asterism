@@ -7,5 +7,3 @@ export function fileMediaType(file: { type: string; name: string }): string {
 }
 /** A derived classification for UI display, not a model capability. */
 export const previewsAsImage = (mediaType: string) => mediaType.startsWith("image/");
-/** Client resource limits: per-file size, count, and total size leave room for protocol envelopes and base64. */
-export const modelInputLimits = { file: 5 * 1024 * 1024, files: 20, total: 20 * 1024 * 1024 } as const;

@@ -2,7 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import type { ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { ModelFailure } from "../contract.ts";
 import { thinkingMappings, type ThinkingMappings } from "../compatibility.ts";
-import { mappedEffort, requestObject, setEffort, withThinkingEncoding, type Body } from "../thinking-options.ts";
+import { mappedEffort, requestObject, setEffort, withRequestEncoding, type Body } from "../request-encoding.ts";
 import { namespaced, pickNative, type ModelProtocol, type ProviderOptions } from "./contract.ts";
 import { withAnthropicThinking } from "./anthropic-thinking.ts";
 import { anthropicUsage } from "./anthropic-usage.ts";
@@ -10,14 +10,16 @@ import { anthropicUsage } from "./anthropic-usage.ts";
 type ActiveLevel = Exclude<ThinkingLevel, "off">;
 const nativeKeys = ["signature", "redactedData"] as const;
 
-/** Allocate manual budgets against the final total output limit, with a minimum of 1024; explicit overrides are always absolute token counts. */
+/** Default manual budgets use the total output limit with a 1024-token floor; explicit overrides are sent unchanged. */
 const budgetRatios: Record<ActiveLevel, number> = {
   minimal: 0.02, low: 0.1, medium: 0.3, high: 0.6, xhigh: 0.9, max: 0.95,
 };
 const defaultManualOutputTokens = 4096;
 
 /** The SDK still identifies Anthropic model reasoning modes; Asterism owns effort and manual-budget mappings. */
-function encodeThinking(body: Body, level: ThinkingLevel, maxOutputTokens: number | undefined, mappings: ThinkingMappings) {
+function encodeRequest(body: Body, level: ThinkingLevel | null, maxOutputTokens: number | undefined, mappings: ThinkingMappings) {
+  if (maxOutputTokens !== undefined) body.max_tokens = maxOutputTokens;
+  if (level === null) return;
   const customEffort = mappings.levels[level];
   if (level === "off") {
     // Do not accept SDK replacement of off with low effort or between_tools; unsupported endpoints reject it themselves.
@@ -31,8 +33,6 @@ function encodeThinking(body: Body, level: ThinkingLevel, maxOutputTokens: numbe
     // Do not infer limits from max_tokens after the SDK adds budgets; the host fixes defaults too.
     const limit = maxOutputTokens ?? defaultManualOutputTokens;
     const budget = mappings.budgets[level] ?? Math.max(1024, Math.floor(limit * budgetRatios[level]));
-    if (!Number.isSafeInteger(budget) || budget < 1024 || budget >= limit)
-      throw new ModelFailure("thinking_budget_unavailable", "The thinking budget must be at least 1024 tokens and smaller than the output token limit. Adjust the budget or output limit.");
     body.thinking = { ...thinking, budget_tokens: budget };
     // The SDK adds reasoning budgets to max_tokens; Asterism's limit includes reasoning and must not expand.
     body.max_tokens = limit;
@@ -45,7 +45,6 @@ function encodeThinking(body: Body, level: ThinkingLevel, maxOutputTokens: numbe
     throw new ModelFailure("protocol_encoding", "The Messages encoder returned an unsupported thinking mode.");
   // Messages has no minimal effort; the nearest supported value is low.
   setEffort(body, "output_config", mappedEffort(level, mappings, { minimal: "low" }));
-  if (maxOutputTokens !== undefined) body.max_tokens = maxOutputTokens;
 }
 
 export const anthropicMessages: ModelProtocol = {
@@ -55,10 +54,10 @@ export const anthropicMessages: ModelProtocol = {
   toolResultFiles: () => "content",
   createModel(target, connection) {
     const mappings = thinkingMappings(target);
-    return withThinkingEncoding(
+    return withRequestEncoding(
       transport => withAnthropicThinking(fetch => createAnthropic({ ...connection, fetch }).messages(target.model.modelId), transport),
       connection.fetch,
-      (body, level, maxOutputTokens) => encodeThinking(body, level, maxOutputTokens, mappings),
+      (body, level, maxOutputTokens) => encodeRequest(body, level, maxOutputTokens, mappings),
     );
   },
   callOptions: (_target, request) => ({

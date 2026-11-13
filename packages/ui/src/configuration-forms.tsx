@@ -30,14 +30,14 @@ export function TextField({ label, value, onChange, multiline = false, required 
   </Field>;
 }
 export function NumberField({ label, value, onChange, min = 0, max, integer = false, placeholder, onReset, onClear, clearLabel }: {
-  label: string; value: number | null; onChange: (value: number | null) => void; min?: number; max?: number; integer?: boolean;
+  label: string; value: number | null; onChange: (value: number | null) => void; min?: number | null; max?: number; integer?: boolean;
   placeholder?: string; onReset?: () => void; onClear?: () => void; clearLabel?: string;
 }) {
   const i18n = useI18n();
   const id = useId();
   // InputGroup composition: remove native stepper arrows and place reset/clear as additional buttons inside the input.
   return <Field><FieldLabel htmlFor={id}>{label}</FieldLabel><InputGroup>
-    <InputGroupInput id={id} type="number" inputMode={integer ? "numeric" : "decimal"} value={value ?? ""} min={min} max={max} step={integer ? 1 : "any"}
+    <InputGroupInput id={id} type="number" inputMode={integer ? "numeric" : "decimal"} value={value ?? ""} min={min ?? undefined} max={max} step={integer ? 1 : "any"}
       className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
       placeholder={placeholder ?? i18n.formatMessage(formsMessages.default)} onChange={event => onChange(event.target.value === "" ? null : Number(event.target.value))} />
     {(onReset || onClear) && <InputGroupAddon align="inline-end">

@@ -12,6 +12,5 @@ export const mediaMessages = builtin.messages("en", defineMessages({
   uploading: { id: "media.attachments.uploading", defaultMessage: "Adding files…" },
   cancel: { id: "media.attachments.cancelUpload", defaultMessage: "Cancel upload" },
   unavailable: { id: "media.preview.unavailable", defaultMessage: "Preview unavailable" },
-  limit: { id: "media.attachments.limitExceeded", defaultMessage: "The files exceed the message size or file count limit." },
   failed: { id: "media.attachments.addFailed", defaultMessage: "The file could not be added. Try again." },
 }));

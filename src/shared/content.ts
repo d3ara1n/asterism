@@ -3,8 +3,6 @@ import { contentRefSchema, fileRefSchema } from "@asterism-app/sdk/contracts";
 
 /** Per-chunk transfer limit; chunk acknowledgments provide backpressure. */
 export const contentChunkSize = 1024 * 1024;
-/** Per-read limit; larger content uses open or range reads. */
-export const contentReadLimit = 16 * 1024 * 1024;
 const id = z.string().uuid();
 const identity = z.string().min(1).max(160);
 export const contentTargetSchema = z.discriminatedUnion("kind", [

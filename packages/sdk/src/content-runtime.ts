@@ -1,7 +1,7 @@
 import type { ContentRef, ContentRange } from "./content.ts";
 import type { Json } from "./json.ts";
 
-/** Individual reads have a size limit; large content uses bounded byte chunks through open. */
+/** Read complete content or a byte range; open streams the selected bytes in chunks. */
 export interface ContentReader {
   read(ref: ContentRef, range?: ContentRange): Promise<Uint8Array>;
   open(ref: ContentRef, range?: ContentRange): AsyncIterable<Uint8Array>;

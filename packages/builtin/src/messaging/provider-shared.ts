@@ -44,22 +44,19 @@ export function messageObserver(store: ObservedMessages, publish: (event: Messag
 }
 
 /** Resolve every file before any message is sent. File references remain owned by their original resource. */
-export async function messagingFiles(plugin: Pick<PluginContext, "files">, files: readonly FileReferencePart[], signal: AbortSignal,
-  limit?: { bytes: number; label: string }) {
+export async function messagingFiles(plugin: Pick<PluginContext, "files">, files: readonly FileReferencePart[], signal: AbortSignal) {
   return Promise.all(files.map(async file => {
     try {
       const chunks: Uint8Array[] = [];
       let size = 0;
       for await (const chunk of plugin.files.open(file.ref, { signal })) {
         size += chunk.byteLength;
-        if (limit && size > limit.bytes) throw new MessagingError("invalid_input", `File '${file.filename ?? "file"}' exceeds ${limit.label}.`);
         chunks.push(chunk);
       }
       signal.throwIfAborted();
       return { name: file.filename ?? "file", mediaType: fileMediaType({ name: file.filename ?? "", type: file.mediaType ?? "" }), bytes: Buffer.concat(chunks, size) };
     } catch (error) {
       signal.throwIfAborted();
-      if (error instanceof MessagingError && error.code === "invalid_input") throw error;
       throw new MessagingError("invalid_input", `File '${file.filename ?? "file"}' could not be read: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
     }
   }));

@@ -305,7 +305,6 @@
   "media.attachments.uploading": "正在添加文件…",
   "media.attachments.cancelUpload": "取消上传",
   "media.preview.unavailable": "预览不可用",
-  "media.attachments.limitExceeded": "文件数量或大小超过消息限额。",
   "media.attachments.addFailed": "无法添加文件，请重试。",
   "media.file.save": "保存文件",
   "media.file.saveAs": "另存为…",

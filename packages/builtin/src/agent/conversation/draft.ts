@@ -1,4 +1,4 @@
-import { type ContentRef, type UiText, fileMediaType, modelInputLimits } from "@asterism-app/sdk/contracts";
+import { type ContentRef, type UiText, fileMediaType } from "@asterism-app/sdk/contracts";
 import type { AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import type { RendererContentInput, ContentReader } from "@asterism-app/sdk/renderer";
 import { mediaMessages } from "../../messages/media.ts";
@@ -69,22 +69,13 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
     },
     async add(files: readonly File[]) {
       if (state.locked || state.uploading || !files.length) return;
-      // Admit the prefix that fits the limits up front, so every accepted file shows its card at once.
-      let count = state.files.filter(file => file.part.kind === "file").length;
-      let total = state.files.reduce((sum, file) => sum + file.size, 0);
-      const accepted: { entry: PendingFile; file: File }[] = [];
-      for (const file of files) {
-        if (count >= modelInputLimits.files || file.size > modelInputLimits.file || total + file.size > modelInputLimits.total) break;
-        count++; total += file.size;
-        // Label MIME accurately; the server decides how files are used.
-        accepted.push({ file, entry: { id: nextFileId++, name: file.name, mediaType: fileMediaType(file), size: file.size } });
-      }
-      const limit = accepted.length < files.length ? mediaMessages.limit : null;
-      if (!accepted.length) { change({ error: limit }); return; }
+      const pending = files.map(file => ({
+        file, entry: { id: nextFileId++, name: file.name, mediaType: fileMediaType(file), size: file.size },
+      }));
       const current: Upload = { cancelled: false, staging: null }; upload = current;
-      change({ uploading: true, uploads: accepted.map(item => item.entry), error: limit });
+      change({ uploading: true, uploads: pending.map(item => item.entry), error: null });
       try {
-        for (const { entry, file } of accepted) {
+        for (const { entry, file } of pending) {
           if (current.cancelled) break;
           if (!state.uploads.some(item => item.id === entry.id)) continue;
           const controller = new AbortController(); current.staging = { id: entry.id, controller };

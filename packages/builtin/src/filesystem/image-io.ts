@@ -2,7 +2,6 @@ import { readFile, stat } from "node:fs/promises";
 import { TextError } from "../shared/text.ts";
 import { FilesystemError, failed } from "./errors.ts";
 import { withinDirectory } from "./paths.ts";
-import { modelInputLimits } from "@asterism-app/sdk/contracts";
 
 /** Identifies images by file headers without trusting extensions; nonimages are not returned as tool files. */
 export function imageMediaType(bytes: Uint8Array): string | null {
@@ -18,9 +17,7 @@ export async function readImageFile(root: string, rel: string, signal: AbortSign
   const path = await withinDirectory(root, rel);
   const info = await stat(path);
   if (!info.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular image file."));
-  if (info.size > modelInputLimits.file) throw new TextError("file_too_large", "The image exceeds the 5 MiB limit. Choose a smaller image.");
   const bytes = new Uint8Array(await readFile(path, { signal }));
-  if (bytes.length > modelInputLimits.file) throw new TextError("file_too_large", "The image exceeds the 5 MiB limit. Choose a smaller image.");
   const mediaType = imageMediaType(bytes);
   if (!mediaType) throw new TextError("unsupported_image", "Supported image formats are PNG, JPEG, GIF, and WebP.");
   return { bytes, mediaType };

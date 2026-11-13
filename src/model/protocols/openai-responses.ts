@@ -1,7 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { ModelFailure, type ModelEvent } from "../contract.ts";
 import { compatibility, thinkingMappings, type CompatibilityTarget } from "../compatibility.ts";
-import { mappedEffort, setEffort, withThinkingEncoding } from "../thinking-options.ts";
+import { mappedEffort, setEffort, withRequestEncoding } from "../request-encoding.ts";
 import { bearerHeaders, namespaced, pickNative, type ModelProtocol, type ProviderOptions } from "./contract.ts";
 import { withResponsesReasoning } from "./responses-reasoning.ts";
 
@@ -72,10 +72,10 @@ export const openaiResponses: ModelProtocol = {
     const fields = responsesFields(target);
     const mappings = thinkingMappings(target);
     const responses = (fetch: typeof connection.fetch) => createOpenAI({ ...connection, fetch }).responses(target.model.modelId);
-    return withThinkingEncoding(
+    return withRequestEncoding(
       transport => withResponsesReasoning(responses, transport, fields),
       connection.fetch,
-      (body, level) => setEffort(body, "reasoning", mappedEffort(level, mappings)),
+      (body, level) => { if (level !== null) setEffort(body, "reasoning", mappedEffort(level, mappings)); },
     );
   },
   callOptions(target, request) {

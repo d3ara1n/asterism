@@ -113,9 +113,8 @@ export function telegramError(error: unknown): unknown {
 }
 const call = providerCall(telegramError);
 
-const mediaGroupLimit = 10;
-/** Bot API upload limits: photos up to 10 MB, other files up to 50 MB. */
-const photoLimit = 10 * 1024 * 1024, fileLimit = 50 * 1024 * 1024;
+/** Select the photo endpoint for still images within its size range; other files use the document endpoint. */
+const photoLimit = 10 * 1024 * 1024;
 const photoTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const extensionTypes: Readonly<Record<string, string>> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp" };
 /** Still images within the photo limit are sent as photos; other content, including GIFs, is sent as a document. */
@@ -197,9 +196,8 @@ export function telegramProvider(plugin: PluginContext): MessagingProviderDefini
           };
           const caption = text ? { caption: text, parse_mode: "HTML" as const } : {};
           const files = input.files;
-          if (files.length > mediaGroupLimit) throw new MessagingError("invalid_input", `Telegram sends at most ${mediaGroupLimit} files in one message.`);
           // Files are read before the request, so a missing source fails without sending anything.
-          const resolved = await messagingFiles(plugin, files, signal, { bytes: fileLimit, label: "Telegram's 50 MB upload limit" });
+          const resolved = await messagingFiles(plugin, files, signal);
           const uploads = resolved.map(file => ({
             file: new InputFile(file.bytes, file.name),
             photo: telegramSendsPhoto({ filename: file.name, mediaType: file.mediaType }, file.bytes.length),

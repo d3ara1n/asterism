@@ -23,7 +23,7 @@ const customThinkingLevelsSchema = z.strictObject(Object.fromEntries(thinkingLev
   }),
 ]))) as z.ZodObject<{ [Level in ThinkingLevel]: z.ZodOptional<z.ZodNullable<z.ZodString>> }>;
 const customThinkingBudgetsSchema = z.strictObject(Object.fromEntries(activeThinkingLevels.map(level => [
-  level, z.number().int().min(1024).max(Number.MAX_SAFE_INTEGER).optional().meta({
+  level, z.number().int().positive().optional().meta({
     title: level,
     description: "Thinking tokens for manual-budget models. Unset uses the built-in budget; does not enable manual thinking.",
   }),

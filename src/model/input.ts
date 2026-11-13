@@ -1,10 +1,9 @@
-import { modelInputPartsSchema, type ContentRef, type ModelInputPart, type ModelItem, modelInputLimits } from "@asterism-app/sdk/contracts";
+import { modelInputPartsSchema, type ContentRef, type ModelInputPart, type ModelItem } from "@asterism-app/sdk/contracts";
 import type { ContentReader } from "@asterism-app/sdk/runtime";
 import { ModelFailure, type ResolvedInputPart, type ResolvedModelItem } from "./contract.ts";
 
 export interface ModelContent {
   reader: ContentReader;
-  sizes: ReadonlyMap<string, number>;
   close(): Promise<void>;
 }
 /** User input, context, and tool results share text | file parts. */
@@ -20,24 +19,9 @@ export function inputReferences(messages: readonly ModelItem[]): ContentRef[] {
     return parsed.data.flatMap(part => part.kind === "file" ? [part.file] : []);
   });
 }
-export function validateInput(messages: readonly ModelItem[], content?: ModelContent): void {
-  inputReferences(messages);
-  let count = 0, total = 0;
-  for (const item of messages) {
-    for (const part of itemParts(item) ?? []) {
-      if (part.kind === "text") continue;
-      const size = content?.sizes.get(part.file["$asterism.content"]);
-      if (size === undefined) throw new ModelFailure("content_scope", "The model input requires an authorized content reader.");
-      total += size; count++;
-      if (size > modelInputLimits.file || total > modelInputLimits.total || count > modelInputLimits.files)
-        throw new ModelFailure("content_limit", "The model input exceeds the file count or size limit.");
-    }
-  }
-}
 /** Generate byte parts only within model requests without creating another persistent context. */
 export async function resolveInput(messages: readonly ModelItem[], content: ModelContent | undefined,
   signal: AbortSignal): Promise<ResolvedModelItem[]> {
-  validateInput(messages, content);
   const result: ResolvedModelItem[] = [];
   const bytes = new Map<string, Uint8Array>();
   for (const item of messages) {

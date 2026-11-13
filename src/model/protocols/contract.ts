@@ -3,7 +3,7 @@ import type { wrapLanguageModel } from "ai";
 import type { ProtocolTarget } from "../compatibility.ts";
 import type { ModelEvent, ModelValidationInput } from "../contract.ts";
 import { jsonSchema, type Json, type Usage } from "../../shared/model.ts";
-import type { LanguageModelV4 } from "../thinking-options.ts";
+import type { LanguageModelV4 } from "../request-encoding.ts";
 
 export type ProviderOptions = Record<string, Record<string, Json>>;
 export type ProviderPart = Awaited<ReturnType<ReturnType<typeof wrapLanguageModel>["doStream"]>>["stream"] extends ReadableStream<infer Part> ? Part : never;

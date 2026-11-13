@@ -379,8 +379,8 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
         </FieldSet>
         <FieldGroup>
           <NumberField label={i18n.formatMessage(providersMessages.contextWindow)} value={value.contextWindow} onChange={next => set("contextWindow", next)} min={1} integer />
-          <NumberField label={i18n.formatMessage(providersMessages.temperature)} value={value.generation.temperature} onChange={next => set("generation", { ...value.generation, temperature: next })} max={2} />
-          <NumberField label="Top P" value={value.generation.topP} onChange={next => set("generation", { ...value.generation, topP: next })} max={1} />
+          <NumberField label={i18n.formatMessage(providersMessages.temperature)} value={value.generation.temperature} onChange={next => set("generation", { ...value.generation, temperature: next })} min={null} />
+          <NumberField label="Top P" value={value.generation.topP} onChange={next => set("generation", { ...value.generation, topP: next })} min={null} />
           <NumberField label={i18n.formatMessage(providersMessages.maximumOutputTokens)} value={value.generation.maxOutputTokens} onChange={next => set("generation", { ...value.generation, maxOutputTokens: next })} min={1} integer />
         </FieldGroup>
       </EditorSection>

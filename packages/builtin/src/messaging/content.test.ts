@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { modelInputLimits, pluginNamespace, type MessagingMessage } from "@asterism-app/sdk/contracts";
+import { pluginNamespace, type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { definePlugin, type PluginContext } from "@asterism-app/sdk/runtime";
 import { BuiltinApplicationService } from "../testing.ts";
 import { Chat, CreateChat, ReadChat, chatMessageListSchema, type ChatFilePart } from "./contract.ts";
@@ -86,18 +86,6 @@ describe("Chat attachment content", () => {
     expect(projected.some(part => part.kind === "file")).toBe(false);
     expect(projected.some(part => part.kind === "text" && part.text.includes('"messageId":"message"'))).toBe(true);
   });
-  it("stops capture at the model file limit and keeps the reference with the reason", async () => {
-    const f = await setup();
-    f.source.bytes = Buffer.concat([png, Buffer.alloc(modelInputLimits.file)]);
-    const { parts } = await f.input();
-    expect(parts.slice(1)).toMatchObject([{ kind: "file-reference", ref: { source: f.object } }, { kind: "text", text: expect.stringContaining("size limit") }]);
-  });
-  it("does not fetch an image whose declared size already exceeds the limit", async () => {
-    const f = await setup(), [text, file] = f.message.parts;
-    const { parts } = await f.input([{ ...f.message, parts: [text!, { ...file!, size: modelInputLimits.file + 1 } as typeof file & object] }]);
-    expect(parts.slice(1).map(part => part.kind)).toEqual(["file-reference", "text"]);
-    expect(f.opened()).toBe(0);
-  });
   it("keeps the reference and states the failure when retrieval fails or the bytes are not a supported image", async () => {
     const f = await setup();
     f.source.error = "Attachment removed";
@@ -105,14 +93,13 @@ describe("Chat attachment content", () => {
     delete f.source.error; f.source.bytes = Buffer.from("not an image");
     expect((await f.input()).parts.slice(1)).toMatchObject([{ kind: "file-reference" }, { kind: "text", text: expect.stringContaining("supported image") }]);
   });
-  it("shares the input image count across messages in one batch and keeps each file's message identity", async () => {
+  it("captures images across a batch without dropping later files or losing message identity", async () => {
     const f = await setup();
-    const values = Array.from({ length: modelInputLimits.files + 1 }, (_, index) => ({ ...f.message, id: `item-${index}` }));
+    const values = Array.from({ length: 21 }, (_, index) => ({ ...f.message, id: `item-${index}` }));
     const { parts } = await f.input(values);
-    expect(parts.filter(part => part.kind === "file")).toHaveLength(modelInputLimits.files);
-    expect(f.opened()).toBe(modelInputLimits.files);
-    expect(parts.find(part => part.kind === "file-reference")).toMatchObject({
-      ref: { locator: { messageId: `item-${modelInputLimits.files}`, fileId: "image" } },
-    });
+    expect(parts.filter(part => part.kind === "file")).toHaveLength(21);
+    expect(f.opened()).toBe(21);
+    expect(parts.flatMap(part => part.kind === "file" ? [part.ref?.locator] : []))
+      .toEqual(values.map(value => ({ messageId: value.id, fileId: "image" })));
   });
 });

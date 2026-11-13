@@ -6,10 +6,8 @@ import type { DatabaseSync } from "node:sqlite";
 import { applicationStorage } from "../shared/application.ts";
 import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type Json } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ContentReader, type ContentScope } from "@asterism-app/sdk/runtime";
-import { contentChunkSize, contentReadLimit, sameContentTarget, type ContentTarget } from "../shared/content.ts";
+import { contentChunkSize, sameContentTarget, type ContentTarget } from "../shared/content.ts";
 
-/** Host implementation parameters: 1 MiB per chunk, 256 MiB per content item, 1 GiB temporary total, 16 MiB per read. */
-export const contentLimits = { chunk: contentChunkSize, read: contentReadLimit, file: 256 * 1024 * 1024, temporary: 1024 * 1024 * 1024, scopes: 128, uploads: 16 } as const;
 export const contentSchemaSql = `
   CREATE TABLE contents (id TEXT PRIMARY KEY, digest TEXT NOT NULL UNIQUE, size INTEGER NOT NULL) STRICT;
   CREATE TABLE content_roots (
@@ -30,7 +28,6 @@ export interface ContentAccess { owner?: string; sessionId?: string; objectId?: 
 export type { ContentTarget } from "../shared/content.ts";
 export interface CapturedContent {
   reader: ContentReader;
-  sizes: ReadonlyMap<string, number>;
   close(): Promise<void>;
 }
 interface Stored { id: string; size: number; digest: string }
@@ -132,17 +129,9 @@ export class ContentStore {
       this.candidates.add(id);
     this.collect();
   }
-  /** Total sealed content without roots; recalculate only when roots or content sets change, without scanning the table for every chunk write. */
-  private unrooted?: number;
-  private unrootedSize(): number {
-    return this.unrooted ??= (this.db.prepare(`SELECT COALESCE(SUM(size), 0) AS size FROM contents
-      WHERE NOT EXISTS (SELECT 1 FROM content_roots r WHERE r.content_id = contents.id)
-      AND NOT EXISTS (SELECT 1 FROM template_content_roots r WHERE r.content_id = contents.id)`).get() as { size: number }).size;
-  }
   private path(id: string): string { return join(this.root, applicationStorage.sealedContentDirectory, id); }
   scope(target?: ContentTarget): ContentLease {
     if (this.closed) unavailable("The content store is closed.");
-    if (this.leases.size >= contentLimits.scopes) invalid("Too many active content inputs.");
     const scope = new ContentLease(this, target && { ...target });
     this.leases.set(scope.id, scope); return scope;
   }
@@ -171,7 +160,7 @@ export class ContentStore {
     for (const id of [...this.candidates]) {
       if (this.pins.has(id)) continue;
       if (this.db.prepare("SELECT 1 FROM content_roots WHERE content_id = ? UNION ALL SELECT 1 FROM template_content_roots WHERE content_id = ? LIMIT 1").get(id, id)) { this.candidates.delete(id); continue; }
-      try { rmSync(this.path(id), { force: true }); this.db.prepare("DELETE FROM contents WHERE id = ?").run(id); this.unrooted = undefined; }
+      try { rmSync(this.path(id), { force: true }); this.db.prepare("DELETE FROM contents WHERE id = ?").run(id); }
       catch { console.error("Unreferenced content could not be removed."); }
       this.candidates.delete(id);
     }
@@ -209,26 +198,23 @@ export class ContentStore {
       const row = this.assert(ref, access);
       insert.run(templateId, row.id);
     }
-    this.unrooted = undefined;
   }
   releaseTemplate(templateId: string): void {
     if (!this.db.isTransaction) throw new Error("Template content roots require a transaction.");
     for (const row of this.db.prepare("SELECT content_id FROM template_content_roots WHERE template_id = ?").all(templateId) as { content_id: string }[])
       this.candidates.add(row.content_id);
     this.db.prepare("DELETE FROM template_content_roots WHERE template_id = ?").run(templateId);
-    this.unrooted = undefined;
     this.scheduleCollection();
   }
   /** Check and retain the complete batch before the first asynchronous wait; later reads do not borrow input draft lifetimes. */
   capture(refs: readonly ContentRef[], access: ContentAccess): CapturedContent {
-    const sizes = new Map<string, number>();
     const scope = this.scope();
     try {
       for (const ref of refs) {
         const row = this.assert(ref, access);
-        scope.add(row.id); sizes.set(row.id, row.size);
+        scope.add(row.id);
       }
-      return { reader: this.reader({ scope }), sizes, close: () => scope.close() };
+      return { reader: this.reader({ scope }), close: () => scope.close() };
     } catch (error) { void scope.close(); throw error; }
   }
   private readerAccess(reader: ContentReader | undefined, owner: string): ContentAccess {
@@ -262,13 +248,11 @@ export class ContentStore {
     // Record completion adds output dependencies without revoking the input's content roots.
     const insert = this.db.prepare("INSERT OR IGNORE INTO content_roots VALUES (?, ?, ?, ?, ?)");
     for (const ref of refs) insert.run(sessionId, objectId, root.kind, root.id, ref["$asterism.content"]);
-    this.unrooted = undefined; this.scheduleCollection();
+    this.scheduleCollection();
   }
   async begin(scope: ContentLease): Promise<string> {
     scope.check();
-    if (this.uploads.size >= contentLimits.uploads) invalid("Too many content uploads.");
     const id = randomUUID(), path = join(this.root, applicationStorage.temporaryContentDirectory, id);
-    // Reserve slots so concurrent opens cannot exceed upload limits after awaiting.
     const upload = { id, scope, path, size: 0, hash: createHash("sha256"), tail: Promise.resolve(), sealed: false } as Upload;
     this.uploads.set(id, upload);
     try { upload.file = await open(path, "wx", 0o600); scope.check(); return id; }
@@ -284,14 +268,9 @@ export class ContentStore {
     const bytes = Uint8Array.from(data);
     const work = upload.tail.then(async () => {
       scope.check();
-      if (upload.sealed || !Number.isSafeInteger(offset) || offset !== upload.size || bytes.byteLength > contentLimits.chunk)
+      if (upload.sealed || !Number.isSafeInteger(offset) || offset !== upload.size || bytes.byteLength > contentChunkSize)
         invalid("Invalid content chunk or upload offset.");
-      if (upload.size + bytes.byteLength > contentLimits.file) invalid("The content exceeds the size limit.");
-      const temporary = this.unrootedSize();
-      if (temporary + [...this.uploads.values()].reduce((sum, value) => sum + value.size, 0) + bytes.length > contentLimits.temporary)
-        invalid("The temporary content capacity has been reached.");
       const start = upload.size;
-      // Reserve capacity before the first await so separate uploads cannot exceed the global limit together.
       upload.size += bytes.length;
       let written = 0;
       while (written < bytes.length) {
@@ -317,7 +296,7 @@ export class ContentStore {
         rmSync(upload.path, { force: true });
       } else {
         renameSync(upload.path, this.path(contentId));
-        this.db.prepare("INSERT INTO contents VALUES (?, ?, ?)").run(contentId, digest, upload.size); this.unrooted = undefined;
+        this.db.prepare("INSERT INTO contents VALUES (?, ?, ?)").run(contentId, digest, upload.size);
       }
       scope.add(contentId); this.uploads.delete(id);
       return { "$asterism.content": contentId };
@@ -355,7 +334,6 @@ export class ContentStore {
     const reader: ContentReader = {
       read: (ref, range) => {
         const row = this.assert(ref, access), part = this.range(row, range);
-        if (part.length > contentLimits.read) invalid("Use a content stream or bounded range for large content.");
         access.scope?.add(row.id);
         this.pin(row.id);
         const work = this.readBytes(row, part.offset, part.length).finally(() => this.unpin(row.id));
@@ -374,9 +352,9 @@ export class ContentStore {
     access.scope?.readers.add(release);
     const hash = part.offset === 0 && part.length === row.size ? createHash("sha256") : null;
     try {
-      for (let position = 0; position < part.length; position += contentLimits.chunk) {
+      for (let position = 0; position < part.length; position += contentChunkSize) {
         access.check?.(); access.scope?.check();
-        const work = this.readBytes(row, part.offset + position, Math.min(contentLimits.chunk, part.length - position));
+        const work = this.readBytes(row, part.offset + position, Math.min(contentChunkSize, part.length - position));
         const bytes = await (access.scope ? access.scope.track(work) : work);
         hash?.update(bytes); yield bytes;
       }
@@ -395,8 +373,8 @@ export class ContentStore {
           for await (const part of parts) {
             scope!.check();
             if (!(part instanceof Uint8Array)) invalid("Content sources must yield byte arrays.");
-            for (let start = 0; start < part.length; start += contentLimits.chunk) {
-              const chunk = part.subarray(start, start + contentLimits.chunk);
+            for (let start = 0; start < part.length; start += contentChunkSize) {
+              const chunk = part.subarray(start, start + contentChunkSize);
               await this.write(scope!, id, offset, chunk); offset += chunk.length;
             }
           }

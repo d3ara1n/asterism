@@ -37,7 +37,7 @@ export type WebProviderConfiguration = z.infer<typeof webProviderSchema>;
  * Saved connection with its API key, a literal value or `!` command; empty when no key is saved.
  * Runtime consumers receive the connection without the key and read the resolved credential separately.
  */
-export const modelProviderSchema = modelProviderInputSchema.extend({ apiKey: z.string().trim().max(16_384) });
+export const modelProviderSchema = modelProviderInputSchema.extend({ apiKey: z.string().trim() });
 /** API-key authentication requires a key; other authentication methods carry none. */
 export function modelProviderComplete(provider: Pick<ModelProvider, "auth" | "apiKey">): boolean {
   return provider.auth !== "api_key" || provider.apiKey.trim() !== "";
@@ -49,7 +49,7 @@ export const modelInputSchema = z.strictObject({
   // Retain only capabilities that change requests; servers decide whether files are accepted.
   capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema) }),
   generation: z.strictObject({
-    temperature: z.number().min(0).max(2).nullable(), topP: z.number().min(0).max(1).nullable(),
+    temperature: z.number().nullable(), topP: z.number().nullable(),
     maxOutputTokens: z.number().int().positive().nullable(),
   }),
   compatibility: modelCompatibilitySchema,

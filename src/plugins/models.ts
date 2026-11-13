@@ -7,7 +7,7 @@ import { modelReference, parseModelExpression, resolveProviderModel, type Config
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
 import { PluginApiError } from "@asterism-app/sdk/runtime";
 import type { ModelServices } from "@asterism-app/sdk/runtime";
-import { inputReferences, validateInput, resolveInput, type ModelContent } from "../model/input.ts";
+import { inputReferences, resolveInput, type ModelContent } from "../model/input.ts";
 import type { ModelItem } from "@asterism-app/sdk/contracts";
 import { errorMessages } from "../shared/error-display.ts";
 
@@ -91,7 +91,6 @@ export function createModelServices(configuration: ConfigurationService, adapter
         content = capture(messages, options?.content);
         const { settings, adapter } = await resolve(target, false);
         request.signal.throwIfAborted();
-        validateInput(messages, content);
         adapter.validate({ settings, system, messages, userAgent, sessionId,
           tools: [] });
       } catch (error) {

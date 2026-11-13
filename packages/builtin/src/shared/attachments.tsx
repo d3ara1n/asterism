@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
 import { useI18n, useRendererApplication, type ContentReader, type I18n } from "@asterism-app/sdk/renderer";
-import { modelInputLimits, previewsAsImage, type ModelFilePart } from "@asterism-app/sdk/contracts";
+import { previewsAsImage, type ModelFilePart } from "@asterism-app/sdk/contracts";
 import { inputFileName, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { Download, File as FileIcon, FileArchive, FileAudio, FileText, FileVideo, Image as ImageIcon, ImageOff } from "lucide-react";
 import { Attachment, AttachmentMedia, AttachmentContent, AttachmentTitle, AttachmentDescription, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@asterism-app/ui/ui/attachment";
@@ -42,10 +42,9 @@ export function useFileImage(part: ModelFilePart, content: ContentReader): Previ
   return useStreamImage(part.file["$asterism.content"], part.mediaType, () => content.open(part.file));
 }
 
-/** Captured images always preview; image references preview through their source only with a known size within the model file limit. */
+/** Image content and image references preview through their owning content source. */
 export function previewable(part: InputFile): boolean {
-  return !!part.mediaType && previewsAsImage(part.mediaType)
-    && (part.kind === "file" || (part.size !== undefined && part.size <= modelInputLimits.file));
+  return !!part.mediaType && previewsAsImage(part.mediaType);
 }
 function useOpener(part: InputFile, content: ContentReader) {
   const application = useRendererApplication();

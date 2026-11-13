@@ -7,12 +7,11 @@ import { z } from "zod";
 import { contentRefSchema, defineCall, defineAction, defineCreation, defineRecord, defineOperationRecord, defineImplementation, defineTool, pluginNamespace, resourceCall, type ContentRef } from "@asterism-app/sdk/contracts";
 import { implementCall, implementTool, defineModule, definePlugin, defineTopLevelTool, implementAction, implementCreation, implementPreparer, implementResource, type ObjectExecutor, type ContentScope, type PluginContext, type TopLevelTool } from "@asterism-app/sdk/runtime";
 import { ApplicationService } from "../runtime/service.ts";
-import { contentLimits } from "../runtime/content-store.ts";
+import { contentChunkSize } from "../shared/content.ts";
 import { serveContent } from "../runtime/dispatch.ts";
 import { randomUUID } from "node:crypto";
 import type { ModelAdapter, ModelInput } from "../model/contract.ts";
 import type { StreamRequest } from "@asterism-app/sdk/contracts";
-import { modelInputLimits } from "@asterism-app/sdk/contracts";
 import { applicationStorage } from "../shared/application.ts";
 
 const ns = pluginNamespace("test.content");
@@ -337,7 +336,7 @@ describe("Host immutable content", () => {
   });
   it("read holds protect replaced content until reads finish", async () => {
     const f = fixture(), draft = f.input();
-    const payload = new Uint8Array(contentLimits.chunk + 3).fill(7);
+    const payload = new Uint8Array(contentChunkSize + 3).fill(7);
     const ref = await f.store.writer({ scope: draft }).stage(payload);
     const id = await f.create(ref, draft.id); await draft.close();
     const stream = f.object(id).content.open(ref)[Symbol.asyncIterator]();
@@ -423,7 +422,7 @@ describe("Host immutable content", () => {
     const f = fixture();
     const opened = await f.service.content.execute({ type: "input.open", target: { kind: "resource", sessionId: f.sessionId, resourceKind: Document.kind, contractId: Create.id } });
     if (opened.kind !== "input") throw new Error("Expected input.");
-    const oversized = { type: "upload.write", scopeId: opened.scopeId, uploadId: randomUUID(), offset: 0, data: new Uint8Array(contentLimits.chunk + 1) };
+    const oversized = { type: "upload.write", scopeId: opened.scopeId, uploadId: randomUUID(), offset: 0, data: new Uint8Array(contentChunkSize + 1) };
     expect(await serveContent(f.service, oversized)).toMatchObject({ ok: false, error: { code: "invalid_argument" } });
     const begun = await f.service.content.execute({ type: "upload.begin", scopeId: opened.scopeId });
     if (begun.kind !== "upload") throw new Error("Expected upload.");
@@ -586,18 +585,30 @@ describe("Models consuming immutable content", () => {
     } finally { release(); await iterator.return?.(); spy.mockRestore(); }
   });
 
-  it("validate reads only metadata; corrupt files fail during request reads and size is checked independently", async () => {
+  it("validate checks access without reading bytes; corrupt files fail during request reads", async () => {
     const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
     const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("intact"));
     const id = await f.create(file, draft.id), content = f.object(id).content;
     writeFileSync(join(f.root, applicationStorage.contentDirectory, "sealed", file["$asterism.content"]), bytes("broken"));
     await f.context.models.validate(request(file), { content });
     await expect((async () => { for await (const _ of f.context.models.stream(request(file), { content })) {} })()).rejects.toMatchObject({ code: "content_unavailable" });
-    // Establish valid ownership using the same object's action draft so authorization failure is not mistaken for size validation.
-    const actionDraft = f.service.sessions.openContentInput({ kind: "resource", sessionId: f.sessionId, objectId: id, resourceKind: Document.kind, contractId: Replace.id });
-    const large = await f.store.writer({ scope: actionDraft }).stage(new Uint8Array(modelInputLimits.file + 1));
-    await f.replace(id, { file: large }, actionDraft.id);
-    await expect(f.context.models.validate(request(large), { content: f.object(id).content })).rejects.toMatchObject({ reason: "content_limit" });
     expect(seen).toHaveLength(0);
+  });
+
+  it("resolves large files throughout history without file-count or byte-budget rejection", async () => {
+    const seen: ModelInput[] = [], f = fixture({ adapter: adapter(seen) }); await configure(f);
+    const payload = new Uint8Array(21 * 1024 * 1024).fill(7);
+    const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(payload);
+    const id = await f.create(file, draft.id); await draft.close();
+    const value = request(file);
+    value.messages = Array.from({ length: 21 }, () => structuredClone(value.messages[0]!));
+    const content = f.object(id).content;
+    await f.context.models.validate(value, { content });
+    for await (const _ of f.context.models.stream(value, { content })) { /* Consume the request. */ }
+    expect(seen[0]!.messages).toHaveLength(21);
+    const files = seen[0]!.messages.flatMap(item => item.kind === "output" ? [] : item.parts.filter(part => part.kind === "file"));
+    expect(files).toHaveLength(21);
+    expect(Buffer.from(files[0]!.data).equals(payload)).toBe(true);
+    expect(files.every(part => part.data === files[0]!.data)).toBe(true);
   });
 });

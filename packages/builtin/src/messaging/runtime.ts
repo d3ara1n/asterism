@@ -2,7 +2,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { defineModule, implementResource, implementCreation, implementTool, implementAction, implementCall,
   MessagingError, type Lifetime, type ObjectExecutor, type ObjectReader, type ToolContribution, type MessagingHandle } from "@asterism-app/sdk/runtime";
-import { modelInputLimits, type ConnectionEvent, type ConversationAddress, type Json, type MessagingConnectionInfo, type MessagingMessage, type ResourceRef } from "@asterism-app/sdk/contracts";
+import type { ConnectionEvent, ConversationAddress, Json, MessagingConnectionInfo, MessagingMessage, ResourceRef } from "@asterism-app/sdk/contracts";
 import { Agent, SubmitAgentInput, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema, ConversationsView, ChatView,
@@ -221,7 +221,7 @@ export default defineModule(plugin => {
         call(data, target, _args, { object, signal }) {
           return messagingOutcome("read", signal, async () => {
             const source = openChatFile(await captured().get(data.connectionId), data, target, signal);
-            const image = await captureImage(object.content, source, modelInputLimits.file, signal);
+            const image = await captureImage(object.content, source, signal);
             return { ...target, ...image, ref: chatFileRef(object.ref, target.messageId, target.fileId) };
           });
         },

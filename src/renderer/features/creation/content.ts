@@ -1,7 +1,7 @@
 import { runtime } from "../../runtime";
 import type { ContentRange, ContentRef, FileRef } from "@asterism-app/sdk/contracts";
 import type { ContentReader, RendererContentInput, RendererReceipt } from "@asterism-app/sdk/renderer";
-import { contentChunkSize, contentReadLimit, sameContentTarget, type ContentCommand, type ContentReply } from "../../../shared/content";
+import { contentChunkSize, sameContentTarget, type ContentCommand, type ContentReply } from "../../../shared/content";
 
 type Target = Extract<ContentCommand, { type: "input.open" }>["target"];
 type Source = Extract<ContentCommand, { type: "read.open" }>["source"];
@@ -29,7 +29,6 @@ export function contentReader(source: () => Source | Promise<Source>, request = 
     const parts: Uint8Array[] = []; let size = 0;
     for await (const part of open(ref, range)) {
       size += part.length;
-      if (size > contentReadLimit) throw new Error("Use a content stream or bounded range for large content.");
       parts.push(part);
     }
     const bytes = new Uint8Array(size); let offset = 0;

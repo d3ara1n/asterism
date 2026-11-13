@@ -32,7 +32,9 @@ Parameter lookup from models.dev returns supported capabilities and prices for t
 
 Valid mapped fields overwrite the current draft values, using the same change detection and explicit save as manual editing. Lookup works before the model is saved and does not persist configuration or invalidate connection tests. Missing or unrepresentable metadata retains draft values with a diagnostic. Lookup does not infer compatibility packs from model names.
 
-Input files are sent with their media types; the service determines accepted modalities. The client’s model capability switches govern reasoning and tool declaration.
+Input files are sent with their media types; the service determines accepted modalities and input limits. The client’s model capability switches govern reasoning and tool declaration.
+
+Client validation protects request structure, resource authorization, and application-owned identity and history invariants. Configured generation values reach the service unchanged by provider-range assumptions or SDK model-name heuristics. A caller’s explicit output cap still combines with the configured cap under the public request contract; service acceptance and errors remain upstream responsibilities.
 
 ## Model targets and inheritance
 
@@ -66,7 +68,7 @@ Disabling reasoning omits request reasoning options and historical reasoning par
 
 Protocol defaults map levels to effort or manual budgets. Compatibility settings can override individual mappings. They do not choose a different reasoning mode or trigger fallback requests.
 
-Manual thinking budgets use the effective total output cap and must fit beneath it. The cap includes thinking rather than receiving an additional hidden allowance. Invalid explicit budgets fail before sending.
+Default manual thinking budgets are calculated from the effective total output cap. The cap includes thinking rather than receiving an additional hidden allowance. Explicit budgets are sent unchanged; the service determines whether a budget is accepted with that output cap.
 
 Conversation, naming, and compaction share encoding; minimal connectivity tests have their own request purpose.
 

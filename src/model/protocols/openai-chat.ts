@@ -1,7 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { ModelFailure } from "../contract.ts";
 import { compatibility, thinkingMappings } from "../compatibility.ts";
-import { mappedEffort, withThinkingEncoding } from "../thinking-options.ts";
+import { mappedEffort, withRequestEncoding } from "../request-encoding.ts";
 import { bearerHeaders, type ModelProtocol, type ProviderOptions } from "./contract.ts";
 
 /** Chat Completions has no native continuation data and no public reasoning input. */
@@ -13,10 +13,11 @@ export const openaiChat: ModelProtocol = {
   toolResultFiles: () => "user-message",
   createModel(target, connection) {
     const mappings = thinkingMappings(target);
-    return withThinkingEncoding(
+    return withRequestEncoding(
       transport => createOpenAI({ ...connection, fetch: transport }).chat(target.model.modelId),
       connection.fetch,
       (body, level) => {
+        if (level === null) return;
         const effort = mappedEffort(level, mappings);
         if (effort === null) delete body.reasoning_effort;
         else body.reasoning_effort = effort;
