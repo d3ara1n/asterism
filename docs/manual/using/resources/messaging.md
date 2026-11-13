@@ -44,6 +44,12 @@ A quoted fragment and a retrievable original message are different evidence. Quo
 
 The same distinction applies to instructions. A message or quotation from another participant is material from that participant; its presence in the Agent's context does not turn it into the user's approval for an unrelated action.
 
+## Expect platform-specific formatting
+
+QQ and Telegram outgoing text is interpreted as Markdown, including text sent from the Chat interface. Formatting is adapted to the destination rather than reproduced as an Asterism page: Telegram headings become bold text, tables become text rows, and image markup becomes a link rather than an upload. Send an attachment when the image itself needs to arrive as a file.
+
+QQ Markdown delivery requires the bot's platform Markdown permission. A bot can connect and receive messages while still lacking permission to send this format; a rejected send reports the platform error rather than resending the message as plain text.
+
 ## Account for attachment availability
 
 An attachment may be visible now but depend on an external service for later retrieval. Passing its reference preserves an address, not permanent possession of the content. Preserve a stable copy when the work needs evidence or a deliverable that outlives the conversation's platform access.

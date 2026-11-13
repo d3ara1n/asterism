@@ -62,7 +62,7 @@ export function qqProvider(plugin: PluginContext): MessagingProviderDefinition {
         async receive({ signal, ready }) {
           await receiveConnection(signal, scope => {
             const client = new GatewayConnection({
-              account: { accountId: connectionId, appId, clientSecret: settings.appSecret!, markdownSupport: false },
+              account: { accountId: connectionId, appId, clientSecret: settings.appSecret!, markdownSupport: true },
               abortSignal: scope.signal, intents: 1 << 25, reconnect: { maxAttempts: 0 },
               session: { load: () => session, save: value => { session = value; }, clear: () => { session = null; } },
               getAccessToken: () => api.accessToken(scope.signal), clearTokenCache: () => api.clearToken(),
@@ -96,7 +96,7 @@ export function qqProvider(plugin: PluginContext): MessagingProviderDefinition {
           const input = outgoingMessage(message), target = qqTarget(input);
           if (input.files.length) throw new MessagingError("unsupported", "The QQ provider currently sends text messages only.");
           const sent = await api.send<MessageResponse>(messagePath(target.scope, encodeURIComponent(target.targetId)), signal, {
-            content: input.text, msg_type: 0,
+            markdown: { content: input.text }, msg_type: 2,
             ...(target.msgId ? { msg_id: target.msgId, msg_seq: getNextMsgSeq(target.msgId) } : {}),
           });
           if (!sent.id) throw new Error("QQ accepted the message without returning its identity.");

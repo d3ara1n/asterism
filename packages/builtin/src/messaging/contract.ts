@@ -75,7 +75,7 @@ export const ChatRead = defineImplementation({
 export const ChatSend = defineImplementation({
   ...builtin.data("chat.send", chatMessageSchema.describe("The message accepted by the external messaging service. Telegram album sends return the first item's receipt; all sent items remain available in Chat reads.")),
   resource: Chat, tool: Send,
-  targetSchema: z.strictObject({ replyTo: z.string().min(1).optional() }).nullable().describe("Send to this conversation. Null sends a message; replyTo quotes a message ID."),
+  targetSchema: z.strictObject({ replyTo: z.string().min(1).optional() }).nullable().describe("Send to this conversation. Null sends a message; replyTo quotes a message ID. QQ sends text as Markdown and requires the bot's platform Markdown permission. Telegram converts Markdown to supported formatting in message bodies and attachment captions; tables use text rows and image markup becomes a link."),
   effect: "write", execution: "sequential",
 });
 export const ChatSee = defineImplementation({

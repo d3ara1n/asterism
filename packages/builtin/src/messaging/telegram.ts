@@ -5,6 +5,7 @@ import { MessagingError, type PluginContext, type MessagingProviderDefinition } 
 import type { MessageSenderRole, MessagingConversation, MessagingMessage, MessagingFilePart } from "@asterism-app/sdk/contracts";
 import { ObservedMessages, forgetObservedConnection } from "./observed-store.ts";
 import { TelegramAlbums } from "./telegram-albums.ts";
+import { telegramMarkdown } from "./telegram-markdown.ts";
 import { messagingMessages as messages } from "../messages/messaging.ts";
 import { downloadFile, messagingFiles, outgoingMessage, observedFile, providerCall } from "./provider-shared.ts";
 
@@ -189,11 +190,12 @@ export function telegramProvider(plugin: PluginContext): MessagingProviderDefini
         },
         async sendMessage(message, { signal }) {
           const input = outgoingMessage(message);
+          const text = telegramMarkdown(input.text);
           const options = {
             ...(input.threadId ? { message_thread_id: Number(input.threadId) } : {}),
             ...(input.replyTo ? { reply_parameters: { message_id: Number(input.replyTo) } } : {}),
           };
-          const caption = input.text.trim() ? { caption: input.text } : {};
+          const caption = text ? { caption: text, parse_mode: "HTML" as const } : {};
           const files = input.files;
           if (files.length > mediaGroupLimit) throw new MessagingError("invalid_input", `Telegram sends at most ${mediaGroupLimit} files in one message.`);
           // Files are read before the request, so a missing source fails without sending anything.
@@ -204,7 +206,7 @@ export function telegramProvider(plugin: PluginContext): MessagingProviderDefini
           }));
           const [first] = uploads;
           const sent = await call(signal, async () => {
-            if (!first) return api.sendMessage(input.conversationId, input.text, options, apiSignal(signal));
+            if (!first) return api.sendMessage(input.conversationId, text, { ...options, parse_mode: "HTML" }, apiSignal(signal));
             if (uploads.length === 1) return first.photo
               ? api.sendPhoto(input.conversationId, first.file, { ...options, ...caption }, apiSignal(signal))
               : api.sendDocument(input.conversationId, first.file, { ...options, ...caption }, apiSignal(signal));
