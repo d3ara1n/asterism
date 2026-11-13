@@ -58,7 +58,6 @@ function StartupNotification() {
             </div>
           </div>,
           duration: Infinity,
-          closeButton: true,
           onDismiss: acknowledge,
         });
       }

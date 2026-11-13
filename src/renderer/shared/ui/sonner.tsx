@@ -6,14 +6,17 @@ import {
   TriangleAlertIcon,
 } from "lucide-react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+import { cn } from "@asterism-app/ui/utils"
 
 import { useScheme } from "../../features/appearance/state"
 
 /**
  * Official shadcn sonner source; the only changes: derive the theme from resolved appearance (useScheme) without introducing next-themes,
- * and color status icons using success / warning / destructive tokens.
+ * color status icons using success / warning / destructive tokens, and top-align the icon with the title line.
+ * Sonner centers the icon against the whole content, which drifts away from the title once a description wraps;
+ * the 2px offset centers the 16px icon on the 13px/1.5 title line.
  */
-const Toaster = ({ ...props }: ToasterProps) => {
+const Toaster = ({ toastOptions, ...props }: ToasterProps) => {
   const scheme = useScheme()
 
   return (
@@ -36,6 +39,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
         } as React.CSSProperties
       }
       {...props}
+      toastOptions={{
+        ...toastOptions,
+        classNames: { ...toastOptions?.classNames, toast: cn("items-start!", toastOptions?.classNames?.toast), icon: cn("mt-0.5", toastOptions?.classNames?.icon) },
+      }}
     />
   )
 }
