@@ -16,6 +16,8 @@ export const filesystemMessages = pluginNamespace("asterism.builtin").messages("
     id: "filesystem.refresh",
     defaultMessage: "Refresh",
   },
+  directoryOpen: { id: "filesystem.open", defaultMessage: "Open in file manager" },
+  directoryOpenFailed: { id: "filesystem.openFailed", defaultMessage: "Directory could not be opened." },
   directorySearch: {
     id: "filesystem.filter",
     defaultMessage: "Filter files",

@@ -1,8 +1,12 @@
 import { lazy } from "react";
-import { useI18n, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererApplication, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
-import { Eye, Folder, FileText, FileDown, FilePenLine, FilePlus2, Info, ListTree, Replace } from "lucide-react";
+import { Eye, Folder, FolderOpen, FileText, FileDown, FilePenLine, FilePlus2, Info, ListTree, Replace } from "lucide-react";
 
+import { toast } from "sonner";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { useSettingsAction } from "@asterism-app/ui/use-settings-action";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { filesystemMessages } from "../messages/filesystem";
@@ -54,9 +58,18 @@ const useDirectoryTree = () => useTreeStore("asterism.builtin/directory-tree", (
   },
 }));
 
-function DirectoryTreeActions() {
+function DirectoryTreeActions({ data }: { data: { path: string } }) {
   const { store, state } = useDirectoryTree();
-  return <FileTreeActions store={store} state={state} />;
+  const i18n = useI18n();
+  const application = useRendererApplication();
+  const { run, busy } = useSettingsAction(filesystemMessages.directoryOpenFailed, message => { toast.error(i18n.text(message)); });
+  return <>
+    <FileTreeActions store={store} state={state} />
+    <IconButton size="icon-xs" label={i18n.text(filesystemMessages.directoryOpen)} disabled={busy} aria-busy={busy}
+      onClick={() => { void run(() => application.openLocalFile(data.path)); }}>
+      {busy ? <Spinner aria-hidden /> : <FolderOpen />}
+    </IconButton>
+  </>;
 }
 
 function DirectoryTreeBody() {

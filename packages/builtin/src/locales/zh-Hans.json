@@ -1,4 +1,6 @@
 {
+  "filesystem.open": "在文件管理器中打开",
+  "filesystem.openFailed": "无法打开目录。",
   "tools.filesystem.inspectPath": "检查路径",
   "agents.getState": "读取助手状态",
   "agents.state.identity": "身份",
