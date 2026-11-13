@@ -8,6 +8,7 @@ import { CreateDirectory } from "./filesystem/contract.ts";
 import { createManualModule } from "./manual/runtime.ts";
 import { CreateManual } from "./manual/contract.ts";
 import notes from "./notes/runtime.ts";
+import todo, { todoCreation } from "./todo/runtime.ts";
 import { BuiltinSettings } from "./settings/contract.ts";
 import { createNamingModule } from "./naming/runtime.ts";
 import questions from "./questions/runtime.ts";
@@ -51,7 +52,7 @@ export default definePlugin({ namespace: builtin,
           })],
         modules: [defineAgentInstructions([{ id: "environment", text: environment(application.name).text }]),
         providers, models, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.shell), createNamingModule(application.userAgent), notes, questions,
-        resourceOperations, mcp, web, mesh, schedules, messaging, ...messagingCreations, createSubagentPoolModule(application, usage, skills),
+        resourceOperations, mcp, web, mesh, todo, todoCreation, schedules, messaging, ...messagingCreations, createSubagentPoolModule(application, usage, skills),
         createManualModule(() => plugin.manual.sources(), application.name), createShellModule(), createTerminalModule(),
         defineAgentCreation({ id: CreateDirectory.id, creation: CreateDirectory,
           description: "Open an existing local directory, or create a new project directory, and link its Directory resource to you.",

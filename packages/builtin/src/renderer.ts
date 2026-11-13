@@ -22,8 +22,9 @@ import messaging from "./messaging/renderer";
 import web from "./web/renderer";
 import subagents from "./subagents/renderer";
 import schedules from "./schedules/renderer";
+import todo from "./todo/renderer";
 
-const builtinViews: readonly RendererModule[] = [agent, filesystem, manual, mcp, mesh, models, naming, notes, questions, resources, shell, skills, terminal, usage, web, subagents, messaging, schedules];
+const builtinViews: readonly RendererModule[] = [agent, filesystem, manual, mcp, mesh, models, naming, notes, questions, resources, shell, skills, terminal, usage, web, subagents, messaging, schedules, todo];
 export default defineRendererPlugin({
   modules: builtinViews, settings: builtinSettingsPages, prepare: prepareHomeEntry,
   commands: [sessionCommands],

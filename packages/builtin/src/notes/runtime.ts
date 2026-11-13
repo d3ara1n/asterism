@@ -1,7 +1,7 @@
 import { noteCard } from "../shared/card-appearance.ts";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type ObjectReader, type ObjectExecutor, type CallResult } from "@asterism-app/sdk/runtime";
 import { Note, CreateNote, NoteContent, NoteView, NoteRead, NoteGrep, NoteEdit, NoteWrite, NoteReplace, ReadNoteText, SaveNoteText, MAX_NOTE_LENGTH } from "./contract.ts";
-import { grepNote, noteGrepToModel } from "./search.ts";
+import { grepText, textGrepToModel } from "../shared/text-search.ts";
 import { FilesystemError } from "../filesystem/errors.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { TextError, readText, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
@@ -80,7 +80,7 @@ export default defineModule(plugin => ({
       async call(_data, target, args, { object, signal }) {
         try {
           signal.throwIfAborted();
-          return { kind: "succeeded", data: await grepNote(requireText(object), args, target?.anchored !== false, signal) };
+          return { kind: "succeeded", data: await grepText(requireText(object), args, target?.anchored !== false, signal) };
         } catch (error) {
           if (signal.aborted) return { kind: "cancelled", message: "Note search was cancelled." };
           if (error instanceof TextError) return error.outcome();
@@ -88,7 +88,7 @@ export default defineModule(plugin => ({
           throw error;
         }
       },
-      toModel: noteGrepToModel,
+      toModel: textGrepToModel,
     }),
     implementTool(NoteEdit, {
       async call(_data, _target, args, { object, signal }) {

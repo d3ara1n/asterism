@@ -1,15 +1,14 @@
-import type { z } from "zod";
-import type { GrepArgs } from "@asterism-app/builtin-api/contracts";
+import type { GrepArgs, TextRow } from "@asterism-app/builtin-api/contracts";
+import type { SearchStopReason } from "../filesystem/search-contract.ts";
 import { grepOutput } from "../filesystem/search-output.ts";
 import { runSearch, searchArguments } from "../filesystem/search-process.ts";
 import { stopMessage } from "../filesystem/search-presentation.ts";
-import { splitLines } from "../shared/hashline/lines.ts";
-import { excerptNote, rowText } from "../shared/text-row.ts";
-import type { NoteGrep } from "./contract.ts";
+import { splitLines } from "./hashline/lines.ts";
+import { excerptNote, rowText } from "./text-row.ts";
 
-type NoteGrepResult = z.infer<typeof NoteGrep.schema>;
+export type TextGrepResult = { rows: (TextRow & { match: boolean })[]; stopReason: SearchStopReason };
 
-export async function grepNote(text: string, args: GrepArgs, anchored: boolean, signal: AbortSignal): Promise<NoteGrepResult> {
+export async function grepText(text: string, args: GrepArgs, anchored: boolean, signal: AbortSignal): Promise<TextGrepResult> {
   const lines = splitLines(text);
   // Use the original UTF-16 lines for anchors and excerpts; UTF-8 transport can replace isolated surrogates.
   const output = grepOutput(".", "", args, anchored, line => lines[line - 1]);
@@ -18,7 +17,7 @@ export async function grepNote(text: string, args: GrepArgs, anchored: boolean, 
   return { rows: output.result.rows.map(({ path: _path, ...row }) => row), stopReason };
 }
 
-export function noteGrepToModel(data: NoteGrepResult): string {
+export function textGrepToModel(data: TextGrepResult): string {
   const matches = data.rows.filter(row => row.match);
   const lines = [`${matches.length} matching ${matches.length === 1 ? "line" : "lines"} · search ${data.stopReason === null ? "complete" : "incomplete"}`];
   if (matches.length && matches.length !== data.rows.length) lines.push(`Matching line numbers: ${matches.map(row => row.line).join(", ")}.`);
