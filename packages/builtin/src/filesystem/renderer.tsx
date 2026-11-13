@@ -19,6 +19,7 @@ import { useTreeStore } from "./tree-store";
 import { FileTreeBody, FileTreeActions } from "./FileTree";
 import { searchToolRenderers } from "./search-view";
 import { listViews } from "./list-view";
+import { inspectPathRenderer } from "./inspection-view";
 import { fileOpener } from "./open-file";
 
 import { directoryCard as appearance } from "../shared/card-appearance.ts";
@@ -72,6 +73,7 @@ export default {
     Actions: DirectoryTreeActions,
   })],
   tools: [
+    inspectPathRenderer,
     toolRenderer(DirectoryMetadata, { label: filesystemMessages.toolDirectoryMetadata, icon: <Info /> }),
     toolRenderer(DirectorySave, { label: mediaMessages.save, icon: <FileDown /> }),
     ...searchToolRenderers,

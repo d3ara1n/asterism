@@ -1,6 +1,7 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const filesystemMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
+  inspectPath: { id: "tools.filesystem.inspectPath", defaultMessage: "Inspect path" },
   filesView: { id: "filesystem.view.files", defaultMessage: "Files" },
   changesView: { id: "filesystem.view.changes", defaultMessage: "Changes" },
   viewLabel: { id: "filesystem.view.label", defaultMessage: "Directory view" },

@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,7 +17,7 @@ function open() {
   return { root, service, sessionId: service.sessions.tree.create("Resource") };
 }
 
-// Expectations follow the directory creation contract: normalize titles and accept only actual directories.
+// Expectations distinguish opening existing material from creating a new on-disk project.
 describe("Directory creation", () => {
   it("uses the directory name by default and trims a supplied title", async () => {
     const { root, service, sessionId } = open();
@@ -40,6 +40,42 @@ describe("Directory creation", () => {
     }
     expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
     expect(service.sessions.current(sessionId).workbench.objects).toEqual([]);
+  });
+
+  it("creates a real project folder before binding its Directory resource", async () => {
+    const { root, service, sessionId } = open();
+    const path = join(root, "project");
+    await service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "asterism.builtin/directory.create" },
+      input: { path, mode: "new" }, position: { x: 0, y: 0 } });
+    expect(statSync(path).isDirectory()).toBe(true);
+    const directory = service.sessions.current(sessionId).workbench.objects.find(object => object.kind === Directory.kind)!;
+    expect(directory.presentation.data).toEqual({ path });
+  });
+
+  it("rejects an occupied project name instead of opening or changing the existing project", async () => {
+    const { root, service, sessionId } = open();
+    const path = join(root, "project"); mkdirSync(path); writeFileSync(join(path, "keep.txt"), "existing work");
+    await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "asterism.builtin/directory.create" },
+      input: { path, mode: "new" }, position: { x: 0, y: 0 } })).rejects.toMatchObject({ reason: "path_exists" });
+    expect(readFileSync(join(path, "keep.txt"), "utf8")).toBe("existing work");
+    expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
+  });
+
+  it("leaves missing parent folders uncreated and creates no resource", async () => {
+    const { root, service, sessionId } = open();
+    const parent = join(root, "missing");
+    await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "asterism.builtin/directory.create" },
+      input: { path: join(parent, "project"), mode: "new" }, position: { x: 0, y: 0 } })).rejects.toMatchObject({ reason: "path_not_found" });
+    expect(existsSync(parent)).toBe(false);
+    expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
+  });
+
+  it("treats a broken symbolic link as an occupied project name", async () => {
+    const { root, service, sessionId } = open();
+    const path = join(root, "project"); symlinkSync(join(root, "missing"), path, "junction");
+    await expect(service.sessions.execute({ type: "resource.create", sessionId, kind: Directory.kind, creation: { id: "asterism.builtin/directory.create" },
+      input: { path, mode: "new" }, position: { x: 0, y: 0 } })).rejects.toMatchObject({ reason: "path_exists" });
+    expect(service.sessions.tree.nodes(sessionId)).toEqual([]);
   });
 
 });

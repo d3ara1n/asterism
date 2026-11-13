@@ -10,6 +10,14 @@ The root gives file operations their scope and commands their initial working di
 
 Sharing a Directory lets participants work on the same current files; it does not copy those files into every Agent's context or establish an editing order. An Agent may still need to read material changed by another participant. Decide who owns overlapping edits when parallel work touches the same output.
 
+### Start without a prepared project folder
+
+An Agent can inspect a local path and list its immediate contents before a Directory is linked. This is useful when the project location is known but the working material has not yet been organized into session resources. The inspection describes the filesystem at that moment; it does not reserve a project name.
+
+Opening an existing directory and starting a new project are different intentions. Opening binds the resource to a folder already on disk. Starting a new project creates one new folder inside an existing parent and binds it to a Directory. An occupied name is an error, so a new project does not silently reuse existing work. Adding or dropping a folder through the workbench opens the existing folder.
+
+A new project folder belongs to the actual filesystem, not to session history. Removing its Directory resource does not delete the folder. If folder creation succeeds but the resource cannot be committed afterward, the folder can remain on disk without a corresponding card.
+
 ### A browser view is not a complete filesystem search
 
 The file tree loads folders as they are expanded. Its filter narrows the paths already loaded; an absent match does not establish that no matching file exists in an unopened folder. Use a filesystem search when the question concerns the whole directory rather than the visible tree.

@@ -17,6 +17,8 @@ export function filesystemFailure(error: unknown, operation: string, root = fals
   const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "";
   const subject = root ? "The directory resource root" : "The target path";
   switch (code) {
+    case "EEXIST":
+      return failed("path_exists", `${operation}: The target path already exists.`);
     case "ENOENT":
       return failed(root ? "resource_not_found" : "path_not_found", `${operation}: ${subject} is missing or contains a broken symbolic link.`);
     case "ENOTDIR":

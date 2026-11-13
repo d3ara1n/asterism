@@ -3,10 +3,10 @@ import { createReadStream } from "node:fs";
 import { z } from "zod";
 import { readFile, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, isAbsolute, join } from "node:path";
-import { defineModule, implementResource, implementCreation, implementTool, implementCall, implementChannel, PluginApiError, type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
+import { basename, join } from "node:path";
+import { defineModule, implementResource, implementTool, implementCall, implementChannel, PluginApiError, type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { TextError, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
-import { Directory, CreateDirectory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryStatus, DirectoryWatch } from "./contract.ts";
+import { Directory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryStatus, DirectoryWatch } from "./contract.ts";
 import { saveFileContent } from "./save.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { readImageFile } from "./image-io.ts";
@@ -22,6 +22,8 @@ import { readDirectoryStatus } from "./git-status.ts";
 import { watchDirectory } from "./watch.ts";
 import { fileFailure } from "./file-io.ts";
 import { editorCalls } from "./editor-runtime.ts";
+import { directoryCreation } from "./creation-runtime.ts";
+import { inspectPathTool } from "./inspect-path.ts";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (signal.aborted) return { kind: "cancelled", message: `${operation} was cancelled before committing file content.` };
@@ -35,6 +37,7 @@ function rootOf(object: ObjectReader): string {
 }
 
 export function createFilesystemModule(shell: ShellExecution) { return defineModule(plugin => ({
+  topLevelTools: [inspectPathTool],
   resources: [implementResource(Directory, DirectoryView, {
     card: directoryCard,
     async *openFile(directory, locator, { signal }) {
@@ -67,19 +70,7 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
         return { ...base, exists: failure.error.code === "resource_not_found" || failure.error.code === "resource_not_directory" ? false : null, error: failure.error };
       }
     },
-    creation: implementCreation(CreateDirectory, {
-      /** Shared by drag-and-drop and dialogs; title is optional and falls back to basename. Accepts only existing absolute directory paths. */
-      async prepare({ path }, { signal }) {
-        signal.throwIfAborted();
-        if (!isAbsolute(path)) throw new PluginApiError("invalid_argument", "Directory path must be absolute.");
-        if (!(await stat(path).catch(() => null))?.isDirectory()) throw new PluginApiError("invalid_argument", "The path is not an existing directory.");
-        signal.throwIfAborted();
-        return { action: "accept" };
-      },
-      create({ path, title }) {
-        return { title: title ?? (basename(path) || path), data: { path } };
-      },
-    }),
+    creation: directoryCreation,
     async context(directory) {
       const file = await withinDirectory(directory.path, "AGENTS.md").catch(() => null);
       if (!file) return [];

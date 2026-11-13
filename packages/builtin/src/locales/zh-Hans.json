@@ -1,4 +1,5 @@
 {
+  "tools.filesystem.inspectPath": "检查路径",
   "agents.getState": "读取助手状态",
   "agents.state.identity": "身份",
   "agents.state.thinking": "思考",

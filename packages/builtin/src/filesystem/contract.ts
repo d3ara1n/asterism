@@ -4,7 +4,11 @@ import { builtin, List, Metadata, Read, Edit, Write, Save, Replace, See, textRea
 
 export const Directory = builtin.resource("directory", z.object({ path: z.string() }));
 export const CreateDirectory = defineCreation(Directory, { id: builtin.name("directory.create"),
-  schema: z.strictObject({ path: z.string().min(1).max(4096), title: z.string().trim().min(1).max(160).optional() }),
+  schema: z.strictObject({
+    path: z.string().min(1).max(4096).describe("Absolute directory path or current-user home shorthand (~ or ~/path)."),
+    mode: z.enum(["existing", "new"]).default("existing").describe("existing opens an existing directory. new creates only the target directory; its parent must exist and any existing target is an error. Defaults to existing."),
+    title: z.string().trim().min(1).max(160).optional().describe("Display name; defaults to the directory name."),
+  }).describe("Open an existing directory or create a new project directory and bind it to a Directory resource."),
 });
 export const ReadDirectoryDefaults = defineCall(builtin.name("directory.defaults"), {
   scope: "plugin", input: z.strictObject({}), output: z.strictObject({ path: z.string() }),

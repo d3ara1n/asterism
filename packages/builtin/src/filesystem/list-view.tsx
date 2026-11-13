@@ -43,17 +43,20 @@ function EntryRow({ entry, path, resource }: { entry: Entry; path: string; resou
 }
 
 function ListBody({ result, invocation }: ListProps) {
+  return result?.data ? <DirectoryListing data={result.data} resource={invocation.resource} /> : null;
+}
+
+/** Shared one-level listing; only a resource-backed listing provides file navigation. */
+export function DirectoryListing({ data, resource }: { data: z.infer<typeof DirectoryList.schema>; resource?: ListProps["invocation"]["resource"] }) {
   const i18n = useI18n();
   const [expanded, setExpanded] = useRendererViewState("asterism.builtin/list-all", false);
-  const data = result?.data;
-  if (!data) return null;
   if (!data.entries.length) return <p className="type-caption">{i18n.formatMessage(filesystemMessages.toolDirectoryEmpty)}</p>;
   const entries = sortEntries(data.entries);
   const shown = expanded ? entries : entries.slice(0, TOOL_BODY_LINE_LIMIT);
   return <div className="flex flex-col gap-1.5">
     <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-1">
       {shown.map(entry => <li key={entry.name} className="min-w-0">
-        <EntryRow entry={entry} path={entryPath(data.path, entry.name)} resource={invocation.resource} />
+        <EntryRow entry={entry} path={resource ? entryPath(data.path, entry.name) : entry.name} resource={resource} />
       </li>)}
     </ul>
     {shown.length < entries.length && <Button variant="ghost" size="xs" className="self-start text-muted-foreground" onClick={() => setExpanded(true)}>

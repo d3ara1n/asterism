@@ -4,6 +4,7 @@ import { builtin, CreateAgent, agentCreateSchema } from "@asterism-app/builtin-a
 import { defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { createAgentModule } from "./agent/runtime.ts";
 import { createFilesystemModule } from "./filesystem/runtime.ts";
+import { CreateDirectory } from "./filesystem/contract.ts";
 import { createManualModule } from "./manual/runtime.ts";
 import { CreateManual } from "./manual/contract.ts";
 import notes from "./notes/runtime.ts";
@@ -52,6 +53,14 @@ export default definePlugin({ namespace: builtin,
         providers, models, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.shell), createNamingModule(application.userAgent), notes, questions,
         resourceOperations, mcp, web, mesh, schedules, messaging, ...messagingCreations, createSubagentPoolModule(application, usage, skills),
         createManualModule(() => plugin.manual.sources(), application.name), createShellModule(), createTerminalModule(),
+        defineAgentCreation({ id: CreateDirectory.id, creation: CreateDirectory,
+          description: "Open an existing local directory, or create a new project directory, and link its Directory resource to you.",
+          guidelines: [
+            "Absolute paths and current-user home shorthand (~ or ~/path) are supported. The stored path is absolute.",
+            "existing mode binds an existing directory. new mode creates only the target directory: the parent must exist, and an existing file, directory, or symbolic link produces an error.",
+            "inspect_path reports absolute paths, metadata, and optional directory entries independently of resource links. Directory creation uses filesystem state at execution time.",
+            "The directory is a real filesystem location shared with other programs. Removing its resource leaves files on disk; a later resource-creation failure can also leave a newly created directory on disk.",
+          ] }),
         defineAgentCreation({ id: CreateTimer.id, creation: CreateTimer,
           description: "Create a stopped Timer with a 30-minute duration, no repeat, and an empty message. Its resource tools read, configure, start, pause, and reset the countdown.",
           inputSchema: z.strictObject({}).describe("Create a Timer with default settings."), toInput: () => ({}) }),
