@@ -1,83 +1,56 @@
-// Single source of truth for the app icon: declare geometry and colors here to generate source images and platform artifacts under assets/icon/.
+// Official application artwork and platform exports. Geometry is shared with the interface BrandMark.
 // Requires local rsvg-convert (Homebrew librsvg) and macOS iconutil; rerun only after changing the icon.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { brandStarPath, brandStars } from "../packages/ui/src/brand/geometry.ts";
 
 const output = resolve(import.meta.dirname, "../assets/icon");
-const BLUE = "#2F6BFF";
+const starPaths = brandStars.map(({ x, y }) => `<path d="${brandStarPath}" transform="translate(${x} ${y})"/>`).join("\n    ");
 
 interface Theme {
-  /** Base gradient from top left to bottom right. */
-  stops: [string, string];
-  /** Overlay color and opacity of the frame glass on the base. */
-  glass: [string, number];
-  /** White frost opacity on the top glass layer. */
-  frost: number;
-  /** Frame shadow color and opacity. */
-  shadow: [string, number];
+  /** Quiet surface shading; the silhouette carries the identity. */
+  surface: [string, string];
+  mark: string;
+  edge: string;
 }
 
 const themes = {
-  light: { stops: ["#F2F6FF", "#D9E5FF"], glass: ["#FFFFFF", 0.45], frost: 0.3, shadow: ["#1B3A8C", 0.14] },
-  dark: { stops: ["#1E2A4A", "#0E1428"], glass: ["#FFFFFF", 0.16], frost: 0.12, shadow: ["#000000", 0.35] },
+  light: { surface: ["#E7F5A3", "#CBE66B"], mark: "#203E35", edge: "#F7FFDA" },
+  dark: { surface: ["#29483F", "#142D27"], mark: "#DCEF91", edge: "#668677" },
 } satisfies Record<string, Theme>;
 
 interface Layout {
   /** Base side length and corner radius within the 1024 canvas. */
   body: number;
   radius: number;
-  /** System-style shadow below the base. */
   drop: boolean;
 }
 
 const layouts = {
   // macOS icon grid: center the 824 base with space around it for the shadow.
   mac: { body: 824, radius: 185, drop: true },
-  // Windows and Linux: fill the canvas with the base, without a shadow.
+  // Canvas-filling variant for Windows and window icons.
   full: { body: 1024, radius: 230, drop: false },
 } satisfies Record<string, Layout>;
 
-const rr = (x: number, y: number, w: number, h: number, r: number) =>
-  `M${x + r} ${y}H${x + w - r}A${r} ${r} 0 0 1 ${x + w} ${y + r}V${y + h - r}A${r} ${r} 0 0 1 ${x + w - r} ${y + h}H${x + r}A${r} ${r} 0 0 1 ${x} ${y + h - r}V${y + r}A${r} ${r} 0 0 1 ${x + r} ${y}Z`;
-
-// Content geometry (1024 coordinates, scaled to the base): thick frame in front, canvas extending to the upper right, with cutout connecting lines.
-const frame = { x: 172, y: 262, w: 640, h: 520, r: 150, t: 120 };
-const canvas = { x: 252, y: 172, w: 600, h: 520, r: 110 };
-const ring = rr(frame.x, frame.y, frame.w, frame.h, frame.r)
-  + rr(frame.x + frame.t, frame.y + frame.t, frame.w - 2 * frame.t, frame.h - 2 * frame.t, frame.r - frame.t + 20);
-const painting = rr(canvas.x, canvas.y, canvas.w, canvas.h, canvas.r);
-const link = `<path d="M395 560 L590 445" stroke="#000" stroke-width="34" stroke-linecap="round"/><circle cx="395" cy="560" r="42" fill="#000"/><circle cx="590" cy="445" r="42" fill="#000"/>`;
-
 function svg(theme: Theme, layout: Layout): string {
   const offset = (1024 - layout.body) / 2;
-  const scale = layout.body / 1024;
+  const markSize = layout.body * 0.88;
+  const markOffset = (1024 - markSize) / 2;
   const body = `<rect x="${offset}" y="${offset}" width="${layout.body}" height="${layout.body}" rx="${layout.radius}"`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
 <defs>
-  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${theme.stops[0]}"/><stop offset="1" stop-color="${theme.stops[1]}"/></linearGradient>
-  <filter id="blur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="30"/></filter>
-  <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="22"/></filter>
-  <filter id="drop" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14"/></filter>
-  <clipPath id="ring"><path d="${ring}" clip-rule="evenodd"/></clipPath>
-  <mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024"><rect width="1024" height="1024" fill="#fff"/>${link}</mask>
+  <linearGradient id="surface" x1="0" y1="0" x2="0.65" y2="1"><stop stop-color="${theme.surface[0]}"/><stop offset="1" stop-color="${theme.surface[1]}"/></linearGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${theme.edge}" stop-opacity="0.7"/><stop offset="1" stop-color="${theme.edge}" stop-opacity="0"/></linearGradient>
+  <filter id="shadow" x="-25%" y="-25%" width="150%" height="160%"><feGaussianBlur stdDeviation="12"/></filter>
 </defs>
-${layout.drop ? `${body} fill="#000" opacity="0.18" transform="translate(0 12)" filter="url(#drop)"/>` : ""}
-${body} fill="url(#bg)"/>
-<g transform="translate(512 512) scale(${scale}) translate(-512 -512)">
-  <g mask="url(#cut)">
-    <path d="${rr(canvas.x, canvas.y + 18, canvas.w, canvas.h, canvas.r)}" fill="${BLUE}" opacity="0.22" filter="url(#soft)"/>
-    <path d="${painting}" fill="${BLUE}"/>
-  </g>
-  <path d="${ring}" fill-rule="evenodd" fill="${theme.shadow[0]}" opacity="${theme.shadow[1]}" filter="url(#soft)" transform="translate(0 16)"/>
-  <g clip-path="url(#ring)">
-    <rect width="1024" height="1024" fill="url(#bg)"/>
-    <rect width="1024" height="1024" fill="${theme.glass[0]}" opacity="${theme.glass[1]}"/>
-    <g filter="url(#blur)" opacity="0.9"><path d="${painting}" fill="${BLUE}"/></g>
-    <rect width="1024" height="1024" fill="#fff" opacity="${theme.frost}"/>
-  </g>
-  <path d="${ring}" fill-rule="evenodd" fill="none" stroke="#fff" stroke-width="4" opacity="0.9"/>
+${layout.drop ? `${body} fill="#12271F" opacity="0.18" transform="translate(0 12)" filter="url(#shadow)"/>` : ""}
+${body} fill="url(#surface)"/>
+<rect x="${offset + 2}" y="${offset + 2}" width="${layout.body - 4}" height="${layout.body - 4}" rx="${layout.radius - 2}" fill="none" stroke="url(#rim)" stroke-width="3"/>
+<g transform="translate(${markOffset} ${markOffset}) scale(${markSize / 24})" fill="${theme.mark}">
+    ${starPaths}
 </g>
 </svg>
 `;
@@ -110,6 +83,11 @@ function ico(images: { size: number; data: Buffer }[]): Buffer {
 }
 
 mkdirSync(output, { recursive: true });
+// Transparent, monochrome artwork for reuse outside the application component.
+writeFileSync(join(output, "asterism-mark.svg"), `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 24 24" fill="currentColor">
+    ${starPaths}
+</svg>
+`);
 const sources = {
   "asterism.svg": svg(themes.light, layouts.mac),
   "asterism-dark.svg": svg(themes.dark, layouts.mac),

@@ -5,6 +5,7 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Separator } from "@asterism-app/ui/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import appIcon from "../../../../assets/icon/asterism.svg";
+import darkAppIcon from "../../../../assets/icon/asterism-dark.svg";
 import { applicationId } from "../../../shared/application";
 import { appMessages } from "../../messages/app";
 import { settingsMessages } from "../../messages/settings";
@@ -20,7 +21,8 @@ export function AboutSettings() {
   const i18n = useI18n();
   return <div className="pb-2">
     <header className="flex flex-col items-center pt-2 pb-8 text-center">
-      <img src={appIcon} alt="" className="size-24 select-none" draggable={false} />
+      <img src={appIcon} alt="" className="size-24 select-none dark:hidden" draggable={false} />
+      <img src={darkAppIcon} alt="" className="hidden size-24 select-none dark:block" draggable={false} />
       <p className="type-page mt-3">{i18n.formatMessage(appMessages.appName)}</p>
       <p className="type-caption mt-1">{i18n.text(settingsMessages.aboutSummary)}</p>
     </header>

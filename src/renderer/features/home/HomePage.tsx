@@ -34,7 +34,7 @@ export function HomePage({ active, onSettings, ready, onCreated, templates, onTe
   return <HomeFolderProvider value={folder}><div className="home-page"><div className="home-content">
     <div className="mx-auto w-full max-w-2xl">
       <header className="mb-8 flex flex-col items-center text-center">
-        <BrandMark className="mb-4 size-12 text-primary" /><h1 className="type-page">{i18n.text(appMessages.appName)}</h1>
+        <BrandMark className="mb-4 size-12 text-foreground" /><h1 className="type-page">{i18n.text(appMessages.appName)}</h1>
         <p className="type-body mt-2 text-muted-foreground">{i18n.text(homeMessages.homePrompt)}</p>
       </header>
       {entry && Body ? <PluginRegion key={`${sessionEntryKey(entry)}:${attempt}`} pluginId={entry.pluginId} page fallback={<Alert variant="destructive"><AlertDescription>

@@ -119,9 +119,9 @@ List rows keep one hit surface with separate actions. Editors group related fiel
 
 ## Branding and implementation ownership
 
-The approved brand direction is a three-star arrangement. Formal logo design is deferred. Existing interface marks and application icons remain placeholders.
+The official Asterism identity is a triangular constellation of three rounded six-point stars. Application icons pair citron and deep green surfaces; interface marks use the same silhouette in the foreground color. The brand palette is independent of the configurable interface accent. Surface shading stays restrained, and the mark remains recognizable without material effects.
 
-Icon geometry and colors have one generating source; platform assets are generated from it. Packaging uses committed assets rather than requiring local generation tools.
+Interface marks and exported artwork share one geometry definition. The icon generator owns surface colors and platform layouts, and produces the SVG, PNG, macOS ICNS, and Windows ICO assets. Packaging consumes the repository assets rather than requiring local generation tools. The About page selects light or dark artwork from application appearance; system icons use the primary citron version without automatic operating-system appearance switching.
 
 Shared control semantics belong to `packages/ui/`; window behavior belongs to main and Window; layout belongs to weave; UI messages belong to the relevant app or plugin.
 
