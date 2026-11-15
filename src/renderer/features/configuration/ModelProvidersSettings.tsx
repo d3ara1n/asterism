@@ -131,9 +131,16 @@ const billingLabels = {
   subscription: providersMessages.subscription,
   none: providersMessages.noBilling,
 };
-function presetDescription(preset: ModelProviderPreset, includeBilling = true): string {
+function presetDescription(preset: ModelProviderPreset, presets: readonly ModelProviderPreset[], includeBilling = true): string {
   const i18n = getI18n();
-  return [preset.region && i18n.text(preset.region), preset.plan && i18n.text(preset.plan), includeBilling && i18n.text(billingLabels[preset.billing])].filter(Boolean).join(" · ");
+  const text = (value: ModelProviderPreset["region"]) => value ? i18n.text(value) : "";
+  // Subtitles distinguish choices rather than inventory connection attributes. Billing is already grouped;
+  // region and plan distinguish endpoint/product variants. Add protocol only when those labels still collide
+  // (currently Command Code). Compare the full catalog so search filtering preserves the distinction.
+  const showProtocol = presets.some(other => other.name === preset.name && other.billing === preset.billing
+    && text(other.region) === text(preset.region) && text(other.plan) === text(preset.plan)
+    && other.connection.protocol !== preset.connection.protocol);
+  return [text(preset.region), text(preset.plan), showProtocol && protocolLabel(preset.connection.protocol), includeBilling && i18n.text(billingLabels[preset.billing])].filter(Boolean).join(" · ");
 }
 const searchThreshold = 8;
 function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null) => void }) {
@@ -142,7 +149,7 @@ function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null)
   const modelProviderPresets = snapshot?.modelProviderPresets ?? [];
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  const matches = modelProviderPresets.filter(preset => !q || [preset.name, preset.id, presetDescription(preset), ...(preset.keywords ?? [])].some(word => word.toLowerCase().includes(q)));
+  const matches = modelProviderPresets.filter(preset => !q || [preset.name, preset.id, presetDescription(preset, modelProviderPresets), ...(preset.keywords ?? [])].some(word => word.toLowerCase().includes(q)));
   const groups = billingOrder.map(billing => ({ billing, items: matches.filter(preset => preset.billing === billing) })).filter(entry => entry.items.length);
   const tile = "min-h-16 flex-col items-start justify-center gap-0.5 px-3 py-2 text-left hover:bg-accent";
   return <div className="flex flex-col gap-5">
@@ -154,13 +161,16 @@ function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null)
     {groups.map(({ billing, items }) => <section key={billing} aria-label={i18n.text(billingLabels[billing])}>
       <h3 className="type-label mb-2">{i18n.text(billingLabels[billing])}</h3>
       <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9rem, 1fr))" }}>
-        {items.map(preset => <div key={preset.id} className="flex flex-col gap-1">
-          <Item asChild variant="outline" className={cn(tile, "bg-card")}><button type="button" onClick={() => onPick(preset)}>
-            <span className="type-section max-w-full truncate">{preset.name}</span>
-            {(preset.region || preset.plan) && <span className="type-caption">{presetDescription(preset, false)}</span>}
-          </button></Item>
-          {preset.keyUrl && <ProviderKeyLink href={preset.keyUrl}>{i18n.formatMessage(providersMessages.getKey)}</ProviderKeyLink>}
-        </div>)}
+        {items.map(preset => {
+          const description = presetDescription(preset, modelProviderPresets, false);
+          return <div key={preset.id} className="flex flex-col gap-1">
+            <Item asChild variant="outline" className={cn(tile, "bg-card")}><button type="button" onClick={() => onPick(preset)}>
+              <span className="type-section max-w-full truncate">{preset.name}</span>
+              {description && <span className="type-caption">{description}</span>}
+            </button></Item>
+            {preset.keyUrl && <ProviderKeyLink href={preset.keyUrl}>{i18n.formatMessage(providersMessages.getKey)}</ProviderKeyLink>}
+          </div>;
+        })}
       </div>
     </section>)}
     {q && !groups.length && <p className="type-caption">{i18n.formatMessage(providersMessages.noMatchingProvider)}</p>}
@@ -191,7 +201,7 @@ function ProviderCreation() {
   return <Editor form={form} title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false} busy={false} error={null}>
     <PresetPicker onPick={preset => setPicked(preset ? { keyUrl: preset.keyUrl, value: {
       ...modelProviderPresetDraft(preset, snapshot?.modelProviders.map(provider => provider.id)), apiKey: "",
-      name: `${preset.name} · ${presetDescription(preset)}`,
+      name: `${preset.name} · ${presetDescription(preset, snapshot?.modelProviderPresets ?? [])}`,
     } } : { value: structuredClone(blank) })} />
   </Editor>;
 }

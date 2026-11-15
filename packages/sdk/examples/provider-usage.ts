@@ -24,7 +24,7 @@ const usage: UsageProvider = {
   },
 };
 const preset: ModelProviderPreset = {
-  id: "example-plan", name: "Example plan", billing: "subscription",
+  id: "example-plan", name: "Example", billing: "subscription",
   connection: { protocol: "openai-responses", baseUrl: "https://example.invalid/v1", auth: "api_key", compatibility: [],
     usage: usage.id, fixedFields: ["protocol", "baseUrl", "auth", "compatibility", "usage"] },
   sources: ["https://example.invalid/docs"], verifiedOn: "2026-10-20",

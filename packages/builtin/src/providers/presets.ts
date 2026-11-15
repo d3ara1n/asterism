@@ -18,7 +18,7 @@ const zaiResponses = (baseUrl: string): ModelProviderPreset["connection"] => ({
 /** Billing entries share inference endpoints and the key-selected account usage implementation. */
 function commandCodePreset(id: string, billing: "usage" | "subscription", protocol: "openai-responses" | "anthropic"): ModelProviderPreset {
   return {
-    id, name: protocol === "anthropic" ? "Command Code (Anthropic)" : "Command Code (Responses)", billing,
+    id, name: "Command Code", billing,
     connection: { fixedFields, protocol, baseUrl: "https://api.commandcode.ai/provider/v1", auth: "api_key", compatibility: [], usage: "commandcode" },
     keyUrl: "https://commandcode.ai/settings/keys",
     sources: ["https://commandcode.ai/docs/provider", "https://commandcode.ai/docs/plans/goat", "https://commandcode.ai/docs/resources/usage-limits"],

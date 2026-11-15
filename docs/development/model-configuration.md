@@ -20,6 +20,14 @@ Credentials are stored in plaintext where they are used: model keys in their con
 
 User-entered credentials beginning with `!` are shell commands; plugin secrets are returned as stored. A command runs through the platform shell on first use, with the application's inherited login environment and the user's home directory as its working directory. Successful nonempty standard output, trimmed at its boundaries, becomes the credential and stays in memory for the application's lifetime; it is never persisted. Concurrent readers of the same expression share one execution. Failures are not retained, so the next read runs the command again, and their errors omit the command and its output. A command stops when every waiting reader cancels or the application shuts down.
 
+### Preset names and distinguishing information
+
+A preset name is the provider or product brand, not a label assembled from its protocol, region, or billing method. Those distinctions remain separate from the brand. The editable name of a connection created from a preset is a different value: its initial suggestion can include distinguishing information, and later catalog edits leave saved names unchanged.
+
+The picker uses supplementary labels to distinguish alternatives, not to inventory connection attributes. Billing headings already separate payment methods. Region labels such as Mainland China and International expose endpoint variants that the shared brand name cannot distinguish. A protocol with no alternative adds no useful distinction and remains absent from the subtitle.
+
+Protocol labels appear only when entries share the same brand, billing group, region, and plan but offer different protocols. Command Code currently has that choice; its brand stays Command Code, while its subtitle identifies OpenAI Responses or Anthropic Messages. This is a comparison of catalog entries, not a special rendering rule keyed to that brand. The comparison uses the complete catalog so filtering search results does not change the meaning of an option.
+
 ## Model discovery and parameter lookup
 
 Discovery seeks the provider’s model-list endpoint using the saved base address and connection authentication. It preserves the configured base path and tries two candidate request addresses in parallel by appending `/models` and `/v1/models`. The first candidate to return a complete valid catalog supplies the result; the other request is cancelled, and catalogs are not merged. Discovery does not change the configured inference address.

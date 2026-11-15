@@ -17,6 +17,7 @@ export interface ModelProviderConnection {
 }
 export interface ModelProviderPreset {
   id: string;
+  /** Provider or product brand; region, plan, billing, and protocol distinctions remain separate from the name. */
   name: string;
   billing: "usage" | "subscription" | "none";
   region?: UiText;
