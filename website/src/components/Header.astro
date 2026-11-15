@@ -1,0 +1,72 @@
+---
+import Mark from "./Mark.astro";
+import { content, repoUrl, type Locale } from "../i18n/content";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = content[locale].nav;
+const base = import.meta.env.BASE_URL;
+const home = locale === "en" ? base : `${base}zh/`;
+const other = locale === "en" ? `${base}zh/` : base;
+---
+
+<header class="header wrap">
+  <a class="brand" href={home} aria-label="Asterism">
+    <Mark size={22} />
+    <span>Asterism</span>
+  </a>
+  <nav class="nav">
+    <a href={other} hreflang={locale === "en" ? "zh" : "en"} aria-label={t.switchLabel}>{t.switchName}</a>
+    <a href={repoUrl}>{t.source}</a>
+    <a class="nav-download" href="#download">{t.download}</a>
+  </nav>
+</header>
+
+<style>
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 4.5rem;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 560;
+    font-stretch: 112%;
+    letter-spacing: -0.01em;
+  }
+
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: clamp(1rem, 3vw, 2rem);
+    font-size: 0.9375rem;
+    color: var(--ink-2);
+  }
+
+  .nav a {
+    transition: color 0.2s;
+  }
+
+  .nav a:hover {
+    color: var(--ink);
+  }
+
+  .nav-download {
+    color: var(--ink);
+    padding: 0.35rem 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    transition: border-color 0.2s;
+  }
+
+  .nav-download:hover {
+    border-color: var(--ink);
+  }
+</style>

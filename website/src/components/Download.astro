@@ -1,0 +1,255 @@
+---
+import Mark from "./Mark.astro";
+import { content, releasesUrl, repoUrl, type Locale } from "../i18n/content";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = content[locale].download;
+const repo = new URL(repoUrl).pathname.slice(1);
+---
+
+<section id="download" class="download">
+  <div class="wrap">
+    <div class="top">
+      <Mark size={56} class="mark" />
+      <h2>{t.title}</h2>
+      <p class="status">
+        <span class="badge">{t.status}</span>
+        <span class="version" data-version hidden></span>
+      </p>
+    </div>
+
+    <ul class="platforms" data-platforms data-repo={repo}>
+      {
+        t.platforms.map(platform => (
+          <li>
+            <a href={releasesUrl} data-asset={platform.asset}>
+              <span class="os">{platform.os}</span>
+              <span class="detail">
+                {platform.arch} <span class="type">{platform.type}</span>
+              </span>
+            </a>
+          </li>
+        ))
+      }
+    </ul>
+
+    <div class="foot">
+      <details>
+        <summary>{t.quarantine.summary}</summary>
+        <p>{t.quarantine.body}</p>
+        <pre><code>xattr -dr com.apple.quarantine /Applications/Asterism.app</code></pre>
+      </details>
+      <a class="all" href={releasesUrl}>{t.all}</a>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Links point at the releases page until the newest published build (prereleases included) is known.
+  const list = document.querySelector<HTMLElement>("[data-platforms]");
+  const version = document.querySelector<HTMLElement>("[data-version]");
+  if (list && version) {
+    fetch(`https://api.github.com/repos/${list.dataset.repo}/releases?per_page=1`, {
+      headers: { Accept: "application/vnd.github+json" },
+    })
+      .then(response => (response.ok ? response.json() : Promise.reject(new Error(String(response.status)))))
+      .then((releases: { tag_name: string; assets: { name: string; browser_download_url: string }[] }[]) => {
+        const release = releases[0];
+        if (!release) return;
+        list.querySelectorAll<HTMLAnchorElement>("[data-asset]").forEach(link => {
+          const asset = release.assets.find(item => item.name.endsWith(link.dataset.asset!));
+          if (asset) link.href = asset.browser_download_url;
+        });
+        version.textContent = release.tag_name;
+        version.hidden = false;
+      })
+      .catch(error => console.warn("Latest release lookup failed:", error));
+  }
+</script>
+
+<style>
+  .download {
+    background: var(--ink);
+    color: var(--bg);
+    padding-block: clamp(5rem, 11vw, 9rem) 3rem;
+
+    --line-inv: color-mix(in srgb, var(--bg) 18%, transparent);
+    --ink-inv: color-mix(in srgb, var(--bg) 62%, transparent);
+  }
+
+  .top {
+    display: grid;
+    justify-items: start;
+    gap: 1.5rem;
+  }
+
+  .top :global(.mark) {
+    opacity: 0.9;
+  }
+
+  h2 {
+    font-size: clamp(3rem, 8vw, 7rem);
+    line-height: 0.95;
+    font-weight: 300;
+    font-stretch: 120%;
+    letter-spacing: -0.045em;
+  }
+
+  :global(html:lang(zh-CN)) h2 {
+    letter-spacing: 0;
+    font-stretch: 100%;
+  }
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    color: var(--ink-inv);
+  }
+
+  .badge {
+    padding: 0.2rem 0.65rem;
+    border: 1px solid var(--line-inv);
+    border-radius: 999px;
+  }
+
+  .version {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+  }
+
+  .platforms {
+    list-style: none;
+    margin: clamp(3rem, 7vw, 5rem) 0 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-top: 1px solid var(--line-inv);
+  }
+
+  .platforms li + li {
+    border-left: 1px solid var(--line-inv);
+  }
+
+  .platforms a {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 1.75rem 1.5rem 1.75rem 0;
+    transition: background-color 0.25s, padding 0.35s var(--ease);
+  }
+
+  .platforms li + li a {
+    padding-left: 1.5rem;
+  }
+
+  .platforms a:hover {
+    background: color-mix(in srgb, var(--bg) 6%, transparent);
+    padding-left: 1.5rem;
+  }
+
+  .os {
+    font-size: 1.5rem;
+    font-weight: 420;
+    font-stretch: 110%;
+    letter-spacing: -0.015em;
+  }
+
+  .detail {
+    font-size: 0.875rem;
+    color: var(--ink-inv);
+  }
+
+  .type {
+    margin-left: 0.35rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+  }
+
+  .foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 2rem;
+    padding-top: 1.75rem;
+    border-top: 1px solid var(--line-inv);
+    font-size: 0.875rem;
+    color: var(--ink-inv);
+  }
+
+  summary {
+    cursor: pointer;
+    list-style: none;
+    transition: color 0.2s;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary::after {
+    content: "+";
+    display: inline-block;
+    margin-left: 0.5rem;
+    transition: rotate 0.3s var(--ease);
+  }
+
+  details[open] summary::after {
+    rotate: 45deg;
+  }
+
+  summary:hover,
+  .all:hover {
+    color: var(--bg);
+  }
+
+  details p {
+    margin-top: 1rem;
+    max-width: 34em;
+  }
+
+  pre {
+    margin: 0.75rem 0 0;
+    padding: 0.85rem 1rem;
+    overflow-x: auto;
+    border: 1px solid var(--line-inv);
+    border-radius: 0.6rem;
+    color: var(--bg);
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+  }
+
+  .all {
+    flex: none;
+    transition: color 0.2s;
+  }
+
+  .download :global(:focus-visible) {
+    outline-color: var(--bg);
+  }
+
+  @media (max-width: 52rem) {
+    .platforms {
+      grid-template-columns: 1fr;
+    }
+
+    .platforms li + li {
+      border-left: 0;
+      border-top: 1px solid var(--line-inv);
+    }
+
+    .platforms li + li a,
+    .platforms a {
+      padding-left: 0;
+    }
+
+    .foot {
+      flex-direction: column;
+    }
+  }
+</style>

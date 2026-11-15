@@ -1,0 +1,57 @@
+---
+import { content, type Locale } from "../i18n/content";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const items = content[locale].principles;
+---
+
+<section class="principles wrap">
+  <dl>
+    {
+      items.map(item => (
+        <div>
+          <dt>{item.term}</dt>
+          <dd>{item.detail}</dd>
+        </div>
+      ))
+    }
+  </dl>
+</section>
+
+<style>
+  .principles {
+    padding-bottom: clamp(5rem, 10vw, 9rem);
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(1.5rem, 4vw, 4rem);
+    border-top: 1px solid var(--line);
+    padding-top: 2rem;
+  }
+
+  dt {
+    font-size: 1.25rem;
+    font-weight: 450;
+    font-stretch: 108%;
+    letter-spacing: -0.01em;
+  }
+
+  dd {
+    margin-top: 0.6rem;
+    max-width: 22em;
+    font-size: 0.9375rem;
+    color: var(--ink-2);
+  }
+
+  @media (max-width: 52rem) {
+    dl {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

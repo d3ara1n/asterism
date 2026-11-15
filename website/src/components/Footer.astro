@@ -1,0 +1,55 @@
+---
+import Mark from "./Mark.astro";
+import { content, repoUrl, type Locale } from "../i18n/content";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = content[locale].footer;
+---
+
+<footer class="footer">
+  <div class="wrap row">
+    <span class="brand"><Mark size={14} /> Asterism</span>
+    <span class="links">
+      <a href={`${repoUrl}/blob/main/LICENSE`}>{t.license}</a>
+      <a href={repoUrl}>GitHub</a>
+    </span>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    background: var(--ink);
+    color: color-mix(in srgb, var(--bg) 55%, transparent);
+    font-size: 0.8125rem;
+    padding-block: 0 2.5rem;
+  }
+
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .links {
+    display: flex;
+    gap: 1.5rem;
+  }
+
+  a {
+    transition: color 0.2s;
+  }
+
+  a:hover {
+    color: var(--bg);
+  }
+</style>

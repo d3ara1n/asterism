@@ -1,0 +1,110 @@
+---
+import { content, manualUrl, type Locale } from "../i18n/content";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = content[locale].plugins;
+---
+
+<section class="plugins wrap">
+  <div class="copy">
+    <h2>{t.title}</h2>
+    <p>{t.body}</p>
+    <a class="more" href={manualUrl}>{t.link}</a>
+  </div>
+
+  <div class="diagram" aria-hidden="true">
+    <div class="slot slot-builtin">{t.builtin}</div>
+    <div class="slot slot-yours">{t.yours}</div>
+    <div class="host">{t.host}</div>
+  </div>
+</section>
+
+<style>
+  .plugins {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(2.5rem, 6vw, 6rem);
+    align-items: center;
+    padding-block: clamp(5rem, 10vw, 9rem);
+    background: linear-gradient(var(--line), var(--line)) top center / calc(100% - var(--gutter) * 2) 1px no-repeat;
+  }
+
+  h2 {
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    line-height: 1.04;
+    font-weight: 340;
+    font-stretch: 110%;
+    letter-spacing: -0.03em;
+  }
+
+  :global(html:lang(zh-CN)) h2 {
+    letter-spacing: 0;
+    line-height: 1.25;
+  }
+
+  p {
+    max-width: 28em;
+    margin-top: 1.25rem;
+    color: var(--ink-2);
+  }
+
+  .more {
+    display: inline-block;
+    margin-top: 2rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 0.15rem;
+    transition: border-color 0.2s;
+  }
+
+  .more:hover {
+    border-color: var(--ink);
+  }
+
+  .diagram {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    font-stretch: 105%;
+  }
+
+  .diagram > div {
+    display: flex;
+    align-items: flex-end;
+    min-height: 9rem;
+    padding: 1rem 1.1rem;
+    border-radius: 1rem;
+  }
+
+  .slot-builtin {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+
+  .slot-yours {
+    border: 1px dashed var(--ink-3);
+    color: var(--ink-2);
+  }
+
+  .host {
+    grid-column: 1 / -1;
+    min-height: 4.5rem !important;
+    align-items: center !important;
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  @media (max-width: 52rem) {
+    .plugins {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

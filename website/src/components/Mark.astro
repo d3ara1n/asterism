@@ -1,0 +1,15 @@
+---
+// Official three-star constellation, kept in sync with packages/ui/src/brand/geometry.ts.
+import { brandStarPath, brandStars } from "../../../packages/ui/src/brand/geometry";
+
+interface Props {
+  size?: number | string;
+  class?: string;
+}
+
+const { size = 20, class: className } = Astro.props;
+---
+
+<svg class={className} width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+  {brandStars.map(star => <path d={brandStarPath} transform={`translate(${star.x} ${star.y})`} />)}
+</svg>

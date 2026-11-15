@@ -1,0 +1,354 @@
+---
+import { content, type Locale } from "../i18n/content";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = content[locale];
+const n = t.hero.nodes;
+
+// One abstract diagram whose state follows the step being read: cards, links, contexts, then history.
+const agents = [
+  { id: "writer", x: 190, y: 230, label: n.writer.title },
+  { id: "reviewer", x: 360, y: 370, label: n.reviewer.title },
+];
+const resources = [
+  { id: "note", x: 70, y: 110, label: n.notes.title, linked: true },
+  { id: "folder", x: 250, y: 70, label: n.folder.title, linked: true },
+  { id: "terminal", x: 420, y: 170, label: n.terminal.title, linked: false },
+];
+const size = 34;
+---
+
+<section class="story wrap" aria-label={t.story.label}>
+  <div class="stage" data-stage data-step="0">
+    <svg viewBox="0 0 500 480" aria-hidden="true">
+      <g class="layer-canvas">
+        <g class="contexts">
+          {agents.map(agent => <circle class="context" cx={agent.x} cy={agent.y} r="86" />)}
+        </g>
+
+        <g class="links">
+          {
+            resources
+              .filter(resource => resource.linked)
+              .map(resource => (
+                <line class="link" x1={resource.x} y1={resource.y} x2={agents[0].x} y2={agents[0].y} pathLength="1" />
+              ))
+          }
+          <line class="link link-report" x1={agents[0].x} y1={agents[0].y} x2={agents[1].x} y2={agents[1].y} pathLength="1" />
+        </g>
+
+        {
+          resources.map(resource => (
+            <g class:list={["resource", { unlinked: !resource.linked }]}>
+              <rect x={resource.x - size / 2} y={resource.y - size / 2} width={size} height={size} rx="8" />
+              <text x={resource.x} y={resource.y - size / 2 - 12}>{resource.label}</text>
+              {!resource.linked && (
+                <text class="unlinked-label" x={resource.x} y={resource.y + size / 2 + 22}>
+                  {t.story.unlinked}
+                </text>
+              )}
+            </g>
+          ))
+        }
+
+        {
+          agents.map(agent => (
+            <g class="agent">
+              <circle cx={agent.x} cy={agent.y} r="22" />
+              <circle class="core" cx={agent.x} cy={agent.y} r="5" />
+              <text x={agent.x} y={agent.y + 48}>{agent.label}</text>
+            </g>
+          ))
+        }
+      </g>
+
+      <g class="layer-history">
+        <path class="trunk" d="M40 300 H460" pathLength="1" />
+        <path class="branch" d="M220 300 C 270 300, 270 200, 320 200 H460" pathLength="1" />
+        {[40, 130, 220, 310, 400].map(x => <circle class="commit" cx={x} cy="300" r="7" />)}
+        {[320, 400].map(x => <circle class="commit commit-branch" cx={x} cy="200" r="7" />)}
+        <circle class="head" cx="460" cy="200" r="11" />
+      </g>
+    </svg>
+  </div>
+
+  <ol class="steps">
+    {
+      t.story.steps.map((step, index) => (
+        <li class="step" data-step-index={index}>
+          <h2>{step.title}</h2>
+          <p>{step.body}</p>
+        </li>
+      ))
+    }
+  </ol>
+</section>
+
+<script>
+  const stage = document.querySelector<HTMLElement>("[data-stage]");
+  const steps = document.querySelectorAll<HTMLElement>("[data-step-index]");
+  if (stage && steps.length) {
+    // The step crossing a reading band drives the diagram; on narrow screens the band sits below the pinned stage.
+    const band = matchMedia("(max-width: 52rem)").matches ? "-68% 0px -22% 0px" : "-45% 0px -45% 0px";
+    const observer = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const index = (entry.target as HTMLElement).dataset.stepIndex!;
+          stage.dataset.step = index;
+          steps.forEach(step => step.classList.toggle("is-active", step.dataset.stepIndex === index));
+        }
+      },
+      { rootMargin: band },
+    );
+    steps.forEach(step => observer.observe(step));
+  }
+</script>
+
+<style>
+  .story {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: clamp(2rem, 6vw, 6rem);
+    padding-block: clamp(6rem, 14vw, 11rem);
+  }
+
+  .stage {
+    position: sticky;
+    top: calc(50vh - min(19rem, 40vw) + 1rem);
+    align-self: start;
+    aspect-ratio: 500 / 480;
+    max-height: 38rem;
+  }
+
+  svg {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  text {
+    fill: var(--ink-2);
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 450;
+    text-anchor: middle;
+  }
+
+  .layer-canvas,
+  .layer-history {
+    transition: opacity 0.7s var(--ease);
+  }
+
+  .resource rect {
+    fill: var(--surface);
+    stroke: var(--ink-2);
+    stroke-width: 1.25;
+    transition: stroke 0.5s, stroke-dasharray 0.5s, opacity 0.5s;
+  }
+
+  .agent circle {
+    fill: var(--surface);
+    stroke: var(--ink);
+    stroke-width: 1.25;
+  }
+
+  .agent .core {
+    fill: var(--ink);
+    stroke: none;
+  }
+
+  .agent text {
+    fill: var(--ink);
+    font-weight: 540;
+  }
+
+  .unlinked-label {
+    fill: var(--ink-3);
+    font-size: 11.5px;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+
+  .link {
+    stroke: var(--ink-2);
+    stroke-width: 1.25;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 0.9s var(--ease);
+  }
+
+  .context {
+    fill: var(--ink);
+    fill-opacity: 0.045;
+    stroke: var(--ink-3);
+    stroke-width: 1;
+    stroke-dasharray: 2 5;
+    opacity: 0;
+    transform-box: fill-box;
+    transform-origin: center;
+    scale: 0.6;
+    transition: opacity 0.7s var(--ease), scale 0.9s var(--ease);
+  }
+
+  .layer-history {
+    opacity: 0;
+  }
+
+  .trunk,
+  .branch {
+    fill: none;
+    stroke: var(--ink-2);
+    stroke-width: 1.25;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 1.2s var(--ease);
+  }
+
+  .branch {
+    stroke: var(--ink);
+    transition-delay: 0.35s;
+  }
+
+  .commit {
+    fill: var(--bg);
+    stroke: var(--ink-2);
+    stroke-width: 1.25;
+  }
+
+  .commit-branch {
+    stroke: var(--ink);
+  }
+
+  .head {
+    fill: var(--ink);
+    opacity: 0;
+    transition: opacity 0.4s 1.2s;
+  }
+
+  /* Step 2: links appear; the terminal stays unlinked. */
+  .stage:is([data-step="1"], [data-step="2"]) .link:not(.link-report) {
+    stroke-dashoffset: 0;
+  }
+
+  .stage:is([data-step="1"], [data-step="2"]) .unlinked rect {
+    stroke-dasharray: 3 4;
+    stroke: var(--ink-3);
+  }
+
+  .stage[data-step="1"] .unlinked-label {
+    opacity: 1;
+  }
+
+  /* Step 3: each agent has its own context; a directed link carries the report. */
+  .stage[data-step="2"] .context {
+    opacity: 1;
+    scale: 1;
+  }
+
+  .stage[data-step="2"] .link-report {
+    stroke: var(--ink);
+    stroke-dashoffset: 0;
+  }
+
+  /* Step 4: the canvas gives way to a branching history. */
+  .stage[data-step="3"] .layer-canvas {
+    opacity: 0;
+  }
+
+  .stage[data-step="3"] .layer-history {
+    opacity: 1;
+  }
+
+  .stage[data-step="3"] :is(.trunk, .branch) {
+    stroke-dashoffset: 0;
+  }
+
+  .stage[data-step="3"] .head {
+    opacity: 1;
+  }
+
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .step {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 70vh;
+    color: var(--ink-3);
+    transition: color 0.5s;
+  }
+
+  .step:first-child {
+    min-height: 50vh;
+  }
+
+  .step.is-active {
+    color: var(--ink);
+  }
+
+  h2 {
+    font-size: clamp(1.75rem, 3.2vw, 2.75rem);
+    line-height: 1.08;
+    font-weight: 380;
+    font-stretch: 108%;
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  :global(html:lang(zh-CN)) h2 {
+    letter-spacing: 0;
+    line-height: 1.3;
+    font-weight: 400;
+  }
+
+  p {
+    max-width: 30em;
+    margin-top: 1rem;
+    color: var(--ink-2);
+    opacity: 0.4;
+    transition: opacity 0.5s;
+  }
+
+  .step.is-active p {
+    opacity: 1;
+  }
+
+  @media (max-width: 52rem) {
+    .story {
+      grid-template-columns: 1fr;
+      gap: 0;
+      padding-top: 5rem;
+    }
+
+    .stage {
+      top: 0;
+      z-index: 1;
+      width: min(100%, 24rem);
+      margin-inline: auto;
+      padding-block: 0.5rem;
+      background: var(--bg);
+      box-shadow: 0 0 0 100vmax var(--bg);
+      clip-path: inset(0 -100vmax);
+    }
+
+    text {
+      font-size: 16px;
+    }
+
+    .step,
+    .step:first-child {
+      justify-content: flex-end;
+      min-height: 60vh;
+      padding-bottom: 12vh;
+    }
+  }
+</style>
