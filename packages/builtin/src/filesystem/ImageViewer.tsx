@@ -9,7 +9,7 @@ import { commonMessages } from "@asterism-app/ui/messages/common";
 import { editorMessages as messages } from "../messages/editor";
 
 /** An independent content surface using the same island shell as the text editor. */
-export default function ImageViewer({ path, mediaType, base64, source }: { path: string; mediaType: string; base64: string; source?: ReactNode }) {
+export default function ImageViewer({ path, mediaType, base64, source, actions }: { path: string; mediaType: string; base64: string; source?: ReactNode; actions?: ReactNode }) {
   const i18n = useI18n();
   const viewport = useRef<HTMLDivElement>(null);
   const [area, setArea] = useState({ width: 0, height: 0 });
@@ -31,6 +31,7 @@ export default function ImageViewer({ path, mediaType, base64, source }: { path:
     <Button size="sm" variant="ghost" aria-label={i18n.text(messages.actualSize)} onClick={() => setZoom(1)}>{Math.round(scale * 100)}%</Button>
     <IconButton label={i18n.text(commonMessages.zoomIn)} disabled={scale >= 8} onClick={() => setZoom(Math.min(8, scale * 1.25))}><Plus /></IconButton>
     <IconButton label={i18n.text(messages.fitImage)} onClick={() => setZoom(null)}><Maximize /></IconButton>
+    {actions}
   </>}>
     {failed && <Alert variant="destructive"><AlertDescription>{i18n.text(messages.imageFailed)}</AlertDescription></Alert>}
     <div ref={viewport} className="min-h-0 flex-1 overflow-auto overscroll-contain bg-muted/30">

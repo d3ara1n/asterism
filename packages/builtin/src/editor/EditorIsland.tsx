@@ -12,9 +12,10 @@ import { TextEditor, type TextEditorHandle } from "./TextEditor";
 import { editorMessages as messages } from "../messages/editor";
 
 /** The island owns the buffer; its caller supplies persistence and optional source metadata. */
-export function EditorIsland({ title, source, filename, text, onSave, gitBase = null, status, format }: {
+export function EditorIsland({ title, source, actions, filename, text, onSave, gitBase = null, status, format }: {
   title: string;
   source?: ReactNode;
+  actions?: ReactNode;
   filename: string;
   text: string;
   onSave(text: string): Promise<void>;
@@ -53,6 +54,7 @@ export function EditorIsland({ title, source, filename, text, onSave, gitBase = 
     <Button size="sm" disabled={!dirty || saving} aria-busy={saving} onClick={() => void save()}>
       {saving ? <Spinner data-icon="inline-start" /> : <Save data-icon="inline-start" />}{i18n.text(messages.save)}
     </Button>
+    {actions}
   </>}>
     {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
     <TextEditor ref={editor} filename={filename} initialText={initial} gitBase={gitBase} lineWrapping={lineWrapping}

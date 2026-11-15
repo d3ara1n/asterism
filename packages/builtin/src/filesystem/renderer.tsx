@@ -1,7 +1,7 @@
 import { lazy } from "react";
 import { useI18n, useRendererApplication, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
-import { Eye, Folder, FolderOpen, FileText, FileDown, FilePenLine, FilePlus2, Info, ListTree, Replace } from "lucide-react";
+import { ExternalLink, Eye, Folder, FolderOpen, FileText, FileDown, FilePenLine, FilePlus2, Info, ListTree, Replace } from "lucide-react";
 
 import { toast } from "sonner";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -17,6 +17,8 @@ import { inputText } from "../shared/tool-preview";
 import { Directory, CreateDirectory, DirectoryView, DirectoryChildren, DirectoryStatus, DirectoryWatch, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee } from "./contract";
 import { FilePreview } from "../shared/attachments";
 import { mediaMessages } from "../messages/media";
+import { commonMessages } from "@asterism-app/ui/messages/common";
+import { ResolveDirectoryLocation } from "./editor-contract";
 import { DirectoryInput } from "./creation";
 import { execToolRenderer } from "./exec-view";
 import { useTreeStore } from "./tree-store";
@@ -79,7 +81,18 @@ function DirectoryTreeBody() {
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: Directory.kind, label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance, open: fileOpener(DirectoryFile) }],
+  resources: [{ kind: Directory.kind, label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance, open: fileOpener(DirectoryFile),
+    actions: (location, { resource, calls, application }) => [
+      { id: "open-system", label: commonMessages.openWithSystem, icon: <ExternalLink />, async run() {
+        const file = await calls.invoke(ResolveDirectoryLocation, { path: location }, { object: resource });
+        await application.openLocalFile(file.path);
+      } },
+      { id: "show-in-folder", label: commonMessages.showInFileManager, icon: <FolderOpen />, async run() {
+        const file = await calls.invoke(ResolveDirectoryLocation, { path: location }, { object: resource });
+        await application.showLocalFile(file.path, file.directory);
+      } },
+    ],
+  }],
   cards: [cardRenderer(DirectoryView, {
     ...appearance,
     Body: DirectoryTreeBody,

@@ -1,4 +1,6 @@
 {
+  "editor.previewUnavailable": "无法预览",
+  "editor.folder": "文件夹",
   "filesystem.open": "在文件管理器中打开",
   "filesystem.openFailed": "无法打开目录。",
   "tools.filesystem.inspectPath": "检查路径",

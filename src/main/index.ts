@@ -7,7 +7,7 @@ import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { pickDirectoryChannel, openLocalFileChannel, openLogsChannel, localFilePathSchema, statusChannel } from "../shared/contracts.ts";
+import { pickDirectoryChannel, openLocalFileChannel, showLocalFileChannel, showLocalFileSchema, openLogsChannel, localFilePathSchema, statusChannel } from "../shared/contracts.ts";
 import { connectionRequestChannel } from "../shared/connection.ts";
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage } from "../shared/application.ts";
@@ -174,6 +174,7 @@ function createWindow(): void {
   current.webContents.on("will-attach-webview", event => event.preventDefault());
   ipcMain.removeHandler(pickDirectoryChannel);
   ipcMain.removeHandler(openLocalFileChannel);
+  ipcMain.removeHandler(showLocalFileChannel);
   ipcMain.removeHandler(openLogsChannel);
   const trusted = (event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent) => event.sender === current.webContents &&
     event.senderFrame === current.webContents.mainFrame && event.senderFrame?.url === allowedURL;
@@ -319,6 +320,14 @@ function createWindow(): void {
     if (!parsed.success || !isAbsolute(parsed.data)) return "An absolute local file path is required.";
     return shell.openPath(parsed.data);
   });
+  ipcMain.handle(showLocalFileChannel, async (event, raw: unknown) => {
+    if (!trusted(event)) return "Untrusted application frame.";
+    const parsed = showLocalFileSchema.safeParse(raw);
+    if (!parsed.success || !isAbsolute(parsed.data.path)) return "An absolute local file path is required.";
+    if (parsed.data.directory) return shell.openPath(parsed.data.path);
+    shell.showItemInFolder(parsed.data.path);
+    return "";
+  });
   // The main process resolves the log directory from the data root; the renderer only requests opening it.
   ipcMain.handle(openLogsChannel, event => {
     if (!trusted(event)) return "Untrusted application frame.";
@@ -337,7 +346,7 @@ function createWindow(): void {
     for (const channel of [startupGetChannel, startupRestartChannel, startupDataDirectoryChannel, startupRecoveryPointChannel, startupRecoveryChannel, startupInitializedChannel, startupAcknowledgeMigrationChannel]) ipcMain.removeHandler(channel);
     connectSettings = null;
     closeConnection();
-    window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
+    window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(showLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
     stopAppearance(); stopPreferences(); stopLanguage(); stopUpdates(); stopNetwork();
   });
   const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);

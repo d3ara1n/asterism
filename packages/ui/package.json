@@ -25,6 +25,7 @@
     "./ConfigurationChoice": "./src/ConfigurationChoice.tsx",
     "./links": "./src/links.ts",
     "./markdown": "./src/markdown/markdown.tsx",
+    "./resource-location-actions": "./src/resource-location-actions.tsx",
     "./reference-chip": "./src/reference-chip.tsx",
     "./references": "./src/references.ts",
     "./tool-content": "./src/tool-content.tsx",

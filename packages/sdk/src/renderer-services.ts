@@ -87,6 +87,8 @@ export interface RendererApplicationServices {
   preferences(pluginId: string): import("./renderer-creation.ts").RendererPreferences;
   pickDirectory(initialPath?: string): Promise<string | null>;
   openLocalFile(path: string): Promise<void>;
+  /** Select a local file in the system file manager; directory targets open in that manager. */
+  showLocalFile(path: string, directory: boolean): Promise<void>;
   readonly files: {
     open(ref: import("./files.ts").FileRef): AsyncIterable<Uint8Array>;
     /** Show the system Save As dialog, then consume the stream. Returns false when the user cancels. */

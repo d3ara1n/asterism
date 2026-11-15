@@ -5,6 +5,7 @@ import { ResourcePresenceChanged, type ResourceRef, type UiText } from "@asteris
 import type { z } from "zod";
 import { CodeDiff, CodeText, parseFileDiff } from "@asterism-app/ui/code-view";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { ResourceLocationActions } from "@asterism-app/ui/resource-location-actions";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { RefreshCw } from "lucide-react";
@@ -55,10 +56,12 @@ export default function DirectoryDiff({ resource, path, store }: { resource: Res
     return () => { unsubscribe(); controller.abort(); };
   }, [present, calls, resource, path, store, attempt]);
   const parsed = useMemo(() => data?.kind === "patch" ? parseFileDiff(data.patch) : null, [data]);
-  return <IslandPanel title={path} description={i18n.text(messages.diffBase)} action={
+  return <IslandPanel title={path} description={i18n.text(messages.diffBase)} action={<>
     <IconButton label={i18n.text(messages.directoryRefresh)} disabled={loading} onClick={() => setAttempt(value => value + 1)}>
       {loading ? <Spinner /> : <RefreshCw />}
-    </IconButton>}>
+    </IconButton>
+    <ResourceLocationActions resource={resource} location={path} />
+  </>}>
     {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
     {data?.kind === "patch" ? parsed?.hunks.length === 0
       ? <CodeText contents={data.patch} language="diff" /> : <CodeDiff diff={parsed ?? data.patch} />

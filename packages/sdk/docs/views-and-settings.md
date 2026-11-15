@@ -24,6 +24,8 @@ A resource owns the meaning of its locations and the surfaces used to display th
 
 A reference names something; it is not an access grant or proof of current availability. Resolve it when followed and report the actual result. Keep navigation initiated by a user distinct from a model request's captured authorization scope.
 
+A source's location actions express what users can do with the original material independently of its preview format. Declare those actions with the resource rather than teaching shared chips and viewers to recognize particular resource kinds. Resolve the actual target when an action runs: an earlier preview is not proof of current availability. An internal preview, a system application, and a file-manager reveal can reach the same source without exporting a copy or treating an unsaved editor draft as saved content.
+
 Opening a file should preserve its meaning as file content. Text inside it does not become another application interaction contract merely because the viewer can recognize a link-like string.
 
 ## Keep transfers with the right owner

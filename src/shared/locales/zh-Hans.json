@@ -1,4 +1,9 @@
 {
+  "common.actions.noLocationActions": "无可用操作",
+  "common.actions.openInApp": "在 Asterism 中打开",
+  "common.actions.openWithSystem": "用系统应用打开",
+  "common.actions.showInFileManager": "在文件管理器中显示",
+  "common.actions.locationFailed": "无法执行此位置操作。",
   "references.model.context": "上下文窗口",
   "references.model.outputLimit": "输出上限",
   "references.model.reasoning": "推理",

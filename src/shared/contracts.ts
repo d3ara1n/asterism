@@ -17,8 +17,10 @@ export const systemResumeMessage = "system.resume";
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
 export const openLocalFileChannel = coreChannel("open-local-file");
+export const showLocalFileChannel = coreChannel("show-local-file");
 export const openLogsChannel = coreChannel("open-logs");
 export const localFilePathSchema = z.string().min(1).refine(value => !value.includes("\0"), "A local file path is required.");
+export const showLocalFileSchema = z.strictObject({ path: localFilePathSchema, directory: z.boolean() });
 const id = z.string().uuid();
 /** Application entries read workspace identity and session summaries only, without holding open-session bodies. */
 export const commandSchema = z.discriminatedUnion("type", [
@@ -89,6 +91,7 @@ export interface DesktopBridge {
   pickDirectory(initialPath?: string): Promise<string | null>;
   /** Open user-clicked local files with system-associated apps; return error text on failure. */
   openLocalFile(path: string): Promise<string>;
+  showLocalFile(path: string, directory: boolean): Promise<string>;
   saveFile(command: import("./file-save.ts").FileSaveCommand): Promise<import("./file-save.ts").FileSaveReply>;
   /** Open the application log directory in the system file manager; return error text on failure. */
   openLogs(): Promise<string>;

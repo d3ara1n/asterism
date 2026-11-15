@@ -33,6 +33,11 @@ export const commonMessages = pluginNamespace("asterism.host").messages("en", de
     id: "common.message.send",
     defaultMessage: "Send message",
   },
+  openInApp: { id: "common.actions.openInApp", defaultMessage: "Open in Asterism" },
+  openWithSystem: { id: "common.actions.openWithSystem", defaultMessage: "Open with system app" },
+  showInFileManager: { id: "common.actions.showInFileManager", defaultMessage: "Show in file manager" },
+  noLocationActions: { id: "common.actions.noLocationActions", defaultMessage: "No actions available" },
+  locationActionFailed: { id: "common.actions.locationFailed", defaultMessage: "The location action failed." },
   retry: {
     id: "common.actions.retry",
     defaultMessage: "Try again",

@@ -7,7 +7,7 @@ import { editorMessages as messages } from "../messages/editor";
 import { ReadDirectoryGitBase, SaveDirectoryText } from "./editor-contract";
 
 /** Files retain their text format and refresh the Git baseline after saving. */
-export default function FileEditor({ resource, path, text, source }: { resource: ResourceRef; path: string; text: string; source?: ReactNode }) {
+export default function FileEditor({ resource, path, text, source, actions }: { resource: ResourceRef; path: string; text: string; source?: ReactNode; actions?: ReactNode }) {
   const i18n = useI18n();
   const calls = useRendererCalls();
   const [initial] = useState(() => parseEditorText(text));
@@ -27,7 +27,7 @@ export default function FileEditor({ resource, path, text, source }: { resource:
     });
     return () => controller.abort();
   }, [calls, resource, path, saved]);
-  return <EditorIsland title={path} source={source} filename={path} text={initial.content} gitBase={gitBase}
+  return <EditorIsland title={path} source={source} actions={actions} filename={path} text={initial.content} gitBase={gitBase}
     status={gitFailed ? i18n.text(messages.gitFailed) : null}
     format={<>UTF-8 · {initial.format.lineSeparator === "\r\n" ? "CRLF" : initial.format.lineSeparator === "\r" ? "CR" : "LF"}</>}
     onSave={async content => {

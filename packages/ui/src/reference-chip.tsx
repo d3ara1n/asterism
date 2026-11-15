@@ -1,4 +1,4 @@
-import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useState, type ComponentProps, type ComponentType, type ReactNode } from "react";
+import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useRef, useState, type ComponentProps, type ComponentType, type ReactNode } from "react";
 import { ModelCatalog, formatModelExpression, parseModelUrl, parseResourceUrl, parseSkillUrl, resourceUrl, type ModelExpression, type ResourceRef, type UiText } from "@asterism-app/sdk/contracts";
 import { useI18n, useRendererCatalogs, useRendererResourceNavigation, useRendererResources, type RendererResourceIdentity } from "@asterism-app/sdk/renderer";
 import { BookOpen, Box, Cpu, Link2, X, type LucideIcon } from "lucide-react";
@@ -9,6 +9,8 @@ import { referenceKind, splitReferenceLabel, type ReferenceKind } from "./refere
 import { Badge } from "./ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
 import { Spinner } from "./ui/spinner";
+import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuGroup, ContextMenuItem } from "./ui/context-menu";
+import { useResourceLocationActions } from "./resource-location-actions";
 import { ModelReferenceDetails } from "./model-reference-details";
 
 /**
@@ -118,11 +120,37 @@ export function ReferenceChip({ href, sessionId, children, openable = false, sel
       setPending(true);
       void activate(event.currentTarget).finally(() => setPending(false));
     }}>{face}</a> : face;
-  if (!card) return trigger;
+  const hoverTrigger = card ? <HoverCardTrigger asChild>{trigger}</HoverCardTrigger> : trigger;
+  const menuTrigger = openable && resource && sessionId
+    ? <ResourceReferenceMenu resource={{ sessionId, id: resource.resourceId }} location={resource.location}>{hoverTrigger}</ResourceReferenceMenu>
+    : hoverTrigger;
+  if (!card) return menuTrigger;
   return <HoverCard openDelay={400} closeDelay={100}>
-    <HoverCardTrigger asChild>{trigger}</HoverCardTrigger>
+    {menuTrigger}
     <HoverCardContent side="top" align="start" className={cn("w-72 p-3", model && "max-h-[var(--radix-hover-card-content-available-height)] w-80 max-w-[var(--radix-hover-card-content-available-width)] overflow-y-auto")}>{card}</HoverCardContent>
   </HoverCard>;
+}
+
+/** The menu resolves capabilities only when opened; the reference's normal click remains unchanged. */
+function ResourceReferenceMenu({ resource, location, children }: {
+  resource: Pick<ResourceRef, "sessionId" | "id">; location: string; children: ReactNode;
+}) {
+  const i18n = useI18n();
+  const [open, setOpen] = useState(false);
+  const origin = useRef<HTMLElement | null>(null);
+  const { actions, loading, error, pending, run } = useResourceLocationActions(resource, location, open);
+  return <ContextMenu onOpenChange={setOpen}>
+    <ContextMenuTrigger asChild onContextMenu={event => { origin.current = event.currentTarget; }}>{children}</ContextMenuTrigger>
+    <ContextMenuContent>
+      <ContextMenuGroup>
+        {loading ? <ContextMenuItem disabled><Spinner />{i18n.text(commonMessages.loading)}</ContextMenuItem>
+          : error ? <ContextMenuItem disabled>{i18n.text(error)}</ContextMenuItem>
+          : actions.length ? actions.map(action => <ContextMenuItem key={action.id} disabled={pending !== null}
+            onSelect={() => void run(action, origin.current)}>{action.icon}{i18n.text(action.label)}</ContextMenuItem>)
+          : <ContextMenuItem disabled>{i18n.text(commonMessages.noLocationActions)}</ContextMenuItem>}
+      </ContextMenuGroup>
+    </ContextMenuContent>
+  </ContextMenu>;
 }
 
 /** Hover card layout shared by reference kinds: identity row, optional description, then monospaced details. */

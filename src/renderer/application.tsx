@@ -115,6 +115,9 @@ export async function startApplication(root: Root, progress: (message: UiText, d
     pickDirectory: (initialPath?: string) => window.host.pickDirectory(initialPath), async openLocalFile(path: string) {
     const error = await window.host.openLocalFile(path);
     if (error) throw new Error(error);
+  }, async showLocalFile(path: string, directory: boolean) {
+    const error = await window.host.showLocalFile(path, directory);
+    if (error) throw new Error(error);
   } };
   signal.throwIfAborted();
   root.render(

@@ -1,9 +1,11 @@
 import { Component, useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
-  RendererCallsProvider, RendererIslandPanelProvider, RendererIslandProvider, RendererPreferencesProvider, RendererResourceNavigationProvider, useRendererCalls,
+  RendererCallsProvider, RendererIslandPanelProvider, RendererIslandProvider, RendererPreferencesProvider, RendererResourceNavigationProvider, useRendererCalls, useRendererApplication,
   type RendererIsland, type RendererIslandSpec, type RendererCalls, type RendererReceipt, type RendererResourceIdentity, type RendererResourceNavigation,
 } from "@asterism-app/sdk/renderer";
 import { pluginOf } from "@asterism-app/sdk/contracts";
+import { AppWindow } from "lucide-react";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { failureDisplay } from "@asterism-app/ui/error-display";
 import { objectsMessages } from "../../messages/objects";
@@ -116,6 +118,7 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
 }) {
   const island = useIsland();
   const registry = useModuleViews();
+  const application = useRendererApplication();
   const calls = useRendererCalls();
   const i18n = useI18n();
   const opened = useRef(new Set<string>());
@@ -126,6 +129,24 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
       const read = await readResource(target);
       if (!read.ok) throw Object.assign(new Error(read.error.message), read.error);
       return read.resource;
+    },
+    async actions(target, location) {
+      const read = await readResource(target);
+      if (!read.ok) throw Object.assign(new Error(read.error.message), read.error);
+      if (!read.resource) return [];
+      const { ref: resource } = read.resource;
+      const descriptor = registry.resource(resource.kind);
+      const actions = [...(descriptor.actions?.(location, { resource, calls, application }) ?? [])];
+      if (descriptor.open) actions.unshift({ id: "open", label: commonMessages.openInApp, icon: <AppWindow />,
+        run: options => navigation.open(target, location, options) });
+      return actions.map(action => ({ ...action, async run(options) {
+        try { return await action.run(options); }
+        catch (error) {
+          console.error("Resource location action failed.", error);
+          toast.error(i18n.text(failureDisplay(error, commonMessages.locationActionFailed)));
+          return false;
+        }
+      } }));
     },
     async open(target, location, options) {
       try {
@@ -143,7 +164,7 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
         return false;
       }
     },
-  }), [island, registry, calls, i18n, owned]);
+  }), [island, registry, calls, application, i18n, owned]);
   useEffect(() => {
     if (!owned) return;
     // Home and the workbench share a host island and overlap during page transitions.

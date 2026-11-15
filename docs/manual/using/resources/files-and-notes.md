@@ -24,6 +24,12 @@ The file tree loads folders as they are expanded. Its filter narrows the paths a
 
 The open Directory browser watches for changes, but that view is not a background monitor for Agents. A browser refresh and an Agent learning about a change are different events. A refreshed file tree also does not replace an editor's unsaved draft.
 
+### Internal previews and system applications serve different purposes
+
+A Directory location refers to an actual file or folder. Its ability to open in a system application does not depend on whether Asterism can preview its contents. An unsupported preview format therefore does not make the file inaccessible; use the source's system-opening action when another application is better suited to it. Opening the containing folder locates a file in the system file manager, while a folder target opens that folder itself.
+
+These actions act on the current saved filesystem content. They neither export the editor's unsaved draft nor automatically save it. A virtual source, such as the Manual, can offer an internal view without offering system-file actions, even when its implementation stores material on disk.
+
 ### Git views answer a particular comparison
 
 The Changes view compares current files with HEAD. It is useful for reviewing the net result, not for distinguishing everything staged from everything unstaged. Opposing edits can cancel in the displayed diff while Git status still lists a change. Reviewing the diff does not stage, revert, or commit anything.

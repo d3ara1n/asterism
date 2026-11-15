@@ -1,4 +1,4 @@
-import { open, readFile } from "node:fs/promises";
+import { open, readFile, stat } from "node:fs/promises";
 import { PluginApiError } from "@asterism-app/sdk/runtime";
 import type { z } from "zod";
 import type { ReadDirectoryFile } from "./editor-contract.ts";
@@ -17,9 +17,11 @@ export function fileFailure(error: unknown): never {
   throw new PluginApiError("unavailable", failure.error.message, failure.error.code);
 }
 
-/** Read a resolved file for a text or image surface. Resource implementations resolve their own paths. */
+/** Classify a resolved location for an internal preview. Unsupported formats remain usable through source-owned actions. */
 export async function readViewerFile(path: string, signal: AbortSignal): Promise<z.infer<typeof ReadDirectoryFile.output>> {
   signal.throwIfAborted();
+  const info = await stat(path);
+  if (info.isDirectory()) return { kind: "directory" };
   const file = await open(path, "r");
   let mediaType: string | null;
   try {
@@ -28,5 +30,10 @@ export async function readViewerFile(path: string, signal: AbortSignal): Promise
     mediaType = imageMediaType(header);
   } finally { await file.close(); }
   if (mediaType) return { kind: "image" as const, mediaType, base64: (await readFile(path, { signal })).toString("base64") };
-  return { kind: "text" as const, text: (await readTextFile(path, signal)).text };
+  try { return { kind: "text" as const, text: (await readTextFile(path, signal)).text }; }
+  catch (error) {
+    if (error instanceof TextError && (error.code === "unsupported_text" || error.code === "file_too_large"))
+      return { kind: "unsupported", reason: error.code === "file_too_large" ? "size" : "format", size: info.size };
+    throw error;
+  }
 }

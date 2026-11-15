@@ -8,7 +8,7 @@ import { TextEditor, type TextEditorHandle } from "./TextEditor";
 import { parseEditorText } from "./text-format";
 import { editorMessages as messages } from "../messages/editor";
 
-export default function TextViewer({ path, text, source }: { path: string; text: string; source?: ReactNode }) {
+export default function TextViewer({ path, text, source, actions }: { path: string; text: string; source?: ReactNode; actions?: ReactNode }) {
   const i18n = useI18n();
   const editor = useRef<TextEditorHandle>(null);
   const [initial] = useState(() => parseEditorText(text));
@@ -19,6 +19,7 @@ export default function TextViewer({ path, text, source }: { path: string; text:
     <IconButton label={i18n.text(messages.searchText)} onClick={() => editor.current?.find()}><Search /></IconButton>
     <IconButton label={i18n.text(commonMessages.wordWrap)} aria-pressed={lineWrapping}
       variant={lineWrapping ? "selected" : "ghost"} onClick={() => setLineWrapping(value => !value)}><WrapText /></IconButton>
+    {actions}
   </>}>
     {languageFailed && <Alert variant="destructive"><AlertDescription>{i18n.text(messages.languageFailed)}</AlertDescription></Alert>}
     <TextEditor ref={editor} filename={path} initialText={initial.content} lineWrapping={lineWrapping} readOnly onPosition={setPosition}
