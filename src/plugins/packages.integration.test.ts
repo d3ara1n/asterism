@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync, readFileSync, symlinkSyn
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { PackageList, loadPackages, packageCandidates, runtimeDependencies } from "./packages.ts";
+import { PackageList, buildPackages, loadPackages, packageCandidates, runtimeDependencies } from "./packages.ts";
 import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
 import { ApplicationService } from "../runtime/service.ts";
 import { pathToFileURL } from "node:url";
@@ -363,4 +363,44 @@ describe("Public modules", () => {
     const packages = await loadPackages(list, fixture.data, fixture.cache, []);
     expect(packages.map(pkg => pkg.status)).toEqual(["disabled", "ready", "ready"]);
   });
+});
+
+// Libraries fetch named resources relative to their directory URL; lazy chunks and cache relocation must preserve that relationship.
+it("relocates lazy renderer worker and directory URLs without flattening library resources", async () => {
+  const root = temp(), data = temp(), cache = join(data, "cache");
+  pkg(root, { id: "acme.assets", renderer: "src/renderer.ts" });
+  const library = join(root, "node_modules/asset-library");
+  mkdirSync(join(library, "resources/nested"), { recursive: true });
+  mkdirSync(join(library, "other"), { recursive: true });
+  writeFileSync(join(library, "package.json"), JSON.stringify({ name: "asset-library" }));
+  writeFileSync(join(library, "worker.mjs"), 'throw new Error("Worker must remain an asset, not execute on import.");');
+  writeFileSync(join(library, "resources/nested/data.bin"), "nested-data");
+  writeFileSync(join(library, "resources/z.bin"), "root-data");
+  writeFileSync(join(library, "other/z.bin"), "other-data");
+  writeFileSync(join(root, "src/renderer.ts"), 'export const load = () => import("./reader.ts"); export default {};');
+  writeFileSync(join(root, "src/reader.ts"), `
+    import worker from "asset-library/worker.mjs?url";
+    import directory from "asset-library/resources/?url";
+    import other from "asset-library/other/z.bin?url";
+    export { worker, directory, other };
+  `);
+  const list = new PackageList(join(data, "plugins.json"));
+  list.add({ source: { kind: "path", path: root } }, data);
+  const [loaded] = await loadPackages(list, data, cache, []);
+  expect(loaded!.status, loaded!.diagnostic?.message).toBe("ready");
+  const entry = await import(pathToFileURL(join(cache, loaded!.renderer!)).href);
+  const assets = await entry.load() as { worker: string; directory: string; other: string };
+  expect(readFileSync(new URL(assets.worker), "utf8")).toContain("Worker must remain an asset");
+  expect(readFileSync(new URL("nested/data.bin", assets.directory), "utf8")).toBe("nested-data");
+  expect(readFileSync(new URL("z.bin", assets.directory), "utf8")).toBe("root-data");
+  expect(readFileSync(new URL(assets.other), "utf8")).toBe("other-data");
+});
+
+// The shipped renderer must compile its actual dependency graph, not just fixture packages.
+it("builds the bundled plugin with its local PDF rendering dependencies", async () => {
+  const data = temp(), cache = join(data, "cache");
+  const list = new PackageList(join(data, "plugins.json"));
+  list.add({ source: { kind: "bundled", name: "builtin" } }, data);
+  const [built] = await buildPackages(list, data, cache);
+  expect(built!.status, built!.diagnostic?.message).toBe("ready");
 });

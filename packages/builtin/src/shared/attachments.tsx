@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@asterism-app/ui/ui/button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { cn } from "@asterism-app/ui/utils";
+import { PdfPreviewDialog } from "./pdf-preview-dialog";
 import { mediaMessages as messages } from "../messages/media";
 
 export type InputFile = Exclude<AgentInputPart, { kind: "text" }>;
@@ -56,6 +57,9 @@ function usePartImage(part: InputFile, content: ContentReader): Preview | undefi
   const key = !enabled ? null : part.kind === "file" ? part.file["$asterism.content"] : JSON.stringify(part.ref);
   const preview = useStreamImage(key, part.mediaType, useOpener(part, content));
   return enabled ? preview : undefined;
+}
+function previewsAsPdf(part: InputFile): boolean {
+  return part.mediaType === "application/pdf" || /\.pdf$/iu.test(inputFileName(part));
 }
 function partKey(part: InputFile, index: number) {
   return `${part.kind === "file" ? part.file["$asterism.content"] : JSON.stringify(part.ref)}:${index}`;
@@ -116,8 +120,10 @@ export function FilePreview({ part, content }: { part: InputFile; content: Conte
   const [open, setOpen] = useState(false);
   const preview = usePartImage(part, content);
   const name = inputFileName(part), details = fileDetails(i18n, part);
-  const { saving, save } = useSave(name, useOpener(part, content));
+  const openFile = useOpener(part, content);
+  const { saving, save } = useSave(name, openFile);
   const failure = preview?.failed ? i18n.text(messages.unavailable) : null;
+  const pdf = !preview && previewsAsPdf(part);
   return <>
     <Attachment state={failure ? "error" : preview && !preview.url ? "processing" : "done"} orientation={preview ? "vertical" : "horizontal"} className="max-w-64">
       <AttachmentMedia variant={preview?.url ? "image" : "icon"}>
@@ -128,11 +134,13 @@ export function FilePreview({ part, content }: { part: InputFile; content: Conte
         <AttachmentTitle title={name}>{name}</AttachmentTitle>
         <AttachmentDescription title={failure ?? details}>{failure ?? details}</AttachmentDescription>
       </AttachmentContent>
-      {preview?.url && <AttachmentTrigger aria-label={i18n.text(messages.preview)} onClick={() => setOpen(true)} />}
+      {(preview?.url || pdf) && <AttachmentTrigger aria-label={i18n.text(pdf ? messages.pdfPreview : messages.preview)} onClick={() => setOpen(true)} />}
       <AttachmentActions><AttachmentAction aria-label={i18n.text(messages.saveAs)} title={i18n.text(messages.saveAs)}
         disabled={saving} aria-busy={saving || undefined} onClick={() => void save()}>{saving ? <Spinner /> : <Download />}</AttachmentAction></AttachmentActions>
     </Attachment>
     {preview?.url && <PreviewDialog open={open} onOpenChange={setOpen} name={name} details={details} url={preview.url} onError={preview.fail}
+      saving={saving} save={() => void save()} />}
+    {pdf && open && <PdfPreviewDialog key={partKey(part, 0)} onOpenChange={setOpen} name={name} details={details} openFile={openFile}
       saving={saving} save={() => void save()} />}
   </>;
 }
@@ -184,15 +192,22 @@ function ImageTile({ part, content, single }: { part: InputFile; content: Conten
 
 function FileRow({ part, content }: { part: InputFile; content: ContentReader }) {
   const i18n = useI18n();
-  const name = inputFileName(part), details = fileDetails(i18n, part);
-  const { saving, save } = useSave(name, useOpener(part, content));
-  return <Attachment size="sm" className="w-52 min-w-0 max-w-full">
-    <AttachmentMedia variant="icon"><FileTypeIcon mediaType={part.mediaType} /></AttachmentMedia>
-    <AttachmentContent>
-      <AttachmentTitle title={name}>{name}</AttachmentTitle>
-      <AttachmentDescription title={details}>{details}</AttachmentDescription>
-    </AttachmentContent>
-    <AttachmentActions><AttachmentAction aria-label={`${i18n.text(messages.saveAs)}: ${name}`} title={i18n.text(messages.saveAs)}
-      disabled={saving} aria-busy={saving || undefined} onClick={() => void save()}>{saving ? <Spinner /> : <Download />}</AttachmentAction></AttachmentActions>
-  </Attachment>;
+  const [open, setOpen] = useState(false);
+  const name = inputFileName(part), details = fileDetails(i18n, part), pdf = previewsAsPdf(part);
+  const openFile = useOpener(part, content);
+  const { saving, save } = useSave(name, openFile);
+  return <>
+    <Attachment size="sm" className="w-52 min-w-0 max-w-full">
+      <AttachmentMedia variant="icon"><FileTypeIcon mediaType={part.mediaType} /></AttachmentMedia>
+      <AttachmentContent>
+        <AttachmentTitle title={name}>{name}</AttachmentTitle>
+        <AttachmentDescription title={details}>{details}</AttachmentDescription>
+      </AttachmentContent>
+      {pdf && <AttachmentTrigger aria-label={`${i18n.text(messages.pdfPreview)}: ${name}`} onClick={() => setOpen(true)} />}
+      <AttachmentActions><AttachmentAction aria-label={`${i18n.text(messages.saveAs)}: ${name}`} title={i18n.text(messages.saveAs)}
+        disabled={saving} aria-busy={saving || undefined} onClick={() => void save()}>{saving ? <Spinner /> : <Download />}</AttachmentAction></AttachmentActions>
+    </Attachment>
+    {pdf && open && <PdfPreviewDialog key={partKey(part, 0)} onOpenChange={setOpen} name={name} details={details} openFile={openFile}
+      saving={saving} save={() => void save()} />}
+  </>;
 }

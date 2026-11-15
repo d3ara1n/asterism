@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import type { BuildOptions, Plugin } from "esbuild";
 import { publicModuleSource, type PublicProvider, type ModuleRealm } from "../shared/public-modules.ts";
+import { rendererAssets } from "./renderer-assets.ts";
 import { assertRuntimeModules } from "../shared/runtime-modules.ts";
 
 /** Package public entry is standard exports["./public"]; types and runtime share ordinary package imports. */
@@ -183,9 +184,10 @@ export async function compileModules(packages: readonly PackageModule[], enabled
         return build.resolve(args.path, { kind: args.kind, resolveDir: provider.root, pluginData: { publicResolution: true } });
       });
     } });
+    // Renderer libraries fetch sibling assets by name; the enclosing module directory is already content-addressed.
     const options = (realm: ModuleRealm, entries: readonly PackageModule[]): BuildOptions => ({
       entryPoints: Object.fromEntries(entries.flatMap(pkg => realmEntries(realm, pkg))),
-      outdir: resolve(cacheRoot, "build", realm), entryNames: "[name]", chunkNames: "chunks/[name]-[hash]", assetNames: "assets/[name]-[hash]",
+      outdir: resolve(cacheRoot, "build", realm), entryNames: "[name]", chunkNames: "chunks/[name]-[hash]", assetNames: realm === "renderer" ? "assets/[dir]/[name]" : "assets/[name]-[hash]",
       outExtension: { ".js": ".mjs" }, bundle: true, splitting: true, format: "esm", write: false,
       platform: realm === "runtime" ? "node" : "browser", target: realm === "runtime" ? "node22" : "chrome130",
       logLevel: "silent", sourcemap: "linked", metafile: true,
@@ -202,7 +204,7 @@ export async function compileModules(packages: readonly PackageModule[], enabled
             assertRuntimeModules(inputs);
           }
         });
-      } }, hostModule(realm), resolver(realm, entries.length === 1 ? entries[0] : undefined)],
+      } }, ...(realm === "renderer" ? [rendererAssets()] : []), hostModule(realm), resolver(realm, entries.length === 1 ? entries[0] : undefined)],
     });
     const active = packages.filter(pkg => enabled.has(pkg.id));
     // Independent preflights isolate broken plugins; build together afterward without using preflight artifacts as independent bundles.
