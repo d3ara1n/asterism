@@ -39,7 +39,7 @@ function namingObserver() {
   } as unknown as SessionExecutor;
   const start = vi.fn<PluginContext["tasks"]["start"]>(() => true);
   const paradigm = structuredClone(defaultParadigmConfiguration);
-  paradigm.roles.find(role => role.id === "utility")!.overrides.model = "test/model";
+  paradigm.roles.push({ id: "utility", builtin: true, overrides: { model: "test/model" } });
   const roles = vi.fn(() => ({ get: () => ({ paradigm }) }));
   const stream = vi.fn<ModelServices["stream"]>();
   const module = createNamingModule().setup({

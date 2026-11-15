@@ -8,7 +8,7 @@ export const AgentListResult = builtin.data("agent.list",
     id: z.string(), description: z.string(),
     examples: z.array(z.string()),
     delegates: z.array(z.string()).nullable(),
-  })).describe("Available agent configurations, purposes, task examples, and delegation allowlists. delegates is null for unrestricted delegation, an empty list for none, or a list of target role IDs."));
+  })).describe("Agent configurations available to assistants, purposes, task examples, and delegation allowlists. delegates is null for unrestricted delegation, an empty list for none, or a list of allowed target IDs from this catalog."));
 const creationEntrySchema = z.strictObject({
   id: z.string(), resourceKind: z.string(), description: z.string(),
   notice: z.string().optional().describe("Tool-call restriction on the resulting resource; creation remains available."),

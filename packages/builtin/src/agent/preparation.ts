@@ -17,7 +17,10 @@ export function createRequestAssembly(plugin: PluginContext, catalog: SkillCatal
           text,
           source: { id, plugin: owner },
         })),
-        { id: builtin.name("agent"), kind: "agent", role: agent.id, text: agent.systemPrompt, source: { id: agent.id, plugin: plugin.id } },
+        ...(agent.systemPrompt.trim() ? [{
+          id: builtin.name("agent"), kind: "agent" as const, role: agent.id,
+          text: agent.systemPrompt, source: { id: agent.id, plugin: plugin.id },
+        }] : []),
         ...files.map(({ file, text }, index): AgentPromptBlock => ({ id: builtin.name(`context.${index}`), kind: "context", file, text, source: { id: file, plugin: null } })),
       ];
       const prepared = prepare({ skills, blocks });

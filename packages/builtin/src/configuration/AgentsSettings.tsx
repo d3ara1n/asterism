@@ -1,7 +1,5 @@
 import { Plus, X } from "lucide-react";
 import { useId, useState, type ReactNode } from "react";
-import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
-
 import type { AgentConfiguration, AgentOverrides } from "@asterism-app/builtin-api/contracts";
 import type { ConfigurationSnapshot } from "./renderer-state";
 import { agentsMessages } from "../messages/agents";
@@ -19,10 +17,11 @@ import { Switch } from "@asterism-app/ui/ui/switch";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
 import { useRendererIsland as useIsland, useRendererIslandCancel, useRendererIslandKey } from "@asterism-app/sdk/renderer";
 import { Section } from "@asterism-app/ui/settings-layout";
-import { Editor, EditorSection, ModifiedNote, ReadStatus } from "@asterism-app/ui/configuration-forms";
+import { Editor, EditorSection, ModifiedNote, OverrideToggleField, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
 import { ResourceAccessFields } from "./ResourceAccessFields";
 import { DelegationFields } from "./DelegationFields";
+import { legacyAgentPreset } from "./legacy-agent";
 
 type Base = Omit<AgentConfiguration, "id" | "builtin">;
 type Budget = Base["subagent"]["budget"];
@@ -30,7 +29,7 @@ const agentIslandKey = (id: string | null) => id === null ? "agent:create" : `ag
 
 const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : defaultAgentPreset]!;
+const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : legacyAgentPreset]!;
 
 /** Override normalization: remove blank text and fields matching built-in values; subagent fields compare individually. */
 function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
@@ -93,10 +92,10 @@ function DefaultAgentSetting({ snapshot }: { snapshot: ConfigurationSnapshot }) 
   const { run, busy } = useConfigurationAction("toast");
   const available = snapshot.agents.filter(agent => agent.enabled);
   const unavailable = !available.some(agent => agent.id === snapshot.defaultAgentId);
-  return <FieldGroup className="mb-4"><Field data-invalid={unavailable || undefined}>
+  return <FieldGroup className="mb-4"><Field orientation="horizontal" data-invalid={unavailable || undefined}>
     <FieldLabel htmlFor={id}>{i18n.text(agentsMessages.defaultAgent)}</FieldLabel>
     <Select value={snapshot.defaultAgentId} disabled={busy} onValueChange={id => { void run({ type: "agent.default", id }); }}>
-      <SelectTrigger id={id} className="w-full" aria-invalid={unavailable || undefined}><SelectValue /></SelectTrigger>
+      <SelectTrigger id={id} className="w-40 shrink-0" aria-invalid={unavailable || undefined}><SelectValue /></SelectTrigger>
       <SelectContent><SelectGroup>
         {unavailable && <SelectItem value={snapshot.defaultAgentId} disabled>{snapshot.defaultAgentId} · {i18n.text(agentsMessages.unavailableAgent)}</SelectItem>}
         {available.map(agent => <SelectItem key={agent.id} value={agent.id}>{agent.id}</SelectItem>)}
@@ -116,7 +115,10 @@ function AgentRow({ agent, snapshot, selected, onOpen }: {
   };
   const role = agent.modelRole === null ? null : snapshot.roles.find(item => item.id === agent.modelRole);
   return <ListRow selected={selected} inactive={!agent.enabled} onOpen={onOpen}
-    title={<>{agent.id}{agent.id === snapshot.defaultAgentId && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
+    title={<>{agent.id}
+      {agent.id === snapshot.defaultAgentId && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}
+      {!agent.availableToAgents && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.userSelectionOnly)}</Badge>}
+    </>}
     description={agent.description}
     actions={<>
       {agent.modelRole !== null && !role
@@ -138,21 +140,21 @@ function Label({ htmlFor, children, modified, onRestore }: { htmlFor?: string; c
 
 /**
  * Model role selection: the “None” item uses a sentinel only in the UI and saves as null; default is a real role saved as a normal ID.
- * Hidden roles are unavailable to agents, and disabled roles are unavailable in the application; neither appears among choices. Existing references to these or invalid roles appear as disabled items so the selector retains its current value.
+ * Disabled roles are omitted from new choices. Existing references to disabled or missing roles remain visible.
  */
 function RoleSelect({ id, value, onChange }: { id: string; value: string | null; onChange: (value: string | null) => void }) {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   const roles = snapshot?.roles ?? [];
-  const selectable = roles.filter(role => role.enabled && !role.hidden);
-  const blocked = value !== null ? roles.find(role => role.id === value && (!role.enabled || role.hidden)) : undefined;
+  const selectable = roles.filter(role => role.enabled);
+  const blocked = value !== null ? roles.find(role => role.id === value && !role.enabled) : undefined;
   const missing = value !== null && !roles.some(role => role.id === value);
   return <Select value={value ?? NONE} onValueChange={next => onChange(next === NONE ? null : next)}>
     <SelectTrigger id={id} className="w-full" aria-invalid={missing || !!blocked || undefined}><SelectValue /></SelectTrigger>
     <SelectContent><SelectGroup>
       <SelectItem value={NONE}>{i18n.formatMessage(agentsMessages.none)}</SelectItem>
       {missing && <SelectItem value={value} disabled>{i18n.formatMessage(agentsMessages.unavailableRoleOption)} · {value}</SelectItem>}
-      {blocked && <SelectItem value={blocked.id} disabled>{blocked.id}{!blocked.enabled ? i18n.formatMessage(agentsMessages.disabledSuffix) : i18n.formatMessage(agentsMessages.internalSuffix)}</SelectItem>}
+      {blocked && <SelectItem value={blocked.id} disabled>{blocked.id}{i18n.formatMessage(agentsMessages.disabledSuffix)}</SelectItem>}
     </SelectGroup><SelectSeparator /><SelectGroup>
       {selectable.map(role => <SelectItem key={role.id} value={role.id}>{role.id}</SelectItem>)}
     </SelectGroup></SelectContent>
@@ -212,10 +214,8 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
 
   return <Editor form="agent-form" title={current?.id ?? i18n.formatMessage(agentsMessages.newAgent)} description={builtin ? i18n.formatMessage(agentsMessages.builtinAgent) : undefined} dirty={dirty} busy={busy} error={error}
     restore={builtin && Object.keys(normalized).length > 0 ? () => setDraft({}) : undefined}
-    remove={current ? { title: i18n.formatMessage(agentsMessages.deleteTitle),
-      description: builtin
-        ? i18n.formatMessage(agentsMessages.deleteBuiltinDescription, { current_name: current.id })
-        : i18n.formatMessage(agentsMessages.deleteDescription, { current_name: current.id }),
+    remove={current && !builtin ? { title: i18n.formatMessage(agentsMessages.deleteTitle),
+      description: i18n.formatMessage(agentsMessages.deleteDescription, { current_name: current.id }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "agent", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
     <form id="agent-form" onSubmit={async event => {
       event.preventDefault();
@@ -229,6 +229,9 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
           <Input id={ids.identity} value={slug} readOnly={builtin} required maxLength={160} pattern="[a-z0-9]+((_|-)[a-z0-9]+)*" className="font-mono" onChange={event => setSlug(event.target.value)} /></Field>
         <Field><Label htmlFor={ids.description} modified={modified("description")} onRestore={() => restore("description")}>{i18n.formatMessage(agentsMessages.description)}</Label>
           <Textarea id={ids.description} rows={3} value={draft.description ?? ""} placeholder={base.description} onChange={event => set("description", event.target.value)} /></Field>
+        <OverrideToggleField label={i18n.formatMessage(agentsMessages.availableToAgents)}
+          value={draft.availableToAgents} inherited={base.availableToAgents}
+          onChange={value => set("availableToAgents", value)} />
       </FieldGroup></EditorSection>
 
       <EditorSection title={i18n.formatMessage(agentsMessages.modelRoles)}><FieldGroup>

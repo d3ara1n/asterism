@@ -5,7 +5,7 @@ import {
 } from "@asterism-app/sdk/runtime";
 import type { Json } from "@asterism-app/sdk/contracts";
 import { builtin, type AgentConfiguration } from "@asterism-app/builtin-api/contracts";
-import { builtinConfiguration } from "../configuration/runtime.ts";
+import { selectAgentForModel, builtinConfiguration } from "../configuration/runtime.ts";
 import { createRequestAssembly } from "../agent/preparation.ts";
 import type { SkillCatalog } from "../skills/catalog.ts";
 import { subagentPoolCard } from "../shared/card-appearance.ts";
@@ -53,8 +53,7 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
             throw new PluginApiError("invalid_argument", "Delegation requires a calling Agent role.");
           const source = agents.find(agent => agent.id === caller.agent && agent.enabled);
           if (!source) throw new PluginApiError("not_found", `Calling Agent role "${caller.agent}" is unavailable.`);
-          if (!agents.some(role => role.id === args.role && role.enabled))
-            throw new PluginApiError("not_found", `Agent role ${args.role} is unavailable.`);
+          selectAgentForModel(agents, args.role);
           if (source.delegates !== null && !source.delegates.includes(args.role))
             throw new PluginApiError("unavailable", `Agent role "${source.id}" cannot delegate tasks to Agent role "${args.role}".`, "access_denied");
           return pool(object.ref).delegate(args, caller);

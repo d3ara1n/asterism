@@ -47,6 +47,8 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
     id: "agents.enable",
     defaultMessage: "Enable {agent_name}",
   },
+  availableToAgents: { id: "agents.availableToAgents", defaultMessage: "Available to assistants" },
+  userSelectionOnly: { id: "agents.userSelectionOnly", defaultMessage: "User selection only" },
   none: {
     id: "agents.modelRole.none",
     defaultMessage: "None",
@@ -59,10 +61,6 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
     id: "agents.modelRole.disabledSuffix",
     defaultMessage: " (disabled)",
   },
-  internalSuffix: {
-    id: "agents.modelRole.internalSuffix",
-    defaultMessage: " (internal, not available to agents)",
-  },
   newAgent: {
     id: "agents.new",
     defaultMessage: "New agent",
@@ -74,10 +72,6 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
   deleteTitle: {
     id: "agents.delete.title",
     defaultMessage: "Delete this agent?",
-  },
-  deleteBuiltinDescription: {
-    id: "agents.delete.builtinDescription",
-    defaultMessage: "“{current_name}” will be removed and will not come back on its own. Conversations using it fail on their next request.",
   },
   deleteDescription: {
     id: "agents.delete.description",
@@ -117,7 +111,7 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
   },
   systemPromptHint: {
     id: "agents.rolePromptHint",
-    defaultMessage: "Shared by workbench agents and subagents. Leave blank to use the default prompt shown above.",
+    defaultMessage: "Leave blank to use the configuration default.",
   },
   taskExamples: {
     id: "agents.taskExamples",

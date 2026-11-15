@@ -3,7 +3,7 @@ import { modelExpressionSchema, thinkingSchema } from "@asterism-app/sdk/contrac
 /** Configurations use readable slugs for identification by both users and models. */
 export const configurationIdSchema = z.string().trim().min(1).max(160).regex(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/u, "Use lowercase letters, digits, hyphens or underscores.");
 export const modelRoleInputSchema = z.strictObject({
-  model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000), hidden: z.boolean(),
+  model: modelExpressionSchema.nullable(), thinking: thinkingSchema.nullable(), enabled: z.boolean(), description: z.string().max(20_000),
 });
 export const modelRoleSchema = modelRoleInputSchema.extend({ id: configurationIdSchema, builtin: z.boolean() });
 export const modelRoleOverridesSchema = modelRoleInputSchema.partial();
@@ -21,7 +21,9 @@ const subagentConfigurationSchema = z.strictObject({
 });
 const resourceTypesSchema = z.array(z.string().trim().min(1).max(160)).max(200).nullable();
 const agentFieldsSchema = z.strictObject({
-  enabled: z.boolean(), description: z.string().max(20_000), systemPrompt: z.string().max(100_000),
+  enabled: z.boolean(),
+  availableToAgents: z.boolean().describe("Whether models can discover or newly select this configuration for creation or delegation. Existing selections and user-selected conversations are unaffected."),
+  description: z.string().max(20_000), systemPrompt: z.string().max(100_000),
   modelRole: configurationIdSchema.nullable(), examples: z.array(z.string().max(4_000)).max(50),
   subagent: subagentConfigurationSchema,
   resources: resourceTypesSchema,

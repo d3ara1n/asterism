@@ -35,7 +35,7 @@ function open(root = mkdtempSync(join(tmpdir(), "asterism-mesh-")), onSessionCha
   ] }); apps.push(app);
   capture.mockRestore();
   const session = (name: string) => plugin.session(app.sessions.tree.create(name));
-  const agent = (session: SessionExecutor, title: string, type = "worker") =>
+  const agent = (session: SessionExecutor, title: string, type = "general") =>
     session.create(CreateAgent, { title, selection: { agent: type, model: null, thinking: null } });
   const mesh = (session: SessionExecutor) => session.create(CreateMesh, {});
   const capabilities = (caller: ResourceRef) => {
@@ -65,7 +65,7 @@ describe("Mesh resource routing", () => {
     left.link(a, ma); right.link(mb, b);
     expect(await list(f.capabilities(a), ma)).toEqual([{ title: "Atlas", id: 0, type: "explorer", descriptions: [] }]);
     expect(await call(f.capabilities(b), mb, "list")).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
-    expect(await profile(f.capabilities(a), ma)).toEqual({ title: "Ada", id: null, type: "worker", descriptions: [] });
+    expect(await profile(f.capabilities(a), ma)).toEqual({ title: "Ada", id: null, type: "general", descriptions: [] });
     expect(f.view(ma).channels).toEqual([{ id: "default", title: "Default", agents: 1 }]);
   });
 
@@ -77,7 +77,7 @@ describe("Mesh resource routing", () => {
     await call(captured, first, "mesh_set_profile", null, { description: "Investigate login" });
     await call(captured, second, "mesh_set_profile", null, { description: "Implement messaging" });
     expect(await list(captured, first)).toEqual([
-      { title: "Atlas", id: 0, type: "worker", descriptions: ["Investigate login", "Implement messaging"] },
+      { title: "Atlas", id: 0, type: "general", descriptions: ["Investigate login", "Implement messaging"] },
     ]);
     expect((await profile(captured, first)).descriptions).toEqual(["Investigate login"]);
     expect((await profile(captured, second)).descriptions).toEqual(["Implement messaging"]);
@@ -179,7 +179,7 @@ describe("Mesh resource routing", () => {
     await f.app.sessions.execute({ type: "select", sessionId: s.id, nodeId: before });
     await retired;
     await f.app.sessions.execute({ type: "select", sessionId: s.id, nodeId: attached });
-    expect(await list(f.capabilities(a), mesh)).toEqual([{ title: "Atlas", id: 0, type: "worker", descriptions: [] }]);
+    expect(await list(f.capabilities(a), mesh)).toEqual([{ title: "Atlas", id: 0, type: "general", descriptions: [] }]);
     expect(await list(f.capabilities(a), mesh)).toHaveLength(1);
     expect(f.view(mesh).channels[0]!.agents).toBe(1);
   });

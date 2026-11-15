@@ -89,7 +89,7 @@ describe("SDK session resource lifetimes", () => {
         argsSchema: z.strictObject({}).describe("No arguments.") }),
       targetSchema: z.null().describe("The whole resource."), effect: "read", execution: "parallel",
     });
-    let called = 0, role = "worker", changeDuringRequest = true, createOnRequest = false;
+    let called = 0, role = "general", changeDuringRequest = true, createOnRequest = false;
     const policy: { allow?: string[]; exclude?: string[] } = { exclude: [Item.kind] };
     let resource!: ResourceRef;
     const f = open({ plugins: [definePlugin({ namespace: extension, modules: [defineModule(() => ({
@@ -120,15 +120,15 @@ describe("SDK session resource lifetimes", () => {
     const run = () => f.plugin.execution.run({ access: actor, agent: role, resources: policy, interactive: true, target,
       requestParentId: null, system: { blocks: [] }, messages: [], signal: new AbortController().signal, observer: { event() {} } });
     const first = await run();
-    const notice = 'Agent role "worker" cannot call tools on this resource.';
+    const notice = 'Agent role "general" cannot call tools on this resource.';
     expect(first.tools[0]!.data).toEqual({ resources: [{ resource_id: resource.id, type: Item.kind, title: "Item", state: { value: 8 }, notice }] });
     expect(first.tools[1]).toMatchObject({ kind: "succeeded", data: {
       resource_id: resource.id, state: { value: 8 }, tools: [{ name: "resource_role" }],
-      notice: 'Agent role "worker" cannot call tools on this resource.',
+      notice: 'Agent role "general" cannot call tools on this resource.',
     } });
     expect(first.tools[2]).toMatchObject({ kind: "rejected", error: { code: "access_denied",
-      message: 'Agent role "worker" cannot call tools on this resource.' } });
-    expect(first.tools[3]).toMatchObject({ kind: "succeeded", data: "worker" });
+      message: 'Agent role "general" cannot call tools on this resource.' } });
+    expect(first.tools[3]).toMatchObject({ kind: "succeeded", data: "general" });
     expect(called).toBe(0);
     expect(first.tools[4]).toMatchObject({ kind: "succeeded", data: expect.arrayContaining([
       { id: ns.name("new"), resourceKind: Item.kind, description: "Create an item.", notice },
@@ -540,7 +540,7 @@ describe("SDK session resource lifetimes", () => {
   // Use actual registered built-in resources to verify dimensions through SDK assembly; successive creations avoid complete rectangles and stay near creators.
   it("successive backend creations avoid each type's full default bounds and prefer positions near the creator", async () => {
     const f = open();
-    const input = { selection: { agent: "worker", model: null, thinking: null } };
+    const input = { selection: { agent: "general", model: null, thinking: null } };
     const actor = await f.session.create(CreateAgent, input);
     await f.app.sessions.execute({ type: "view.set", sessionId: f.sessionId, objectId: actor.id,
       position: { x: 4000, y: 3000 }, collapsed: true });
@@ -677,7 +677,7 @@ describe("SDK session resource lifetimes", () => {
     await expect(f.session.create(Create, 2)).rejects.toThrow("Creation failed");
     expect(f.app.sessions.current(f.sessionId).nodes).toEqual(before.nodes);
     fail = false;
-    const note = await f.session.create(CreateAgent, { selection: { agent: "worker", model: null, thinking: null } });
+    const note = await f.session.create(CreateAgent, { selection: { agent: "general", model: null, thinking: null } });
     const foreign = { ...note, sessionId: f.app.sessions.tree.create("Foreign") };
     const head = f.session.snapshot().position.nodeId;
     await expect(f.session.create(Create, 2, { linkTo: foreign })).rejects.toThrow("another session");
@@ -686,7 +686,7 @@ describe("SDK session resource lifetimes", () => {
     expect(f.session.snapshot().position.nodeId).toBe(head);
     const child = await f.session.create(Create, 3, { linkTo: note });
     expect(f.app.sessions.current(f.sessionId).workbench.links).toEqual([{ receiverId: note.id, resourceId: child.id }]);
-    const otherAgent = await f.session.create(CreateAgent, { selection: { agent: "worker", model: null, thinking: null } }, { linkTo: note });
+    const otherAgent = await f.session.create(CreateAgent, { selection: { agent: "general", model: null, thinking: null } }, { linkTo: note });
     expect(f.app.sessions.current(f.sessionId).workbench.links.filter(link => link.receiverId === otherAgent.id)).toEqual([]);
   });
 
@@ -897,7 +897,7 @@ describe("Agent resource operation entries", () => {
       const first = requests++ === 0;
       return { async *stream() {
         if (first) {
-          await f.session.invoke(ConfigureAgent, agent, { selection: { agent: "worker", model: "test/test", thinking: "low" } });
+          await f.session.invoke(ConfigureAgent, agent, { selection: { agent: "general", model: "test/test", thinking: "low" } });
           yield { type: "part.start", part: { id: "state", kind: "toolcall", callId: "state", name: "get_agent_state" } };
           yield { type: "part.end", partId: "state", arguments: {} };
         } else {
@@ -916,7 +916,7 @@ describe("Agent resource operation entries", () => {
       compatibility: [], apiKey: "", usage: "test-balance",
     } });
     await configureBuiltin(f.app, { type: "role.save", id: "default", value: { id: "default", model: "test/test", thinking: "high" } });
-    agent = await f.session.create(CreateAgent, { selection: { agent: "worker", model: null, thinking: null } });
+    agent = await f.session.create(CreateAgent, { selection: { agent: "general", model: null, thinking: null } });
     f.plugin.ipc.events.subscribe(AgentTurnEnded, {}, event => { if (event.data.settled) done.release(); });
     await f.session.invoke(SubmitAgentInput, agent, { submissionId: "self-state-input", parts: [{ kind: "text", text: "Read your state" }], mode: "follow", sender: { kind: "user" } });
     await done.promise;
@@ -924,7 +924,7 @@ describe("Agent resource operation entries", () => {
       record?.status === "known" && record.data.block.kind === "toolcall" && record.data.block.name === "get_agent_state");
     const block = call?.status === "known" ? call.data.block : null;
     expect(block?.kind === "toolcall" ? block.outcome : null).toMatchObject({ kind: balanceError ? "partial" : "succeeded", data: {
-      role: "worker", model: "test/test", thinking: "high", context: { max: null, used: 123 },
+      role: "general", model: "test/test", thinking: "high", context: { max: null, used: 123 },
       balance: balanceError ? null : [{ name: "Account balance", remaining: 12.5, unit: "USD" }],
       quota: balanceError ? null : [{ name: "Requests", category: "rate_limit", periodSeconds: 60, remaining: 0.5, amount: null, resetsAt: null }],
     } });
@@ -982,8 +982,8 @@ describe("Agent resource operation entries", () => {
   it("list_agent exposes selection fields while isolating system prompts and execution configuration", async () => {
     const f = open({ adapter: adapter(() => [{ name: "list_agent", args: {} }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
-    await configureBuiltin(f.app, { type: "agent.save", id: "worker", value: { id: "worker",
-      description: "Public purpose", examples: ["Public example"], delegates: ["explorer"],
+    await configureBuiltin(f.app, { type: "agent.save", id: "advisor", value: { id: "advisor",
+      description: "Public purpose", examples: ["Public example"], delegates: ["explorer", "general", "reviewer", "missing"],
       systemPrompt: "PRIVATE_AGENT_INSTRUCTIONS", subagent: { budget: { maxRequests: 123 } },
     } });
     await configureBuiltin(f.app, { type: "agent.save", id: "reviewer", value: { id: "reviewer", enabled: false } });
@@ -992,14 +992,37 @@ describe("Agent resource operation entries", () => {
     const result = await runner(f, actor, target)();
     expect(result.tools[0]?.kind).toBe("succeeded");
     const entries = result.tools[0]!.data as { id: string }[];
-    expect(entries.find(entry => entry.id === "worker")).toEqual({
-      id: "worker", description: "Public purpose",
+    expect(entries.find(entry => entry.id === "advisor")).toEqual({
+      id: "advisor", description: "Public purpose",
       examples: ["Public example"], delegates: ["explorer"],
     });
-    expect(entries.some(entry => entry.id === "reviewer")).toBe(false);
+    expect(entries.some(entry => entry.id === "reviewer" || entry.id === "general")).toBe(false);
     expect(entries.find(entry => entry.id === "explorer")).toMatchObject({ delegates: [] });
     expect(entries.find(entry => entry.id === "researcher")).toMatchObject({ delegates: null });
     expect(JSON.stringify(result.tools[0]!.model)).not.toContain("PRIVATE_AGENT_INSTRUCTIONS");
+  });
+
+  it("keeps existing Agents visible while rejecting new model creation of a user-only configuration", async () => {
+    let calls: { name: string; args: Json }[] = [{ name: "resource_create", args: {
+      creation_id: "asterism.builtin/agent.create",
+      input: { selection: { agent: "general", model: "test/test", thinking: null } },
+    } }];
+    const f = open({ adapter: adapter(() => calls) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    const userAgent = await f.session.create(CreateAgent, { selection: { agent: "general", model: "test/test", thinking: null } });
+    const run = runner(f, actor, target), before = f.session.snapshot().position.nodeId;
+    expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "not_found" } });
+    expect(f.session.snapshot().position.nodeId).toBe(before);
+    expect(f.app.sessions.current(f.sessionId).workbench.objects.some(resource => resource.id === userAgent.id)).toBe(true);
+    await configureBuiltin(f.app, { type: "agent.save", id: "general", value: { id: "general", availableToAgents: true } });
+    const created = (await run()).tools[0]!;
+    expect(created.kind).toBe("succeeded");
+    const ref = { sessionId: f.sessionId, kind: CreateAgent.resource.kind, id: (created.data as { resource_id: string }).resource_id };
+    await configureBuiltin(f.app, { type: "agent.save", id: "general", value: { id: "general", availableToAgents: false } });
+    calls = [{ name: "resource_list", args: {} }];
+    expect((await run()).tools[0]).toMatchObject({ kind: "succeeded", data: {
+      resources: expect.arrayContaining([expect.objectContaining({ resource_id: ref.id })]),
+    } });
   });
 
   // Explicit initial link and self-authorization contract: omitted/false does not expose self; true adds only the bound initiator and preserves source links.
@@ -1010,7 +1033,7 @@ describe("Agent resource operation entries", () => {
     f.session.link(actor, shared); f.session.link(actor, other);
     calls = [{ name: "resource_create", args: {
       creation_id: "asterism.builtin/agent.create",
-      input: { selection: { agent: "worker", model: null, thinking: null }, resources: [shared.id, shared.id],
+      input: { selection: { agent: "explorer", model: null, thinking: null }, resources: [shared.id, shared.id],
         ...(exposeSelf === undefined ? {} : { expose_self: exposeSelf }) },
     } }];
     const run = runner(f, actor, target), result = await run();
@@ -1030,7 +1053,7 @@ describe("Agent resource operation entries", () => {
     let resourceId = "";
     const f = open({ adapter: adapter(() => [{ name: "resource_create", args: {
       creation_id: "asterism.builtin/agent.create",
-      input: { selection: { agent: "worker", model: null, thinking: null }, expose_self: true, resources: [resourceId] },
+      input: { selection: { agent: "explorer", model: null, thinking: null }, expose_self: true, resources: [resourceId] },
     } }]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0), other = await f.session.create(Create, 1);
     const before = f.app.sessions.current(f.sessionId);
@@ -1071,7 +1094,7 @@ describe("Agent resource operation entries", () => {
     const f = open({ adapter: adapter(() => {
       mutate?.();
       return [{ name: "resource_create", args: { creation_id: "asterism.builtin/agent.create",
-        input: { selection: { agent: "worker", model: null, thinking: null }, resources: [resourceId] } } }];
+        input: { selection: { agent: "explorer", model: null, thinking: null }, resources: [resourceId] } } }];
     }) });
     const target = await model(f.app), actor = await f.session.create(Create, 0), resource = await f.session.create(Create, 1);
     resourceId = resource.id;

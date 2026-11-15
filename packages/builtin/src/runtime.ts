@@ -31,7 +31,7 @@ import { CreateMesh } from "./mesh/contract.ts";
 import { environment } from "./agent/system-prompt.ts";
 import { UpdateParadigmConfiguration } from "./configuration/contract.ts";
 import { resolveParadigmConfiguration } from "./configuration/state.ts";
-import { updateParadigmConfiguration } from "./configuration/runtime.ts";
+import { selectAgentForModel, builtinConfiguration, updateParadigmConfiguration } from "./configuration/runtime.ts";
 import { createSubagentPoolModule } from "./subagents/runtime.ts";
 import { CreateSubagentPool, createPoolSchema } from "./subagents/contract.ts";
 import schedules from "./schedules/runtime.ts";
@@ -100,10 +100,13 @@ export default definePlugin({ namespace: builtin,
             expose_self: z.boolean().optional()
               .describe("Authorize the new Agent to access you as a resource. Your identity is supplied by the host. Defaults to false."),
           }).describe("Agent configuration selection, optional title, and initial resource links."),
-          toInput: ({ resources: _resources, expose_self: _exposeSelf, ...input }) => input,
+          toInput: ({ resources: _resources, expose_self: _exposeSelf, ...input }) => {
+            selectAgentForModel(builtinConfiguration(plugin).agents, input.selection.agent);
+            return input;
+          },
           toOptions: ({ resources, expose_self }) => ({ resources, exposeSelf: expose_self }),
           guidelines: [
-            "list_agent returns available agent configurations and their purposes.",
+            "list_agent returns configurations available for assistant creation and delegation, with their purposes. Availability is checked when choosing the configuration; existing Agents keep their selection. Missing and unavailable configurations return the same selection error.",
             "resource_list returns your linked resource IDs.",
             "Creation and all initial links are committed together.",
           ] }),

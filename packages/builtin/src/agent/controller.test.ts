@@ -66,7 +66,7 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
   for (const value of options.values ?? history(options.completed)) append(value);
   const snapshot = () => sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null));
   const data = new Map<string, Json>([
-    [AgentSelection.id, { selection: { agent: "worker", model: null, thinking: null } }],
+    [AgentSelection.id, { selection: { agent: "general", model: null, thinking: null } }],
     [AgentDrafts.id, [
       { id: "steer", mode: "steer", parts: [{ kind: "text", text: "Steer next request" }], sender: { kind: "user" } },
       { id: "follow", mode: "follow", parts: [{ kind: "text", text: "Follow up next turn" }], sender: { kind: "user" } },
@@ -107,9 +107,9 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
     withProgress: (_ref, work) => work({ event() {} }),
   };
   const selection = createSelection({
-    agents: () => [{ id: "worker", builtin: false, enabled: true, description: "", systemPrompt: "", modelRole: "default", examples: [],
+    agents: () => [{ id: "general", builtin: false, enabled: true, availableToAgents: false, description: "", systemPrompt: "", modelRole: "default", examples: [],
       subagent: { instructions: "", budget: { maxRequests: 1, maxDurationSeconds: 1 } }, resources: null, excludeResources: null, delegates: null }],
-    roles: () => [{ id: "default", builtin: true, enabled: true, model: "p/m", thinking: null, description: "", hidden: false }],
+    roles: () => [{ id: "default", builtin: true, enabled: true, model: "p/m", thinking: null, description: "" }],
   });
   const controller = createAgentController({ selection, tasks: driver.tasks, models, execution, feedback, userAgent: "test",
     prepareRequest: () => () => ({ blocks: [], skills: [], system: { blocks: [] } }),
@@ -263,8 +263,8 @@ it.each([false, true])("retains the captured request selection and clears it aft
   const f = fixture();
   f.object.commit(writer => { writer.set(AgentDrafts, []); });
   vi.mocked(f.execution.run).mockImplementation(async () => {
-    f.object.commit(writer => { writer.set(AgentSelection, { selection: { agent: "worker", model: "other/model", thinking: "high" } }); });
-    expect(f.controller.currentRequest(f.object)).toEqual({ role: "worker", model: "p/m", thinking: null });
+    f.object.commit(writer => { writer.set(AgentSelection, { selection: { agent: "general", model: "other/model", thinking: "high" } }); });
+    expect(f.controller.currentRequest(f.object)).toEqual({ role: "general", model: "p/m", thinking: null });
     if (fail) throw new Error("Model request failed");
     return completedRun;
   });

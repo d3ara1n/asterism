@@ -2,11 +2,17 @@ import type { ConfigurationOperation, ParadigmConfiguration } from "./contract.t
 import { normalizeOverrides } from "./layers.ts";
 import { parseModelExpression, resolveModelSelection, type ModelTarget, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type PluginContext } from "@asterism-app/sdk/runtime";
-import type { ModelRole } from "@asterism-app/builtin-api/contracts";
+import type { AgentConfiguration, ModelRole } from "@asterism-app/builtin-api/contracts";
 import { BuiltinSettings, settingsMessages } from "../settings/contract.ts";
 import { resolveParadigmConfiguration } from "./state.ts";
 
 export function builtinConfiguration(plugin: PluginContext) { return resolveParadigmConfiguration(plugin.config(BuiltinSettings).get().paradigm); }
+/** Model-created Agents and delegated tasks validate new role selections at admission. */
+export function selectAgentForModel(agents: readonly AgentConfiguration[], id: string): AgentConfiguration {
+  const agent = agents.find(agent => agent.id === id && agent.enabled && agent.availableToAgents);
+  if (!agent) throw new PluginApiError("not_found", `Agent role ${id} is unavailable.`);
+  return agent;
+}
 export function resolveRoleTarget(roles: readonly ModelRole[], roleId: string, overrides: { model?: string | null; thinking?: ThinkingLevel | null } = {}): ModelTarget {
   const role = roles.find(role => role.id === roleId && role.enabled);
   if (!role) throw new PluginApiError("unavailable", `Model role ${roleId} is unavailable.`, "role_unavailable");
@@ -27,18 +33,19 @@ export function updateParadigmConfiguration(value: ParadigmConfiguration, comman
   }
   const kind = command.type === "remove" ? command.kind : command.type === "role.save" ? "role" : "agent";
   const collection = kind === "role" ? next.roles : next.agents;
+  const effective = resolveParadigmConfiguration(value);
+  const configurations = kind === "role" ? effective.roles : effective.agents;
+  const current = command.id === null ? undefined : configurations.find(item => item.id === command.id);
   const index = command.id === null ? -1 : collection.findIndex(item => item.id === command.id);
-  if (command.id !== null && index < 0) throw new PluginApiError("not_found", "This configuration no longer exists.", undefined, settingsMessages.missing);
+  if (command.id !== null && !current) throw new PluginApiError("not_found", "This configuration no longer exists.", undefined, settingsMessages.missing);
   if (command.type === "remove") {
-    if (index < 0) throw new PluginApiError("not_found", "This configuration no longer exists.", undefined, settingsMessages.missing);
-    if (kind === "role" && collection[index]!.builtin) throw new PluginApiError("invalid_argument", "Built-in model roles cannot be deleted.", undefined, settingsMessages.builtinRole);
+    if (current!.builtin) throw new PluginApiError("invalid_argument", "Built-in configurations cannot be deleted.", undefined, settingsMessages.builtinRemoval);
     collection.splice(index, 1);
   } else {
-    if (collection.some((entry, current) => current !== index && entry.id === command.value.id)) throw new PluginApiError("conflict", "This configuration ID is already used.", undefined, settingsMessages.idTaken);
-    const builtin = index >= 0 && collection[index]!.builtin;
-    if (builtin && command.value.id !== command.id) throw new PluginApiError("invalid_argument", "Built-in configuration IDs are fixed.", undefined, settingsMessages.builtinId);
+    if (current?.builtin && command.value.id !== command.id) throw new PluginApiError("invalid_argument", "Built-in configuration IDs are fixed.", undefined, settingsMessages.builtinId);
+    if (configurations.some(item => item.id === command.value.id && item.id !== command.id)) throw new PluginApiError("conflict", "This configuration ID is already used.", undefined, settingsMessages.idTaken);
     const { id, ...overrides } = command.value;
-    const entry = { id, builtin, overrides: normalizeOverrides(overrides) };
+    const entry = { id, builtin: current?.builtin ?? false, overrides: normalizeOverrides(overrides) };
     if (index < 0) collection.push(entry); else collection[index] = entry;
   }
   resolveParadigmConfiguration(next);

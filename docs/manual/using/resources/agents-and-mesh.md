@@ -14,9 +14,9 @@ Input acceptance, execution ending, and acceptance of the deliverable are separa
 
 ### A default role is a starting choice
 
-The default role selected in Agent settings is the starting choice for a new conversation on the home page, not a policy for every Agent. Choosing a different role for one conversation does not change that preference, and changing the default does not reconfigure existing Agents. The selected role supplies its instructions and model role; the default preference does not maintain a separate copy of those settings.
+The default role selected in Agent settings is the starting choice for a new conversation on the home page, not a policy for every Agent. Choosing a different role for one conversation does not change that preference, and changing the default does not reconfigure existing Agents. The selected role supplies its instructions and model role; the default preference does not maintain a separate copy of those settings. The factory default has no role instructions and is reserved for user-created conversations unless you allow assistant use.
 
-Disabling, deleting, or renaming the selected role leaves its default reference unavailable rather than silently switching to another role. Choose a new default in settings, or select an available role for the conversation before sending.
+Disabling the selected role, or deleting or renaming a selected custom role, leaves its default reference unavailable rather than silently switching to another role. Choose a new default in settings, or select an available role for the conversation before sending.
 
 ## Mesh: access and membership are different directions
 

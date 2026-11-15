@@ -45,10 +45,6 @@ export const rolesMessages = pluginNamespace("asterism.builtin").messages("en", 
     id: "roles.add",
     defaultMessage: "Add role",
   },
-  internal: {
-    id: "roles.internal",
-    defaultMessage: "Internal",
-  },
   enableRole: {
     id: "roles.enable",
     defaultMessage: "Enable {role_name}",
@@ -80,14 +76,6 @@ export const rolesMessages = pluginNamespace("asterism.builtin").messages("en", 
   purposeHint: {
     id: "roles.purposeHint",
     defaultMessage: "Leave blank to use the built-in text.",
-  },
-  availableToAgents: {
-    id: "roles.availableToAgents",
-    defaultMessage: "Available to agents",
-  },
-  availableToAgentsHint: {
-    id: "roles.availableToAgentsHint",
-    defaultMessage: "Agents may pick this role on their own. Internal features can use it either way.",
   },
   usedBy: {
     id: "roles.usedBy",

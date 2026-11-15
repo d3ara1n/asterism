@@ -10,18 +10,13 @@ export const defaultAgents: AgentConfiguration[] = [
     "excludeResources": null,
     "builtin": true,
     "enabled": true,
-    "description": "General-purpose agent for tasks across domains.",
-    "systemPrompt": "General-purpose agent. Carry out the requested task using the available context and capabilities.",
+    "availableToAgents": false,
+    "description": "Default agent for conversations.",
+    "systemPrompt": "",
     "modelRole": "default",
-    "examples": [
-      "Rename all snake_case fields to camelCase",
-      "Add input validation to POST /login"
-    ],
+    "examples": [],
     "subagent": {
-      "instructions": [
-        "Work autonomously on the delegated task using its supplied context.",
-        "Return the result with relevant supporting details and any unresolved gaps.",
-      ].join("\n"),
+      "instructions": "",
       "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
     }
   },
@@ -32,6 +27,7 @@ export const defaultAgents: AgentConfiguration[] = [
     "excludeResources": null,
     "builtin": true,
     "enabled": true,
+    "availableToAgents": true,
     "description": "Codebase exploration: file locations, symbols, dependencies, structure, and change history.",
     "systemPrompt": [
       "Code explorer. Provide read-only investigation of file locations, symbols, dependencies, structure, and change history.",
@@ -61,6 +57,7 @@ export const defaultAgents: AgentConfiguration[] = [
     "excludeResources": null,
     "builtin": true,
     "enabled": true,
+    "availableToAgents": true,
     "description": "Code review and analysis of correctness, security, performance, and maintainability.",
     "systemPrompt": [
       "Senior code reviewer. Provide read-only analysis of correctness, security, performance, and maintainability, with suggested fixes.",
@@ -89,6 +86,7 @@ export const defaultAgents: AgentConfiguration[] = [
     "excludeResources": null,
     "builtin": true,
     "enabled": true,
+    "availableToAgents": true,
     "description": "Research into documentation, external sources, and repositories, with source citations.",
     "systemPrompt": [
       "Researcher. Investigate documentation, external sources, and repositories.",
@@ -118,6 +116,7 @@ export const defaultAgents: AgentConfiguration[] = [
     "excludeResources": null,
     "builtin": true,
     "enabled": true,
+    "availableToAgents": true,
     "description": "Advice on architecture, design, and migration decisions, including tradeoffs and risks.",
     "systemPrompt": [
       "Expert advisor. Give well-grounded advice on architecture, design, and migration decisions.",
@@ -150,8 +149,7 @@ export const defaultRoles: ModelRole[] = [
     "enabled": true,
     "model": null,
     "thinking": "medium",
-    "description": "General development tasks: writing new features, modifying existing code, code review, adding tests, routine debugging, file-level changes",
-    "hidden": false
+    "description": "Default model and thinking level.",
   },
   {
     "id": "heavy",
@@ -160,7 +158,6 @@ export const defaultRoles: ModelRole[] = [
     "model": null,
     "thinking": "high",
     "description": "Tasks requiring deep thinking: cross-file refactoring, architecture design, complex bug debugging, performance optimization, security analysis, database schema changes, multi-module migrations",
-    "hidden": false
   },
   {
     "id": "fast",
@@ -169,7 +166,6 @@ export const defaultRoles: ModelRole[] = [
     "model": null,
     "thinking": "low",
     "description": "Simple deterministic tasks: one-line edits, formatting tweaks, simple Q&A, doc lookups, git operations, confirmation replies",
-    "hidden": false
   },
   {
     "id": "utility",
@@ -177,8 +173,7 @@ export const defaultRoles: ModelRole[] = [
     "enabled": true,
     "model": null,
     "thinking": "off",
-    "description": "Lightweight utilities: model routing, commit generation, title/summary, etc. (hidden)",
-    "hidden": true
+    "description": "Lightweight utilities: model routing, commit generation, title/summary, etc.",
   },
   {
     "id": "smart",
@@ -187,6 +182,5 @@ export const defaultRoles: ModelRole[] = [
     "model": null,
     "thinking": "high",
     "description": "Expert judgment, architectural advice, and decisions grounded in evidence.",
-    "hidden": false
   }
 ];

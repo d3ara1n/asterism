@@ -34,10 +34,10 @@ it("moves version 3 budget overrides into subagent settings while preserving unr
     },
   });
   const effective = resolveParadigmConfiguration(BuiltinSettings.schema.parse(migrated).paradigm);
-  expect(effective.agents[0]).toMatchObject({
+  expect(effective.agents.find(agent => agent.id === "worker")).toMatchObject({
     systemPrompt: "  User instructions\n", subagent: { budget: { maxRequests: 17, maxDurationSeconds: 2400 } },
   });
-  expect(effective.agents[1]).toMatchObject({ subagent: { budget: { maxRequests: 4096, maxDurationSeconds: 75 } } });
+  expect(effective.agents.find(agent => agent.id === "custom")).toMatchObject({ subagent: { budget: { maxRequests: 4096, maxDurationSeconds: 75 } } });
   expect(previous.paradigm.agents[0]!.overrides).toHaveProperty("budget", { maxRequests: 17 });
 });
 

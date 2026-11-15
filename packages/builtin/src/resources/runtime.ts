@@ -23,15 +23,18 @@ export default defineModule(plugin => ({
   topLevelTools: [
     defineTopLevelTool({
       id: AgentListResult.id, name: "list_agent",
-      description: "List available agent configurations, their purposes, task examples, and delegation allowlists.",
-      guidelines: ["Each entry's delegates field describes that role's allowed delegation targets: null allows any enabled role, [] allows none, and a list allows only those role IDs."],
+      description: "List agent configurations available to assistants, their purposes, task examples, and delegation allowlists.",
+      guidelines: ["Each entry's delegates field describes that role's allowed delegation targets: null allows any role available to assistants, [] allows none, and a list contains only allowed target IDs from this catalog."],
       argsSchema: z.strictObject({}).describe("Empty parameter object."),
       resultSchema: AgentListResult.schema,
       effect: "read", execution: "parallel",
       execute(_args, { signal }) {
-        return attempt(signal, () => builtinConfiguration(plugin).agents
-          .filter(agent => agent.enabled)
-          .map(({ id, description, examples, delegates }) => ({ id, description, examples, delegates })));
+        return attempt(signal, () => {
+          const available = builtinConfiguration(plugin).agents.filter(agent => agent.enabled && agent.availableToAgents);
+          const ids = new Set(available.map(agent => agent.id));
+          return available.map(({ id, description, examples, delegates }) => ({ id, description, examples,
+            delegates: delegates === null ? null : delegates.filter(target => ids.has(target)) }));
+        });
       },
     }),
     defineTopLevelTool({

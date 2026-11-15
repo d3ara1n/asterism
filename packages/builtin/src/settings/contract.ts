@@ -21,7 +21,7 @@ export const settingsMessages = builtin.messages("en", defineMessages({
   retry: { id: "settings.retry", defaultMessage: "Try again" },
   missing: { id: "settings.missing", defaultMessage: "This configuration no longer exists. Reload settings." },
   idTaken: { id: "settings.idTaken", defaultMessage: "This ID is already used. Choose another." },
-  builtinRole: { id: "settings.builtinRole", defaultMessage: "Built-in model roles cannot be deleted." },
+  builtinRemoval: { id: "settings.builtinRemoval", defaultMessage: "Built-in configurations cannot be deleted. Disable them instead." },
   agentUnavailable: { id: "settings.agentUnavailable", defaultMessage: "Agent unavailable" },
   builtinId: { id: "settings.builtinId", defaultMessage: "Built-in configuration IDs cannot be changed." },
   autoExpand: { id: "settings.autoExpand", defaultMessage: "Automatically expand streaming content" },

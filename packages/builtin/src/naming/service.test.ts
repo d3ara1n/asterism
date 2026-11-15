@@ -18,7 +18,7 @@ function fixture(explicit = false, utility = true) {
   const set = vi.fn();
   const session = { id: "s", snapshot: () => snapshot, title: { set }, commit: (work: () => undefined) => work() } as unknown as SessionExecutor;
   const config = structuredClone(defaultParadigmConfiguration);
-  if (utility) config.roles.find(role => role.id === "utility")!.overrides.model = "test/model";
+  if (utility) config.roles.push({ id: "utility", builtin: true, overrides: { model: "test/model" } });
   const stream = vi.fn<ModelServices["stream"]>();
   const generate = createSessionNaming({ models: { stream }, roles: () => resolveParadigmConfiguration(config).roles });
   return { snapshot, session, set, stream, generate };

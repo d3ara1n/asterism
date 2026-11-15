@@ -1,11 +1,23 @@
 import { z } from "zod";
 import { defineCall } from "@asterism-app/sdk/contracts";
-import { builtin, defaultAgentPreset, configurationIdSchema, agentInputSchema, agentSchema, agentOverridesSchema, modelRoleInputSchema, modelRoleSchema, modelRoleOverridesSchema } from "@asterism-app/builtin-api/contracts";
+import { builtin, configurationIdSchema, agentInputSchema, agentSchema, agentOverridesSchema, modelRoleInputSchema, modelRoleSchema, modelRoleOverridesSchema } from "@asterism-app/builtin-api/contracts";
+import { legacyAgentPreset } from "./legacy-agent.ts";
+
+// The retired model-role visibility field is accepted only while reading saved settings.
+const storedModelRoleOverridesSchema = z.codec(
+  modelRoleOverridesSchema.extend({ hidden: z.boolean().optional() }),
+  modelRoleOverridesSchema,
+  {
+    decode: ({ hidden: _hidden, ...overrides }) => overrides,
+    encode: overrides => overrides,
+  },
+);
 
 const identity = { id: configurationIdSchema, builtin: z.boolean() };
 export const paradigmConfigurationSchema = z.strictObject({
-  defaultAgentId: configurationIdSchema.default(defaultAgentPreset),
-  roles: z.array(z.strictObject({ ...identity, overrides: modelRoleOverridesSchema })),
+  // Saved configurations predating the preference used worker; factory defaults set their choice explicitly.
+  defaultAgentId: configurationIdSchema.default(legacyAgentPreset),
+  roles: z.array(z.strictObject({ ...identity, overrides: storedModelRoleOverridesSchema })),
   agents: z.array(z.strictObject({ ...identity, overrides: agentOverridesSchema })),
 }).superRefine((value, context) => {
   for (const kind of ["roles", "agents"] as const) {

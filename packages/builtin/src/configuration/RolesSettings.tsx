@@ -18,7 +18,7 @@ import { Switch } from "@asterism-app/ui/ui/switch";
 import { cn } from "@asterism-app/ui/utils";
 import { useRendererIsland as useIsland, useRendererIslandCancel, useRendererIslandKey } from "@asterism-app/sdk/renderer";
 import { Section } from "@asterism-app/ui/settings-layout";
-import { Editor, TextField, OverrideToggleField, ReadStatus } from "@asterism-app/ui/configuration-forms";
+import { Editor, TextField, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
 
 const roleIslandKey = (id: string | null) => id === null ? "role:create" : `role:item:${id}`;
@@ -100,7 +100,7 @@ function RoleRow({ role, snapshot, selected, onOpen }: {
     void run({ type: "role.save", id: role.id, value: { ...overrides, id: role.id } });
   };
   return <ListRow className="flex-wrap" contentClassName="min-w-40" selected={selected} inactive={!role.enabled} onOpen={onOpen}
-    title={<>{role.id}{role.hidden && <Badge variant="secondary">{i18n.formatMessage(rolesMessages.internal)}</Badge>}</>}
+    title={role.id}
     description={role.description}
     actions={<>
       <ModelSelect value={role.model} disabled={busy} onChange={next => patch("model", next)} />
@@ -122,7 +122,7 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
   const [slug, setSlug] = useState(initialId ?? "");
   const current = snapshot?.roles.find(role => role.id === id);
   const stored = id ? snapshot?.overrides.roles[id] ?? {} : {};
-  const pick = (overrides: ModelRoleOverrides) => ({ description: overrides.description, hidden: overrides.hidden });
+  const pick = (overrides: ModelRoleOverrides) => ({ description: overrides.description });
   const [value, setValue] = useState(() => pick(stored));
   const base = snapshot?.defaults.roles[current?.builtin ? current.id : "default"];
   if (!base || !snapshot) return null;
@@ -136,7 +136,8 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
       event.preventDefault();
       const latest = id ? snapshot.overrides.roles[id] ?? {} : {};
       const next: ModelRoleOverrides = { ...latest };
-      for (const field of ["description", "hidden"] as const) { if (value[field] === undefined) delete next[field]; else (next as Record<string, unknown>)[field] = value[field]; }
+      if (value.description === undefined) delete next.description;
+      else next.description = value.description;
       const result = await run({ type: "role.save", id, value: { ...next, id: slug } });
       if (result?.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); setValue(pick(result.snapshot.overrides.roles[result.savedId]!)); }
     }}><FieldGroup>
@@ -144,8 +145,6 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
         <Input id={slugField} value={slug} readOnly={current?.builtin} required maxLength={160} pattern="[a-z0-9]+((_|-)[a-z0-9]+)*" className="font-mono" onChange={event => setSlug(event.target.value)} /></Field>
       <TextField label={i18n.formatMessage(rolesMessages.purpose)} value={value.description ?? ""} placeholder={base.description} onChange={next => setValue(v => ({ ...v, description: next || undefined }))} multiline
         hint={current?.builtin ? i18n.formatMessage(rolesMessages.purposeHint) : undefined} />
-      <OverrideToggleField label={i18n.formatMessage(rolesMessages.availableToAgents)} hint={i18n.formatMessage(rolesMessages.availableToAgentsHint)}
-        value={value.hidden === undefined ? undefined : !value.hidden} inherited={!base.hidden} onChange={next => setValue(v => ({ ...v, hidden: next === undefined ? undefined : !next }))} />
       {current && <Field><FieldLabel>{i18n.formatMessage(rolesMessages.usedBy)}</FieldLabel>
         {users.length ? <ul className="flex flex-wrap gap-1.5" aria-label={i18n.formatMessage(rolesMessages.agentsUsingRole)}>
           {users.map(agent => <li key={agent.id}><Badge variant="secondary" className="gap-1">

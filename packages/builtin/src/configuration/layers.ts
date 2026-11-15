@@ -4,7 +4,7 @@ import {
   type AgentOverrides, type ModelRoleOverrides,
 } from "@asterism-app/builtin-api/contracts";
 import { defaultAgents, defaultRoles } from "./defaults.ts";
-import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
+import { legacyAgentPreset, legacyWorker } from "./legacy-agent.ts";
 
 type ConfigurationIdentity = { id: string; builtin: boolean };
 export type RoleConfigurationEntry = ConfigurationIdentity & { overrides: ModelRoleOverrides };
@@ -12,7 +12,7 @@ export type AgentConfigurationEntry = ConfigurationIdentity & { overrides: Agent
 
 export const configurationDefaults: ParadigmSnapshot["defaults"] = {
   roles: Object.fromEntries(defaultRoles.map(({ id, builtin: _builtin, ...value }) => [id, value])),
-  agents: Object.fromEntries(defaultAgents.map(({ id, builtin: _builtin, ...value }) => [id, value])),
+  agents: Object.fromEntries([...defaultAgents, legacyWorker].map(({ id, builtin: _builtin, ...value }) => [id, value])),
 };
 
 export function normalizeOverrides<T extends ModelRoleOverrides | AgentOverrides>(value: T): T {
@@ -47,7 +47,7 @@ export function resolveRoleConfiguration(role: RoleConfigurationEntry, defaults 
 }
 export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaults = configurationDefaults) {
   const overrides = agentOverridesSchema.parse(agent.overrides);
-  const base = baseId(agent, defaultAgentPreset);
+  const base = baseId(agent, legacyAgentPreset);
   const inherited = defaults.agents[base];
   if (!inherited) throw new Error("Built-in agent definition is unavailable.");
   // The two lists form one policy; overriding either clears the inherited opposite list.

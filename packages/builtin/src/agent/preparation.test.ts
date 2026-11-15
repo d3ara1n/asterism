@@ -9,6 +9,20 @@ function context(id: string, sessions: SessionDirectory, catalog: AgentCatalog, 
   return { id, sessions, agentCatalog: catalog, lifetime: { signal: controller.signal } } as PluginContext;
 }
 describe("Agent request preparation", () => {
+  it.each(["", " \n "])("omits an empty role without losing resource context, and includes user-written instructions: %j", systemPrompt => {
+    const sessions: SessionDirectory = { list: () => [], sleeping: () => [], archived: () => [] };
+    const catalog: AgentCatalog = { skills: () => [], instructions: () => [], refresh: () => [], read: async () => "" };
+    const assemble = createRequestAssembly(context("asterism.builtin", sessions, catalog, new AbortController()), new SkillCatalog(catalog));
+    const files = [{ file: "/project/AGENTS.md", text: "Project context" }];
+    const empty = assemble({ id: "general", systemPrompt })(files);
+    expect(empty.blocks.map(block => block.kind)).toEqual(["context"]);
+    expect(empty.system.blocks.map(block => block.text)).toEqual(['<context file="/project/AGENTS.md">\nProject context\n</context>']);
+    const written = assemble({ id: "general", systemPrompt: "My instructions" })(files);
+    expect(written.system.blocks.map(block => block.text)).toEqual([
+      '<agent role="general">\nMy instructions\n</agent>', '<context file="/project/AGENTS.md">\nProject context\n</context>',
+    ]);
+  });
+
   it("composes preparers in registration order, keeps provenance, and isolates prepared results", () => {
     const sessions: SessionDirectory = { list: () => [], sleeping: () => [], archived: () => [] };
     const source = { id: "example.skills:main", plugin: "example.skills", directory: "/skills" };

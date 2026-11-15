@@ -40,7 +40,7 @@ export function DelegationFields({ value, agents, onChange, modified, onRestore 
         <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0"><Command>
           <CommandInput placeholder={i18n.formatMessage(agentsMessages.searchDelegates)} />
           <CommandList><CommandEmpty>{i18n.formatMessage(commonMessages.noMatches)}</CommandEmpty><CommandGroup>
-            {agents.filter(agent => agent.enabled).map(agent => <CommandItem key={agent.id} value={agent.id} keywords={[agent.description]} onSelect={() => toggle(agent.id)}>
+            {agents.filter(agent => agent.enabled && agent.availableToAgents).map(agent => <CommandItem key={agent.id} value={agent.id} keywords={[agent.description]} onSelect={() => toggle(agent.id)}>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span>{agent.id}</span><span className="type-caption line-clamp-2">{agent.description}</span>
               </span>
@@ -53,7 +53,7 @@ export function DelegationFields({ value, agents, onChange, modified, onRestore 
       {selected.length > 0 && <ul className="flex flex-col gap-3">
         {agents.filter(agent => selected.includes(agent.id)).map(agent => <li key={agent.id} className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <p className="type-label">{agent.id}{!agent.enabled && i18n.formatMessage(agentsMessages.disabledSuffix)}</p>
+            <p className="type-label">{agent.id}{(!agent.enabled || !agent.availableToAgents) && i18n.formatMessage(agentsMessages.disabledSuffix)}</p>
             <p className="type-caption line-clamp-2">{agent.description}</p>
           </div>
           <Button type="button" variant="ghost" size="icon-sm" onClick={() => toggle(agent.id)}

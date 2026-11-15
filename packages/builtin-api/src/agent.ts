@@ -7,8 +7,8 @@ import { agentMessageSenderSchema } from "./messaging.ts";
 
 /** Agents are ordinary resources: creation events record only identity; mutable data such as model selection belongs to private resource state. */
 export const Agent = builtin.resource("agent", z.object({}));
-/** Factory default and baseline for custom Agent configurations; the user-selected default is exposed by AgentServices.defaultAgentId. */
-export const defaultAgentPreset = "worker";
+/** Factory default Agent configuration; the user-selected default is exposed by AgentServices.defaultAgentId. */
+export const defaultAgentPreset = "general";
 /** Pending input is delivered at request or turn boundaries; execution starts immediately when idle. */
 export const agentInputModeSchema = z.enum(["steer", "follow"]);
 /** Submissions and drafts share a 16-character Nano ID identity. */
