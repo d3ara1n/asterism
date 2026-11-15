@@ -12,6 +12,12 @@ Being available as an Agent resource includes investigation of saved conversatio
 
 Input acceptance, execution ending, and acceptance of the deliverable are separate events. A supervisor relationship requires an agreement about reports, evidence, and follow-through; the link alone does not schedule work or make a final response a verified result.
 
+### A default role is a starting choice
+
+The default role selected in Agent settings is the starting choice for a new conversation on the home page, not a policy for every Agent. Choosing a different role for one conversation does not change that preference, and changing the default does not reconfigure existing Agents. The selected role supplies its instructions and model role; the default preference does not maintain a separate copy of those settings.
+
+Disabling, deleting, or renaming the selected role leaves its default reference unavailable rather than silently switching to another role. Choose a new default in settings, or select an available role for the conversation before sending.
+
 ## Mesh: access and membership are different directions
 
 A Mesh resource belongs to one selected channel. Participating sessions can use separate Mesh resources with the same channel selection. Merely giving them similar card titles does not establish a shared channel.

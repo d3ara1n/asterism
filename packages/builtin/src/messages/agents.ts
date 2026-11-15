@@ -33,6 +33,8 @@ export const agentsMessages = pluginNamespace("asterism.builtin").messages("en",
     id: "agents.default",
     defaultMessage: "Default",
   },
+  defaultAgent: { id: "agents.defaultAgent", defaultMessage: "Default agent for new conversations" },
+  unavailableAgent: { id: "agents.unavailable", defaultMessage: "Unavailable" },
   noRole: {
     id: "agents.modelRole.unset",
     defaultMessage: "No role",

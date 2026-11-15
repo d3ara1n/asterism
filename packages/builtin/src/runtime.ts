@@ -48,7 +48,7 @@ export default definePlugin({ namespace: builtin,
         calls: [
           implementCall(UpdateParadigmConfiguration, async input => {
             settings.update(current => ({ ...current, paradigm: updateParadigmConfiguration(current.paradigm, input) }));
-            return { snapshot: resolveParadigmConfiguration(settings.get().paradigm), savedId: input.type === "remove" ? null : input.value.id };
+            return { snapshot: resolveParadigmConfiguration(settings.get().paradigm), savedId: input.type === "agent.save" || input.type === "role.save" ? input.value.id : null };
           })],
         modules: [defineAgentInstructions([{ id: "environment", text: environment(application.name).text }]),
         providers, models, createAgentModule(application, usage, skills), createSkillsModule(skills), createFilesystemModule(plugin.shell), createNamingModule(application.userAgent), notes, questions,

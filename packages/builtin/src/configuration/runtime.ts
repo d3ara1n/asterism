@@ -19,6 +19,12 @@ export function resolveRoleTarget(roles: readonly ModelRole[], roleId: string, o
 /** Apply one edit to the latest plugin configuration; saved references remain explicit when a target disappears. */
 export function updateParadigmConfiguration(value: ParadigmConfiguration, command: ConfigurationOperation): ParadigmConfiguration {
   const next = structuredClone(value);
+  if (command.type === "agent.default") {
+    const agent = resolveParadigmConfiguration(value).agents.find(agent => agent.id === command.id && agent.enabled);
+    if (!agent) throw new PluginApiError("unavailable", "The default Agent configuration is unavailable.", "agent_unavailable", settingsMessages.agentUnavailable);
+    next.defaultAgentId = command.id;
+    return next;
+  }
   const kind = command.type === "remove" ? command.kind : command.type === "role.save" ? "role" : "agent";
   const collection = kind === "role" ? next.roles : next.agents;
   const index = command.id === null ? -1 : collection.findIndex(item => item.id === command.id);

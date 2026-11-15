@@ -2,8 +2,10 @@ import type { ResourceRef, SessionDirectory } from "@asterism-app/sdk/contracts"
 import { PluginApiError, type PluginContext } from "@asterism-app/sdk/runtime";
 import type { PeekClient } from "./peek.ts";
 
-/** Agent-owned operations for trusted plugins that have resolved an authorized resource reference. */
+/** Agent defaults and resource operations for trusted plugins; resource operations take authorized references. */
 export interface AgentServices {
+  /** Current default configuration ID for new conversations, read on access. The configuration may be disabled or missing; this does not select a model or change existing Agents. */
+  readonly defaultAgentId: string;
   describe(target: ResourceRef): { type: string };
   peek(target: ResourceRef): PeekClient;
 }

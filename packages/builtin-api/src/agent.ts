@@ -7,7 +7,7 @@ import { agentMessageSenderSchema } from "./messaging.ts";
 
 /** Agents are ordinary resources: creation events record only identity; mutable data such as model selection belongs to private resource state. */
 export const Agent = builtin.resource("agent", z.object({}));
-/** The built-in agent preset selected by default when starting from the home page. */
+/** Factory default and baseline for custom Agent configurations; the user-selected default is exposed by AgentServices.defaultAgentId. */
 export const defaultAgentPreset = "worker";
 /** Pending input is delivered at request or turn boundaries; execution starts immediately when idle. */
 export const agentInputModeSchema = z.enum(["steer", "follow"]);

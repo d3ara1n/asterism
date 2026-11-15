@@ -1,6 +1,6 @@
 import { ArrowUp, Bot, Settings } from "lucide-react";
 import { useRef, useState, useSyncExternalStore } from "react";
-import { defaultAgentPreset, StartAgentSession } from "@asterism-app/builtin-api/contracts";
+import { StartAgentSession } from "@asterism-app/builtin-api/contracts";
 import { useI18n, useRendererCalls, useRendererSettings, type RendererPrepareContext, type SessionEntryProps } from "@asterism-app/sdk/renderer";
 import type { ThinkingLevel, UiText } from "@asterism-app/sdk/contracts";
 import { createMessageDraft, type MessageDraft } from "../agent/conversation/draft";
@@ -8,6 +8,7 @@ import { SubmissionIdentity } from "../agent/conversation/submission";
 import { AttachFiles, DraftFiles, DraftFileError, fileInputEvents } from "../agent/conversation/Files";
 import { ModelChoices } from "../agent/conversation/ModelChoices";
 import { useSettingsConfiguration } from "../configuration/renderer-state";
+import { agentsMessages } from "../messages/agents";
 import { homeMessages } from "../messages/home";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { failureDisplay } from "@asterism-app/ui/error-display";
@@ -30,7 +31,8 @@ export function ConversationEntry({ ready, open, folder }: SessionEntryProps) {
   const { draft, identity } = entry;
   const input = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const { snapshot, readError } = useSettingsConfiguration();
-  const [agentId, setAgentId] = useState(defaultAgentPreset);
+  const [selectedAgentId, setAgentId] = useState<string | null>(null);
+  const agentId = selectedAgentId ?? snapshot?.defaultAgentId ?? null;
   const [model, setModel] = useState<string | null>(null);
   const [thinking, setThinking] = useState<ThinkingLevel | null>(null);
   const [busy, setBusy] = useState(false), [error, setError] = useState<UiText | null>(null);
@@ -43,9 +45,9 @@ export function ConversationEntry({ ready, open, folder }: SessionEntryProps) {
     : !snapshot.roles.some(role => role.model !== null) ? { message: homeMessages.setupRole, action: homeMessages.openRoles, run: () => settings.open("asterism.builtin", "roles") }
     : null;
   const submit = async () => {
-    if (!canSend || pending.current) return;
+    if (!canSend || !agent || pending.current) return;
     pending.current = true; setBusy(true); setError(null); draft.lock(true);
-    const value = { selection: { agent: agentId, model, thinking }, parts: draft.parts(), folderId: folder.id };
+    const value = { selection: { agent: agent.id, model, thinking }, parts: draft.parts(), folderId: folder.id };
     try {
       const result = await calls.invoke(StartAgentSession, { ...value, submissionId: identity.forInput(value) }, { content: draft.content() });
       identity.accepted(); draft.accepted(); open(result.sessionId);
@@ -71,8 +73,8 @@ export function ConversationEntry({ ready, open, folder }: SessionEntryProps) {
       </InputGroup>
       <div className="flex min-w-0 flex-wrap items-center gap-0.5 px-1.5 py-1">
         <folder.Picker disabled={busy} />
-        <Choice icon={<Bot />} label={i18n.text(commonMessages.agent)} value={agent?.id ?? i18n.text(commonMessages.agent)}
-          disabled={!snapshot || busy} selected={agent?.id ?? ""} onSelect={setAgentId}
+        <Choice icon={<Bot />} label={i18n.text(commonMessages.agent)} value={agent?.id ?? (agentId ? `${agentId} · ${i18n.text(agentsMessages.unavailableAgent)}` : i18n.text(commonMessages.agent))}
+          disabled={!snapshot || busy} selected={agentId ?? ""} onSelect={setAgentId}
           options={snapshot?.agents.filter(agent => agent.enabled).map(agent => ({ value: agent.id, label: agent.id })) ?? []} />
         <ModelChoices configuration={snapshot} agent={agentId} model={model} thinking={thinking} disabled={busy}
           onModelChange={setModel} onThinkingChange={setThinking} />

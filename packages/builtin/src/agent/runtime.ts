@@ -26,6 +26,7 @@ import { saveDraft, setDraftMode, exchangeDraft, discardDraft, moveDraft } from 
 import { createSendTool } from "./send/runtime.ts";
 import { createWaitTool } from "./wait/runtime.ts";
 import type { SkillCatalog } from "../skills/catalog.ts";
+import { BuiltinSettings } from "../settings/contract.ts";
 import { builtinConfiguration, resolveRoleTarget } from "../configuration/runtime.ts";
 
 /** The resource entry point only assembles domain modules and contributions; business modules do not depend on the full plugin context. */
@@ -49,6 +50,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
     };
     const peekAgent = (ref: ResourceRef) => createPeekClient(peek, () => agentObject(ref), plugin.lifetime.signal);
     registerAgentServices(plugin, {
+      get defaultAgentId() { return plugin.config(BuiltinSettings).get().paradigm.defaultAgentId; },
       describe: ref => ({ type: selectionOf(agentObject(ref)).selection.agent }),
       peek: peekAgent,
     });

@@ -34,6 +34,12 @@ Creating an Agent establishes an object; submitting input asks it to work. An in
 
 Put required initialization in creation or prepared initial work. Observe creation facts for reactions after commitment, not as a blocking initialization hook. Resource presence is a lifetime concern: reconstruction can make an existing Agent present again without creating a new Agent.
 
+## Treat the default as a creation preference
+
+An integration that offers a new conversation can follow the user's default Agent configuration instead of hard-coding a bundled preset. Read that preference when choosing the initial configuration; keep an explicit user choice and the configuration of an existing Agent independent of later default changes.
+
+The preference is only a configuration ID, not a copy of its instructions or a resolved model. It remains explicit if its target is disabled, deleted, or renamed. An integration should present that unavailable choice or expose the creation failure rather than silently substituting another role.
+
 ## Route through explicit relationships
 
 The publishing integration chooses recipients. A bridge can use its direct links to find Agents without obtaining their private state or inheriting their access to other resources. The reverse link is a separate relationship.

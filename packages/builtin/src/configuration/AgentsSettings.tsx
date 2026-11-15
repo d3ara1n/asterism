@@ -80,11 +80,29 @@ export function AgentsSettings() {
   return <Section title={i18n.formatMessage(agentsMessages.agents)} hint={i18n.formatMessage(agentsMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(agentsMessages.addAgent)}</Button>}>
     <ReadStatus loaded={!!snapshot} error={readError} onRetry={() => void load()} />
+    {snapshot && <DefaultAgentSetting snapshot={snapshot} />}
     {snapshot && <ItemGroup className="surface">{agents.map((agent, index) =>
       <div key={agent.id}>{index > 0 && <ItemSeparator />}
         <AgentRow agent={agent} snapshot={snapshot} selected={island.has(agentIslandKey(agent.id))} onOpen={origin => open(agent.id, origin)} />
       </div>)}</ItemGroup>}
   </Section>;
+}
+
+function DefaultAgentSetting({ snapshot }: { snapshot: ConfigurationSnapshot }) {
+  const i18n = useI18n(), id = useId();
+  const { run, busy } = useConfigurationAction("toast");
+  const available = snapshot.agents.filter(agent => agent.enabled);
+  const unavailable = !available.some(agent => agent.id === snapshot.defaultAgentId);
+  return <FieldGroup className="mb-4"><Field data-invalid={unavailable || undefined}>
+    <FieldLabel htmlFor={id}>{i18n.text(agentsMessages.defaultAgent)}</FieldLabel>
+    <Select value={snapshot.defaultAgentId} disabled={busy} onValueChange={id => { void run({ type: "agent.default", id }); }}>
+      <SelectTrigger id={id} className="w-full" aria-invalid={unavailable || undefined}><SelectValue /></SelectTrigger>
+      <SelectContent><SelectGroup>
+        {unavailable && <SelectItem value={snapshot.defaultAgentId} disabled>{snapshot.defaultAgentId} · {i18n.text(agentsMessages.unavailableAgent)}</SelectItem>}
+        {available.map(agent => <SelectItem key={agent.id} value={agent.id}>{agent.id}</SelectItem>)}
+      </SelectGroup></SelectContent>
+    </Select>
+  </Field></FieldGroup>;
 }
 
 function AgentRow({ agent, snapshot, selected, onOpen }: {
@@ -98,7 +116,7 @@ function AgentRow({ agent, snapshot, selected, onOpen }: {
   };
   const role = agent.modelRole === null ? null : snapshot.roles.find(item => item.id === agent.modelRole);
   return <ListRow selected={selected} inactive={!agent.enabled} onOpen={onOpen}
-    title={<>{agent.id}{agent.id === defaultAgentPreset && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
+    title={<>{agent.id}{agent.id === snapshot.defaultAgentId && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.default)}</Badge>}</>}
     description={agent.description}
     actions={<>
       {agent.modelRole !== null && !role

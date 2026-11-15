@@ -31,6 +31,27 @@ describe("Builtin configuration ownership", () => {
     expect(renamed.roles.some(role => role.id === "review")).toBe(false);
     expect(() => updateParadigmConfiguration(renamed, { type: "role.save", id: "default", value: { id: "renamed" } })).toThrow("fixed");
   });
+  it("accepts an enabled default and rejects unavailable choices without replacing it", () => {
+    const created = updateParadigmConfiguration(initial(), { type: "agent.save", id: null, value: { id: "custom" } });
+    const selected = updateParadigmConfiguration(created, { type: "agent.default", id: "custom" });
+    const disabled = updateParadigmConfiguration(selected, { type: "agent.save", id: "worker", value: { id: "worker", enabled: false } });
+    expect(() => updateParadigmConfiguration(disabled, { type: "agent.default", id: "worker" })).toThrow("unavailable");
+    expect(() => updateParadigmConfiguration(disabled, { type: "agent.default", id: "missing" })).toThrow("unavailable");
+    expect(disabled.defaultAgentId).toBe("custom");
+    expect(created.defaultAgentId).toBe("worker");
+  });
+  it.each(["disable", "rename", "delete"] as const)("preserves the explicit default ID when its target is changed: %s", change => {
+    const created = updateParadigmConfiguration(initial(), { type: "agent.save", id: null, value: { id: "custom" } });
+    const selected = updateParadigmConfiguration(created, { type: "agent.default", id: "custom" });
+    const changed = updateParadigmConfiguration(selected, change === "delete"
+      ? { type: "remove", kind: "agent", id: "custom" }
+      : { type: "agent.save", id: "custom", value: { id: change === "rename" ? "renamed" : "custom", enabled: change !== "disable" } });
+    const snapshot = resolveParadigmConfiguration(changed);
+    expect(snapshot.defaultAgentId).toBe("custom");
+    expect(snapshot.agents.find(agent => agent.id === snapshot.defaultAgentId && agent.enabled)).toBeUndefined();
+    const restored = updateParadigmConfiguration(changed, { type: "agent.default", id: "worker" });
+    expect(resolveParadigmConfiguration(restored).defaultAgentId).toBe("worker");
+  });
   it("resolves role inheritance before calling the host and keeps a captured target stable across role edits", () => {
     const roles = resolveParadigmConfiguration(initial()).roles;
     const role = roles.find(role => role.id === "default")!;
