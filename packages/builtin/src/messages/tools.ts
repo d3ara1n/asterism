@@ -9,4 +9,8 @@ export const toolsMessages = pluginNamespace("asterism.builtin").messages("en", 
     id: "conversation.tools.resultDetails",
     defaultMessage: "Result details",
   },
+  toolModelDetails: {
+    id: "conversation.tools.modelDetails",
+    defaultMessage: "Model projection",
+  },
 }));

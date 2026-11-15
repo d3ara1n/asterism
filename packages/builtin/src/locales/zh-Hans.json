@@ -338,6 +338,7 @@
   "filesystem.absolutePath": "绝对路径",
   "conversation.tools.callDetails": "调用详情",
   "conversation.tools.resultDetails": "结果详情",
+  "conversation.tools.modelDetails": "模型投影",
   "resources.creationList": "列出创建入口",
   "resources.creationInspect": "查看创建入口",
   "resources.create": "创建资源",
