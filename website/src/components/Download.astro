@@ -1,4 +1,5 @@
 ---
+import Glyph from "./Glyph.astro";
 import Mark from "./Mark.astro";
 import { content, releasesUrl, repoUrl, type Locale } from "../i18n/content";
 
@@ -9,25 +10,91 @@ interface Props {
 const { locale } = Astro.props;
 const t = content[locale].download;
 const repo = new URL(repoUrl).pathname.slice(1);
+
+interface ReleaseSnapshot {
+  tag: string;
+  assets: { name: string; url: string }[];
+}
+
+// Resolve the newest release at build time so direct download links work even if GitHub's anonymous API is rate-limited in the browser.
+async function fetchLatestBuild(): Promise<ReleaseSnapshot | null> {
+  const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "asterism-website-build" };
+  const token = process.env.GITHUB_TOKEN ?? process.env.GH_TOKEN;
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=1`, { headers });
+    if (res.ok) {
+      const releases = (await res.json()) as { tag_name: string; assets: { name: string; browser_download_url: string }[] }[];
+      const first = releases[0];
+      if (first) {
+        return {
+          tag: first.tag_name,
+          assets: first.assets.map(a => ({ name: a.name, url: a.browser_download_url })),
+        };
+      }
+    }
+  } catch {
+    // Fall through to the public Atom feed.
+  }
+
+  try {
+    const atomRes = await fetch(`${repoUrl}/releases.atom`, { headers: { "User-Agent": "asterism-website-build" } });
+    if (atomRes.ok) {
+      const xml = await atomRes.text();
+      const match = xml.match(/\/releases\/tag\/(v[0-9A-Za-z.-]+)"/);
+      if (match) {
+        const tag = match[1];
+        const version = tag.replace(/^v/, "");
+        const suffixes = ["-mac-arm64.dmg", "-win-x64.exe", "-linux-x86_64.AppImage"];
+        return {
+          tag,
+          assets: suffixes.map(suffix => ({
+            name: `Asterism-${version}${suffix}`,
+            url: `${repoUrl}/releases/download/${tag}/Asterism-${version}${suffix}`,
+          })),
+        };
+      }
+    }
+  } catch {
+    // Fall back to the releases index URL.
+  }
+
+  return null;
+}
+
+const buildRelease = await fetchLatestBuild();
+const resolveUrl = (suffix: string) => buildRelease?.assets.find(item => item.name.endsWith(suffix))?.url ?? releasesUrl;
+const quarantineCmd = "xattr -dr com.apple.quarantine /Applications/Asterism.app";
 ---
 
 <section id="download" class="download">
   <div class="wrap">
     <div class="top">
-      <Mark size={56} class="mark" />
+      <Mark size={52} class="mark" />
       <h2>{t.title}</h2>
       <p class="status">
         <span class="badge">{t.status}</span>
-        <span class="version" data-version hidden></span>
+        <a
+          class="version"
+          href={buildRelease ? `${repoUrl}/releases/tag/${buildRelease.tag}` : releasesUrl}
+          data-version
+          hidden={!buildRelease}
+        >
+          {buildRelease?.tag ?? ""}
+        </a>
       </p>
     </div>
 
-    <ul class="platforms" data-platforms data-repo={repo}>
+    <ul class="platforms" data-platforms data-repo={repo} data-repo-url={repoUrl}>
       {
         t.platforms.map(platform => (
-          <li>
-            <a href={releasesUrl} data-asset={platform.asset}>
-              <span class="os">{platform.os}</span>
+          <li class="platform-item" data-os={platform.id}>
+            <a class="platform-main" href={resolveUrl(platform.asset)} data-asset={platform.asset}>
+              <span class="os-row">
+                <span class="os">{platform.os}</span>
+                <span class="rec" data-rec hidden>{t.recommended}</span>
+              </span>
               <span class="detail">
                 {platform.arch} <span class="type">{platform.type}</span>
               </span>
@@ -38,10 +105,23 @@ const repo = new URL(repoUrl).pathname.slice(1);
     </ul>
 
     <div class="foot">
-      <details>
+      <details class="quarantine">
         <summary>{t.quarantine.summary}</summary>
         <p>{t.quarantine.body}</p>
-        <pre><code>xattr -dr com.apple.quarantine /Applications/Asterism.app</code></pre>
+        <div class="code-box">
+          <pre><code>{quarantineCmd}</code></pre>
+          <button
+            type="button"
+            class="copy-btn"
+            data-copy={quarantineCmd}
+            data-label-copy={t.copy}
+            data-label-copied={t.copied}
+          >
+            <span class="icon-copy"><Glyph name="copy" /></span>
+            <span class="icon-check" hidden><Glyph name="check" /></span>
+            <span data-copy-text>{t.copy}</span>
+          </button>
+        </div>
       </details>
       <a class="all" href={releasesUrl}>{t.all}</a>
     </div>
@@ -49,25 +129,84 @@ const repo = new URL(repoUrl).pathname.slice(1);
 </section>
 
 <script>
-  // Links point at the releases page until the newest published build (prereleases included) is known.
   const list = document.querySelector<HTMLElement>("[data-platforms]");
-  const version = document.querySelector<HTMLElement>("[data-version]");
+  const version = document.querySelector<HTMLAnchorElement>("[data-version]");
+
+  // Highlight the visitor's likely platform without hiding the others.
+  const ua = navigator.userAgent.toLowerCase();
+  const detected = ua.includes("mac") ? "mac" : ua.includes("win") ? "win" : ua.includes("linux") ? "linux" : null;
+  if (detected && list) {
+    const item = list.querySelector<HTMLElement>(`[data-os="${detected}"]`);
+    const badge = item?.querySelector<HTMLElement>("[data-rec]");
+    item?.classList.add("is-detected");
+    if (badge) badge.hidden = false;
+  }
+
+  // Refresh release links in the browser with sessionStorage caching so subsequent releases appear immediately without burning rate limits.
   if (list && version) {
-    fetch(`https://api.github.com/repos/${list.dataset.repo}/releases?per_page=1`, {
+    const repo = list.dataset.repo!;
+    const repoUrl = list.dataset.repoUrl!;
+    const cacheKey = `asterism-release:${repo}`;
+
+    const applyRelease = (data: { tag_name: string; assets: { name: string; browser_download_url: string }[] }) => {
+      list.querySelectorAll<HTMLAnchorElement>("[data-asset]").forEach(link => {
+        const asset = data.assets.find(item => item.name.endsWith(link.dataset.asset!));
+        if (asset) link.href = asset.browser_download_url;
+      });
+      version.textContent = data.tag_name;
+      version.href = `${repoUrl}/releases/tag/${data.tag_name}`;
+      version.hidden = false;
+    };
+
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) applyRelease(JSON.parse(cached));
+    } catch {
+      // Ignore storage access errors.
+    }
+
+    fetch(`https://api.github.com/repos/${repo}/releases?per_page=1`, {
       headers: { Accept: "application/vnd.github+json" },
     })
-      .then(response => (response.ok ? response.json() : Promise.reject(new Error(String(response.status)))))
+      .then(res => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
       .then((releases: { tag_name: string; assets: { name: string; browser_download_url: string }[] }[]) => {
         const release = releases[0];
         if (!release) return;
-        list.querySelectorAll<HTMLAnchorElement>("[data-asset]").forEach(link => {
-          const asset = release.assets.find(item => item.name.endsWith(link.dataset.asset!));
-          if (asset) link.href = asset.browser_download_url;
-        });
-        version.textContent = release.tag_name;
-        version.hidden = false;
+        applyRelease(release);
+        try {
+          sessionStorage.setItem(cacheKey, JSON.stringify(release));
+        } catch {
+          // Ignore storage quota errors.
+        }
       })
-      .catch(error => console.warn("Latest release lookup failed:", error));
+      .catch(() => {
+        // Keep build-time URLs when rate-limited or offline.
+      });
+  }
+
+  // Copy helper for the macOS quarantine command.
+  const copyBtn = document.querySelector<HTMLButtonElement>("[data-copy]");
+  if (copyBtn) {
+    let timer = 0;
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(copyBtn.dataset.copy!);
+        const text = copyBtn.querySelector<HTMLElement>("[data-copy-text]");
+        const iconCopy = copyBtn.querySelector<HTMLElement>(".icon-copy");
+        const iconCheck = copyBtn.querySelector<HTMLElement>(".icon-check");
+        if (text) text.textContent = copyBtn.dataset.labelCopied!;
+        if (iconCopy) iconCopy.hidden = true;
+        if (iconCheck) iconCheck.hidden = false;
+        clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          if (text) text.textContent = copyBtn.dataset.labelCopy!;
+          if (iconCopy) iconCopy.hidden = false;
+          if (iconCheck) iconCheck.hidden = true;
+        }, 1800);
+      } catch {
+        // Leave the selectable code block for manual copy if clipboard access is denied.
+      }
+    });
   }
 </script>
 
@@ -78,34 +217,35 @@ const repo = new URL(repoUrl).pathname.slice(1);
     padding-block: clamp(5rem, 11vw, 9rem) 3rem;
 
     --line-inv: color-mix(in srgb, var(--bg) 18%, transparent);
-    --ink-inv: color-mix(in srgb, var(--bg) 62%, transparent);
+    --ink-inv: color-mix(in srgb, var(--bg) 64%, transparent);
   }
 
   .top {
     display: grid;
     justify-items: start;
-    gap: 1.5rem;
+    gap: 1.4rem;
   }
 
   .top :global(.mark) {
-    opacity: 0.9;
+    opacity: 0.92;
   }
 
   h2 {
-    font-size: clamp(3rem, 8vw, 7rem);
+    font-size: clamp(3rem, 7.5vw, 6.5rem);
     line-height: 0.95;
     font-weight: 300;
     font-stretch: 120%;
     letter-spacing: -0.045em;
   }
 
-  :global(html:lang(zh-CN)) h2 {
+  :global(html:lang(zh)) h2 {
     letter-spacing: 0;
     font-stretch: 100%;
   }
 
   .status {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.75rem;
     font-size: 0.875rem;
@@ -121,36 +261,57 @@ const repo = new URL(repoUrl).pathname.slice(1);
   .version {
     font-family: var(--mono);
     font-size: 0.8125rem;
+    border-bottom: 1px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .version:hover {
+    color: var(--bg);
+    border-color: var(--line-inv);
   }
 
   .platforms {
     list-style: none;
-    margin: clamp(3rem, 7vw, 5rem) 0 0;
+    margin: clamp(3rem, 6.5vw, 4.75rem) 0 0;
     padding: 0;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     border-top: 1px solid var(--line-inv);
   }
 
-  .platforms li + li {
+  .platform-item {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .platform-item + .platform-item {
     border-left: 1px solid var(--line-inv);
   }
 
-  .platforms a {
+  .platform-main {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.45rem;
+    flex: 1;
     padding: 1.75rem 1.5rem 1.75rem 0;
     transition: background-color 0.25s, padding 0.35s var(--ease);
   }
 
-  .platforms li + li a {
+  .platform-item + .platform-item .platform-main {
     padding-left: 1.5rem;
   }
 
-  .platforms a:hover {
+  .platform-main:hover {
     background: color-mix(in srgb, var(--bg) 6%, transparent);
     padding-left: 1.5rem;
+  }
+
+  .os-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
   }
 
   .os {
@@ -158,6 +319,15 @@ const repo = new URL(repoUrl).pathname.slice(1);
     font-weight: 420;
     font-stretch: 110%;
     letter-spacing: -0.015em;
+  }
+
+  .rec {
+    padding: 0.12rem 0.5rem;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--bg) 13%, transparent);
+    color: var(--bg);
+    font-size: 0.72rem;
+    font-weight: 500;
   }
 
   .detail {
@@ -180,6 +350,11 @@ const repo = new URL(repoUrl).pathname.slice(1);
     border-top: 1px solid var(--line-inv);
     font-size: 0.875rem;
     color: var(--ink-inv);
+  }
+
+  .quarantine {
+    min-width: 0;
+    max-width: 100%;
   }
 
   summary {
@@ -209,24 +384,66 @@ const repo = new URL(repoUrl).pathname.slice(1);
   }
 
   details p {
-    margin-top: 1rem;
-    max-width: 34em;
+    margin-top: 0.9rem;
+    max-width: 36em;
+    text-wrap: pretty;
+  }
+
+  .code-box {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.55rem 0.5rem 0.9rem;
+    border: 1px solid var(--line-inv);
+    border-radius: 0.65rem;
+    background: color-mix(in srgb, var(--bg) 4%, transparent);
+    max-width: 100%;
   }
 
   pre {
-    margin: 0.75rem 0 0;
-    padding: 0.85rem 1rem;
+    margin: 0;
+    flex: 1;
     overflow-x: auto;
-    border: 1px solid var(--line-inv);
-    border-radius: 0.6rem;
     color: var(--bg);
     font-family: var(--mono);
     font-size: 0.8125rem;
   }
 
+  .copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex: none;
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--line-inv);
+    border-radius: 0.45rem;
+    background: transparent;
+    color: var(--ink-inv);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+  }
+
+  .copy-btn:hover {
+    color: var(--bg);
+    border-color: color-mix(in srgb, var(--bg) 45%, transparent);
+    background: color-mix(in srgb, var(--bg) 7%, transparent);
+  }
+
+  .copy-btn span[hidden] {
+    display: none;
+  }
+
   .all {
     flex: none;
-    transition: color 0.2s;
+    border-bottom: 1px solid var(--line-inv);
+    padding-bottom: 0.12rem;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .all:hover {
+    border-color: var(--bg);
   }
 
   .download :global(:focus-visible) {
@@ -238,18 +455,22 @@ const repo = new URL(repoUrl).pathname.slice(1);
       grid-template-columns: 1fr;
     }
 
-    .platforms li + li {
+    .platform-item + .platform-item {
       border-left: 0;
       border-top: 1px solid var(--line-inv);
     }
 
-    .platforms li + li a,
-    .platforms a {
+    .platform-item + .platform-item .platform-main,
+    .platform-main {
       padding-left: 0;
     }
 
     .foot {
       flex-direction: column;
+    }
+
+    .code-box {
+      flex-wrap: wrap;
     }
   }
 </style>

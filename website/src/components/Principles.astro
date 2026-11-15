@@ -24,7 +24,7 @@ const items = content[locale].principles;
 
 <style>
   .principles {
-    padding-bottom: clamp(5rem, 10vw, 9rem);
+    padding-bottom: clamp(5rem, 10vw, 8.5rem);
   }
 
   dl {
@@ -32,21 +32,22 @@ const items = content[locale].principles;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: clamp(1.5rem, 4vw, 4rem);
     border-top: 1px solid var(--line);
-    padding-top: 2rem;
+    padding-top: 2.25rem;
   }
 
   dt {
-    font-size: 1.25rem;
-    font-weight: 450;
+    font-size: 1.1875rem;
+    font-weight: 480;
     font-stretch: 108%;
     letter-spacing: -0.01em;
   }
 
   dd {
     margin-top: 0.6rem;
-    max-width: 22em;
+    max-width: 24em;
     font-size: 0.9375rem;
     color: var(--ink-2);
+    text-wrap: pretty;
   }
 
   @media (max-width: 52rem) {

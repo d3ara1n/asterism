@@ -3,6 +3,7 @@ import Base from "../layouts/Base.astro";
 import Header from "./Header.astro";
 import Hero from "./Hero.astro";
 import Story from "./Story.astro";
+import Primitives from "./Primitives.astro";
 import Plugins from "./Plugins.astro";
 import Principles from "./Principles.astro";
 import Download from "./Download.astro";
@@ -18,9 +19,10 @@ const { locale } = Astro.props;
 
 <Base locale={locale}>
   <Header locale={locale} />
-  <main>
+  <main id="main">
     <Hero locale={locale} />
     <Story locale={locale} />
+    <Primitives locale={locale} />
     <Plugins locale={locale} />
     <Principles locale={locale} />
     <Download locale={locale} />

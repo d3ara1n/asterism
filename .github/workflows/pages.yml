@@ -8,6 +8,8 @@ on:
       # The site renders the brand mark from the shared geometry source.
       - packages/ui/src/brand/geometry.ts
       - .github/workflows/pages.yml
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -35,6 +37,8 @@ jobs:
         working-directory: website
       - run: npm run build
         working-directory: website
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-pages-artifact@v5
         with:
           path: website/dist

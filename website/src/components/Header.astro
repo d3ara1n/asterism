@@ -19,9 +19,8 @@ const other = locale === "en" ? `${base}zh/` : base;
     <span>Asterism</span>
   </a>
   <nav class="nav">
-    <a href={other} hreflang={locale === "en" ? "zh" : "en"} aria-label={t.switchLabel}>{t.switchName}</a>
     <a href={repoUrl}>{t.source}</a>
-    <a class="nav-download" href="#download">{t.download}</a>
+    <a href={other} hreflang={locale === "en" ? "zh-CN" : "en"} aria-label={t.switchLabel}>{t.switchName}</a>
   </nav>
 </header>
 
@@ -30,6 +29,7 @@ const other = locale === "en" ? `${base}zh/` : base;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 1rem;
     height: 4.5rem;
   }
 
@@ -40,33 +40,23 @@ const other = locale === "en" ? `${base}zh/` : base;
     font-weight: 560;
     font-stretch: 112%;
     letter-spacing: -0.01em;
+    flex: none;
   }
 
   .nav {
     display: flex;
     align-items: center;
-    gap: clamp(1rem, 3vw, 2rem);
+    gap: clamp(1rem, 2.8vw, 2rem);
     font-size: 0.9375rem;
     color: var(--ink-2);
   }
 
   .nav a {
+    white-space: nowrap;
     transition: color 0.2s;
   }
 
   .nav a:hover {
     color: var(--ink);
-  }
-
-  .nav-download {
-    color: var(--ink);
-    padding: 0.35rem 0.9rem;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    transition: border-color 0.2s;
-  }
-
-  .nav-download:hover {
-    border-color: var(--ink);
   }
 </style>
