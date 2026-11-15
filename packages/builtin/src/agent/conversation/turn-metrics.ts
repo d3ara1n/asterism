@@ -25,6 +25,7 @@ export interface TurnMeasurement {
   incomplete: boolean;
   metrics: TurnMetricsData;
   replyMarkdown: string | null;
+  replyCreatedAt: string | null;
 }
 
 /** Preserves historical turns; consecutive input in a batch and steer messages belong to the same turn, and only the currently running turn is hidden. */
@@ -42,13 +43,16 @@ export function turnMetrics(path: readonly SessionRecord[], agentId: string, run
     if (!current.length) return [];
     const incomplete = projectTurnState(path.slice(start.index, next?.index), agentId) !== "completed";
     // Requests are ordered newest first and blocks by ordinal; take only the final response, without falling back to intermediate body text before tool execution.
-    const reply = incomplete ? "" : current[0]!.blocks.flatMap(({ block }) =>
+    const final = current[0]!;
+    const reply = incomplete ? "" : final.blocks.flatMap(({ block }) =>
       block.kind === "text" ? [block.text] : []).join("\n\n");
     return [{
       inputId: start.record.id, nextInputId: next?.record.id ?? null,
       incomplete,
       metrics: summarizeRequests(current),
       replyMarkdown: reply.trim() ? reply : null,
+      // Blocks are ordered by ordinal; the terminal record timestamps the final response, not an intermediate request or later input.
+      replyCreatedAt: reply.trim() ? final.blocks.at(-1)!.record.createdAt : null,
     }];
   });
 }

@@ -16,6 +16,7 @@ import { MessageAttachments, type InputFile } from "../../shared/attachments";
 import { Disclosure } from "./Disclosure";
 import { TurnFooter } from "./TurnFooter";
 import { MessageSender } from "./MessageSender";
+import { MessageFooter } from "./MessageFooter";
 import { messageAppearance } from "../message-presentation";
 import { TimelineViewState, viewStateKeys } from "./view-state";
 import { ExecutionErrorDetails } from "../ErrorDetails";
@@ -100,7 +101,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "toolcall": return <ToolCall node={node} />;
     case "summary": return <Summary text={node.text} />;
     case "compression": return <CompressionMarker node={node} />;
-    case "turn-metrics": return <TurnFooter metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} />;
+    case "turn-metrics": return <TurnFooter metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} replyCreatedAt={node.replyCreatedAt} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>
         <p className="whitespace-pre-wrap break-words">{node.message}</p>
@@ -116,12 +117,13 @@ function MessageNode({ node, content }: { node: Extract<TimelineItem, { kind: "m
   const files = parts.filter((part): part is InputFile => part.kind !== "text");
   const texts = parts.flatMap(part => part.kind === "text" && part.text ? [part.text] : []);
   return <article data-conversation-message={node.id}
-    className={cn("flex min-w-0 max-w-[92%] flex-col gap-1.5", user ? "ml-auto items-end" : "mr-auto items-start")}>
+    className={cn("group/message flex min-w-0 max-w-[92%] flex-col gap-1.5", user ? "ml-auto items-end" : "mr-auto items-start")}>
     <MessageSender sender={node.sender} />
     <MessageAttachments parts={files} content={content} align={user ? "end" : "start"} {...(texts.length ? {} : { "data-message-surface": "" })} />
     {texts.length > 0 && <div data-message-surface="" className={cn("flex w-full flex-col gap-2 rounded-md px-3 py-2", messageAppearance[node.sender.kind].surface)}>
       {texts.map((text, index) => <Markdown key={index}>{text}</Markdown>)}
     </div>}
+    <MessageFooter node={node} text={texts.join("\n")} />
   </article>;
 }
 function Summary({ text }: { text: string }) {

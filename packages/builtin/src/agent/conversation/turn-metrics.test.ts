@@ -79,6 +79,7 @@ describe("Per-turn conversation measurements", () => {
     const interruptedTurn = turnMetrics(records(path), "a", false)[0]!;
     expect(interruptedTurn.incomplete).toBe(true);
     expect(interruptedTurn.replyMarkdown).toBeNull();
+    expect(interruptedTurn.replyCreatedAt).toBeNull();
     const interrupted = interruptedTurn.metrics;
     expect(interrupted.cache).toBeNull();
     expect(interrupted.usage.output).toEqual({ value: null, count: 0 });
@@ -95,8 +96,8 @@ describe("Per-turn conversation measurements", () => {
     expect(tokensPerSecond(resumed.performance.rates.output)).toBe(10);
   });
 
-  // Copy all body text from the final response without missing blocks or including thinking, intermediate text, tools, or other turns.
-  it("Final replies preserve Markdown in block ordinal order, and historical turns retain their own replies", () => {
+  // Copy the final response in ordinal order and timestamp its terminal record, not a later lower-ordinal block, another agent, or the next turn.
+  it("Final replies preserve Markdown and terminal timestamps in their own historical turns", () => {
     const first = "# 结果\n\n- **已修复**";
     const second = "```ts\nconst ready = true;\n```\n";
     const path = [
@@ -104,14 +105,17 @@ describe("Per-turn conversation measurements", () => {
       node("progress", "u1", text("a", "work", 0, "Let me inspect the file.")),
       node("tool", "progress", call("a", "work", 1, "Tool output")),
       node("reasoning", "tool", thinking("a", "final", 0, "Private reasoning")),
-      node("second", "reasoning", text("a", "final", 2, second, { completion: completion(100, 20, 50, 2000) })),
-      node("first", "second", text("a", "final", 1, first)),
-      node("other", "first", text("b", "other", 0, "Other agent")),
+      node("second", "reasoning", text("a", "final", 2, second, { completion: completion(100, 20, 50, 2000) }), "2026-10-10T10:01:02Z"),
+      node("first", "second", text("a", "final", 1, first), "2026-10-10T10:01:01Z"),
+      node("other", "first", text("b", "other", 0, "Other agent"), "2026-10-10T10:02:00Z"),
       node("u2", "other", message("a", "Next question")),
-      node("next", "u2", text("a", "next", 0, "Next answer", { completion: completion(100, 20, 50, 2000) })),
+      node("next", "u2", text("a", "next", 0, "Next answer", { completion: completion(100, 20, 50, 2000) }), "2026-10-10T10:03:00Z"),
     ];
-    expect(turnMetrics(records(path), "a", false).map(turn => turn.replyMarkdown))
-      .toEqual([`${first}\n\n${second}`, "Next answer"]);
+    expect(turnMetrics(records(path), "a", false).map(turn => ({ text: turn.replyMarkdown, at: turn.replyCreatedAt })))
+      .toEqual([
+        { text: `${first}\n\n${second}`, at: "2026-10-10T10:01:02Z" },
+        { text: "Next answer", at: "2026-10-10T10:03:00Z" },
+      ]);
   });
 
   // Without a final body, do not fall back to copying earlier intermediate text; tool results and thinking cannot substitute for a reply.
@@ -125,6 +129,6 @@ describe("Per-turn conversation measurements", () => {
       node("earlier", "u", text("a", "earlier", 0, "Earlier response", { completion: completion(100, 20, 50, 2000) })),
       node("last", "earlier", last),
     ];
-    expect(turnMetrics(records(path), "a", false)[0]?.replyMarkdown).toBeNull();
+    expect(turnMetrics(records(path), "a", false)[0]).toMatchObject({ replyMarkdown: null, replyCreatedAt: null });
   });
 });

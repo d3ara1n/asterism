@@ -6,13 +6,19 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { turnMetricMessages as messages } from "../../messages/turn-metrics";
 import type { TurnMetricsData } from "./turn-metrics";
 import { TurnMetrics } from "./TurnMetrics";
+import { MessageTimestamp } from "./MessageTimestamp";
 
-export function TurnFooter({ metrics, incomplete, replyMarkdown }: {
-  metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null;
+export function TurnFooter({ metrics, incomplete, replyMarkdown, replyCreatedAt }: {
+  metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null; replyCreatedAt: string | null;
 }) {
-  return <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-2">
+  return <div className="group/turn grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-2 gap-y-2">
     <div className="min-w-0"><TurnMetrics metrics={metrics} incomplete={incomplete} /></div>
-    {replyMarkdown !== null && <CopyReply markdown={replyMarkdown} />}
+    {replyMarkdown !== null && <div className="flex items-center gap-2">
+      {replyCreatedAt !== null && <MessageTimestamp createdAt={replyCreatedAt} />}
+      <div className="opacity-60 transition-opacity group-hover/turn:opacity-100 focus-within:opacity-100">
+        <CopyReply markdown={replyMarkdown} />
+      </div>
+    </div>}
   </div>;
 }
 
@@ -31,7 +37,7 @@ function CopyReply({ markdown }: { markdown: string }) {
       setCopying(false);
     }
   };
-  return <IconButton size="icon-xs" className="mt-0.5"
+  return <IconButton size="icon-xs"
     label={i18n.text(messages.copyReply)} disabled={copying} onClick={() => { void copy(); }}>
     <Copy />
   </IconButton>;

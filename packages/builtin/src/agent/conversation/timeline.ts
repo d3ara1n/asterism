@@ -13,10 +13,10 @@ type SavedBlock = DisplayBlock & {
   responseCompleted?: boolean;
 };
 export type TimelineItem = SavedBlock | ModelLiveBlock
-  | { kind: "message"; id: string; parts: readonly AgentInputPart[]; sender: AgentMessageSender; startsTurn?: boolean }
+  | { kind: "message"; id: string; createdAt: string; parts: readonly AgentInputPart[]; sender: AgentMessageSender; startsTurn?: boolean }
   | { kind: "summary"; id: string; text: string }
   | { kind: "compression"; id: string; status: CompressionActivity["status"] | "completed" | "boundary"; details?: CompressionActivity["details"] }
-  | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null }
+  | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null; replyCreatedAt: string | null }
   | { kind: "conversation-process"; id: string; content: readonly ("text" | "thinking")[]; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; incomplete: boolean; open: boolean }
   | ({ kind: "notice" } & InlineFeedback);
 /** Saved and live model blocks; notices may carry a responseId but are not blocks. */
@@ -46,7 +46,7 @@ function item(record: SessionRecord, agentId: string): RecordedItem | null {
   const summary = ContextSummary.decode(record);
   if (summary?.status === "known") return { kind: "compression", id: record.id, status: "completed" };
   const message = AgentInputMessage.decode(record);
-  if (message?.status === "known") return { kind: "message", id: record.id, parts: message.data.parts, sender: message.data.sender, startsTurn: message.data.startsTurn };
+  if (message?.status === "known") return { kind: "message", id: record.id, createdAt: record.createdAt, parts: message.data.parts, sender: message.data.sender, startsTurn: message.data.startsTurn };
   const execution = decodeExecution(record);
   if (execution?.status === "known") return { ...execution.data.block, id: record.id, createdAt: record.createdAt };
   return null;
@@ -143,7 +143,7 @@ export function conversationTimeline(projection: ConversationProjection, running
   const before = new Map(summaries.map(turn => [turn.nextInputId, turn]));
   const measured = (turn: typeof summaries[number]): TimelineItem => ({
     kind: "turn-metrics", id: `turn-metrics:${turn.inputId}`, inputId: turn.inputId, metrics: turn.metrics, incomplete: turn.incomplete,
-    replyMarkdown: turn.replyMarkdown,
+    replyMarkdown: turn.replyMarkdown, replyCreatedAt: turn.replyCreatedAt,
   });
   const items = saved.flatMap(value => {
     const turn = value.kind === "message" ? before.get(value.id) : undefined;

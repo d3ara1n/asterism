@@ -19,7 +19,7 @@ describe("Exiting item order in the virtual list", () => {
   it("Exiting process items do not cross intervening supplemental messages", () => {
     const before = text("before"), after = text("after"), answer = text("answer");
     const earlier: TimelineItem = { ...process, id: "earlier-process" };
-    const steer: TimelineItem = { kind: "message", id: "steer", parts: [], sender: { kind: "user" }, startsTurn: false };
+    const steer: TimelineItem = { kind: "message", id: "steer", createdAt: "2026-07-21T10:00:00Z", parts: [], sender: { kind: "user" }, startsTurn: false };
     const result = retainExitingItems([before, steer, after, answer], [earlier, steer, process, answer],
       new Set([timelineKey(before), timelineKey(after)]),
       new Map([[timelineKey(before), earlier.id], [timelineKey(after), process.id]]));

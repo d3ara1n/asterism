@@ -8,7 +8,7 @@ export interface DiagnosticRequest {
   requestParentId: string | null; completion: ModelCompletion | null;
   blocks: { record: SessionRecord; block: ModelBlock }[];
   summary: string | null; onTimeline: boolean;
-  relatedInput: { id: string; parts: readonly AgentInputPart[]; sender: AgentMessageSender } | null;
+  relatedInput: { id: string; createdAt: string; startsTurn: boolean; parts: readonly AgentInputPart[]; sender: AgentMessageSender } | null;
   /** Determines only whether the historical projection contains files; multimodal token totals are not presented as a text breakdown. */
   inputHasFiles: boolean | null;
   /** Pre-compression estimate saved by a compression request; null for work requests. */
@@ -53,7 +53,7 @@ export function diagnosticRecords(records: readonly SessionRecord[], timelineIds
       unreadable++; state = { input: null, lastFile: null };
     }
     if (input?.status === "known") state = {
-      input: { id: record.id, parts: input.data.parts, sender: input.data.sender },
+      input: { id: record.id, createdAt: record.createdAt, startsTurn: input.data.startsTurn, parts: input.data.parts, sender: input.data.sender },
       lastFile: input.data.parts.some(part => part.kind === "file") ? record.sequence : state.lastFile,
     };
     if (summary?.status === "known") {

@@ -1,0 +1,63 @@
+import { useRef, useState } from "react";
+import { Copy, FileText, MoreHorizontal } from "lucide-react";
+import { toast } from "sonner";
+import { useI18n } from "@asterism-app/sdk/renderer";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Button } from "@asterism-app/ui/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { JsonView } from "@asterism-app/ui/json-view";
+import { conversationMessages as messages } from "../../messages/conversation";
+import type { TimelineItem } from "./timeline";
+import { MessageTimestamp } from "./MessageTimestamp";
+
+type Message = Extract<TimelineItem, { kind: "message" }>;
+
+export function MessageFooter({ node, text }: { node: Message; text: string }) {
+  const i18n = useI18n();
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const more = useRef<HTMLButtonElement>(null);
+  const copy = async (value: string) => {
+    setCopying(true);
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(i18n.text(messages.inputCopied));
+    } catch (error) {
+      console.error("Input could not be copied.", error);
+      toast.error(i18n.text(messages.inputCopyFailed));
+    } finally { setCopying(false); }
+  };
+  // Use the saved input parts, including event frontmatter, without reading attachment bytes or source resources.
+  const details = () => ({ id: node.id, createdAt: node.createdAt, sender: node.sender, parts: node.parts, startsTurn: node.startsTurn });
+  return <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+    <div className="flex items-center gap-2">
+      <MessageTimestamp createdAt={node.createdAt} />
+      <div className="nodrag nopan nokey flex items-center gap-0.5 opacity-60 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
+        {text && <IconButton size="icon-xs" label={i18n.text(messages.copyInput)} disabled={copying} onClick={() => { void copy(text); }}><Copy /></IconButton>}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button ref={more} variant="ghost" size="icon-xs"
+            aria-label={i18n.text(messages.inputMoreActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="nodrag nopan nokey"
+            onCloseAutoFocus={event => { if (detailsOpen) event.preventDefault(); }}>
+            <DropdownMenuGroup>
+              <DropdownMenuItem onSelect={() => setDetailsOpen(true)}><FileText />{i18n.text(messages.inputDetails)}</DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+    <DialogContent aria-describedby={undefined}
+      onCloseAutoFocus={event => { event.preventDefault(); more.current?.focus(); }}
+      className="nodrag nopan nokey flex max-h-[calc(100dvh-2rem)] min-w-0 flex-col overflow-hidden sm:max-w-3xl">
+      <DialogHeader className="shrink-0 pr-6"><DialogTitle>{i18n.text(messages.inputDetails)}</DialogTitle></DialogHeader>
+      <div tabIndex={0} role="region" aria-label={i18n.text(messages.inputDetails)}
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pr-2 select-text outline-offset-[-2px]">
+        {detailsOpen && <JsonView className="max-h-none overflow-visible" value={details()} />}
+      </div>
+      <DialogFooter className="shrink-0">
+        <Button variant="outline" disabled={copying} onClick={() => { void copy(JSON.stringify(details(), null, 2)); }}><Copy />{i18n.text(messages.copyInputDetails)}</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>;
+}
