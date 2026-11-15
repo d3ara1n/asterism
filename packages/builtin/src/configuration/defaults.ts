@@ -1,6 +1,9 @@
 import type { AgentConfiguration, ModelRole } from "@asterism-app/builtin-api/contracts";
 import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 
+/** General-purpose built-in agent; custom agents inherit its definition, and saved settings without a default selection resolve to it. */
+export const workerAgentId = "worker";
+
 // Built-in agents supply purpose-specific defaults used as the original resolution baseline.
 export const defaultAgents: AgentConfiguration[] = [
   {
@@ -17,6 +20,29 @@ export const defaultAgents: AgentConfiguration[] = [
     "examples": [],
     "subagent": {
       "instructions": "",
+      "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
+    }
+  },
+  {
+    "id": workerAgentId,
+    "delegates": null,
+    "resources": null,
+    "excludeResources": null,
+    "builtin": true,
+    "enabled": true,
+    "availableToAgents": true,
+    "description": "General-purpose agent for tasks across domains.",
+    "systemPrompt": "General-purpose agent. Carry out the requested task using the available context and capabilities.",
+    "modelRole": "default",
+    "examples": [
+      "Rename all snake_case fields to camelCase",
+      "Add input validation to POST /login"
+    ],
+    "subagent": {
+      "instructions": [
+        "Work autonomously on the delegated task using its supplied context.",
+        "Return the result with relevant supporting details and any unresolved gaps.",
+      ].join("\n"),
       "budget": { "maxRequests": 4096, "maxDurationSeconds": 2400 }
     }
   },
@@ -149,7 +175,7 @@ export const defaultRoles: ModelRole[] = [
     "enabled": true,
     "model": null,
     "thinking": "medium",
-    "description": "Default model and thinking level.",
+    "description": "Default model and thinking level."
   },
   {
     "id": "heavy",
@@ -157,7 +183,7 @@ export const defaultRoles: ModelRole[] = [
     "enabled": true,
     "model": null,
     "thinking": "high",
-    "description": "Tasks requiring deep thinking: cross-file refactoring, architecture design, complex bug debugging, performance optimization, security analysis, database schema changes, multi-module migrations",
+    "description": "Tasks requiring deep thinking: cross-file refactoring, architecture design, complex bug debugging, performance optimization, security analysis, database schema changes, multi-module migrations"
   },
   {
     "id": "fast",
@@ -165,7 +191,7 @@ export const defaultRoles: ModelRole[] = [
     "enabled": true,
     "model": null,
     "thinking": "low",
-    "description": "Simple deterministic tasks: one-line edits, formatting tweaks, simple Q&A, doc lookups, git operations, confirmation replies",
+    "description": "Simple deterministic tasks: one-line edits, formatting tweaks, simple Q&A, doc lookups, git operations, confirmation replies"
   },
   {
     "id": "utility",
@@ -173,7 +199,7 @@ export const defaultRoles: ModelRole[] = [
     "enabled": true,
     "model": null,
     "thinking": "off",
-    "description": "Lightweight utilities: model routing, commit generation, title/summary, etc.",
+    "description": "Lightweight utilities: model routing, commit generation, title/summary, etc."
   },
   {
     "id": "smart",
@@ -181,6 +207,6 @@ export const defaultRoles: ModelRole[] = [
     "enabled": true,
     "model": null,
     "thinking": "high",
-    "description": "Expert judgment, architectural advice, and decisions grounded in evidence.",
+    "description": "Expert judgment, architectural advice, and decisions grounded in evidence."
   }
 ];

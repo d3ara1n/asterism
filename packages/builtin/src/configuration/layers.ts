@@ -3,8 +3,7 @@ import {
   agentSchema, agentOverridesSchema, modelRoleSchema, modelRoleOverridesSchema,
   type AgentOverrides, type ModelRoleOverrides,
 } from "@asterism-app/builtin-api/contracts";
-import { defaultAgents, defaultRoles } from "./defaults.ts";
-import { legacyAgentPreset, legacyWorker } from "./legacy-agent.ts";
+import { defaultAgents, defaultRoles, workerAgentId } from "./defaults.ts";
 
 type ConfigurationIdentity = { id: string; builtin: boolean };
 export type RoleConfigurationEntry = ConfigurationIdentity & { overrides: ModelRoleOverrides };
@@ -12,7 +11,7 @@ export type AgentConfigurationEntry = ConfigurationIdentity & { overrides: Agent
 
 export const configurationDefaults: ParadigmSnapshot["defaults"] = {
   roles: Object.fromEntries(defaultRoles.map(({ id, builtin: _builtin, ...value }) => [id, value])),
-  agents: Object.fromEntries([...defaultAgents, legacyWorker].map(({ id, builtin: _builtin, ...value }) => [id, value])),
+  agents: Object.fromEntries(defaultAgents.map(({ id, builtin: _builtin, ...value }) => [id, value])),
 };
 
 export function normalizeOverrides<T extends ModelRoleOverrides | AgentOverrides>(value: T): T {
@@ -31,13 +30,12 @@ function normalizeFields(value: object): Record<string, unknown> {
   }));
 }
 
-/** Custom entries inherit only behavior fields; users supply their identities. */
-function baseId(item: { id: string; builtin: boolean }, fallback: string): string {
-  return item.builtin ? item.id : fallback;
-}
+/** Built-in entries inherit their own defaults; custom and new entries inherit only behavior fields from a fixed baseline, and users supply their identities. */
+export const roleBaseId = (role?: ConfigurationIdentity) => role?.builtin ? role.id : "default";
+export const agentBaseId = (agent?: ConfigurationIdentity) => agent?.builtin ? agent.id : workerAgentId;
 export function resolveRoleConfiguration(role: RoleConfigurationEntry, defaults = configurationDefaults) {
   const overrides = modelRoleOverridesSchema.parse(role.overrides);
-  const base = baseId(role, "default");
+  const base = roleBaseId(role);
   const inherited = defaults.roles[base];
   if (!inherited) throw new Error("Built-in role definition is unavailable.");
   return modelRoleSchema.parse({
@@ -47,7 +45,7 @@ export function resolveRoleConfiguration(role: RoleConfigurationEntry, defaults 
 }
 export function resolveAgentConfiguration(agent: AgentConfigurationEntry, defaults = configurationDefaults) {
   const overrides = agentOverridesSchema.parse(agent.overrides);
-  const base = baseId(agent, legacyAgentPreset);
+  const base = agentBaseId(agent);
   const inherited = defaults.agents[base];
   if (!inherited) throw new Error("Built-in agent definition is unavailable.");
   // The two lists form one policy; overriding either clears the inherited opposite list.

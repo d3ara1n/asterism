@@ -1,5 +1,6 @@
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { homeMessages } from "../../messages/home";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { usePluginSettingsRegistry } from "../../modules/settings";
 import { useConfigurationAction, useSettingsConfiguration } from "../configuration/state";
 import { ConfigurationActionError, ReadStatus } from "../configuration/forms";
@@ -15,7 +16,7 @@ export function HomeEntrySettings() {
   const selected = snapshot ? resolveSessionEntry(sessionEntries, snapshot.sessionEntry) : null;
   const value = selected ? sessionEntryKey(selected) : snapshot?.sessionEntry
     ? JSON.stringify([snapshot.sessionEntry.pluginId, snapshot.sessionEntry.entryId]) : "";
-  return <Section title={i18n.text(homeMessages.entryTitle)}>
+  return <Section title={i18n.text(commonMessages.home)}>
     <ReadStatus loaded={!!snapshot} error={readError} onRetry={() => void load()} />
     <Row label={i18n.text(homeMessages.entryTitle)} hint={i18n.text(homeMessages.entrySummary)}>
       <Select value={value} disabled={!snapshot || busy || !sessionEntries.length} onValueChange={key => {

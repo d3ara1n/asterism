@@ -16,12 +16,12 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectGroup, SelectI
 import { Switch } from "@asterism-app/ui/ui/switch";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
 import { useRendererIsland as useIsland, useRendererIslandCancel, useRendererIslandKey } from "@asterism-app/sdk/renderer";
-import { Section } from "@asterism-app/ui/settings-layout";
+import { Row, Section } from "@asterism-app/ui/settings-layout";
 import { Editor, EditorSection, ModifiedNote, OverrideToggleField, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
 import { ResourceAccessFields } from "./ResourceAccessFields";
 import { DelegationFields } from "./DelegationFields";
-import { legacyAgentPreset } from "./legacy-agent";
+import { agentBaseId } from "./layers";
 
 type Base = Omit<AgentConfiguration, "id" | "builtin">;
 type Budget = Base["subagent"]["budget"];
@@ -29,7 +29,7 @@ const agentIslandKey = (id: string | null) => id === null ? "agent:create" : `ag
 
 const NONE = "__none";
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
-const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agent?.builtin ? agent.id : legacyAgentPreset]!;
+const baseOf = (snapshot: ConfigurationSnapshot, agent?: AgentConfiguration): Base => snapshot.defaults.agents[agentBaseId(agent)]!;
 
 /** Override normalization: remove blank text and fields matching built-in values; subagent fields compare individually. */
 function normalize(draft: AgentOverrides, base: Base): AgentOverrides {
@@ -76,32 +76,34 @@ export function AgentsSettings() {
     return opened;
   };
   const agents = snapshot?.agents ?? [];
-  return <Section title={i18n.formatMessage(agentsMessages.agents)} hint={i18n.formatMessage(agentsMessages.summary)}
-    action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(agentsMessages.addAgent)}</Button>}>
+  return <>
     <ReadStatus loaded={!!snapshot} error={readError} onRetry={() => void load()} />
     {snapshot && <DefaultAgentSetting snapshot={snapshot} />}
-    {snapshot && <ItemGroup className="surface">{agents.map((agent, index) =>
-      <div key={agent.id}>{index > 0 && <ItemSeparator />}
-        <AgentRow agent={agent} snapshot={snapshot} selected={island.has(agentIslandKey(agent.id))} onOpen={origin => open(agent.id, origin)} />
-      </div>)}</ItemGroup>}
-  </Section>;
+    <Section title={i18n.formatMessage(agentsMessages.agents)} hint={i18n.formatMessage(agentsMessages.summary)}
+      action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(agentsMessages.addAgent)}</Button>}>
+      {snapshot && <ItemGroup className="surface">{agents.map((agent, index) =>
+        <div key={agent.id}>{index > 0 && <ItemSeparator />}
+          <AgentRow agent={agent} snapshot={snapshot} selected={island.has(agentIslandKey(agent.id))} onOpen={origin => open(agent.id, origin)} />
+        </div>)}</ItemGroup>}
+    </Section>
+  </>;
 }
 
 function DefaultAgentSetting({ snapshot }: { snapshot: ConfigurationSnapshot }) {
-  const i18n = useI18n(), id = useId();
+  const i18n = useI18n();
   const { run, busy } = useConfigurationAction("toast");
+  const label = i18n.text(agentsMessages.defaultAgentLabel);
   const available = snapshot.agents.filter(agent => agent.enabled);
   const unavailable = !available.some(agent => agent.id === snapshot.defaultAgentId);
-  return <FieldGroup className="mb-4"><Field orientation="horizontal" data-invalid={unavailable || undefined}>
-    <FieldLabel htmlFor={id}>{i18n.text(agentsMessages.defaultAgent)}</FieldLabel>
+  return <Section title={i18n.text(agentsMessages.defaultAgent)}><Row label={label} hint={i18n.text(agentsMessages.defaultAgentHint)}>
     <Select value={snapshot.defaultAgentId} disabled={busy} onValueChange={id => { void run({ type: "agent.default", id }); }}>
-      <SelectTrigger id={id} className="w-40 shrink-0" aria-invalid={unavailable || undefined}><SelectValue /></SelectTrigger>
+      <SelectTrigger aria-label={label} className="w-40" aria-invalid={unavailable || undefined}><SelectValue /></SelectTrigger>
       <SelectContent><SelectGroup>
         {unavailable && <SelectItem value={snapshot.defaultAgentId} disabled>{snapshot.defaultAgentId} · {i18n.text(agentsMessages.unavailableAgent)}</SelectItem>}
         {available.map(agent => <SelectItem key={agent.id} value={agent.id}>{agent.id}</SelectItem>)}
       </SelectGroup></SelectContent>
     </Select>
-  </Field></FieldGroup>;
+  </Row></Section>;
 }
 
 function AgentRow({ agent, snapshot, selected, onOpen }: {

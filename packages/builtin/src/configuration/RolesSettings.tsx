@@ -20,6 +20,7 @@ import { useRendererIsland as useIsland, useRendererIslandCancel, useRendererIsl
 import { Section } from "@asterism-app/ui/settings-layout";
 import { Editor, TextField, ReadStatus } from "@asterism-app/ui/configuration-forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./renderer-state";
+import { roleBaseId } from "./layers";
 
 const roleIslandKey = (id: string | null) => id === null ? "role:create" : `role:item:${id}`;
 
@@ -93,7 +94,7 @@ function RoleRow({ role, snapshot, selected, onOpen }: {
   const { run, busy } = useConfigurationAction("toast");
   // Inline changes save immediately: replace a single field in existing overrides, removing it when it matches the built-in value.
   const patch = <K extends keyof ModelRoleOverrides>(field: K, next: ModelRoleOverrides[K]) => {
-    const base = snapshot.defaults.roles[role.builtin ? role.id : "default"]!;
+    const base = snapshot.defaults.roles[roleBaseId(role)]!;
     const overrides = { ...snapshot.overrides.roles[role.id] };
     const value = toOverride(next, base[field as keyof typeof base] as ModelRoleOverrides[K]);
     if (value === undefined) delete overrides[field]; else overrides[field] = value;
@@ -124,7 +125,7 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
   const stored = id ? snapshot?.overrides.roles[id] ?? {} : {};
   const pick = (overrides: ModelRoleOverrides) => ({ description: overrides.description });
   const [value, setValue] = useState(() => pick(stored));
-  const base = snapshot?.defaults.roles[current?.builtin ? current.id : "default"];
+  const base = snapshot?.defaults.roles[roleBaseId(current)];
   if (!base || !snapshot) return null;
   const dirty = !current || slug !== id || JSON.stringify(pick(stored)) !== JSON.stringify(value);
   const users = current ? snapshot.agents.filter(agent => agent.modelRole === current.id) : [];

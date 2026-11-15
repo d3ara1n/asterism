@@ -31,7 +31,7 @@ import { CreateMesh } from "./mesh/contract.ts";
 import { environment } from "./agent/system-prompt.ts";
 import { UpdateParadigmConfiguration } from "./configuration/contract.ts";
 import { resolveParadigmConfiguration } from "./configuration/state.ts";
-import { selectAgentForModel, builtinConfiguration, updateParadigmConfiguration } from "./configuration/runtime.ts";
+import { assertModelSelectableAgent, builtinConfiguration, updateParadigmConfiguration } from "./configuration/runtime.ts";
 import { createSubagentPoolModule } from "./subagents/runtime.ts";
 import { CreateSubagentPool, createPoolSchema } from "./subagents/contract.ts";
 import schedules from "./schedules/runtime.ts";
@@ -101,7 +101,7 @@ export default definePlugin({ namespace: builtin,
               .describe("Authorize the new Agent to access you as a resource. Your identity is supplied by the host. Defaults to false."),
           }).describe("Agent configuration selection, optional title, and initial resource links."),
           toInput: ({ resources: _resources, expose_self: _exposeSelf, ...input }) => {
-            selectAgentForModel(builtinConfiguration(plugin).agents, input.selection.agent);
+            assertModelSelectableAgent(builtinConfiguration(plugin).agents, input.selection.agent);
             return input;
           },
           toOptions: ({ resources, expose_self }) => ({ resources, exposeSelf: expose_self }),

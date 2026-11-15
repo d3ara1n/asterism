@@ -8,10 +8,9 @@ import { resolveParadigmConfiguration } from "./state.ts";
 
 export function builtinConfiguration(plugin: PluginContext) { return resolveParadigmConfiguration(plugin.config(BuiltinSettings).get().paradigm); }
 /** Model-created Agents and delegated tasks validate new role selections at admission. */
-export function selectAgentForModel(agents: readonly AgentConfiguration[], id: string): AgentConfiguration {
-  const agent = agents.find(agent => agent.id === id && agent.enabled && agent.availableToAgents);
-  if (!agent) throw new PluginApiError("not_found", `Agent role ${id} is unavailable.`);
-  return agent;
+export function assertModelSelectableAgent(agents: readonly AgentConfiguration[], id: string): void {
+  if (!agents.some(agent => agent.id === id && agent.enabled && agent.availableToAgents))
+    throw new PluginApiError("not_found", `Agent role ${id} is unavailable.`);
 }
 export function resolveRoleTarget(roles: readonly ModelRole[], roleId: string, overrides: { model?: string | null; thinking?: ThinkingLevel | null } = {}): ModelTarget {
   const role = roles.find(role => role.id === roleId && role.enabled);

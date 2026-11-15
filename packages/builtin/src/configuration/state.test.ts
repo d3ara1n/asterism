@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { defaultParadigmConfiguration, resolveParadigmConfiguration } from "./state.ts";
-import { updateParadigmConfiguration, resolveRoleTarget, selectAgentForModel } from "./runtime.ts";
+import { updateParadigmConfiguration, resolveRoleTarget, assertModelSelectableAgent } from "./runtime.ts";
 import { createSelection } from "../agent/selection.ts";
 import { paradigmConfigurationSchema } from "./contract.ts";
 import { configurationDefaults, resolveAgentConfiguration, resolveRoleConfiguration } from "./layers.ts";
@@ -34,7 +34,7 @@ describe("Builtin configuration ownership", () => {
     const configuration = resolveParadigmConfiguration(initial());
     const role = configuration.agents.find(agent => agent.id === "general")!;
     const failure = (agents: typeof configuration.agents) => {
-      try { selectAgentForModel(agents, "general"); return null; }
+      try { assertModelSelectableAgent(agents, "general"); return null; }
       catch (error) {
         const value = error as { code: string; message: string };
         return { code: value.code, message: value.message };
@@ -44,7 +44,7 @@ describe("Builtin configuration ownership", () => {
     expect(failure([])).toEqual(missing);
     expect(failure([role])).toEqual(missing);
     expect(failure([{ ...role, enabled: false, availableToAgents: true }])).toEqual(missing);
-    expect(selectAgentForModel([{ ...role, availableToAgents: true }], "general").id).toBe("general");
+    expect(failure([{ ...role, availableToAgents: true }])).toBeNull();
   });
 
   it("keeps an existing workbench selection usable after closing its role to new model selections", () => {
