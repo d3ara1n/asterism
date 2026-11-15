@@ -98,7 +98,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
   };
   return <aside id="app-sidebar" className="app-sidebar" aria-label={i18n.formatMessage(appMessages.appNavigation)}>
     <header className="flex items-center justify-between gap-2 px-2 pb-5 pt-1">
-      <span className="flex items-center gap-2 text-sm font-semibold"><BrandMark className="size-5 text-foreground" />{i18n.formatMessage(appMessages.appName)}</span>
+      <span className="flex items-center gap-2 text-sm font-semibold"><BrandMark className="size-5 translate-y-px text-foreground" />{i18n.formatMessage(appMessages.appName)}</span>
       <IconButton size="icon-xs" label={i18n.formatMessage(appMessages.hideSidebar)} onClick={onHide}><PanelLeftClose /></IconButton>
     </header>
     <nav className="flex flex-col gap-1" aria-label={i18n.formatMessage(appMessages.mainViews)}>
