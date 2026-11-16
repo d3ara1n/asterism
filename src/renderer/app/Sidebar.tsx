@@ -1,5 +1,4 @@
 import { lazy, Suspense, useRef, useState, type ReactNode } from "react";
-import { BrandMark } from "@asterism-app/ui/ui/brand-mark";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
@@ -98,7 +97,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
   };
   return <aside id="app-sidebar" className="app-sidebar" aria-label={i18n.formatMessage(appMessages.appNavigation)}>
     <header className="flex items-center justify-between gap-2 px-2 pb-5 pt-1">
-      <span className="flex items-center gap-2 text-sm font-semibold"><BrandMark className="size-5 translate-y-px text-foreground" />{i18n.formatMessage(appMessages.appName)}</span>
+      <span className="flex items-center gap-2 text-sm font-semibold"><span aria-hidden="true" className="shrink-0 text-xl leading-none font-normal text-foreground">⁂</span>{i18n.formatMessage(appMessages.appName)}</span>
       <IconButton size="icon-xs" label={i18n.formatMessage(appMessages.hideSidebar)} onClick={onHide}><PanelLeftClose /></IconButton>
     </header>
     <nav className="flex flex-col gap-1" aria-label={i18n.formatMessage(appMessages.mainViews)}>

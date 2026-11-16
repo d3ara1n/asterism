@@ -4,7 +4,6 @@ import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuConten
 import { Button } from "@asterism-app/ui/ui/button";
 import { PanelLeft, ArrowLeft, ChevronDown, House, Settings, Plus, KeyRound, ListTree, History, Command } from "lucide-react";
 
-import { BrandMark } from "@asterism-app/ui/ui/brand-mark";
 
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
 import { WorkbenchFeedback } from "../features/workbench/WorkbenchFeedback";
@@ -222,7 +221,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       onClick={() => setSidebarVisible(visible => !visible)}><PanelLeft /></IconButton>}
     {inSettings ? <Button variant="ghost" size="sm" onClick={() => go("main")}><ArrowLeft />{i18n.formatMessage(commonMessages.back)}</Button> :
       <DropdownMenu modal={false}><DropdownMenuTrigger asChild><Button ref={menuTrigger} variant="ghost" size="sm" aria-label={i18n.formatMessage(appMessages.menu)}>
-        <BrandMark className="size-4 translate-y-px text-foreground" /><span className="text-sm font-semibold text-foreground">{i18n.formatMessage(appMessages.appName)}</span><ChevronDown className="text-muted-foreground" />
+        <span aria-hidden="true" className="shrink-0 text-xl leading-none font-normal text-foreground">⁂</span><span className="text-sm font-semibold text-foreground">{i18n.formatMessage(appMessages.appName)}</span><ChevronDown className="text-muted-foreground" />
       </Button></DropdownMenuTrigger><DropdownMenuContent align="start">
         <DropdownMenuItem onSelect={goHome}><House />{i18n.formatMessage(commonMessages.home)}</DropdownMenuItem>
         <DropdownMenuSeparator />
