@@ -54,9 +54,9 @@ function ServerDetails({ server, catalog }: { server: McpServerState; catalog: C
 }
 
 /** A single server: status and cached tools; connection management belongs to settings. */
-function ServerRow({ server, open, onToggle }: { server: McpServerState; open: boolean; onToggle(): void }) {
+function ServerRow({ server, open, onToggle, onFocus }: { server: McpServerState; open: boolean; onToggle(): void; onFocus(): void }) {
   const i18n = useI18n();
-  return <div className={columns}>
+  return <div className={columns} onFocusCapture={onFocus}>
     <div className={cn("col-span-full grid min-h-8 grid-cols-subgrid items-center py-1", !server.enabled && "opacity-60")}>
       <button type="button" aria-expanded={open} onClick={onToggle}
         className="col-span-4 grid grid-cols-subgrid items-center rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
@@ -80,6 +80,7 @@ function HostBody({ data }: { data: { servers: McpServerState[] } }) {
   const i18n = useI18n(), openSettings = useOpenSettings();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
   const [catalogs, setCatalogs] = useState<Record<string, Catalog>>({});
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
   const onCatalog = useCallback((id: string, catalog: Catalog) => {
     setCatalogs(current => ({ ...current, [id]: catalog }));
   }, []);
@@ -102,12 +103,14 @@ function HostBody({ data }: { data: { servers: McpServerState[] } }) {
       })),
     ] : []),
   ]);
+  const focusedIndex = rows.findIndex(row => row.key === focusedKey);
   return <>
     {data.servers.filter(server => expanded.has(server.id)).map(server =>
       <ServerCatalog key={server.id} id={server.id} onChange={onCatalog} />)}
-    <VirtualList data={rows} className="nodrag nopan" viewportClassName="px-2 py-1.5">
+    <VirtualList data={rows} keepMounted={focusedIndex >= 0 ? [focusedIndex] : []} className="nodrag nopan" viewportClassName="px-2 py-1.5">
       {row => row.kind === "server"
-        ? <ServerRow key={row.key} server={row.server} open={expanded.has(row.server.id)} onToggle={() => toggle(row.server.id)} />
+        ? <ServerRow key={row.key} server={row.server} open={expanded.has(row.server.id)} onToggle={() => toggle(row.server.id)}
+          onFocus={() => setFocusedKey(row.key)} />
         : <div key={row.key} className={columns}><div className={detail}>
           {row.kind === "details" ? <ServerDetails server={row.server} catalog={catalogs[row.server.id]} />
             : <div className="pb-2"><ToolEntry {...row.tool} /></div>}

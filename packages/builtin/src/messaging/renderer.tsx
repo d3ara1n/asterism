@@ -112,12 +112,14 @@ function ConversationsCard({ data }: { data: z.infer<typeof ConversationsView.sc
   const object = useRendererObject(), i18n = useI18n(), settings = useRendererSettings(), operations = useOperations();
   const retained = object.retained.get("asterism.builtin/conversations-selection", () => ({ id: null as string | null }));
   const [selectedId, setSelectedId] = useState(retained.id);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
   const direction = useRef<1 | -1>(1);
   const select = (id: string | null) => {
     direction.current = id === null ? -1 : 1;
     retained.id = id; setSelectedId(id); operations.clear();
   };
   const selected = data.connections.find(connection => connection.id === selectedId) ?? null;
+  const focusedIndex = data.connections.findIndex(connection => connection.id === focusedId);
   const notify = (target: SubscriptionTarget, title: string, label: string) => {
     const key = subscriptionKey(target);
     return <NotifyToggle label={label} pending={operations.pending(key)}
@@ -138,13 +140,17 @@ function ConversationsCard({ data }: { data: z.infer<typeof ConversationsView.sc
       <Page key={selected ? `connection:${selected.id}` : "list"} direction={direction.current}>
         {selected ? <ConnectionConversations connection={selected} back={() => select(null)} notify={notify} error={operations.error} />
           : <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
-            <ItemGroup className="min-h-0 flex-1"><VirtualList data={data.connections}>{connection => <ListRow key={connection.id} inactive={connection.status === "disabled"}
-              onOpen={() => select(connection.id)} mediaVariant="icon"
-              media={<StatusIcon tone={statusTone[connection.status]} className="size-4" />} title={connection.name}
-              description={[connection.identity, connection.providerLabel && i18n.text(connection.providerLabel)].filter(Boolean).join(" · ") || undefined}
-              details={connection.status !== "connected" ? <ConnectionStatus connection={connection} /> : undefined}
-              actions={notify({ connectionId: connection.id }, connection.name,
-                i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))} />}</VirtualList></ItemGroup>
+            <ItemGroup className="min-h-0 flex-1"><VirtualList data={data.connections} keepMounted={focusedIndex >= 0 ? [focusedIndex] : []}>
+              {connection => <div key={connection.id} onFocusCapture={() => setFocusedId(connection.id)}>
+                <ListRow inactive={connection.status === "disabled"}
+                  onOpen={() => select(connection.id)} mediaVariant="icon"
+                  media={<StatusIcon tone={statusTone[connection.status]} className="size-4" />} title={connection.name}
+                  description={[connection.identity, connection.providerLabel && i18n.text(connection.providerLabel)].filter(Boolean).join(" · ") || undefined}
+                  details={connection.status !== "connected" ? <ConnectionStatus connection={connection} /> : undefined}
+                  actions={notify({ connectionId: connection.id }, connection.name,
+                    i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))} />
+              </div>}
+            </VirtualList></ItemGroup>
             <ErrorLine error={operations.error} />
           </div>}
       </Page>
@@ -161,6 +167,8 @@ function ConnectionConversations({ connection, back, notify, error }: {
   const [dialogs, setDialogs] = useState<MessagingConversation[] | null>(null);
   const [loading, setLoading] = useState(true), [loadError, setLoadError] = useState<string | null>(null);
   const [revision, setRevision] = useState(0);
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
+  const focusedIndex = dialogs?.findIndex(dialog => subscriptionKey(addressTarget(connection.id, dialog)) === focusedKey) ?? -1;
   const usable = connection.enabled && connection.status !== "unavailable";
   // Reload on each observed event, status change, and explicit refresh; the current list stays visible meanwhile.
   useEffect(() => {
@@ -190,9 +198,10 @@ function ConnectionConversations({ connection, back, notify, error }: {
     <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
       {loading && dialogs === null && !loadError && <div className="flex justify-center py-6"><Spinner aria-hidden="true" /></div>}
       {dialogs?.length === 0 && <p className="type-caption px-1 py-4 text-center text-balance">{i18n.text(messages.empty)}</p>}
-      {dialogs && dialogs.length > 0 && <ItemGroup className="min-h-0 flex-1"><VirtualList data={dialogs}>{dialog => {
+      {dialogs && dialogs.length > 0 && <ItemGroup className="min-h-0 flex-1"><VirtualList data={dialogs} keepMounted={focusedIndex >= 0 ? [focusedIndex] : []}>{dialog => {
         const target = addressTarget(connection.id, dialog), Icon = dialog.threadId ? Hash : kindIcon[dialog.kind] ?? MessageSquare;
-        return <Item key={subscriptionKey(target)} size="sm">
+        const key = subscriptionKey(target);
+        return <Item key={key} size="sm" onFocusCapture={() => setFocusedKey(key)}>
           <ItemMedia variant="icon"><Icon /></ItemMedia>
           <ItemContent className="min-w-0">
             <ItemTitle className="max-w-full truncate" title={dialog.title}>{dialog.title}</ItemTitle>
