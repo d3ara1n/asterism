@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, MessageSquare, Moon, Search } from "lucide-react";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import {
   RendererPreferencesProvider,
@@ -11,6 +11,10 @@ import { cn } from "@asterism-app/ui/utils";
 import { filterCommandLabels } from "@asterism-app/ui/command-filter";
 import { CommandBack, isCommandBackKey, useCommandPageMotion } from "@asterism-app/ui/command-page";
 import { commandDetail, commandEmpty, commandHeading, commandListMotion, commandRow } from "@asterism-app/ui/command-styles";
+import type { AppSnapshot } from "../../../shared/contracts";
+import { commonMessages } from "@asterism-app/ui/messages/common";
+import { appMessages } from "../../messages/app";
+import { useFolders } from "../folders/context";
 import { commandsMessages as messages } from "../../messages/commands";
 import { usePluginCommands, type RegisteredCommandGroup } from "../../modules/commands";
 import { useI18n } from "../../shared/i18n";
@@ -18,6 +22,18 @@ import { PluginCallScope, SettingsBoundary } from "../plugins/scope";
 import { pluginPreferences } from "../creation/preferences";
 import { resolveCommandPage } from "./model";
 import { settingsCommands } from "./settings";
+
+interface SessionNavigation {
+  sessions: AppSnapshot["sessions"];
+  selectedId: string | null;
+  ready: boolean;
+  open(sessionId: string): void;
+}
+
+const sessionsNamespace = "host/sessions";
+const searchSessionsCommand: RendererCommand = {
+  id: "search", label: messages.searchSessions, icon: <Search />, children: [],
+};
 
 interface Page {
   namespace: string;
@@ -46,6 +62,40 @@ function CommandRow({ id, command, heading, disabled, onOpen }: {
     {command.current && <><Check className="ml-auto" aria-hidden="true" /><span className="sr-only">{i18n.text(messages.current)}</span></>}
     {command.children && <ChevronRight className="ml-auto" aria-hidden="true" />}
   </CommandItem>;
+}
+
+/** Session rows search only titles; folder and lifecycle marks are context, not search aliases. */
+function SessionSection({ sessions, navigation, close }: {
+  sessions: SessionNavigation; navigation: Navigation; close(): void;
+}) {
+  const i18n = useI18n();
+  const { folders } = useFolders();
+  if (navigation.page && navigation.page.namespace !== sessionsNamespace) return null;
+  if (!navigation.page) return <CommandGroup className="p-0 [&_[cmdk-group-heading]]:p-0"
+    heading={<div className={commandHeading}>{i18n.text(commonMessages.conversations)}</div>}>
+    <CommandRow id={JSON.stringify([sessionsNamespace, searchSessionsCommand.id])} command={searchSessionsCommand}
+      heading={i18n.text(commonMessages.conversations)} disabled={!sessions.ready}
+      onOpen={() => navigation.openPage(sessionsNamespace, searchSessionsCommand)} />
+  </CommandGroup>;
+  const folderById = new Map(folders.map(folder => [folder.id, folder]));
+  return <CommandGroup className="p-0">
+    {sessions.sessions.map(session => {
+      const folder = session.folder_id === null ? undefined : folderById.get(session.folder_id);
+      const current = session.id === sessions.selectedId;
+      return <CommandItem key={session.id} value={JSON.stringify([sessionsNamespace, "search", session.id])}
+        keywords={[session.title]} disabled={!sessions.ready} className={commandRow}
+        onSelect={() => { close(); sessions.open(session.id); }}>
+        {session.sleeping ? <Moon aria-hidden="true" /> : <MessageSquare aria-hidden="true" />}
+        <div className="min-w-0 flex-1">
+          <div className={cn("truncate", session.completed && "line-through")}>{session.title}</div>
+          {folder && <div className={cn("mt-0.5 truncate", commandDetail)}>{folder.name}</div>}
+          {session.sleeping && <span className="sr-only">{i18n.text(appMessages.sleeping)}</span>}
+          {session.completed && <span className="sr-only">{i18n.text(appMessages.completed)}</span>}
+        </div>
+        {current && <><Check className="ml-auto" aria-hidden="true" /><span className="sr-only">{i18n.text(messages.currentSession)}</span></>}
+      </CommandItem>;
+    })}
+  </CommandGroup>;
 }
 
 /** Keep contribution hooks mounted across navigation and filtering so pending work and feedback retain their owner. */
@@ -89,8 +139,8 @@ function PluginSection({ group, context, navigation }: {
 }
 
 /** One opening owns the page stack and search; dismissal disposes plugin calls, but not application services. */
-function CommandContent({ session, ready, close }: {
-  session: RendererSessionSnapshot | null; ready: boolean; close(): void;
+function CommandContent({ session, ready, sessions, close }: {
+  session: RendererSessionSnapshot | null; ready: boolean; sessions: SessionNavigation; close(): void;
 }) {
   const i18n = useI18n();
   const groups = usePluginCommands();
@@ -113,7 +163,7 @@ function CommandContent({ session, ready, close }: {
     {page && <CommandBack label={i18n.text(page.path.at(-1)!.label)} onBack={back} />}
     <Command label={i18n.text(messages.title)} filter={filterCommandLabels} value={value} onValueChange={setValue}
       className="h-auto min-h-0 bg-transparent **:data-[slot=command-input-wrapper]:h-12 **:data-[slot=command-input-wrapper]:px-4">
-      <CommandInput ref={input} autoFocus value={search} onValueChange={setSearch} placeholder={i18n.text(messages.search)}
+      <CommandInput ref={input} autoFocus value={search} onValueChange={setSearch} placeholder={i18n.text(page?.namespace === sessionsNamespace ? messages.searchSessions : messages.search)}
         onKeyDown={event => {
           if (page && isCommandBackKey(event, search)) {
             event.preventDefault(); back();
@@ -122,6 +172,7 @@ function CommandContent({ session, ready, close }: {
       <CommandList className={`max-h-[calc(70dvh-7rem)] min-h-0 scroll-py-2 ${commandListMotion}`}>
         <div ref={body} className="p-1.5">
           <CommandEmpty className={commandEmpty}>{i18n.text(messages.empty)}</CommandEmpty>
+          <SessionSection sessions={sessions} navigation={navigation} close={close} />
           <CommandSection group={settingsCommands} context={context} namespace="host/settings" navigation={navigation} />
           {groups.map(group => <PluginSection key={JSON.stringify([group.pluginId, group.id])} group={group} context={context} navigation={navigation} />)}
         </div>
@@ -140,9 +191,9 @@ function isApplicationChord(event: KeyboardEvent) {
 }
 
 /** Application modal opened from the menu or the application chord. */
-export function ApplicationCommands({ open, onOpenChange, session, ready, returnFocus }: {
+export function ApplicationCommands({ open, onOpenChange, session, ready, sessions, returnFocus }: {
   open: boolean; onOpenChange(open: boolean): void; session: RendererSessionSnapshot | null; ready: boolean;
-  returnFocus: RefObject<HTMLElement | null>;
+  sessions: SessionNavigation; returnFocus: RefObject<HTMLElement | null>;
 }) {
   const i18n = useI18n();
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
@@ -163,7 +214,7 @@ export function ApplicationCommands({ open, onOpenChange, session, ready, return
       onCloseAutoFocus={event => { event.preventDefault(); if (returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true }); }}>
       <DialogTitle className="sr-only">{i18n.text(messages.title)}</DialogTitle>
       {/* Content mounts and unmounts with the dialog's presence, so the exit animation keeps its rows. */}
-      <CommandContent session={session} ready={ready} close={close} />
+      <CommandContent session={session} ready={ready} sessions={sessions} close={close} />
     </DialogContent>
   </Dialog>;
 }
