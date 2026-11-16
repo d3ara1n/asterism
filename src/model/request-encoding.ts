@@ -33,9 +33,11 @@ export function mappedEffort(level: ThinkingLevel, mappings: ThinkingMappings, r
 
 /**
  * Preserves explicit sampling values and applies protocol mappings after SDK serialization.
+ * Protocols that fully encode reasoning can omit it from SDK options to avoid model-name mode substitutions.
  * Each call independently captures options and transport without shared mutable state linking concurrent requests.
  */
-export function withRequestEncoding(createModel: (transport: typeof fetch) => LanguageModelV4, transport: typeof fetch, encode: RequestEncoder) {
+export function withRequestEncoding(createModel: (transport: typeof fetch) => LanguageModelV4, transport: typeof fetch, encode: RequestEncoder,
+  { forwardReasoning = true }: { forwardReasoning?: boolean } = {}) {
   const project = (params: CallOptions) => {
     const level = params.reasoning === undefined || params.reasoning === "provider-default" ? null
       : params.reasoning === "none" ? "off" : params.reasoning;
@@ -56,11 +58,11 @@ export function withRequestEncoding(createModel: (transport: typeof fetch) => La
     specificationVersion: "v4",
     wrapStream: ({ params, doStream }) => {
       const target = project(params);
-      return target ? target.doStream(params) : doStream();
+      return target ? target.doStream(forwardReasoning ? params : { ...params, reasoning: undefined }) : doStream();
     },
     wrapGenerate: ({ params, doGenerate }) => {
       const target = project(params);
-      return target ? target.doGenerate(params) : doGenerate();
+      return target ? target.doGenerate(forwardReasoning ? params : { ...params, reasoning: undefined }) : doGenerate();
     },
   } });
 }

@@ -74,7 +74,9 @@ The configured level set controls menus. It does not clamp or reject a saved exp
 
 Disabling reasoning omits request reasoning options and historical reasoning parts while retaining saved selections and historical records. Returned reasoning is still received and displayed.
 
-Protocol defaults map levels to effort or manual budgets. Compatibility settings can override individual mappings. They do not choose a different reasoning mode or trigger fallback requests.
+Protocol defaults map levels to effort or manual budgets. Messages uses adaptive thinking for explicit active levels regardless of the service model ID. The custom thinking budgets pack selects manual thinking instead; an empty pack uses built-in budgets. Effort mappings remain independent of that mode choice. Unset levels, disabled reasoning, and connectivity probes do not activate either mode. Explicit off sends disabled thinking even when a service rejects it.
+
+Asterism owns Messages thinking mode and effort encoding at the final transport boundary. The SDK receives no explicit reasoning option for this protocol, so its model-name heuristics cannot replace the chosen mode. Compatibility settings do not trigger fallback requests.
 
 Default manual thinking budgets are calculated from the effective total output cap. The cap includes thinking rather than receiving an additional hidden allowance. Explicit budgets are sent unchanged; the service determines whether a budget is accepted with that output cap.
 

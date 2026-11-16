@@ -12,6 +12,14 @@ Treat discovery and parameter lookup as starting information. The service you ac
 
 Check a connection before relying on it for substantial work. A successful test establishes that the tested request worked; it does not validate every input or capability a later task may need.
 
+## Choose thinking behavior for the endpoint
+
+Anthropic Messages connections use adaptive thinking when you select an active thinking level. This choice is independent of the model name, so a relay alias does not silently select a different thinking mode. A familiar Claude name does not establish which modes a relay accepts.
+
+For an endpoint that needs token-budget thinking, add the Custom thinking budgets compatibility setting. Adding it selects manual thinking even with no per-level overrides; it is not just a tuning control for a mode selected elsewhere. The total output cap includes both thinking and the answer, so a larger thinking budget leaves less room for the answer. A request that the endpoint rejects remains a visible failure rather than being retried in another mode.
+
+These choices apply to subsequent requests, not an already-running response. Adaptive thinking does not impose a wall-clock deadline, and switching modes is not evidence that a relay will complete a task.
+
 ## Reuse a model choice without confusing it with a role
 
 A model role is a reusable model choice. An assistant role describes responsibility and expertise. Keeping them distinct lets you change the model without rewriting the working agreement, or use the same model for different responsibilities.

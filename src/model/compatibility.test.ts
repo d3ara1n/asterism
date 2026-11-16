@@ -81,14 +81,17 @@ describe("Reasoning level and budget mappings", () => {
     expect(effort(await request(current))).toBeUndefined();
   });
 
-  // Anthropic manual budgets work without compatibility packages; the output limit includes reasoning and cannot be expanded by the SDK.
+  // An empty budget pack selects manual thinking; model overrides replace the whole provider mapping.
   it("Anthropic default budgets use the final output limit and budget packages override only specified levels", async () => {
     const current = input("anthropic");
     current.settings.model.modelId = "claude-sonnet-4-5";
+    current.settings.provider.compatibility = [{ id: "customThinkingBudgets", value: {} }];
     current.settings.model.generation.maxOutputTokens = 20000;
     current.maxOutputTokens = 10000;
     current.settings.thinking = "medium";
-    expect(await request(current)).toMatchObject({ thinking: { type: "enabled", budget_tokens: 3000 }, max_tokens: 10000 });
+    const defaults = await request(current);
+    expect(defaults).toMatchObject({ thinking: { type: "enabled", budget_tokens: 3000 }, max_tokens: 10000 });
+    expect(defaults).not.toHaveProperty("output_config");
     current.settings.provider.compatibility = [{ id: "customThinkingBudgets", value: { medium: 5000, low: 2048 } }];
     expect(await request(current)).toMatchObject({ thinking: { type: "enabled", budget_tokens: 5000 }, max_tokens: 10000 });
     current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { high: 6000 } }];
@@ -99,32 +102,49 @@ describe("Reasoning level and budget mappings", () => {
     expect(await request(current)).toMatchObject({ thinking: { type: "enabled", budget_tokens: 2048 }, max_tokens: 10000 });
   });
 
-  // With both mappings present, effort names do not affect token calculations; budget packages cannot force adaptive models into manual budgeting.
-  it("Anthropic mode is independent of both mappings and the SDK does not downgrade off to low reasoning", async () => {
+  // Unknown relay IDs, old manual models, adaptive models, and always-thinking models must obey the same explicit mode choice.
+  it.each(["relay-claude", "claude-sonnet-4-5", "claude-opus-4-7", "claude-sonnet-5-5"])(
+    "Messages thinking mode follows the budget pack rather than SDK heuristics for %s", async modelId => {
+      const current = input("anthropic");
+      current.settings.model.modelId = modelId;
+      current.settings.model.generation.maxOutputTokens = 20000;
+      current.settings.provider.compatibility = [{ id: "customThinkingLevels", value: { low: "custom-low" } }];
+      const adaptive = await request(current);
+      expect(adaptive.thinking).toEqual({ type: "adaptive", display: "summarized" });
+      expect(adaptive.output_config).toMatchObject({ effort: "custom-low" });
+      current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: {} }];
+      const manual = await request(current);
+      expect(manual).toMatchObject({ thinking: { type: "enabled", budget_tokens: 2000 }, max_tokens: 20000,
+        output_config: { effort: "custom-low" } });
+      current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: 4096 } }];
+      expect((await request(current)).thinking).toEqual({ type: "enabled", budget_tokens: 4096 });
+      current.settings.model.compatibility = [];
+      expect((await request(current)).thinking).toEqual(adaptive.thinking);
+      current.settings.model.capabilities.thinkingLevels = ["low"];
+      current.settings.thinking = "off";
+      const disabled = await request(current);
+      expect(disabled.thinking).toEqual({ type: "disabled" });
+      expect(disabled.output_config).toBeUndefined();
+      current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: {} }];
+      expect((await request(current)).thinking).toEqual({ type: "disabled" });
+    });
+
+  // Budget packs cannot enable thinking when the caller leaves the level unset or disables reasoning capability.
+  it.each(["unset", "disabled"])("Messages omits thinking with a budget pack and reasoning %s", async mode => {
     const current = input("anthropic");
-    current.settings.model.generation.maxOutputTokens = 20000;
-    current.settings.provider.compatibility = [
-      { id: "customThinkingLevels", value: { low: "custom-low" } },
-      { id: "customThinkingBudgets", value: { low: 4096 } },
-    ];
-    const manual = await request(current);
-    expect(manual).toMatchObject({ thinking: { type: "enabled", budget_tokens: 4096 }, output_config: { effort: "custom-low" } });
-    current.settings.model.modelId = "claude-opus-4-7";
-    const adaptive = await request(current);
-    expect(adaptive.thinking).toMatchObject({ type: "adaptive" });
-    expect(adaptive.thinking).not.toHaveProperty("budget_tokens");
-    expect(adaptive.output_config).toMatchObject({ effort: "custom-low" });
-    current.settings.model.capabilities.thinkingLevels = ["low"];
-    current.settings.thinking = "off";
-    const disabled = await request(current);
-    expect(disabled.thinking).toEqual({ type: "disabled" });
-    expect(disabled.output_config).toBeUndefined();
+    current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: 2048 } }];
+    if (mode === "unset") current.settings.thinking = null;
+    else current.settings.model.capabilities.reasoning = false;
+    const body = await request(current);
+    expect(body).not.toHaveProperty("thinking");
+    expect(body).not.toHaveProperty("output_config");
   });
 
-  // For unknown models the SDK adds the default output limit and budget, and separately truncates known models; neither defines the host default budget base.
+  // SDK output defaults differ for unknown and known models; manual budgets use the host total cap instead.
   it("manual budgets without output limits use a fixed total cap of 4096 without SDK or level expansion", async () => {
     const current = input("anthropic");
     current.settings.model.generation.maxOutputTokens = null;
+    current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: {} }];
     for (const modelId of ["test", "claude-sonnet-4-5"]) {
       current.settings.model.modelId = modelId;
       current.settings.thinking = "low";
@@ -139,7 +159,7 @@ describe("Reasoning level and budget mappings", () => {
     "sends the manual budget unchanged with output limit $limit and budget $budget", async ({ limit, budget, expected }) => {
       const current = input("anthropic");
       current.settings.model.generation.maxOutputTokens = limit;
-      if (budget !== undefined) current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: budget } }];
+      current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: budget === undefined ? {} : { low: budget } }];
       current.settings.model = modelInputSchema.parse(current.settings.model);
       expect(await request(current)).toMatchObject({ max_tokens: limit, thinking: { type: "enabled", budget_tokens: expected } });
     });
@@ -159,10 +179,11 @@ describe("Reasoning level and budget mappings", () => {
     });
 
   // Streaming and non-streaming SDK calls share the budget contract; minimal connection probes do not enable reasoning.
-  it("non-streaming execution uses the same budget mapping while connection tests do not consume mappings", async () => {
+  it.each([false, true])("non-streaming execution shares thinking mode with streaming while probes omit it (manual=%s)", async manual => {
     const current = input("anthropic");
     current.settings.model.generation.maxOutputTokens = 10000;
-    current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: 2048 } }];
+    current.settings.model.modelId = "claude-sonnet-5-5";
+    if (manual) current.settings.model.compatibility = [{ id: "customThinkingBudgets", value: { low: 2048 } }];
     const bodies: Record<string, unknown>[] = [];
     const transport: typeof fetch = async (_url, init) => {
       bodies.push(JSON.parse(String(init?.body)));
@@ -173,8 +194,9 @@ describe("Reasoning level and budget mappings", () => {
     const languageModel = createProviderModel(provider, model, "unused", transport);
     await generateText({ model: languageModel, prompt: "Question", ...requestOptions(provider, model, { purpose: "execution", thinking: "low" }) });
     await generateText({ model: languageModel, prompt: "Question", ...requestOptions(provider, model, { purpose: "probe" }) });
-    expect(bodies[0]).toMatchObject({ thinking: { type: "enabled", budget_tokens: 2048 }, max_tokens: 10000 });
+    expect(bodies[0]).toMatchObject({ thinking: manual ? { type: "enabled", budget_tokens: 2048 } : { type: "adaptive" }, max_tokens: 10000 });
     expect(bodies[1]).not.toHaveProperty("thinking");
+    expect(bodies[1]).not.toHaveProperty("output_config");
     expect(bodies[1]).toMatchObject({ max_tokens: 10000 });
   });
 });

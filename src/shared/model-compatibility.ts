@@ -25,7 +25,7 @@ const customThinkingLevelsSchema = z.strictObject(Object.fromEntries(thinkingLev
 const customThinkingBudgetsSchema = z.strictObject(Object.fromEntries(activeThinkingLevels.map(level => [
   level, z.number().int().positive().optional().meta({
     title: level,
-    description: "Thinking tokens for manual-budget models. Unset uses the built-in budget; does not enable manual thinking.",
+    description: "Thinking tokens for this level. Unset uses the built-in budget based on the total output cap.",
   }),
 ]))) as z.ZodObject<{ [Level in Exclude<ThinkingLevel, "off">]: z.ZodOptional<z.ZodNumber> }>;
 
@@ -50,7 +50,7 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
     appliesTo: { protocols: ["anthropic"] },
     schema: customThinkingBudgetsSchema.meta({
       title: "Custom thinking budgets",
-      description: "Override manual thinking budgets in tokens. Adaptive thinking keeps its effort mapping.",
+      description: "Use manual thinking instead of adaptive thinking for Messages requests. Empty settings use built-in budgets; specified levels override them in tokens.",
     }),
   },
   {

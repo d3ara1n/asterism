@@ -1,8 +1,7 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
 import type { ThinkingLevel } from "@asterism-app/sdk/contracts";
-import { ModelFailure } from "../contract.ts";
-import { thinkingMappings, type ThinkingMappings } from "../compatibility.ts";
-import { mappedEffort, requestObject, setEffort, withRequestEncoding, type Body } from "../request-encoding.ts";
+import { compatibility, thinkingMappings, type ThinkingMappings } from "../compatibility.ts";
+import { mappedEffort, setEffort, withRequestEncoding, type Body } from "../request-encoding.ts";
 import { namespaced, pickNative, type ModelProtocol, type ProviderOptions } from "./contract.ts";
 import { withAnthropicThinking } from "./anthropic-thinking.ts";
 import { anthropicUsage } from "./anthropic-usage.ts";
@@ -16,33 +15,30 @@ const budgetRatios: Record<ActiveLevel, number> = {
 };
 const defaultManualOutputTokens = 4096;
 
-/** The SDK still identifies Anthropic model reasoning modes; Asterism owns effort and manual-budget mappings. */
-function encodeRequest(body: Body, level: ThinkingLevel | null, maxOutputTokens: number | undefined, mappings: ThinkingMappings) {
+/** Explicit levels use adaptive thinking unless the budget pack selects manual thinking, independent of model IDs. */
+function encodeRequest(body: Body, level: ThinkingLevel | null, maxOutputTokens: number | undefined, mappings: ThinkingMappings, manual: boolean) {
   if (maxOutputTokens !== undefined) body.max_tokens = maxOutputTokens;
   if (level === null) return;
   const customEffort = mappings.levels[level];
   if (level === "off") {
-    // Do not accept SDK replacement of off with low effort or between_tools; unsupported endpoints reject it themselves.
+    // Unsupported endpoints reject explicit off rather than silently substituting another mode.
     body.thinking = { type: "disabled" };
     setEffort(body, "output_config", customEffort ?? null);
     return;
   }
 
-  const thinking = body.thinking === undefined ? undefined : requestObject(body.thinking);
-  if (thinking?.type === "enabled") {
-    // Do not infer limits from max_tokens after the SDK adds budgets; the host fixes defaults too.
+  if (manual) {
     const limit = maxOutputTokens ?? defaultManualOutputTokens;
     const budget = mappings.budgets[level] ?? Math.max(1024, Math.floor(limit * budgetRatios[level]));
-    body.thinking = { ...thinking, budget_tokens: budget };
-    // The SDK adds reasoning budgets to max_tokens; Asterism's limit includes reasoning and must not expand.
+    body.thinking = { type: "enabled", budget_tokens: budget };
+    // The output cap includes thinking; budgets do not add a hidden allowance.
     body.max_tokens = limit;
     // Manual budgets do not require effort; attach it only with explicit mappings for endpoints supporting both.
     setEffort(body, "output_config", customEffort ?? null);
     return;
   }
 
-  if (thinking !== undefined && thinking.type !== "adaptive" && thinking.type !== "between_tools")
-    throw new ModelFailure("protocol_encoding", "The Messages encoder returned an unsupported thinking mode.");
+  body.thinking = { type: "adaptive", display: "summarized" };
   // Messages has no minimal effort; the nearest supported value is low.
   setEffort(body, "output_config", mappedEffort(level, mappings, { minimal: "low" }));
 }
@@ -54,10 +50,12 @@ export const anthropicMessages: ModelProtocol = {
   toolResultFiles: () => "content",
   createModel(target, connection) {
     const mappings = thinkingMappings(target);
+    const manual = compatibility(target).has("customThinkingBudgets");
     return withRequestEncoding(
       transport => withAnthropicThinking(fetch => createAnthropic({ ...connection, fetch }).messages(target.model.modelId), transport),
       connection.fetch,
-      (body, level, maxOutputTokens) => encodeRequest(body, level, maxOutputTokens, mappings),
+      (body, level, maxOutputTokens) => encodeRequest(body, level, maxOutputTokens, mappings, manual),
+      { forwardReasoning: false },
     );
   },
   callOptions: (_target, request) => ({
