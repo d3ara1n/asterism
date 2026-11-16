@@ -1,3 +1,12 @@
+/** Chromium canvas dimension limit; one complete image is produced or the export fails, never a cropped or paginated one. */
+const canvasLimit = 32767;
+
+/** Output scale for an excerpt of layout size width × height: 2x for sharp text, reduced for long excerpts down to 1x; null when even 1x exceeds the limit. */
+export function shareImageScale(width: number, height: number): number | null {
+  const scale = Math.min(2, canvasLimit / width, canvasLimit / height);
+  return scale >= 1 ? scale : null;
+}
+
 /** Wait on explicit asynchronous Markdown work, not an arbitrary screenshot delay. */
 async function ready(node: HTMLElement, signal: AbortSignal) {
   await new Promise<void>((resolve, reject) => {
@@ -27,11 +36,12 @@ export async function shareImage(node: HTMLElement, signal: AbortSignal): Promis
   await ready(node, signal);
   const { domToBlob } = await import("modern-screenshot");
   signal.throwIfAborted();
-  const width = Math.ceil(node.getBoundingClientRect().width), height = Math.ceil(node.getBoundingClientRect().height);
-  // Chromium canvas has finite dimensions. Keep one complete image; never silently crop or paginate it.
-  if (width > 32767 || height > 32767) throw new ShareImageSizeError("The excerpt exceeds Chromium's canvas dimensions.");
+  // Layout size, not the bounding box: the preview may display the document scaled down.
+  const width = node.offsetWidth, height = node.offsetHeight;
+  const scale = shareImageScale(width, height);
+  if (scale === null) throw new ShareImageSizeError("The excerpt exceeds Chromium's canvas dimensions.");
   let embeddingFailed = false;
-  const blob = await domToBlob(node, { scale: 1, width, height, type: "image/png", maximumCanvasSize: 32767,
+  const blob = await domToBlob(node, { scale, width, height, type: "image/png",
     // The library logs and absorbs failed embedding tasks. Preserve their failure for our caller.
     fetch: { requestInit: { signal }, placeholderImage: () => { embeddingFailed = true; return ""; } } });
   signal.throwIfAborted();

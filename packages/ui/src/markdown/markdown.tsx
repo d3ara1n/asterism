@@ -68,11 +68,11 @@ export const Markdown = memo(function Markdown({ children, streaming = false, do
 function MarkdownImage({ src, alt, title }: { src: string; alt: string; title?: string }) {
   const i18n = useI18n();
   const [failed, setFailed] = useState(false);
-  const document = useContext(MarkdownDocumentContext);
+  const documentMode = useContext(MarkdownDocumentContext);
   return <a href={src} target="_blank" rel="noopener noreferrer" aria-label={alt || i18n.text(markdownMessages.markdownImage)}>
     {failed
       ? <span>{i18n.text(markdownMessages.markdownImageFailed)}{alt ? ` · ${alt}` : ""}</span>
-      : <img src={src} alt={alt} title={title} loading={document ? "eager" : "lazy"} decoding="async" referrerPolicy="no-referrer"
+      : <img src={src} alt={alt} title={title} loading={documentMode ? "eager" : "lazy"} decoding="async" referrerPolicy="no-referrer"
         className="my-2 block h-auto max-w-full rounded-md" onError={() => setFailed(true)} />}
   </a>;
 }

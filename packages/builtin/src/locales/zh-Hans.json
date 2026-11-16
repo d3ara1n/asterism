@@ -950,7 +950,11 @@
   "conversation.share.saveMarkdown": "保存 Markdown",
   "conversation.share.saved": "已保存",
   "conversation.share.selectMessages": "选择消息",
-  "conversation.share.selected": "已选 {count} 条",
-  "conversation.share.tooLarge": "图片过长或过宽，请减少消息或导出 Markdown。",
-  "conversation.share.width": "图片宽度"
+  "conversation.share.selected": "已选 {count}/{total}",
+  "conversation.share.tooLarge": "过长，无法生成单张图片",
+  "conversation.share.width": "图片宽度",
+  "conversation.share.selectAll": "全选",
+  "conversation.share.clearSelection": "清除",
+  "conversation.share.size": "{width} × {height} px",
+  "conversation.share.markdown": "Markdown"
 }

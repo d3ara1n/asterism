@@ -8,8 +8,8 @@ import { ReferenceChip } from "../reference-chip";
 type AnchorProps = ComponentProps<"a">;
 
 export function MarkdownLink({ href, children, ...props }: AnchorProps) {
-  const document = useContext(MarkdownDocumentContext);
-  if (document && href && (parseModelUrl(href) || parseSkillUrl(href) || parseResourceUrl(href))) return <span>{children}</span>;
+  const documentMode = useContext(MarkdownDocumentContext);
+  if (documentMode && href && (parseModelUrl(href) || parseSkillUrl(href) || parseResourceUrl(href))) return <span>{children}</span>;
   if (href?.startsWith("#")) return <a {...props} href={href} onAuxClick={event => event.preventDefault()} onClick={event => {
     event.preventDefault();
     const root = event.currentTarget.closest("[data-markdown-root]");

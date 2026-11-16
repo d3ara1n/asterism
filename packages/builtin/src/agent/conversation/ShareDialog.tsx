@@ -1,24 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Ref } from "react";
 import { useI18n, useRendererApplication, type RendererSessionSnapshot } from "@asterism-app/sdk/renderer";
-import { Copy, Download, FileText, Paperclip } from "lucide-react";
+import { Agent, type AgentMessageSender } from "@asterism-app/builtin-api/contracts";
+import { Check, ChevronDown, Copy, Download, FileText, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import { Markdown } from "@asterism-app/ui/markdown";
+import { BrandMark } from "@asterism-app/ui/ui/brand-mark";
 import { Button } from "@asterism-app/ui/ui/button";
-import { Checkbox } from "@asterism-app/ui/ui/checkbox";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";
-import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@asterism-app/ui/ui/field";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
-import { Empty, EmptyHeader, EmptyTitle, EmptyMedia } from "@asterism-app/ui/ui/empty";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from "@asterism-app/ui/ui/empty";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { StatusText } from "@asterism-app/ui/ui/status";
+import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
+import { useLifetimeSignal } from "@asterism-app/ui/use-lifetime";
+import { cn } from "@asterism-app/ui/utils";
 import { shareMessages as messages } from "../../messages/share";
 import { conversationMessages } from "../../messages/conversation";
 import { commonMessages } from "../../messages/common";
-import { messageSenderLabel } from "../message-presentation";
-import { initialShareSelection, shareMessages, shareMarkdown, type ShareMessage } from "./share-content";
+import { messageAppearance, messageSenderLabel } from "../message-presentation";
+import { messageTimeOptions } from "./message-time";
+import { initialShareSelection, prependEarlierShareMessages, shareMarkdown, shareMessages, shareTurnGroups, toggleShareSelection,
+  type ShareMessage } from "./share-content";
 import { readConversation } from "./read-history";
 import { conversationTimeline } from "./timeline";
 import type { ConversationHistoryWindow } from "./history-window";
-import { shareImage, ShareImageSizeError } from "./share-image";
+import { shareImage, shareImageScale, ShareImageSizeError } from "./share-image";
 import "./share.css";
 
 export interface ShareDialogProps {
@@ -32,28 +38,59 @@ export interface ShareDialogProps {
   onClose(): void;
 }
 
+type Action = "copyImage" | "saveImage" | "copyMarkdown" | "saveMarkdown";
+const widths = [720, 960, 1200] as const;
+/** Printed in the image, where it cannot be clicked, so the visible text carries the address. */
+const siteUrl = "https://asterism.dearain.dev";
+const segment = "h-6 min-w-0 rounded-sm px-2.5 text-xs tabular-nums text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs";
+
 export default function ShareDialog({ snapshot, agentId, messages: initial, anchor, historyWindow, earlier: initialEarlier, origin, onClose }: ShareDialogProps) {
   const i18n = useI18n();
   const application = useRendererApplication();
+  const lifetime = useLifetimeSignal();
   const [candidates, setCandidates] = useState(initial);
   const [selected, setSelected] = useState(() => initialShareSelection(initial, anchor));
-  const [width, setWidth] = useState("960");
+  const [rangeFrom, setRangeFrom] = useState<string | null>(anchor);
+  const [width, setWidth] = useState<number>(960);
   const [earlier, setEarlier] = useState(initialEarlier);
   const [loading, setLoading] = useState(false);
-  const [busy, setBusy] = useState<string | null>(null);
-  const preview = useRef<HTMLDivElement>(null);
-  const anchorRef = useCallback((element: HTMLDivElement | null) => { element?.scrollIntoView({ block: "nearest" }); }, []);
-  const lifetime = useRef<AbortController | null>(null);
+  const [busy, setBusy] = useState<Action | null>(null);
+  const [agentTitle, setAgentTitle] = useState<string | null>(null);
+  const preview = useRef<HTMLDivElement | null>(null);
+  const [frameWidth, frameRef] = useLayoutWidth();
+  const [documentHeight, setDocumentHeight] = useState(0);
+
   useEffect(() => {
-    const controller = new AbortController();
-    lifetime.current = controller;
-    return () => controller.abort();
+    const signal = lifetime();
+    void snapshot.resources.get(Agent, agentId, { signal }).then(result => {
+      if (result && !signal.aborted) setAgentTitle(result.resource.title);
+    }, error => { if (!signal.aborted) console.error("Agent title could not be read for sharing.", error); });
+  }, [snapshot, agentId, lifetime]);
+
+  const agentName = agentTitle ?? i18n.text(commonMessages.kindAgent);
+  const label = useCallback((message: ShareMessage) => message.sender ? i18n.text(messageSenderLabel(message.sender)) : agentName, [i18n, agentName]);
+  const chosen = useMemo(() => candidates.filter(message => selected.has(message.id)), [candidates, selected]);
+  const groups = useMemo(() => shareTurnGroups(candidates), [candidates]);
+  const scale = documentHeight ? shareImageScale(width, documentHeight) : 1;
+  const zoom = frameWidth ? Math.min(1, frameWidth / width) : 1;
+  const idle = busy === null;
+
+  const documentRef = useCallback((element: HTMLDivElement | null) => {
+    preview.current = element;
+    if (!element) return;
+    const observer = new ResizeObserver(() => setDocumentHeight(element.offsetHeight));
+    observer.observe(element);
+    return () => { observer.disconnect(); preview.current = null; };
   }, []);
-  const chosen = candidates.filter(message => selected.has(message.id));
-  const label = (message: ShareMessage) => i18n.text(message.sender ? messageSenderLabel(message.sender) : commonMessages.agent);
+  const anchorRow = useRef<HTMLButtonElement>(null);
+
+  const toggle = (id: string, range: boolean) => {
+    setSelected(current => toggleShareSelection(candidates, current, id, range ? rangeFrom : null));
+    setRangeFrom(id);
+  };
   const loadEarlier = async () => {
-    const signal = lifetime.current?.signal;
-    if (loading || !signal) return;
+    const signal = lifetime();
+    if (loading) return;
     setLoading(true);
     try {
       historyWindow.expand(snapshot.records.index({ scope: "timeline" }));
@@ -61,22 +98,19 @@ export default function ShareDialog({ snapshot, agentId, messages: initial, anch
       signal.throwIfAborted();
       const timeline = conversationTimeline(read.projection, false);
       const loaded = shareMessages([...timeline.items, ...(timeline.tail ? [timeline.tail] : [])]);
-      // Keep already-previewed messages byte-for-byte, including a partially visible first turn.
-      const previous = new Map(candidates.map(message => [message.id, message]));
-      const merged = loaded.map(message => previous.get(message.id) ?? message);
-      const ids = new Set(merged.map(message => message.id));
-      setCandidates([...merged, ...candidates.filter(message => !ids.has(message.id))]);
+      setCandidates(current => prependEarlierShareMessages(loaded, current));
       setEarlier(read.earlier);
     } catch (error) {
       if (!signal.aborted) { console.error("Share history could not be loaded.", error); toast.error(i18n.text(messages.earlierFailed)); }
     } finally { if (!signal.aborted) setLoading(false); }
   };
-  const run = async (action: "copyImage" | "saveImage" | "copyMarkdown" | "saveMarkdown") => {
-    const signal = lifetime.current?.signal;
-    if (busy || !signal || !chosen.length || !preview.current) return;
+  const run = async (action: Action) => {
+    const signal = lifetime();
+    if (!idle || !chosen.length) return;
     setBusy(action);
     try {
       if (action === "copyImage" || action === "saveImage") {
+        if (!preview.current) return;
         const blob = await shareImage(preview.current, signal);
         if (action === "copyImage") await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
         else if (!await application.files.save("asterism-excerpt.png", bytes(blob, signal))) return;
@@ -93,64 +127,169 @@ export default function ShareDialog({ snapshot, agentId, messages: initial, anch
       }
     } finally { if (!signal.aborted) setBusy(null); }
   };
+  const icon = (action: Action, Icon: typeof Copy) => busy === action ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" />;
+
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
-    <DialogContent aria-describedby={undefined} onCloseAutoFocus={event => { event.preventDefault(); if (origin.isConnected) origin.focus(); }}
-      className="nodrag nopan nokey flex h-[min(860px,calc(100dvh-2rem))] min-h-0 flex-col overflow-hidden sm:max-w-[min(1360px,calc(100vw-2rem))]">
-      <DialogHeader className="shrink-0 pr-6"><DialogTitle>{i18n.text(messages.share)}</DialogTitle></DialogHeader>
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-4 max-sm:grid-cols-[140px_minmax(0,1fr)]">
-        <fieldset disabled={busy !== null} className="flex min-h-0 min-w-0 flex-col gap-3">
-          <FieldSet className="min-h-0 flex-1 gap-2">
-            <FieldLegend variant="label">{i18n.text(messages.messages)}</FieldLegend>
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2">
-              <FieldGroup className="gap-2">
-                {earlier && <Button variant="outline" size="sm" disabled={loading} onClick={() => { void loadEarlier(); }}>
-                  {loading && <Spinner />}{i18n.text(conversationMessages.earlierMessages)}</Button>}
-                {candidates.map(message => <Field key={message.id} ref={message.id === anchor ? anchorRef : undefined} orientation="horizontal" className="rounded-md border p-2">
-                  <Checkbox id={`share-${message.id}`} checked={selected.has(message.id)} onCheckedChange={checked => setSelected(current => {
-                    const next = new Set(current);
-                    if (checked) next.add(message.id); else next.delete(message.id);
-                    return next;
-                  })} />
-                  <FieldLabel htmlFor={`share-${message.id}`} className="min-w-0 flex-col items-start gap-1">
-                    <span className="type-label">{label(message)}</span>
-                    <span className="line-clamp-2 break-words text-xs font-normal">{message.markdown || message.attachments.join(", ")}</span>
-                  </FieldLabel>
-                </Field>)}
-              </FieldGroup>
-            </div>
-          </FieldSet>
-          <p className="type-caption" aria-live="polite">{i18n.formatMessage(messages.selected, { count: chosen.length })}</p>
-        </fieldset>
-        <div className="flex min-h-0 min-w-0 flex-col gap-3">
-          <Field orientation="horizontal" className="shrink-0">
-            <FieldLabel htmlFor="share-width">{i18n.text(messages.width)}</FieldLabel>
-            <Select value={width} onValueChange={setWidth} disabled={busy !== null}>
-              <SelectTrigger id="share-width" size="sm"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectGroup>{[720, 960, 1200].map(width => <SelectItem key={width} value={String(width)}>{width} px</SelectItem>)}</SelectGroup></SelectContent>
-            </Select>
-          </Field>
-          <div role="region" aria-label={i18n.text(messages.preview)} tabIndex={0}
-            className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-md border bg-muted p-4">
-            {chosen.length > 0 ? <div ref={preview} className="conversation-share-document" style={{ width: Number(width) }}>
-              <div className="conversation-share-messages">{chosen.map(message => <article key={message.id} className="conversation-share-message" data-user={message.sender?.kind === "user" || undefined}>
-                <p className="conversation-share-sender">{label(message)}</p>
-                {message.markdown && <Markdown document>{message.markdown}</Markdown>}
-                {message.attachments.map((name, index) => <p key={index} className="conversation-share-attachment"><Paperclip aria-hidden="true" />{name}</p>)}
-              </article>)}</div>
-              <footer className="conversation-share-brand">Asterism</footer>
-            </div> : <Empty><EmptyHeader><EmptyMedia variant="icon"><FileText /></EmptyMedia><EmptyTitle>{i18n.text(messages.selectMessages)}</EmptyTitle></EmptyHeader></Empty>}
+    <DialogContent aria-describedby={undefined}
+      onOpenAutoFocus={event => {
+        // Start at the message sharing was opened from; its turn is the initial selection.
+        const row = anchorRow.current;
+        if (!row) return;
+        event.preventDefault();
+        row.focus({ preventScroll: true });
+        row.scrollIntoView({ block: "center" });
+      }}
+      onCloseAutoFocus={event => { event.preventDefault(); if (origin.isConnected) origin.focus(); }}
+      className="nodrag nopan nokey flex h-[min(840px,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1240px,calc(100vw-2rem))]">
+      <DialogHeader className="shrink-0 border-b px-5 py-3.5 pr-12"><DialogTitle className="type-section">{i18n.text(messages.share)}</DialogTitle></DialogHeader>
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(240px,320px)_minmax(0,1fr)] max-sm:grid-cols-[180px_minmax(0,1fr)]">
+        <section aria-label={i18n.text(messages.messages)} className="flex min-h-0 min-w-0 flex-col border-r">
+          <div className="flex h-11 shrink-0 items-center gap-1 border-b px-3">
+            <span className="type-label min-w-0 flex-1 truncate tabular-nums" aria-live="polite">
+              {i18n.formatMessage(messages.selected, { count: chosen.length, total: candidates.length })}</span>
+            <Button variant="ghost" size="xs" disabled={!idle || chosen.length === candidates.length}
+              onClick={() => setSelected(new Set(candidates.map(message => message.id)))}>{i18n.text(messages.selectAll)}</Button>
+            <Button variant="ghost" size="xs" disabled={!idle || !chosen.length}
+              onClick={() => setSelected(new Set())}>{i18n.text(messages.clearSelection)}</Button>
           </div>
-        </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
+            {earlier && <Button variant="ghost" size="sm" className="mb-2 w-full text-muted-foreground" disabled={loading || !idle}
+              onClick={() => { void loadEarlier(); }}>{loading && <Spinner data-icon="inline-start" />}{i18n.text(conversationMessages.earlierMessages)}</Button>}
+            {groups.map((group, index) => <div key={group[0]!.id} role="group" className={cn("flex flex-col gap-0.5", index > 0 && "mt-2 border-t pt-2")}>
+              {group.map(message => <SelectionRow key={message.id} ref={message.id === anchor ? anchorRow : undefined}
+                message={message} name={label(message)} checked={selected.has(message.id)} disabled={!idle}
+                onToggle={range => toggle(message.id, range)} />)}
+            </div>)}
+          </div>
+        </section>
+        <section aria-label={i18n.text(messages.preview)} className="flex min-h-0 min-w-0 flex-col bg-muted/50">
+          <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b bg-background px-3">
+            <ToggleGroup type="single" spacing={0.5} value={String(width)} aria-label={i18n.text(messages.width)} disabled={!idle}
+              className="rounded-md bg-muted p-0.5" onValueChange={value => { if (value) setWidth(Number(value)); }}>
+              {widths.map(value => <ToggleGroupItem key={value} value={String(value)} className={segment}>{value}</ToggleGroupItem>)}
+            </ToggleGroup>
+            {chosen.length > 0 && (scale === null
+              ? <StatusText tone="warning">{i18n.text(messages.tooLarge)}</StatusText>
+              : <span className="type-caption tabular-nums">{i18n.formatMessage(messages.size,
+                { width: Math.floor(width * scale), height: Math.floor(documentHeight * scale) })}</span>)}
+          </div>
+          <div tabIndex={0} role="region" aria-label={i18n.text(messages.preview)}
+            className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain p-6 outline-offset-[-2px]">
+            <div ref={frameRef} className="w-full">
+              {chosen.length > 0
+                ? <div className="mx-auto overflow-hidden rounded-lg shadow-sm ring-1 ring-border" style={{ width: width * zoom, height: documentHeight * zoom || undefined }}>
+                  <div style={{ width, transform: `scale(${zoom})`, transformOrigin: "top left" }}>
+                    <ShareDocument ref={documentRef} width={width} title={agentName} messages={chosen} label={label} />
+                  </div>
+                </div>
+                : <Empty className="py-24"><EmptyHeader><EmptyMedia variant="icon"><FileText /></EmptyMedia>
+                  <EmptyTitle>{i18n.text(messages.selectMessages)}</EmptyTitle></EmptyHeader></Empty>}
+            </div>
+          </div>
+        </section>
       </div>
-      <DialogFooter className="shrink-0 flex-wrap">
-        {(["copyMarkdown", "saveMarkdown", "copyImage", "saveImage"] as const).map(action => <Button key={action}
-          variant={action === "saveImage" ? "default" : "outline"} disabled={!chosen.length || busy !== null}
-          onClick={() => { void run(action); }}>
-          {busy === action ? <Spinner /> : action.startsWith("copy") ? <Copy /> : <Download />}{i18n.text(messages[action])}
-        </Button>)}
+      <DialogFooter className="shrink-0 items-center border-t px-5 py-3 sm:justify-between">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" disabled={!chosen.length || !idle}>
+              {busy === "copyMarkdown" || busy === "saveMarkdown" ? <Spinner data-icon="inline-start" /> : <FileText data-icon="inline-start" />}
+              {i18n.text(messages.markdown)}<ChevronDown className="text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="nodrag nopan nokey">
+            <DropdownMenuGroup>
+              <DropdownMenuItem onSelect={() => { void run("copyMarkdown"); }}><Copy />{i18n.text(messages.copyMarkdown)}</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => { void run("saveMarkdown"); }}><Download />{i18n.text(messages.saveMarkdown)}</DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={!chosen.length || !idle || scale === null} onClick={() => { void run("saveImage"); }}>
+            {icon("saveImage", Download)}{i18n.text(messages.saveImage)}</Button>
+          <Button disabled={!chosen.length || !idle || scale === null} onClick={() => { void run("copyImage"); }}>
+            {icon("copyImage", Copy)}{i18n.text(messages.copyImage)}</Button>
+        </div>
       </DialogFooter>
     </DialogContent>
   </Dialog>;
+}
+
+/** A row toggles its message; Shift extends the previous toggle's state across the range. */
+function SelectionRow({ ref, message, name, checked, disabled, onToggle }: {
+  ref?: Ref<HTMLButtonElement>; message: ShareMessage; name: string; checked: boolean; disabled: boolean;
+  onToggle(range: boolean): void;
+}) {
+  const i18n = useI18n();
+  const Icon = senderIcon(message.sender);
+  const summary = message.markdown.replace(/\s+/gu, " ").trim() || message.attachments.join(", ");
+  const time = message.createdAt ? new Date(message.createdAt) : null;
+  return <button ref={ref} type="button" role="checkbox" aria-checked={checked} disabled={disabled}
+    onClick={event => onToggle(event.shiftKey)}
+    className={cn("group/row flex w-full min-w-0 items-start gap-2.5 rounded-md px-2 py-2 text-left outline-none transition-colors select-none",
+      "hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60", checked && "bg-accent/40")}>
+    <span aria-hidden="true" className={cn("mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-input transition-colors",
+      checked && "border-primary bg-primary text-primary-foreground")}>{checked && <Check className="size-3" />}</span>
+    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+      <span className="type-label flex min-w-0 items-center gap-1.5">
+        <Icon className="size-3 shrink-0" aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate">{name}</span>
+        {time && <time dateTime={message.createdAt!} className="shrink-0 font-normal tabular-nums">
+          {i18n.formatDate(time.getTime(), messageTimeOptions(time, new Date()))}</time>}
+      </span>
+      <span className={cn("line-clamp-2 text-xs leading-relaxed [overflow-wrap:anywhere]", checked ? "text-foreground" : "text-muted-foreground")}>{summary}</span>
+    </span>
+  </button>;
+}
+
+/** The captured surface. Its own px sizes and light tokens keep the image independent of the dialog's scale and color scheme. */
+function ShareDocument({ ref, width, title, messages, label }: {
+  ref: (element: HTMLDivElement | null) => void; width: number; title: string; messages: readonly ShareMessage[]; label(message: ShareMessage): string;
+}) {
+  const i18n = useI18n();
+  const first = messages.find(message => message.createdAt)?.createdAt;
+  return <div ref={ref} className="share-document" style={{ width }}>
+    <div className="share-card">
+      <header className="share-header">
+        <span className="share-title">{title}</span>
+        {first && <time className="share-date" dateTime={first}>{i18n.formatDate(Date.parse(first), { dateStyle: "long" })}</time>}
+      </header>
+      <div className="share-turns">{shareTurnGroups(messages).map(turn => <section key={turn[0]!.id} className="share-turn">
+        {turn.map(message => <ShareDocumentMessage key={message.id} message={message} name={label(message)} />)}
+      </section>)}</div>
+    </div>
+    <footer className="share-footer"><a href={siteUrl} target="_blank" rel="noopener noreferrer">
+      <BrandMark />Asterism<span className="share-footer-url">· {siteUrl.replace(/^https:\/\//u, "")}</span>
+    </a></footer>
+  </div>;
+}
+
+function ShareDocumentMessage({ message, name }: { message: ShareMessage; name: string }) {
+  const kind = message.sender?.kind ?? "reply";
+  const Icon = senderIcon(message.sender);
+  const body = message.markdown.trim() && <Markdown document>{message.markdown}</Markdown>;
+  return <article className="share-message" data-kind={kind}>
+    {(kind === "agent" || kind === "event") && <p className="share-sender"><Icon aria-hidden="true" />{name}</p>}
+    {message.attachments.length > 0 && <div className="share-attachments">
+      {message.attachments.map((file, index) => <span key={index} className="share-attachment"><Paperclip aria-hidden="true" />{file}</span>)}
+    </div>}
+    {body && (kind === "reply" ? body : <div className="share-bubble">{body}</div>)}
+  </article>;
+}
+
+function senderIcon(sender: AgentMessageSender | null) {
+  return messageAppearance[sender?.kind ?? "agent"].Icon;
+}
+
+/** Content-box width of an element, tracked through resizes. */
+function useLayoutWidth(): [number, (element: HTMLDivElement | null) => (() => void) | undefined] {
+  const [width, setWidth] = useState(0);
+  const ref = useCallback((element: HTMLDivElement | null) => {
+    if (!element) return;
+    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return [width, ref];
 }
 
 async function* bytes(blob: Blob, signal: AbortSignal) {
