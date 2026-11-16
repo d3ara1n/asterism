@@ -1,8 +1,7 @@
 import { ArrowLeft, ArrowRight, MoreHorizontal, RotateCcw, Scaling } from "lucide-react";
 
-import { Button } from "@asterism-app/ui/ui/button";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { islandsMessages } from "../../messages/islands";
 import { useI18n } from "../i18n";
 import { useIsland } from "./Screen";
@@ -20,12 +19,10 @@ export function IslandMenu() {
   const arrangement = useIsland().arrangement;
   if (!arrangement) return null;
   const label = i18n.text(islandsMessages.actions);
-  return <DropdownMenu><Tooltip>
-    <TooltipTrigger asChild><DropdownMenuTrigger asChild>
-      <Button variant="ghost" size="icon-xs" aria-label={label}><MoreHorizontal /></Button>
-    </DropdownMenuTrigger></TooltipTrigger>
-    <TooltipContent>{label}</TooltipContent>
-  </Tooltip>
+  return <DropdownMenu>
+    <IconButton label={label} asChild>
+      <DropdownMenuTrigger><MoreHorizontal /></DropdownMenuTrigger>
+    </IconButton>
     <DropdownMenuContent align="end">
       <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{i18n.text(islandsMessages.size)}</DropdownMenuSubTrigger>
         <DropdownMenuSubContent>
