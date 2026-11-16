@@ -8,6 +8,7 @@ import { failureDisplay } from "./error-display";
 import { referenceKind, splitReferenceLabel, type ReferenceKind } from "./references";
 import { Badge } from "./ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./ui/hover-card";
+import { ScrollArea } from "./ui/scroll-area";
 import { Spinner } from "./ui/spinner";
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuGroup, ContextMenuItem } from "./ui/context-menu";
 import { useResourceLocationActions } from "./resource-location-actions";
@@ -127,7 +128,12 @@ export function ReferenceChip({ href, sessionId, children, openable = false, sel
   if (!card) return menuTrigger;
   return <HoverCard openDelay={400} closeDelay={100}>
     {menuTrigger}
-    <HoverCardContent side="top" align="start" className={cn("w-72 p-3", model && "max-h-[var(--radix-hover-card-content-available-height)] w-80 max-w-[var(--radix-hover-card-content-available-width)] overflow-y-auto")}>{card}</HoverCardContent>
+    <HoverCardContent side="top" align="start" className={cn("w-72 max-w-[var(--radix-hover-card-content-available-width)] overflow-hidden p-0", model && "w-80")}>
+      <ScrollArea className="max-h-[calc(var(--radix-hover-card-content-available-height)-2px)] rounded-[inherit]"
+        viewportClassName="h-auto" contentClassName="p-3">
+        {card}
+      </ScrollArea>
+    </HoverCardContent>
   </HoverCard>;
 }
 
