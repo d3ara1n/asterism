@@ -84,6 +84,7 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
     id: "conversation.status.ready",
     defaultMessage: "Ready",
   },
+  elapsed: { id: "conversation.status.elapsed", defaultMessage: "Elapsed {duration}" },
   workingHint: {
     id: "conversation.status.workingHint",
     defaultMessage: "The agent is working…",

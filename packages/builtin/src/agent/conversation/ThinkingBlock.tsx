@@ -8,7 +8,7 @@ import { thinkingMessages } from "../../messages/thinking";
 import { BuiltinSettings } from "../../settings/contract";
 import { Disclosure } from "./Disclosure";
 import { Markdown } from "@asterism-app/ui/markdown";
-import { thinkingDuration } from "./thinking-state";
+import { formatElapsedTime } from "./elapsed-time";
 import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { generating, type TimelineItem } from "./timeline";
 import { viewStateKeys } from "./view-state";
@@ -45,7 +45,7 @@ function ThinkingHeader({ streaming, startedAt, endedAt }: {
   }, [streaming, startedAt]);
   // Only generating blocks use the current time for timing; formed blocks interrupted before completion do not infer elapsed time.
   const end = endedAt ?? (streaming ? now : null);
-  const duration = end === null ? null : thinkingDuration(startedAt, end);
+  const duration = end === null ? null : formatElapsedTime(startedAt, end);
   return <>
     <IconSwap swapKey={streaming ? "spinner" : "brain"}>
       {streaming ? <Spinner className="size-3.5 motion-reduce:animate-none" /> : <Brain className="size-3.5" />}

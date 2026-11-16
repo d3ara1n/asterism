@@ -13,6 +13,7 @@ export const AgentView = builtin.data("agent.card", z.strictObject({
   agentId: z.string(),
   selection: agentSelectionSchema.nullable(),
   executionState: agentExecutionStateSchema,
+  executionStartedAt: z.number().nullable(),
   drafts: z.array(agentDraftSchema),
   feedback: z.array(inlineFeedbackSchema),
   compressions: z.array(compressionActivitySchema),

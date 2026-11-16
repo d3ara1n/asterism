@@ -30,7 +30,7 @@ interface AgentControllerDependencies {
 /** Bind the Agent loop to resource scheduling, timeline records, persistent drafts, and workbench feedback. */
 export function createAgentController(deps: AgentControllerDependencies) {
   // One owned task accepts inputs at a time; task cleanup remains tracked by the host lifecycle.
-  const active = new Map<string, { key: string; entered: boolean; request: AgentRequestState | null; end(reason: AgentTurnEndReason): void }>();
+  const active = new Map<string, { key: string; startedAt: number; entered: boolean; request: AgentRequestState | null; end(reason: AgentTurnEndReason): void }>();
   const waiters = new Map<string, Set<() => void>>();
   // Conversation and compression exits both release callers waiting for this Agent to settle.
   const finish = (id: string) => {
@@ -65,7 +65,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
     work: (signal: AbortSignal) => Promise<AgentTurnEndReason>,
     ended: (reason: AgentTurnEndReason, entered: boolean) => () => void) => {
     const run = {
-      key: `agent:${object.ref.id}:${++execution}`, entered: false, request: null as AgentRequestState | null,
+      key: `agent:${object.ref.id}:${++execution}`, startedAt: Date.now(), entered: false, request: null as AgentRequestState | null,
       end(reason: AgentTurnEndReason) {
         const notify = ended(reason, run.entered);
         finish(object.ref.id);
@@ -114,6 +114,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
   };
   return {
     running,
+    startedAt: (object: ObjectReader) => running(object) ? active.get(object.ref.id)!.startedAt : null,
     currentRequest: (object: ObjectReader) => active.get(object.ref.id)?.request ?? null,
     /** Waits for the current conversation or compression task to exit. Later input may start another task. */
     settled(object: ObjectReader, signal: AbortSignal): Promise<void> {

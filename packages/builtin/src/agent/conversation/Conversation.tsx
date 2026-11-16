@@ -28,6 +28,7 @@ import type { AgentActivity, CompressionActivity, InlineFeedback } from "../feed
 import { useConversationProcesses } from "./use-conversation-processes";
 import { useTimelinePresence } from "./timeline-presence";
 import { conversationTransition, immediateTransition } from "./motion";
+import { formatElapsedTime } from "./elapsed-time";
 
 /** Execution status in the card title bar; history belongs to the session and is accessed from the window title bar. */
 export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
@@ -45,8 +46,9 @@ export function ConversationActions({ data }: { data: { executionState: AgentExe
 const viewStateKey = "asterism.builtin/agent.timeline-view";
 
 /** Agent card content: the final view of the current path and the input area; branches are not exposed here, and rewinding takes place in session history. */
-export function Conversation({ feedback, compressions, activity = null }: {
-  feedback: readonly InlineFeedback[]; compressions: readonly CompressionActivity[]; activity?: AgentActivity | null;
+export function Conversation({ feedback, compressions, activity = null, executionStartedAt }: {
+  feedback: readonly InlineFeedback[]; compressions: readonly CompressionActivity[];
+  activity?: AgentActivity | null; executionStartedAt: number | null;
 }) {
   const i18n = useI18n();
   const object = useRendererObject();
@@ -115,7 +117,7 @@ export function Conversation({ feedback, compressions, activity = null }: {
           onToggleProcess={id => { preserveItem(id); toggle(id); }} />
         <div className="px-4 pb-4">
           {running && !timeline.some(item => item.kind === "compression" && item.status === "running") &&
-            <ExecutionStatus activity={activity} />}
+            <ExecutionStatus activity={activity} startedAt={executionStartedAt} />}
         </div>
       </ScrollArea>
       {read.status === "ready" && !timeline.length && !running && <Empty className="pointer-events-none absolute inset-0 p-6">
@@ -147,22 +149,24 @@ export function Conversation({ feedback, compressions, activity = null }: {
   </ConversationSharing>;
 }
 
-/** Retry countdown belongs to live activity; persisted notices never imply a scheduled action after restart. */
-function ExecutionStatus({ activity }: { activity: AgentActivity | null }) {
+/** Elapsed time spans requests and retry waits; clock updates stay within this status row. */
+function ExecutionStatus({ activity, startedAt }: { activity: AgentActivity | null; startedAt: number | null }) {
   const i18n = useI18n();
   const [now, setNow] = useState(Date.now);
   const resumeAt = activity?.resumeAt ?? null;
   useEffect(() => {
-    if (resumeAt === null) return;
     setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 250);
+    const timer = setInterval(() => setNow(Date.now()), resumeAt === null ? 1000 : 250);
     return () => clearInterval(timer);
-  }, [resumeAt]);
+  }, [resumeAt, startedAt]);
+  const duration = formatElapsedTime(startedAt, now);
   const label = !activity ? i18n.formatMessage(conversationMessages.workingHint)
     : resumeAt !== null
       ? i18n.formatMessage(conversationMessages.retryWaiting, { attempt: activity.attempt, max: activity.max, seconds: Math.max(0, Math.ceil((resumeAt - now) / 1000)) })
       : i18n.formatMessage(conversationMessages.retrying, { attempt: activity.attempt, max: activity.max });
-  return <p role="status" className="type-caption flex items-center gap-2 pt-4">
-    <StatusIcon tone="progress" className="size-3" />{label}
+  return <p className="type-caption flex items-center gap-2 pt-4">
+    <span role="status" className="flex items-center gap-2"><StatusIcon tone="progress" className="size-3" />{label}</span>
+    {duration && <span role="timer" aria-live="off" aria-label={i18n.formatMessage(conversationMessages.elapsed, { duration })}
+      className="shrink-0 tabular-nums">{duration}</span>}
   </p>;
 }

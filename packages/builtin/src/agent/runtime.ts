@@ -101,7 +101,8 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
           const drafts = object.get(AgentDrafts) ?? [];
           const transient = feedback.get(object);
           if (controller.running(object))
-            return { agentId: object.ref.id, selection: value?.selection ?? null, executionState: "running" as const, drafts,
+            return { agentId: object.ref.id, selection: value?.selection ?? null,
+              executionState: "running" as const, executionStartedAt: controller.startedAt(object), drafts,
               feedback: [...transient.inline], compressions: [...transient.compressions], activity: transient.activity };
           const history = object.session.snapshot();
           let turn = turns.get(object.ref.id);
@@ -111,7 +112,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
             turns.set(object.ref.id, turn);
           }
           return { agentId: object.ref.id, selection: value?.selection ?? null,
-            executionState: agentExecutionState(turn.state, false), drafts,
+            executionState: agentExecutionState(turn.state, false), executionStartedAt: null, drafts,
             feedback: [...transient.inline], compressions: [...transient.compressions], activity: null };
         },
         async inspect(_data, object) {
