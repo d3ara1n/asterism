@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useMemo, useRef, useState } from "react";
 import { Info, LayoutTemplate, MoreHorizontal, PenLine, Trash2 } from "lucide-react";
 import type { UiText } from "@asterism-app/sdk/contracts";
@@ -93,7 +94,7 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
     <ActionMenu modal={false}>
       <ActionMenuTarget asChild disabled={!ready || busy}>
         <div className="group relative">
-          <Item variant="outline" asChild className="w-full overflow-hidden bg-card p-0 text-left hover:bg-accent/50 disabled:opacity-50">
+          <TooltipHint content={template.title}><Item variant="outline" asChild className="w-full overflow-hidden bg-card p-0 text-left hover:bg-accent/50 disabled:opacity-50">
             <button type="button" data-action-menu-primary disabled={!ready || busy} aria-busy={starting} onClick={() => void run(() => onStart(template.id))}>
               {/* The folder color marks where new sessions land; the folder name stays in the information tooltip. */}
               <span className={cn("relative flex h-20 w-full overflow-hidden text-muted-foreground", folder ? folderTint(folder.color) : "bg-muted")} aria-hidden="true">
@@ -101,13 +102,13 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
                 {starting && <span className="absolute inset-0 flex items-center justify-center bg-muted/80"><Spinner className="size-8" /></span>}
               </span>
               <span className="block w-full min-w-0 px-3 pb-3">
-                <span className="block truncate font-medium" title={template.title}>{template.title}</span>
+                <span className="block truncate font-medium">{template.title}</span>
                 <span className="type-caption mt-1 block truncate pr-8">
                   {i18n.formatMessage(templateMessages.objectCount, { count: template.objects.length })}
                 </span>
               </span>
             </button>
-          </Item>
+          </Item></TooltipHint>
           <div className="absolute bottom-2 right-2">
             <Tooltip delayDuration={250}>
               <TooltipTrigger asChild>

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import { ArrowLeft, Bot, Brain, ChevronDown, ChevronRight, Cpu, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -248,13 +249,13 @@ function ConfigurationPopover({ wide, pageKey, reducedMotion, children, ...props
   </PopoverContent>;
 }
 
-function ConfigurationRow({ icon: Icon, label, value, ...props }: React.ComponentProps<typeof Button> & {
+function ConfigurationRow({ icon: Icon, label, value, title, ...props }: React.ComponentProps<typeof Button> & {
   icon: LucideIcon; label: string; value: string;
 }) {
-  return <Button variant="ghost" size="sm" className="w-full justify-start gap-2" title={`${label}: ${value}`} {...props}>
+  return <TooltipHint content={title ?? `${label}: ${value}`}><Button variant="ghost" size="sm" className="w-full justify-start gap-2" {...props}>
     <Icon data-icon="inline-start" className="text-muted-foreground" />
     <span className="shrink-0">{label}</span>
     <span className="ml-auto truncate text-muted-foreground">{value}</span>
     <ChevronRight data-icon="inline-end" className="text-muted-foreground" />
-  </Button>;
+  </Button></TooltipHint>;
 }

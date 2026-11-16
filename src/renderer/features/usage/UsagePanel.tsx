@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useState } from "react";
 import { AlertCircle, ChevronUp, RotateCw, Timer } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -108,7 +109,7 @@ function ProviderMeter({ provider, state }: { provider: ModelProvider; state: Pr
   return <li className="min-w-0">
     <div className="flex h-5 items-center gap-2">
       <SignalDot level={state ? usageLevel(state.items) : null} />
-      <span className="min-w-0 flex-1 truncate text-sm font-medium" title={provider.name}>{provider.name}</span>
+      <TooltipHint content={provider.name}><span className="min-w-0 flex-1 truncate text-sm font-medium">{provider.name}</span></TooltipHint>
       {(!state || state.state === "loading") && <Spinner className="size-3 text-muted-foreground" />}
       {state?.error && <AlertCircle aria-hidden="true" className="size-3.5 shrink-0 text-warning" />}
     </div>

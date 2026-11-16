@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import { ChevronRight, FileSearch, TextSearch } from "lucide-react";
 import { toolRenderer, useI18n, useRendererViewState, type ToolRenderProps } from "@asterism-app/sdk/renderer";
@@ -38,7 +39,7 @@ function Header(props: Props & { grep?: boolean }) {
   const truncated = counts ? !counts.complete : false;
   return <ToolHeader label={i18n.text(props.grep ? messages.toolDirectoryGrep : messages.toolDirectoryFind)}
     subject={useToolResourceSubject(props.invocation.resource)}
-    summary={summary && <span className="font-mono" title={summary}>{summary}</span>}
+    summary={summary && <TooltipHint content={summary}><span className="font-mono">{summary}</span></TooltipHint>}
     meta={counts && [
       counts.matches !== null && i18n.formatMessage(messages.toolSearchMatches, { count: counts.matches, truncated }),
       i18n.formatMessage(messages.toolSearchFiles, { count: counts.files, truncated }),
@@ -85,7 +86,7 @@ function GrepFileRow({ file, name, initialOpen }: { file: GrepFile; name: string
     <CollapsibleTrigger asChild>
       <Button variant="ghost" size="xs" className="h-auto min-h-6 w-full justify-start px-1 font-mono font-normal">
         <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-90")} />
-        <span className="min-w-0 truncate" title={file.path}>{name}</span>
+        <TooltipHint content={file.path}><span className="min-w-0 truncate">{name}</span></TooltipHint>
         <span className="ml-auto shrink-0 type-caption tabular-nums text-muted-foreground">{file.matches}</span>
       </Button>
     </CollapsibleTrigger>

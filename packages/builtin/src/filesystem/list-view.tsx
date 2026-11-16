@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useI18n, useRendererObject, useRendererResourceNavigation, useRendererViewState, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
 import { File, FileQuestion, Folder } from "lucide-react";
@@ -19,7 +20,7 @@ function ListHeader({ target, invocation, result }: ListProps) {
   const path = inputText(target, "path");
   return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectoryList)}
     subject={useToolResourceSubject(invocation.resource)}
-    summary={path && path !== "." && <span className="font-mono" title={path}>{path}</span>}
+    summary={path && path !== "." && <TooltipHint content={path}><span className="font-mono">{path}</span></TooltipHint>}
     meta={result?.data && i18n.formatMessage(filesystemMessages.toolEntryCount, { count: result.data.entries.length, truncated: result.data.truncated })} />;
 }
 
@@ -35,11 +36,11 @@ function EntryRow({ entry, path, resource }: { entry: Entry; path: string; resou
     <Icon className={cn("size-3.5 shrink-0", entry.type === "directory" ? "text-primary-text" : "text-muted-foreground")} />
     <span className={cn("min-w-0 truncate", entry.name.startsWith(".") && "text-muted-foreground")}>{entry.name}</span>
   </>;
-  if (entry.type !== "file" || !resource) return <span className={cn(rowClass, "inline-flex items-center")} title={path}>{content}</span>;
-  return <Button variant="ghost" size="xs" className={rowClass} title={path}
+  if (entry.type !== "file" || !resource) return <TooltipHint content={path}><span className={cn(rowClass, "inline-flex items-center")}>{content}</span></TooltipHint>;
+  return <TooltipHint content={path}><Button variant="ghost" size="xs" className={rowClass}
     onClick={event => void navigation.open({ sessionId: object.ref.sessionId, id: resource.id }, path, { origin: event.currentTarget })}>
     {content}
-  </Button>;
+  </Button></TooltipHint>;
 }
 
 function ListBody({ result, invocation }: ListProps) {

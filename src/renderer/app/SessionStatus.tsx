@@ -1,3 +1,5 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { Hand, type LucideIcon } from "lucide-react";
 import type { ResourceActivity, ResourceNotice } from "@asterism-app/sdk/contracts";
 import { useId, type ReactNode } from "react";
@@ -17,12 +19,15 @@ function StatusDetails({ label, title, tone, icon, count, children }: {
 }) {
   const titleId = useId();
   return <Popover>
-    <PopoverTrigger asChild>
-      <Button variant="ghost" size="xs" aria-label={label} title={label} className="shrink-0 gap-1">
-        <StatusIcon tone={tone} icon={icon} className="size-4" />
-        {count > 1 && <span className="tabular-nums">{count}</span>}
-      </Button>
-    </PopoverTrigger>
+    <Tooltip>
+      <PopoverTrigger asChild><TooltipTrigger asChild>
+        <Button variant="ghost" size="xs" aria-label={label} className="shrink-0 gap-1">
+          <StatusIcon tone={tone} icon={icon} className="size-4" />
+          {count > 1 && <span className="tabular-nums">{count}</span>}
+        </Button>
+      </TooltipTrigger></PopoverTrigger>
+      <TooltipContent className="max-w-[min(24rem,var(--radix-tooltip-content-available-width))] whitespace-pre-wrap break-words text-left">{label}</TooltipContent>
+    </Tooltip>
     <PopoverContent side="right" align="start" className="p-2" aria-labelledby={titleId}>
       <h2 id={titleId} className="type-label px-2 py-1">{title}</h2>
       <ItemGroup className="max-h-80 overflow-y-auto">{children}</ItemGroup>
@@ -40,7 +45,7 @@ export function SessionStatus({ activities, notices }: { activities: readonly Re
       {activities.map(activity => <Item key={activity.id} size="sm" role="listitem">
         <ItemMedia><StatusIcon tone="progress" className="size-4" /></ItemMedia>
         <ItemContent className="min-w-0">
-          <ItemTitle className="max-w-full"><span className="truncate" title={i18n.text(activity.title)}>{i18n.text(activity.title)}</span></ItemTitle>
+          <ItemTitle className="max-w-full"><TooltipHint content={i18n.text(activity.title)}><span className="truncate">{i18n.text(activity.title)}</span></TooltipHint></ItemTitle>
           {activity.progress && <Progress value={activity.progress.value * 100} aria-label={i18n.text(activity.title)} />}
         </ItemContent>
       </Item>)}
@@ -50,7 +55,7 @@ export function SessionStatus({ activities, notices }: { activities: readonly Re
       {notices.map(notice => <Item key={JSON.stringify([notice.resource.sessionId, notice.resource.id, notice.kind])} size="sm" role="listitem">
         <ItemMedia><StatusIcon tone={tones[notice.kind]} icon={notice.kind === "attention" ? Hand : undefined} className="size-4" /></ItemMedia>
         <ItemContent className="min-w-0">
-          <ItemTitle className="max-w-full"><span className="truncate" title={i18n.text(notice.title)}>{i18n.text(notice.title)}</span></ItemTitle>
+          <ItemTitle className="max-w-full"><TooltipHint content={i18n.text(notice.title)}><span className="truncate">{i18n.text(notice.title)}</span></TooltipHint></ItemTitle>
           <ItemDescription>{i18n.text(messages[notice.kind])}</ItemDescription>
         </ItemContent>
       </Item>)}

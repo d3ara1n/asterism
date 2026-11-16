@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText, PenLine, Link } from "lucide-react";
@@ -100,9 +101,9 @@ function CreationCard({ entry }: { entry: z.infer<typeof CreationListResult.sche
     <ItemContent className="min-w-0 gap-0.5">
       <ItemTitle className="w-full break-words">{i18n.text(resource.label)}</ItemTitle>
       <p className="type-caption whitespace-pre-wrap break-words text-pretty text-muted-foreground">{entry.description}</p>
-      {entry.notice && <div className="mt-1" title={entry.notice}>
+      {entry.notice && <TooltipHint content={entry.notice}><div className="mt-1">
         <StatusText tone="warning">{i18n.text(messages.restricted)}</StatusText>
-      </div>}
+      </div></TooltipHint>}
     </ItemContent>
   </Item>;
 }
@@ -165,7 +166,7 @@ function RemoveHeader({ args, result }: RemoveProps) {
   const i18n = useI18n();
   const id = result?.data?.resource_id ?? inputText(args, "resource_id");
   return <ToolHeader label={i18n.text(messages.remove)}
-    subject={id && <span className="font-mono" title={id}>{id}</span>} />;
+    subject={id && <TooltipHint content={id}><span className="font-mono">{id}</span></TooltipHint>} />;
 }
 function RemoveBody({ result }: RemoveProps) {
   const i18n = useI18n();
@@ -180,7 +181,7 @@ function RemoveBody({ result }: RemoveProps) {
 function RenameHeader({ args, result }: ToolRenderProps<z.infer<typeof ResourceRenameResult.schema>>) {
   const id = result?.data?.resource_id ?? inputText(args, "resource_id");
   return <ToolHeader label={useI18n().text(messages.rename)}
-    subject={id && <span className="font-mono" title={id}>{id}</span>}
+    subject={id && <TooltipHint content={id}><span className="font-mono">{id}</span></TooltipHint>}
     summary={result?.data?.title ?? inputText(args, "title")} />;
 }
 const renameView = { headerRenderer: RenameHeader };
@@ -189,7 +190,7 @@ function ExposureHeader({ args, result }: ToolRenderProps<z.infer<typeof Resourc
   const id = result?.data?.resource_id ?? inputText(args, "resource_id");
   const label = exposed === true ? messages.expose : exposed === false ? messages.unexpose : messages.exposure;
   return <ToolHeader label={useI18n().text(label)}
-    subject={id && <span className="font-mono" title={id}>{id}</span>} />;
+    subject={id && <TooltipHint content={id}><span className="font-mono">{id}</span></TooltipHint>} />;
 }
 const exposureView = { headerRenderer: ExposureHeader };
 const listView = { headerRenderer: ListHeader, bodyRenderer: ListBody };

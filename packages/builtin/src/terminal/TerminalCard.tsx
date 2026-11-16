@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
@@ -40,7 +41,7 @@ export function TerminalActions({ data }: { data: TerminalConfig }) {
   };
   const warn = status.state === "running" || status.state === "unknown" || status.state === "starting";
   return <>
-    <StatusBadge tone={tones[status.state]} role="status" title={status.cwd ?? data.cwd}>{i18n.formatMessage(terminalMessages.state, { state: status.state })}</StatusBadge>
+    <TooltipHint content={status.cwd ?? data.cwd}><StatusBadge tone={tones[status.state]} role="status">{i18n.formatMessage(terminalMessages.state, { state: status.state })}</StatusBadge></TooltipHint>
     {status.state !== "inactive" && <IconButton size="icon-xs" label={i18n.formatMessage(terminalMessages.close)} disabled={closing}
       onClick={() => { if (warn) setConfirming(true); else close(); }}><Power /></IconButton>}
     <AlertDialog open={confirming} onOpenChange={open => { if (!open && !closing) setConfirming(false); }}><AlertDialogContent>

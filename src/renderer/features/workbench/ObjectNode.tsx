@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { Handle, NodeResizeControl, Position, useUpdateNodeInternals, type Node, type NodeProps } from "@xyflow/react";
 import { Grip, PanelLeftClose, PanelRightOpen } from "lucide-react";
 import { memo, useCallback, useEffect } from "react";
@@ -95,12 +96,14 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
         </div>
         : content.body}
     </ObjectCard>}</ObjectActions>
-    {selected && !collapsed && <div className="contents" title={i18n.text(objectsMessages.resizeCard)}
+    {selected && !collapsed && <div className="contents"
       onDoubleClick={event => { event.stopPropagation(); onObjectView({ size: null }); }}>
       <NodeResizeControl position="bottom-right"
         className="object-resize-handle nopan" minWidth={content.view.minWidth ?? minimumCardWidth}
         minHeight={content.view.minHeight ?? minimumCardHeight} maxWidth={maximumCardDimension} maxHeight={maximumCardDimension}>
-        <Grip className="size-2.5" aria-hidden="true" />
+        <TooltipHint content={i18n.text(objectsMessages.resizeCard)}>
+          <span className="flex size-full items-center justify-center"><Grip className="size-2.5" aria-hidden="true" /></span>
+        </TooltipHint>
       </NodeResizeControl>
     </div>}
   </>;

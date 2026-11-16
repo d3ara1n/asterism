@@ -5,15 +5,16 @@ import { Brain, Check, Minus, Wrench } from "lucide-react";
 import { formatCount } from "./format-count";
 import { referenceModelMessages as messages } from "./messages/reference-model";
 import { thinkingLabels } from "./messages/model-selection";
+import { TooltipHint } from "./tooltip-hint";
 import { Badge } from "./ui/badge";
 
 function Capability({ icon, label, supported }: { icon: ReactNode; label: string; supported: boolean }) {
   const i18n = useI18n();
   const state = i18n.text(supported ? messages.supported : messages.unsupported);
-  return <Badge variant="outline" className="font-normal" title={state}>
+  return <TooltipHint content={state}><Badge variant="outline" className="font-normal">
     {icon}{label}{supported ? <Check className="text-success" aria-hidden /> : <Minus aria-hidden />}
     <span className="sr-only"> · {state}</span>
-  </Badge>;
+  </Badge></TooltipHint>;
 }
 
 function formatPrice(i18n: I18n, price: UnitPrice): string {

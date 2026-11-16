@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { useLayoutEffect, useRef } from "react";
 import { runScopeHandlers, type EditorView } from "@codemirror/view";
 import { SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll, selectMatches, closeSearchPanel } from "@codemirror/search";
@@ -52,9 +53,18 @@ export function SearchPanel({ view, query, readOnly }: { view: EditorView; query
       <ToggleGroup type="multiple" size="sm"
         value={[query.caseSensitive && "case", query.wholeWord && "word", query.regexp && "regexp"].filter((value): value is string => !!value)}
         onValueChange={values => update({ caseSensitive: values.includes("case"), wholeWord: values.includes("word"), regexp: values.includes("regexp") })}>
-        <ToggleGroupItem value="case" aria-label={i18n.text(messages.matchCase)} title={i18n.text(messages.matchCase)}><CaseSensitive /></ToggleGroupItem>
-        <ToggleGroupItem value="word" aria-label={i18n.text(messages.wholeWord)} title={i18n.text(messages.wholeWord)}><WholeWord /></ToggleGroupItem>
-        <ToggleGroupItem value="regexp" aria-label={i18n.text(messages.regexp)} title={i18n.text(messages.regexp)}><Regex /></ToggleGroupItem>
+        <Tooltip>
+          <ToggleGroupItem asChild value="case" aria-label={i18n.text(messages.matchCase)}><TooltipTrigger><CaseSensitive /></TooltipTrigger></ToggleGroupItem>
+          <TooltipContent>{i18n.text(messages.matchCase)}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <ToggleGroupItem asChild value="word" aria-label={i18n.text(messages.wholeWord)}><TooltipTrigger><WholeWord /></TooltipTrigger></ToggleGroupItem>
+          <TooltipContent>{i18n.text(messages.wholeWord)}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <ToggleGroupItem asChild value="regexp" aria-label={i18n.text(messages.regexp)}><TooltipTrigger><Regex /></TooltipTrigger></ToggleGroupItem>
+          <TooltipContent>{i18n.text(messages.regexp)}</TooltipContent>
+        </Tooltip>
       </ToggleGroup>
       <Button type="button" variant="ghost" size="sm" disabled={!query.valid} onClick={() => { selectMatches(view); view.focus(); }}>
         {i18n.text(messages.selectAllMatches)}

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { textMessages } from "./messages/text";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { toolsMessages } from "@asterism-app/ui/messages/tools";
@@ -19,7 +20,7 @@ function TextReadHeader({ target, invocation, result }: ToolRenderProps<TextRead
   const data = result?.data;
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextRead)}
     subject={useToolResourceSubject(invocation.resource)}
-    summary={path && <span className="font-mono" title={path}>{path}</span>}
+    summary={path && <TooltipHint content={path}><span className="font-mono">{path}</span></TooltipHint>}
     meta={data && i18n.formatMessage(textMessages.toolTextLines, { shown: data.rows.length, total: data.totalLines })} />;
 }
 function TextWriteHeader({ target, args, invocation, result }: ToolRenderProps<TextChange>) {
@@ -30,7 +31,7 @@ function TextWriteHeader({ target, args, invocation, result }: ToolRenderProps<T
   const data = result?.data;
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextWrite)}
     subject={useToolResourceSubject(invocation.resource)}
-    summary={path && <span className="font-mono" title={path}>{path}</span>}
+    summary={path && <TooltipHint content={path}><span className="font-mono">{path}</span></TooltipHint>}
     meta={<>{data && <>+{data.added} −{data.removed}{count !== undefined && " · "}</>}
       {count !== undefined && i18n.formatMessage(textMessages.toolTextCharacters, { count: formatCount(count) })}</>} />;
 }
@@ -41,7 +42,7 @@ function TextEditHeader({ target, args, invocation, result }: ToolRenderProps<Te
   const data = result?.data;
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextEdit)}
     subject={useToolResourceSubject(invocation.resource)}
-    summary={path && <span className="font-mono" title={path}>{path}</span>}
+    summary={path && <TooltipHint content={path}><span className="font-mono">{path}</span></TooltipHint>}
     meta={<>{data && <>+{data.added} −{data.removed}{Array.isArray(edits) && " · "}</>}
       {Array.isArray(edits) && i18n.formatMessage(textMessages.toolTextEdits, { count: edits.length })}</>} />;
 }
@@ -54,7 +55,7 @@ function TextReplaceHeader({ target, args, invocation, result }: ToolRenderProps
   const flags = inputText(args, "flags");
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextReplace)}
     subject={useToolResourceSubject(invocation.resource)}
-    summary={path && <span className="font-mono" title={path}>{path}</span>}
+    summary={path && <TooltipHint content={path}><span className="font-mono">{path}</span></TooltipHint>}
     meta={<>{mode}{flags ? ` /${flags}` : ""}{data && <> · {i18n.formatMessage(textMessages.toolTextMatches, { count: data.matches })} · +{data.added} −{data.removed}</>}</>} />;
 }
 function TextReplaceBody(props: ToolRenderProps<TextReplace>) {

@@ -1,3 +1,4 @@
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useId, useRef, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, Globe, GripVertical, Plus } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
@@ -99,10 +100,10 @@ export function WebProvidersSettings() {
               selected={island.has(webProviderIslandKey(state.id))} onOpen={origin => open(state.id, origin)}
               actions={<>
                 {issue && <StatusBadge tone={issue.tone}>{issue.label}</StatusBadge>}
-                <Button variant="ghost" size="icon-sm" disabled={busy || index === 0}
-                  aria-label={moveUpLabel} title={moveUpLabel} onClick={() => move(index, -1)}><ArrowUp /></Button>
-                <Button variant="ghost" size="icon-sm" disabled={busy || index === ordered.length - 1}
-                  aria-label={moveDownLabel} title={moveDownLabel} onClick={() => move(index, 1)}><ArrowDown /></Button>
+                <IconButton variant="ghost" size="icon-sm" disabled={busy || index === 0}
+                  label={moveUpLabel} onClick={() => move(index, -1)}><ArrowUp /></IconButton>
+                <IconButton variant="ghost" size="icon-sm" disabled={busy || index === ordered.length - 1}
+                  label={moveDownLabel} onClick={() => move(index, 1)}><ArrowDown /></IconButton>
                 {/* Saving validates against the type declaration, so unavailable types cannot be toggled. */}
                 <Switch aria-label={i18n.formatMessage(messages.enableProvider, { provider: label })} checked={state.enabled} disabled={busy || !type}
                   onCheckedChange={enabled => void action.run({ type: "webProvider.save", id: state.id, enabled,
@@ -123,10 +124,10 @@ function SortableProvider({ id, label, disabled, onDragStart, onDragEnd, childre
   const dragLabel = i18n.formatMessage(messages.reorder, { provider: label });
   return <Reorder.Item as="div" role="listitem" value={id} className="relative bg-card" dragListener={false} dragControls={controls}
     onDragStart={onDragStart} onDragEnd={onDragEnd}>
-    {children(<Button variant="ghost" size="icon-sm" disabled={disabled} tabIndex={-1}
+    {children(<IconButton variant="ghost" size="icon-sm" disabled={disabled} tabIndex={-1}
       className="touch-none cursor-grab active:cursor-grabbing"
-      aria-label={dragLabel} title={dragLabel}
-      onPointerDown={event => { if (!disabled) controls.start(event); }}><GripVertical /></Button>)}
+      label={dragLabel}
+      onPointerDown={event => { if (!disabled) controls.start(event); }}><GripVertical /></IconButton>)}
   </Reorder.Item>;
 }
 

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import { Brain, Clock, MessageSquarePlus, TextQuote, Wrench, type LucideIcon } from "lucide-react";
 import { useI18n, useRendererTools } from "@asterism-app/sdk/renderer";
@@ -15,10 +16,10 @@ function Row({ tone, icon, children }: { tone: StatusTone; icon?: LucideIcon; ch
 }
 /** Quoted italic text on one line: the icon tells model output from instructions; the closing quote survives truncation. */
 function Quoted({ label, text, title, muted }: { label: string; text: string; title?: string; muted?: boolean }) {
-  return <span className={cn("flex min-w-0 italic", muted && "text-muted-foreground")} title={title ?? text}>
+  return <TooltipHint content={title ?? text}><span className={cn("flex min-w-0 italic", muted && "text-muted-foreground")}>
     <span className="sr-only">{label}: </span>
     <span aria-hidden="true">“</span><span className="min-w-0 truncate">{text}</span><span aria-hidden="true">”</span>
-  </span>;
+  </span></TooltipHint>;
 }
 
 export type SteerState = "delivered" | "pending" | "undelivered";
@@ -41,8 +42,8 @@ export function ActivityRow({ entry }: { entry: ActivityEntry }) {
     case "tool": {
       const label = tools.label(entry.name, entry.implementation);
       return <Row tone={toolTones[entry.state]} icon={entry.state === "running" ? undefined : Wrench}>
-        {label ? <span className="shrink-0" title={entry.name}>{label}</span> : <span className="shrink-0 font-mono">{entry.name}</span>}
-        {entry.subject && <span className="min-w-0 truncate font-mono text-muted-foreground" title={entry.subject}>{entry.subject}</span>}
+        {label ? <TooltipHint content={entry.name}><span className="shrink-0">{label}</span></TooltipHint> : <span className="shrink-0 font-mono">{entry.name}</span>}
+        {entry.subject && <TooltipHint content={entry.subject}><span className="min-w-0 truncate font-mono text-muted-foreground">{entry.subject}</span></TooltipHint>}
         <span className="sr-only">{i18n.formatMessage(messages.toolState, { state: entry.state })}</span>
       </Row>;
     }

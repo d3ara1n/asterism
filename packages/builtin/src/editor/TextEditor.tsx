@@ -1,7 +1,6 @@
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { basicSetup } from "codemirror";
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
@@ -13,6 +12,9 @@ import { chinesePhrases } from "./phrases.ts";
 import { editorTheme } from "./theme.ts";
 import { SearchPanel } from "./SearchPanel";
 import { gitGutter, setGitBaseline } from "./git-gutter";
+import { createHintPortals, type HintPortal } from "./hint-portals";
+import { HintPortals } from "./HintPortals";
+import { editorSetup } from "./setup";
 import { editorMessages as messages } from "../messages/editor";
 
 export interface TextEditorHandle { find(): void }
@@ -35,18 +37,21 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, lineW
   const editor = useRef<EditorView | null>(null);
   const settings = useRef(new Compartment()).current;
   const [panel, setPanel] = useState<{ dom: HTMLElement; view: EditorView; query: SearchQuery } | null>(null);
+  const [hints, setHints] = useState<HintPortal[]>([]);
   const callbacks = useRef({ onChange, onSave, onPosition, onLanguageError });
   callbacks.current = { onChange, onSave, onPosition, onLanguageError };
   useImperativeHandle(ref, () => ({ find() { if (editor.current) openSearchPanel(editor.current); } }), []);
 
   useEffect(() => {
     const language = new Compartment();
+    const hintPortals = createHintPortals(setHints);
     const view = new EditorView({
       parent: container.current!,
       state: EditorState.create({
         doc: initialText,
         extensions: [
-          basicSetup, editorTheme, syntaxHighlighting(highlightStyle), gitGutter,
+          hintPortals.extension, editorSetup(hintPortals.render), editorTheme, syntaxHighlighting(highlightStyle),
+          gitGutter(hintPortals.render),
           search({ top: true, createPanel: view => {
             const dom = document.createElement("div");
             let query = getSearchQuery(view.state);
@@ -94,6 +99,9 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, lineW
     };
   }, [filename, initialText, settings]);
 
+  // Portal contents arrive after CodeMirror draws its hosts; measure their committed geometry.
+  useLayoutEffect(() => { editor.current?.requestMeasure(); }, [hints]);
+
   useEffect(() => {
     editor.current?.dispatch({ effects: settings.reconfigure([
       lineWrapping ? EditorView.lineWrapping : [],
@@ -112,6 +120,7 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, lineW
 
   return <><div ref={container} className="min-h-0 flex-1 overflow-hidden text-sm" />
     {panel && createPortal(<SearchPanel view={panel.view} query={panel.query} readOnly={readOnly} />, panel.dom)}
+    <HintPortals portals={hints} />
   </>;
 }
 

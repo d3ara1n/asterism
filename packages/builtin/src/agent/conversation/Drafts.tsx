@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useId, useState, useRef, useSyncExternalStore, type DragEvent, type KeyboardEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion, type MotionProps } from "motion/react";
 import { useI18n } from "@asterism-app/sdk/renderer";
@@ -293,11 +294,11 @@ function DraftRow({
   // Source marker
   const senderName = i18n.text(messageSenderLabel(item.sender));
   const senderChip = (
-    <span title={senderName} className={cn("inline-flex max-w-[7rem] shrink-0 items-center gap-1 rounded-full px-1.5 text-[10px] font-medium leading-4",
+    <TooltipHint content={senderName}><span className={cn("inline-flex max-w-[7rem] shrink-0 items-center gap-1 rounded-full px-1.5 text-[10px] font-medium leading-4",
       surface)}>
       <SenderIcon className="size-2.5 shrink-0" aria-hidden />
       <span className={item.sender.kind === "user" ? "sr-only" : "truncate"}>{senderName}</span>
-    </span>
+    </span></TooltipHint>
   );
 
   // Mode label text and styles

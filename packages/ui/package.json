@@ -13,6 +13,7 @@
     "./use-settings-action": "./src/use-settings-action.ts",
     "./use-lifetime": "./src/use-lifetime.ts",
     "./usage-level": "./src/usage-level.ts",
+    "./tooltip-hint": "./src/tooltip-hint.tsx",
     "./tool-header": "./src/tool-header.tsx",
     "./icon-summary": "./src/icon-summary.tsx",
     "./streaming-preview": "./src/streaming-preview.tsx",

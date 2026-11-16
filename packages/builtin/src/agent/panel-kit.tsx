@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import type { CSSProperties, ReactNode } from "react";
 import { motion } from "motion/react";
@@ -43,7 +44,7 @@ function SystemRow({ label, detail, value, total, color, nested = false }: { lab
   const i18n = useI18n();
   return <li className={cn("space-y-1", nested && "pl-4")}>
     <div className="flex items-baseline gap-2">
-      <span className={cn("min-w-0 flex-1 truncate", nested ? "type-caption text-foreground" : "type-body")} title={detail ?? label}>{label}</span>
+      <TooltipHint content={detail ?? label}><span className={cn("min-w-0 flex-1 truncate", nested ? "type-caption text-foreground" : "type-body")}>{label}</span></TooltipHint>
       <span className="type-caption tabular-nums">{i18n.formatMessage(messages.characters, { count: formatCount(value) })}</span>
       <span className="type-label w-10 text-right tabular-nums">{percent(i18n, value, total)}</span>
     </div>

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useState } from "react";
 import { Terminal, FileText } from "lucide-react";
 import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
@@ -55,13 +56,13 @@ function Body({ args, phase, result }: ToolRenderProps<ExecResult>) {
     </section>}
     {data?.truncation && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 type-caption">
       <span>{i18n.formatMessage(messages.truncated, { retained: data.truncation.retainedChars, total: data.truncation.totalChars })}</span>
-      <Button variant="link" size="sm" className="h-auto p-0" disabled={opening} title={`${data.truncation.file}\n${i18n.text(messages.temporary)}`}
+      <TooltipHint content={`${data.truncation.file}\n${i18n.text(messages.temporary)}`}><Button variant="link" size="sm" className="h-auto p-0" disabled={opening}
         onClick={async () => {
           setOpening(true); setError(false);
           try { await services.openLocalFile(data.truncation!.file); }
           catch { setError(true); }
           finally { setOpening(false); }
-        }}><FileText className="size-3.5" />{i18n.text(messages.openLog)}</Button>
+        }}><FileText className="size-3.5" />{i18n.text(messages.openLog)}</Button></TooltipHint>
       {error && <span role="alert" className="text-destructive">{i18n.text(messages.openFailed)}</span>}
     </div>}
   </div>;

@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "../utils";
+import { TooltipHint } from "../tooltip-hint";
 import { Button, buttonVariants } from "./button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "./item";
 
@@ -8,8 +9,8 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle }
  * Compose an openable row from Item primitives. The title's hit area spans the row;
  * action slots sit above it, keeping interactive controls separate from decorative media.
  */
-export function ListRow({ title, description, descriptionLines = 1, details, media, mediaVariant, leadingActions, actions, opens = false, selected = false, disabled, inactive, onOpen, className, contentClassName, variant = "default", buttonProps }: {
-  title: ReactNode; description?: ReactNode; media?: ReactNode; mediaVariant?: "default" | "icon"; leadingActions?: ReactNode; actions?: ReactNode;
+export function ListRow({ title, description, descriptionLines = 1, details, media, mediaVariant, leadingActions, actions, opens = false, selected = false, disabled, inactive, onOpen, className, contentClassName, variant = "default", buttonProps, tooltip }: {
+  title: ReactNode; tooltip?: string; description?: ReactNode; media?: ReactNode; mediaVariant?: "default" | "icon"; leadingActions?: ReactNode; actions?: ReactNode;
   /** Two lines suit prose descriptions such as skill summaries; one line suits identifiers and status. */ descriptionLines?: 1 | 2;
   /** Opening shows the item in another island; a trailing chevron marks the row as a navigation target. */ opens?: boolean;
   /** Additional information below the description. */ details?: ReactNode;
@@ -26,10 +27,10 @@ export function ListRow({ title, description, descriptionLines = 1, details, med
     {leadingActions && <ItemActions className="relative z-10 shrink-0">{leadingActions}</ItemActions>}
     {media && <ItemMedia variant={mediaVariant} className={cn(navigation && "mr-2 [&_svg]:size-4")}>{media}</ItemMedia>}
     <ItemContent className={cn("min-w-0", contentClassName)}>
-      <button type="button" data-slot="list-row-open" disabled={disabled} aria-current={selected || undefined}
+      <TooltipHint content={tooltip}><button type="button" data-slot="list-row-open" disabled={disabled} aria-current={selected || undefined}
         {...buttonProps}
         className={cn("min-w-0 text-left outline-none after:absolute after:inset-0 focus-visible:underline", disabled && "opacity-50", buttonProps?.className)}
-        onClick={event => onOpen(event.currentTarget)}>{navigation ? <span className="block min-w-0">{title}</span> : <ItemTitle>{title}</ItemTitle>}</button>
+        onClick={event => onOpen(event.currentTarget)}>{navigation ? <span className="block min-w-0">{title}</span> : <ItemTitle>{title}</ItemTitle>}</button></TooltipHint>
       {description && <ItemDescription className={descriptionLines === 1 ? "truncate" : "line-clamp-2 text-pretty"}>{description}</ItemDescription>}
       {details && <ItemDescription className="type-caption truncate">{details}</ItemDescription>}
     </ItemContent>

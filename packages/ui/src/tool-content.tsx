@@ -1,6 +1,7 @@
 import { type ToolRenderProps, useI18n, useRendererResources, useRendererViewState } from "@asterism-app/sdk/renderer";
 import { useId, type ReactNode } from "react";
 
+import { TooltipHint } from "./tooltip-hint";
 import { toolsMessages } from "./messages/tools";
 import { JsonView } from "./json-view";
 import { ToolHeader } from "./tool-header";
@@ -38,9 +39,9 @@ export function ToolDetailsSwitcher({ items, stateKey = null }: {
   </div>;
 }
 function resourceSubject(icon: ReactNode, title: string): ReactNode {
-  return <span className="inline-flex max-w-full items-center gap-1 align-middle [&_svg]:size-3 [&_svg]:shrink-0" title={title}>
+  return <TooltipHint content={title}><span className="inline-flex max-w-full items-center gap-1 align-middle [&_svg]:size-3 [&_svg]:shrink-0">
     {icon}<span className="truncate">{title}</span>
-  </span>;
+  </span></TooltipHint>;
 }
 
 /** Resource identity comes from the call; only its static kind icon comes from the current renderer catalog. */

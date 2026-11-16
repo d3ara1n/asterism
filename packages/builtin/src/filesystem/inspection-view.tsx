@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { z } from "zod";
 import { ScanSearch } from "lucide-react";
 import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
@@ -16,7 +17,7 @@ function Header({ args, result }: Props) {
   const data = result?.data;
   const path = data?.path ?? inputText(args, "path");
   return <ToolHeader label={i18n.text(messages.inspectPath)}
-    summary={path && <span className="font-mono" title={path}>{path}</span>}
+    summary={path && <TooltipHint content={path}><span className="font-mono">{path}</span></TooltipHint>}
     meta={data && (!data.exists ? <Badge variant="outline">{i18n.text(commonMessages.referenceMissing)}</Badge>
       : data.entries !== null ? i18n.formatMessage(messages.toolEntryCount, { count: data.entries.length, truncated: data.truncated }) : undefined)} />;
 }

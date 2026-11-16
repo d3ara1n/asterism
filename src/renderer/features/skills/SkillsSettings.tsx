@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useCallback, useEffect, useState } from "react";
 import { BookOpen, Folder, FolderOpen, Puzzle, RefreshCw, Search, TriangleAlert } from "lucide-react";
 import { IslandPanel, useI18n, useRendererApplication, useRendererCalls, useRendererEvents, useRendererIsland } from "@asterism-app/sdk/renderer";
@@ -119,7 +120,7 @@ function SourceRow({ group, names }: { group: SkillSource; names: PluginNames })
     <ItemMedia><Icon className="size-4 text-muted-foreground" /></ItemMedia>
     <ItemContent className="min-w-0">
       <ItemTitle className="block truncate">{i18n.text(sourceTitle(group, names))}</ItemTitle>
-      <ItemDescription className="truncate font-mono text-xs select-text" title={group.id} translate="no">{group.id}</ItemDescription>
+      <TooltipHint content={group.id}><ItemDescription className="truncate font-mono text-xs select-text" translate="no">{group.id}</ItemDescription></TooltipHint>
     </ItemContent>
     <ItemActions>
       {group.issues.length > 0 && <Badge variant="warning"><TriangleAlert />{i18n.formatMessage(messages.issueCount, { count: group.issues.length })}</Badge>}
@@ -204,7 +205,7 @@ function SkillDetailPanel({ source, name, names }: { source: string; name: strin
         <p className="type-body text-pretty select-text">{skill.description}</p>
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
           <dt className="type-label">{i18n.text(messages.source)}</dt>
-          <dd className="type-caption truncate font-mono select-text" title={source} translate="no">{source}</dd>
+          <TooltipHint content={source}><dd className="type-caption truncate font-mono select-text" translate="no">{source}</dd></TooltipHint>
           <dt className="type-label">{i18n.text(messages.directory)}</dt>
           <dd className="type-caption break-all font-mono select-text" translate="no">{skill.directory}</dd>
         </dl>

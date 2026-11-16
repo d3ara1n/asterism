@@ -1,3 +1,5 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { CircleDot, History, PanelsTopLeft, MoreHorizontal, ArrowUpLeft, GitBranch, ChevronDown, Layers, Check } from "lucide-react";
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -138,17 +140,16 @@ export function SessionHistoryPanel({ controller, onClose }: { controller: Sessi
   return <Tabs value={branch.id} activationMode="manual" onValueChange={id => { const target = tree.branches.find(item => item.id === id); if (target) navigate(target); }} className="island-panel min-w-0 gap-0">
     <Panel onClose={onClose} title={i18n.formatMessage(historyMessages.history)} compact contentRef={list} action={<ContinueAction controller={controller} nodeId={selectedId} directory={directory.data} label={selectedLabel} />} toolbar={<>
       <ScrollArea orientation="horizontal" className="h-10 shrink-0" viewportRef={tabs} viewportClassName="pb-1"><TabsList variant="line" aria-label={i18n.formatMessage(historyMessages.historyBranches)}>
-        {tree.branches.map(item => <TabsTrigger key={item.id} value={item.id}
-          title={item.id === executionBranch.id ? `${branchLabel(item)} · ${i18n.formatMessage(historyMessages.historyExecutionBranch)}` : branchLabel(item)}>
+        {tree.branches.map(item => <Tooltip key={item.id}><TabsTrigger asChild value={item.id}><TooltipTrigger>
           {branchLabel(item)}{item.id === executionBranch.id && <CircleDot className="size-3" aria-label={i18n.formatMessage(historyMessages.historyExecutionBranch)} />}
-        </TabsTrigger>)}
+        </TooltipTrigger></TabsTrigger><TooltipContent>{item.id === executionBranch.id ? `${branchLabel(item)} · ${i18n.formatMessage(historyMessages.historyExecutionBranch)}` : branchLabel(item)}</TooltipContent></Tooltip>)}
       </TabsList></ScrollArea>
       <SearchInput value={query} onChange={setQuery} label={i18n.formatMessage(historyMessages.searchHistory)} />
       <div className="flex items-center gap-1">
         <HistoryViewPicker entries={entries} value={view} onChange={next => { setView(next); if (list.current) list.current.scrollTop = 0; }} />
       </div>
-      <div className="flex items-center justify-between gap-2"><p className="type-caption min-w-0 truncate" title={selectedLabel}>
-        {selectedLabel}</p></div>
+      <div className="flex items-center justify-between gap-2"><TooltipHint content={selectedLabel}><p className="type-caption min-w-0 truncate">
+        {selectedLabel}</p></TooltipHint></div>
       {!selectedVisible && (search || view.kind !== "all") && <p className="type-caption">{i18n.formatMessage(historyMessages.historyFiltered)}</p>}
     </>}>
       {tree.branches.map(item => <TabsContent key={item.id} value={item.id}>{item.id === branch.id && <>
@@ -195,8 +196,8 @@ function HistoryRecordRow({ info, snapshot, directory, selected, current, select
     <ActionMenu>
       <ActionMenuTarget asChild disabled={!!read.error}>
         <div><ListRow variant="navigation" selected={selected} className="h-auto px-2 py-1.5 font-normal" onOpen={() => select(info.id)}
-          buttonProps={{ "aria-pressed": selected, "aria-current": undefined,
-            title: `${label}\n${source}\n${i18n.formatDate(Date.parse(info.createdAt), { dateStyle: "medium", timeStyle: "short" })}` }}
+          buttonProps={{ "aria-pressed": selected, "aria-current": undefined }}
+          tooltip={`${label}\n${source}\n${i18n.formatDate(Date.parse(info.createdAt), { dateStyle: "medium", timeStyle: "short" })}`}
           media={<span className="text-muted-foreground" aria-hidden="true">{entry?.icon ?? (info.source?.resource ? descriptor.icon : <PanelsTopLeft />)}</span>}
           title={<span className="flex min-w-0 items-center gap-3">
             <span className="min-w-0 flex-1">{entry?.row?.(label) ?? <span className="block truncate leading-5">{label}</span>}
@@ -221,10 +222,10 @@ function BranchNavigationRow({ parent, branches, onNavigate }: { parent?: Histor
   if (!parent && branches.length === 0) return null;
   const singleBranch = branches.length === 1 ? branches[0] : undefined;
   return <div className="flex flex-wrap items-center gap-1 py-1 pl-9 pr-2">
-    {parent && <Button variant="ghost" size="xs" title={i18n.formatMessage(historyMessages.historyBranchOrigin, { branch: branchLabel(parent) })} aria-label={i18n.formatMessage(historyMessages.historyBranchOrigin, { branch: branchLabel(parent) })} onClick={() => onNavigate(parent)}><ArrowUpLeft />{branchLabel(parent)}</Button>}
-    {singleBranch && <Button variant="ghost" size="xs" title={i18n.formatMessage(historyMessages.historyBranchJump, { branch: branchLabel(singleBranch) })} aria-label={i18n.formatMessage(historyMessages.historyBranchJump, { branch: branchLabel(singleBranch) })} onClick={() => onNavigate(singleBranch)}>
+    {parent && <TooltipHint content={i18n.formatMessage(historyMessages.historyBranchOrigin, { branch: branchLabel(parent) })}><Button variant="ghost" size="xs" aria-label={i18n.formatMessage(historyMessages.historyBranchOrigin, { branch: branchLabel(parent) })} onClick={() => onNavigate(parent)}><ArrowUpLeft />{branchLabel(parent)}</Button></TooltipHint>}
+    {singleBranch && <TooltipHint content={i18n.formatMessage(historyMessages.historyBranchJump, { branch: branchLabel(singleBranch) })}><Button variant="ghost" size="xs" aria-label={i18n.formatMessage(historyMessages.historyBranchJump, { branch: branchLabel(singleBranch) })} onClick={() => onNavigate(singleBranch)}>
       <GitBranch />{branchLabel(singleBranch)}
-    </Button>}
+    </Button></TooltipHint>}
     {branches.length > 1 && <DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="xs" aria-label={i18n.formatMessage(historyMessages.historyBranchChildren, { count: branches.length })}><GitBranch />{branches.length}<ChevronDown /></Button></DropdownMenuTrigger>
       <DropdownMenuContent align="end">{branches.map(child => <DropdownMenuItem key={child.id} onSelect={() => onNavigate(child)}><GitBranch />{branchLabel(child)}</DropdownMenuItem>)}</DropdownMenuContent>
     </DropdownMenu>}
@@ -246,10 +247,12 @@ function HistoryViewPicker({ entries, value, onChange }: { entries: HistoryEntry
   const label = resource?.title ?? preset?.label ?? i18n.formatMessage(historyMessages.unknownResource);
   const icon = resource ? registry.resource(resource.kind).icon : preset?.icon;
   const choose = (view: HistoryView) => { onChange(view); setOpen(false); };
-  return <Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild>
-    <Button variant="outline" size="sm" role="combobox" aria-expanded={open} aria-label={`${i18n.formatMessage(historyMessages.historyView)}: ${label}`} title={label} className="min-w-0 flex-1 justify-start">
+  return <Popover open={open} onOpenChange={setOpen}><Tooltip>
+    <PopoverTrigger asChild><TooltipTrigger asChild><Button variant="outline" size="sm" role="combobox" aria-expanded={open} aria-label={`${i18n.formatMessage(historyMessages.historyView)}: ${label}`} className="min-w-0 flex-1 justify-start">
       <span aria-hidden="true">{icon}</span><span className="min-w-0 flex-1 truncate text-left">{label}</span><ChevronDown />
-    </Button></PopoverTrigger><PopoverContent align="start" className="w-80 p-0"><Command>
+    </Button></TooltipTrigger></PopoverTrigger>
+    <TooltipContent className="max-w-[min(24rem,var(--radix-tooltip-content-available-width))] whitespace-pre-wrap break-words text-left">{label}</TooltipContent>
+    </Tooltip><PopoverContent align="start" className="w-80 p-0"><Command>
       <CommandInput placeholder={i18n.formatMessage(historyMessages.searchHistoryViews)} /><CommandList><CommandEmpty>{i18n.formatMessage(commonMessages.noMatches)}</CommandEmpty>
         <CommandGroup>{presets.map(item => <CommandItem key={item.kind} value={`view:${item.kind}`} keywords={[item.label]} onSelect={() => choose({ kind: item.kind })}>
           <span aria-hidden="true">{item.icon}</span><span className="flex-1">{item.label}</span>{value.kind === item.kind && <Check aria-hidden="true" />}
@@ -286,7 +289,7 @@ function ContinueAction({ controller, nodeId, directory, label }: { controller: 
   const unsettled = progress.timelineBusy || progress.busyObjectIds.length > 0;
   const wait = i18n.formatMessage(historyMessages.waitForResources, { names: progress.busyObjectIds.map(id => resources?.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource)).join(", ") });
   const disabled = saving || unsettled || state.navigating || state.status !== "ready" || (target !== null && leaving.status !== "ready") || warnings.status === "loading";
-  return <><span title={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span>
+  return <><TooltipHint content={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><span><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span></TooltipHint>
     <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent>
       <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
       <p className="type-body break-words">{label ?? i18n.formatMessage(historyMessages.historyStart)}</p>

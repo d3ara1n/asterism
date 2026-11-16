@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
 import { ItemGroup, Item, ItemContent, ItemTitle, ItemDescription, ItemMedia } from "@asterism-app/ui/ui/item";
@@ -14,7 +15,7 @@ export function ServerSummary({ server }: { server: ServerSummaryData }) {
   return <>
     <StatusIcon tone={server.enabled ? phaseTone[server.connection] : "neutral"} className="size-3.5 shrink-0" />
     <span className="sr-only">{server.enabled ? i18n.formatMessage(messages.state, { state: server.connection }) : i18n.text(messages.disabled)}</span>
-    <span className="type-body min-w-0 truncate" title={server.name}>{server.name}</span>
+    <TooltipHint content={server.name}><span className="type-body min-w-0 truncate">{server.name}</span></TooltipHint>
     <span className="type-caption ml-auto shrink-0 tabular-nums text-muted-foreground">
       {server.indexed ? i18n.formatMessage(messages.tools, { count: server.toolCount }) : i18n.text(messages.unindexed)}
     </span>
@@ -23,7 +24,7 @@ export function ServerSummary({ server }: { server: ServerSummaryData }) {
 
 /** Single-line error when collapsed; read the full error in the expanded card area or result details. */
 export function ServerError({ error, className }: { error: string | null; className?: string }) {
-  return error ? <p className={cn("type-caption truncate text-destructive", className)} title={error}>{error}</p> : null;
+  return error ? <TooltipHint content={error}><p className={cn("type-caption truncate text-destructive", className)}>{error}</p></TooltipHint> : null;
 }
 
 /** Compact outline item for tool results: status, name, and tool count on one row; an error adds one clipped line beneath the name. */
@@ -34,10 +35,10 @@ export function ServerItem({ server, listItem = false }: { server: ServerSummary
     <ItemMedia><StatusIcon tone={server.enabled ? phaseTone[server.connection] : "neutral"} className="size-3.5" /></ItemMedia>
     <ItemContent className="min-w-0 gap-0">
       <ItemTitle className="w-full min-w-0">
-        <span className="min-w-0 truncate" title={server.name}>{server.name}</span>
+        <TooltipHint content={server.name}><span className="min-w-0 truncate">{server.name}</span></TooltipHint>
         <span className="sr-only">{server.enabled ? i18n.formatMessage(messages.state, { state: server.connection }) : i18n.text(messages.disabled)}</span>
       </ItemTitle>
-      {server.error && <ItemDescription className="type-caption line-clamp-1 break-all text-destructive" title={server.error}>{server.error}</ItemDescription>}
+      {server.error && <TooltipHint content={server.error}><ItemDescription className="type-caption line-clamp-1 break-all text-destructive">{server.error}</ItemDescription></TooltipHint>}
     </ItemContent>
     <span className="type-caption shrink-0 tabular-nums text-muted-foreground">
       {server.indexed ? i18n.formatMessage(messages.tools, { count: server.toolCount }) : i18n.text(messages.unindexed)}
@@ -58,9 +59,9 @@ export interface ToolEntryData { name: string; title?: string; description?: str
 
 export function ToolEntry({ name, title, description, server }: ToolEntryData) {
   return <div className="flex min-w-0 flex-col gap-0.5">
-    <span className="type-code truncate text-xs" title={name} translate="no">{title ? `${title} · ${name}` : name}</span>
+    <TooltipHint content={name}><span className="type-code truncate text-xs" translate="no">{title ? `${title} · ${name}` : name}</span></TooltipHint>
     {server && <span className="type-caption text-muted-foreground" translate="no">{server}</span>}
-    {description && <span className="type-caption line-clamp-2 text-muted-foreground select-text" title={description}>{description}</span>}
+    {description && <TooltipHint content={description}><span className="type-caption line-clamp-2 text-muted-foreground select-text">{description}</span></TooltipHint>}
   </div>;
 }
 const toolKey = (tool: ToolEntryData, index: number) => `${tool.server ?? ""}/${tool.name}/${index}`;
@@ -74,7 +75,7 @@ export function Instructions({ text }: { text: string }) {
   const i18n = useI18n();
   return <div className="flex flex-col gap-0.5">
     <p className="type-label">{i18n.text(messages.instructions)}</p>
-    <p className="type-caption line-clamp-3 whitespace-pre-wrap text-muted-foreground select-text" title={text}>{text}</p>
+    <TooltipHint content={text}><p className="type-caption line-clamp-3 whitespace-pre-wrap text-muted-foreground select-text">{text}</p></TooltipHint>
   </div>;
 }
 

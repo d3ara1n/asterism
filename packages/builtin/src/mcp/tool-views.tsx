@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import { z } from "zod";
 import { FileSearch, ListTree, Plug, Search, Zap } from "lucide-react";
@@ -62,7 +63,7 @@ function ToolTargetHeader({ label, tool, meta }: { label: string; tool: string |
   const server = tool && split > 0 ? tool.slice(0, split) : undefined;
   const name = tool && split > 0 ? tool.slice(split + 1) : tool;
   return <ToolHeader label={label} subject={server && <span className="font-mono">{server}</span>}
-    summary={name && <span className="font-mono" title={tool}>{name}</span>} meta={meta} />;
+    summary={name && <TooltipHint content={tool}><span className="font-mono">{name}</span></TooltipHint>} meta={meta} />;
 }
 
 function ListHeader(props: ToolRenderProps) {
@@ -155,7 +156,7 @@ function InspectBody({ result }: ToolRenderProps) {
               {type && <span className="text-muted-foreground">{type}</span>}
               {required.includes(name) && <span className="text-muted-foreground">*</span>}
             </span>
-            {param.description && <span className="type-caption line-clamp-2 text-muted-foreground" title={param.description}>{param.description}</span>}
+            {param.description && <TooltipHint content={param.description}><span className="type-caption line-clamp-2 text-muted-foreground">{param.description}</span></TooltipHint>}
           </li>;
         })}
       </ul></ToolScrollArea> : <Empty text={messages.noParameters} />}

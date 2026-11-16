@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useI18n, useRendererTools } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Marker, MarkerContent, MarkerIcon } from "@asterism-app/ui/ui/marker";
@@ -64,9 +65,9 @@ export function ConversationProcess({ node, onToggle, onMount }: {
           {groups.slice(0, visibleTools).map(group => {
             const icon = tools.icon(group.node.name, implementation(group.node));
             const label = tools.label(group.node.name, implementation(group.node)) ?? group.node.name;
-            return <span key={group.key} title={label} className="inline-flex shrink-0 items-center gap-0.5 tabular-nums [&_svg]:size-3.5">
+            return <TooltipHint key={group.key} content={label}><span className="inline-flex shrink-0 items-center gap-0.5 tabular-nums [&_svg]:size-3.5">
               {icon ?? <Wrench />}{group.count > 1 && group.count}
-            </span>;
+            </span></TooltipHint>;
           })}
           {groups.length > visibleTools && <span className="shrink-0 tabular-nums">+{groups.length - visibleTools}</span>}
         </span>

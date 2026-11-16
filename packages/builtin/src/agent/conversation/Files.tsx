@@ -1,10 +1,11 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useRef, useSyncExternalStore, type ClipboardEvent, type DragEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion, type MotionProps } from "motion/react";
 import { useI18n, type ContentReader } from "@asterism-app/sdk/renderer";
 import { type ModelFilePart, previewsAsImage } from "@asterism-app/sdk/contracts";
 import { inputFileName, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { File as FileIcon, Image as ImageIcon, Paperclip, X } from "lucide-react";
-import { Button } from "@asterism-app/ui/ui/button";
 import { Attachment, AttachmentGroup, AttachmentContent, AttachmentTitle, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@asterism-app/ui/ui/attachment";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism-app/ui/ui/tooltip";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
@@ -46,31 +47,31 @@ function DraftFile({ file, content, disabled, onRemove }: {
   const mediaType = part ? (part.kind === "file" ? part.mediaType : null) : pending!.mediaType;
   const Icon = mediaType && previewsAsImage(mediaType) ? ImageIcon : FileIcon;
   const action = i18n.text(pending ? mediaMessages.cancel : mediaMessages.remove);
-  return <Tooltip delayDuration={400}>
-    <Attachment size="xs" state={pending ? "uploading" : "done"}
-      className={cn("h-6 min-w-0 max-w-48 flex-nowrap has-data-[slot=attachment-content]:py-0", pending && "overflow-hidden")}>
-      {/* Staging reports no progress, so the sheen marks activity rather than a fraction. */}
-      <AnimatePresence initial={false}>
-        {pending && !reducedMotion && <motion.span key="sheen" aria-hidden className="pointer-events-none absolute inset-0"
-          style={{ backgroundImage: "linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--foreground) 10%, transparent) 50%, transparent 100%)", backgroundSize: "200% 100%" }}
-          initial={{ opacity: 0 }} animate={{ opacity: 1, backgroundPosition: ["150% 0%", "-50% 0%"] }} exit={{ opacity: 0 }}
-          transition={{ opacity: { duration: 0.2 }, backgroundPosition: { duration: 1.4, ease: "linear", repeat: Infinity } }} />}
-      </AnimatePresence>
-      <Icon className={cn("size-3.5 shrink-0 transition-opacity duration-200", pending && "opacity-50")} />
-      <AttachmentContent className={cn("transition-opacity duration-200", pending && "opacity-50")}>
-        <AttachmentTitle className="flex">
-          <span className="truncate">{extension ? name.slice(0, dot) : name}</span>
-          {extension && <span className="max-w-16 shrink-0 truncate">{extension}</span>}
-        </AttachmentTitle>
-      </AttachmentContent>
+  return <Attachment size="xs" state={pending ? "uploading" : "done"}
+    className={cn("h-6 min-w-0 max-w-48 flex-nowrap has-data-[slot=attachment-content]:py-0", pending && "overflow-hidden")}>
+    {/* Staging reports no progress, so the sheen marks activity rather than a fraction. */}
+    <AnimatePresence initial={false}>
+      {pending && !reducedMotion && <motion.span key="sheen" aria-hidden className="pointer-events-none absolute inset-0"
+        style={{ backgroundImage: "linear-gradient(90deg, transparent 0%, color-mix(in oklab, var(--foreground) 10%, transparent) 50%, transparent 100%)", backgroundSize: "200% 100%" }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1, backgroundPosition: ["150% 0%", "-50% 0%"] }} exit={{ opacity: 0 }}
+        transition={{ opacity: { duration: 0.2 }, backgroundPosition: { duration: 1.4, ease: "linear", repeat: Infinity } }} />}
+    </AnimatePresence>
+    <Icon className={cn("size-3.5 shrink-0 transition-opacity duration-200", pending && "opacity-50")} />
+    <AttachmentContent className={cn("transition-opacity duration-200", pending && "opacity-50")}>
+      <AttachmentTitle className="flex">
+        <span className="truncate">{extension ? name.slice(0, dot) : name}</span>
+        {extension && <span className="max-w-16 shrink-0 truncate">{extension}</span>}
+      </AttachmentTitle>
+    </AttachmentContent>
+    <Tooltip delayDuration={400}>
       <TooltipTrigger asChild><AttachmentTrigger aria-label={pending ? `${name}, ${i18n.text(mediaMessages.uploading)}` : name} /></TooltipTrigger>
-      <AttachmentActions><AttachmentAction type="button" className="size-5" disabled={disabled} onClick={onRemove}
-        aria-label={`${action}: ${name}`} title={action}><X /></AttachmentAction></AttachmentActions>
-    </Attachment>
-    <TooltipContent side="top" sideOffset={8} aria-label={name} className="max-h-(--radix-tooltip-content-available-height) max-w-[min(18rem,var(--radix-tooltip-content-available-width))] overflow-y-auto">
-      {part?.kind === "file" ? <DraftFileDetails part={part} content={content} /> : <p>{name}</p>}
-    </TooltipContent>
-  </Tooltip>;
+      <TooltipContent side="top" sideOffset={8} aria-label={name} className="max-h-(--radix-tooltip-content-available-height) max-w-[min(18rem,var(--radix-tooltip-content-available-width))] overflow-y-auto">
+        {part?.kind === "file" ? <DraftFileDetails part={part} content={content} /> : <p>{name}</p>}
+      </TooltipContent>
+    </Tooltip>
+    <AttachmentActions><TooltipHint content={action}><AttachmentAction type="button" className="size-5" disabled={disabled} onClick={onRemove}
+      aria-label={`${action}: ${name}`}><X /></AttachmentAction></TooltipHint></AttachmentActions>
+  </Attachment>;
 }
 
 /** Single additions grow into the row and removals fold out of it; clipping applies only while the width moves, so focus rings stay visible at rest. */
@@ -127,8 +128,8 @@ export function AttachFiles({ draft, disabled }: { draft: MessageDraft; disabled
   return <div className="flex shrink-0 items-center gap-1">
     <input ref={input} type="file" multiple className="hidden" disabled={disabled || state.uploading}
       onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void draft.add(files); }} />
-    <Button type="button" variant="ghost" size="icon-sm" disabled={disabled || state.uploading} onClick={() => input.current?.click()}
-      aria-label={i18n.text(mediaMessages.attach)} title={i18n.text(mediaMessages.attach)}><Paperclip /></Button>
+    <IconButton type="button" variant="ghost" size="icon-sm" disabled={disabled || state.uploading} onClick={() => input.current?.click()}
+      label={i18n.text(mediaMessages.attach)}><Paperclip /></IconButton>
   </div>;
 }
 /** Files are accepted by the conversation entry point, preventing propagation to workbench creation routing; plain-text paste retains input behavior. */

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { z } from "zod";
 import { BookOpen, FileText, RefreshCw } from "lucide-react";
 import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
@@ -18,10 +19,10 @@ function SkillReadHeader({ args, result }: ReadProps) {
   const path = result?.data?.path ?? inputText(args, "path") ?? "SKILL.md";
   const offset = inputField(args, "offset"), limit = inputField(args, "limit");
   return <ToolHeader label={i18n.text(skillsMessages.read)}
-    subject={name && <span className="inline-flex max-w-full items-center gap-1 align-middle" title={name}>
+    subject={name && <TooltipHint content={name}><span className="inline-flex max-w-full items-center gap-1 align-middle">
       <BookOpen className="size-3 shrink-0" aria-hidden="true" /><span className="truncate">{name}</span>
-    </span>}
-    summary={<span className="font-mono" title={path}>{path}</span>}
+    </span></TooltipHint>}
+    summary={<TooltipHint content={path}><span className="font-mono">{path}</span></TooltipHint>}
     meta={`offset ${typeof offset === "number" ? offset : 1} · limit ${typeof limit === "number" ? limit : 1000}`} />;
 }
 function SkillReadBody({ result }: ReadProps) {

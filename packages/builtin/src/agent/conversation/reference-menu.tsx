@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import type { VirtualizerHandle } from "virtua";
 import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
@@ -87,9 +88,9 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
     // Clicking the menu must not blur the editor, which would dismiss the suggestion.
     onMouseDown={event => event.preventDefault()}>
     {view.level === "category" && <div className="flex h-8 items-center gap-1 border-b px-1">
-      <button type="button" tabIndex={-1} aria-label={i18n.text(commonMessages.back)} title={i18n.text(commonMessages.back)}
+      <TooltipHint content={i18n.text(commonMessages.back)}><button type="button" tabIndex={-1} aria-label={i18n.text(commonMessages.back)}
         className="inline-flex size-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-        onClick={() => setView({ level: "root" })}><ChevronLeft className="size-4" /></button>
+        onClick={() => setView({ level: "root" })}><ChevronLeft className="size-4" /></button></TooltipHint>
       <BookOpen className="size-3.5 text-folder-violet" />
       <span className="type-label">{skillLabel}</span>
       {skills && <span className="type-caption ml-auto px-2 tabular-nums">{skills.length}</span>}
@@ -116,11 +117,11 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
                 <span className="type-caption tabular-nums">{row.count}</span>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
               </>
-              // The row stays one fixed height; the full description is a native tooltip.
-              : <span className="flex min-w-0 flex-1 flex-col" title={row.skill.description}>
+              // The row stays one fixed height; the tooltip exposes the full description.
+              : <TooltipHint content={row.skill.description}><span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate font-medium leading-tight" translate="no">{row.skill.name}</span>
                 <span className="type-caption truncate leading-tight">{row.skill.description}</span>
-              </span>}
+              </span></TooltipHint>}
           </div>}
         </VirtualList></div>}
   </div>;

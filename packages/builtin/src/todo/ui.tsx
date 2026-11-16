@@ -1,3 +1,5 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism-app/ui/ui/tooltip";
 import { useRef, useState, type ReactElement, type ReactNode } from "react";
 import type { z } from "zod";
 import { MoreHorizontal } from "lucide-react";
@@ -35,12 +37,12 @@ export function formatMoment(i18n: I18n, value: string): string {
 
 /** Task states are stored facts, not live work, so in-progress uses the still progress shape. */
 const tones = { pending: "neutral", in_progress: "progress", done: "success" } as const satisfies Record<Todo["status"], StatusTone>;
-export function TodoStatusIcon({ status }: { status: Todo["status"] }) {
+export function TodoStatusIcon({ status, tooltip = true }: { status: Todo["status"]; tooltip?: boolean }) {
   const label = useI18n().text(messages[status]);
-  return <span className="inline-flex shrink-0" title={label}>
+  return <TooltipHint content={tooltip ? label : undefined}><span className="inline-flex shrink-0">
     <StatusIcon tone={tones[status]} still className="size-3.5" />
     <span className="sr-only">{label}</span>
-  </span>;
+  </span></TooltipHint>;
 }
 export function TodoStatusBadge({ status }: { status: Todo["status"] }) {
   return <Badge variant="outline" className="font-normal">
@@ -85,11 +87,12 @@ export function MenuConfirm({ label, items, open, onOpenChange, disabled = false
 }) {
   const keepFocus = useRef(false);
   const handOff = () => { keepFocus.current = true; };
-  const trigger = <PopoverAnchor asChild>
-    <ActionMenuTrigger asChild>
-      <Button size="icon-xs" variant="ghost" disabled={disabled} aria-label={label} title={label}><MoreHorizontal /></Button>
-    </ActionMenuTrigger>
-  </PopoverAnchor>;
+  const trigger = <Tooltip>
+    <PopoverAnchor asChild><ActionMenuTrigger asChild><TooltipTrigger asChild>
+      <Button size="icon-xs" variant="ghost" disabled={disabled} aria-label={label}><MoreHorizontal /></Button>
+    </TooltipTrigger></ActionMenuTrigger></PopoverAnchor>
+    <TooltipContent>{label}</TooltipContent>
+  </Tooltip>;
   return <Popover open={open} onOpenChange={onOpenChange}>
     <ActionMenu>
       <ActionMenuTarget asChild disabled={disabled} blankOnly={blankOnly}>{children(trigger)}</ActionMenuTarget>

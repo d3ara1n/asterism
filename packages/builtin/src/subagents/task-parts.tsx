@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useState } from "react";
 import { CircleDashed, CircleDot, CircleSlash, type LucideIcon } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
@@ -26,10 +27,10 @@ export function TaskStateText({ status }: { status: TaskSnapshot["status"] }) {
 /** The same still status as an icon alone, for one column of a task list; the state name is the tooltip and accessible text. */
 export function TaskStateIcon({ status }: { status: TaskSnapshot["status"] }) {
   const state = stateOf(status), label = useI18n().formatMessage(messages.state, { state });
-  return <span className="inline-flex shrink-0" title={label}>
+  return <TooltipHint content={label}><span className="inline-flex shrink-0">
     <StatusIcon tone={stateTones[state]} icon={stateIcons[state]} still className="size-3.5" />
     <span className="sr-only">{label}</span>
-  </span>;
+  </span></TooltipHint>;
 }
 
 /** Elapsed time keeps counting between published updates while the task runs. */

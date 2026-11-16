@@ -1,3 +1,4 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { Monitor, Sun, Moon, FileText, Bot, Palette } from "lucide-react";
 import { useState, type CSSProperties } from "react";
 import { getBezierPath, getSmoothStepPath, Position } from "@xyflow/react";
@@ -150,9 +151,9 @@ export function AppearanceSettings() {
           <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.cornerRadiusLabel)} value={appearance.radius}
             onValueChange={radius => radius && void save({ radius: radius as Appearance["radius"] })}>
             {([["none", i18n.formatMessage(appearanceMessages.square)], ["sm", i18n.formatMessage(appearanceMessages.small)], ["md", i18n.formatMessage(appearanceMessages.medium)], ["lg", i18n.formatMessage(appearanceMessages.large)]] as const).map(([v, text]) =>
-              <ToggleGroupItem key={v} value={v} aria-label={text} title={text} className="px-2.5">
+              <Tooltip key={v}><ToggleGroupItem asChild value={v} aria-label={text} className="px-2.5"><TooltipTrigger>
                 <span aria-hidden="true" className="size-3.5 border-t-2 border-l-2 border-current" style={{ borderTopLeftRadius: radiusCorner[v] }} />
-              </ToggleGroupItem>)}
+              </TooltipTrigger></ToggleGroupItem><TooltipContent>{text}</TooltipContent></Tooltip>)}
           </ToggleGroup>
         </Row>
         <ItemSeparator />

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useState } from "react";
 import type { z } from "zod";
 import { CircleCheck, Ellipsis, Waypoints, Wrench } from "lucide-react";
@@ -77,9 +78,9 @@ function GroupRow({ group, now }: { group: ScriptCallGroup; now: number }) {
   return <li className="space-y-1">
     <div className="flex min-w-0 items-center gap-2 type-caption">
       <span className="inline-flex shrink-0 [&_svg]:size-3.5" aria-hidden="true">{icon}</span>
-      <span className="min-w-0 flex-1 truncate" title={[name, call.resource?.title].filter(Boolean).join(" · ")}>
+      <TooltipHint content={[name, call.resource?.title].filter(Boolean).join(" · ")}><span className="min-w-0 flex-1 truncate">
         {name}{call.resource?.title && <span className="text-muted-foreground"> · {call.resource.title}</span>}
-      </span>
+      </span></TooltipHint>
       {group.count > 1 && <span className="shrink-0 tabular-nums text-muted-foreground">×{group.count}</span>}
       {failed > 0 && failed < group.count && <span className="shrink-0 text-destructive">
         {i18n.formatMessage(messages.toolScriptFailedCount, { count: failed })}

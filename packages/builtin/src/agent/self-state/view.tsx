@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import { Bot, Coins, Cpu, Gauge, Timer } from "lucide-react";
@@ -54,11 +55,11 @@ function Identity({ state }: { state: State }) {
   const levels = model ? availableThinkingLevels(model) : [];
   return <Panel icon={<Bot aria-hidden="true" />} title={i18n.text(messages.identity)}>
     <div className="min-w-0 space-y-0.5">
-      <p className="truncate type-section" title={state.role}>{state.role}</p>
-      <p className="flex min-w-0 items-center gap-1.5 text-sm" title={state.model}>
+      <TooltipHint content={state.role}><p className="truncate type-section">{state.role}</p></TooltipHint>
+      <TooltipHint content={state.model}><p className="flex min-w-0 items-center gap-1.5 text-sm">
         <Cpu aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
         <span className="truncate">{model?.name ?? expression?.model ?? state.model}</span>
-      </p>
+      </p></TooltipHint>
       {expression && <p className="truncate type-caption">{names.provider(expression.provider)}</p>}
     </div>
     <div className="mt-auto flex items-center justify-between gap-2 type-caption">
@@ -96,7 +97,7 @@ function BalanceRow({ item }: { item: NonNullable<State["balance"]>[number] }) {
   return <li className="min-w-0 space-y-0.5">
     <p className="flex items-center gap-1.5 type-caption">
       <span aria-hidden="true" className={cn("size-1.5 shrink-0 rounded-full", usageLevelTones[level].dot)} />
-      <span className="truncate" title={item.name}>{item.name}</span>
+      <TooltipHint content={item.name}><span className="truncate">{item.name}</span></TooltipHint>
     </p>
     <p className={cn("type-page tabular-nums", level !== "available" && usageLevelTones[level].text)}>
       {formatUsageAmount(i18n, item.remaining, unit)}
@@ -114,7 +115,7 @@ function QuotaRow({ item }: { item: NonNullable<State["quota"]>[number] }) {
   const share = i18n.formatNumber(item.remaining, { style: "percent", maximumFractionDigits: 0 });
   return <li className="min-w-0 space-y-1">
     <div className="flex items-baseline justify-between gap-3 type-caption">
-      <span className="truncate" title={label}>{label}</span>
+      <TooltipHint content={label}><span className="truncate">{label}</span></TooltipHint>
       <span className={cn("shrink-0 tabular-nums", level === "available" ? "text-foreground" : tone.text)}>
         {i18n.formatMessage(usageMessages.remaining, { value: share })}
       </span>

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useId, useRef, type FormEvent, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Maximize2, MessageSquarePlus, Pencil, Send } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
@@ -73,13 +74,12 @@ export function QuestionForm({ questions, draft, update, answer, cancel, busy, f
         <AgentScrollArea axis="horizontal"><nav className="flex gap-1" aria-label={i18n.text(messages.navigation)}>
           {questions.map((item, index) => {
             const status = submission.answers[index]?.status === "skipped" ? "skipped" : answerIssue(item, submission.answers[index]) ? "pending" : "answered";
-            return <Button key={item.id} type="button" size="xs" variant={index === draft.page ? "selected" : "ghost"}
-              className="max-w-40 shrink-0" aria-current={index === draft.page ? "step" : undefined} onClick={() => navigate(index)}
-              title={`${item.question} · ${i18n.text(messages[status])}`}>
+            return <TooltipHint key={item.id} content={`${item.question} · ${i18n.text(messages[status])}`}><Button type="button" size="xs" variant={index === draft.page ? "selected" : "ghost"}
+              className="max-w-40 shrink-0" aria-current={index === draft.page ? "step" : undefined} onClick={() => navigate(index)}>
               <StatusText tone={status === "answered" ? "success" : "neutral"}><span className="sr-only">{i18n.text(messages[status])} · </span>
                 <span className="block truncate">{index + 1}. {item.label ?? item.question}</span>
               </StatusText>
-            </Button>;
+            </Button></TooltipHint>;
           })}
           <Button type="button" size="xs" variant={review ? "selected" : "ghost"} aria-current={review ? "step" : undefined}
             onClick={() => navigate(questions.length)}>{i18n.text(messages.review)}</Button>
@@ -105,9 +105,9 @@ export function QuestionForm({ questions, draft, update, answer, cancel, busy, f
             </Button>}
             {!review ? <Button type="button" size="sm" onClick={() => navigate(draft.page + 1)}>
               {i18n.text(draft.page === questions.length - 1 ? messages.review : messages.next)}<ArrowRight />
-            </Button> : <Button type="button" size="sm" title="⌘ / Ctrl + Enter" onClick={() => submit()}>
+            </Button> : <TooltipHint content="⌘ / Ctrl + Enter"><Button type="button" size="sm" onClick={() => submit()}>
               {busy ? <Spinner /> : <Send />}{i18n.text(messages.answer)}
-            </Button>}
+            </Button></TooltipHint>}
           </div>
         </div>
       </fieldset>

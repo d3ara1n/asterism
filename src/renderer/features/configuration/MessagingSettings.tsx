@@ -1,3 +1,4 @@
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useId, useState } from "react";
 import { Plus, MessageSquare, RotateCcw } from "lucide-react";
 import type { MessagingConnectionStatus } from "@asterism-app/sdk/contracts";
@@ -55,11 +56,11 @@ export function MessagingSettings() {
           selected={island.has(messagingIslandKey(connection.id))} onOpen={origin => open(connection.id, origin)}
           actions={<>
             <StatusBadge tone={statusTone[status]}>{i18n.text(messages[status])}</StatusBadge>
-            {restartable.has(status) && <Button variant="ghost" size="icon-sm" disabled={action.busy}
-              aria-label={i18n.text(messages.restart)} title={i18n.text(messages.restart)}
+            {restartable.has(status) && <IconButton variant="ghost" size="icon-sm" disabled={action.busy}
+              label={i18n.text(messages.restart)}
               onClick={() => void action.run({ type: "messaging.restart", id: connection.id })}>
               <RotateCcw />
-            </Button>}
+            </IconButton>}
           </>} />
       </div>;
     })}</ItemGroup>}

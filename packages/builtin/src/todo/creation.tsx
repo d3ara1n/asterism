@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useId, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { useI18n, useRendererCalls, type CreationInputProps } from "@asterism-app/sdk/renderer";
@@ -65,7 +66,7 @@ export function TodoListInput({ initialInput, busy, resolve, cancel }: CreationI
             onDoubleClick={() => { setChoice(list.id); queueMicrotask(() => form.current?.requestSubmit()); }}
             className={cn("flex min-w-0 cursor-pointer items-center gap-3 rounded-sm px-2 py-2 font-normal hover:bg-accent/60", choice === list.id && "bg-accent")}>
             <RadioGroupItem id={option(list.id)} value={list.id} />
-            <span className="min-w-0 flex-1 truncate" title={list.title}>{list.title}</span>
+            <TooltipHint content={list.title}><span className="min-w-0 flex-1 truncate">{list.title}</span></TooltipHint>
             <span className="type-caption shrink-0 tabular-nums">
               {i18n.formatMessage(messages.listCounts, { open: list.counts.pending + list.counts.in_progress, done: list.counts.done })}
             </span>

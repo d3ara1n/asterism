@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
@@ -40,7 +41,7 @@ export function ConfigurationOptions({ label, options, selected, initialActive =
           disabled={disabled} onSelect={() => onSelect(option.value)}>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="wrap-anywhere">{option.label}</span>
-            {option.description && <span className="type-caption line-clamp-2 wrap-anywhere text-muted-foreground" title={option.description}>{option.description}</span>}
+            {option.description && <TooltipHint content={option.description}><span className="type-caption line-clamp-2 wrap-anywhere text-muted-foreground">{option.description}</span></TooltipHint>}
           </span>
           {option.navigation ? <ChevronRight aria-hidden="true" className="ml-auto" />
             : <Check aria-hidden="true" className={cn("ml-auto", selected !== option.value && "invisible")} />}

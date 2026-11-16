@@ -3,6 +3,7 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import { useReducedMotion } from "./reduced-motion";
 import { memo, useContext, useEffect, useId, useMemo, useState } from "react";
 
+import { TooltipHint } from "../tooltip-hint";
 import { externalWebUrl } from "../links";
 import { markdownMessages } from "../messages/markdown";
 import { MarkdownCode, MarkdownStreamingContext } from "./code";
@@ -69,10 +70,10 @@ function MarkdownImage({ src, alt, title }: { src: string; alt: string; title?: 
   const i18n = useI18n();
   const [failed, setFailed] = useState(false);
   const documentMode = useContext(MarkdownDocumentContext);
-  return <a href={src} target="_blank" rel="noopener noreferrer" aria-label={alt || i18n.text(markdownMessages.markdownImage)}>
+  return <TooltipHint content={title}><a href={src} target="_blank" rel="noopener noreferrer" aria-label={alt || i18n.text(markdownMessages.markdownImage)}>
     {failed
       ? <span>{i18n.text(markdownMessages.markdownImageFailed)}{alt ? ` · ${alt}` : ""}</span>
-      : <img src={src} alt={alt} title={title} loading={documentMode ? "eager" : "lazy"} decoding="async" referrerPolicy="no-referrer"
+      : <img src={src} alt={alt} loading={documentMode ? "eager" : "lazy"} decoding="async" referrerPolicy="no-referrer"
         className="my-2 block h-auto max-w-full rounded-md" onError={() => setFailed(true)} />}
-  </a>;
+  </a></TooltipHint>;
 }

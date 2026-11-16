@@ -241,7 +241,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       setSettingsTarget({ category: "about", sequence: ++navigation.current });
     }} />
     <span className="h-4 w-px shrink-0 bg-border" />
-    <span className={completed && !inSettings ? "window-session-title line-through" : "window-session-title"} title={inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}>{inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}</span>
+    <span className={completed && !inSettings ? "window-session-title line-through" : "window-session-title"}>{inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}</span>
   </>;
   const actions = session ? <>
     <DropdownMenu modal={false}><DropdownMenuTrigger asChild>

@@ -1,8 +1,8 @@
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useEffect, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, MoveHorizontal, ZoomIn, ZoomOut } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { Button } from "@asterism-app/ui/ui/button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import cMapUrl from "pdfjs-dist/cmaps/?url";
@@ -61,22 +61,22 @@ export default function PdfPreview({ openFile }: { openFile(): AsyncIterable<Uin
   return <div className="flex min-h-0 min-w-0 flex-col gap-2">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon-sm" aria-label={i18n.text(messages.pdfPreviousPage)} title={i18n.text(messages.pdfPreviousPage)}
-          disabled={!pages || page <= 1} onClick={() => changePage(page - 1)}><ChevronLeft /></Button>
+        <IconButton variant="ghost" size="icon-sm" label={i18n.text(messages.pdfPreviousPage)}
+          disabled={!pages || page <= 1} onClick={() => changePage(page - 1)}><ChevronLeft /></IconButton>
         <span className="min-w-20 text-center text-sm tabular-nums" aria-live="polite">
           {pages ? i18n.formatMessage(messages.pdfPages, { page, pages }) : "—"}
         </span>
-        <Button variant="ghost" size="icon-sm" aria-label={i18n.text(messages.pdfNextPage)} title={i18n.text(messages.pdfNextPage)}
-          disabled={!pages || page >= pages} onClick={() => changePage(page + 1)}><ChevronRight /></Button>
+        <IconButton variant="ghost" size="icon-sm" label={i18n.text(messages.pdfNextPage)}
+          disabled={!pages || page >= pages} onClick={() => changePage(page + 1)}><ChevronRight /></IconButton>
       </div>
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon-sm" aria-label={i18n.text(messages.pdfZoomOut)} title={i18n.text(messages.pdfZoomOut)}
-          disabled={!naturalWidth || scale <= 0.25} onClick={() => setZoom(Math.max(0.25, Math.min(4, scale - 0.25)))}><ZoomOut /></Button>
+        <IconButton variant="ghost" size="icon-sm" label={i18n.text(messages.pdfZoomOut)}
+          disabled={!naturalWidth || scale <= 0.25} onClick={() => setZoom(Math.max(0.25, Math.min(4, scale - 0.25)))}><ZoomOut /></IconButton>
         <span className="min-w-14 text-center text-sm tabular-nums">{naturalWidth ? i18n.formatNumber(scale, { style: "percent", maximumFractionDigits: 0 }) : "—"}</span>
-        <Button variant="ghost" size="icon-sm" aria-label={i18n.text(messages.pdfZoomIn)} title={i18n.text(messages.pdfZoomIn)}
-          disabled={!naturalWidth || scale >= 4} onClick={() => setZoom(Math.min(4, Math.max(0.25, scale + 0.25)))}><ZoomIn /></Button>
-        <Button variant="ghost" size="icon-sm" aria-label={i18n.text(messages.pdfFitWidth)} title={i18n.text(messages.pdfFitWidth)}
-          disabled={!naturalWidth} onClick={() => setZoom(null)}><MoveHorizontal /></Button>
+        <IconButton variant="ghost" size="icon-sm" label={i18n.text(messages.pdfZoomIn)}
+          disabled={!naturalWidth || scale >= 4} onClick={() => setZoom(Math.min(4, Math.max(0.25, scale + 0.25)))}><ZoomIn /></IconButton>
+        <IconButton variant="ghost" size="icon-sm" label={i18n.text(messages.pdfFitWidth)}
+          disabled={!naturalWidth} onClick={() => setZoom(null)}><MoveHorizontal /></IconButton>
       </div>
     </div>
     <div ref={viewport} className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain rounded-md border bg-muted">

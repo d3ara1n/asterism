@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { TerminalSquare } from "lucide-react";
 import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
@@ -30,10 +31,10 @@ function Body({ result }: Props) {
     <ItemContent className="min-w-0">
       <ItemTitle className="flex-wrap">
         {profile.id}
-        {profile.available ? <span className="inline-flex shrink-0" title={i18n.text(messages.installed)}>
+        {profile.available ? <TooltipHint content={i18n.text(messages.installed)}><span className="inline-flex shrink-0">
           <StatusIcon tone="success" still className="size-3.5" />
           <span className="sr-only">{i18n.text(messages.installed)}</span>
-        </span> : <span className="sr-only">{i18n.text(messages.notInstalled)}</span>}
+        </span></TooltipHint> : <span className="sr-only">{i18n.text(messages.notInstalled)}</span>}
         {profile.id === data.resolvedProfile && <span className="type-caption font-normal text-muted-foreground">{i18n.text(messages.isDefault)}</span>}
       </ItemTitle>
       <ItemDescription className="line-clamp-none break-all font-mono">

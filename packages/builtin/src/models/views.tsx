@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useState, type ReactNode } from "react";
 import type { z } from "zod";
 import { motion } from "motion/react";
@@ -46,15 +47,15 @@ function ListBody({ result }: ListProps) {
     <ToolScrollArea className="max-h-80"><div className="grid grid-cols-1 items-start gap-2 @min-[36rem]/models:grid-cols-2">
       {groups.map(group => <section key={group.provider} className="min-w-0 rounded-md border">
         <header className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-1.5">
-          <h4 className="min-w-0 truncate type-label text-foreground" title={group.provider}>{names.provider(group.provider)}</h4>
+          <TooltipHint content={group.provider}><h4 className="min-w-0 truncate type-label text-foreground">{names.provider(group.provider)}</h4></TooltipHint>
           <Badge variant="secondary" className="py-0 font-normal tabular-nums">{group.models.length}</Badge>
         </header>
         <ul className="divide-y">{group.models.map(entry => {
           const name = names.model(entry.expression);
-          return <li key={entry.expression} className="min-w-0 px-3 py-1.5" title={entry.expression}>
+          return <TooltipHint key={entry.expression} content={entry.expression}><li className="min-w-0 px-3 py-1.5">
             <p className="truncate text-sm">{name ?? entry.model}</p>
             {name && <p className="truncate type-caption type-code">{entry.model}</p>}
-          </li>;
+          </li></TooltipHint>;
         })}</ul>
       </section>)}
     </div></ToolScrollArea>
@@ -90,12 +91,12 @@ function GetHeader({ args, result }: GetProps) {
 function Capability({ icon, label, supported }: { icon: ReactNode; label: string; supported: boolean }) {
   const i18n = useI18n();
   const state = i18n.text(supported ? configurationMessages.supported : configurationMessages.unsupported);
-  return <span title={state} className={cn("inline-flex items-center gap-1.5 rounded-md border px-2 py-1 type-caption [&_svg]:size-3.5 [&_svg]:shrink-0",
+  return <TooltipHint content={state}><span className={cn("inline-flex items-center gap-1.5 rounded-md border px-2 py-1 type-caption [&_svg]:size-3.5 [&_svg]:shrink-0",
     supported ? "text-foreground" : "border-dashed text-muted-foreground/70")}>
     {icon}<span>{label}</span>
     {supported ? <Check aria-hidden="true" className="text-success" /> : <Minus aria-hidden="true" />}
     <span className="sr-only">{state}</span>
-  </span>;
+  </span></TooltipHint>;
 }
 
 function Bar({ share, className }: { share: number | null; className: string }) {
@@ -107,7 +108,7 @@ function Bar({ share, className }: { share: number | null; className: string }) 
 
 function Row({ label, value, children }: { label: string; value: string; children: ReactNode }) {
   return <li className="grid grid-cols-[minmax(4.5rem,auto)_minmax(0,1fr)_auto] items-center gap-3 type-caption">
-    <span className="truncate" title={label}>{label}</span>{children}
+    <TooltipHint content={label}><span className="truncate">{label}</span></TooltipHint>{children}
     <span className="text-right tabular-nums text-foreground">{value}</span>
   </li>;
 }

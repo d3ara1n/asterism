@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Virtualizer, type VirtualizerHandle } from "virtua";
 import { Pencil, Plus } from "lucide-react";
@@ -77,7 +78,7 @@ export function MeshCard({ data }: { data: MeshCardData }) {
                     else radios.current.delete(channel.id);
                   }} />
                 <FieldLabel htmlFor={`${prefix}-${channel.id}`} className="min-w-0 flex-1 flex-col items-start gap-0.5 py-1">
-                  <span className="max-w-full truncate" title={channel.title}>{channel.title}</span>
+                  <TooltipHint content={channel.title}><span className="max-w-full truncate">{channel.title}</span></TooltipHint>
                   <span className="type-caption">{i18n.formatMessage(messages.agents, { count: channel.agents })}</span>
                 </FieldLabel>
                 <IconButton size="icon-xs" disabled={disabled} label={i18n.text(messages.rename)}

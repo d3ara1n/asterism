@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { Fragment } from "react";
 import type { z } from "zod";
 import { Bell, BellOff, Eye, Hash, List, MessageSquare, Paperclip, Send } from "lucide-react";
@@ -66,12 +67,12 @@ function ConnectionLine({ connection }: { connection: MessagingConnectionInfo })
   return <li className="flex min-w-0 flex-col py-0.5">
     <div className="flex min-w-0 items-center gap-2">
       <StatusIcon tone={statusTone[connection.status]} className="size-3.5 shrink-0" />
-      <span className={cn("min-w-0 truncate", !connection.enabled && "text-muted-foreground")} title={`${connection.name} · ${connection.id}`}>
-        {connection.name}</span>
-      {connection.identity && <span className="min-w-0 truncate type-caption" title={connection.identity}>{connection.identity}</span>}
+      <TooltipHint content={`${connection.name} · ${connection.id}`}><span className={cn("min-w-0 truncate", !connection.enabled && "text-muted-foreground")}>
+        {connection.name}</span></TooltipHint>
+      {connection.identity && <TooltipHint content={connection.identity}><span className="min-w-0 truncate type-caption">{connection.identity}</span></TooltipHint>}
       <span className={connected ? "sr-only" : "ml-auto shrink-0 type-caption"}>{i18n.text(statusLabel[connection.status])}</span>
     </div>
-    {connection.error && <p className="type-caption truncate pl-5.5 text-destructive" title={connection.error}>{connection.error}</p>}
+    {connection.error && <TooltipHint content={connection.error}><p className="type-caption truncate pl-5.5 text-destructive">{connection.error}</p></TooltipHint>}
   </li>;
 }
 function ConversationLine({ conversation }: { conversation: MessagingConversation }) {
@@ -79,13 +80,12 @@ function ConversationLine({ conversation }: { conversation: MessagingConversatio
   const Icon = conversation.threadId ? Hash : kindIcon[conversation.kind] ?? MessageSquare;
   return <li className="flex min-w-0 items-center gap-2 py-0.5">
     <Icon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
-    <span className="min-w-0 truncate" title={[conversation.title, conversation.conversationId, conversation.threadId].filter(Boolean).join(" · ")}>
-      {conversation.title}</span>
+    <TooltipHint content={[conversation.title, conversation.conversationId, conversation.threadId].filter(Boolean).join(" · ")}><span className="min-w-0 truncate">
+      {conversation.title}</span></TooltipHint>
     {conversation.change && <Badge variant="secondary" className="px-1.5 py-0 font-normal">
       {i18n.text(conversation.change === "discovered" ? messages.newConversation : messages.newMessages)}</Badge>}
-    {conversation.activity && <time dateTime={conversation.activity} className="ml-auto shrink-0 type-caption tabular-nums"
-      title={i18n.formatDate(Date.parse(conversation.activity), { dateStyle: "full", timeStyle: "medium" })}>
-      {relativeTime(i18n, conversation.activity)}</time>}
+    {conversation.activity && <TooltipHint content={i18n.formatDate(Date.parse(conversation.activity), { dateStyle: "full", timeStyle: "medium" })}><time dateTime={conversation.activity} className="ml-auto shrink-0 type-caption tabular-nums">
+      {relativeTime(i18n, conversation.activity)}</time></TooltipHint>}
   </li>;
 }
 
@@ -136,9 +136,8 @@ function Transcript({ items, content }: { items: readonly ChatMessage[]; content
         : <section className="flex min-w-0 flex-col gap-1.5">
           <header className="flex min-w-0 items-baseline gap-2">
             <span className={cn("min-w-0 truncate font-medium", group.sender.role === "self" && "text-primary-text")}>{nameOf(first)}</span>
-            <time dateTime={first.sentAt} className="shrink-0 type-caption tabular-nums"
-              title={i18n.formatDate(sentAt, { dateStyle: "full", timeStyle: "medium" })}>
-              {i18n.formatDate(sentAt, { hour: "2-digit", minute: "2-digit" })}</time>
+            <TooltipHint content={i18n.formatDate(sentAt, { dateStyle: "full", timeStyle: "medium" })}><time dateTime={first.sentAt} className="shrink-0 type-caption tabular-nums">
+              {i18n.formatDate(sentAt, { hour: "2-digit", minute: "2-digit" })}</time></TooltipHint>
           </header>
           {group.messages.map(message => <div key={message.id} className="flex min-w-0 flex-col gap-1">
             {(message.replyTo || message.quote) && <QuoteLine id={message.replyTo} quote={message.quote}

@@ -107,7 +107,8 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
       onRename={title => onRename(session.id, title)} onArchive={() => onArchive(session.id)} onTemplateSaved={onTemplateSaved}>
       {trigger => <ListRow variant="navigation"
         selected={selectedSessionId === session.id} disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
-        buttonProps={{ title: session.title, "aria-current": selectedSessionId === session.id ? "page" : undefined }}
+        tooltip={session.title}
+        buttonProps={{ "aria-current": selectedSessionId === session.id ? "page" : undefined }}
         media={media}
         title={<span className={cn("relative block truncate", session.completed && "line-through")}>
           {session.title}{folder && <span className="sr-only">, {folder.name}</span>}

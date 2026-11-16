@@ -1,3 +1,6 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism-app/ui/ui/tooltip";
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { AnimatePresence } from "motion/react";
 import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
@@ -102,16 +105,19 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
 
   return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
     <header className="flex min-w-0 items-center gap-2 border-b px-2 py-1.5">
-      <Button size="icon-sm" variant="ghost" aria-label={i18n.text(messages.back)} title={i18n.text(messages.back)}
-        autoFocus={focus} onClick={back}><ArrowLeft /></Button>
+      <IconButton size="icon-sm" variant="ghost" label={i18n.text(messages.back)}
+        autoFocus={focus} onClick={back}><ArrowLeft /></IconButton>
       <span className="shrink-0 font-mono text-xs">{id}</span>
       <span className="min-w-0 flex-1 truncate type-caption">{task?.input.role}</span>
       {task && <TaskStatus status={task.status} />}
       {working && <Popover open={confirming} onOpenChange={setConfirming}>
-        <PopoverTrigger asChild>
-          <Button size="icon-sm" variant="ghost" aria-label={i18n.text(messages.cancel)} title={i18n.text(messages.cancel)}
-            disabled={blocked}><Square /></Button>
-        </PopoverTrigger>
+        <Tooltip>
+          <PopoverTrigger asChild><TooltipTrigger asChild>
+            <Button size="icon-sm" variant="ghost" aria-label={i18n.text(messages.cancel)}
+              disabled={blocked}><Square /></Button>
+          </TooltipTrigger></PopoverTrigger>
+          <TooltipContent>{i18n.text(messages.cancel)}</TooltipContent>
+        </Tooltip>
         <PopoverContent align="end" className="flex w-64 flex-col gap-3 p-3 text-sm">
           <PopoverDescription>{i18n.text(messages.cancelConfirm)}</PopoverDescription>
           <div className="flex justify-end gap-2">
@@ -172,10 +178,10 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
             if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); steer(); }
           }} />
         <InputGroupAddon align="inline-end" className="self-end">
-          <InputGroupButton type="submit" size="icon-xs" disabled={blocked || !text.trim()}
-            aria-label={i18n.text(messages.steer)} title={i18n.formatMessage(messages.send, { shortcut })}>
+          <TooltipHint content={i18n.formatMessage(messages.send, { shortcut })}><InputGroupButton type="submit" size="icon-xs" disabled={blocked || !text.trim()}
+            aria-label={i18n.text(messages.steer)}>
             {pending === "steer" ? <Spinner className="size-3.5" /> : <Send />}
-          </InputGroupButton>
+          </InputGroupButton></TooltipHint>
         </InputGroupAddon>
       </InputGroup>
     </form>}
@@ -201,10 +207,10 @@ export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
         {selected ? <TaskDetail id={selected} back={() => select(null)} focus={opened} /> : <>
           <p className="type-caption px-3 py-2" role="status" aria-atomic="true">{i18n.formatMessage(messages.active, { running, queued })}</p>
           {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VirtualList data={data.tasks.toReversed()}>{task =>
-              <ListRow key={task.id} title={`${task.id} · ${task.role}`} onOpen={() => select(task.id)}
+              <ListRow key={task.id} title={`${task.id} · ${task.role}`} tooltip={task.task} onOpen={() => select(task.id)}
                 className="gap-2 px-3 py-1.5 [&_[data-slot=item-title]]:text-xs [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-snug"
                 contentClassName="gap-0.5"
-                description={<span className="block truncate" title={task.task}>{task.task}</span>}
+                description={<span className="block truncate">{task.task}</span>}
                 actions={<TaskStatus status={task.status} />} />}</VirtualList></ItemGroup>
             : <p className="type-caption p-3">{i18n.text(messages.empty)}</p>}
         </>}

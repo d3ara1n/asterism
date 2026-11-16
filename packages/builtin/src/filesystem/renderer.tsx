@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { lazy } from "react";
 import { useI18n, useRendererApplication, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
@@ -37,7 +38,7 @@ function SeeHeader({ target, invocation }: SeeProps) {
   const path = inputText(target, "path");
   return <ToolHeader label={i18n.formatMessage(filesystemMessages.toolDirectorySee)}
     subject={useToolResourceSubject(invocation.resource)}
-    summary={path && <span className="font-mono" title={path}>{path}</span>} />;
+    summary={path && <TooltipHint content={path}><span className="font-mono">{path}</span></TooltipHint>} />;
 }
 function SeeBody({ result }: SeeProps) {
   const object = useRendererObject();

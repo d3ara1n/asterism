@@ -69,12 +69,12 @@ export function ShellSettings({ value, disabled, save }: {
   const row = (saved: ShellProfile) => {
     const installedPath = discovery?.profiles.find(item => item.id === saved.id)?.resolvedExecutable;
     return <div key={saved.id} role="listitem">
-      <ListRow selected={island.has(islandKey(saved.id))} onOpen={origin => { void open(saved, origin); }}
+      <ListRow tooltip={installedPath ?? undefined} selected={island.has(islandKey(saved.id))} onOpen={origin => { void open(saved, origin); }}
         title={<>{saved.id}{value.selected === saved.id && <Badge variant="secondary">{i18n.text(messages.isDefault)}</Badge>}</>}
         description={<span className="font-mono text-xs">{preview(saved)}</span>}
         details={installedPath && <span className="flex min-w-0 items-center gap-2">
           <StatusBadge tone="success">{i18n.text(messages.installed)}</StatusBadge>
-          <span className="truncate font-mono" title={installedPath}>{installedPath}</span>
+          <span className="truncate font-mono">{installedPath}</span>
         </span>}
         actions={<>
           <IconButton label={i18n.text(messages.add)} disabled={disabled} onClick={event => { void append(saved, event.currentTarget); }}><CopyPlus /></IconButton>

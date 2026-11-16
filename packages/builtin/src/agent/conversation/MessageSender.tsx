@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import type { AgentMessageSender } from "@asterism-app/builtin-api/contracts";
 import { messageAppearance, messageSenderLabel } from "../message-presentation";
@@ -10,6 +11,6 @@ export function MessageSender({ sender }: { sender: AgentMessageSender }) {
   const { Icon } = messageAppearance[sender.kind];
   return <p className="type-label flex min-w-0 items-center gap-1.5">
     <Icon className="size-3.5 shrink-0" aria-hidden="true" />
-    <span className="truncate" title={name}>{name}</span>
+    <TooltipHint content={name}><span className="truncate">{name}</span></TooltipHint>
   </p>;
 }

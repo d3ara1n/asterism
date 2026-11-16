@@ -124,8 +124,8 @@ export function TaskDetail({ id, latest, focus, back }: { id: string; latest: nu
     </>}>
     {trigger => <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
       <header className="flex min-w-0 items-center gap-1 border-b px-2 py-1.5">
-        <Button size="icon-xs" variant="ghost" aria-label={i18n.text(messages.back)} title={i18n.text(messages.back)}
-          autoFocus={focus} onClick={back}><ArrowLeft /></Button>
+        <IconButton size="icon-xs" variant="ghost" label={i18n.text(messages.back)}
+          autoFocus={focus} onClick={back}><ArrowLeft /></IconButton>
         <div className="min-w-0 flex-1">{todo && <TodoStatusBadge status={todo.status} />}</div>
         {todo && <>
           <IconButton size="icon-xs" label={i18n.text(messages.editContent)} disabled={opening}

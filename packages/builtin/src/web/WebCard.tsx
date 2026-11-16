@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import { Download, Search } from "lucide-react";
 import { useI18n, type I18n } from "@asterism-app/sdk/renderer";
@@ -62,13 +63,13 @@ export function WebCard({ data }: { data: WebCardData }) {
           {stats.recent.map(item => {
             const Icon = item.kind === "search" ? Search : Download;
             const when = i18n.formatDate(item.at, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-            return <li key={`${item.at}/${item.kind}/${item.subject}`} className="flex min-w-0 items-center gap-1.5 rounded-sm px-0.5 py-1" title={`${when} · ${item.subject}`}>
+            return <TooltipHint key={`${item.at}/${item.kind}/${item.subject}`} content={`${when} · ${item.subject}`}><li className="flex min-w-0 items-center gap-1.5 rounded-sm px-0.5 py-1">
               <Icon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
               <span className={cn("type-caption min-w-0 flex-1 truncate text-foreground select-text", item.kind === "fetch" && "font-mono")} translate="no">{item.subject}</span>
               <span className="type-caption shrink-0 tabular-nums">{[item.cost.length > 0 && cost(i18n, item.cost), duration(i18n, item.durationMs)].filter(Boolean).join(" · ")}</span>
               <StatusIcon tone={outcomeTone[item.outcome]} className="size-3.5 shrink-0" />
               <span className="sr-only">{i18n.formatMessage(messages.outcome, { outcome: item.outcome })}</span>
-            </li>;
+            </li></TooltipHint>;
           })}
         </ol>
       </section>}

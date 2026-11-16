@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { RendererCardProvider, type CardPanelView, type RendererCard } from "@asterism-app/sdk/renderer";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { PanelsTopLeft, X } from "lucide-react";
@@ -81,10 +82,10 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
       <div className="flex min-h-0 min-w-0 flex-col" style={{ height: expandedHeight ?? "100%" }}>
         {wrapHeader(<header ref={collapse.header} className={cn("flex shrink-0 items-center gap-2 px-3 py-2", headerClassName)}>
           {/* Narrow containers show only the type icon, leaving width for the title; the type name always remains the icon's accessible name and tooltip. */}
-          <span role="img" aria-label={kind} title={kind} className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">{icon}</span>
+          <TooltipHint content={kind}><span role="img" aria-label={kind} className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">{icon}</span></TooltipHint>
           <div className="flex min-w-0 flex-1 items-baseline gap-2">
             <p aria-hidden="true" className="type-label hidden max-w-1/3 shrink-0 truncate @min-[16rem]/card:block">{kind}</p>
-            <h2 className="type-section min-w-0 flex-1 truncate" title={title}>{title}</h2>
+            <TooltipHint content={title}><h2 className="type-section min-w-0 flex-1 truncate">{title}</h2></TooltipHint>
           </div>
           <div className="nodrag flex shrink-0 items-center gap-0.5">
             {actions}

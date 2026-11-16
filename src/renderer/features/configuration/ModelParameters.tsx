@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useState } from "react";
 import type { UiMessage } from "@asterism-app/sdk/contracts";
 import { Check, Download } from "lucide-react";
@@ -73,11 +74,11 @@ export function useModelParameters(modelId: string, disabled: boolean, onFetched
   return {
     pending,
     hint: lookupId ? i18n.formatMessage(messages.lookupHint, { modelId: lookupId }) : undefined,
-    action: <Button type="button" size="sm" variant="outline" disabled={!lookupId || disabled || pending}
-      title={i18n.text(messages.fetchTitle)} onClick={() => void fetchParameters()}>
+    action: <TooltipHint content={i18n.text(messages.fetchTitle)}><span className="inline-flex"><Button type="button" size="sm" variant="outline" disabled={!lookupId || disabled || pending}
+      onClick={() => void fetchParameters()}>
       {pending ? <Spinner data-icon="inline-start" /> : <Download data-icon="inline-start" />}
       {i18n.text(pending ? messages.fetching : messages.fetch)}
-    </Button>,
+    </Button></span></TooltipHint>,
     feedback: error
       ? <Alert role="alert" variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>
       : report && <CatalogModelCard report={report} />,

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
 import type { VirtualizerHandle } from "virtua";
@@ -68,11 +69,11 @@ function useOperations() {
   return { pending: (key: string) => pending.has(key), error, run, clear: () => setError(null) };
 }
 /** Status that explains itself: failure details follow the label when present. */
-function ConnectionStatus({ connection }: { connection: Pick<MessagingConnectionInfo, "status" | "error"> }) {
+function ConnectionStatus({ connection, showTooltip = true }: { connection: Pick<MessagingConnectionInfo, "status" | "error">; showTooltip?: boolean }) {
   const i18n = useI18n();
   const detail = connection.error;
   return <StatusText tone={statusTone[connection.status]} className="max-w-full">
-    <span className="truncate" title={detail || undefined}>{i18n.text(statusLabel[connection.status])}{detail ? ` · ${detail}` : ""}</span>
+    <TooltipHint content={showTooltip ? detail || undefined : undefined}><span className="truncate">{i18n.text(statusLabel[connection.status])}{detail ? ` · ${detail}` : ""}</span></TooltipHint>
   </StatusText>;
 }
 function NotifyToggle({ label, pressed, pending, onChange }: { label: string; pressed: boolean; pending: boolean; onChange(value: boolean): void }) {
@@ -146,7 +147,8 @@ function ConversationsCard({ data }: { data: z.infer<typeof ConversationsView.sc
                   onOpen={() => select(connection.id)} mediaVariant="icon"
                   media={<StatusIcon tone={statusTone[connection.status]} className="size-4" />} title={connection.name}
                   description={[connection.identity, connection.providerLabel && i18n.text(connection.providerLabel)].filter(Boolean).join(" · ") || undefined}
-                  details={connection.status !== "connected" ? <ConnectionStatus connection={connection} /> : undefined}
+                  tooltip={connection.status !== "connected" ? connection.error ?? undefined : undefined}
+                  details={connection.status !== "connected" ? <ConnectionStatus connection={connection} showTooltip={false} /> : undefined}
                   actions={notify({ connectionId: connection.id }, connection.name,
                     i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))} />
               </div>}
@@ -204,7 +206,7 @@ function ConnectionConversations({ connection, back, notify, error }: {
         return <Item key={key} size="sm" onFocusCapture={() => setFocusedKey(key)}>
           <ItemMedia variant="icon"><Icon /></ItemMedia>
           <ItemContent className="min-w-0">
-            <ItemTitle className="max-w-full truncate" title={dialog.title}>{dialog.title}</ItemTitle>
+            <TooltipHint content={dialog.title}><ItemTitle className="max-w-full truncate">{dialog.title}</ItemTitle></TooltipHint>
             {dialog.activity && <ItemDescription className="truncate">{relativeTime(i18n, dialog.activity)}</ItemDescription>}
           </ItemContent>
           <ItemActions>{notify(target, dialog.title, i18n.formatMessage(messages.subscribeConversation, { name: dialog.title }))}</ItemActions>
@@ -421,8 +423,8 @@ function ChatRow({ message, first, fresh, usable, quoted, nameOf, onReply, onJum
           </Bubble>}
           <div className={cn("absolute bottom-0 flex items-center gap-0.5 whitespace-nowrap opacity-0 transition-opacity duration-150",
             "group-hover/row:opacity-100 group-focus-within/row:opacity-100", self ? "right-full mr-1 flex-row-reverse" : "left-full ml-1")}>
-            <time dateTime={message.sentAt} title={i18n.formatDate(sentAt, { dateStyle: "full", timeStyle: "medium" })}
-              className="type-caption px-0.5 tabular-nums">{i18n.formatDate(sentAt, { hour: "2-digit", minute: "2-digit" })}</time>
+            <TooltipHint content={i18n.formatDate(sentAt, { dateStyle: "full", timeStyle: "medium" })}><time dateTime={message.sentAt}
+              className="type-caption px-0.5 tabular-nums">{i18n.formatDate(sentAt, { hour: "2-digit", minute: "2-digit" })}</time></TooltipHint>
             {usable && <IconButton size="icon-xs" label={i18n.text(messages.reply)} onClick={() => onReply(message)}><CornerUpLeft /></IconButton>}
           </div>
         </div>
@@ -446,9 +448,9 @@ function Quote({ id, quote, quoted, self, nameOf, onJump }: {
   </>;
   return <div className="flex min-w-0 flex-col gap-1">
     {quoted
-      ? <button type="button" title={label} aria-label={label} onClick={() => onJump(quoted.id)} className={cn(className,
-        "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", self ? "hover:bg-primary-foreground/25" : "hover:bg-foreground/10")}>{body}</button>
-      : <div title={label} className={className}>{body}</div>}
+      ? <TooltipHint content={label}><button type="button" aria-label={label} onClick={() => onJump(quoted.id)} className={cn(className,
+        "transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring", self ? "hover:bg-primary-foreground/25" : "hover:bg-foreground/10")}>{body}</button></TooltipHint>
+      : <TooltipHint content={label}><div className={className}>{body}</div></TooltipHint>}
     {quote && <MessageAttachments parts={chatFiles(quote)} content={object.content} />}
   </div>;
 }

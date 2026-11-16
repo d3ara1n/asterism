@@ -1,3 +1,6 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
 import { useI18n, useRendererApplication, type ContentReader, type I18n } from "@asterism-app/sdk/renderer";
@@ -114,6 +117,16 @@ function PreviewDialog({ open, onOpenChange, name, details, url, onError, saving
   </Dialog>;
 }
 
+/** The full-surface preview trigger owns the file details hint, rather than the text underneath it. */
+function FilePreviewTrigger({ name, details, label, onOpen }: { name: string; details: string; label: string; onOpen(): void }) {
+  return <Tooltip>
+    <TooltipTrigger asChild><AttachmentTrigger aria-label={label} onClick={onOpen} /></TooltipTrigger>
+    <TooltipContent className="max-h-(--radix-tooltip-content-available-height) max-w-[min(24rem,var(--radix-tooltip-content-available-width))] overflow-y-auto whitespace-pre-wrap wrap-anywhere">
+      <p>{name}</p><p>{details}</p>
+    </TooltipContent>
+  </Tooltip>;
+}
+
 /** A standalone file result, such as a tool output: images show a large preview card, other files a file card. */
 export function FilePreview({ part, content }: { part: InputFile; content: ContentReader }) {
   const i18n = useI18n();
@@ -124,6 +137,7 @@ export function FilePreview({ part, content }: { part: InputFile; content: Conte
   const { saving, save } = useSave(name, openFile);
   const failure = preview?.failed ? i18n.text(messages.unavailable) : null;
   const pdf = !preview && previewsAsPdf(part);
+  const canPreview = !!preview?.url || pdf;
   return <>
     <Attachment state={failure ? "error" : preview && !preview.url ? "processing" : "done"} orientation={preview ? "vertical" : "horizontal"} className="max-w-64">
       <AttachmentMedia variant={preview?.url ? "image" : "icon"}>
@@ -131,12 +145,13 @@ export function FilePreview({ part, content }: { part: InputFile; content: Conte
           : preview && !preview.failed ? <Spinner /> : <FileTypeIcon mediaType={part.mediaType} />}
       </AttachmentMedia>
       <AttachmentContent>
-        <AttachmentTitle title={name}>{name}</AttachmentTitle>
-        <AttachmentDescription title={failure ?? details}>{failure ?? details}</AttachmentDescription>
+        <TooltipHint content={canPreview ? undefined : name}><AttachmentTitle>{name}</AttachmentTitle></TooltipHint>
+        <TooltipHint content={canPreview ? undefined : failure ?? details}><AttachmentDescription>{failure ?? details}</AttachmentDescription></TooltipHint>
       </AttachmentContent>
-      {(preview?.url || pdf) && <AttachmentTrigger aria-label={i18n.text(pdf ? messages.pdfPreview : messages.preview)} onClick={() => setOpen(true)} />}
-      <AttachmentActions><AttachmentAction aria-label={i18n.text(messages.saveAs)} title={i18n.text(messages.saveAs)}
-        disabled={saving} aria-busy={saving || undefined} onClick={() => void save()}>{saving ? <Spinner /> : <Download />}</AttachmentAction></AttachmentActions>
+      {canPreview && <FilePreviewTrigger name={name} details={failure ?? details}
+        label={i18n.text(pdf ? messages.pdfPreview : messages.preview)} onOpen={() => setOpen(true)} />}
+      <AttachmentActions><TooltipHint content={i18n.text(messages.saveAs)}><AttachmentAction aria-label={i18n.text(messages.saveAs)}
+        disabled={saving} aria-busy={saving || undefined} onClick={() => void save()}>{saving ? <Spinner /> : <Download />}</AttachmentAction></TooltipHint></AttachmentActions>
     </Attachment>
     {preview?.url && <PreviewDialog open={open} onOpenChange={setOpen} name={name} details={details} url={preview.url} onError={preview.fail}
       saving={saving} save={() => void save()} />}
@@ -171,20 +186,20 @@ function ImageTile({ part, content, single }: { part: InputFile; content: Conten
   const shown = preview.url && !preview.failed;
   return <div className={cn("group/tile relative shrink-0 overflow-hidden rounded-xl border bg-muted",
     single ? (shown && loaded ? "h-32 min-w-16 max-w-48" : "h-32 w-32") : "size-20")}>
-    <button type="button" disabled={!shown} title={name} aria-label={`${i18n.text(messages.preview)}: ${name}`} onClick={() => setOpen(true)}
+    <TooltipHint content={name}><button type="button" disabled={!shown} aria-label={`${i18n.text(messages.preview)}: ${name}`} onClick={() => setOpen(true)}
       className="flex size-full items-center justify-center text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
       {shown ? <img src={preview.url} alt={name} onLoad={() => setLoaded(true)} onError={preview.fail}
         className={cn("transition-[opacity,scale] duration-300 ease-out group-hover/tile:scale-[1.04] motion-reduce:transition-none",
           single ? "h-full w-auto max-w-48 object-cover" : "size-full object-cover", loaded ? "opacity-100" : "opacity-0")} />
         : preview.failed ? <ImageOff className="size-5" aria-label={i18n.text(messages.unavailable)} />
         : <span className="size-full animate-pulse bg-foreground/5" aria-hidden="true" />}
-    </button>
-    <Button type="button" variant="secondary" size="icon-xs" aria-label={`${i18n.text(messages.saveAs)}: ${name}`} title={i18n.text(messages.saveAs)}
+    </button></TooltipHint>
+    <IconButton type="button" variant="secondary" size="icon-xs" label={`${i18n.text(messages.saveAs)}: ${name}`} tooltip={i18n.text(messages.saveAs)}
       disabled={saving} aria-busy={saving || undefined} onClick={() => void save()}
       className={cn("absolute top-1 right-1 bg-background/85 shadow-sm backdrop-blur-sm transition-opacity hover:bg-background focus-visible:opacity-100",
         saving ? "opacity-100" : "opacity-0 group-hover/tile:opacity-100")}>
       {saving ? <Spinner /> : <Download />}
-    </Button>
+    </IconButton>
     {shown && <PreviewDialog open={open} onOpenChange={setOpen} name={name} details={details} url={preview.url!} onError={preview.fail}
       saving={saving} save={() => void save()} />}
   </div>;
@@ -200,12 +215,13 @@ function FileRow({ part, content }: { part: InputFile; content: ContentReader })
     <Attachment size="sm" className="w-52 min-w-0 max-w-full">
       <AttachmentMedia variant="icon"><FileTypeIcon mediaType={part.mediaType} /></AttachmentMedia>
       <AttachmentContent>
-        <AttachmentTitle title={name}>{name}</AttachmentTitle>
-        <AttachmentDescription title={details}>{details}</AttachmentDescription>
+        <TooltipHint content={pdf ? undefined : name}><AttachmentTitle>{name}</AttachmentTitle></TooltipHint>
+        <TooltipHint content={pdf ? undefined : details}><AttachmentDescription>{details}</AttachmentDescription></TooltipHint>
       </AttachmentContent>
-      {pdf && <AttachmentTrigger aria-label={`${i18n.text(messages.pdfPreview)}: ${name}`} onClick={() => setOpen(true)} />}
-      <AttachmentActions><AttachmentAction aria-label={`${i18n.text(messages.saveAs)}: ${name}`} title={i18n.text(messages.saveAs)}
-        disabled={saving} aria-busy={saving || undefined} onClick={() => void save()}>{saving ? <Spinner /> : <Download />}</AttachmentAction></AttachmentActions>
+      {pdf && <FilePreviewTrigger name={name} details={details}
+        label={`${i18n.text(messages.pdfPreview)}: ${name}`} onOpen={() => setOpen(true)} />}
+      <AttachmentActions><TooltipHint content={i18n.text(messages.saveAs)}><AttachmentAction aria-label={`${i18n.text(messages.saveAs)}: ${name}`}
+        disabled={saving} aria-busy={saving || undefined} onClick={() => void save()}>{saving ? <Spinner /> : <Download />}</AttachmentAction></TooltipHint></AttachmentActions>
     </Attachment>
     {pdf && open && <PdfPreviewDialog key={partKey(part, 0)} onOpenChange={setOpen} name={name} details={details} openFile={openFile}
       saving={saving} save={() => void save()} />}

@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { Boxes, Check, ChevronRight, Minus, MousePointerClick, ScanSearch, TriangleAlert, Wrench } from "lucide-react";
 import { previewArguments } from "../../../shared/partial-arguments";
 import type { ReactNode } from "react";
@@ -37,7 +38,7 @@ function ResourceListBody({ result }: ListProps) {
       const description = registry.resource(resource.type);
       return <li key={resource.resource_id} className="flex h-7 min-w-0 items-center gap-2 text-sm [&>svg]:size-4 [&>svg]:shrink-0">
         {description.icon}
-        <span className="min-w-0 truncate" title={resource.title}>{resource.title}</span>
+        <TooltipHint content={resource.title}><span className="min-w-0 truncate">{resource.title}</span></TooltipHint>
         {resource.notice && <Tooltip>
           <TooltipTrigger asChild>
             <span tabIndex={0} className="inline-flex shrink-0 rounded-sm text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -80,11 +81,11 @@ function StateFields({ fields, path }: { fields: readonly StateField[]; path: st
       const key = `${path}/${field.key}`;
       return field.value.kind === "prose"
         ? <div key={key} className="col-span-2 min-w-0 space-y-0.5">
-          {field.label && <dt className="text-muted-foreground" title={field.key}>{field.label}</dt>}
+          {field.label && <TooltipHint content={field.key}><dt className="text-muted-foreground">{field.label}</dt></TooltipHint>}
           <dd className="whitespace-pre-wrap break-words">{field.value.value}</dd>
         </div>
         : <div key={key} className="contents">
-          <dt className="truncate text-muted-foreground" title={field.key}>{field.label}</dt>
+          <TooltipHint content={field.key}><dt className="truncate text-muted-foreground">{field.label}</dt></TooltipHint>
           <dd className="min-w-0"><StateValueView value={field.value} path={key} /></dd>
         </div>;
     })}
@@ -102,7 +103,7 @@ function StateValueView({ value, path }: { value: StateValue; path: string }) {
     case "text": case "prose": return <span className="whitespace-pre-wrap break-words">{value.value}</span>;
     case "list": return <span className="flex flex-wrap gap-1">
       {value.values.map((item, index) => <Badge key={index} variant="secondary" className="max-w-full font-normal">
-        <span className="truncate" title={item}>{item}</span>
+        <TooltipHint content={item}><span className="truncate">{item}</span></TooltipHint>
       </Badge>)}
     </span>;
     case "group": return <div className="border-l pl-3"><StateFields fields={value.fields} path={path} /></div>;

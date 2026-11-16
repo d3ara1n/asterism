@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import { ArrowRight, Users } from "lucide-react";
@@ -113,7 +114,7 @@ function TaskRows({ todos }: { todos: readonly TodoSummary[] }) {
   return <ToolScrollArea className="max-h-80"><ul className="flex min-w-0 flex-col gap-1">
     {todos.map(todo => <li key={todo.id} className="flex min-w-0 items-center gap-2">
       <TodoStatusIcon status={todo.status} />
-      <span className="min-w-0 flex-1 truncate" title={todo.title}>{todo.title}</span>
+      <TooltipHint content={todo.title}><span className="min-w-0 flex-1 truncate">{todo.title}</span></TooltipHint>
       {todo.assignee && <span className="type-caption shrink-0 truncate">{actorName(i18n, todo.assignee)}</span>}
     </li>)}
   </ul></ToolScrollArea>;
@@ -186,7 +187,7 @@ function GrepBody({ result }: GrepProps) {
       if (last && last.at(-1)!.line + 1 === row.line) last.push(row); else segments.push([row]);
     }
     return <section key={group.target.id} className="flex min-w-0 flex-col gap-1">
-      <p className="type-label truncate" title={group.title}>{group.title}</p>
+      <TooltipHint content={group.title}><p className="type-label truncate">{group.title}</p></TooltipHint>
       {segments.map(segment => <CodeRows key={segment[0]!.line} filename="task.md"
         rows={segment.map(row => ({ line: row.line, content: displayText(row) }))}
         dimmed={segment.flatMap((row, index) => row.match ? [] : [index])} />)}
@@ -214,7 +215,7 @@ function ListsBody({ result }: ListsProps) {
   if (!lists) return null;
   if (!lists.length) return <p className="type-caption">{i18n.text(messages.noLists)}</p>;
   return <ToolScrollArea className="max-h-80"><ul className="flex min-w-0 flex-col gap-1">{lists.map(list => <li key={list.id} className="flex min-w-0 items-center gap-2">
-    <span className="min-w-0 flex-1 truncate" title={list.title}>{list.title}</span><ListCounts list={list} />
+    <TooltipHint content={list.title}><span className="min-w-0 flex-1 truncate">{list.title}</span></TooltipHint><ListCounts list={list} />
   </li>)}</ul></ToolScrollArea>;
 }
 export const listsViews = {

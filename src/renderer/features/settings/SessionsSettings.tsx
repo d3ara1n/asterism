@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { createContext, useContext, useState } from "react";
 import { ArchiveRestore, Trash2 } from "lucide-react";
 import type { AppSnapshot } from "../../../shared/contracts";
@@ -98,7 +99,7 @@ function RecycleBin() {
         : !sessions.length ? <PanelListState icon={<Trash2 />} label={i18n.text(settingsMessages.recycleBinEmpty)} /> : null}
       renderItem={session => <Item size="sm">
         <ItemContent className="min-w-0">
-          <ItemTitle className="block truncate" title={session.title}>{session.title}</ItemTitle>
+          <TooltipHint content={session.title}><ItemTitle className="block truncate">{session.title}</ItemTitle></TooltipHint>
           <ItemDescription className="truncate">{i18n.formatMessage(settingsMessages.archivedAt,
             { date: i18n.formatDate(Date.parse(session.archived_at), { dateStyle: "medium", timeStyle: "short" }) })}</ItemDescription>
         </ItemContent>

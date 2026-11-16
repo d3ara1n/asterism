@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { z } from "zod";
 import { useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
@@ -23,7 +24,7 @@ function Header({ args, invocation, result }: Props) {
   const summary = searchHeaderSummary(undefined, inputText(args, "pattern"));
   return <ToolHeader label={i18n.text(messages.toolDirectoryGrep)}
     subject={useToolResourceSubject(invocation.resource)}
-    summary={summary && <span className="font-mono" title={summary}>{summary}</span>}
+    summary={summary && <TooltipHint content={summary}><span className="font-mono">{summary}</span></TooltipHint>}
     meta={data && i18n.formatMessage(messages.toolSearchMatches, {
       count: data.rows.filter(row => row.match).length, truncated: data.stopReason !== null,
     })} />;

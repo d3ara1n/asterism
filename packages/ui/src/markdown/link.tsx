@@ -3,14 +3,15 @@ import { MarkdownDocumentContext } from "./presentation";
 import { parseModelUrl, parseResourceUrl, parseSkillUrl } from "@asterism-app/sdk/contracts";
 import { useRendererObject } from "@asterism-app/sdk/renderer";
 import { externalWebUrl } from "../links";
+import { TooltipHint } from "../tooltip-hint";
 import { ReferenceChip } from "../reference-chip";
 
 type AnchorProps = ComponentProps<"a">;
 
-export function MarkdownLink({ href, children, ...props }: AnchorProps) {
+export function MarkdownLink({ href, children, title, ...props }: AnchorProps) {
   const documentMode = useContext(MarkdownDocumentContext);
   if (documentMode && href && (parseModelUrl(href) || parseSkillUrl(href) || parseResourceUrl(href))) return <span>{children}</span>;
-  if (href?.startsWith("#")) return <a {...props} href={href} onAuxClick={event => event.preventDefault()} onClick={event => {
+  if (href?.startsWith("#")) return <TooltipHint content={title}><a {...props} href={href} onAuxClick={event => event.preventDefault()} onClick={event => {
     event.preventDefault();
     const root = event.currentTarget.closest("[data-markdown-root]");
     const target = root?.querySelector<HTMLElement>(`#${CSS.escape(href.slice(1))}`);
@@ -18,12 +19,12 @@ export function MarkdownLink({ href, children, ...props }: AnchorProps) {
     if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: "nearest" });
-  }}>{children}</a>;
+  }}>{children}</a></TooltipHint>;
   if (href && parseModelUrl(href)) return <ReferenceChip href={href}>{children}</ReferenceChip>;
   if (href && parseSkillUrl(href)) return <ReferenceChip href={href} openable>{children}</ReferenceChip>;
   if (href && parseResourceUrl(href)) return <ResourceReference href={href}>{children}</ResourceReference>;
   const url = href ? externalWebUrl(href) : null;
-  return url ? <a {...props} href={url} target="_blank" rel="noopener noreferrer">{children}</a> : <span>{children}</span>;
+  return url ? <TooltipHint content={title}><a {...props} href={url} target="_blank" rel="noopener noreferrer">{children}</a></TooltipHint> : <span>{children}</span>;
 }
 
 /** Resource IDs are scoped to the session of the object rendering the message. */

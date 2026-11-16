@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
@@ -19,7 +20,7 @@ function TaskLine({ task, showStatus = true, leading }: {
     {leading}
     <span className="shrink-0 font-mono">{task.id}</span>
     <span className="shrink-0 type-caption">{task.role}</span>
-    <span className="min-w-0 flex-1 truncate" title={task.task}>{task.task}</span>
+    <TooltipHint content={task.task}><span className="min-w-0 flex-1 truncate">{task.task}</span></TooltipHint>
     {showStatus && <TaskStatus status={task.status} />}
   </div>;
 }
@@ -87,7 +88,7 @@ function WaitHeader({ phase, target, result }: WaitProps) {
   const i18n = useI18n(), tasks = result?.data?.tasks;
   const finished = tasks?.filter(task => task.status.phase === "finished").length ?? 0;
   return <ToolHeader label={i18n.text(messages.wait)}
-    subject={phase === "input" ? undefined : <span className="font-mono" title={target.ids.join(", ")}>{target.ids.join(", ")}</span>}
+    subject={phase === "input" ? undefined : <TooltipHint content={target.ids.join(", ")}><span className="font-mono">{target.ids.join(", ")}</span></TooltipHint>}
     meta={tasks && i18n.formatMessage(messages.finished, { finished, total: tasks.length })} />;
 }
 function WaitBody({ phase, result }: WaitProps) {

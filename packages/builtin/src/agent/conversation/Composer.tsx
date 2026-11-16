@@ -1,3 +1,4 @@
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { Square, ArrowUp, Archive } from "lucide-react";
 import { useRef, useState, useSyncExternalStore, type Ref } from "react";
@@ -43,7 +44,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
         onClick={() => { void control(onCancel); }}><Square />{i18n.formatMessage(conversationMessages.stop)}</Button>
         : <div className="flex shrink-0 gap-1">
           {executionState === "incomplete" && <Button type="button" size="sm" variant="ghost" disabled={!writable || controlPending} onClick={() => { void control(onContinue); }}>{i18n.formatMessage(conversationMessages.continue)}</Button>}
-          <Button type="submit" size="icon-sm" disabled={!writable || state.uploading || (!state.text.trim() && !state.files.length)} aria-label={i18n.formatMessage(commonMessages.sendMessage)} title={i18n.formatMessage(commonMessages.sendMessage)}><ArrowUp /></Button>
+          <IconButton type="submit" variant="default" size="icon-sm" disabled={!writable || state.uploading || (!state.text.trim() && !state.files.length)} label={i18n.formatMessage(commonMessages.sendMessage)}><ArrowUp /></IconButton>
         </div>}
     </InputGroupAddon>
   </InputGroup>

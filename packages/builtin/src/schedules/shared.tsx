@@ -1,3 +1,4 @@
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useState } from "react";
 import { useI18n, useRendererObject, type RendererReceipt } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -38,7 +39,7 @@ export function ScheduleError({ error }: { error: string | null }) {
 /** The front's message line; an empty message is the one state that blocks activation, so it links to the editor. */
 export function MessageLine({ message, onEdit, editable }: { message: string; onEdit(): void; editable: boolean }) {
   const i18n = useI18n();
-  if (message.trim()) return <p className="type-caption min-w-0 flex-1 truncate" title={message}>{message}</p>;
+  if (message.trim()) return <TooltipHint content={message}><p className="type-caption min-w-0 flex-1 truncate">{message}</p></TooltipHint>;
   return <button type="button" disabled={!editable} onClick={onEdit}
     className="type-label min-w-0 flex-1 truncate text-left text-warning underline-offset-2 enabled:hover:underline disabled:opacity-50">
     {i18n.text(messages.noMessage)}

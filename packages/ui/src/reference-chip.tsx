@@ -1,3 +1,4 @@
+import { TooltipHint } from "./tooltip-hint";
 import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useRef, useState, type ComponentProps, type ComponentType, type ReactNode } from "react";
 import { ModelCatalog, formatModelExpression, parseModelUrl, parseResourceUrl, parseSkillUrl, resourceUrl, type ModelExpression, type ResourceRef, type UiText } from "@asterism-app/sdk/contracts";
 import { useI18n, useRendererCatalogs, useRendererResourceNavigation, useRendererResources, type RendererResourceIdentity } from "@asterism-app/sdk/renderer";
@@ -57,8 +58,8 @@ function ReferenceLabel({ children }: { children: ReactNode }) {
 }
 
 /** Shared chip presentation for references in the composer, rendered messages, and panel titles. */
-export function ReferenceChipFace({ href, children, selected = false, size = "inline", onRemove, className, ...props }: ComponentProps<"span"> & {
-  href: string; selected?: boolean; size?: ReferenceChipSize;
+export function ReferenceChipFace({ href, children, selected = false, size = "inline", onRemove, hint, className, ...props }: ComponentProps<"span"> & {
+  href: string; selected?: boolean; size?: ReferenceChipSize; hint?: string;
   /** Present in the composer; omitted where the chip is read-only. */
   onRemove?(): void;
 }) {
@@ -71,13 +72,13 @@ export function ReferenceChipFace({ href, children, selected = false, size = "in
       metrics.face, tone, selected && "ring-2 ring-ring", className)}>
     <Icon data-chip-icon="" className={cn("shrink-0", metrics.icon)} aria-hidden />
     <span className={cn("w-0 self-baseline", metrics.line)} aria-hidden>{"\u200b"}</span>
-    <span className={cn("truncate", metrics.line)} translate="no"><ReferenceLabel>{children}</ReferenceLabel></span>
-    {onRemove && <button type="button" tabIndex={-1}
+    <TooltipHint content={hint}><span className={cn("truncate", metrics.line)} translate="no"><ReferenceLabel>{children}</ReferenceLabel></span></TooltipHint>
+    {onRemove && <TooltipHint content={i18n.text(commonMessages.removeReference)}><button type="button" tabIndex={-1}
       className={cn("-mr-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-foreground/10 hover:text-foreground", metrics.remove)}
-      aria-label={i18n.text(commonMessages.removeReference)} title={i18n.text(commonMessages.removeReference)}
+      aria-label={i18n.text(commonMessages.removeReference)}
       // Keep the editor selection; deleting must not move focus out of the composer.
       onMouseDown={event => event.preventDefault()}
-      onClick={onRemove}><X className="size-3" /></button>}
+      onClick={onRemove}><X className="size-3" /></button></TooltipHint>}
   </span>;
 }
 
@@ -112,7 +113,7 @@ export function ReferenceChip({ href, sessionId, children, openable = false, sel
   const activate = !openable ? null
     : skill ? skills && ((origin: HTMLElement) => skills.open(skill.name, skill.path, origin))
     : resource && sessionId ? (origin: HTMLElement) => navigation.open({ sessionId, id: resource.resourceId }, resource.location, { origin }) : null;
-  const face = <ReferenceChipFace href={href} selected={selected} size={size} onRemove={onRemove} title={card ? undefined : href}
+  const face = <ReferenceChipFace href={href} selected={selected} size={size} onRemove={onRemove} hint={card ? undefined : href}
     tabIndex={model ? 0 : undefined} className={model ? "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : undefined}>{children}</ReferenceChipFace>;
   const trigger = activate ? <a href={href} className="no-underline" aria-disabled={pending || undefined}
     onAuxClick={event => event.preventDefault()} onClick={event => {
@@ -174,7 +175,7 @@ export function ReferenceCard({ icon, title, missing = false, loading = false, e
     </div>
     {error && <p className="type-caption text-destructive">{i18n.text(error)}</p>}
     {description && <p className="type-caption line-clamp-4">{description}</p>}
-    {details.filter(Boolean).map((detail, index) => <p key={index} className="type-caption truncate font-mono" title={detail!} translate="no">{detail}</p>)}
+    {details.filter(Boolean).map((detail, index) => <TooltipHint key={index} content={detail}><p className="type-caption truncate font-mono" translate="no">{detail}</p></TooltipHint>)}
     {children}
   </div>;
 }
