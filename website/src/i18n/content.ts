@@ -100,7 +100,6 @@ interface Content {
   principles: { term: string; detail: string }[];
   download: {
     title: string;
-    status: string;
     recommended: string;
     all: string;
     copy: string;
@@ -120,21 +119,21 @@ const basePlatforms = {
     id: "mac" as const,
     os: "macOS",
     type: "DMG",
-    asset: "-mac-arm64.dmg",
+    asset: "Asterism-mac-arm64.dmg",
   },
   win: {
     id: "win" as const,
     os: "Windows",
     arch: "x64",
     type: "EXE",
-    asset: "-win-x64.exe",
+    asset: "Asterism-win-x64.exe",
   },
   linux: {
     id: "linux" as const,
     os: "Linux",
     arch: "x86_64",
     type: "AppImage",
-    asset: "-linux-x86_64.AppImage",
+    asset: "Asterism-linux-x86_64.AppImage",
   },
 };
 
@@ -281,7 +280,6 @@ export const content: Record<Locale, Content> = {
     ],
     download: {
       title: "Download",
-      status: "Preview builds",
       recommended: "For this device",
       all: "All releases",
       copy: "Copy",
@@ -293,7 +291,7 @@ export const content: Record<Locale, Content> = {
       ],
       quarantine: {
         summary: "macOS says the app cannot be opened?",
-        body: "Preview builds use a self-signed certificate rather than Apple notarization. After moving Asterism to Applications, clear the quarantine attribute:",
+        body: "macOS builds use a self-signed certificate rather than Apple notarization. After moving Asterism to Applications, clear the quarantine attribute:",
       },
     },
     footer: {
@@ -443,7 +441,6 @@ export const content: Record<Locale, Content> = {
     ],
     download: {
       title: "下载",
-      status: "预览版构建",
       recommended: "匹配当前设备",
       all: "全部版本",
       copy: "复制",
@@ -455,7 +452,7 @@ export const content: Record<Locale, Content> = {
       ],
       quarantine: {
         summary: "macOS 提示无法打开应用？",
-        body: "预览版安装包使用自签名证书（暂未经过 Apple 公证）。将 Asterism 移入「应用程序」后，可在终端清除隔离属性：",
+        body: "macOS 安装包使用自签名证书，未经 Apple 公证。将 Asterism 移入「应用程序」后，可在终端清除隔离属性：",
       },
     },
     footer: {

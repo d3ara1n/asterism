@@ -218,11 +218,3 @@ jobs:
             -F draft=true -F prerelease="$RELEASE_PRERELEASE" --jq '.id')
           gh release upload "$tag" artifacts/*
           gh api --method PATCH "repos/$GH_REPO/releases/$release_id" -F draft=false > /dev/null
-
-  website:
-    needs: publish
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    uses: ./.github/workflows/pages.yml

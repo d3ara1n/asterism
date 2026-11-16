@@ -1,7 +1,7 @@
 ---
 import Glyph from "./Glyph.astro";
 import Mark from "./Mark.astro";
-import { content, releasesUrl, repoUrl, type Locale } from "../i18n/content";
+import { content, releasesUrl, type Locale } from "../i18n/content";
 
 interface Props {
   locale: Locale;
@@ -9,62 +9,6 @@ interface Props {
 
 const { locale } = Astro.props;
 const t = content[locale].download;
-const repo = new URL(repoUrl).pathname.slice(1);
-
-interface ReleaseSnapshot {
-  tag: string;
-  assets: { name: string; url: string }[];
-}
-
-// Resolve release metadata at build time; visitors receive static version and download links.
-async function fetchLatestBuild(): Promise<ReleaseSnapshot | null> {
-  const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "asterism-website-build" };
-  const token = import.meta.env.GITHUB_TOKEN ?? import.meta.env.GH_TOKEN;
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  try {
-    const res = await fetch(`https://api.github.com/repos/${repo}/releases?per_page=1`, { headers });
-    if (res.ok) {
-      const releases = (await res.json()) as { tag_name: string; assets: { name: string; browser_download_url: string }[] }[];
-      const first = releases[0];
-      if (first) {
-        return {
-          tag: first.tag_name,
-          assets: first.assets.map(a => ({ name: a.name, url: a.browser_download_url })),
-        };
-      }
-    }
-  } catch {
-    // Fall through to the public Atom feed.
-  }
-
-  try {
-    const atomRes = await fetch(`${repoUrl}/releases.atom`, { headers: { "User-Agent": "asterism-website-build" } });
-    if (atomRes.ok) {
-      const xml = await atomRes.text();
-      const match = xml.match(/\/releases\/tag\/(v[0-9A-Za-z.-]+)"/);
-      if (match) {
-        const tag = match[1];
-        const version = tag.replace(/^v/, "");
-        const suffixes = ["-mac-arm64.dmg", "-win-x64.exe", "-linux-x86_64.AppImage"];
-        return {
-          tag,
-          assets: suffixes.map(suffix => ({
-            name: `Asterism-${version}${suffix}`,
-            url: `${repoUrl}/releases/download/${tag}/Asterism-${version}${suffix}`,
-          })),
-        };
-      }
-    }
-  } catch {
-    // Fall back to the releases index URL.
-  }
-
-  return null;
-}
-
-const buildRelease = await fetchLatestBuild();
-const resolveUrl = (suffix: string) => buildRelease?.assets.find(item => item.name.endsWith(suffix))?.url ?? releasesUrl;
 const quarantineCmd = "xattr -dr com.apple.quarantine /Applications/Asterism.app";
 ---
 
@@ -73,23 +17,13 @@ const quarantineCmd = "xattr -dr com.apple.quarantine /Applications/Asterism.app
     <div class="top">
       <Mark size={52} class="mark" />
       <h2>{t.title}</h2>
-      <p class="status">
-        <span class="badge">{t.status}</span>
-        <a
-          class="version"
-          href={buildRelease ? `${repoUrl}/releases/tag/${buildRelease.tag}` : releasesUrl}
-          hidden={!buildRelease}
-        >
-          {buildRelease?.tag ?? ""}
-        </a>
-      </p>
     </div>
 
     <ul class="platforms" data-platforms>
       {
         t.platforms.map(platform => (
           <li class="platform-item" data-os={platform.id}>
-            <a class="platform-main" href={resolveUrl(platform.asset)}>
+            <a class="platform-main" href={`${releasesUrl}/latest/download/${platform.asset}`}>
               <span class="os-row">
                 <span class="os">{platform.os}</span>
                 <span class="rec" data-rec hidden>{t.recommended}</span>
@@ -197,33 +131,6 @@ const quarantineCmd = "xattr -dr com.apple.quarantine /Applications/Asterism.app
   :global(html:lang(zh)) h2 {
     letter-spacing: 0;
     font-stretch: 100%;
-  }
-
-  .status {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-    font-size: 0.875rem;
-    color: var(--ink-inv);
-  }
-
-  .badge {
-    padding: 0.2rem 0.65rem;
-    border: 1px solid var(--line-inv);
-    border-radius: 999px;
-  }
-
-  .version {
-    font-family: var(--mono);
-    font-size: 0.8125rem;
-    border-bottom: 1px solid transparent;
-    transition: color 0.2s, border-color 0.2s;
-  }
-
-  .version:hover {
-    color: var(--bg);
-    border-color: var(--line-inv);
   }
 
   .platforms {

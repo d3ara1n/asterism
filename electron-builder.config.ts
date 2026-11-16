@@ -23,7 +23,7 @@ const config: Configuration = {
     verifyPackagedPlugins(join(context.packager.getResourcesDir(context.appOutDir), "app.asar.unpacked"));
   },
   extraResources: [{ from: "assets/icon/asterism-full.png", to: "asterism-full.png" }],
-  artifactName: "Asterism-${version}-${os}-${arch}.${ext}",
+  artifactName: "Asterism-${os}-${arch}.${ext}",
   publish: { provider: "github", owner: applicationRepository.owner, repo: applicationRepository.name, channel: "latest" },
   mac: {
     target: ["dmg", "zip"],
