@@ -4,6 +4,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyDescription } from "@asterism-app/
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
+import { ConversationSharing } from "./ConversationSharing";
 import { ConversationNavigation, type ConversationNavigationHandle } from "./ConversationNavigation";
 
 import { MessageComposer } from "./Composer";
@@ -79,7 +80,7 @@ export function Conversation({ feedback, compressions, activity = null }: {
     await interaction.resume(); latest();
   };
 
-  return <>
+  return <ConversationSharing items={items} historyWindow={viewState.historyWindow} earlier={read.data?.earlier ?? false}>
     <AgentUIRegion position="top" />
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <ConversationNavigation ref={navigation} timeline={timeline} scroll={scroll} list={list} onSelect={jumpTo} />
@@ -127,7 +128,7 @@ export function Conversation({ feedback, compressions, activity = null }: {
         ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
         onSave={() => interaction.save()} onCancel={interaction.cancel} onContinue={resume} />
     </footer>}
-  </>;
+  </ConversationSharing>;
 }
 
 /** Retry countdown belongs to live activity; persisted notices never imply a scheduled action after restart. */

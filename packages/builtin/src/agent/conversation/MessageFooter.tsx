@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { Copy, FileText, MoreHorizontal } from "lucide-react";
+import { useContext, useRef, useState } from "react";
+import { Copy, FileText, MoreHorizontal, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -11,10 +11,14 @@ import { conversationMessages as messages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";
 import { MessageTimestamp } from "./MessageTimestamp";
 
+import { ConversationShareContext } from "./share-context";
+import { shareMessages } from "../../messages/share";
+
 type Message = Extract<TimelineItem, { kind: "message" }>;
 
 export function MessageFooter({ node, text }: { node: Message; text: string }) {
   const i18n = useI18n();
+  const share = useContext(ConversationShareContext);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [copying, setCopying] = useState(false);
   const more = useRef<HTMLButtonElement>(null);
@@ -35,6 +39,7 @@ export function MessageFooter({ node, text }: { node: Message; text: string }) {
       <MessageTimestamp createdAt={node.createdAt} />
       <div className="nodrag nopan nokey flex items-center gap-0.5 opacity-60 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
         {text && <IconButton size="icon-xs" label={i18n.text(messages.copyInput)} disabled={copying} onClick={() => { void copy(text); }}><Copy /></IconButton>}
+        {share && <IconButton size="icon-xs" label={i18n.text(shareMessages.share)} onClick={event => share(node.id, event.currentTarget)}><Share2 /></IconButton>}
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button ref={more} variant="ghost" size="icon-xs"
             aria-label={i18n.text(messages.inputMoreActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>

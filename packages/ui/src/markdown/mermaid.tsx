@@ -70,5 +70,7 @@ export function MermaidDiagram({ code, streaming, children }: { code: string; st
         {children}
       </>;
   }
-  return <div ref={container}>{content}</div>;
+  const settled = theme && (cached?.svg || (rendered?.code === code && diagramKey(code, rendered.theme) === diagramKey(code, theme)));
+  const pending = !streaming && !!code.trim() && !settled;
+  return <div ref={container} data-render-pending={pending ? "" : undefined}>{content}</div>;
 }

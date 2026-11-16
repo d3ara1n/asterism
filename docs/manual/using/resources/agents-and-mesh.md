@@ -12,6 +12,12 @@ Being available as an Agent resource includes investigation of saved conversatio
 
 Input acceptance, execution ending, and acceptance of the deliverable are separate events. A supervisor relationship requires an agreement about reports, evidence, and follow-through; the link alone does not schedule work or make a final response a verified result.
 
+### Sharing an excerpt is different from publishing an Agent
+
+A shared excerpt is a static artifact for someone to read outside the workbench, not a connection to the Agent. It does not give its recipient access to the conversation's records or resources. The excerpt keeps the selected messages as they were when sharing opened; later output does not update it. This makes it useful for showing a question and its answer without publishing the full working context.
+
+The image is laid out independently of the Agent card, so a narrow workbench view need not produce a narrow image. It remains one long image rather than a set of pages. Extremely long excerpts can exceed the browser's image limits; a smaller selection or Markdown is more suitable in that case. Sharing includes input text and final replies, not the execution trace or runtime measurements. Attachments remain names rather than embedded file contents. Internal references are labels in the image; Markdown retains their original syntax, whose destinations still belong to the originating workbench and are not public links.
+
 ### A default role is a starting choice
 
 The default role selected in Agent settings is the starting choice for a new conversation on the home page, not a policy for every Agent. Choosing a different role for one conversation does not change that preference, and changing the default does not reconfigure existing Agents. The selected role supplies its instructions and model role; the default preference does not maintain a separate copy of those settings. The factory default has no role instructions and is reserved for user-created conversations unless you allow assistant use.

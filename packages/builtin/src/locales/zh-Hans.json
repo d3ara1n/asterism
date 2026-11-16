@@ -937,5 +937,20 @@
   "todo.listCount": "{count} 个清单",
   "todo.noLists": "暂无共享清单",
   "todo.retains": "保留 {count} 个已完成",
-  "todo.transferred": "已转移 {count} 个"
+  "todo.transferred": "已转移 {count} 个",
+  "conversation.share.copied": "已复制",
+  "conversation.share.copyImage": "复制图片",
+  "conversation.share.copyMarkdown": "复制 Markdown",
+  "conversation.share.earlierFailed": "无法加载更早的消息。",
+  "conversation.share.failed": "无法导出片段。",
+  "conversation.share.messages": "消息",
+  "conversation.share.open": "分享片段",
+  "conversation.share.preview": "预览",
+  "conversation.share.saveImage": "保存 PNG",
+  "conversation.share.saveMarkdown": "保存 Markdown",
+  "conversation.share.saved": "已保存",
+  "conversation.share.selectMessages": "选择消息",
+  "conversation.share.selected": "已选 {count} 条",
+  "conversation.share.tooLarge": "图片过长或过宽，请减少消息或导出 Markdown。",
+  "conversation.share.width": "图片宽度"
 }

@@ -24,6 +24,16 @@ export class ConversationHistoryWindow {
     return { boundary: this.boundary, from: this.from, earlier: start > boundary };
   }
 
+  /** Independent readers can start at the same range without moving the card's reading window. */
+  fork(): ConversationHistoryWindow {
+    const window = new ConversationHistoryWindow();
+    window.initialized = this.initialized;
+    window.tip = this.tip;
+    window.boundary = this.boundary;
+    window.from = this.from;
+    return window;
+  }
+
   expand(path: readonly RecordInfo[]): void {
     const boundary = this.lowerBound(path);
     const start = this.from ? path.findIndex(record => record.id === this.from) : path.length;

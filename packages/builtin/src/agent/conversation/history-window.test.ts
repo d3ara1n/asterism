@@ -22,6 +22,20 @@ function project(path: ReturnType<typeof node>[], window: ConversationHistoryWin
 const ids = (saved: ReturnType<typeof project>) => withLive(saved, []).map(item => item.id);
 
 describe("Conversation reading range after compression", () => {
+  it("expands a fork without moving the original reader or losing its compression boundary", () => {
+    const path = Array.from({ length: 350 }, (_, index) => node(String(index), index ? String(index - 1) : null, message("a", "Input")));
+    path.push(node("summary", "349", summary("100")));
+    const window = new ConversationHistoryWindow();
+    project(path, window);
+    const index = snapshot(path).records.index({ scope: "timeline" });
+    const range = window.observe(index, null);
+    const fork = window.fork();
+    while (fork.observe(index, null).earlier) fork.expand(index);
+    expect(fork.observe(index, null)).toMatchObject({ from: "100", earlier: false });
+    expect(window.observe(index, null)).toEqual(range);
+    expect(range.from).toBe("251");
+  });
+
   // Loading older pages must stop at the retained boundary, and incoming records must not slide an existing reading window.
   it("keeps an open reading window fixed while fresh windows page back only as far as the compression boundary", () => {
     const path = Array.from({ length: 250 }, (_, index) => node(String(index), index ? String(index - 1) : null, message("a", "Input")));

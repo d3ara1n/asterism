@@ -1,7 +1,7 @@
 import { CachedMarkdown, Streamdown, type StreamdownProps } from "@lobehub/streamdown";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { useReducedMotion } from "./reduced-motion";
-import { memo, useEffect, useId, useMemo, useState } from "react";
+import { memo, useContext, useEffect, useId, useMemo, useState } from "react";
 
 import { externalWebUrl } from "../links";
 import { markdownMessages } from "../messages/markdown";
@@ -9,6 +9,7 @@ import { MarkdownCode, MarkdownStreamingContext } from "./code";
 import { MarkdownLink } from "./link";
 import { markdownOptions } from "./options";
 import { rehypeScopedAnchors } from "./anchors";
+import { MarkdownDocumentContext } from "./presentation";
 
 const components: NonNullable<StreamdownProps["components"]> = {
   a: ({ node: _node, ...props }) => <MarkdownLink {...props} />,
@@ -34,9 +35,10 @@ const streamSettleMs = 1000;
 /**
  * Shared Markdown for every plugin; typography and KaTeX styles come from the host stylesheet (`.markdown-content`).
  * The library handles parsing, completion, and fade-in; historical content is displayed statically.
+ * Document presentation keeps the same parser and components, with wrapped code and non-navigating internal references.
  * Streamdown has no end signal and retains word-by-word animation while the trailing block is mounted, so mount it only during generation and the drain window.
  */
-export const Markdown = memo(function Markdown({ children, streaming = false }: { children: string; streaming?: boolean }) {
+export const Markdown = memo(function Markdown({ children, streaming = false, document = false }: { children: string; streaming?: boolean; document?: boolean }) {
   const id = useId();
   const i18n = useI18n();
   const options = useMemo(() => ({ ...markdownOptions,
@@ -54,22 +56,23 @@ export const Markdown = memo(function Markdown({ children, streaming = false }: 
   }, [streaming, settling]);
   const live = streaming || settling;
   const reducedMotion = useReducedMotion();
-  return <MarkdownStreamingContext value={streaming}>
+  return <MarkdownDocumentContext value={document}><MarkdownStreamingContext value={streaming}>
     <div data-markdown-root className="markdown-content type-body min-w-0 break-words [overflow-wrap:anywhere]">
       {live && !reducedMotion
         ? <Streamdown {...options} components={components} content={children} smoothing="balanced" granularity="word" remend={{ htmlTags: false }} />
         : <CachedMarkdown {...options} components={components}>{children}</CachedMarkdown>}
     </div>
-  </MarkdownStreamingContext>;
+  </MarkdownStreamingContext></MarkdownDocumentContext>;
 });
 
 function MarkdownImage({ src, alt, title }: { src: string; alt: string; title?: string }) {
   const i18n = useI18n();
   const [failed, setFailed] = useState(false);
+  const document = useContext(MarkdownDocumentContext);
   return <a href={src} target="_blank" rel="noopener noreferrer" aria-label={alt || i18n.text(markdownMessages.markdownImage)}>
     {failed
       ? <span>{i18n.text(markdownMessages.markdownImageFailed)}{alt ? ` · ${alt}` : ""}</span>
-      : <img src={src} alt={alt} title={title} loading="lazy" decoding="async" referrerPolicy="no-referrer"
+      : <img src={src} alt={alt} title={title} loading={document ? "eager" : "lazy"} decoding="async" referrerPolicy="no-referrer"
         className="my-2 block h-auto max-w-full rounded-md" onError={() => setFailed(true)} />}
   </a>;
 }

@@ -3,7 +3,7 @@ import { useLayoutEffect, useState, type RefObject } from "react";
 
 /** Mermaid color calculations require actual color values; values come from public host tokens without depending on the application's settings implementation. */
 function diagramTheme(element: HTMLElement): MermaidConfig {
-  const root = getComputedStyle(document.documentElement);
+  const root = getComputedStyle(element);
   const text = getComputedStyle(element);
   const token = (name: string) => root.getPropertyValue(`--${name}`).trim();
   const card = token("card"), foreground = token("foreground"), border = token("border");

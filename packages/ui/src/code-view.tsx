@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { File, FileDiff, type FileDiffOptions, type FileOptions } from "@pierre/diffs/react";
-import { parsePatchFiles, preloadHighlighter, resolveLanguage, type BaseCodeOptions, type FileDiffMetadata, type SupportedLanguages } from "@pierre/diffs";
+import { parsePatchFiles, preloadHighlighter, type BaseCodeOptions, type FileDiffMetadata, type SupportedLanguages } from "@pierre/diffs";
 
 /** Shared Pierre presentation; the host stylesheet supplies `.pierre-code` fonts, sizes, and compact spacing. */
 export const codeViewOptions = {
@@ -58,15 +58,18 @@ export function CodeRows({ rows, filename, dimmed, overflow }: {
 const resolvedLanguages = new Map<string, string>();
 
 /** Whole text in an explicit language, such as fenced Markdown code or script source; Pierre resolves aliases and loads grammars itself. */
-export function CodeText({ contents, language, lineNumbers = false, overflow = "scroll" }: {
-  contents: string; language: string; lineNumbers?: boolean; overflow?: "wrap" | "scroll";
+export function CodeText({ contents, language, lineNumbers = false, overflow = "scroll", themeType = "system" }: {
+  contents: string; language: string; lineNumbers?: boolean; overflow?: "wrap" | "scroll"; themeType?: "system" | "light" | "dark";
 }) {
   const requested = language.toLowerCase();
   const [, setResolved] = useState<string>();
   useEffect(() => {
     let active = true;
     if (!requested || requested === "text" || resolvedLanguages.has(requested)) return;
-    void resolveLanguage(requested).then(() => {
+    // A resolved grammar is not yet attached to Pierre's shared highlighter. Prepare it
+    // before committing the language so a static capture cannot observe the plain-text fallback.
+    void preloadHighlighter({ themes: [codeViewOptions.theme.light, codeViewOptions.theme.dark],
+      langs: [requested], preferredHighlighter: codeViewOptions.preferredHighlighter }).then(() => {
       resolvedLanguages.set(requested, requested);
       if (active) setResolved(requested);
     }, () => {
@@ -78,10 +81,14 @@ export function CodeText({ contents, language, lineNumbers = false, overflow = "
   }, [requested]);
   const lang = resolvedLanguages.get(requested) ?? "text";
   const file = useMemo(() => ({ name: "code", contents, lang }), [contents, lang]);
+  const [rendered, setRendered] = useState<typeof file | null>(null);
   const options = useMemo<FileOptions<undefined, undefined>>(() => ({
-    ...codeViewOptions, disableLineNumbers: !lineNumbers, overflow,
-  }), [lineNumbers, overflow]);
-  return <File file={file} options={options} className="pierre-code type-code" disableWorkerPool />;
+    ...codeViewOptions, disableLineNumbers: !lineNumbers, overflow, themeType,
+    onPostRender(_node, _instance, phase) { if (phase !== "unmount") setRendered(file); },
+  }), [file, lineNumbers, overflow, themeType]);
+  return <div data-render-pending={rendered !== file || (requested && requested !== "text" && !resolvedLanguages.has(requested)) ? "" : undefined}>
+    <File file={file} options={options} className="pierre-code type-code" disableWorkerPool />
+  </div>;
 }
 
 export const diffViewOptions = {

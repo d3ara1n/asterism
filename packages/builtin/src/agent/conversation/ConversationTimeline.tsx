@@ -101,7 +101,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "toolcall": return <ToolCall node={node} />;
     case "summary": return <Summary text={node.text} />;
     case "compression": return <CompressionMarker node={node} />;
-    case "turn-metrics": return <TurnFooter metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} replyCreatedAt={node.replyCreatedAt} />;
+    case "turn-metrics": return <TurnFooter inputId={node.inputId} metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} replyCreatedAt={node.replyCreatedAt} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>
         <p className="whitespace-pre-wrap break-words">{node.message}</p>

@@ -1,4 +1,5 @@
-import type { ComponentProps } from "react";
+import { useContext, type ComponentProps } from "react";
+import { MarkdownDocumentContext } from "./presentation";
 import { parseModelUrl, parseResourceUrl, parseSkillUrl } from "@asterism-app/sdk/contracts";
 import { useRendererObject } from "@asterism-app/sdk/renderer";
 import { externalWebUrl } from "../links";
@@ -7,6 +8,8 @@ import { ReferenceChip } from "../reference-chip";
 type AnchorProps = ComponentProps<"a">;
 
 export function MarkdownLink({ href, children, ...props }: AnchorProps) {
+  const document = useContext(MarkdownDocumentContext);
+  if (document && href && (parseModelUrl(href) || parseSkillUrl(href) || parseResourceUrl(href))) return <span>{children}</span>;
   if (href?.startsWith("#")) return <a {...props} href={href} onAuxClick={event => event.preventDefault()} onClick={event => {
     event.preventDefault();
     const root = event.currentTarget.closest("[data-markdown-root]");
