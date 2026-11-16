@@ -50,6 +50,20 @@ describe("Subagent activity log", () => {
     ]);
   });
 
+  it("stops completed thinking while later output and tool input remain live", () => {
+    const live: ModelLiveBlock[] = [
+      { id: "a", responseId: "r1", ordinal: 0, kind: "thinking", text: "Checking", startedAt: 100, endedAt: 200 },
+      { id: "b", responseId: "r1", ordinal: 1, kind: "text", text: "Reading the file.", endedAt: null },
+      { id: "c", responseId: "r1", ordinal: 2, kind: "toolcall", name: "read", argumentsText: "", arguments: null,
+        state: "input", invocation: null, result: null },
+    ];
+    expect(activityOf([], live, [])).toEqual([
+      { kind: "thinking", state: "done" },
+      { kind: "text", preview: "Reading the file." },
+      { kind: "tool", name: "read", implementation: null, subject: null, state: "running" },
+    ]);
+  });
+
   // A live block that has also been finalized must appear once, with its final state; text not yet streamed has no step.
   it("adds only unfinalized live steps and marks a finalized call without outcome as cancelled", () => {
     const live: ModelLiveBlock[] = [

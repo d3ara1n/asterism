@@ -72,7 +72,7 @@ export function activityOf(blocks: readonly ProcessBlock[], live: readonly Model
   deliver(count);
   for (const block of live) {
     if (finalized.has(`${block.responseId}:${block.ordinal}`)) continue;
-    if (block.kind === "thinking") entries.push({ kind: "thinking", state: "running" });
+    if (block.kind === "thinking") entries.push({ kind: "thinking", state: block.endedAt === null ? "running" : "done" });
     else if (block.kind === "text") { const text = oneLine(block.text); if (text) entries.push({ kind: "text", preview: text }); }
     else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.arguments),
       implementation: block.invocation?.implementation?.id ?? null, state: "running" });
