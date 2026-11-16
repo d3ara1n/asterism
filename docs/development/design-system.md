@@ -117,6 +117,10 @@ A two-state menu item is one checkbox item. Its identity icon sits in the shared
 
 List rows keep one hit surface with separate actions. Editors group related fields and operations in shared sections and expose reset where values override their baseline.
 
+An island whose whole content is a list uses the shared panel list body in a fill-layout panel. The list sits flush inside the island rather than in a nested card: rows keep a small inset so hover and selection fills stay inside the island border, row text aligns with the panel title, and hairlines separate consecutive rows. The title bar carries the item count; a search toolbar appears when the list can grow long. Optional group headings use the label role with a trailing count. Empty, loading, failed, and no-match states replace the list with one centered icon and short label, with a recovery action where one exists. Issues that affect the listed items scroll with the list as its first row.
+
+A list whose rows open further detail uses the same body with openable rows: each row is one hit surface ending in a chevron, the opened detail is an island owned by the list island, and the row keeps the selected tone while that island is open. Rows whose operations finish in place, such as restoring an archived conversation, carry those operations as row actions without a chevron.
+
 ## Branding and implementation ownership
 
 The official Asterism identity is a triangular constellation of three rounded six-point stars. Application icons pair citron and deep green surfaces; interface marks use the same silhouette in the foreground color. The brand palette is independent of the configurable interface accent. Surface shading stays restrained, and the mark remains recognizable without material effects.

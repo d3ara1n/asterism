@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { ChevronRight } from "lucide-react";
 import { cn } from "../utils";
 import { Button, buttonVariants } from "./button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "./item";
@@ -7,8 +8,10 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle }
  * Compose an openable row from Item primitives. The title's hit area spans the row;
  * action slots sit above it, keeping interactive controls separate from decorative media.
  */
-export function ListRow({ title, description, details, media, mediaVariant, leadingActions, actions, selected = false, disabled, inactive, onOpen, className, contentClassName, variant = "default", buttonProps }: {
+export function ListRow({ title, description, descriptionLines = 1, details, media, mediaVariant, leadingActions, actions, opens = false, selected = false, disabled, inactive, onOpen, className, contentClassName, variant = "default", buttonProps }: {
   title: ReactNode; description?: ReactNode; media?: ReactNode; mediaVariant?: "default" | "icon"; leadingActions?: ReactNode; actions?: ReactNode;
+  /** Two lines suit prose descriptions such as skill summaries; one line suits identifiers and status. */ descriptionLines?: 1 | 2;
+  /** Opening shows the item in another island; a trailing chevron marks the row as a navigation target. */ opens?: boolean;
   /** Additional information below the description. */ details?: ReactNode;
   selected?: boolean; disabled?: boolean; inactive?: boolean; onOpen: (origin: HTMLElement) => void;
   className?: string; contentClassName?: string;
@@ -27,10 +30,11 @@ export function ListRow({ title, description, details, media, mediaVariant, lead
         {...buttonProps}
         className={cn("min-w-0 text-left outline-none after:absolute after:inset-0 focus-visible:underline", disabled && "opacity-50", buttonProps?.className)}
         onClick={event => onOpen(event.currentTarget)}>{navigation ? <span className="block min-w-0">{title}</span> : <ItemTitle>{title}</ItemTitle>}</button>
-      {description && <ItemDescription className="truncate">{description}</ItemDescription>}
+      {description && <ItemDescription className={descriptionLines === 1 ? "truncate" : "line-clamp-2 text-pretty"}>{description}</ItemDescription>}
       {details && <ItemDescription className="type-caption truncate">{details}</ItemDescription>}
     </ItemContent>
     {actions && <ItemActions className={cn("relative shrink-0", navigation && "gap-0")}>{actions}</ItemActions>}
+    {opens && <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-colors group-hover/list-row:text-foreground" aria-hidden="true" />}
   </Item>;
 }
 

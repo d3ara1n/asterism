@@ -9,6 +9,8 @@ import { IslandPanel, panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemSeparator, ItemTitle } from "@asterism-app/ui/ui/item";
+import { PanelList, PanelListState, type PanelListEntry } from "@asterism-app/ui/ui/panel-list";
+import { commonMessages } from "@asterism-app/ui/messages/common";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
 import { sessionLifecycleDays, sessionLifecycleDaysSchema, type SessionLifecycle } from "../../../shared/configuration";
 import { useConfigurationAction, useSettingsConfiguration } from "../configuration/state";
@@ -88,22 +90,25 @@ function RecycleBin() {
   const { snapshot, restore } = useSessionArchive();
   const [pending, setPending] = useState<string | null>(null);
   const sessions = snapshot?.archivedSessions ?? [];
-  return <IslandPanel title={i18n.text(settingsMessages.recycleBin)}>
-    {sessions.length === 0 ? <p className="type-caption px-1 py-3">{i18n.text(settingsMessages.recycleBinEmpty)}</p>
-      : <ItemGroup className="surface">{sessions.map((session, index) => <div key={session.id}>{index > 0 && <ItemSeparator />}
-        <Item size="sm">
-          <ItemContent className="min-w-0">
-            <ItemTitle className="block truncate" title={session.title}>{session.title}</ItemTitle>
-            <ItemDescription>{i18n.formatMessage(settingsMessages.archivedAt,
-              { date: i18n.formatDate(Date.parse(session.archived_at), { dateStyle: "medium", timeStyle: "short" }) })}</ItemDescription>
-          </ItemContent>
-          <ItemActions>
-            <Button size="sm" variant="ghost" disabled={pending !== null} aria-busy={pending === session.id}
-              aria-label={i18n.formatMessage(settingsMessages.restoreConversationLabel, { title: session.title })}
-              onClick={() => { setPending(session.id); void restore(session.id).finally(() => setPending(null)); }}>
-              {pending === session.id ? <Spinner /> : <ArchiveRestore />}{i18n.text(settingsMessages.restoreConversation)}
-            </Button>
-          </ItemActions>
-        </Item></div>)}</ItemGroup>}
+  const entries: PanelListEntry<(typeof sessions)[number]>[] = sessions.map(session => ({ kind: "item", key: session.id, item: session }));
+  return <IslandPanel layout="fill" title={i18n.text(settingsMessages.recycleBin)}
+    description={sessions.length ? i18n.formatMessage(settingsMessages.archivedCount, { count: sessions.length }) : undefined}>
+    <PanelList entries={entries}
+      state={!snapshot ? <PanelListState icon={<Spinner />} label={i18n.text(commonMessages.loading)} />
+        : !sessions.length ? <PanelListState icon={<Trash2 />} label={i18n.text(settingsMessages.recycleBinEmpty)} /> : null}
+      renderItem={session => <Item size="sm">
+        <ItemContent className="min-w-0">
+          <ItemTitle className="block truncate" title={session.title}>{session.title}</ItemTitle>
+          <ItemDescription className="truncate">{i18n.formatMessage(settingsMessages.archivedAt,
+            { date: i18n.formatDate(Date.parse(session.archived_at), { dateStyle: "medium", timeStyle: "short" }) })}</ItemDescription>
+        </ItemContent>
+        <ItemActions>
+          <Button size="sm" variant="ghost" disabled={pending !== null} aria-busy={pending === session.id}
+            aria-label={i18n.formatMessage(settingsMessages.restoreConversationLabel, { title: session.title })}
+            onClick={() => { setPending(session.id); void restore(session.id).finally(() => setPending(null)); }}>
+            {pending === session.id ? <Spinner /> : <ArchiveRestore />}{i18n.text(settingsMessages.restoreConversation)}
+          </Button>
+        </ItemActions>
+      </Item>} />
   </IslandPanel>;
 }

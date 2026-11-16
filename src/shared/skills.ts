@@ -11,3 +11,7 @@ export type SkillSource = z.infer<typeof skillSourcesSchema>[number];
 export const ReadSkills = defineCall(coreId("skills.read"), { scope: "plugin", input: z.strictObject({}), output: skillSourcesSchema });
 export const RefreshSkills = defineCall(coreId("skills.refresh"), { scope: "plugin", input: z.strictObject({}), output: skillSourcesSchema });
 export const SkillsChanged = defineEvent(coreId("skills.changed"), { schema: skillSourcesSchema, source: "host", semantics: { kind: "snapshot", key: [] } });
+/** Instructions of one source's skill package: SKILL.md without frontmatter, read at call time. Missing entries reject with skill_not_found. */
+export const ReadSkillDocument = defineCall(coreId("skills.document.read"), {
+  scope: "plugin", input: z.strictObject({ source: z.string(), name: z.string() }), output: z.strictObject({ text: z.string() }),
+});

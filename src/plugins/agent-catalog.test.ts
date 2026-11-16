@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, realpathSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { AgentCatalogService, parseSkillMetadata } from "./agent-catalog.ts";
+import { AgentCatalogService, parseSkillMetadata, skillDocumentBody } from "./agent-catalog.ts";
 import { packageAsset } from "./package-assets.ts";
 
 const roots: string[] = [];
@@ -26,6 +26,12 @@ describe("host skill sources", () => {
     for (const text of ["---\nname: a\nname: b\ndescription: test\n---", "---\nname: [a]\ndescription: test\n---",
       "---\nname: a\ndescription: ''\n---", "Body\n---\nname: a\ndescription: test\n---", "---\nname: a\ndescription: test"])
       expect(() => parseSkillMetadata(text)).toThrow();
+  });
+
+  it("strips only leading frontmatter from SKILL.md instructions", () => {
+    expect(skillDocumentBody("\uFEFF---\r\nname: a\r\ndescription: b\r\n---\r\n\r\n# Steps\r\n---\r\nmore")).toBe("\r\n# Steps\r\n---\r\nmore");
+    expect(skillDocumentBody("---\nname: a\n---\nBody")).toBe("Body");
+    expect(skillDocumentBody("Intro\n---\nname: a\n---\n")).toBe("Intro\n---\nname: a\n---\n");
   });
 
   it("refreshes explicitly and isolates invalid or ambiguous entries within a source", () => {

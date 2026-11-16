@@ -30,8 +30,9 @@ function decode(bytes: Buffer): string {
     return failure("unsupported_text", "The content format differs from the supported UTF-8 text format.");
   return bytes.toString("utf8");
 }
+const frontmatterPattern = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)^---[ \t]*\r?$/m;
 export function parseSkillMetadata(text: string): Pick<AgentSkill, "name" | "description"> {
-  const frontmatter = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)^---[ \t]*\r?$/m.exec(text);
+  const frontmatter = frontmatterPattern.exec(text);
   if (!frontmatter || frontmatter.index !== 0) return failure("invalid_skill", "SKILL.md requires YAML frontmatter enclosed by --- lines.");
   const document = parseDocument(frontmatter[1]);
   if (document.errors.length) return failure("invalid_skill", document.errors.map(error => error.message).join("\n"));
@@ -70,6 +71,13 @@ function scan(source: AgentSource, signal: AbortSignal): AgentSkillSource {
     return false;
   }).sort((a, b) => compare(a.name, b.name));
   return result;
+}
+
+/** SKILL.md instructions without the leading frontmatter, whose metadata the catalog already carries; text without frontmatter is returned unchanged. */
+export function skillDocumentBody(text: string): string {
+  const frontmatter = frontmatterPattern.exec(text);
+  if (!frontmatter || frontmatter.index !== 0) return text;
+  return text.slice(frontmatter[0].length).replace(/^\r?\n/, "");
 }
 
 /** Skill directory of the current OS user. */

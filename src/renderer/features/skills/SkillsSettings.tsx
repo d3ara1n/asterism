@@ -1,26 +1,43 @@
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, TriangleAlert } from "lucide-react";
-import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
-import { IslandPanel, useI18n, useRendererCalls, useRendererEvents, useRendererIsland } from "@asterism-app/sdk/renderer";
+import { BookOpen, Folder, FolderOpen, Puzzle, RefreshCw, Search, TriangleAlert } from "lucide-react";
+import { IslandPanel, useI18n, useRendererApplication, useRendererCalls, useRendererEvents, useRendererIsland } from "@asterism-app/sdk/renderer";
+import type { UiText } from "@asterism-app/sdk/contracts";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from "@asterism-app/ui/ui/item";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
+import { PanelList, PanelListState, type PanelListEntry } from "@asterism-app/ui/ui/panel-list";
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
+import { Markdown } from "@asterism-app/ui/markdown";
+import { commonMessages } from "@asterism-app/ui/messages/common";
+import { failureDisplay } from "@asterism-app/ui/error-display";
 import { useLifetimeSignal } from "@asterism-app/ui/use-lifetime";
 import { PluginCallScope, PluginIslandProvider } from "../plugins/scope";
+import { Section } from "../settings/layout";
+import { toast } from "../../shared/toast";
 import { skillsMessages as messages } from "../../messages/skills";
-import { ReadSkills, RefreshSkills, SkillsChanged, type SkillSource } from "../../../shared/skills";
+import { pluginName } from "../../../shared/plugin-name";
+import type { AppSnapshot } from "../../../shared/contracts";
+import { ReadSkillDocument, ReadSkills, RefreshSkills, SkillsChanged, type SkillSource } from "../../../shared/skills";
 
-const islandKey = (source: string) => `skills:${source}`;
+type Skill = SkillSource["skills"][number];
+/** Display names of loaded plugins by ID; sources of unknown plugins fall back to the plugin ID. */
+type PluginNames = ReadonlyMap<string, UiText>;
+
+const catalogKey = "skills:catalog";
+const skillKey = (source: string, name: string) => `skills:skill:${source}\u0000${name}`;
 /** Issues under directory sources display paths relative to the package; files from plugin and built-in sources retain their original values. */
 const issueFile = (source: string, file: string) =>
   file.startsWith(source) && /^[\\/]/.test(file.slice(source.length)) ? file.slice(source.length + 1) : file;
 
-/** Settings and source islands independently subscribe to the same catalog snapshot; SkillsChanged synchronizes refresh results to all subscribers. */
+function sourceTitle(source: Pick<SkillSource, "plugin">, names: PluginNames): UiText {
+  return source.plugin === null ? messages.userDirectory : names.get(source.plugin) ?? source.plugin;
+}
+
+/** Settings and catalog islands independently subscribe to the same catalog snapshot; SkillsChanged synchronizes refresh results to all subscribers. */
 function useSkillCatalog() {
   const calls = useRendererCalls(), events = useRendererEvents();
   const [catalog, setCatalog] = useState<SkillSource[] | null>(null);
@@ -39,11 +56,15 @@ function useSkillCatalog() {
   return { catalog, failed, retry };
 }
 
-/** Settings show only source summaries; entries are searchable in source islands, while the model reads bodies and supporting files as needed. */
-export function SkillSettings() {
-  return <PluginCallScope><PluginIslandProvider pluginId="asterism.host" page><SkillSettingsBody /></PluginIslandProvider></PluginCallScope>;
+/**
+ * Settings show the catalog entry and a source summary. Skills are browsed in one catalog island grouped by source,
+ * and each skill opens a detail island owned by it; the model reads bodies and supporting files as needed.
+ */
+export function SkillSettings({ plugins }: { plugins: AppSnapshot["plugins"] }) {
+  const names: PluginNames = new Map(plugins.flatMap(plugin => plugin.id ? [[plugin.id, pluginName(plugin)] as const] : []));
+  return <PluginCallScope><PluginIslandProvider pluginId="asterism.host" page><SkillSettingsBody names={names} /></PluginIslandProvider></PluginCallScope>;
 }
-function SkillSettingsBody() {
+function SkillSettingsBody({ names }: { names: PluginNames }) {
   const i18n = useI18n(), calls = useRendererCalls(), island = useRendererIsland();
   const { catalog, failed, retry } = useSkillCatalog();
   const [refreshing, setRefreshing] = useState(false), [refreshFailed, setRefreshFailed] = useState(false);
@@ -55,76 +76,144 @@ function SkillSettingsBody() {
     catch { if (!signal.aborted) setRefreshFailed(true); }
     finally { if (!signal.aborted) setRefreshing(false); }
   };
-  const open = (source: string, origin: HTMLElement) => island.open({ key: islandKey(source), label: messages.source, origin,
-    render: () => <SkillSourcePanel source={source} /> });
+  const open = (origin: HTMLElement) => island.open({ key: catalogKey, label: messages.title, origin,
+    render: () => <SkillCatalogPanel names={names} /> });
   const total = catalog?.reduce((sum, group) => sum + group.skills.length, 0) ?? 0;
+  const issues = catalog?.reduce((sum, group) => sum + group.issues.length, 0) ?? 0;
 
   return <div className="flex flex-col gap-3">
-    <div className="flex items-center justify-between gap-2">
-      <p className="type-caption">{catalog ? i18n.formatMessage(messages.count, { count: total })
-        : !failed && <span className="flex items-center gap-2"><Spinner />{i18n.text(messages.loading)}</span>}</p>
-      <IconButton label={i18n.text(messages.refresh)} disabled={!catalog || refreshing} aria-busy={refreshing}
-        onClick={() => { void refresh(); }}>{refreshing ? <Spinner /> : <RefreshCw />}</IconButton>
-    </div>
     {(failed || refreshFailed) && <Alert variant="destructive"><AlertDescription>
       {i18n.text(messages.failed)}
       {failed && <Button variant="outline" size="sm" onClick={retry}>{i18n.text(messages.retry)}</Button>}
     </AlertDescription></Alert>}
-    {catalog && <>
+    <ItemGroup className="surface">
+      <div role="listitem">
+        <ListRow opens disabled={!catalog} selected={island.has(catalogKey)} onOpen={origin => { void open(origin); }}
+          media={<BookOpen className="size-4 text-folder-violet" />} title={i18n.text(messages.allSkills)}
+          description={catalog ? i18n.formatMessage(messages.count, { count: total })
+            : !failed && <span className="inline-flex items-center gap-2"><Spinner />{i18n.text(messages.loading)}</span>}
+          actions={<>
+            {issues > 0 && <Badge variant="warning"><TriangleAlert />{i18n.formatMessage(messages.issueCount, { count: issues })}</Badge>}
+            <IconButton label={i18n.text(messages.refresh)} disabled={!catalog || refreshing} aria-busy={refreshing}
+              onClick={() => { void refresh(); }}>{refreshing ? <Spinner /> : <RefreshCw />}</IconButton>
+          </>} />
+      </div>
+    </ItemGroup>
+    {catalog && catalog.length > 0 && <Section title={i18n.text(messages.sources)} hint={i18n.text(messages.composition)}>
       <ItemGroup className="surface">{catalog.flatMap((group, index) => {
-        const row = <div key={group.id} role="listitem">
-          <ListRow selected={island.has(islandKey(group.id))} onOpen={origin => { void open(group.id, origin); }}
-            title={<span className="block truncate font-mono text-xs" title={group.id} translate="no">{group.id}</span>}
-            description={group.skills.length
-              ? i18n.formatMessage(messages.count, { count: group.skills.length })
-              : `${i18n.text(messages.empty)} ${i18n.text(messages.emptyHint)}`}
-            actions={group.issues.length > 0 && <Badge variant="warning"><TriangleAlert />
-              {i18n.formatMessage(messages.issueCount, { count: group.issues.length })}</Badge>} />
-        </div>;
+        const row = <SourceRow key={group.id} group={group} names={names} />;
         return index ? [<ItemSeparator key={`${group.id}-separator`} />, row] : [row];
       })}</ItemGroup>
-      <p className="type-caption">{i18n.text(messages.composition)}</p>
-    </>}
+    </Section>}
   </div>;
 }
 
+/** Source summary: readable owner, original identity, skill count, and issues; user directories can be shown in the file manager. */
+function SourceRow({ group, names }: { group: SkillSource; names: PluginNames }) {
+  const i18n = useI18n(), application = useRendererApplication();
+  const user = group.plugin === null;
+  const Icon = user ? Folder : Puzzle;
+  const reveal = () => application.showLocalFile(group.directory, true)
+    .catch(() => { toast.error(i18n.text(commonMessages.locationActionFailed)); });
+  return <Item role="listitem" size="sm">
+    <ItemMedia><Icon className="size-4 text-muted-foreground" /></ItemMedia>
+    <ItemContent className="min-w-0">
+      <ItemTitle className="block truncate">{i18n.text(sourceTitle(group, names))}</ItemTitle>
+      <ItemDescription className="truncate font-mono text-xs select-text" title={group.id} translate="no">{group.id}</ItemDescription>
+    </ItemContent>
+    <ItemActions>
+      {group.issues.length > 0 && <Badge variant="warning"><TriangleAlert />{i18n.formatMessage(messages.issueCount, { count: group.issues.length })}</Badge>}
+      <span className="type-caption tabular-nums">{i18n.formatMessage(messages.count, { count: group.skills.length })}</span>
+      {user && <IconButton label={i18n.text(commonMessages.showInFileManager)} onClick={() => { void reveal(); }}><FolderOpen /></IconButton>}
+    </ItemActions>
+  </Item>;
+}
+
 /**
- * Source island: discovery issues appear first, skills can be filtered by name and description, and the list is virtualized to accommodate thousands of entries.
- * The list owns its viewport; status, issues, and the panel insets scroll together as list rows.
+ * Catalog island: every source's skills grouped under source headings, filtered by name and description,
+ * virtualized to accommodate thousands of entries. Discovery issues scroll with the list as its first row.
  */
-function SkillSourcePanel({ source }: { source: string }) {
-  const i18n = useI18n();
+function SkillCatalogPanel({ names }: { names: PluginNames }) {
+  const i18n = useI18n(), island = useRendererIsland();
   const { catalog, failed, retry } = useSkillCatalog();
   const [query, setQuery] = useState("");
-  const group = catalog?.find(item => item.id === source);
   const q = query.trim().toLowerCase();
-  const skills = group?.skills.filter(skill => !q || skill.name.toLowerCase().includes(q) || skill.description.toLowerCase().includes(q)) ?? [];
-  const status = failed ? <Alert variant="destructive"><AlertDescription>{i18n.text(messages.failed)}
-      <Button variant="outline" size="sm" onClick={retry}>{i18n.text(messages.retry)}</Button></AlertDescription></Alert>
-    : !catalog ? <p className="type-caption flex items-center gap-2"><Spinner />{i18n.text(messages.loading)}</p>
-    : !group ? <p className="type-caption">{i18n.text(messages.sourceRemoved)}</p>
-    : !group.skills.length ? <p className="type-caption">{i18n.text(messages.empty)} {i18n.text(messages.emptyHint)}</p>
-    : !skills.length ? <p className="type-caption">{i18n.text(messages.noMatch)}</p> : null;
-  const issues = !!group?.issues.length && <Alert><TriangleAlert className="text-warning" />
+  const total = catalog?.reduce((sum, group) => sum + group.skills.length, 0) ?? 0;
+  const entries: PanelListEntry<Skill>[] = (catalog ?? []).flatMap(group => {
+    const skills = group.skills.filter(skill => !q || skill.name.toLowerCase().includes(q) || skill.description.toLowerCase().includes(q));
+    return skills.length ? [
+      { kind: "heading" as const, key: `source:${group.id}`, title: i18n.text(sourceTitle(group, names)), meta: skills.length },
+      ...skills.map(skill => ({ kind: "item" as const, key: skillKey(group.id, skill.name), item: skill })),
+    ] : [];
+  });
+  const open = (skill: Skill, origin: HTMLElement) => island.open({ key: skillKey(skill.source.id, skill.name), label: messages.skill, size: "content", origin,
+    render: () => <SkillDetailPanel source={skill.source.id} name={skill.name} names={names} /> });
+  const issues = catalog?.filter(group => group.issues.length) ?? [];
+  const notice = issues.length > 0 && <Alert><TriangleAlert className="text-warning" />
     <AlertDescription>
       <p className="text-foreground">{i18n.text(messages.issues)}</p>
-      {group.issues.map((issue, index) => <p key={`${issue.file}:${index}`} className="break-all select-text">
-        <span className="font-mono text-xs" translate="no">{issueFile(source, issue.file)}</span>: {issue.message}</p>)}
+      {issues.flatMap(group => group.issues.map((issue, index) => <p key={`${group.id}:${issue.file}:${index}`} className="break-all select-text">
+        <span className="font-mono text-xs" translate="no">{issueFile(group.id, issue.file)}</span>: {issue.message}</p>))}
     </AlertDescription></Alert>;
-  const rows = [
-    { key: "inset-start", node: <div className="h-5" /> },
-    ...(issues ? [{ key: "issues", node: <div className="pb-3">{issues}</div> }] : []),
-    ...(status ? [{ key: "status", node: <div className="pb-3">{status}</div> }] : []),
-    ...skills.map(skill => ({ key: `skill:${skill.name}`, node: <div className="flex flex-col gap-0.5 py-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate text-sm font-medium text-foreground select-text" translate="no">{skill.name}</span>
+  const state = failed ? <PanelListState icon={<TriangleAlert />} label={i18n.text(messages.failed)}
+      action={<Button variant="outline" size="sm" onClick={retry}>{i18n.text(messages.retry)}</Button>} />
+    : !catalog ? <PanelListState icon={<Spinner />} label={i18n.text(messages.loading)} />
+    : !total ? <PanelListState icon={<BookOpen />} label={`${i18n.text(messages.empty)} ${i18n.text(messages.emptyHint)}`} />
+    : !entries.length ? <PanelListState icon={<Search />} label={i18n.text(messages.noMatch)} /> : null;
+  return <IslandPanel layout="fill" title={i18n.text(messages.title)} description={catalog ? i18n.formatMessage(messages.count, { count: total }) : undefined}
+    toolbar={total > 0 && <SearchInput value={query} onChange={setQuery} label={i18n.text(messages.search)} />}>
+    <PanelList entries={entries} notice={notice || undefined} state={state}
+      renderItem={skill => <ListRow opens descriptionLines={2} selected={island.has(skillKey(skill.source.id, skill.name))}
+        onOpen={origin => { void open(skill, origin); }}
+        title={<span className="block truncate" translate="no">{skill.name}</span>}
+        description={skill.description} />} />
+  </IslandPanel>;
+}
+
+/**
+ * Detail island for one source's copy of a skill: catalog metadata followed by the current SKILL.md instructions.
+ * Which copy is effective for a given Agent paradigm is resolved by that paradigm, not shown here.
+ */
+function SkillDetailPanel({ source, name, names }: { source: string; name: string; names: PluginNames }) {
+  const i18n = useI18n(), calls = useRendererCalls(), application = useRendererApplication();
+  const { catalog, failed, retry } = useSkillCatalog();
+  const group = catalog?.find(item => item.id === source);
+  const skill = group?.skills.find(item => item.name === name);
+  const [instructions, setInstructions] = useState<{ text: string } | { error: UiText } | null>(null);
+  const directory = skill?.directory;
+  useEffect(() => {
+    if (!directory) return;
+    const controller = new AbortController();
+    setInstructions(null);
+    calls.invoke(ReadSkillDocument, { source, name }, { signal: controller.signal }).then(
+      value => { if (!controller.signal.aborted) setInstructions(value); },
+      error => { if (!controller.signal.aborted) setInstructions({ error: failureDisplay(error, messages.documentFailed) }); });
+    return () => controller.abort();
+  }, [calls, source, name, directory]);
+  const reveal = (path: string) => application.showLocalFile(path, true)
+    .catch(() => { toast.error(i18n.text(commonMessages.locationActionFailed)); });
+  const owner = group ? i18n.text(sourceTitle(group, names)) : undefined;
+  const status = failed ? <Alert variant="destructive"><AlertDescription>{i18n.text(messages.failed)}
+      <Button variant="outline" size="sm" onClick={retry}>{i18n.text(messages.retry)}</Button></AlertDescription></Alert>
+    : !catalog ? <p className="type-caption flex items-center gap-2" role="status"><Spinner />{i18n.text(messages.loading)}</p>
+    : !skill ? <p className="type-caption" role="status">{i18n.text(messages.skillRemoved)}</p> : null;
+  return <IslandPanel title={name} description={owner}
+    action={skill && <IconButton label={i18n.text(commonMessages.showInFileManager)} onClick={() => { void reveal(skill.directory); }}><FolderOpen /></IconButton>}>
+    {status ?? (skill && <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-3">
+        <p className="type-body text-pretty select-text">{skill.description}</p>
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5">
+          <dt className="type-label">{i18n.text(messages.source)}</dt>
+          <dd className="type-caption truncate font-mono select-text" title={source} translate="no">{source}</dd>
+          <dt className="type-label">{i18n.text(messages.directory)}</dt>
+          <dd className="type-caption break-all font-mono select-text" translate="no">{skill.directory}</dd>
+        </dl>
       </div>
-      <p className="type-caption line-clamp-2 select-text" title={skill.description}>{skill.description}</p>
-    </div> })),
-    { key: "inset-end", node: <div className="h-5" /> },
-  ];
-  return <IslandPanel layout="fill" title={source} description={group ? i18n.formatMessage(messages.count, { count: group.skills.length }) : undefined}
-    toolbar={!!group?.skills.length && <SearchInput value={query} onChange={setQuery} label={i18n.text(messages.search)} />}>
-    <VirtualList data={rows}>{row => <div key={row.key} className="px-5">{row.node}</div>}</VirtualList>
+      <div className="border-t pt-5">
+        {!instructions ? <p className="type-caption flex items-center gap-2" role="status"><Spinner />{i18n.text(commonMessages.loading)}</p>
+          : "error" in instructions ? <Alert variant="destructive"><AlertDescription>{i18n.text(instructions.error)}</AlertDescription></Alert>
+          : <div className="select-text"><Markdown>{instructions.text}</Markdown></div>}
+      </div>
+    </div>)}
   </IslandPanel>;
 }

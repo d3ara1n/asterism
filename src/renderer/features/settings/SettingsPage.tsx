@@ -41,13 +41,14 @@ export type SettingsCategoryId = "general" | "appearance" | "providers" | "plugi
 export const isSettingsCategory = (id: string): id is SettingsCategoryId => ["general", "appearance", "providers", "plugins", "skills", "shell", "mcp", "about"].includes(id);
 /** Host and plugin cards share one icon contract; the card decides size and color. */
 type SettingsIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
-interface SettingsCategory { id: SettingsCategoryId; title: UiText; summary: UiText; icon: SettingsIcon; content: () => ReactNode }
+/** Host categories render with the plugin manager available, for pages that present plugin-contributed material. */
+interface SettingsCategory { id: SettingsCategoryId; title: UiText; summary: UiText; icon: SettingsIcon; content: (manager: PluginManager) => ReactNode }
 
 const categories: SettingsCategory[] = [
   { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: SlidersHorizontal, content: () => <><LanguageSettings /><NetworkSettings /><HomeEntrySettings /><SidebarSettings /><SessionsSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /><MessagingSettings /></> },
-  { id: "skills", title: skillsMessages.title, summary: skillsMessages.summary, icon: BookOpen, content: () => <SkillSettings /> },
+  { id: "skills", title: skillsMessages.title, summary: skillsMessages.summary, icon: BookOpen, content: manager => <SkillSettings plugins={manager.list} /> },
   { id: "shell", title: shellMessages.title, summary: shellMessages.summary, icon: Terminal, content: () => <ShellSettingsPage /> },
   { id: "mcp", title: mcpMessages.settings, summary: mcpMessages.summary, icon: Network, content: () => <McpSettings /> },
   { id: "about", title: settingsMessages.aboutTitle, summary: settingsMessages.aboutSummary, icon: Info, content: () => <AboutSettings /> },
@@ -72,7 +73,7 @@ function SettingsRoot({ openId, onOpen, onClosed, onCancel, manager, location }:
   const [origin, setOrigin] = useState("50% 0px");
   const registry = usePluginSettingsRegistry();
   const entries: { id: string; title: UiText; summary: UiText; icon: SettingsIcon; source?: UiText; content: () => ReactNode }[] = [
-    ...categories,
+    ...categories.map(category => ({ ...category, content: () => category.content(manager) })),
     { id: "plugins", title: pluginsMessages.plugins, summary: pluginsMessages.pluginsSummary, icon: Puzzle, content: () => <PluginsSettings manager={manager} /> },
     ...Array.from(registry.pages, ([id, page]) => ({ id, title: page.title, summary: page.summary, icon: page.icon ?? Puzzle, source: page.pluginName,
       content: () => <PluginSettingsContent key={id} pluginId={page.pluginId} page={page} location={location} /> })),

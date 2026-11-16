@@ -1,18 +1,18 @@
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { McpChanged, ReadUsage, UsageChanged, SystemResumed } from "@asterism-app/sdk/contracts";
-import { implementCall, type ManualSource } from "@asterism-app/sdk/runtime";
+import { implementCall, PluginApiError, type ManualSource } from "@asterism-app/sdk/runtime";
 import type { ConfigurationService } from "../configuration/service.ts";
 import { ProviderUsageService } from "../configuration/usage.ts";
 import { createModelProviderServices, createUsageProviderServices } from "../configuration/provider-services.ts";
 import { McpApplication } from "../mcp/application.ts";
-import { AgentCatalogService } from "../plugins/agent-catalog.ts";
+import { AgentCatalogService, skillDocumentBody } from "../plugins/agent-catalog.ts";
 import type { EventBus } from "../plugins/events.ts";
 import type { SharedServices } from "../plugins/host.ts";
 import { DeadlineScheduler } from "./deadline-scheduler.ts";
 import { ShellHost } from "../shell/host.ts";
 import { applicationStorage } from "../shared/application.ts";
-import { ReadSkills, RefreshSkills, SkillsChanged } from "../shared/skills.ts";
+import { ReadSkillDocument, ReadSkills, RefreshSkills, SkillsChanged } from "../shared/skills.ts";
 
 export interface SharedServiceOptions {
   db: DatabaseSync;
@@ -45,6 +45,11 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
       ...mcp.calls, ...shell.calls,
       implementCall(ReadSkills, async () => agentCatalog.skills()),
       implementCall(RefreshSkills, async (_input, { signal }) => agentCatalog.refresh(signal)),
+      implementCall(ReadSkillDocument, async ({ source, name }, { signal }) => {
+        const skill = agentCatalog.skills().find(item => item.id === source)?.skills.find(item => item.name === name);
+        if (!skill) throw new PluginApiError("rejected", `Skill "${name}" is absent from source "${source}".`, "skill_not_found");
+        return { text: skillDocumentBody(await agentCatalog.read(skill, "SKILL.md", signal)) };
+      }),
       implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal })),
     ],
     async close() {
