@@ -24,6 +24,8 @@ These choices apply to subsequent requests, not an already-running response. Ada
 
 A model role is a reusable model choice. An assistant role describes responsibility and expertise. Keeping them distinct lets you change the model without rewriting the working agreement, or use the same model for different responsibilities.
 
+Model roles organize your configuration; they do not give an Agent another identity or responsibility. The runtime resolves the configuration into the model and thinking settings used for a request. You do not need to teach the Agent your model-role names or use those names in task instructions.
+
 Use reusable choices for work you repeat. Make a task-specific choice when the material or stakes differ. Configuration changes are captured at request boundaries, so do not expect an in-progress response to adopt a new selection halfway through.
 
 Response usage and estimated cost concern model requests; account balance and quota concern the provider account or plan. Use each to answer its own question rather than treating one as confirmation of the other.
