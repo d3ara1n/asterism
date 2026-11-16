@@ -17,7 +17,7 @@ export const panelIslandWidth: IslandWidth = { min: 400, grow: 1, max: 620 };
  * The titlebar is fixed and the content area scrolls independently; primary action and close sit at the right of the titlebar, with no bottom action bar to avoid resembling a dialog.
  * Secondary actions sit with their corresponding content groups. When dirty is true, confirm discarding changes before closing this island, including closure through the island that opened it.
  */
-export function IslandPanel({ dirty, ...props }: Omit<PanelProps, "onClose" | "tools"> & { dirty?: boolean }) {
+export function IslandPanel({ dirty, ...props }: Omit<PanelProps, "onClose" | "tools" | "renderHeader"> & { dirty?: boolean }) {
   const i18n = useI18n();
   const island = useIsland();
   useUnsavedChanges(props.title, !!dirty);
@@ -25,7 +25,7 @@ export function IslandPanel({ dirty, ...props }: Omit<PanelProps, "onClose" | "t
   useCloseGuard(dirty ? () => new Promise<boolean>(resolve => setAsking(() => resolve)) : null);
   const answer = (discard: boolean) => { asking?.(discard); setAsking(null); };
   return <>
-    <Panel {...props} tools={<IslandMenu />} onClose={() => void island.close()} />
+    <IslandMenu>{(tools, renderHeader) => <Panel {...props} tools={tools} renderHeader={renderHeader} onClose={() => void island.close()} />}</IslandMenu>
     <AlertDialog open={asking !== null} onOpenChange={open => { if (!open) answer(false); }}>
       <AlertDialogContent>
         <AlertDialogHeader>

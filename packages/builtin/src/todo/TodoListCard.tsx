@@ -7,7 +7,7 @@ import { useI18n, useRendererObject } from "@asterism-app/sdk/renderer";
 import { toast } from "sonner";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { DropdownMenuItem } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenuItem } from "@asterism-app/ui/ui/action-menu";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "@asterism-app/ui/ui/empty";
@@ -57,33 +57,34 @@ function ListPage({ list, latest, filter, onFilter, onOpen }: {
     const handle = scroller.current;
     if (handle && handle.scrollOffset + handle.viewportSize >= handle.scrollSize - 120) loadMore();
   };
-  return <>
-    <header className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
-      <ToggleGroup type="single" size="sm" value={filter} aria-label={i18n.text(messages.status)} className="min-w-0 flex-1"
-        onValueChange={value => { if (value) onFilter(value as TodoFilterKey); }}>
-        {(["open", "done", "all"] as const).map(key => <ToggleGroupItem key={key} value={key} className="h-7 gap-1.5 px-2 text-xs">
-          {i18n.text(messages[key])}<span className="tabular-nums text-muted-foreground">{counts[key]}</span>
-        </ToggleGroupItem>)}
-      </ToggleGroup>
-      <IconButton size="icon-xs" label={i18n.text(messages.newTask)} onClick={() => setCreating(true)}><Plus /></IconButton>
-      <MenuConfirm label={i18n.text(messages.listActions)} open={deleting} onOpenChange={setDeleting}
-        items={confirm => <DropdownMenuItem variant="destructive" onSelect={confirm}><Trash2 />{i18n.text(messages.deleteList)}…</DropdownMenuItem>}>
-        {deleting && <DeleteListConfirm list={list} onClose={() => setDeleting(false)} />}
-      </MenuConfirm>
-    </header>
-    <TodoError error={error} className="m-2 w-auto" />
-    {!pages ? !error && <div className="flex justify-center py-6"><Spinner className="text-muted-foreground" /></div>
-      : pages.todos.length === 0 ? <Empty className="p-6"><EmptyHeader><EmptyTitle className="text-sm">{i18n.text(messages.noTasks)}</EmptyTitle></EmptyHeader>
-        {filter !== "done" && <EmptyContent><Button size="sm" variant="outline" onClick={() => setCreating(true)}><Plus />{i18n.text(messages.newTask)}</Button></EmptyContent>}
-      </Empty>
-        : <ItemGroup className="relative min-h-0 flex-1">
-          <VirtualList ref={scroller} data={pages.todos} onScroll={reachEnd} viewportClassName="py-1">
-            {todo => <TaskRow key={todo.id} todo={todo} onOpen={() => onOpen(todo.id)} />}
-          </VirtualList>
-          {loadingMore && <Spinner className="absolute bottom-2 left-1/2 -translate-x-1/2 text-muted-foreground" />}
-        </ItemGroup>}
-    {creating && <NewTaskDialog onClose={() => setCreating(false)} onCreated={() => { if (filter === "done") onFilter("open"); }} />}
-  </>;
+  return <MenuConfirm blankOnly label={i18n.text(messages.listActions)} open={deleting} onOpenChange={setDeleting}
+    items={confirm => <ActionMenuItem variant="destructive" onSelect={confirm}><Trash2 />{i18n.text(messages.deleteList)}…</ActionMenuItem>}
+    confirmation={deleting && <DeleteListConfirm list={list} onClose={() => setDeleting(false)} />}>
+    {trigger => <div className="flex min-h-0 flex-1 flex-col">
+      <header className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
+        <ToggleGroup type="single" size="sm" value={filter} aria-label={i18n.text(messages.status)} className="min-w-0 flex-1"
+          onValueChange={value => { if (value) onFilter(value as TodoFilterKey); }}>
+          {(["open", "done", "all"] as const).map(key => <ToggleGroupItem key={key} value={key} className="h-7 gap-1.5 px-2 text-xs">
+            {i18n.text(messages[key])}<span className="tabular-nums text-muted-foreground">{counts[key]}</span>
+          </ToggleGroupItem>)}
+        </ToggleGroup>
+        <IconButton size="icon-xs" label={i18n.text(messages.newTask)} onClick={() => setCreating(true)}><Plus /></IconButton>
+        {trigger}
+      </header>
+      <TodoError error={error} className="m-2 w-auto" />
+      {!pages ? !error && <div className="flex justify-center py-6"><Spinner className="text-muted-foreground" /></div>
+        : pages.todos.length === 0 ? <Empty className="p-6"><EmptyHeader><EmptyTitle className="text-sm">{i18n.text(messages.noTasks)}</EmptyTitle></EmptyHeader>
+          {filter !== "done" && <EmptyContent><Button size="sm" variant="outline" onClick={() => setCreating(true)}><Plus />{i18n.text(messages.newTask)}</Button></EmptyContent>}
+        </Empty>
+          : <ItemGroup className="relative min-h-0 flex-1">
+            <VirtualList ref={scroller} data={pages.todos} onScroll={reachEnd} viewportClassName="py-1">
+              {todo => <TaskRow key={todo.id} todo={todo} onOpen={() => onOpen(todo.id)} />}
+            </VirtualList>
+            {loadingMore && <Spinner className="absolute bottom-2 left-1/2 -translate-x-1/2 text-muted-foreground" />}
+          </ItemGroup>}
+      {creating && <NewTaskDialog onClose={() => setCreating(false)} onCreated={() => { if (filter === "done") onFilter("open"); }} />}
+    </div>}
+  </MenuConfirm>;
 }
 
 export function TodoListCard({ data }: { data: TodoListCardData }) {

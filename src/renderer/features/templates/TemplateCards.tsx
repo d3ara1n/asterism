@@ -13,7 +13,7 @@ import { Item } from "@asterism-app/ui/ui/item";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { StatusText } from "@asterism-app/ui/ui/status";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenu, ActionMenuContent, ActionMenuGroup, ActionMenuItem, ActionMenuTrigger, ActionMenuTarget } from "@asterism-app/ui/ui/action-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { TemplateObjectLabel } from "./TemplateObjects";
 import { RenameTemplate } from "./RenameTemplate";
@@ -90,62 +90,64 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
   };
   const move = (folderId: string | null) => run(() => runFolder({ type: "template.move", templateId: template.id, folderId }));
   return <div className="min-w-0">
-    <div className="group relative">
-      <Item variant="outline" asChild className="w-full overflow-hidden bg-card p-0 text-left hover:bg-accent/50 disabled:opacity-50">
-        <button type="button" disabled={!ready || busy} aria-busy={starting} onClick={() => void run(() => onStart(template.id))}>
-          {/* The folder color marks where new sessions land; the folder name stays in the information tooltip. */}
-          <span className={cn("relative flex h-20 w-full overflow-hidden text-muted-foreground", folder ? folderTint(folder.color) : "bg-muted")} aria-hidden="true">
-            <TemplatePreview objects={template.objects} />
-            {starting && <span className="absolute inset-0 flex items-center justify-center bg-muted/80"><Spinner className="size-8" /></span>}
-          </span>
-          <span className="block w-full min-w-0 px-3 pb-3">
-            <span className="block truncate font-medium" title={template.title}>{template.title}</span>
-            <span className="type-caption mt-1 block truncate pr-8">
-              {i18n.formatMessage(templateMessages.objectCount, { count: template.objects.length })}
-            </span>
-          </span>
-        </button>
-      </Item>
-      <div className="absolute bottom-2 right-2">
-        <Tooltip delayDuration={250}>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-xs" aria-label={i18n.text(templateMessages.info)}><Info /></Button>
-          </TooltipTrigger>
-          <TooltipContent side="top" align="end" sideOffset={6} className="max-w-80 text-left text-wrap">
-            <p className="mb-2 font-medium">{template.title}</p>
-            <ul className="max-h-64 space-y-2 overflow-y-auto">
-              {template.objects.map(object => <li key={object.id}><TemplateObjectLabel object={object} /></li>)}
-            </ul>
-            <p className="mt-3 flex items-center gap-1.5">{i18n.text(folderMessages.folder)}:
-              {folder ? <><FolderDot color={folder.color} />{folder.name}</> : i18n.text(folderMessages.noFolder)}</p>
-            <p className="mt-3 opacity-70">{i18n.formatMessage(templateMessages.created, { time: Date.parse(template.createdAt) })}</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-      <div className="absolute right-2 top-2 opacity-0 focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
-        <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild>
-            <Button ref={trigger} variant="ghost" size="icon-xs" disabled={!ready || busy} aria-label={i18n.text(templateMessages.actions)}>
-              <MoreHorizontal />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" onCloseAutoFocus={event => {
-            if (openingDialog.current) { event.preventDefault(); openingDialog.current = false; }
-          }}>
-            <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => { openingDialog.current = true; setError(null); setRenaming(true); }}>
-                <PenLine />{i18n.text(templateMessages.rename)}…
-              </DropdownMenuItem>
-              <MoveToFolderMenu value={template.folderId} onMove={folderId => { void move(folderId); }}
-                onCreate={() => { openingDialog.current = true; setError(null); setCreatingFolder(true); }} />
-              <DropdownMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
-                <Trash2 />{i18n.text(templateMessages.delete)}
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </div>
+    <ActionMenu modal={false}>
+      <ActionMenuTarget asChild disabled={!ready || busy}>
+        <div className="group relative">
+          <Item variant="outline" asChild className="w-full overflow-hidden bg-card p-0 text-left hover:bg-accent/50 disabled:opacity-50">
+            <button type="button" data-action-menu-primary disabled={!ready || busy} aria-busy={starting} onClick={() => void run(() => onStart(template.id))}>
+              {/* The folder color marks where new sessions land; the folder name stays in the information tooltip. */}
+              <span className={cn("relative flex h-20 w-full overflow-hidden text-muted-foreground", folder ? folderTint(folder.color) : "bg-muted")} aria-hidden="true">
+                <TemplatePreview objects={template.objects} />
+                {starting && <span className="absolute inset-0 flex items-center justify-center bg-muted/80"><Spinner className="size-8" /></span>}
+              </span>
+              <span className="block w-full min-w-0 px-3 pb-3">
+                <span className="block truncate font-medium" title={template.title}>{template.title}</span>
+                <span className="type-caption mt-1 block truncate pr-8">
+                  {i18n.formatMessage(templateMessages.objectCount, { count: template.objects.length })}
+                </span>
+              </span>
+            </button>
+          </Item>
+          <div className="absolute bottom-2 right-2">
+            <Tooltip delayDuration={250}>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon-xs" aria-label={i18n.text(templateMessages.info)}><Info /></Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" align="end" sideOffset={6} className="max-w-80 text-left text-wrap">
+                <p className="mb-2 font-medium">{template.title}</p>
+                <ul className="max-h-64 space-y-2 overflow-y-auto">
+                  {template.objects.map(object => <li key={object.id}><TemplateObjectLabel object={object} /></li>)}
+                </ul>
+                <p className="mt-3 flex items-center gap-1.5">{i18n.text(folderMessages.folder)}:
+                  {folder ? <><FolderDot color={folder.color} />{folder.name}</> : i18n.text(folderMessages.noFolder)}</p>
+                <p className="mt-3 opacity-70">{i18n.formatMessage(templateMessages.created, { time: Date.parse(template.createdAt) })}</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          <div className="absolute right-2 top-2 opacity-0 focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+            <ActionMenuTrigger asChild>
+              <Button ref={trigger} variant="ghost" size="icon-xs" disabled={!ready || busy} aria-label={i18n.text(templateMessages.actions)}>
+                <MoreHorizontal />
+              </Button>
+            </ActionMenuTrigger>
+            <ActionMenuContent align="end" onCloseAutoFocus={event => {
+              if (openingDialog.current) { event.preventDefault(); openingDialog.current = false; }
+            }}>
+              <ActionMenuGroup>
+                <ActionMenuItem onSelect={() => { openingDialog.current = true; setError(null); setRenaming(true); }}>
+                  <PenLine />{i18n.text(templateMessages.rename)}…
+                </ActionMenuItem>
+                <MoveToFolderMenu value={template.folderId} onMove={folderId => { void move(folderId); }}
+                  onCreate={() => { openingDialog.current = true; setError(null); setCreatingFolder(true); }} />
+                <ActionMenuItem variant="destructive" onSelect={() => setDeleting(true)}>
+                  <Trash2 />{i18n.text(templateMessages.delete)}
+                </ActionMenuItem>
+              </ActionMenuGroup>
+            </ActionMenuContent>
+          </div>
+        </div>
+      </ActionMenuTarget>
+    </ActionMenu>
     {starting && <span role="status" className="sr-only">{i18n.text(templateMessages.starting)}</span>}
     {error && !deleting && <p role="alert" className="mt-2 text-sm"><StatusText tone="error">{i18n.text(error)}</StatusText></p>}
     {renaming && <RenameTemplate template={template} disabled={!ready || busy} onSaved={onChanged}

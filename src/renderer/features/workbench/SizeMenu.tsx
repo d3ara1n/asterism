@@ -1,4 +1,4 @@
-import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenuGroup, ActionMenuItem, ActionMenuSeparator, ActionMenuSub, ActionMenuSubContent, ActionMenuSubTrigger } from "@asterism-app/ui/ui/action-menu";
 import { RotateCcw, Scaling } from "lucide-react";
 
 import { objectsMessages } from "../../messages/objects";
@@ -14,14 +14,14 @@ export const sizePresets = [
 /** Size submenu for canvas cards; islands size through the island menu. */
 export function SizeMenu({ onScale, onRestore }: { onScale: (scale: number) => void; onRestore: () => void }) {
   const i18n = useI18n();
-  return <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{i18n.formatMessage(objectsMessages.cardSize)}</DropdownMenuSubTrigger>
-    <DropdownMenuSubContent>
-      <DropdownMenuGroup>
+  return <ActionMenuSub><ActionMenuSubTrigger><Scaling />{i18n.formatMessage(objectsMessages.cardSize)}</ActionMenuSubTrigger>
+    <ActionMenuSubContent>
+      <ActionMenuGroup>
         {sizePresets.map(({ label, scale }) =>
-          <DropdownMenuItem key={scale} onSelect={() => onScale(scale)}>{i18n.text(label)}</DropdownMenuItem>)}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={onRestore}><RotateCcw />{i18n.formatMessage(objectsMessages.restoreCardSize)}</DropdownMenuItem>
-      </DropdownMenuGroup>
-    </DropdownMenuSubContent>
-  </DropdownMenuSub>;
+          <ActionMenuItem key={scale} onSelect={() => onScale(scale)}>{i18n.text(label)}</ActionMenuItem>)}
+        <ActionMenuSeparator />
+        <ActionMenuItem onSelect={onRestore}><RotateCcw />{i18n.formatMessage(objectsMessages.restoreCardSize)}</ActionMenuItem>
+      </ActionMenuGroup>
+    </ActionMenuSubContent>
+  </ActionMenuSub>;
 }

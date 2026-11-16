@@ -1,7 +1,7 @@
 import type { CardPanelView } from "@asterism-app/sdk/renderer";
 import { ChevronRight } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { memo, useCallback, useEffect, useRef, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useRef, type ReactElement, type ReactNode } from "react";
 
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { useI18n } from "../../shared/i18n";
@@ -19,12 +19,12 @@ export type ViewPatch = { collapsed?: boolean; size?: CardSize | null };
 const cardBorderBlock = 2;
 
 /** Object container on the canvas: adds a drag handle, collapsing, and canvas wheel ownership around the shared shell. */
-export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions, controls, panels, collapsed, expandedHeight, resizing, selected, retiring, onView, children }: {
+export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions, controls, panels, collapsed, expandedHeight, resizing, selected, retiring, onView, renderHeader, children }: {
   icon: ReactNode; kind: string; title: string; actions?: ReactNode; controls?: ReactNode; panels?: readonly CardPanelView[];
   collapsed: boolean; selected: boolean;
   retiring?: boolean;
   expandedHeight: number; resizing: boolean;
-  onView: (patch: ViewPatch) => void; children: ReactNode;
+  onView: (patch: ViewPatch) => void; renderHeader?: (header: ReactElement) => ReactNode; children: ReactNode;
 }) {
   const i18n = useI18n();
   const reducedMotion = useReducedMotion();
@@ -47,7 +47,7 @@ export const ObjectCard = memo(function ObjectCard({ icon, kind, title, actions,
   return <Card ref={root} className={cn("isolate w-full gap-0 overflow-hidden py-0 shadow-none", selected && "border-ring ring-1 ring-ring", retiring && "border-dashed")}>
     <ObjectSurface icon={icon} kind={kind} title={title} actions={actions} panels={panels} collapsed={collapsed} onExpand={expand}
       expandedHeight={expandedHeight - cardBorderBlock} resizing={resizing}
-      headerClassName="card-drag-handle cursor-grab active:cursor-grabbing"
+      headerClassName="card-drag-handle cursor-grab active:cursor-grabbing" renderHeader={renderHeader}
       controls={retiring ? undefined : <>{controls}<IconButton size="icon-xs" label={toggleLabel} aria-expanded={!collapsed} onClick={() => onView({ collapsed: !collapsed })}>
         <motion.span className="flex" initial={false} animate={{ rotate: collapsed ? 0 : 90 }}
           transition={reducedMotion ? { duration: 0 } : fadeTransition}><ChevronRight className="size-3.5" /></motion.span>

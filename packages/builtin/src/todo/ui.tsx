@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactElement, type ReactNode } from "react";
 import type { z } from "zod";
 import { MoreHorizontal } from "lucide-react";
 import { useI18n, useRendererObject, type I18n } from "@asterism-app/sdk/renderer";
@@ -7,7 +7,7 @@ import { cn } from "@asterism-app/ui/utils";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenu, ActionMenuContent, ActionMenuGroup, ActionMenuTarget, ActionMenuTrigger } from "@asterism-app/ui/ui/action-menu";
 import { Popover, PopoverAnchor, PopoverContent } from "@asterism-app/ui/ui/popover";
 import { StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
 import { failureDisplay } from "@asterism-app/ui/error-display";
@@ -69,32 +69,36 @@ export function useTodoMutation(onError?: (error: UiText) => void) {
 }
 
 /**
- * An overflow menu whose items can open a confirmation anchored to the same trigger.
- * items receives confirm, which opens the confirmation, and handOff, which keeps the menu from
- * returning focus to its trigger when the selected item moves focus elsewhere.
+ * An object menu whose items can open a confirmation anchored to its overflow trigger.
+ * The render prop places that trigger inside the target surface. handOff keeps the menu
+ * from returning focus when the selected item moves focus to a confirmation or editor.
  */
-export function MenuConfirm({ label, items, open, onOpenChange, children }: {
+export function MenuConfirm({ label, items, open, onOpenChange, disabled = false, blankOnly = false, confirmation, children }: {
   label: string;
   items: (confirm: () => void, handOff: () => void) => ReactNode;
   open: boolean;
   onOpenChange(open: boolean): void;
-  children: ReactNode;
+  disabled?: boolean;
+  blankOnly?: boolean;
+  confirmation: ReactNode;
+  children: (trigger: ReactNode) => ReactElement;
 }) {
   const keepFocus = useRef(false);
   const handOff = () => { keepFocus.current = true; };
+  const trigger = <PopoverAnchor asChild>
+    <ActionMenuTrigger asChild>
+      <Button size="icon-xs" variant="ghost" disabled={disabled} aria-label={label} title={label}><MoreHorizontal /></Button>
+    </ActionMenuTrigger>
+  </PopoverAnchor>;
   return <Popover open={open} onOpenChange={onOpenChange}>
-    <DropdownMenu>
-      <PopoverAnchor asChild>
-        <DropdownMenuTrigger asChild>
-          <Button size="icon-xs" variant="ghost" aria-label={label} title={label}><MoreHorizontal /></Button>
-        </DropdownMenuTrigger>
-      </PopoverAnchor>
-      <DropdownMenuContent align="end" onCloseAutoFocus={event => {
+    <ActionMenu>
+      <ActionMenuTarget asChild disabled={disabled} blankOnly={blankOnly}>{children(trigger)}</ActionMenuTarget>
+      <ActionMenuContent align="end" onCloseAutoFocus={event => {
         if (keepFocus.current) { event.preventDefault(); keepFocus.current = false; }
       }}>
-        {items(() => { handOff(); onOpenChange(true); }, handOff)}
-      </DropdownMenuContent>
-    </DropdownMenu>
-    <PopoverContent align="end" className="flex w-72 flex-col gap-3 p-3 text-sm">{children}</PopoverContent>
+        <ActionMenuGroup>{items(() => { handOff(); onOpenChange(true); }, handOff)}</ActionMenuGroup>
+      </ActionMenuContent>
+    </ActionMenu>
+    <PopoverContent align="end" className="flex w-72 flex-col gap-3 p-3 text-sm">{confirmation}</PopoverContent>
   </Popover>;
 }

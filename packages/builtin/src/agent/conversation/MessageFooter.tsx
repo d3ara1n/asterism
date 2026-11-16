@@ -1,11 +1,11 @@
-import { useContext, useRef, useState } from "react";
+import { useContext, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Copy, FileText, MoreHorizontal, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenu, ActionMenuContent, ActionMenuGroup, ActionMenuItem, ActionMenuTarget, ActionMenuTrigger } from "@asterism-app/ui/ui/action-menu";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { conversationMessages as messages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";
@@ -16,7 +16,10 @@ import { shareMessages } from "../../messages/share";
 
 type Message = Extract<TimelineItem, { kind: "message" }>;
 
-export function MessageFooter({ node, text }: { node: Message; text: string }) {
+/** The message surface and its footer share one object menu; the composer remains outside this scope. */
+export function MessageFooter({ node, text, children }: {
+  node: Message; text: string; children: (footer: ReactNode) => ReactElement;
+}) {
   const i18n = useI18n();
   const share = useContext(ConversationShareContext);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -34,24 +37,25 @@ export function MessageFooter({ node, text }: { node: Message; text: string }) {
   };
   // Use the saved input parts, including event frontmatter, without reading attachment bytes or source resources.
   const details = () => ({ id: node.id, createdAt: node.createdAt, sender: node.sender, parts: node.parts, startsTurn: node.startsTurn });
-  return <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-    <div className="flex items-center gap-2">
-      <MessageTimestamp createdAt={node.createdAt} />
-      <div className="nodrag nopan nokey flex items-center gap-0.5 opacity-60 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
-        {text && <IconButton size="icon-xs" label={i18n.text(messages.copyInput)} disabled={copying} onClick={() => { void copy(text); }}><Copy /></IconButton>}
-        {share && <IconButton size="icon-xs" label={i18n.text(shareMessages.share)} onClick={event => share(node.id, event.currentTarget)}><Share2 /></IconButton>}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild><Button ref={more} variant="ghost" size="icon-xs"
-            aria-label={i18n.text(messages.inputMoreActions)}><MoreHorizontal /></Button></DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="nodrag nopan nokey"
-            onCloseAutoFocus={event => { if (detailsOpen) event.preventDefault(); }}>
-            <DropdownMenuGroup>
-              <DropdownMenuItem onSelect={() => setDetailsOpen(true)}><FileText />{i18n.text(messages.inputDetails)}</DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+  const footer = <div className="flex items-center gap-2">
+    <MessageTimestamp createdAt={node.createdAt} />
+    <div className="nodrag nopan nokey flex items-center gap-0.5 opacity-60 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
+      {text && <IconButton size="icon-xs" label={i18n.text(messages.copyInput)} disabled={copying} onClick={() => { void copy(text); }}><Copy /></IconButton>}
+      {share && <IconButton size="icon-xs" label={i18n.text(shareMessages.share)} onClick={event => share(node.id, event.currentTarget)}><Share2 /></IconButton>}
+      <ActionMenuTrigger asChild><Button ref={more} variant="ghost" size="icon-xs"
+        aria-label={i18n.text(messages.inputMoreActions)}><MoreHorizontal /></Button></ActionMenuTrigger>
     </div>
+  </div>;
+  return <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+    <ActionMenu>
+      <ActionMenuTarget asChild>{children(footer)}</ActionMenuTarget>
+      <ActionMenuContent align="end" className="nodrag nopan nokey"
+        onCloseAutoFocus={event => { if (detailsOpen) event.preventDefault(); }}>
+        <ActionMenuGroup>
+          <ActionMenuItem onSelect={() => setDetailsOpen(true)}><FileText />{i18n.text(messages.inputDetails)}</ActionMenuItem>
+        </ActionMenuGroup>
+      </ActionMenuContent>
+    </ActionMenu>
     <DialogContent aria-describedby={undefined}
       onCloseAutoFocus={event => { event.preventDefault(); more.current?.focus(); }}
       className="nodrag nopan nokey flex max-h-[calc(100dvh-2rem)] min-w-0 flex-col overflow-hidden sm:max-w-3xl">

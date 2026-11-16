@@ -13,7 +13,7 @@ import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@asterism-app/ui/ui/field";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
 import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenu, ActionMenuContent, ActionMenuItem, ActionMenuSeparator, ActionMenuTrigger, ActionMenuTarget } from "@asterism-app/ui/ui/action-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
 import { useMcpSettings } from "../configuration/state";
@@ -110,33 +110,35 @@ function McpSettingsBody() {
     const phase = state?.connection ?? "disconnected";
     const oauth = server.transport === "http" && server.auth === "oauth";
     return <div key={server.id} role="listitem">
-      <ListRow selected={island.has(islandKey(server.id))} onOpen={origin => { void open(server.id, origin); }}
-        media={<StatusIcon tone={server.enabled ? phaseTone[phase] : "neutral"} className="size-4 shrink-0" />}
-        title={<span className="flex min-w-0 items-center gap-2"><span className="truncate">{server.name}</span>
-          {!server.enabled && <Badge variant="secondary">{i18n.text(messages.disabled)}</Badge>}</span>}
-        description={<span className="font-mono text-xs">{server.id} · {summary(server)}</span>}
-        details={<>
-          <span role="status">{i18n.formatMessage(messages.state, { state: phase })}{" · "}
-            {state?.indexed ? i18n.formatMessage(messages.tools, { count: state.toolCount }) : i18n.text(messages.unindexed)}</span>
-          {phase === "authorizing" && state?.authorizationExpiresAt != null
-            && <AuthorizationRemaining key={state.authorizationExpiresAt} expiresAt={state.authorizationExpiresAt} />}
-        </>}
-        actions={<>
-          {connection(server, state, busy)}
-          <Switch checked={server.enabled} disabled={busy} aria-label={i18n.text(messages.enabled)}
-            onCheckedChange={enabled => { void run(server.id, signal => calls.invoke(SetMcpServerEnabled, { serverId: server.id, enabled }, { signal })); }} />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" disabled={busy} aria-label={i18n.text(messages.actions)}><MoreHorizontal /></Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {oauth && <><DropdownMenuItem
-                onSelect={() => { void run(server.id, signal => calls.invoke(ResetMcpAuth, { serverId: server.id }, { signal })); }}>
-                <RotateCcw />{i18n.text(messages.resetAuth)}</DropdownMenuItem><DropdownMenuSeparator /></>}
-              <DropdownMenuItem variant="destructive" onSelect={() => setRemoving(server)}><Trash2 />{i18n.text(messages.remove)}…</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </>} />
+      <ActionMenu>
+        <ActionMenuTarget asChild disabled={busy}>
+          <div><ListRow selected={island.has(islandKey(server.id))} onOpen={origin => { void open(server.id, origin); }}
+            media={<StatusIcon tone={server.enabled ? phaseTone[phase] : "neutral"} className="size-4 shrink-0" />}
+            title={<span className="flex min-w-0 items-center gap-2"><span className="truncate">{server.name}</span>
+              {!server.enabled && <Badge variant="secondary">{i18n.text(messages.disabled)}</Badge>}</span>}
+            description={<span className="font-mono text-xs">{server.id} · {summary(server)}</span>}
+            details={<>
+              <span role="status">{i18n.formatMessage(messages.state, { state: phase })}{" · "}
+                {state?.indexed ? i18n.formatMessage(messages.tools, { count: state.toolCount }) : i18n.text(messages.unindexed)}</span>
+              {phase === "authorizing" && state?.authorizationExpiresAt != null
+                && <AuthorizationRemaining key={state.authorizationExpiresAt} expiresAt={state.authorizationExpiresAt} />}
+            </>}
+            actions={<>
+              {connection(server, state, busy)}
+              <Switch checked={server.enabled} disabled={busy} aria-label={i18n.text(messages.enabled)}
+                onCheckedChange={enabled => { void run(server.id, signal => calls.invoke(SetMcpServerEnabled, { serverId: server.id, enabled }, { signal })); }} />
+              <ActionMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" disabled={busy} aria-label={i18n.text(messages.actions)}><MoreHorizontal /></Button>
+              </ActionMenuTrigger>
+            </>} /></div>
+        </ActionMenuTarget>
+        <ActionMenuContent align="end">
+          {oauth && <><ActionMenuItem
+            onSelect={() => { void run(server.id, signal => calls.invoke(ResetMcpAuth, { serverId: server.id }, { signal })); }}>
+            <RotateCcw />{i18n.text(messages.resetAuth)}</ActionMenuItem><ActionMenuSeparator /></>}
+          <ActionMenuItem variant="destructive" onSelect={() => setRemoving(server)}><Trash2 />{i18n.text(messages.remove)}…</ActionMenuItem>
+        </ActionMenuContent>
+      </ActionMenu>
       {error && <pre className="type-caption mx-4 mb-3 max-h-32 overflow-auto whitespace-pre-wrap break-words text-destructive select-text">{i18n.text(error)}</pre>}
     </div>;
   };

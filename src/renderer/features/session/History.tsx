@@ -11,6 +11,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { ListRow, ListRowAction } from "@asterism-app/ui/ui/list-row";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from "@asterism-app/ui/ui/command";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenu, ActionMenuTarget, ActionMenuTrigger, ActionMenuContent, ActionMenuItem } from "@asterism-app/ui/ui/action-menu";
 import { Popover, PopoverTrigger, PopoverContent } from "@asterism-app/ui/ui/popover";
 import { nearestHistoryAlignment } from "./history-scroll";
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
@@ -189,19 +190,25 @@ function HistoryRecordRow({ info, snapshot, directory, selected, current, select
     : i18n.text(historyMessages.sessionEvents);
   const label = entry?.label ?? i18n.text(read.error ? historyMessages.readFailed : commonMessages.loading);
   return <div data-selected={selected}>
-    <ListRow variant="navigation" selected={selected} className="h-auto px-2 py-1.5 font-normal" onOpen={() => select(info.id)}
-      buttonProps={{ "aria-pressed": selected, "aria-current": undefined,
-        title: `${label}\n${source}\n${i18n.formatDate(Date.parse(info.createdAt), { dateStyle: "medium", timeStyle: "short" })}` }}
-      media={<span className="text-muted-foreground" aria-hidden="true">{entry?.icon ?? (info.source?.resource ? descriptor.icon : <PanelsTopLeft />)}</span>}
-      title={<span className="flex min-w-0 items-center gap-3">
-        <span className="min-w-0 flex-1">{entry?.row?.(label) ?? <span className="block truncate leading-5">{label}</span>}
-          <span className="type-caption block truncate leading-4">{source}</span></span>
-        {current && <CircleDot className="size-3 shrink-0" aria-label={i18n.text(historyMessages.historyExecutionPosition)} />}
-      </span>}
-      actions={read.error ? <Button variant="ghost" size="xs" onClick={read.retry}>{i18n.text(commonMessages.retry)}</Button>
-        : <DropdownMenu><DropdownMenuTrigger asChild><ListRowAction aria-label={i18n.text(historyMessages.historyEntryActions)}><MoreHorizontal /></ListRowAction></DropdownMenuTrigger>
-          <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => select(info.parentId)}>{i18n.text(historyMessages.historyBefore)}</DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => select(info.id)}>{i18n.text(historyMessages.historyAfter)}</DropdownMenuItem></DropdownMenuContent></DropdownMenu>} />
+    <ActionMenu>
+      <ActionMenuTarget asChild disabled={!!read.error}>
+        <div><ListRow variant="navigation" selected={selected} className="h-auto px-2 py-1.5 font-normal" onOpen={() => select(info.id)}
+          buttonProps={{ "aria-pressed": selected, "aria-current": undefined,
+            title: `${label}\n${source}\n${i18n.formatDate(Date.parse(info.createdAt), { dateStyle: "medium", timeStyle: "short" })}` }}
+          media={<span className="text-muted-foreground" aria-hidden="true">{entry?.icon ?? (info.source?.resource ? descriptor.icon : <PanelsTopLeft />)}</span>}
+          title={<span className="flex min-w-0 items-center gap-3">
+            <span className="min-w-0 flex-1">{entry?.row?.(label) ?? <span className="block truncate leading-5">{label}</span>}
+              <span className="type-caption block truncate leading-4">{source}</span></span>
+            {current && <CircleDot className="size-3 shrink-0" aria-label={i18n.text(historyMessages.historyExecutionPosition)} />}
+          </span>}
+          actions={read.error ? <Button variant="ghost" size="xs" onClick={read.retry}>{i18n.text(commonMessages.retry)}</Button>
+            : <ActionMenuTrigger asChild><ListRowAction aria-label={i18n.text(historyMessages.historyEntryActions)}><MoreHorizontal /></ListRowAction></ActionMenuTrigger>} /></div>
+      </ActionMenuTarget>
+      {!read.error && <ActionMenuContent align="end">
+        <ActionMenuItem onSelect={() => select(info.parentId)}>{i18n.text(historyMessages.historyBefore)}</ActionMenuItem>
+        <ActionMenuItem onSelect={() => select(info.id)}>{i18n.text(historyMessages.historyAfter)}</ActionMenuItem>
+      </ActionMenuContent>}
+    </ActionMenu>
     {junction}
   </div>;
 }

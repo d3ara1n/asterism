@@ -12,9 +12,12 @@ import { Badge } from "@asterism-app/ui/ui/badge";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism-app/ui/ui/tooltip";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator,
-  DropdownMenuItem, DropdownMenuGroup,
+  DropdownMenuRadioGroup, DropdownMenuRadioItem,
 } from "@asterism-app/ui/ui/dropdown-menu";
+import {
+  ActionMenu, ActionMenuTarget, ActionMenuTrigger, ActionMenuContent,
+  ActionMenuItem, ActionMenuGroup, ActionMenuSeparator,
+} from "@asterism-app/ui/ui/action-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -254,6 +257,7 @@ function DraftRow({
   const [movePending, setMovePending] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const gripRef = useRef<HTMLButtonElement>(null);
+  const moreRef = useRef<HTMLButtonElement>(null);
 
   const shown = displayInputParts(item);
   const text = shown.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
@@ -306,164 +310,167 @@ function DraftRow({
       {isDragOver && (
         <div className="mx-1 h-0.5 rounded-full bg-primary" aria-hidden />
       )}
-      <div
-        role="listitem"
-        className="group/draft flex items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors hover:bg-accent/40"
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-      >
-        {/* Drag handle; zero width until the row is hovered or the handle is focused, so content starts at the row edge. The negative margin cancels the row gap while collapsed. */}
-        <button
-          ref={gripRef}
-          type="button"
-          draggable
-          disabled={!interaction.editable || movePending}
-          onDragStart={onDragStart}
-          onDragEnd={onDragEnd}
-          onKeyDown={onGripKey}
-          aria-label={`${i18n.text(messages.drafts)} ${index + 1} – Alt+↑/↓ ${i18n.text(messages.moveUp)}/${i18n.text(messages.moveDown)}`}
-          className="-mr-1.5 flex w-0 shrink-0 cursor-grab touch-none items-center justify-center overflow-hidden rounded py-0.5 text-muted-foreground opacity-0 outline-none transition-[width,margin,opacity] duration-150 ease-out motion-reduce:transition-none group-hover/draft:mr-0 group-hover/draft:w-4 group-hover/draft:opacity-60 focus-visible:mr-0 focus-visible:w-4 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          <GripVertical aria-hidden className="size-3 shrink-0" />
-        </button>
-
-        {/* Source, preview, and attachments turn over together when an exchange replaces the content */}
-        <DraftContentSwap swapKey={draftSignature(item)} reducedMotion={reducedMotion}>
-          {senderChip}
-
-          {/* Body preview (with preview Tooltip) */}
-          <Tooltip delayDuration={300}>
-            <TooltipTrigger asChild>
-              <span className="type-caption min-w-0 flex-1 cursor-default select-none truncate">
-                {hasText ? text : files.length > 0
-                  ? i18n.formatMessage(messages.draftFilesOnly, { count: files.length })
-                  : "…"}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent
-              side="top" sideOffset={6}
-              className="max-w-[min(22rem,calc(100vw-2rem))] space-y-1.5 text-left whitespace-pre-wrap break-words">
-              {hasText && <p className="type-body">{text}</p>}
-              {files.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {files.map((f, i) => (
-                    <span key={i} className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 type-label text-foreground">
-                      <Paperclip className="size-2.5 shrink-0" aria-hidden />
-                      {inputFileName(f)}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Attachment count badge */}
-          {files.length > 0 && (
-            <span className="shrink-0 inline-flex items-center gap-0.5 type-label text-muted-foreground">
-              <Paperclip className="size-2.5" aria-hidden />{files.length}
-            </span>
-          )}
-        </DraftContentSwap>
-
-        {/* Delivery timing badge + dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+      <ActionMenu>
+        <ActionMenuTarget asChild disabled={!interaction.editable}>
+          <div
+            role="listitem"
+            className="group/draft flex items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors hover:bg-accent/40"
+            onDragOver={onDragOver}
+            onDrop={onDrop}
+          >
+            {/* Drag handle; zero width until the row is hovered or the handle is focused, so content starts at the row edge. The negative margin cancels the row gap while collapsed. */}
             <button
+              ref={gripRef}
               type="button"
-              disabled={!interaction.editable || modePending}
-              aria-label={`${i18n.text(messages.draftMode)}: ${i18n.text(modeLabel)}`}
-              className="shrink-0 inline-flex items-center gap-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+              draggable
+              disabled={!interaction.editable || movePending}
+              onDragStart={onDragStart}
+              onDragEnd={onDragEnd}
+              onKeyDown={onGripKey}
+              aria-label={`${i18n.text(messages.drafts)} ${index + 1} – Alt+↑/↓ ${i18n.text(messages.moveUp)}/${i18n.text(messages.moveDown)}`}
+              className="-mr-1.5 flex w-0 shrink-0 cursor-grab touch-none items-center justify-center overflow-hidden rounded py-0.5 text-muted-foreground opacity-0 outline-none transition-[width,margin,opacity] duration-150 ease-out motion-reduce:transition-none group-hover/draft:mr-0 group-hover/draft:w-4 group-hover/draft:opacity-60 focus-visible:mr-0 focus-visible:w-4 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
             >
-              <Badge variant={modeTone} className="h-4 px-1.5 text-[10px] gap-0.5 cursor-pointer">
-                {i18n.text(modeLabel)}
-                <ChevronDown className="size-2.5 text-inherit" aria-hidden />
-              </Badge>
+              <GripVertical aria-hidden className="size-3 shrink-0" />
             </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="start" className="w-52">
-            <DropdownMenuRadioGroup
-              value={item.mode}
-              onValueChange={async value => {
-                if (modePending || value === item.mode) return;
-                setModePending(true);
-                await interaction.setMode(item, value as DraftMode);
-                setModePending(false);
-              }}>
-              <ModeItem value="none" label={i18n.text(messages.draftNone)} hint={i18n.text(messages.draftNoneHint)} />
-              <ModeItem value="steer" label={i18n.text(messages.draftSteer)} hint={i18n.text(messages.draftSteerHint)} />
-              <ModeItem value="follow" label={i18n.text(messages.draftFollow)} hint={i18n.text(messages.draftFollowHint)} />
-            </DropdownMenuRadioGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
 
-        {/* Retrieve / exchange */}
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <Button
-              type="button" variant="ghost" size="icon-xs"
-              disabled={!interaction.editable}
-              aria-label={i18n.text(editorHasContent ? messages.exchangeDraft : messages.takeDraft)}
-              onClick={async () => {
-                const release = onIntent("take");
-                if (await interaction.take(item)) onTake(); else release();
-              }}>
-              {editorHasContent ? <ArrowLeftRight aria-hidden /> : <ArrowDownToLine aria-hidden />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={4} className="max-w-[14rem] space-y-0.5 text-left">
-            <p>{i18n.text(editorHasContent ? messages.exchangeDraft : messages.takeDraftHint)}</p>
-            {editorHasContent && <p className="type-caption">{i18n.text(messages.exchangeDraftHint)}</p>}
-          </TooltipContent>
-        </Tooltip>
+            {/* Source, preview, and attachments turn over together when an exchange replaces the content */}
+            <DraftContentSwap swapKey={draftSignature(item)} reducedMotion={reducedMotion}>
+              {senderChip}
 
-        {/* More actions (move + discard) */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" size="icon-xs"
-              disabled={!interaction.editable}
-              aria-label={i18n.text(messages.draftMoreActions)}>
-              <MoreHorizontal aria-hidden />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" align="end" className="w-36">
-            <DropdownMenuGroup>
-              <DropdownMenuItem
-                disabled={index === 0 || movePending}
-                onSelect={async () => {
-                  if (movePending) return;
-                  setMovePending(true);
-                  const drafts = interaction.drafts;
-                  await interaction.move(item, drafts[index - 1]!.id);
-                  setMovePending(false);
-                }}>
-                {i18n.text(messages.moveUp)}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={index === total - 1 || movePending}
-                onSelect={async () => {
-                  if (movePending) return;
-                  setMovePending(true);
-                  const drafts = interaction.drafts;
-                  await interaction.move(item, drafts[index + 2]?.id ?? null);
-                  setMovePending(false);
-                }}>
-                {i18n.text(messages.moveDown)}
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onSelect={() => setConfirmDiscard(true)}>
-              <Trash2 aria-hidden className="size-3.5" />
-              {i18n.text(messages.discardDraft)}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              {/* Body preview (with preview Tooltip) */}
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <span className="type-caption min-w-0 flex-1 cursor-default select-none truncate">
+                    {hasText ? text : files.length > 0
+                      ? i18n.formatMessage(messages.draftFilesOnly, { count: files.length })
+                      : "…"}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent
+                  side="top" sideOffset={6}
+                  className="max-w-[min(22rem,calc(100vw-2rem))] space-y-1.5 text-left whitespace-pre-wrap break-words">
+                  {hasText && <p className="type-body">{text}</p>}
+                  {files.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {files.map((f, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 type-label text-foreground">
+                          <Paperclip className="size-2.5 shrink-0" aria-hidden />
+                          {inputFileName(f)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Attachment count badge */}
+              {files.length > 0 && (
+                <span className="shrink-0 inline-flex items-center gap-0.5 type-label text-muted-foreground">
+                  <Paperclip className="size-2.5" aria-hidden />{files.length}
+                </span>
+              )}
+            </DraftContentSwap>
+
+            {/* Delivery timing badge + dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={!interaction.editable || modePending}
+                  aria-label={`${i18n.text(messages.draftMode)}: ${i18n.text(modeLabel)}`}
+                  className="shrink-0 inline-flex items-center gap-0.5 outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                >
+                  <Badge variant={modeTone} className="h-4 px-1.5 text-[10px] gap-0.5 cursor-pointer">
+                    {i18n.text(modeLabel)}
+                    <ChevronDown className="size-2.5 text-inherit" aria-hidden />
+                  </Badge>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="top" align="start" className="w-52">
+                <DropdownMenuRadioGroup
+                  value={item.mode}
+                  onValueChange={async value => {
+                    if (modePending || value === item.mode) return;
+                    setModePending(true);
+                    await interaction.setMode(item, value as DraftMode);
+                    setModePending(false);
+                  }}>
+                  <ModeItem value="none" label={i18n.text(messages.draftNone)} hint={i18n.text(messages.draftNoneHint)} />
+                  <ModeItem value="steer" label={i18n.text(messages.draftSteer)} hint={i18n.text(messages.draftSteerHint)} />
+                  <ModeItem value="follow" label={i18n.text(messages.draftFollow)} hint={i18n.text(messages.draftFollowHint)} />
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Retrieve / exchange */}
+            <Tooltip delayDuration={300}>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button" variant="ghost" size="icon-xs"
+                  disabled={!interaction.editable}
+                  aria-label={i18n.text(editorHasContent ? messages.exchangeDraft : messages.takeDraft)}
+                  onClick={async () => {
+                    const release = onIntent("take");
+                    if (await interaction.take(item)) onTake(); else release();
+                  }}>
+                  {editorHasContent ? <ArrowLeftRight aria-hidden /> : <ArrowDownToLine aria-hidden />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={4} className="max-w-[14rem] space-y-0.5 text-left">
+                <p>{i18n.text(editorHasContent ? messages.exchangeDraft : messages.takeDraftHint)}</p>
+                {editorHasContent && <p className="type-caption">{i18n.text(messages.exchangeDraftHint)}</p>}
+              </TooltipContent>
+            </Tooltip>
+
+            {/* More actions (move + discard) */}
+            <ActionMenuTrigger asChild>
+              <Button ref={moreRef} type="button" variant="ghost" size="icon-xs"
+                disabled={!interaction.editable}
+                aria-label={i18n.text(messages.draftMoreActions)}>
+                <MoreHorizontal aria-hidden />
+              </Button>
+            </ActionMenuTrigger>
+          </div>
+        </ActionMenuTarget>
+        <ActionMenuContent side="top" align="end" className="w-36"
+          onCloseAutoFocus={event => { if (confirmDiscard) event.preventDefault(); }}>
+          <ActionMenuGroup>
+            <ActionMenuItem
+              disabled={index === 0 || movePending}
+              onSelect={async () => {
+                if (movePending) return;
+                setMovePending(true);
+                const drafts = interaction.drafts;
+                await interaction.move(item, drafts[index - 1]!.id);
+                setMovePending(false);
+              }}>
+              {i18n.text(messages.moveUp)}
+            </ActionMenuItem>
+            <ActionMenuItem
+              disabled={index === total - 1 || movePending}
+              onSelect={async () => {
+                if (movePending) return;
+                setMovePending(true);
+                const drafts = interaction.drafts;
+                await interaction.move(item, drafts[index + 2]?.id ?? null);
+                setMovePending(false);
+              }}>
+              {i18n.text(messages.moveDown)}
+            </ActionMenuItem>
+          </ActionMenuGroup>
+          <ActionMenuSeparator />
+          <ActionMenuItem
+            className="text-destructive focus:text-destructive"
+            onSelect={() => setConfirmDiscard(true)}>
+            <Trash2 aria-hidden className="size-3.5" />
+            {i18n.text(messages.discardDraft)}
+          </ActionMenuItem>
+        </ActionMenuContent>
+      </ActionMenu>
 
       {/* Discard confirmation dialog */}
       <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
-        <AlertDialogContent>
+        <AlertDialogContent onCloseAutoFocus={event => { event.preventDefault(); moreRef.current?.focus(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>{i18n.text(messages.discardDraftTitle)}</AlertDialogTitle>
             <AlertDialogDescription>

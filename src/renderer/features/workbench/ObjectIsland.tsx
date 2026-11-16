@@ -52,13 +52,13 @@ function IslandObject({ object }: { object: WorkbenchObject }) {
   const i18n = useI18n();
   const island = useIsland();
   const content = useObjectView(object);
-  return <ObjectSurface icon={content.icon} kind={content.kind} title={object.title} actions={content.actions} panels={content.panels}
+  return <IslandMenu>{(menuTrigger, renderHeader) => <ObjectSurface renderHeader={renderHeader} icon={content.icon} kind={content.kind} title={object.title} actions={content.actions} panels={content.panels}
     controls={<>
-      <IslandMenu />
+      {menuTrigger}
       <IconButton size="icon-xs" label={i18n.text(objectsMessages.returnToCard)} onClick={() => { void island.close(); }}>
         <PanelLeftClose />
       </IconButton>
     </>}>
     {content.body}
-  </ObjectSurface>;
+  </ObjectSurface>}</IslandMenu>;
 }

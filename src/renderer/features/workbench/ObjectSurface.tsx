@@ -1,7 +1,7 @@
 import { RendererCardProvider, type CardPanelView, type RendererCard } from "@asterism-app/sdk/renderer";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { PanelsTopLeft, X } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode, type RefObject } from "react";
 
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
@@ -19,7 +19,7 @@ const noPanels: readonly CardPanelView[] = [];
  * Shared shell for object content: titlebar, auxiliary panel container, and focus management. Cards and object islands are its two container types,
  * sharing the same content; the shell provides `@container/card`, and content adapts to its container width without knowing the container type.
  */
-export function ObjectSurface({ icon, kind, title, actions, controls, panels = noPanels, collapsed = false, expandedHeight, resizing = false, onExpand, headerClassName, children }: {
+export function ObjectSurface({ icon, kind, title, actions, controls, panels = noPanels, collapsed = false, expandedHeight, resizing = false, onExpand, headerClassName, renderHeader, children }: {
   icon: ReactNode; kind: string; title: string;
   /** Resource and host actions, to the left of the auxiliary panel menu. */ actions?: ReactNode;
   /** Container controls (focus toggle and collapse), at the far right of the titlebar. */ controls?: ReactNode;
@@ -28,7 +28,10 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
   /** The canvas provides expanded height excluding the outer border; an island receives its height from its parent container. */ expandedHeight?: number;
   resizing?: boolean;
   /** Selecting a panel while collapsed requires expanding first. */ onExpand?: () => void;
-  headerClassName?: string; children: ReactNode;
+  headerClassName?: string;
+  /** The container owns the header menu; resource content retains its own context interactions. */
+  renderHeader?: (header: ReactElement) => ReactNode;
+  children: ReactNode;
 }) {
   const i18n = useI18n();
   const collapse = useObjectCollapse(collapsed, expandedHeight, resizing);
@@ -66,6 +69,7 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
     wasOpen.current = activeId !== null;
   }, [activeId, collapse.interactive]);
 
+  const wrapHeader = renderHeader ?? ((header: ReactElement) => header);
   return <RendererCardProvider value={card}>
     <motion.div ref={root} className="@container/card min-w-0 overflow-hidden bg-card-shell"
       style={{ height: expandedHeight === undefined ? "100%" : collapse.height, minHeight: collapse.headerHeight ?? undefined }}
@@ -75,7 +79,7 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
         event.preventDefault(); event.stopPropagation(); closePanel();
       }}>
       <div className="flex min-h-0 min-w-0 flex-col" style={{ height: expandedHeight ?? "100%" }}>
-        <header ref={collapse.header} className={cn("flex shrink-0 items-center gap-2 px-3 py-2", headerClassName)}>
+        {wrapHeader(<header ref={collapse.header} className={cn("flex shrink-0 items-center gap-2 px-3 py-2", headerClassName)}>
           {/* Narrow containers show only the type icon, leaving width for the title; the type name always remains the icon's accessible name and tooltip. */}
           <span role="img" aria-label={kind} title={kind} className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">{icon}</span>
           <div className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -105,7 +109,7 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
             </DropdownMenu>}
             {controls}
           </div>
-        </header>
+        </header>)}
         {collapse.mounted && <motion.div data-object-content="" inert={!collapse.interactive}
           style={{ opacity: collapse.opacity, y: collapse.y }}
           // Distinguish content surface and shell by background color alone, without a border; soft, faint shadows around the edges transition colors without a hard dividing line.

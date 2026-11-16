@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from "react";
+import type { ReactElement, ReactNode, Ref } from "react";
 import { X } from "lucide-react";
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -13,6 +13,8 @@ export interface PanelProps {
   action?: ReactNode;
   toolbar?: ReactNode;
   tools?: ReactNode;
+  /** The container can attach its menu to the header without claiming the panel content. */
+  renderHeader?: (header: ReactElement) => ReactNode;
   compact?: boolean;
   contentRef?: Ref<HTMLDivElement>;
   layout?: "padded" | "fill";
@@ -21,10 +23,11 @@ export interface PanelProps {
 }
 
 /** Shared panel presentation; its owner supplies closing and any container-specific tools. */
-export function Panel({ title, description, source, action, toolbar, tools, compact, contentRef, layout = "padded", onClose, children }: PanelProps) {
+export function Panel({ title, description, source, action, toolbar, tools, renderHeader, compact, contentRef, layout = "padded", onClose, children }: PanelProps) {
   const i18n = useI18n();
+  const wrapHeader = renderHeader ?? ((header: ReactElement) => header);
   return <div className="island-panel">
-    <header className="island-panel-header">
+    {wrapHeader(<header className="island-panel-header">
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-1.5">
           {source && <span className="flex min-w-0 shrink-[2]">{source}</span>}
@@ -35,7 +38,7 @@ export function Panel({ title, description, source, action, toolbar, tools, comp
       {action}
       {tools}
       <IconButton label={i18n.formatMessage(commonMessages.close)} onClick={onClose}><X /></IconButton>
-    </header>
+    </header>)}
     {toolbar && <div className="flex shrink-0 flex-col gap-2 border-b px-3 py-3">{toolbar}</div>}
     {layout === "fill"
       ? <div ref={contentRef} data-layout="fill" className="island-panel-content">{children}</div>

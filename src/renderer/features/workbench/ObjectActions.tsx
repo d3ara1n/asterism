@@ -1,4 +1,4 @@
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenu, ActionMenuTarget, ActionMenuTrigger, ActionMenuContent, ActionMenuGroup, ActionMenuItem, ActionMenuSeparator } from "@asterism-app/ui/ui/action-menu";
 
 import { Button } from "@asterism-app/ui/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
@@ -10,7 +10,7 @@ import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactElement, type ReactNode } from "react";
 
 import type { CardAppearance } from "@asterism-app/sdk/contracts";
 import type { WorkbenchObject } from "../../../shared/workbench";
@@ -24,8 +24,9 @@ import { SizeMenu } from "./SizeMenu";
 import { cardSize } from "./sizing";
 
 /** The card menu centralizes name, view dimensions, and object removal. */
-export function ObjectActions({ object, appearance, onView }: {
+export function ObjectActions({ object, appearance, onView, children }: {
   object: WorkbenchObject; appearance: CardAppearance; onView: (patch: ViewPatch) => void;
+  children: (trigger: ReactNode, renderHeader: (header: ReactElement) => ReactNode) => ReactNode;
 }) {
   const i18n = useI18n();
   const defaultSize = cardSize(appearance);
@@ -33,29 +34,31 @@ export function ObjectActions({ object, appearance, onView }: {
   const [dialog, setDialog] = useState<"rename" | "remove" | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const openingRename = useRef(false);
-  return <><DropdownMenu><Tooltip>
-    <TooltipTrigger asChild><DropdownMenuTrigger asChild>
+  const menuTrigger = <Tooltip>
+    <TooltipTrigger asChild><ActionMenuTrigger asChild>
       <Button ref={trigger} variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.objectActions)}><MoreHorizontal /></Button>
-    </DropdownMenuTrigger></TooltipTrigger>
+    </ActionMenuTrigger></TooltipTrigger>
     <TooltipContent>{i18n.text(objectsMessages.objectActions)}</TooltipContent>
-  </Tooltip>
-    <DropdownMenuContent align="end" onCloseAutoFocus={event => {
+  </Tooltip>;
+  return <><ActionMenu>
+    {children(menuTrigger, header => <ActionMenuTarget asChild blankOnly>{header}</ActionMenuTarget>)}
+    <ActionMenuContent align="end" onCloseAutoFocus={event => {
       if (openingRename.current) { event.preventDefault(); openingRename.current = false; }
     }}>
-      <DropdownMenuGroup>
-        <DropdownMenuItem disabled={!ready} onSelect={() => { openingRename.current = true; setDialog("rename"); }}>
+      <ActionMenuGroup>
+        <ActionMenuItem disabled={!ready} onSelect={() => { openingRename.current = true; setDialog("rename"); }}>
           <PenLine />{i18n.text(objectsMessages.renameObject)}…
-        </DropdownMenuItem>
-      </DropdownMenuGroup>
-      <DropdownMenuSeparator />
+        </ActionMenuItem>
+      </ActionMenuGroup>
+      <ActionMenuSeparator />
       <SizeMenu onRestore={() => onView({ size: null })} onScale={scale => onView({ size: scale === 1 ? null : cardSize(appearance, {
         width: Math.round(defaultSize.width * scale),
         height: Math.round(defaultSize.height * scale),
       }) })} />
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup><DropdownMenuItem disabled={!ready} onSelect={() => setDialog("remove")}><Trash2 />{i18n.formatMessage(objectsMessages.removeObject, { title: object.title })}…</DropdownMenuItem></DropdownMenuGroup>
-    </DropdownMenuContent>
-  </DropdownMenu>{dialog === "remove" && <RemoveObject object={object} onClose={() => setDialog(null)} />}
+      <ActionMenuSeparator />
+      <ActionMenuGroup><ActionMenuItem disabled={!ready} onSelect={() => setDialog("remove")}><Trash2 />{i18n.formatMessage(objectsMessages.removeObject, { title: object.title })}…</ActionMenuItem></ActionMenuGroup>
+    </ActionMenuContent>
+  </ActionMenu>{dialog === "remove" && <RemoveObject object={object} onClose={() => setDialog(null)} />}
     {dialog === "rename" && <RenameObject object={object} onClose={() => setDialog(null)} onRestoreFocus={() => trigger.current?.focus()} />}</>;
 }
 function RemoveObject({ object, onClose }: { object: WorkbenchObject; onClose: () => void }) {

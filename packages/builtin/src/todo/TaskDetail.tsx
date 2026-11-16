@@ -6,7 +6,7 @@ import type { UiText } from "@asterism-app/sdk/contracts";
 import { Markdown } from "@asterism-app/ui/markdown";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { DropdownMenuItem } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenuItem } from "@asterism-app/ui/ui/action-menu";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@asterism-app/ui/ui/input-group";
 import { PopoverDescription } from "@asterism-app/ui/ui/popover";
 import { Separator } from "@asterism-app/ui/ui/separator";
@@ -105,65 +105,68 @@ export function TaskDetail({ id, latest, focus, back }: { id: string; latest: nu
     } catch (failure) { setOpenError(todoFailure(failure)); }
     finally { setOpening(false); }
   };
-  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
-    <header className="flex min-w-0 items-center gap-1 border-b px-2 py-1.5">
-      <Button size="icon-xs" variant="ghost" aria-label={i18n.text(messages.back)} title={i18n.text(messages.back)}
-        autoFocus={focus} onClick={back}><ArrowLeft /></Button>
-      <div className="min-w-0 flex-1">{todo && <TodoStatusBadge status={todo.status} />}</div>
-      {todo && <>
-        <IconButton size="icon-xs" label={i18n.text(messages.editContent)} disabled={opening}
-          onClick={event => { void edit(event.currentTarget); }}>{opening ? <Spinner /> : <Pencil />}</IconButton>
-        <MenuConfirm label={i18n.text(messages.taskActions)} open={confirming} onOpenChange={setConfirming}
-          items={(confirm, handOff) => <>
-            {todo.status === "done" && <DropdownMenuItem onSelect={() => { handOff(); setCompleting(true); }}>
-              <MessageSquareText />{i18n.text(messages.editCompletion)}
-            </DropdownMenuItem>}
-            <DropdownMenuItem variant="destructive" onSelect={confirm}><Trash2 />{i18n.text(messages.deleteTask)}…</DropdownMenuItem>
-          </>}>
-          <PopoverDescription>{i18n.text(messages.deleteTaskConfirm)}</PopoverDescription>
-          <TodoError error={removal.error} />
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" disabled={removal.pending} onClick={() => setConfirming(false)}>{i18n.text(commonMessages.cancel)}</Button>
-            <Button size="sm" variant="destructive" disabled={removal.pending} aria-busy={removal.pending} onClick={async () => {
-              if (await removal.run({ action: "delete", id: todo.id })) { setConfirming(false); back(); }
-            }}>{removal.pending && <Spinner />}{i18n.text(messages.deleteTask)}</Button>
-          </div>
-        </MenuConfirm>
-      </>}
-    </header>
-
-    <ScrollArea className="min-h-0 flex-1" contentClassName="flex flex-col gap-3 p-3">
-      {gone ? <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <p className="type-caption">{i18n.text(messages.taskGone)}</p>
-        <Button size="sm" variant="outline" onClick={back}><ArrowLeft />{i18n.text(messages.back)}</Button>
+  return <MenuConfirm label={i18n.text(messages.taskActions)} disabled={!todo || gone} open={confirming} onOpenChange={setConfirming}
+    items={(confirm, handOff) => todo && <>
+      {todo.status === "done" && <ActionMenuItem onSelect={() => { handOff(); setCompleting(true); }}>
+        <MessageSquareText />{i18n.text(messages.editCompletion)}
+      </ActionMenuItem>}
+      <ActionMenuItem variant="destructive" onSelect={confirm}><Trash2 />{i18n.text(messages.deleteTask)}…</ActionMenuItem>
+    </>}
+    confirmation={todo && <>
+      <PopoverDescription>{i18n.text(messages.deleteTaskConfirm)}</PopoverDescription>
+      <TodoError error={removal.error} />
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" disabled={removal.pending} onClick={() => setConfirming(false)}>{i18n.text(commonMessages.cancel)}</Button>
+        <Button size="sm" variant="destructive" disabled={removal.pending} aria-busy={removal.pending} onClick={async () => {
+          if (await removal.run({ action: "delete", id: todo.id })) { setConfirming(false); back(); }
+        }}>{removal.pending && <Spinner />}{i18n.text(messages.deleteTask)}</Button>
       </div>
-        : !todo ? !error && <div className="flex justify-center py-6"><Spinner className="text-muted-foreground" /></div>
-          : <>
-            <div className="flex min-w-0 flex-col gap-1">
-              <h3 className="type-section select-text break-words">{todo.title}</h3>
-              <p className="type-caption">{[
-                todo.assignee && i18n.formatMessage(messages.assignedTo, { actor: actorName(i18n, todo.assignee) }),
-                i18n.formatMessage(messages.createdBy, { actor: actorName(i18n, todo.createdBy) }),
-                formatMoment(i18n, todo.createdAt),
-              ].filter(Boolean).join(" · ")}</p>
-            </div>
-            {todo.content.trim()
-              ? <div className="select-text"><SkillReferences><Markdown>{todo.content}</Markdown></SkillReferences></div>
-              : <Button size="sm" variant="ghost" className="self-start text-muted-foreground" disabled={opening}
-                onClick={event => { void edit(event.currentTarget); }}><FilePenLine />{i18n.text(messages.noContent)}</Button>}
-            {todo.completion && <>
-              <Separator />
-              <section className="flex flex-col gap-1.5">
-                <p className="type-label">{i18n.formatMessage(messages.completedBy, { actor: actorName(i18n, todo.completion.completedBy) })} · {formatMoment(i18n, todo.completion.completedAt)}</p>
-                {todo.completion.note !== null && <div className="select-text"><SkillReferences><Markdown>{todo.completion.note}</Markdown></SkillReferences></div>}
-              </section>
-            </>}
-          </>}
-      <TodoError error={error ?? openError} />
-    </ScrollArea>
+    </>}>
+    {trigger => <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
+      <header className="flex min-w-0 items-center gap-1 border-b px-2 py-1.5">
+        <Button size="icon-xs" variant="ghost" aria-label={i18n.text(messages.back)} title={i18n.text(messages.back)}
+          autoFocus={focus} onClick={back}><ArrowLeft /></Button>
+        <div className="min-w-0 flex-1">{todo && <TodoStatusBadge status={todo.status} />}</div>
+        {todo && <>
+          <IconButton size="icon-xs" label={i18n.text(messages.editContent)} disabled={opening}
+            onClick={event => { void edit(event.currentTarget); }}>{opening ? <Spinner /> : <Pencil />}</IconButton>
+          {trigger}
+        </>}
+      </header>
 
-    {todo && !gone && (completing
-      ? <CompletionComposer todo={todo} onDone={() => setCompleting(false)} />
-      : <ActionBar todo={todo} onComplete={() => setCompleting(true)} />)}
-  </div>;
+      <ScrollArea className="min-h-0 flex-1" contentClassName="flex flex-col gap-3 p-3">
+        {gone ? <div className="flex flex-col items-center gap-3 py-6 text-center">
+          <p className="type-caption">{i18n.text(messages.taskGone)}</p>
+          <Button size="sm" variant="outline" onClick={back}><ArrowLeft />{i18n.text(messages.back)}</Button>
+        </div>
+          : !todo ? !error && <div className="flex justify-center py-6"><Spinner className="text-muted-foreground" /></div>
+            : <>
+              <div className="flex min-w-0 flex-col gap-1">
+                <h3 className="type-section select-text break-words">{todo.title}</h3>
+                <p className="type-caption">{[
+                  todo.assignee && i18n.formatMessage(messages.assignedTo, { actor: actorName(i18n, todo.assignee) }),
+                  i18n.formatMessage(messages.createdBy, { actor: actorName(i18n, todo.createdBy) }),
+                  formatMoment(i18n, todo.createdAt),
+                ].filter(Boolean).join(" · ")}</p>
+              </div>
+              {todo.content.trim()
+                ? <div className="select-text"><SkillReferences><Markdown>{todo.content}</Markdown></SkillReferences></div>
+                : <Button size="sm" variant="ghost" className="self-start text-muted-foreground" disabled={opening}
+                  onClick={event => { void edit(event.currentTarget); }}><FilePenLine />{i18n.text(messages.noContent)}</Button>}
+              {todo.completion && <>
+                <Separator />
+                <section className="flex flex-col gap-1.5">
+                  <p className="type-label">{i18n.formatMessage(messages.completedBy, { actor: actorName(i18n, todo.completion.completedBy) })} · {formatMoment(i18n, todo.completion.completedAt)}</p>
+                  {todo.completion.note !== null && <div className="select-text"><SkillReferences><Markdown>{todo.completion.note}</Markdown></SkillReferences></div>}
+                </section>
+              </>}
+            </>}
+        <TodoError error={error ?? openError} />
+      </ScrollArea>
+
+      {todo && !gone && (completing
+        ? <CompletionComposer todo={todo} onDone={() => setCompleting(false)} />
+        : <ActionBar todo={todo} onComplete={() => setCompleting(true)} />)}
+    </div>}
+  </MenuConfirm>;
 }

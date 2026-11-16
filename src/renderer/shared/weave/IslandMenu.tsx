@@ -1,7 +1,8 @@
+import type { ReactElement, ReactNode } from "react";
 import { ArrowLeft, ArrowRight, MoreHorizontal, RotateCcw, Scaling } from "lucide-react";
 
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenu, ActionMenuTarget, ActionMenuContent, ActionMenuGroup, ActionMenuItem, ActionMenuSeparator, ActionMenuSub, ActionMenuSubContent, ActionMenuSubTrigger, ActionMenuTrigger } from "@asterism-app/ui/ui/action-menu";
 import { islandsMessages } from "../../messages/islands";
 import { useI18n } from "../i18n";
 import { useIsland } from "./Screen";
@@ -13,30 +14,32 @@ const sizePresets = [
   { label: islandsMessages.sizeLarge, scale: 1.5 },
 ] as const;
 
-/** Island chrome menu: window size and position belong to the containing ordinary island, independent of its content. Renders nothing elsewhere. */
-export function IslandMenu() {
+/** Island chrome menu: window size and position belong to the containing ordinary island, independent of its content. Root islands keep their header without these controls. */
+export function IslandMenu({ children }: {
+  children: (trigger: ReactNode, renderHeader: (header: ReactElement) => ReactNode) => ReactNode;
+}) {
   const i18n = useI18n();
   const arrangement = useIsland().arrangement;
-  if (!arrangement) return null;
+  if (!arrangement) return children(null, header => header);
   const label = i18n.text(islandsMessages.actions);
-  return <DropdownMenu>
-    <IconButton label={label} asChild>
-      <DropdownMenuTrigger><MoreHorizontal /></DropdownMenuTrigger>
-    </IconButton>
-    <DropdownMenuContent align="end">
-      <DropdownMenuSub><DropdownMenuSubTrigger><Scaling />{i18n.text(islandsMessages.size)}</DropdownMenuSubTrigger>
-        <DropdownMenuSubContent>
-          <DropdownMenuGroup>
+  return <ActionMenu>
+    {children(<IconButton label={label} asChild>
+      <ActionMenuTrigger><MoreHorizontal /></ActionMenuTrigger>
+    </IconButton>, header => <ActionMenuTarget asChild blankOnly>{header}</ActionMenuTarget>)}
+    <ActionMenuContent align="end">
+      <ActionMenuSub><ActionMenuSubTrigger><Scaling />{i18n.text(islandsMessages.size)}</ActionMenuSubTrigger>
+        <ActionMenuSubContent>
+          <ActionMenuGroup>
             {sizePresets.map(({ label, scale }) =>
-              <DropdownMenuItem key={scale} onSelect={() => arrangement.resize(Math.round(arrangement.medium * scale))}>{i18n.text(label)}</DropdownMenuItem>)}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem disabled={arrangement.size === null} onSelect={() => arrangement.resize(null)}><RotateCcw />{i18n.text(islandsMessages.restoreSize)}</DropdownMenuItem>
-          </DropdownMenuGroup>
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem disabled={arrangement.first} onSelect={() => arrangement.move(-1)}><ArrowLeft />{i18n.text(islandsMessages.moveLeft)}</DropdownMenuItem>
-      <DropdownMenuItem disabled={arrangement.last} onSelect={() => arrangement.move(1)}><ArrowRight />{i18n.text(islandsMessages.moveRight)}</DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>;
+              <ActionMenuItem key={scale} onSelect={() => arrangement.resize(Math.round(arrangement.medium * scale))}>{i18n.text(label)}</ActionMenuItem>)}
+            <ActionMenuSeparator />
+            <ActionMenuItem disabled={arrangement.size === null} onSelect={() => arrangement.resize(null)}><RotateCcw />{i18n.text(islandsMessages.restoreSize)}</ActionMenuItem>
+          </ActionMenuGroup>
+        </ActionMenuSubContent>
+      </ActionMenuSub>
+      <ActionMenuSeparator />
+      <ActionMenuItem disabled={arrangement.first} onSelect={() => arrangement.move(-1)}><ArrowLeft />{i18n.text(islandsMessages.moveLeft)}</ActionMenuItem>
+      <ActionMenuItem disabled={arrangement.last} onSelect={() => arrangement.move(1)}><ArrowRight />{i18n.text(islandsMessages.moveRight)}</ActionMenuItem>
+    </ActionMenuContent>
+  </ActionMenu>;
 }

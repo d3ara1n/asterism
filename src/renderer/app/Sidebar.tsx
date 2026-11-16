@@ -1,9 +1,9 @@
-import { lazy, Suspense, useRef, useState } from "react";
+import { lazy, Suspense, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
+import { ActionMenu, ActionMenuContent, ActionMenuItem, ActionMenuSeparator, ActionMenuTrigger, ActionMenuTarget } from "@asterism-app/ui/ui/action-menu";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { ChevronRight, Moon, Folder as FolderIcon, FolderPlus, House, MessageSquare, MoreHorizontal, PanelLeftClose, Pencil, Trash2 } from "lucide-react";
@@ -97,22 +97,21 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
       </Tooltip> : <span aria-hidden="true" className="size-2 shrink-0" />}
       {icon}
     </span>;
-    return <ListRow key={session.id} variant="navigation"
-      selected={selectedSessionId === session.id} disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
-      buttonProps={{ title: session.title, "aria-current": selectedSessionId === session.id ? "page" : undefined }}
-      media={media}
-      title={<span className={cn("relative block truncate", session.completed && "line-through")}>
-        {session.title}{folder && <span className="sr-only">, {folder.name}</span>}
-        {session.sleeping && <span className="sr-only">, {i18n.text(appMessages.sleeping)}</span>}
-      </span>}
-      actions={<>
-        <SessionStatus marks={marks} />
-        <SessionActions sessionId={session.id} title={session.title} folderId={session.folder_id} disabled={disabled} sleeping={session.sleeping}
-          keepAwake={session.keepAwake} onKeepAwakeChange={value => onKeepAwakeChange(session.id, value)}
-          completed={session.completed} onCompletedChange={completed => onCompletedChange(session.id, completed)}
-          renameDisabled={renameDisabledSessionId === session.id}
-          onRename={title => onRename(session.id, title)} onArchive={() => onArchive(session.id)} onTemplateSaved={onTemplateSaved} />
-      </>} />;
+    return <SessionActions key={session.id} sessionId={session.id} title={session.title} folderId={session.folder_id} disabled={disabled} sleeping={session.sleeping}
+      keepAwake={session.keepAwake} onKeepAwakeChange={value => onKeepAwakeChange(session.id, value)}
+      completed={session.completed} onCompletedChange={completed => onCompletedChange(session.id, completed)}
+      renameDisabled={renameDisabledSessionId === session.id}
+      onRename={title => onRename(session.id, title)} onArchive={() => onArchive(session.id)} onTemplateSaved={onTemplateSaved}>
+      {trigger => <ListRow variant="navigation"
+        selected={selectedSessionId === session.id} disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
+        buttonProps={{ title: session.title, "aria-current": selectedSessionId === session.id ? "page" : undefined }}
+        media={media}
+        title={<span className={cn("relative block truncate", session.completed && "line-through")}>
+          {session.title}{folder && <span className="sr-only">, {folder.name}</span>}
+          {session.sleeping && <span className="sr-only">, {i18n.text(appMessages.sleeping)}</span>}
+        </span>}
+        actions={<><SessionStatus marks={marks} />{trigger}</>} />}
+    </SessionActions>;
   };
   return <aside id="app-sidebar" className="app-sidebar" aria-label={i18n.formatMessage(appMessages.appNavigation)}>
     <header className="flex items-center justify-between gap-2 px-2 pb-5 pt-1">
@@ -162,38 +161,43 @@ function SidebarGroupHeader({ group, open, spaced, onToggle, onAction }: {
 }) {
   const i18n = useI18n();
   const name = group.folder?.name ?? i18n.text(folderMessages.noFolder);
+  const toggle = <Button type="button" data-action-menu-primary variant="ghost" aria-expanded={open} onClick={onToggle}
+    className="h-full min-w-0 flex-1 justify-start gap-2 py-0 pl-2 pr-1 has-[>svg]:pl-2 has-[>svg]:pr-1 text-left font-normal">
+    <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground motion-safe:transition-transform", open && "rotate-90")} />
+    {group.folder ? <FolderDot color={group.folder.color} className="mx-0.5" /> : <FolderIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />}
+    <span className={cn("min-w-0 flex-1 truncate", group.folder ? "font-medium" : "text-muted-foreground")}>{name}</span>
+    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{group.items.length}</span>
+  </Button>;
+  const header = (trigger: ReactNode) => <div className="group/folder flex h-8 items-center rounded-md pr-1 transition-colors hover:bg-accent/60 has-[:focus-visible]:bg-accent/60">
+    {toggle}
+    {trigger}
+  </div>;
   return <div className={cn(spaced && "pt-1")}>
-    <div className="group/folder flex h-8 items-center rounded-md pr-1 transition-colors hover:bg-accent/60 has-[:focus-visible]:bg-accent/60">
-      <Button type="button" variant="ghost" aria-expanded={open} onClick={onToggle}
-        className="h-full min-w-0 flex-1 justify-start gap-2 py-0 pl-2 pr-1 has-[>svg]:pl-2 has-[>svg]:pr-1 text-left font-normal">
-        <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground motion-safe:transition-transform", open && "rotate-90")} />
-        {group.folder ? <FolderDot color={group.folder.color} className="mx-0.5" /> : <FolderIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />}
-        <span className={cn("min-w-0 flex-1 truncate", group.folder ? "font-medium" : "text-muted-foreground")}>{name}</span>
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{group.items.length}</span>
-      </Button>
-      {group.folder && <FolderGroupActions folder={group.folder} onAction={onAction} />}
-    </div>
+    {group.folder ? <FolderGroupActions folder={group.folder} onAction={onAction}>{header}</FolderGroupActions> : header(null)}
   </div>;
 }
 
-function FolderGroupActions({ folder, onAction }: {
+function FolderGroupActions({ folder, onAction, children }: {
+  children: (trigger: ReactNode) => ReactElement;
   folder: Folder; onAction: (kind: FolderAction["kind"], folder: Folder, trigger: HTMLButtonElement | null) => void;
 }) {
   const i18n = useI18n();
   const { ready } = useFolders();
   const trigger = useRef<HTMLButtonElement>(null);
   const openingDialog = useRef(false);
-  return <DropdownMenu modal={false} onOpenChange={open => { if (open) openingDialog.current = false; }}>
-    <DropdownMenuTrigger asChild>
-      <Button ref={trigger} variant="ghost" size="icon-xs" disabled={!ready} aria-label={i18n.formatMessage(folderMessages.actions, { name: folder.name })}
-        className="w-0 overflow-hidden p-0 opacity-0 group-hover/folder:w-6 group-hover/folder:opacity-100 group-focus-within/folder:w-6 group-focus-within/folder:opacity-100 data-[state=open]:w-6 data-[state=open]:opacity-100">
-        <MoreHorizontal />
-      </Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" onCloseAutoFocus={event => { if (openingDialog.current) event.preventDefault(); }}>
-      <DropdownMenuItem onSelect={() => { openingDialog.current = true; onAction("edit", folder, trigger.current); }}><Pencil />{i18n.text(folderMessages.edit)}…</DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem variant="destructive" onSelect={() => { openingDialog.current = true; onAction("delete", folder, trigger.current); }}><Trash2 />{i18n.text(folderMessages.delete)}…</DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>;
+  return <ActionMenu modal={false} onOpenChange={open => { if (open) openingDialog.current = false; }}>
+    <ActionMenuTarget asChild disabled={!ready}>
+      {children(<ActionMenuTrigger asChild>
+        <Button ref={trigger} variant="ghost" size="icon-xs" disabled={!ready} aria-label={i18n.formatMessage(folderMessages.actions, { name: folder.name })}
+          className="w-0 overflow-hidden p-0 opacity-0 group-hover/folder:w-6 group-hover/folder:opacity-100 group-focus-within/folder:w-6 group-focus-within/folder:opacity-100 data-[state=open]:w-6 data-[state=open]:opacity-100">
+          <MoreHorizontal />
+        </Button>
+      </ActionMenuTrigger>)}
+    </ActionMenuTarget>
+    <ActionMenuContent align="end" onCloseAutoFocus={event => { if (openingDialog.current) event.preventDefault(); }}>
+      <ActionMenuItem onSelect={() => { openingDialog.current = true; onAction("edit", folder, trigger.current); }}><Pencil />{i18n.text(folderMessages.edit)}…</ActionMenuItem>
+      <ActionMenuSeparator />
+      <ActionMenuItem variant="destructive" onSelect={() => { openingDialog.current = true; onAction("delete", folder, trigger.current); }}><Trash2 />{i18n.text(folderMessages.delete)}…</ActionMenuItem>
+    </ActionMenuContent>
+  </ActionMenu>;
 }

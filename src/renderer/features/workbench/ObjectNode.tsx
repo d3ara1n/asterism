@@ -80,10 +80,10 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
   const content = useObjectView(object);
   const onObjectView = useCallback((patch: ViewPatch) => onView(object.id, patch), [onView, object.id]);
   return <>
-    <ObjectCard title={object.title} collapsed={collapsed} expandedHeight={data.expandedHeight} resizing={!!data.resizing} selected={!!selected} onView={onObjectView}
+    <ObjectActions object={object} appearance={content.view} onView={onObjectView}>{(menuTrigger, renderHeader) => <ObjectCard renderHeader={renderHeader} title={object.title} collapsed={collapsed} expandedHeight={data.expandedHeight} resizing={!!data.resizing} selected={!!selected} onView={onObjectView}
       icon={content.icon} kind={content.kind}
       panels={opened ? undefined : content.panels}
-      actions={<>{!opened && content.actions}<ObjectActions object={object} appearance={content.view} onView={onObjectView} /></>}
+      actions={<>{!opened && content.actions}{menuTrigger}</>}
       controls={opened ? undefined : <IconButton size="icon-xs" label={i18n.text(objectsMessages.openInIsland)}
         onClick={event => islands.openObject(object.id, event.currentTarget)}>
         <PanelRightOpen />
@@ -94,7 +94,7 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
           <Button variant="outline" size="sm" onClick={() => islands.closeObject(object.id)}><PanelLeftClose />{i18n.text(objectsMessages.returnToCard)}</Button>
         </div>
         : content.body}
-    </ObjectCard>
+    </ObjectCard>}</ObjectActions>
     {selected && !collapsed && <div className="contents" title={i18n.text(objectsMessages.resizeCard)}
       onDoubleClick={event => { event.stopPropagation(); onObjectView({ size: null }); }}>
       <NodeResizeControl position="bottom-right"

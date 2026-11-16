@@ -125,15 +125,15 @@ function MessageNode({ node, content }: { node: Extract<TimelineItem, { kind: "m
   const parts = displayInputParts(node);
   const files = parts.filter((part): part is InputFile => part.kind !== "text");
   const texts = parts.flatMap(part => part.kind === "text" && part.text ? [part.text] : []);
-  return <article data-conversation-message={node.id}
+  return <MessageFooter node={node} text={texts.join("\n")}>{footer => <article data-conversation-message={node.id}
     className={cn("group/message flex min-w-0 max-w-[92%] flex-col gap-1.5", user ? "ml-auto items-end" : "mr-auto items-start")}>
     <MessageSender sender={node.sender} />
     <MessageAttachments parts={files} content={content} align={user ? "end" : "start"} {...(texts.length ? {} : { "data-message-surface": "" })} />
     {texts.length > 0 && <div data-message-surface="" className={cn("flex w-full flex-col gap-2 rounded-md px-3 py-2", messageAppearance[node.sender.kind].surface)}>
       {texts.map((text, index) => <Markdown key={index}>{text}</Markdown>)}
     </div>}
-    <MessageFooter node={node} text={texts.join("\n")} />
-  </article>;
+    {footer}
+  </article>}</MessageFooter>;
 }
 function Summary({ text }: { text: string }) {
   const [open, setOpen] = useRendererViewState(viewStateKeys.disclosure, false);
