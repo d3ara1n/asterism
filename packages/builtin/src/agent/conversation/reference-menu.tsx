@@ -1,5 +1,6 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
-import { VList, type VListHandle } from "virtua";
+import type { VirtualizerHandle } from "virtua";
+import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { useI18n, useRendererCalls } from "@asterism-app/sdk/renderer";
 import { commonMessages } from "@asterism-app/ui/messages/common";
@@ -30,7 +31,7 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
   // The active row resets whenever the view or query changes the visible rows.
   const rowsKey = `${view.level}\u0000${query}`;
   const [activeState, setActiveState] = useState({ key: rowsKey, index: 0 });
-  const list = useRef<VListHandle>(null);
+  const list = useRef<VirtualizerHandle>(null);
 
   // The catalog can change between openings; read it each time the menu opens.
   useEffect(() => {
@@ -98,8 +99,8 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
       : !rows.length
         ? <p className="type-caption p-2">{i18n.text(commonMessages.noMatches)}</p>
         // Padding sits outside the virtualized viewport so its height equals the rows' total and never scrolls early.
-        : <div className="p-1"><VList ref={list} data={rows} itemSize={rowHeight} id={listId} role="listbox"
-          aria-label={i18n.text(conversationMessages.referenceMenu)}
+        : <div className="p-1"><VirtualList ref={list} data={rows} itemSize={rowHeight}
+          viewportProps={{ id: listId, role: "listbox", "aria-label": i18n.text(conversationMessages.referenceMenu) }}
           style={{ height: Math.min(rows.length * rowHeight, maxListHeight) }}>
           {(row, index) => <div key={row.kind === "category" ? row.category : row.skill.name}
             id={optionId(index)} role="option" aria-selected={index === active}
@@ -121,6 +122,6 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
                 <span className="type-caption truncate leading-tight">{row.skill.description}</span>
               </span>}
           </div>}
-        </VList></div>}
+        </VirtualList></div>}
   </div>;
 }

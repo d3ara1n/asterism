@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { AnimatePresence } from "motion/react";
-import { VList } from "virtua";
+import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { ArrowLeft, CircleSlash, Send, Square } from "lucide-react";
 import { useI18n, useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
 import { cn } from "@asterism-app/ui/utils";
@@ -76,7 +77,7 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
     const element = scroll.current, previous = phase.current;
     phase.current = task?.status.phase ?? null;
     if (!element || !pinned.current) return;
-    if (previous === "running" && task?.status.phase === "finished" && report.current) element.scrollTop = report.current.offsetTop;
+    if (previous === "running" && task?.status.phase === "finished" && report.current) element.scrollTop = report.current.offsetTop - element.offsetTop;
     else element.scrollTop = element.scrollHeight;
   }, [frame, task]);
 
@@ -122,42 +123,44 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
       </Popover>}
     </header>
 
-    <div ref={scroll} className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-auto p-3"
-      onScroll={event => {
+    <ScrollArea viewportRef={scroll} className="relative min-h-0 min-w-0 flex-1"
+      viewportProps={{ onScroll: event => {
         const element = event.currentTarget;
         pinned.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
-      }}>
-      {disconnected && <Alert variant="destructive" className="px-3 py-2">
-        <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-          {i18n.text(messages.disconnected)}
-          <Button size="xs" variant="outline" onClick={reconnect}>{i18n.text(messages.reconnect)}</Button>
-        </AlertDescription>
-      </Alert>}
-      {frame?.error && <Alert className="px-3 py-2"><AlertDescription>{i18n.text(messages.unavailable)}</AlertDescription></Alert>}
-      {!frame && !disconnected && <div className="flex justify-center py-6"><Spinner className="text-muted-foreground" /></div>}
-      {task && <>
-        <Section title={i18n.text(messages.task)}>
-          <Markdown>{task.input.task}</Markdown>
-          <TaskMeta task={task} />
-        </Section>
-        {task.input.context && <Disclosure open={backgroundOpen} onOpenChange={setBackgroundOpen}
-          header={<span className="type-label">{i18n.text(messages.background)}</span>}>
-          <Markdown>{task.input.context}</Markdown>
-        </Disclosure>}
-        {task.status.phase !== "finished" && (task.output.activity.length > 0 || (frame?.queued.length ?? 0) > 0)
-          && <Section title={i18n.text(messages.process)}>
-            <ActivityList entries={task.output.activity} queued={frame?.queued} />
+      } }}>
+      <div className="flex min-w-0 flex-col gap-4 p-3">
+        {disconnected && <Alert variant="destructive" className="px-3 py-2">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            {i18n.text(messages.disconnected)}
+            <Button size="xs" variant="outline" onClick={reconnect}>{i18n.text(messages.reconnect)}</Button>
+          </AlertDescription>
+        </Alert>}
+        {frame?.error && <Alert className="px-3 py-2"><AlertDescription>{i18n.text(messages.unavailable)}</AlertDescription></Alert>}
+        {!frame && !disconnected && <div className="flex justify-center py-6"><Spinner className="text-muted-foreground" /></div>}
+        {task && <>
+          <Section title={i18n.text(messages.task)}>
+            <Markdown>{task.input.task}</Markdown>
+            <TaskMeta task={task} />
+          </Section>
+          {task.input.context && <Disclosure open={backgroundOpen} onOpenChange={setBackgroundOpen}
+            header={<span className="type-label">{i18n.text(messages.background)}</span>}>
+            <Markdown>{task.input.context}</Markdown>
+          </Disclosure>}
+          {task.status.phase !== "finished" && (task.output.activity.length > 0 || (frame?.queued.length ?? 0) > 0)
+            && <Section title={i18n.text(messages.process)}>
+              <ActivityList entries={task.output.activity} queued={frame?.queued} />
+            </Section>}
+          {task.status.phase === "finished" && <Section ref={report} title={i18n.text(messages.report)}>
+            <Outcome status={task.status} />
+            {task.output.result ? <Markdown>{task.output.result}</Markdown> : <p className="type-caption">{i18n.text(messages.noReport)}</p>}
           </Section>}
-        {task.status.phase === "finished" && <Section ref={report} title={i18n.text(messages.report)}>
-          <Outcome status={task.status} />
-          {task.output.result ? <Markdown>{task.output.result}</Markdown> : <p className="type-caption">{i18n.text(messages.noReport)}</p>}
-        </Section>}
-        {instructions && <Section title={i18n.text(messages.steering)}>
-          <InstructionList activity={task.output.activity} undelivered={task.output.undelivered} />
-        </Section>}
-      </>}
-      {error && <p role="alert" className="type-caption text-destructive break-words">{error}</p>}
-    </div>
+          {instructions && <Section title={i18n.text(messages.steering)}>
+            <InstructionList activity={task.output.activity} undelivered={task.output.undelivered} />
+          </Section>}
+        </>}
+        {error && <p role="alert" className="type-caption text-destructive break-words">{error}</p>}
+      </div>
+    </ScrollArea>
 
     {working && <form className="border-t p-2" onSubmit={event => { event.preventDefault(); steer(); }}>
       <InputGroup data-disabled={blocked ? "true" : undefined}>
@@ -197,12 +200,12 @@ export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
       <SlidePage key={selected ? `task:${selected}` : "list"} direction={direction.current}>
         {selected ? <TaskDetail id={selected} back={() => select(null)} focus={opened} /> : <>
           <p className="type-caption px-3 py-2" role="status" aria-atomic="true">{i18n.formatMessage(messages.active, { running, queued })}</p>
-          {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VList data={data.tasks.toReversed()}>{task =>
+          {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VirtualList data={data.tasks.toReversed()}>{task =>
               <ListRow key={task.id} title={`${task.id} · ${task.role}`} onOpen={() => select(task.id)}
                 className="gap-2 px-3 py-1.5 [&_[data-slot=item-title]]:text-xs [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-snug"
                 contentClassName="gap-0.5"
                 description={<span className="block truncate" title={task.task}>{task.task}</span>}
-                actions={<TaskStatus status={task.status} />} />}</VList></ItemGroup>
+                actions={<TaskStatus status={task.status} />} />}</VirtualList></ItemGroup>
             : <p className="type-caption p-3">{i18n.text(messages.empty)}</p>}
         </>}
       </SlidePage>

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Download, Search } from "lucide-react";
 import { useI18n, type I18n } from "@asterism-app/sdk/renderer";
 import { StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { cn } from "@asterism-app/ui/utils";
 import type { WebCardData } from "./contract";
@@ -42,33 +43,35 @@ export function WebCard({ data }: { data: WebCardData }) {
   if (!data.configured && !requests) return <div className="nodrag nopan flex min-h-0 flex-1 flex-col justify-center p-2">
     <p className="type-caption text-center text-balance">{i18n.text(messages.empty)}</p>
   </div>;
-  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-2">
-    <dl className="grid grid-cols-3 gap-1.5">
-      <Metric label={i18n.text(messages.searches)} value={i18n.formatNumber(total(stats.search))} note={countNote(i18n, stats.search)} />
-      <Metric label={i18n.text(messages.fetches)} value={i18n.formatNumber(total(stats.fetch))} note={countNote(i18n, stats.fetch)} />
-      <Metric label={i18n.text(messages.cost)} value={stats.cost.length ? cost(i18n, stats.cost) : "—"} />
-    </dl>
-    <p className="type-caption flex min-w-0 items-center gap-1.5 px-0.5 tabular-nums" role="status">
-      {stats.inFlight > 0 && <><Spinner aria-hidden="true" className="size-3 motion-reduce:animate-none" />
-        <span className="shrink-0">{i18n.formatMessage(messages.inFlight, { count: stats.inFlight })}</span><span aria-hidden="true">·</span></>}
-      <span className="truncate">{stats.averageMs === null ? i18n.text(messages.noRequests)
-        : i18n.formatMessage(messages.durations, { average: duration(i18n, stats.averageMs), last: duration(i18n, stats.lastMs ?? stats.averageMs) })}</span>
-    </p>
-    {stats.recent.length > 0 && <section className="flex min-w-0 flex-col gap-1">
-      <h4 className="type-label px-0.5">{i18n.text(messages.recent)}</h4>
-      <ol className="flex flex-col">
-        {stats.recent.map(item => {
-          const Icon = item.kind === "search" ? Search : Download;
-          const when = i18n.formatDate(item.at, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-          return <li key={`${item.at}/${item.kind}/${item.subject}`} className="flex min-w-0 items-center gap-1.5 rounded-sm px-0.5 py-1" title={`${when} · ${item.subject}`}>
-            <Icon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className={cn("type-caption min-w-0 flex-1 truncate text-foreground select-text", item.kind === "fetch" && "font-mono")} translate="no">{item.subject}</span>
-            <span className="type-caption shrink-0 tabular-nums">{[item.cost.length > 0 && cost(i18n, item.cost), duration(i18n, item.durationMs)].filter(Boolean).join(" · ")}</span>
-            <StatusIcon tone={outcomeTone[item.outcome]} className="size-3.5 shrink-0" />
-            <span className="sr-only">{i18n.formatMessage(messages.outcome, { outcome: item.outcome })}</span>
-          </li>;
-        })}
-      </ol>
-    </section>}
-  </div>;
+  return <ScrollArea className="nodrag nopan min-h-0 min-w-0 flex-1">
+    <div className="flex min-w-0 flex-col gap-3 p-2">
+      <dl className="grid grid-cols-3 gap-1.5">
+        <Metric label={i18n.text(messages.searches)} value={i18n.formatNumber(total(stats.search))} note={countNote(i18n, stats.search)} />
+        <Metric label={i18n.text(messages.fetches)} value={i18n.formatNumber(total(stats.fetch))} note={countNote(i18n, stats.fetch)} />
+        <Metric label={i18n.text(messages.cost)} value={stats.cost.length ? cost(i18n, stats.cost) : "—"} />
+      </dl>
+      <p className="type-caption flex min-w-0 items-center gap-1.5 px-0.5 tabular-nums" role="status">
+        {stats.inFlight > 0 && <><Spinner aria-hidden="true" className="size-3 motion-reduce:animate-none" />
+          <span className="shrink-0">{i18n.formatMessage(messages.inFlight, { count: stats.inFlight })}</span><span aria-hidden="true">·</span></>}
+        <span className="truncate">{stats.averageMs === null ? i18n.text(messages.noRequests)
+          : i18n.formatMessage(messages.durations, { average: duration(i18n, stats.averageMs), last: duration(i18n, stats.lastMs ?? stats.averageMs) })}</span>
+      </p>
+      {stats.recent.length > 0 && <section className="flex min-w-0 flex-col gap-1">
+        <h4 className="type-label px-0.5">{i18n.text(messages.recent)}</h4>
+        <ol className="flex flex-col">
+          {stats.recent.map(item => {
+            const Icon = item.kind === "search" ? Search : Download;
+            const when = i18n.formatDate(item.at, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+            return <li key={`${item.at}/${item.kind}/${item.subject}`} className="flex min-w-0 items-center gap-1.5 rounded-sm px-0.5 py-1" title={`${when} · ${item.subject}`}>
+              <Icon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className={cn("type-caption min-w-0 flex-1 truncate text-foreground select-text", item.kind === "fetch" && "font-mono")} translate="no">{item.subject}</span>
+              <span className="type-caption shrink-0 tabular-nums">{[item.cost.length > 0 && cost(i18n, item.cost), duration(i18n, item.durationMs)].filter(Boolean).join(" · ")}</span>
+              <StatusIcon tone={outcomeTone[item.outcome]} className="size-3.5 shrink-0" />
+              <span className="sr-only">{i18n.formatMessage(messages.outcome, { outcome: item.outcome })}</span>
+            </li>;
+          })}
+        </ol>
+      </section>}
+    </div>
+  </ScrollArea>;
 }

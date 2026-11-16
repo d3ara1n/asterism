@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
+import type { VirtualizerHandle } from "virtua";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { ArrowLeft, Bell, BellOff, CornerUpLeft, Hash, List, MessageSquare, RefreshCw, Send, Settings, X } from "lucide-react";
 import { cardRenderer, creationEntry, recordRenderer, useI18n, useRendererCalls, useRendererObject, useRendererSettings,
@@ -9,14 +10,16 @@ import { MessageAttachments } from "../shared/attachments";
 import { Message, MessageContent, MessageHeader } from "@asterism-app/ui/ui/message";
 import { Bubble, BubbleContent } from "@asterism-app/ui/ui/bubble";
 import { Marker, MarkerContent } from "@asterism-app/ui/ui/marker";
-import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport,
-  useMessageScroller } from "@asterism-app/ui/ui/message-scroller";
+import { MessageScroller, MessageScrollerButton, MessageScrollerItem, MessageScrollerProvider,
+  useMessageScroller, useMessageScrollerScrollable } from "@asterism-app/ui/ui/message-scroller";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Toggle } from "@asterism-app/ui/ui/toggle";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemTitle } from "@asterism-app/ui/ui/item";
+import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
+import { VirtualMessageList } from "@asterism-app/ui/ui/virtual-message-list";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "@asterism-app/ui/ui/empty";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
@@ -30,7 +33,7 @@ import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema,
   BrowseConversations, ReadChat, SendChat, ChatMessageSent, ConfigureSubscription, SubscriptionChanged,
   type SubscriptionTarget, type ViewConnection, type ChatMessage } from "./contract";
 import { subscriptionKey } from "./subscriptions";
-import { groupTimeline } from "./timeline";
+import { chatEntries, chatEntryKey, chatReadingAnchorIndex } from "./timeline";
 import { chatFiles, chatTexts, kindIcon, relativeTime, statusLabel, statusTone } from "./presentation";
 import { messagingToolRenderers } from "./tool-views";
 
@@ -134,14 +137,14 @@ function ConversationsCard({ data }: { data: z.infer<typeof ConversationsView.sc
     <AnimatePresence initial={false} mode="popLayout" custom={direction.current}>
       <Page key={selected ? `connection:${selected.id}` : "list"} direction={direction.current}>
         {selected ? <ConnectionConversations connection={selected} back={() => select(null)} notify={notify} error={operations.error} />
-          : <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2">
-            <ItemGroup>{data.connections.map(connection => <ListRow key={connection.id} inactive={connection.status === "disabled"}
+          : <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
+            <ItemGroup className="min-h-0 flex-1"><VirtualList data={data.connections}>{connection => <ListRow key={connection.id} inactive={connection.status === "disabled"}
               onOpen={() => select(connection.id)} mediaVariant="icon"
               media={<StatusIcon tone={statusTone[connection.status]} className="size-4" />} title={connection.name}
               description={[connection.identity, connection.providerLabel && i18n.text(connection.providerLabel)].filter(Boolean).join(" · ") || undefined}
               details={connection.status !== "connected" ? <ConnectionStatus connection={connection} /> : undefined}
               actions={notify({ connectionId: connection.id }, connection.name,
-                i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))} />)}</ItemGroup>
+                i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))} />}</VirtualList></ItemGroup>
             <ErrorLine error={operations.error} />
           </div>}
       </Page>
@@ -184,10 +187,10 @@ function ConnectionConversations({ connection, back, notify, error }: {
       </IconButton>
       {notify({ connectionId: connection.id }, connection.name, i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))}
     </header>
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto p-2">
+    <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
       {loading && dialogs === null && !loadError && <div className="flex justify-center py-6"><Spinner aria-hidden="true" /></div>}
       {dialogs?.length === 0 && <p className="type-caption px-1 py-4 text-center text-balance">{i18n.text(messages.empty)}</p>}
-      {dialogs && dialogs.length > 0 && <ItemGroup>{dialogs.map(dialog => {
+      {dialogs && dialogs.length > 0 && <ItemGroup className="min-h-0 flex-1"><VirtualList data={dialogs}>{dialog => {
         const target = addressTarget(connection.id, dialog), Icon = dialog.threadId ? Hash : kindIcon[dialog.kind] ?? MessageSquare;
         return <Item key={subscriptionKey(target)} size="sm">
           <ItemMedia variant="icon"><Icon /></ItemMedia>
@@ -197,7 +200,7 @@ function ConnectionConversations({ connection, back, notify, error }: {
           </ItemContent>
           <ItemActions>{notify(target, dialog.title, i18n.formatMessage(messages.subscribeConversation, { name: dialog.title }))}</ItemActions>
         </Item>;
-      })}</ItemGroup>}
+      }}</VirtualList></ItemGroup>}
       <ErrorLine error={loadError ?? error} />
     </div>
   </>;
@@ -205,15 +208,7 @@ function ConnectionConversations({ connection, back, notify, error }: {
 
 /* ---------- Chat: message timeline and composer ---------- */
 
-type ChatEntry = { kind: "day"; key: string; sentAt: string } | { kind: "system"; message: ChatMessage } | { kind: "message"; message: ChatMessage; first: boolean };
-/** Timeline rows in display order: a day marker opens each local day, and the first message of a sender group carries its name. */
-function chatEntries(items: readonly ChatMessage[]): ChatEntry[] {
-  return groupTimeline(items).flatMap((group, index, groups) => [
-    ...(groups[index - 1]?.day === group.day ? [] : [{ kind: "day" as const, key: `day:${group.day}`, sentAt: group.messages[0]!.sentAt }]),
-    ...group.messages.map((message, position): ChatEntry => group.sender.role === "system"
-      ? { kind: "system", message } : { kind: "message", message, first: position === 0 }),
-  ]);
-}
+const liveEdgeThreshold = 8;
 const entrance = { duration: 0.22, ease: [0.23, 1, 0.32, 1] } as const;
 
 function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
@@ -255,7 +250,7 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
       {status !== "connected" && <ConnectionStatus connection={data.connection ?? { status }} />}
     </header>
     <div className="relative min-h-0 flex-1">
-      {items ? <MessageScrollerProvider autoScroll defaultScrollPosition="end">
+      {items ? <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold={liveEdgeThreshold}>
         <ChatTimeline items={items} follow={follow} usable={usable} nameOf={nameOf} onReply={reply} />
       </MessageScrollerProvider>
         : usable && !loadError && <div className="flex h-full items-center justify-center"><Spinner aria-hidden="true" /></div>}
@@ -294,56 +289,99 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
   </div>;
 }
 
-/**
- * Items paint without containment: `content-visibility: auto` clips each item to its box, which would cut the jump highlight
- * ringing beyond a bubble. A Chat shows one page of recent messages, so skipping offscreen rendering gains little.
- */
-const itemPaint = "[content-visibility:visible]";
-
-/** Mounted with loaded messages, so the scroller opens at the newest one; messages that arrive later animate in. */
+/** Mounted with loaded messages; only visible rows, focus, the jump target, and the last message stay mounted. */
 function ChatTimeline({ items, follow, usable, nameOf, onReply }: {
   items: readonly ChatMessage[]; follow: number; usable: boolean;
   nameOf(message: MessagingMessage): string; onReply(message: MessagingMessage): void;
 }) {
-  const i18n = useI18n(), scroller = useMessageScroller(), reducedMotion = useReducedMotion();
-  const content = useRef<HTMLDivElement>(null);
+  const i18n = useI18n(), { scrollToEnd, scrollToMessage } = useMessageScroller(), reducedMotion = useReducedMotion();
+  const viewport = useRef<HTMLDivElement>(null), virtual = useRef<VirtualizerHandle>(null);
+  const entries = useMemo(() => chatEntries(items), [items]);
+  const byId = useMemo(() => new Map(items.map(message => [message.id, message])), [items]);
+  const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [requestedJump, setJumpTarget] = useState<{ id: string; follow: number } | null>(null);
+  // A successful send explicitly resumes following, invalidating navigation requested before that send.
+  const jumpTarget = requestedJump?.follow === follow ? requestedJump : null;
+  const { end: reading } = useMessageScrollerScrollable();
+  const readingAnchor = useRef<{ id: string; offset: number } | null>(null);
+  const previousRows = useRef({ entries, follow });
+  const jumpIndex = jumpTarget ? entries.findIndex(entry => entry.kind !== "day" && entry.message.id === jumpTarget.id) : -1;
+  const focusedIndex = focusedId ? entries.findIndex(entry => entry.kind !== "day" && entry.message.id === focusedId) : -1;
   const seen = useRef<Set<string> | null>(null);
   seen.current ??= new Set(items.map(message => message.id));
   const known = seen.current;
-  useLayoutEffect(() => { for (const message of items) known.add(message.id); }, [items, known]);
-  useEffect(() => { if (follow) scroller.scrollToEnd({ behavior: reducedMotion ? "auto" : "smooth" }); }, [follow]);
-  // The quoted message is brought into view and its surface briefly rings so the eye finds it.
-  const jump = (id: string) => {
-    if (!scroller.scrollToMessage(id, { align: "center", behavior: reducedMotion ? "auto" : "smooth" })) return;
-    const surface = content.current?.querySelector<HTMLElement>(
-      `[data-message-id="${CSS.escape(id)}"] :is([data-slot=bubble-content], [data-slot=message-attachments])`);
+  useLayoutEffect(() => {
+    // Keep animation history bounded by the currently loaded page; remounting a known row never replays its entrance.
+    for (const id of known) if (!byId.has(id)) known.delete(id);
+    for (const id of byId.keys()) known.add(id);
+  }, [byId, known]);
+  useEffect(() => { if (follow) scrollToEnd({ behavior: reducedMotion ? "auto" : "smooth" }); }, [follow, scrollToEnd, reducedMotion]);
+  useLayoutEffect(() => {
+    const previous = previousRows.current;
+    previousRows.current = { entries, follow };
+    const saved = readingAnchor.current;
+    if (!saved || !reading || jumpTarget || previous.follow !== follow) return;
+    const index = chatReadingAnchorIndex(previous.entries, entries, saved.id);
+    if (index !== null) virtual.current?.scrollToIndex(index, { align: "start", offset: -saved.offset });
+  }, [entries, follow, reading, jumpTarget]);
+  const captureReadingPosition = () => {
+    const element = viewport.current, handle = virtual.current;
+    if (!element || !handle || element.scrollHeight - element.scrollTop - element.clientHeight <= liveEdgeThreshold) {
+      readingAnchor.current = null;
+      return;
+    }
+    let index = handle.findItemIndex(element.scrollTop);
+    while (entries[index]?.kind === "day") index++;
+    const entry = entries[index];
+    if (entry && entry.kind !== "day") readingAnchor.current = {
+      id: entry.message.id, offset: handle.getItemOffset(index) - element.scrollTop,
+    };
+  };
+  useLayoutEffect(() => {
+    if (!jumpTarget || jumpIndex < 0) return;
+    // keepMounted registers even an offscreen target before this effect. MessageScroller releases follow-output;
+    // virtua owns final index alignment and corrects its measurements while moving through unmounted rows.
+    if (scrollToMessage(jumpTarget.id, { align: "center", behavior: reducedMotion ? "auto" : "smooth" })) {
+      virtual.current?.scrollToIndex(jumpIndex, { align: "center", smooth: !reducedMotion });
+    }
+  }, [jumpTarget, jumpIndex, scrollToMessage, reducedMotion]);
+  useLayoutEffect(() => {
+    if (!jumpTarget) return;
+    const surface = viewport.current?.querySelector<HTMLElement>(
+      `[data-message-id="${CSS.escape(jumpTarget.id)}"] :is([data-slot=bubble-content], [data-slot=message-attachments])`);
     if (!surface) return;
     const color = getComputedStyle(surface).getPropertyValue("--ring").trim() || "currentColor";
-    surface.animate([{ boxShadow: `0 0 0 2px ${color}` }, { boxShadow: `0 0 0 ${reducedMotion ? 2 : 8}px transparent` }],
+    const animation = surface.animate([{ boxShadow: `0 0 0 2px ${color}` }, { boxShadow: `0 0 0 ${reducedMotion ? 2 : 8}px transparent` }],
       { duration: 1200, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
-  };
-  const byId = new Map(items.map(message => [message.id, message]));
-  return <MessageScroller className="absolute inset-0">
-    <MessageScrollerViewport aria-label={i18n.text(messages.chat)} className="select-text overflow-x-hidden">
-      <MessageScrollerContent ref={content} className="gap-0 px-3 pt-1 pb-3">
-        {items.length === 0 && <MessageScrollerItem className="flex flex-1 items-center justify-center">
-          <p className="type-caption">{i18n.text(messages.noMessages)}</p>
-        </MessageScrollerItem>}
-        {chatEntries(items).map(entry => {
-          if (entry.kind === "day") return <MessageScrollerItem key={entry.key} className={cn(itemPaint, "pt-3")}>
-            <Marker variant="separator" className="text-xs tabular-nums"><MarkerContent>{i18n.formatDate(Date.parse(entry.sentAt), { dateStyle: "medium" })}</MarkerContent></Marker>
-          </MessageScrollerItem>;
-          const { message } = entry;
-          if (entry.kind === "system") return <MessageScrollerItem key={message.id} messageId={message.id} className={cn(itemPaint, "pt-2")}>
-            <Marker className="justify-center text-xs"><MarkerContent className="text-center">{messagingText(message)}</MarkerContent></Marker>
-          </MessageScrollerItem>;
-          return <MessageScrollerItem key={message.id} messageId={message.id} className={cn(itemPaint, entry.first ? "pt-3" : "pt-1")}>
-            <ChatRow message={message} first={entry.first} fresh={!known.has(message.id)} usable={usable} nameOf={nameOf}
-              quoted={message.replyTo ? byId.get(message.replyTo) : undefined} onReply={onReply} onJump={jump} />
-          </MessageScrollerItem>;
-        })}
-      </MessageScrollerContent>
-    </MessageScrollerViewport>
+    return () => animation.cancel();
+  }, [jumpTarget, reducedMotion]);
+  const jump = (id: string) => { if (byId.has(id)) setJumpTarget({ id, follow }); };
+  const clearJump = () => setJumpTarget(null);
+  return <MessageScroller className="absolute inset-0"
+    onWheelCapture={clearJump} onTouchStartCapture={clearJump} onPointerDownCapture={clearJump} onKeyDownCapture={clearJump}>
+    <VirtualMessageList ref={virtual} viewportRef={viewport} data={entries}
+      viewportProps={{ "aria-label": i18n.text(messages.chat), className: "select-text overflow-x-hidden", onScroll: captureReadingPosition }}
+      contentClassName={cn("px-3 pb-3", !entries.length && "pt-1")}
+      keepMounted={[jumpIndex, focusedIndex].filter(index => index >= 0)}
+      empty={<MessageScrollerItem className="flex flex-1 items-center justify-center">
+        <p className="type-caption">{i18n.text(messages.noMessages)}</p>
+      </MessageScrollerItem>}>
+      {(entry, index) => {
+        const key = chatEntryKey(entry);
+        if (entry.kind === "day") return <MessageScrollerItem key={key} className={index === 0 ? "pt-4" : "pt-3"}>
+          <Marker variant="separator" className="text-xs tabular-nums"><MarkerContent>{i18n.formatDate(Date.parse(entry.sentAt), { dateStyle: "medium" })}</MarkerContent></Marker>
+        </MessageScrollerItem>;
+        const { message } = entry;
+        if (entry.kind === "system") return <MessageScrollerItem key={key} messageId={message.id} className="pt-2">
+          <Marker className="justify-center text-xs"><MarkerContent className="text-center">{messagingText(message)}</MarkerContent></Marker>
+        </MessageScrollerItem>;
+        return <MessageScrollerItem key={key} messageId={message.id} className={entry.first ? "pt-3" : "pt-1"}
+          onFocusCapture={() => setFocusedId(message.id)}>
+          <ChatRow message={message} first={entry.first} fresh={!known.has(message.id)} usable={usable} nameOf={nameOf}
+            quoted={message.replyTo ? byId.get(message.replyTo) : undefined} onReply={onReply} onJump={jump} />
+        </MessageScrollerItem>;
+      }}
+    </VirtualMessageList>
     <MessageScrollerButton className="bottom-3" />
   </MessageScroller>;
 }

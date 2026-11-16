@@ -1,4 +1,5 @@
 import * as React from "react"
+import { ScrollArea as ScrollAreaPrimitive } from "radix-ui"
 import {
   MessageScroller as MessageScrollerPrimitive,
   useMessageScroller,
@@ -11,15 +12,17 @@ import { ArrowDownIcon } from "lucide-react"
 import { commonMessages } from "../messages/common"
 import { cn } from "../utils"
 import { Button } from "./button"
+import { ScrollBar } from "./scroll-area"
 
 function MessageScrollerProvider(
-  props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>
+  props: React.ComponentProps<typeof MessageScrollerPrimitive.Provider>,
 ) {
   return <MessageScrollerPrimitive.Provider {...props} />
 }
 
 function MessageScroller({
   className,
+  children,
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Root>) {
   return (
@@ -27,10 +30,16 @@ function MessageScroller({
       data-slot="message-scroller"
       className={cn(
         "group/message-scroller relative flex size-full min-h-0 flex-col overflow-hidden",
-        className
+        className,
       )}
       {...props}
-    />
+    >
+      {/* Keep the primitive root's own ref registration; only the viewport and content compose onto existing DOM. */}
+      <ScrollAreaPrimitive.Root className="relative flex size-full min-h-0 flex-col">
+        {children}
+        <ScrollBar />
+      </ScrollAreaPrimitive.Root>
+    </MessageScrollerPrimitive.Root>
   )
 }
 
@@ -39,14 +48,16 @@ function MessageScrollerViewport({
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Viewport>) {
   return (
-    <MessageScrollerPrimitive.Viewport
-      data-slot="message-scroller-viewport"
-      className={cn(
-        "size-full min-h-0 min-w-0 scrollbar-thin scrollbar-gutter-stable overflow-y-auto overscroll-contain contain-content data-pending-scroll:invisible",
-        className
-      )}
-      {...props}
-    />
+    <ScrollAreaPrimitive.Viewport asChild disableImplicitContentElement>
+      <MessageScrollerPrimitive.Viewport
+        data-slot="message-scroller-viewport"
+        className={cn(
+          "size-full min-h-0 min-w-0 overflow-y-auto overscroll-contain contain-content data-pending-scroll:invisible",
+          className,
+        )}
+        {...props}
+      />
+    </ScrollAreaPrimitive.Viewport>
   )
 }
 
@@ -55,11 +66,13 @@ function MessageScrollerContent({
   ...props
 }: React.ComponentProps<typeof MessageScrollerPrimitive.Content>) {
   return (
-    <MessageScrollerPrimitive.Content
-      data-slot="message-scroller-content"
-      className={cn("flex h-max min-h-full flex-col gap-8", className)}
-      {...props}
-    />
+    <ScrollAreaPrimitive.Content asChild style={{ display: undefined }}>
+      <MessageScrollerPrimitive.Content
+        data-slot="message-scroller-content"
+        className={cn("flex h-max min-h-full flex-col gap-8", className)}
+        {...props}
+      />
+    </ScrollAreaPrimitive.Content>
   )
 }
 
@@ -74,7 +87,7 @@ function MessageScrollerItem({
       scrollAnchor={scrollAnchor}
       className={cn(
         "min-w-0 shrink-0 [contain-intrinsic-size:auto_10rem] [content-visibility:auto]",
-        className
+        className,
       )}
       {...props}
     />
@@ -101,7 +114,7 @@ function MessageScrollerButton({
       direction={direction}
       className={cn(
         "absolute inset-s-1/2 -translate-x-1/2 border-border bg-background text-foreground transition-[translate,scale,opacity] duration-200 hover:bg-muted hover:text-foreground data-[active=false]:pointer-events-none data-[active=false]:scale-95 data-[active=false]:opacity-0 data-[active=false]:duration-400 data-[active=false]:ease-[cubic-bezier(0.7,0,0.84,0)] data-[active=true]:translate-y-0 data-[active=true]:scale-100 data-[active=true]:opacity-100 data-[active=true]:ease-[cubic-bezier(0.23,1,0.32,1)] data-[direction=end]:bottom-4 data-[direction=end]:data-[active=false]:translate-y-full data-[direction=start]:top-4 data-[direction=start]:data-[active=false]:-translate-y-full rtl:translate-x-1/2 data-[direction=start]:[&_svg]:rotate-180",
-        className
+        className,
       )}
       render={render ?? <Button variant={variant} size={size} />}
       {...props}
@@ -110,7 +123,11 @@ function MessageScrollerButton({
         <>
           <ArrowDownIcon />
           <span className="sr-only">
-            {i18n.text(direction === "end" ? commonMessages.scrollToEnd : commonMessages.scrollToStart)}
+            {i18n.text(
+              direction === "end"
+                ? commonMessages.scrollToEnd
+                : commonMessages.scrollToStart,
+            )}
           </span>
         </>
       )}

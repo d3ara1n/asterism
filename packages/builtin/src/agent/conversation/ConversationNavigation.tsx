@@ -6,6 +6,7 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import { displayInputParts, inputFileName } from "@asterism-app/builtin-api/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { Button } from "@asterism-app/ui/ui/button";
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@asterism-app/ui/ui/command";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
@@ -50,10 +51,11 @@ const swap: Variants = {
  * shows the current input once it scrolls under the reading line, and its counter opens an outline of every loaded input.
  * Positions come from virtualizer measurements, so unmounted inputs are located too.
  */
-export function ConversationNavigation({ timeline, scroll, list, onSelect, ref }: {
+export function ConversationNavigation({ timeline, scroll, list, startMargin, onSelect, ref }: {
   timeline: readonly TimelineItem[];
   scroll: RefObject<HTMLDivElement | null>;
   list: RefObject<VirtualizerHandle | null>;
+  startMargin: number;
   onSelect(index: number, inset: number): void;
   ref?: Ref<ConversationNavigationHandle>;
 }) {
@@ -96,7 +98,7 @@ export function ConversationNavigation({ timeline, scroll, list, onSelect, ref }
     const virtualizer = list.current;
     if (!element || !virtualizer || !chapters.length) return;
     const end = Math.max(0, element.scrollHeight - element.clientHeight);
-    const position = readingPosition(chapters.map(chapter => virtualizer.getItemOffset(chapter.index)),
+    const position = readingPosition(chapters.map(chapter => startMargin + virtualizer.getItemOffset(chapter.index)),
       element.scrollTop, end, readingInset);
     // Scroll progress writes the fill directly; React rerenders only when the chapter or its visibility changes.
     if (fill.current) fill.current.style.transform = `scaleX(${position.progress})`;
@@ -106,7 +108,7 @@ export function ConversationNavigation({ timeline, scroll, list, onSelect, ref }
     }
     setActiveId(chapters[position.chapter]!.id);
     setPast(position.past);
-  }, [chapters, scroll, list]);
+  }, [chapters, scroll, list, startMargin]);
   // The owner of the scroll container forwards scroll and measurement events; this effect covers chapter changes.
   useImperativeHandle(ref, () => ({ update }), [update]);
   useLayoutEffect(update, [update]);
@@ -216,25 +218,27 @@ export function ConversationNavigation({ timeline, scroll, list, onSelect, ref }
         <Command label={outlineLabel} value={highlighted} onValueChange={setHighlighted} loop
           filter={(_, query, keywords) => keywords?.join("\n").toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) ? 1 : 0}>
           {chapters.length > searchThreshold && <CommandInput ref={search} placeholder={i18n.text(conversationMessages.outlineSearch)} />}
-          <CommandList ref={outline} tabIndex={-1} label={outlineLabel}
-            className="max-h-[min(24rem,calc(var(--radix-popover-content-available-height)-3rem))] overscroll-contain p-1 outline-hidden">
-            <CommandEmpty>{i18n.text(commonMessages.noMatches)}</CommandEmpty>
-            {chapters.map(chapter => {
-              const isCurrent = chapter.id === current.id;
-              return <CommandItem key={chapter.id} value={chapter.id} keywords={[chapter.sender, chapter.preview]}
-                data-current={isCurrent ? "" : undefined} aria-current={isCurrent ? "location" : undefined}
-                onSelect={() => select(chapter)}
-                className="items-start gap-2.5 py-2 transition-colors duration-(--motion-fast) ease-(--ease-out) motion-reduce:transition-none">
-                <span className={cn("w-5 shrink-0 pt-px text-right text-xs tabular-nums",
-                  isCurrent ? "font-medium text-foreground" : "text-muted-foreground")}>{chapter.number}</span>
-                <span className="min-w-0 flex-1">
-                  {chapter.sender && <span className="type-label block">{chapter.sender}</span>}
-                  <span className={cn("line-clamp-2 [overflow-wrap:anywhere]", isCurrent && "font-medium")}>{chapter.summary}</span>
-                </span>
-                <span aria-hidden="true" className={cn("mt-1.5 size-1.5 shrink-0 rounded-full bg-foreground/60", !isCurrent && "invisible")} />
-              </CommandItem>;
-            })}
-          </CommandList>
+          <ScrollArea className="min-h-0" viewportRef={outline} viewportProps={{ tabIndex: -1 }}
+            viewportClassName="max-h-[min(24rem,calc(var(--radix-popover-content-available-height)-3rem))] scroll-py-1 overscroll-contain outline-hidden">
+            <CommandList label={outlineLabel} className="max-h-none overflow-visible p-1">
+              <CommandEmpty>{i18n.text(commonMessages.noMatches)}</CommandEmpty>
+              {chapters.map(chapter => {
+                const isCurrent = chapter.id === current.id;
+                return <CommandItem key={chapter.id} value={chapter.id} keywords={[chapter.sender, chapter.preview]}
+                  data-current={isCurrent ? "" : undefined} aria-current={isCurrent ? "location" : undefined}
+                  onSelect={() => select(chapter)}
+                  className="items-start gap-2.5 py-2 transition-colors duration-(--motion-fast) ease-(--ease-out) motion-reduce:transition-none">
+                  <span className={cn("w-5 shrink-0 pt-px text-right text-xs tabular-nums",
+                    isCurrent ? "font-medium text-foreground" : "text-muted-foreground")}>{chapter.number}</span>
+                  <span className="min-w-0 flex-1">
+                    {chapter.sender && <span className="type-label block">{chapter.sender}</span>}
+                    <span className={cn("line-clamp-2 [overflow-wrap:anywhere]", isCurrent && "font-medium")}>{chapter.summary}</span>
+                  </span>
+                  <span aria-hidden="true" className={cn("mt-1.5 size-1.5 shrink-0 rounded-full bg-foreground/60", !isCurrent && "invisible")} />
+                </CommandItem>;
+              })}
+            </CommandList>
+          </ScrollArea>
         </Command>
       </PopoverContent>
     </Popover>

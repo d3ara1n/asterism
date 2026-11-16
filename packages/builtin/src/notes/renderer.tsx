@@ -1,3 +1,4 @@
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
 import { FileText, FilePenLine, FilePlus2, Replace, TextSearch } from "lucide-react";
 
@@ -21,10 +22,10 @@ export default {
   cards: [cardRenderer(NoteView, {
     ...appearance,
     Actions: NoteActions,
-    Body: ({ data }) => { const i18n = useI18n(); return <div className="min-h-0 flex-1 select-text overflow-auto p-3">
+    Body: ({ data }) => { const i18n = useI18n(); return <ScrollArea className="min-h-0 flex-1" viewportClassName="select-text" contentClassName="p-3">
       {data.text !== null ? <SkillReferences><Markdown>{data.text}</Markdown></SkillReferences>
         : <p className="type-body text-muted-foreground">{i18n.formatMessage(textMessages.contentUnavailable)}</p>}
-    </div>; },
+    </ScrollArea>; },
   })],
   tools: [
     toolRenderer(NoteGrep, {

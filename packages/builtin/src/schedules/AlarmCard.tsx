@@ -1,3 +1,4 @@
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { useState } from "react";
 import { Bell, BellOff, Pencil } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
@@ -61,7 +62,7 @@ function AlarmBack({ value, onChange, disabled, error, onSubmit, onCancel }: {
   const i18n = useI18n();
   const [hours, minutes] = value.time.split(":").map(Number) as [number, number];
   const setTime = (h: number, m: number) => onChange({ ...value, time: `${pad2(h)}:${pad2(m)}` });
-  return <form className="flex h-full flex-col gap-3 overflow-auto p-4" onSubmit={event => { event.preventDefault(); onSubmit(); }}>
+  return <ScrollArea className="h-full"><form className="flex min-h-full flex-col gap-3 p-4" onSubmit={event => { event.preventDefault(); onSubmit(); }}>
     <div role="group" aria-label={i18n.text(messages.time)} className="flex shrink-0 items-center justify-center gap-1">
       <WheelPicker className="w-20" count={24} value={hours} format={pad2} label={i18n.text(messages.hours)} disabled={disabled} onValueChange={h => setTime(h, minutes)} />
       <span aria-hidden className="text-xl font-light text-muted-foreground">:</span>
@@ -80,7 +81,7 @@ function AlarmBack({ value, onChange, disabled, error, onSubmit, onCancel }: {
     <MessageInput value={value.message} disabled={disabled} onChange={message => onChange({ ...value, message })} />
     <ScheduleError error={error} />
     <BackFooter disabled={disabled} canSubmit={alarmSettingsSchema.safeParse(value).success} onCancel={onCancel} />
-  </form>;
+  </form></ScrollArea>;
 }
 
 const settingsOf = ({ time, weekdays, message }: AlarmSettings): AlarmSettings => ({ time, weekdays, message });

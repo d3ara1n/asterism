@@ -1,21 +1,21 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronRight, Server, Settings } from "lucide-react";
 import { useI18n, useRendererSettings, creationEntry, cardRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
+import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { cn } from "@asterism-app/ui/utils";
 import { McpHost, CreateMcpHost, McpHostView } from "./contract";
 import type { McpServerState } from "@asterism-app/sdk/contracts";
 import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
 import { useMcpTools } from "@asterism-app/ui/mcp-status";
-import { Instructions, ServerError, ServerSummary, ToolList } from "./views";
+import { Instructions, ServerError, ServerSummary, ToolEntry, type ToolEntryData } from "./views";
 import { mcpToolRenderers } from "./tool-views";
 
 import { mcpCard as appearance } from "../shared/card-appearance.ts";
 /** Columns: expand arrow · status · name · tool count; expanded content aligns with the name column. */
-const columns = "grid grid-cols-[auto_auto_minmax(0,1fr)_auto] gap-x-1.5";
+const columns = "grid grid-cols-[0.875rem_0.875rem_minmax(0,1fr)_auto] gap-x-1.5";
 const detail = "col-[3/-1] min-w-0";
 
 function useOpenSettings() {
@@ -29,10 +29,18 @@ function HostActions() {
   return <IconButton size="icon-xs" label={i18n.text(messages.openSettings)} onClick={openSettings}><Settings /></IconButton>;
 }
 
-/** Reads the cached catalog only when expanded; module state events refresh the catalog. */
-function ServerTools({ server }: { server: McpServerState }) {
+type Catalog = ReturnType<typeof useMcpTools>;
+
+/** Catalog subscriptions stay mounted outside virtual rows while their server is expanded. */
+function ServerCatalog({ id, onChange }: { id: string; onChange(id: string, catalog: Catalog): void }) {
+  const { directory, error } = useMcpTools(id, true);
+  useEffect(() => { onChange(id, { directory, error }); }, [id, directory, error, onChange]);
+  return null;
+}
+
+function ServerDetails({ server, catalog }: { server: McpServerState; catalog: Catalog | undefined }) {
   const i18n = useI18n();
-  const { directory, error } = useMcpTools(server.id, true);
+  const { directory, error } = catalog ?? {};
   return <div className="flex min-w-0 flex-col gap-2 pb-2">
     {server.error && <pre className="type-caption whitespace-pre-wrap break-words text-destructive select-text">{server.error}</pre>}
     {error && <p className="type-caption text-destructive">{i18n.text(error)}</p>}
@@ -40,43 +48,72 @@ function ServerTools({ server }: { server: McpServerState }) {
       : directory === null ? <p className="type-caption text-muted-foreground">{i18n.text(messages.unindexedHint)}</p>
         : directory && <>
           {directory.instructions && <Instructions text={directory.instructions} />}
-          {directory.tools.length ? <ToolList tools={directory.tools} />
-            : <p className="type-caption text-muted-foreground">{i18n.text(messages.noTools)}</p>}
+          {!directory.tools.length && <p className="type-caption text-muted-foreground">{i18n.text(messages.noTools)}</p>}
         </>}
   </div>;
 }
 
 /** A single server: status and cached tools; connection management belongs to settings. */
-function ServerRow({ server }: { server: McpServerState }) {
+function ServerRow({ server, open, onToggle }: { server: McpServerState; open: boolean; onToggle(): void }) {
   const i18n = useI18n();
-  const [open, setOpen] = useState(false);
-  return <Collapsible open={open} onOpenChange={setOpen} className="col-span-full grid grid-cols-subgrid">
+  return <div className={columns}>
     <div className={cn("col-span-full grid min-h-8 grid-cols-subgrid items-center py-1", !server.enabled && "opacity-60")}>
-      <CollapsibleTrigger asChild>
-        <button type="button" className="col-span-4 grid grid-cols-subgrid items-center rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
-          <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-90")} />
-          <ServerSummary server={server} />
-        </button>
-      </CollapsibleTrigger>
+      <button type="button" aria-expanded={open} onClick={onToggle}
+        className="col-span-4 grid grid-cols-subgrid items-center rounded-sm text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50">
+        <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-90")} />
+        <ServerSummary server={server} />
+      </button>
     </div>
     <p role="status" className={cn(detail, "type-caption pb-1 text-muted-foreground")}>
       {server.enabled ? i18n.formatMessage(messages.state, { state: server.connection }) : i18n.text(messages.disabled)}
       {server.enabled && server.connection === "awaiting_auth" && <>{" · "}{i18n.text(messages.authorizeInSettings)}</>}
     </p>
     {!open && <ServerError error={server.error} className={detail} />}
-    <CollapsibleContent className={detail}>{open && <ServerTools server={server} />}</CollapsibleContent>
-  </Collapsible>;
+  </div>;
 }
+
+type HostRow = { kind: "server"; key: string; server: McpServerState }
+  | { kind: "details"; key: string; server: McpServerState }
+  | { kind: "tool"; key: string; tool: ToolEntryData };
 
 function HostBody({ data }: { data: { servers: McpServerState[] } }) {
   const i18n = useI18n(), openSettings = useOpenSettings();
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const [catalogs, setCatalogs] = useState<Record<string, Catalog>>({});
+  const onCatalog = useCallback((id: string, catalog: Catalog) => {
+    setCatalogs(current => ({ ...current, [id]: catalog }));
+  }, []);
+  const toggle = (id: string) => setExpanded(current => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   if (!data.servers.length) return <div className="nodrag nopan flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-2">
     <p className="type-caption text-center text-balance text-muted-foreground">{i18n.text(messages.empty)}</p>
     <Button variant="outline" size="xs" onClick={openSettings}><Settings />{i18n.text(messages.openSettings)}</Button>
   </div>;
-  return <div className={cn("nodrag nopan min-h-0 flex-1 content-start overflow-auto px-2 py-1.5", columns)}>
-    {data.servers.map(server => <ServerRow key={server.id} server={server} />)}
-  </div>;
+  // Tools are peers in the virtual list, so a large expanded catalog does not become one unbounded row.
+  const rows = data.servers.flatMap((server): HostRow[] => [
+    { kind: "server", key: `server:${server.id}`, server },
+    ...(expanded.has(server.id) ? [
+      { kind: "details" as const, key: `details:${server.id}`, server },
+      ...(catalogs[server.id]?.directory?.tools ?? []).map((tool, index): HostRow => ({
+        kind: "tool", key: `tool:${server.id}/${tool.name}/${index}`, tool,
+      })),
+    ] : []),
+  ]);
+  return <>
+    {data.servers.filter(server => expanded.has(server.id)).map(server =>
+      <ServerCatalog key={server.id} id={server.id} onChange={onCatalog} />)}
+    <VirtualList data={rows} className="nodrag nopan" viewportClassName="px-2 py-1.5">
+      {row => row.kind === "server"
+        ? <ServerRow key={row.key} server={row.server} open={expanded.has(row.server.id)} onToggle={() => toggle(row.server.id)} />
+        : <div key={row.key} className={columns}><div className={detail}>
+          {row.kind === "details" ? <ServerDetails server={row.server} catalog={catalogs[row.server.id]} />
+            : <div className="pb-2"><ToolEntry {...row.tool} /></div>}
+        </div></div>}
+    </VirtualList>
+  </>;
 }
 
 export default {

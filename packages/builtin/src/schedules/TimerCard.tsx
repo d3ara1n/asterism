@@ -1,3 +1,4 @@
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { useEffect, useState } from "react";
 import { useReducedMotion } from "motion/react";
 import { Bell, Pause, Pencil, Play, Repeat, RotateCcw } from "lucide-react";
@@ -99,7 +100,7 @@ function TimerBack({ value, onChange, disabled, error, onSubmit, onCancel }: {
   const hours = Math.floor(value.durationSeconds / 3600), minutes = Math.floor(value.durationSeconds / 60) % 60, seconds = value.durationSeconds % 60;
   const set = (h: number, m: number, s: number) => onChange({ ...value, durationSeconds: h * 3600 + m * 60 + s });
   const separator = <span aria-hidden className="text-xl font-light text-muted-foreground">:</span>;
-  return <form className="flex h-full flex-col gap-3 overflow-auto p-4" onSubmit={event => { event.preventDefault(); onSubmit(); }}>
+  return <ScrollArea className="h-full"><form className="flex min-h-full flex-col gap-3 p-4" onSubmit={event => { event.preventDefault(); onSubmit(); }}>
     <div role="group" aria-label={i18n.text(messages.duration)} className="flex shrink-0 items-center justify-center gap-1">
       <WheelPicker className="w-16" count={24} value={hours} label={i18n.text(messages.hours)} disabled={disabled} onValueChange={h => set(h, minutes, seconds)} />
       {separator}
@@ -114,7 +115,7 @@ function TimerBack({ value, onChange, disabled, error, onSubmit, onCancel }: {
     <MessageInput value={value.message} disabled={disabled} onChange={message => onChange({ ...value, message })} />
     <ScheduleError error={error} />
     <BackFooter disabled={disabled} canSubmit={timerSettingsSchema.safeParse(value).success} onCancel={onCancel} />
-  </form>;
+  </form></ScrollArea>;
 }
 
 const settingsOf = ({ durationSeconds, repeat, message }: TimerSettings): TimerSettings => ({ durationSeconds, repeat, message });

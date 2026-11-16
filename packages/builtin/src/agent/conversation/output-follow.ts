@@ -9,10 +9,11 @@ const distanceFromBottom = (element: HTMLElement) => element.scrollHeight - elem
  * Follow state is local to the scroll area; successful business acceptance explicitly returns to the latest output.
  * The virtual list compensates for scroll position after measuring items; only scrolling caused by user gestures changes follow state.
  */
-export function useOutputFollow(content: readonly TimelineItem[], processOwners: ReadonlyMap<string, string>, onUserGesture: () => void) {
+export function useOutputFollow(content: readonly TimelineItem[], processOwners: ReadonlyMap<string, string>, onUserGesture: () => void, startMargin: number) {
   const follow = useRef(true);
   const gesture = useRef(false);
   const anchor = useRef<{ key: string; offset: number; focus?: boolean } | null>(null);
+  const area = useRef<HTMLDivElement>(null);
   const scroll = useRef<HTMLDivElement>(null);
   const list = useRef<VirtualizerHandle>(null);
   const [awayFromBottom, setAwayFromBottom] = useState(false);
@@ -34,7 +35,7 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
       saved.offset = 0;
     }
     virtualizer.scrollToIndex(index, { align: "start", offset: -saved.offset });
-  }, [content, processOwners, toBottom]);
+  }, [content, processOwners, toBottom, startMargin]);
   const onProcessMount = useCallback((key: string, button: HTMLButtonElement) => {
     const saved = anchor.current;
     if (saved?.key !== key || !saved.focus) return;
@@ -42,17 +43,17 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
     if (document.activeElement === button) saved.focus = false;
   }, []);
   useLayoutEffect(restore, [restore]);
-  // The card takes over content-area wheel events during native bubbling, so React does not receive them; native listeners on the scroll element identify user gestures.
+  // Root capture includes Radix scrollbar drags before their handlers move the viewport, and precedes the card's native wheel handling.
   useEffect(() => {
-    const element = scroll.current;
+    const element = area.current;
     if (!element) return;
     const start = () => { gesture.current = true; anchor.current = null; onUserGesture(); };
     const events = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
-    for (const name of events) element.addEventListener(name, start, { passive: true });
-    return () => { for (const name of events) element.removeEventListener(name, start); };
+    for (const name of events) element.addEventListener(name, start, { passive: true, capture: true });
+    return () => { for (const name of events) element.removeEventListener(name, start, true); };
   }, [onUserGesture]);
   return {
-    scroll, list, awayFromBottom, onProcessMount,
+    area, scroll, list, awayFromBottom, onProcessMount,
     /** After measurement, continues following output or preserves the user-selected item's position in the viewport. */
     onResize: restore,
     /** After a scroll ends, the next scroll must again originate from a user gesture to change follow state. */
@@ -69,6 +70,18 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
       anchor.current = content[index] ? { key: timelineKey(content[index]), offset: inset } : null;
       list.current?.scrollToIndex(index, { align: "start", offset: -inset });
     },
+    /** Captures the visible item before loading earlier history; later prepends and header changes restore this same reading position. */
+    preserveReadingPosition() {
+      const element = scroll.current;
+      const virtualizer = list.current;
+      if (!element || !virtualizer || !content.length) return;
+      const index = virtualizer.findItemIndex(element.scrollTop);
+      const item = content[index];
+      if (!item) return;
+      follow.current = false;
+      gesture.current = false;
+      anchor.current = { key: timelineKey(item), offset: startMargin + virtualizer.getItemOffset(index) - element.scrollTop };
+    },
     /** Remembers the trailing summary's position before expansion or collapse; the virtual list compensates for insertion, removal, and later measurement of items above it. */
     preserveItem(key: string) {
       const index = content.findIndex(item => timelineKey(item) === key);
@@ -76,7 +89,7 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
       if (index < 0 || !virtualizer) return;
       follow.current = false;
       gesture.current = false;
-      anchor.current = { key, offset: virtualizer.getItemOffset(index) - (scroll.current?.scrollTop ?? virtualizer.scrollOffset), focus: true };
+      anchor.current = { key, offset: startMargin + virtualizer.getItemOffset(index) - (scroll.current?.scrollTop ?? virtualizer.scrollOffset), focus: true };
     },
     onScroll(event: UIEvent<HTMLDivElement>) {
       const away = distanceFromBottom(event.currentTarget) >= followThreshold;
@@ -89,9 +102,10 @@ export function useOutputFollow(content: readonly TimelineItem[], processOwners:
           if (virtualizer) {
             // The outer React scroll listener may run before the virtual list updates; read the current DOM position directly.
             const offset = event.currentTarget.scrollTop;
+            // virtua 0.54 subtracts startMargin in findItemIndex, but getItemOffset remains list-local.
             const index = virtualizer.findItemIndex(offset);
             const item = content[index];
-            if (item) anchor.current = { key: timelineKey(item), offset: virtualizer.getItemOffset(index) - offset };
+            if (item) anchor.current = { key: timelineKey(item), offset: startMargin + virtualizer.getItemOffset(index) - offset };
           }
         }
       }

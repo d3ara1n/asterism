@@ -56,7 +56,7 @@ export function ServerItems({ servers }: { servers: readonly ServerSummaryData[]
 
 export interface ToolEntryData { name: string; title?: string; description?: string; server?: string }
 
-function ToolEntry({ name, title, description, server }: ToolEntryData) {
+export function ToolEntry({ name, title, description, server }: ToolEntryData) {
   return <div className="flex min-w-0 flex-col gap-0.5">
     <span className="type-code truncate text-xs" title={name} translate="no">{title ? `${title} · ${name}` : name}</span>
     {server && <span className="type-caption text-muted-foreground" translate="no">{server}</span>}

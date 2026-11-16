@@ -12,6 +12,8 @@ import { ListRow, ListRowAction } from "@asterism-app/ui/ui/list-row";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandSeparator } from "@asterism-app/ui/ui/command";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@asterism-app/ui/ui/dropdown-menu";
 import { Popover, PopoverTrigger, PopoverContent } from "@asterism-app/ui/ui/popover";
+import { nearestHistoryAlignment } from "./history-scroll";
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@asterism-app/ui/ui/tabs";
@@ -43,6 +45,15 @@ export function SessionHistoryPanel({ controller, onClose }: { controller: Sessi
   const [selection, setSelection] = useState<{ branchId: string; nodeId: string | null } | null>(null);
   const remembered = useRef(new Map<string, string | null>());
   const list = useRef<HTMLDivElement>(null);
+  const listHeader = useRef<HTMLDivElement>(null);
+  const records = useRef<HTMLDivElement>(null);
+  const [startMargin, setStartMargin] = useState(0);
+  const readStartMargin = useCallback(() => {
+    const viewport = list.current, content = records.current;
+    if (!viewport || !content) return null;
+    // Both use ScrollArea's positioned frame as offset parent; layout offsets stay unscaled during Dock animations.
+    return content.offsetTop - viewport.offsetTop;
+  }, []);
   const tabs = useRef<HTMLDivElement>(null);
   const scrollRequested = useRef(true);
   const remote = controller.recordSnapshot();
@@ -82,13 +93,32 @@ export function SessionHistoryPanel({ controller, onClose }: { controller: Sessi
     remembered.current.set(target.id, nodeId);
   };
   const selectEntry = (nodeId: string | null) => navigate(branchForNode(tree, nodeId, branch.id), nodeId);
+  const hasSnapshot = !!snapshot;
   useLayoutEffect(() => {
-    if (!scrollRequested.current) return;
+    const viewport = list.current, header = listHeader.current;
+    if (!hasSnapshot || !viewport || !header) return;
+    const measure = () => {
+      const margin = readStartMargin();
+      if (margin !== null) setStartMargin(margin);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(viewport);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, [hasSnapshot, branch.id, readStartMargin]);
+  useLayoutEffect(() => {
+    // Reveal only after virtua receives the measured offset for this branch.
+    if (!scrollRequested.current || readStartMargin() !== startMargin) return;
     const index = visible.findIndex(node => node.id === selectedId);
     if (index < 0) return;
-    virtual.current?.scrollToIndex(index, { align: "nearest" });
+    const handle = virtual.current, viewport = list.current;
+    if (!handle || !viewport) return;
+    // virtua 0.54's nearest visibility check omits startMargin; explicit alignment keeps both edges viewport-relative.
+    const align = nearestHistoryAlignment(startMargin + handle.getItemOffset(index), handle.getItemSize(index), viewport.scrollTop, viewport.clientHeight);
+    if (align) handle.scrollToIndex(index, { align });
     scrollRequested.current = false;
-  }, [visible, selectedId]);
+  }, [visible, selectedId, startMargin, readStartMargin]);
   useLayoutEffect(() => {
     tabs.current?.querySelector<HTMLElement>('[data-state="active"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }, [branch.id]);
@@ -104,12 +134,12 @@ export function SessionHistoryPanel({ controller, onClose }: { controller: Sessi
   />;
   return <Tabs value={branch.id} activationMode="manual" onValueChange={id => { const target = tree.branches.find(item => item.id === id); if (target) navigate(target); }} className="island-panel min-w-0 gap-0">
     <Panel onClose={onClose} title={i18n.formatMessage(historyMessages.history)} compact contentRef={list} action={<ContinueAction controller={controller} nodeId={selectedId} directory={directory.data} label={selectedLabel} />} toolbar={<>
-      <div ref={tabs} className="overflow-x-auto pb-1"><TabsList variant="line" aria-label={i18n.formatMessage(historyMessages.historyBranches)}>
+      <ScrollArea orientation="horizontal" className="h-10 shrink-0" viewportRef={tabs} viewportClassName="pb-1"><TabsList variant="line" aria-label={i18n.formatMessage(historyMessages.historyBranches)}>
         {tree.branches.map(item => <TabsTrigger key={item.id} value={item.id}
           title={item.id === executionBranch.id ? `${branchLabel(item)} · ${i18n.formatMessage(historyMessages.historyExecutionBranch)}` : branchLabel(item)}>
           {branchLabel(item)}{item.id === executionBranch.id && <CircleDot className="size-3" aria-label={i18n.formatMessage(historyMessages.historyExecutionBranch)} />}
         </TabsTrigger>)}
-      </TabsList></div>
+      </TabsList></ScrollArea>
       <SearchInput value={query} onChange={setQuery} label={i18n.formatMessage(historyMessages.searchHistory)} />
       <div className="flex items-center gap-1">
         <HistoryViewPicker entries={entries} value={view} onChange={next => { setView(next); if (list.current) list.current.scrollTop = 0; }} />
@@ -119,23 +149,27 @@ export function SessionHistoryPanel({ controller, onClose }: { controller: Sessi
       {!selectedVisible && (search || view.kind !== "all") && <p className="type-caption">{i18n.formatMessage(historyMessages.historyFiltered)}</p>}
     </>}>
       {tree.branches.map(item => <TabsContent key={item.id} value={item.id}>{item.id === branch.id && <>
-        {showStart && <div data-selected={selectedId === null}>
-          <ListRow variant="navigation" selected={selectedId === null} className="font-normal"
-            buttonProps={{ "aria-pressed": selectedId === null, "aria-current": undefined }} onOpen={() => selectEntry(null)}
-            media={<History className="size-4 text-muted-foreground" />}
-            title={<span className="flex min-w-0 items-center gap-2"><span className="truncate">{i18n.formatMessage(historyMessages.historyStart)}</span>
-              {snapshot.cursor === null && <CircleDot className="size-3 shrink-0" aria-label={i18n.formatMessage(historyMessages.historyExecutionPosition)} />}
-            </span>} />
-          {junction(null)}
-        </div>}
-        {directory.status === "loading" && !directory.data && <p className="type-caption p-2">{i18n.text(commonMessages.loading)}</p>}
-        {directory.error && <p className="type-caption p-2">{i18n.text(historyMessages.readFailed)} <Button variant="ghost" size="xs" onClick={directory.retry}>{i18n.text(commonMessages.retry)}</Button></p>}
-        {matches.pending && <p className="type-caption p-2" role="status">{i18n.text(historyMessages.searching)}</p>}
-        {matches.failed && <p className="type-caption p-2">{i18n.text(historyMessages.readFailed)} <Button variant="ghost" size="xs" onClick={matches.retry}>{i18n.text(commonMessages.retry)}</Button></p>}
-        <Virtualizer ref={virtual} data={visible} scrollRef={list}>
-          {info => <HistoryRecordRow key={info.id} info={info} snapshot={remote} directory={directory.data}
-            selected={selectedId === info.id} current={snapshot.cursor === info.id} select={selectEntry} junction={junction(info.id)} />}
-        </Virtualizer>
+        <div ref={listHeader}>
+          {showStart && <div data-selected={selectedId === null}>
+            <ListRow variant="navigation" selected={selectedId === null} className="font-normal"
+              buttonProps={{ "aria-pressed": selectedId === null, "aria-current": undefined }} onOpen={() => selectEntry(null)}
+              media={<History className="size-4 text-muted-foreground" />}
+              title={<span className="flex min-w-0 items-center gap-2"><span className="truncate">{i18n.formatMessage(historyMessages.historyStart)}</span>
+                {snapshot.cursor === null && <CircleDot className="size-3 shrink-0" aria-label={i18n.formatMessage(historyMessages.historyExecutionPosition)} />}
+              </span>} />
+            {junction(null)}
+          </div>}
+          {directory.status === "loading" && !directory.data && <p className="type-caption p-2">{i18n.text(commonMessages.loading)}</p>}
+          {directory.error && <p className="type-caption p-2">{i18n.text(historyMessages.readFailed)} <Button variant="ghost" size="xs" onClick={directory.retry}>{i18n.text(commonMessages.retry)}</Button></p>}
+          {matches.pending && <p className="type-caption p-2" role="status">{i18n.text(historyMessages.searching)}</p>}
+          {matches.failed && <p className="type-caption p-2">{i18n.text(historyMessages.readFailed)} <Button variant="ghost" size="xs" onClick={matches.retry}>{i18n.text(commonMessages.retry)}</Button></p>}
+        </div>
+        <div ref={records}>
+          <Virtualizer ref={virtual} data={visible} scrollRef={list} startMargin={startMargin}>
+            {info => <HistoryRecordRow key={info.id} info={info} snapshot={remote} directory={directory.data}
+              selected={selectedId === info.id} current={snapshot.cursor === info.id} select={selectEntry} junction={junction(info.id)} />}
+          </Virtualizer>
+        </div>
         {!visible.length && !showStart && !matches.pending && !matches.failed && directory.status === "ready" && <p className="type-caption px-2 py-6 text-center">{i18n.formatMessage(commonMessages.noMatches)}</p>}
       </>}</TabsContent>)}
     </Panel>

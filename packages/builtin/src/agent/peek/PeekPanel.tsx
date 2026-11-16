@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { memo, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Dialog } from "radix-ui";
 import { ArrowUp, ScanSearch, Square, X } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
@@ -9,13 +9,15 @@ import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } fro
 import { Message, MessageContent } from "@asterism-app/ui/ui/message";
 import { Bubble, BubbleContent } from "@asterism-app/ui/ui/bubble";
 import { StatusBadge, StatusText } from "@asterism-app/ui/ui/status";
-import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem,
-  MessageScrollerProvider, MessageScrollerViewport } from "@asterism-app/ui/ui/message-scroller";
+import { MessageScroller, MessageScrollerButton, MessageScrollerItem,
+  MessageScrollerProvider } from "@asterism-app/ui/ui/message-scroller";
 import { commonMessages as uiMessages } from "@asterism-app/ui/messages/common";
 import { peekMessages as messages } from "../../messages/peek";
 import { commonMessages } from "../../messages/common";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "@asterism-app/ui/markdown";
+import { VirtualMessageList } from "@asterism-app/ui/ui/virtual-message-list";
+import { cn } from "@asterism-app/ui/utils";
 import type { PeekConversation, PeekTurn } from "./conversation";
 
 /** Investigations accept no follow-up input while running; the composer becomes the phase and stop control. */
@@ -44,16 +46,7 @@ export function PeekPanel({ conversation, ready, onClose }: { conversation: Peek
         <EmptyTitle className="type-label">{i18n.text(messages.question)}</EmptyTitle>
       </EmptyHeader></Empty>
       : <MessageScrollerProvider autoScroll defaultScrollPosition="end">
-        <MessageScroller className="flex-1">
-          <MessageScrollerViewport aria-label={i18n.text(messages.title)} className="select-text overflow-x-hidden">
-            <MessageScrollerContent className="mx-auto w-full max-w-3xl gap-5 p-4 pt-1">
-              {turns.map((turn, index) => <MessageScrollerItem key={index} messageId={String(index)}>
-                <PeekTurnView turn={turn} />
-              </MessageScrollerItem>)}
-            </MessageScrollerContent>
-          </MessageScrollerViewport>
-          <MessageScrollerButton />
-        </MessageScroller>
+        <PeekTimeline turns={turns} />
       </MessageScrollerProvider>}
     <form ref={form} className="mx-auto w-full max-w-3xl shrink-0 p-3" onSubmit={event => { event.preventDefault(); send(); }}>
       <InputGroup>
@@ -81,8 +74,26 @@ export function PeekPanel({ conversation, ready, onClose }: { conversation: Peek
   </div>;
 }
 
+/** Turns only append, so their index remains a stable identity as the last turn streams. */
+function PeekTimeline({ turns }: { turns: readonly PeekTurn[] }) {
+  const i18n = useI18n();
+  const [focused, setFocused] = useState<number | null>(null);
+  return <MessageScroller className="flex-1">
+    <VirtualMessageList data={turns}
+      viewportProps={{ "aria-label": i18n.text(messages.title), className: "select-text overflow-x-hidden" }}
+      contentClassName="mx-auto w-full max-w-3xl pb-4" keepMounted={focused === null ? [] : [focused]}>
+      {(turn, index) => <MessageScrollerItem key={index} messageId={String(index)}
+        className={cn("px-4", index === 0 ? "pt-1" : "pt-5")}
+        onFocusCapture={() => setFocused(index)}>
+        <PeekTurnView turn={turn} />
+      </MessageScrollerItem>}
+    </VirtualMessageList>
+    <MessageScrollerButton />
+  </MessageScroller>;
+}
+
 /** Each exchange marks its own non-successful outcome; a running turn streams without a marker. */
-function PeekTurnView({ turn }: { turn: PeekTurn }) {
+const PeekTurnView = memo(function PeekTurnView({ turn }: { turn: PeekTurn }) {
   const i18n = useI18n();
   const report = (turn.result?.data ?? turn.progress)?.report;
   const outcome = turn.result?.kind;
@@ -98,4 +109,4 @@ function PeekTurnView({ turn }: { turn: PeekTurn }) {
       <AlertDescription>{turn.result.error.message}</AlertDescription>
     </Alert>}
   </div>;
-}
+});

@@ -3,6 +3,7 @@ import { ArrowDown, MessageSquare } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyDescription } from "@asterism-app/ui/ui/empty";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@asterism-app/ui/ui/button";
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
 import { ConversationSharing } from "./ConversationSharing";
 import { ConversationNavigation, type ConversationNavigationHandle } from "./ConversationNavigation";
@@ -13,7 +14,7 @@ import { conversationMessages } from "../../messages/conversation";
 import { useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk/renderer";
 
 import { useOutputFollow } from "./output-follow";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useConversationHistory } from "./use-conversation-history";
 import { commonMessages } from "@asterism-app/ui/messages/common";
@@ -63,8 +64,20 @@ export function Conversation({ feedback, compressions, activity = null }: {
   const reducedMotion = useReducedMotion() === true;
   const presence = useTimelinePresence(target, processOwners, reducedMotion);
   const timeline = presence.items;
-  const { scroll, list, awayFromBottom, latest, jumpTo, preserveItem, onProcessMount, onScroll, onResize, onScrollEnd } =
-    useOutputFollow(timeline, processOwners, presence.skipEntrances);
+  const header = useRef<HTMLDivElement>(null);
+  const [startMargin, setStartMargin] = useState(0);
+  const hasSnapshot = snapshot !== null;
+  useLayoutEffect(() => {
+    const element = header.current;
+    if (!element) return;
+    const measure = () => setStartMargin(element.offsetHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [hasSnapshot]);
+  const { area, scroll, list, awayFromBottom, latest, jumpTo, preserveItem, preserveReadingPosition, onProcessMount, onScroll, onResize, onScrollEnd } =
+    useOutputFollow(timeline, processOwners, presence.skipEntrances, startMargin);
   const navigation = useRef<ConversationNavigationHandle>(null);
   const composer = useRef<ComposerEditorHandle>(null);
   const composerHidden = useComposerHidden();
@@ -83,17 +96,20 @@ export function Conversation({ feedback, compressions, activity = null }: {
   return <ConversationSharing items={items} historyWindow={viewState.historyWindow} earlier={read.data?.earlier ?? false}>
     <AgentUIRegion position="top" />
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-      <ConversationNavigation ref={navigation} timeline={timeline} scroll={scroll} list={list} onSelect={jumpTo} />
-      {/* The virtual list compensates for scroll position itself; disable browser scroll anchoring to prevent conflicts. */}
-      <div ref={scroll} className="min-h-0 flex-1 scroll-pt-4 select-text overflow-y-auto overscroll-contain [overflow-anchor:none]"
-        onScroll={event => { onScroll(event); navigation.current?.update(); }}>
-        {read.data?.earlier && <div className="px-4 pt-3"><Button variant="ghost" size="sm" disabled={read.status === "loading"}
-          onClick={loadEarlier}>
-          {i18n.text(conversationMessages.earlierMessages)}</Button></div>}
-        {read.status === "loading" && !read.data && <p className="type-caption p-4" role="status">{i18n.text(commonMessages.loading)}</p>}
-        {read.status === "error" && <div className="p-4"><p className="type-caption">{i18n.text(conversationMessages.historyReadFailed)}</p>
-          <Button variant="ghost" size="sm" onClick={read.retry}>{i18n.text(commonMessages.retry)}</Button></div>}
-        <VirtualConversationTimeline ref={list} items={timeline} viewState={viewState} scrollRef={scroll}
+      <ConversationNavigation ref={navigation} timeline={timeline} scroll={scroll} list={list} startMargin={startMargin} onSelect={jumpTo} />
+      {/* Virtua owns anchoring. Overlay scrollbars keep width stable without a native scrollbar gutter. */}
+      <ScrollArea ref={area} viewportRef={scroll} className="min-h-0 min-w-0 flex-1"
+        viewportClassName="scroll-pt-4 select-text overscroll-contain [overflow-anchor:none]"
+        viewportProps={{ onScroll: event => { onScroll(event); navigation.current?.update(); } }}>
+        <div ref={header}>
+          {read.data?.earlier && <div className="px-4 pt-3"><Button variant="ghost" size="sm" disabled={read.status === "loading"}
+            onClick={() => { preserveReadingPosition(); loadEarlier(); }}>
+            {i18n.text(conversationMessages.earlierMessages)}</Button></div>}
+          {read.status === "loading" && !read.data && <p className="type-caption p-4" role="status">{i18n.text(commonMessages.loading)}</p>}
+          {read.status === "error" && <div className="p-4"><p className="type-caption">{i18n.text(conversationMessages.historyReadFailed)}</p>
+            <Button variant="ghost" size="sm" onClick={read.retry}>{i18n.text(commonMessages.retry)}</Button></div>}
+        </div>
+        <VirtualConversationTimeline ref={list} items={timeline} viewState={viewState} scrollRef={scroll} startMargin={startMargin}
           target={target} presence={presence} reducedMotion={reducedMotion}
           onResize={() => { onResize(); navigation.current?.update(); }} onScrollEnd={onScrollEnd} onProcessMount={onProcessMount}
           onToggleProcess={id => { preserveItem(id); toggle(id); }} />
@@ -101,7 +117,7 @@ export function Conversation({ feedback, compressions, activity = null }: {
           {running && !timeline.some(item => item.kind === "compression" && item.status === "running") &&
             <ExecutionStatus activity={activity} />}
         </div>
-      </div>
+      </ScrollArea>
       {read.status === "ready" && !timeline.length && !running && <Empty className="pointer-events-none absolute inset-0 p-6">
         <EmptyHeader>
           <EmptyMedia variant="icon"><MessageSquare /></EmptyMedia>

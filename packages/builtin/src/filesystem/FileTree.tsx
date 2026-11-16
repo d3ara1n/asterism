@@ -35,6 +35,7 @@ export function FileTreeActions({ store, state }: { store: TreeStore; state: Tre
  */
 const treeStyle = {
   height: "100%",
+  "--trees-scrollbar-thumb-override": "color-mix(in srgb, var(--muted-foreground) 35%, transparent)",
   "--trees-bg-override": "var(--card)",
   "--trees-fg-override": "var(--card-foreground)",
   "--trees-fg-muted-override": "var(--muted-foreground)",

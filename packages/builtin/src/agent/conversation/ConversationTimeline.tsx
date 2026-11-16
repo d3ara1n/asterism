@@ -41,17 +41,26 @@ export function ConversationTimeline({ items, viewState }: { items: readonly Tim
  * Items unmount and remount during scrolling, restoring per-item view state through viewState; live blocks and the last item stay mounted.
  * Item spacing comes from each item's own top padding; absolutely positioned items cannot rely on sibling selectors.
  */
-export function VirtualConversationTimeline({ items, target, presence, reducedMotion, viewState, scrollRef, ref, onResize, onScrollEnd, onToggleProcess, onProcessMount }: {
-  items: readonly TimelineItem[]; viewState: TimelineViewState; scrollRef: RefObject<HTMLElement | null>;
+export function VirtualConversationTimeline({ items, target, presence, reducedMotion, viewState, scrollRef, startMargin, ref, onResize, onScrollEnd, onToggleProcess, onProcessMount }: {
+  items: readonly TimelineItem[]; viewState: TimelineViewState; scrollRef: RefObject<HTMLElement | null>; startMargin: number;
   target: readonly TimelineItem[]; presence: ReturnType<typeof useTimelinePresence>; reducedMotion: boolean;
   ref?: Ref<VirtualizerHandle>; onResize?: () => void; onScrollEnd?: () => void;
   onToggleProcess(id: string): void;
   onProcessMount(id: string, button: HTMLButtonElement): void;
 }) {
+  const [previous, setPrevious] = useState(() => ({ items, shift: false }));
+  let current = previous;
+  if (previous.items !== items) {
+    const added = items.length - previous.items.length;
+    // Only a pure prepend shifts virtua's measurements; folding and live output can also change the item count.
+    current = { items, shift: added > 0 && previous.items.length > 0 && previous.items.every((item, index) =>
+      timelineKey(item) === timelineKey(items[index + added]!)) };
+    setPrevious(current);
+  }
   const present = useMemo(() => new Set(target.map(timelineKey)), [target]);
   const keepMounted = useMemo(() => [...new Set([...mountedTimelineIndexes(items),
     ...items.flatMap((item, index) => present.has(timelineKey(item)) ? [] : [index])])].sort((a, b) => a - b), [items, present]);
-  return <Virtualizer ref={ref} data={items} scrollRef={scrollRef} keepMounted={keepMounted} onResize={onResize} onScrollEnd={onScrollEnd}>
+  return <Virtualizer ref={ref} data={items} scrollRef={scrollRef} startMargin={startMargin} shift={current.shift} keepMounted={keepMounted} onResize={onResize} onScrollEnd={onScrollEnd}>
     {node => {
       const key = timelineKey(node);
       return <TimelinePresenceItem key={key} itemKey={key} present={present.has(key)} enter={presence.entering.has(key)}

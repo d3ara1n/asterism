@@ -1,3 +1,4 @@
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import type { CSSProperties, ReactNode } from "react";
 import { motion } from "motion/react";
 import { useI18n, type I18n } from "@asterism-app/sdk/renderer";
@@ -14,7 +15,7 @@ export const percent = (i18n: I18n, part: number, total: number, digits?: number
   total > 0 ? i18n.formatNumber(part / total, { style: "percent", maximumFractionDigits: digits ?? (part / total < 0.01 && part > 0 ? 1 : 0) }) : "—";
 
 export function PanelBody({ children }: { children: ReactNode }) {
-  return <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overflow-y-auto p-3">{children}</div>;
+  return <ScrollArea className="min-h-0 min-w-0 flex-1" contentClassName="flex flex-col gap-6 p-3">{children}</ScrollArea>;
 }
 export function Section({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
   return <section className="space-y-3">

@@ -1,3 +1,4 @@
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ArrowLeft, Check, FilePenLine, MessageSquareText, Pencil, Trash2, Undo2, UserRoundCheck } from "lucide-react";
 import { IslandPanel, useI18n, useRendererCalls, useRendererIsland, useRendererObject } from "@asterism-app/sdk/renderer";
@@ -131,7 +132,7 @@ export function TaskDetail({ id, latest, focus, back }: { id: string; latest: nu
       </>}
     </header>
 
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
+    <ScrollArea className="min-h-0 flex-1" contentClassName="flex flex-col gap-3 p-3">
       {gone ? <div className="flex flex-col items-center gap-3 py-6 text-center">
         <p className="type-caption">{i18n.text(messages.taskGone)}</p>
         <Button size="sm" variant="outline" onClick={back}><ArrowLeft />{i18n.text(messages.back)}</Button>
@@ -159,7 +160,7 @@ export function TaskDetail({ id, latest, focus, back }: { id: string; latest: nu
             </>}
           </>}
       <TodoError error={error ?? openError} />
-    </div>
+    </ScrollArea>
 
     {todo && !gone && (completing
       ? <CompletionComposer todo={todo} onDone={() => setCompleting(false)} />

@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { VList, type VListHandle } from "virtua";
+import type { VirtualizerHandle } from "virtua";
+import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { Check, Plus, Trash2, Undo2, UserRoundCheck } from "lucide-react";
 import { useI18n, useRendererObject } from "@asterism-app/sdk/renderer";
 import { toast } from "sonner";
@@ -50,7 +51,7 @@ function ListPage({ list, latest, filter, onFilter, onOpen }: {
   const i18n = useI18n();
   const { pages, error, loadingMore, loadMore } = useTodoPages(filter, latest);
   const [creating, setCreating] = useState(false), [deleting, setDeleting] = useState(false);
-  const scroller = useRef<VListHandle>(null);
+  const scroller = useRef<VirtualizerHandle>(null);
   const counts = { open: list.counts.pending + list.counts.in_progress, done: list.counts.done, all: list.counts.pending + list.counts.in_progress + list.counts.done };
   const reachEnd = () => {
     const handle = scroller.current;
@@ -76,9 +77,9 @@ function ListPage({ list, latest, filter, onFilter, onOpen }: {
         {filter !== "done" && <EmptyContent><Button size="sm" variant="outline" onClick={() => setCreating(true)}><Plus />{i18n.text(messages.newTask)}</Button></EmptyContent>}
       </Empty>
         : <ItemGroup className="relative min-h-0 flex-1">
-          <VList ref={scroller} data={pages.todos} onScroll={reachEnd} className="py-1">
+          <VirtualList ref={scroller} data={pages.todos} onScroll={reachEnd} viewportClassName="py-1">
             {todo => <TaskRow key={todo.id} todo={todo} onOpen={() => onOpen(todo.id)} />}
-          </VList>
+          </VirtualList>
           {loadingMore && <Spinner className="absolute bottom-2 left-1/2 -translate-x-1/2 text-muted-foreground" />}
         </ItemGroup>}
     {creating && <NewTaskDialog onClose={() => setCreating(false)} onCreated={() => { if (filter === "done") onFilter("open"); }} />}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, TriangleAlert } from "lucide-react";
-import { Virtualizer } from "virtua";
+import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { IslandPanel, useI18n, useRendererCalls, useRendererEvents, useRendererIsland } from "@asterism-app/sdk/renderer";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Badge } from "@asterism-app/ui/ui/badge";
@@ -90,7 +90,7 @@ function SkillSettingsBody() {
 
 /**
  * Source island: discovery issues appear first, skills can be filtered by name and description, and the list is virtualized to accommodate thousands of entries.
- * The virtual list sits directly in the island content area, using that area as its scroll container; status and issues scroll together as the first list item.
+ * The list owns its viewport; status, issues, and the panel insets scroll together as list rows.
  */
 function SkillSourcePanel({ source }: { source: string }) {
   const i18n = useI18n();
@@ -112,6 +112,7 @@ function SkillSourcePanel({ source }: { source: string }) {
         <span className="font-mono text-xs" translate="no">{issueFile(source, issue.file)}</span>: {issue.message}</p>)}
     </AlertDescription></Alert>;
   const rows = [
+    { key: "inset-start", node: <div className="h-5" /> },
     ...(issues ? [{ key: "issues", node: <div className="pb-3">{issues}</div> }] : []),
     ...(status ? [{ key: "status", node: <div className="pb-3">{status}</div> }] : []),
     ...skills.map(skill => ({ key: `skill:${skill.name}`, node: <div className="flex flex-col gap-0.5 py-2">
@@ -120,9 +121,10 @@ function SkillSourcePanel({ source }: { source: string }) {
       </div>
       <p className="type-caption line-clamp-2 select-text" title={skill.description}>{skill.description}</p>
     </div> })),
+    { key: "inset-end", node: <div className="h-5" /> },
   ];
-  return <IslandPanel title={source} description={group ? i18n.formatMessage(messages.count, { count: group.skills.length }) : undefined}
+  return <IslandPanel layout="fill" title={source} description={group ? i18n.formatMessage(messages.count, { count: group.skills.length }) : undefined}
     toolbar={!!group?.skills.length && <SearchInput value={query} onChange={setQuery} label={i18n.text(messages.search)} />}>
-    <Virtualizer data={rows}>{row => <div key={row.key}>{row.node}</div>}</Virtualizer>
+    <VirtualList data={rows}>{row => <div key={row.key} className="px-5">{row.node}</div>}</VirtualList>
   </IslandPanel>;
 }
