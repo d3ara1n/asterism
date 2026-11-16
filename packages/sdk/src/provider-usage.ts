@@ -44,7 +44,8 @@ export const usageItemsSchema = z.array(usageItemSchema).refine(items => new Set
 export type UsageItem = z.infer<typeof usageItemSchema>;
 export type QuotaItem = Extract<UsageItem, { type: "quota" }>;
 export type BalanceItem = Extract<UsageItem, { type: "balance" }>;
-export const providerUsageErrorSchema = z.enum(["unavailable", "credential", "authentication", "unsupported", "rate_limit", "network", "timeout", "protocol", "server"]);
+/** configuration identifies a connection rejected before querying; unsupported identifies an unavailable provider operation. */
+export const providerUsageErrorSchema = z.enum(["configuration", "unavailable", "credential", "authentication", "unsupported", "rate_limit", "network", "timeout", "protocol", "server"]);
 export type ProviderUsageError = z.infer<typeof providerUsageErrorSchema>;
 export const usageProviderInfoSchema = z.strictObject({ id: providerUsageIdSchema, label: uiTextSchema, owner: z.string(),
   source: z.enum(["query", "headers"]).default("query") });

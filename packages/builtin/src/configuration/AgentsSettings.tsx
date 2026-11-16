@@ -171,6 +171,7 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
   const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
   useRendererIslandCancel(async () => { await island.close(); });
+  const form = useId();
   const ids = { identity: useId(), description: useId(), prompt: useId(), subagent: useId(), role: useId(), requests: useId(), duration: useId() };
   const [id, setId] = useState(initialId);
   useRendererIslandKey(agentIslandKey(id));
@@ -214,12 +215,12 @@ function AgentEditor({ initialId }: { initialId: string | null }) {
     ? { resources: draft.resources ?? null, excludeResources: draft.excludeResources ?? null } : base;
   const restore = (...fields: (keyof AgentOverrides)[]) => setDraft(previous => { const updated = { ...previous }; for (const field of fields) delete updated[field]; return updated; });
 
-  return <Editor form="agent-form" title={current?.id ?? i18n.formatMessage(agentsMessages.newAgent)} description={builtin ? i18n.formatMessage(agentsMessages.builtinAgent) : undefined} dirty={dirty} busy={busy} error={error}
+  return <Editor form={form} title={current?.id ?? i18n.formatMessage(agentsMessages.newAgent)} description={builtin ? i18n.formatMessage(agentsMessages.builtinAgent) : undefined} dirty={dirty} busy={busy} error={error}
     restore={builtin && Object.keys(normalized).length > 0 ? () => setDraft({}) : undefined}
     remove={current && !builtin ? { title: i18n.formatMessage(agentsMessages.deleteTitle),
       description: i18n.formatMessage(agentsMessages.deleteDescription, { current_name: current.id }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "agent", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
-    <form id="agent-form" onSubmit={async event => {
+    <form id={form} onSubmit={async event => {
       event.preventDefault();
       const result = await run({ type: "agent.save", id, value: { ...normalized, id: slug,
         ...(current && snapshot.overrides.agents[current.id]?.enabled !== undefined ? { enabled: snapshot.overrides.agents[current.id]!.enabled } : {}) } });

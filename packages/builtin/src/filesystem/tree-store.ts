@@ -9,7 +9,7 @@ import type { DirectoryStatus, DirectoryWatchEvent } from "./contract.ts";
 import { sameChanges } from "./changes-model.ts";
 import { ChangesTree } from "./changes-tree.ts";
 import { filesystemMessages as messages } from "../messages/filesystem.ts";
-import { childPath, diffPaths, filterPaths, loadedPaths, parentOf, type TreeEntry } from "./tree-model.ts";
+import { childPath, diffPaths, filterPaths, isKnownMissing, loadedPaths, parentOf, type TreeEntry } from "./tree-model.ts";
 
 type Calls = ReturnType<typeof useRendererCalls>;
 type StatusData = z.infer<typeof DirectoryStatus.output>;
@@ -241,9 +241,9 @@ export class TreeStore {
       try { this.model.batch(operations); } finally { this.applying = false; }
     }
     this.visible = next;
-    const shown = new Set(next), exists = new Set(listed);
+    const shown = new Set(next);
     for (const path of this.rendered) if (!shown.has(path)) this.rendered.delete(path);
-    for (const path of this.expanded) if (!exists.has(path)) this.expanded.delete(path);
+    for (const path of this.expanded) if (isKnownMissing(this.children, path)) this.expanded.delete(path);
     const rootLoaded = this.children.has("");
     this.setState({
       empty: rootLoaded && listed.length === 0,

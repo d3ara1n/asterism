@@ -171,20 +171,23 @@ export async function prepareData(root: string, options: PreparationOptions): Pr
     options.onProgress?.({ stage: "dataCheck" });
     continueRecovery(root, options.paths, options.version);
     paused = readState(root)?.phase === "restored";
+    const pauseError = new Error("Automatic migration is paused after restoring a recovery point. Retry when you are ready.");
     const host = plansOf(options.stores);
-    if (paused && host.length) throw new Error("Automatic migration is paused after restoring a recovery point. Retry when you are ready.");
+    if (paused && host.length) throw pauseError;
     options.onHost?.(host.length ? "migrating" : "ready");
     let point: RecoveryPoint | null = null;
-    // Retries of the same changes reuse the latest migration recovery point so repeated failures cannot evict older points.
-    const record = (changes: StorageChange[]) => {
+    // Only a host-first invocation can reuse a previous point: plugin failures allow writable startup between invocations.
+    // Once chosen, one point covers all host and plugin migrations in this invocation.
+    const record = (changes: StorageChange[], reusePrevious = false) => {
       if (!changes.length) return;
+      if (paused) throw pauseError;
       if (point) {
         point = { ...point, changes: [...point.changes, ...changes.filter(change => !point!.changes.some(old => sameChange(old, change)))] };
         writePoint(root, point);
         return;
       }
       const latest = listRecoveryPoints(root)[0];
-      if (latest?.kind === "migration" && changes.every(change => latest.changes.some(old => sameChange(old, change)))) point = latest;
+      if (reusePrevious && latest?.kind === "migration" && changes.every(change => latest.changes.some(old => sameChange(old, change)))) point = latest;
       else {
         options.onProgress?.({ stage: "dataBackup" });
         point = readPoint(root, snapshot(root, options.paths, options.version, changes));
@@ -197,9 +200,8 @@ export async function prepareData(root: string, options: PreparationOptions): Pr
       await plan.apply();
       console.info(`Storage migration completed. storage=${plan.change.id} elapsedMs=${Math.round(performance.now() - started)}`);
     };
-    record(host.map(plan => plan.change));
+    record(host.map(plan => plan.change), true);
     for (const plan of host) await apply(plan);
-    if (paused) saveState(root, null);
     if (host.length) options.onHost?.("ready");
     const plugins: PluginStorageFailure[] = [];
     options.onProgress?.({ stage: "dataPlugins" });
@@ -211,10 +213,12 @@ export async function prepareData(root: string, options: PreparationOptions): Pr
         record(plans.map(plan => plan.change));
         for (const plan of plans) await apply(plan);
       } catch (error) {
+        if (error === pauseError) throw error;
         console.error(`Storage of plugin ${group.id} could not be prepared.`, error);
         plugins.push({ id: group.id, error: message(error) });
       }
     }
+    if (paused) saveState(root, null);
     const finished = point as RecoveryPoint | null;
     if (finished && !plugins.length) writePoint(root, { ...finished, notice: true });
     if (finished) console.info(`Data migration recorded in recovery point ${finished.id}.`);

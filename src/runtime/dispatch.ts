@@ -10,6 +10,7 @@ import type { ContentResult } from "../shared/content.ts";
 import type { PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 import type { SessionResult } from "../shared/session.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
+import type { SessionWatchOwner } from "./sessions.ts";
 import { ApplicationError, type ApplicationService } from "./service.ts";
 
 /** Validate untrusted commands into results without returning stacks, paths, or raw exceptions to renderers. Domain services parse their own command structures. */
@@ -24,8 +25,8 @@ export function serveWorkspace(service: ApplicationService, command: unknown): C
   }
 }
 
-export async function serveSession(service: ApplicationService, command: unknown): Promise<SessionResult> {
-  try { return { ok: true, reply: await service.sessions.execute(command) }; }
+export async function serveSession(service: ApplicationService, command: unknown, watchOwner?: SessionWatchOwner): Promise<SessionResult> {
+  try { return { ok: true, reply: await service.sessions.execute(command, watchOwner) }; }
   catch (error) {
     const failure = error instanceof PluginApiError ? sessionPluginError(error) : error;
     const known = failure instanceof SessionError || failure instanceof ConfigurationError;
@@ -67,10 +68,10 @@ export async function serveContent(service: ApplicationService, command: unknown
 }
 
 /** Dispatch direct requests by service name; unknown services are invalid requests. */
-export async function serve(service: ApplicationService, name: ConnectionService, command: unknown): Promise<ConnectionServices[ConnectionService]["result"]> {
+export async function serve(service: ApplicationService, name: ConnectionService, command: unknown, watchOwner?: SessionWatchOwner): Promise<ConnectionServices[ConnectionService]["result"]> {
   switch (name) {
     case "workspace": return serveWorkspace(service, command);
-    case "session": return serveSession(service, command);
+    case "session": return serveSession(service, command, watchOwner);
     case "configuration": return serveConfiguration(service, command);
     case "plugin-configuration": return servePluginConfiguration(service, command);
     case "content": return serveContent(service, command);

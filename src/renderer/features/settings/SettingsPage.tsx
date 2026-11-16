@@ -26,10 +26,10 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { ArrowLeft, Info, SlidersHorizontal, Palette, PlugZap, Puzzle, BookOpen, Terminal, Network } from "lucide-react";
 import { ConfigurationReadStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";
-import { Screen, useIsland, useIslandCancel, type IslandSpec } from "../../shared/weave/Screen";
+import { Screen, useIsland, useIslandCancel, type IslandSpec, type ScreenHandle } from "../../shared/weave/Screen";
 import { settingsMessages } from "../../messages/settings";
 import { useI18n } from "../../shared/i18n";
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode, type Ref } from "react";
 import type { UiText } from "@asterism-app/sdk/contracts";
 
 /** The official Card carries the detail animation; component source remains unchanged. */
@@ -143,7 +143,7 @@ function SettingsRoot({ openId, onOpen, onClosed, onCancel, manager, location }:
 const pageMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0
   : parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--motion-page")) || 380;
 
-export function SettingsPage({ active, target, onCancel }: { active: boolean; target: SettingsTarget | null; onCancel: () => void }) {
+export function SettingsPage({ active, target, onCancel, screenRef }: { active: boolean; target: SettingsTarget | null; onCancel: () => void; screenRef: Ref<ScreenHandle> }) {
   const i18n = useI18n();
   const configuration = useConfiguration(active);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -178,5 +178,5 @@ export function SettingsPage({ active, target, onCancel }: { active: boolean; ta
     render: () => <SettingsRoot openId={openId} onOpen={id => { setLocation(undefined); setOpenId(id); }}
       onClosed={() => { setLocation(undefined); setOpenId(null); }} onCancel={onCancel} manager={manager} location={location} />,
   };
-  return <ConfigurationContext.Provider value={configuration}><Screen key={generation} label={i18n.formatMessage(settingsMessages.settings)} root={root} className="h-full" /></ConfigurationContext.Provider>;
+  return <ConfigurationContext.Provider value={configuration}><Screen ref={screenRef} key={generation} label={i18n.formatMessage(settingsMessages.settings)} root={root} className="h-full" /></ConfigurationContext.Provider>;
 }

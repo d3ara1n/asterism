@@ -3,6 +3,7 @@ import { MessagingError } from "@asterism-app/sdk/runtime";
 import { prepareSend } from "./outcome.ts";
 
 const apiUrl = "https://api.bot.qq.com";
+const tokenUrl = "https://bots.qq.com/app/getAppAccessToken";
 
 /** Preserve platform refusals separately from requests whose delivery is unknown. */
 export function qqApiError(error: ApiError, retryAfterMs?: number): MessagingError {
@@ -45,7 +46,7 @@ export class QQApi {
     signal.throwIfAborted();
     if (this.token && Date.now() < this.token.expiresAt) return this.token.value;
     const path = "/app/getAppAccessToken";
-    const response = await fetch(`${apiUrl}${path}`, {
+    const response = await fetch(tokenUrl, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ appId: this.appId, clientSecret: this.appSecret }),
       signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)]),

@@ -44,9 +44,9 @@ One resource-bound managed task supervises the queue and its active executions w
 
 A short ID such as `sub-1` is a target within one pool. A globally unique run ID identifies the execution for diagnostics. The Delegation record retains both their relationship and the run ID used for audit lookup.
 
-Executed runs append internal process records to a JSONL file named by the run ID in plugin-owned storage as the run proceeds. Each line is independent, so an interrupted process loses at most its final line. A task cancelled before admission has no process and no audit. Audit files are retained permanently for investigation. Normal result retrieval reads the Delegation record. The audit is not an alternative report delivery channel or a source for resuming execution.
+Executed runs append internal process records to a JSONL file named by the run ID in plugin-owned storage as the run proceeds. Writes queue in order, with each line written before its attachment copies. Normal close awaits the queue. Abrupt interruption can leave an incomplete line and omit multiple queued entries or attachment copies. A task cancelled before admission has no process and no audit. Audit files are retained permanently for investigation. Normal result retrieval reads the Delegation record. The audit is not an alternative report delivery channel or a source for resuming execution.
 
-Audit entries preserve the original input, queued and delivered steering, request instructions, finalized model blocks, diagnostics, and completion measurements. Attachments from delivered tool outcomes are copied beside the audit when those outcomes arrive, while the temporary content scope is open. Rejected or invented references in tool arguments remain recorded arguments and do not acquire content ownership. Audit failure is an execution failure with any available report retained.
+Audit entries preserve the original input, queued and delivered steering, request instructions, finalized model blocks, diagnostics, and completion measurements. Attachments from delivered tool outcomes are queued for copying beside the audit while the temporary content scope is open. Rejected or invented references in tool arguments remain recorded arguments and do not acquire content ownership. Audit failure is an execution failure with any available report retained.
 
 ## Observation
 

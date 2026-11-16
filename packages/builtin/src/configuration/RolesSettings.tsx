@@ -113,7 +113,7 @@ function RoleRow({ role, snapshot, selected, onOpen }: {
 /** Details contain only infrequent fields; model, thinking, and enabling are immediate inline actions excluded from the draft to prevent mutual overwrites. */
 function RoleEditor({ initialId }: { initialId: string | null }) {
   const i18n = useI18n();
-  const slugField = useId();
+  const slugField = useId(), form = useId();
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const island = useIsland();
@@ -129,11 +129,11 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
   if (!base || !snapshot) return null;
   const dirty = !current || slug !== id || JSON.stringify(pick(stored)) !== JSON.stringify(value);
   const users = current ? snapshot.agents.filter(agent => agent.modelRole === current.id) : [];
-  return <Editor form="role-form" title={current?.id ?? i18n.formatMessage(rolesMessages.newRole)} description={current?.builtin ? i18n.formatMessage(rolesMessages.builtinRole) : undefined} dirty={dirty} busy={busy} error={error}
+  return <Editor form={form} title={current?.id ?? i18n.formatMessage(rolesMessages.newRole)} description={current?.builtin ? i18n.formatMessage(rolesMessages.builtinRole) : undefined} dirty={dirty} busy={busy} error={error}
     remove={current && !current.builtin ? { title: i18n.formatMessage(rolesMessages.deleteTitle),
       description: i18n.formatMessage(rolesMessages.deleteDescription, { current_name: current.id }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "role", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
-    <form id="role-form" onSubmit={async event => {
+    <form id={form} onSubmit={async event => {
       event.preventDefault();
       const latest = id ? snapshot.overrides.roles[id] ?? {} : {};
       const next: ModelRoleOverrides = { ...latest };
@@ -141,7 +141,7 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
       else next.description = value.description;
       const result = await run({ type: "role.save", id, value: { ...next, id: slug } });
       if (result?.ok && result.savedId) { setId(result.savedId); setSlug(result.savedId); setValue(pick(result.snapshot.overrides.roles[result.savedId]!)); }
-    }}><FieldGroup>
+    }}><fieldset disabled={busy}><FieldGroup>
       <Field><FieldLabel htmlFor={slugField}>{i18n.formatMessage(rolesMessages.id)}</FieldLabel>
         <Input id={slugField} value={slug} readOnly={current?.builtin} required maxLength={160} pattern="[a-z0-9]+((_|-)[a-z0-9]+)*" className="font-mono" onChange={event => setSlug(event.target.value)} /></Field>
       <TextField label={i18n.formatMessage(rolesMessages.purpose)} value={value.description ?? ""} placeholder={base.description} onChange={next => setValue(v => ({ ...v, description: next || undefined }))} multiline
@@ -154,7 +154,7 @@ function RoleEditor({ initialId }: { initialId: string | null }) {
           </Badge></li>)}
         </ul> : <FieldDescription>{i18n.formatMessage(rolesMessages.noAgentsUsingRole)}</FieldDescription>}
       </Field>}
-    </FieldGroup></form>
+    </FieldGroup></fieldset></form>
     {!current && <p className="type-caption mt-4">{i18n.formatMessage(rolesMessages.chooseModelHint)}</p>}
   </Editor>;
 }

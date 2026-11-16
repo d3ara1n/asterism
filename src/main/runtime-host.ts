@@ -77,7 +77,7 @@ export class RuntimeHost {
         clearTimeout(timeout);
         this.child = null;
         requests.close();
-        if (this.status !== "stopping") this.setStatus("unavailable");
+        if (this.status !== "stopping" || code !== 0) this.setStatus("unavailable");
         reject(new Error("Task runtime exited with code " + code));
       });
     });
@@ -111,7 +111,10 @@ export class RuntimeHost {
     const child = this.child;
     if (!child) return Promise.resolve();
     return new Promise((resolve, reject) => {
-      const exited = () => resolve();
+      const exited = (code: number) => {
+        if (code === 0) resolve();
+        else reject(new Error("Task runtime cleanup failed with exit code " + code));
+      };
       child.once("exit", exited);
       try { child.postMessage({ kind: "shutdown" }); }
       catch (error) { child.removeListener("exit", exited); reject(error); }

@@ -4,7 +4,7 @@ import { ApplicationController } from "./controller.ts";
 import { ResourceActivitiesChanged, ResourceNoticeRaised, ResourcePresenceChanged, type EventContract, type EventSubscriber, type EventSubscribeOptions, type Json, type PluginCalls, type ResourceActivity, type ResourceNotice, type ResourceRef, type Source } from "@asterism-app/sdk/contracts";
 import { summarizeResourceNotices } from "./resource-status.ts";
 
-const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, folders: [], sessions: [], templates: [], archivedSessions: [], plugins: [], restartRequired: false };
+const snapshot: AppSnapshot = { workspace: { id: "w", title: "Workspace" }, folders: [], sessions: [], templates: [], archivedSessions: [], plugins: [], rendererPlugins: [], restartRequired: false };
 const quietEvents: EventSubscriber = { subscribe: () => ({ ready: Promise.resolve(), closed: new Promise(() => {}), close() {} }) };
 const emptyActivities: PluginCalls = { async invoke(contract) { return contract.output.parse([]); } };
 describe("Application session list", () => {

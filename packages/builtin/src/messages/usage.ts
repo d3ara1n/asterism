@@ -26,6 +26,7 @@ export const usageMessages = builtin.messages("en", defineMessages({
   empty: { id: "usage.empty", defaultMessage: "No allowance reported" },
   updated: { id: "usage.updated", defaultMessage: "Updated {time}" },
   unavailable: { id: "usage.unavailable", defaultMessage: "The usage provider is unavailable." },
+  configuration: { id: "usage.configuration", defaultMessage: "API key connections require HTTPS except on loopback." },
   credential: { id: "usage.credential", defaultMessage: "Save a valid API key in provider settings." },
   authentication: { id: "usage.authentication", defaultMessage: "The usage service rejected the credentials." },
   unsupported: { id: "usage.unsupported", defaultMessage: "This connection does not support the selected usage query." },

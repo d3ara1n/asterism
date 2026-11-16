@@ -50,9 +50,11 @@ Explicit unavailable profiles fail. Automatic selection searches configured prof
 
 Directory exec uses the resource as its initial working directory. Commands can change directories or address other system resources under the current user’s privileges. That directory is not a shell sandbox.
 
-Each exec creates a separate noninteractive process with closed stdin and piped output. It captures the chosen profile for that call. Waiting for exit and explicitly stopping a process are different operations.
+Each exec creates a separate noninteractive process with closed stdin and piped output. Operation-scoped execution reads current shell settings. The shell service can synchronously capture a cloned configuration without discovering executables or starting a process; Directory exec uses this through its contribution capture hook at the model-request boundary. Captured handles retain the same plugin run registration, availability checks, host shutdown signal and caller cancellation as operation-scoped execution. The startup-inherited environment is already established; executable discovery and external files remain ordinary execution-time OS inputs.
 
-An optional timeout ends the running command, not its already completed effects. Cancellation and shutdown terminate the owned process scope and wait for actual process and output completion. Detached processes fall outside that ownership.
+Foreground exit and invocation settlement are distinct. Ordinary foreground exit leaves background jobs running while output collection settles. Cancellation and timeout remain active through output settlement. An explicit stop targets the owned POSIX process group even after the leader exits, closes collection and drains accepted output callbacks. Stop does not await that callback queue itself, because an output callback failure can initiate stop.
+
+An optional timeout ends the running command, not its already completed effects. Cancellation and shutdown use the platform process termination mechanism and wait for process and output settlement. Windows uses parent-based taskkill tree termination; descendant termination after the parent has disappeared is not guaranteed. Detached processes fall outside that ownership.
 
 Output combines stdout and stderr in receipt order, decodes incrementally, and removes terminal control sequences. A bounded tail remains in memory and history. Exceeding the budget streams full processed output to a temporary log with backpressure.
 

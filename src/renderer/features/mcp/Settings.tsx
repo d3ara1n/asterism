@@ -189,8 +189,8 @@ function McpServerEditor({ initialId }: { initialId: string | null }) {
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
   const submit = async () => {
-    if (saving || !dirty) return;
-    const result = validateDraft(draft, servers.map(server => server.id).filter(item => create || item !== draft.server.id));
+    if (saving || !dirty || (!create && !saved)) return;
+    const result = validateDraft(draft, servers.map(server => server.id).filter(item => create || item !== draft.server.id), create ? true : saved!.enabled);
     if (!result.ok) { setErrors(result.errors); setFailure(null); return; }
     setErrors({}); setFailure(null); setSaving(true);
     try {
@@ -203,7 +203,7 @@ function McpServerEditor({ initialId }: { initialId: string | null }) {
 
   const disabled = saving, server = draft.server;
   const patch = (next: (draft: McpDraft) => McpDraft) => setDraft(next);
-  const update = (value: Partial<McpServerConfig>) => patch(current => ({ ...current, server: { ...current.server, ...value } }));
+  const update = (value: Partial<McpDraft["server"]>) => patch(current => ({ ...current, server: { ...current.server, ...value } }));
   const field = (key: string, label: ReactNode, control: ReactNode) => {
     const error = errors[key as McpField];
     return <Field data-invalid={error ? true : undefined}>
@@ -220,7 +220,7 @@ function McpServerEditor({ initialId }: { initialId: string | null }) {
           ...(current.create && !current.idEdited && { id: slugifyServerId(event.target.value, servers.map(item => item.id)) }) } }))
         : update({ [key]: event.target.value })} />;
   const select = <K extends "transport" | "mode" | "auth">(key: K, options: [McpServerConfig[K], keyof typeof messages][]) =>
-    <Select value={server[key]} disabled={disabled} onValueChange={value => update({ [key]: value } as Partial<McpServerConfig>)}>
+    <Select value={server[key]} disabled={disabled} onValueChange={value => update({ [key]: value } as Partial<McpDraft["server"]>)}>
       <SelectTrigger id={`${id}-${key}`} className="w-full"><SelectValue /></SelectTrigger>
       <SelectContent>{options.map(([value, label]) => <SelectItem key={value} value={value}>{i18n.text(messages[label])}</SelectItem>)}</SelectContent>
     </Select>;

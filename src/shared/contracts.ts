@@ -53,6 +53,9 @@ export const snapshotSchema = z.strictObject({
     stylesheet: z.string().nullable(),
     metadata: pluginMetadataSchema.default({}),
     dependencies: z.array(z.string()).default([]) })),
+  /** Captured loaded composition for every renderer in this runtime, independent of next-start management edits. */
+  rendererPlugins: z.array(z.strictObject({ id: z.string(), source: z.string(), metadata: pluginMetadataSchema,
+    renderer: z.string().nullable(), stylesheet: z.string().nullable(), dependencies: z.array(z.string()) })),
   /** Package lists differing from this startup require restart to take effect. */
   restartRequired: z.boolean(),
   catalogs: z.array(translationCatalogSchema).optional(),

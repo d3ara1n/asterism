@@ -59,6 +59,7 @@ export class RendererConnection {
   private readonly calls: CallPeer;
   private readonly channels: ChannelPeer;
   private closed = false;
+  private readonly watchOwner = { active: true };
   constructor(private readonly service: ApplicationService, private readonly port: ConnectionPort<RendererFrame, RuntimeFrame>,
     private readonly onClosed: () => void = () => {}) {
     this.events = new EventPeer(service.sessions.events, frame => this.send({ kind: "events", frame }));
@@ -78,7 +79,7 @@ export class RendererConnection {
     if (frame.kind === "request") {
       const { id, service } = frame;
       if (typeof id !== "number" || !connectionServices.includes(service as never)) return;
-      void serve(this.service, service as never, frame.command).then(result => this.send({ kind: "response", id, result }));
+      void serve(this.service, service as never, frame.command, this.watchOwner).then(result => this.send({ kind: "response", id, result }));
       return;
     }
     if (frame.kind === "events") { const parsed = eventControlSchema.safeParse(frame.control); if (parsed.success) this.events.receive(parsed.data); return; }
@@ -88,6 +89,8 @@ export class RendererConnection {
   close() {
     if (this.closed) return;
     this.closed = true;
+    this.watchOwner.active = false;
+    this.service.sessions.releaseWatches(this.watchOwner);
     this.events.close(); this.calls.close(); this.channels.close();
     void this.service.content.execute({ type: "reset" }).catch(() => {});
     try { this.port.close(); } catch { /* The port is closed. */ }

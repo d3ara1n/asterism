@@ -172,7 +172,8 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
       </div>)}
       {state?.state === "waiting" && <p>{i18n.text(messages.usageWaiting)}</p>}
       {state?.state === "ready" && empty && <p>{i18n.text(messages.usageEmpty)}</p>}
-      {state?.error && <p className="text-warning">{i18n.text(state.error === "credential" ? messages.usageCredential
+      {state?.error && <p className="text-warning">{i18n.text(state.error === "configuration" ? messages.usageConfiguration
+        : state.error === "credential" ? messages.usageCredential
         : state.error === "authentication" ? messages.usageAuthentication
         : state.error === "rate_limit" ? messages.usageRateLimited : messages.usageFailed)}</p>}
       <p className="opacity-70">{state?.updatedAt ? i18n.formatMessage(messages.usageUpdated, { time: i18n.formatDate(state.updatedAt, { hour: "numeric", minute: "2-digit" }) })

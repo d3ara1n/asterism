@@ -1,6 +1,7 @@
 import type { ModelResponse } from "@asterism-app/sdk/contracts";
 import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, type UsageProviderServices } from "@asterism-app/sdk/runtime";
 import type { ProviderUsageState } from "@asterism-app/sdk/contracts";
+import { ProviderTransportError, validateProviderTransport } from "../model/provider.ts";
 
 interface Entry { value: ProviderUsageState; attemptedAt: number; controller: AbortController; pending?: Promise<ProviderUsageState> }
 /** Canceling a waiter does not end a query shared by other cards. */
@@ -55,6 +56,7 @@ export class ProviderUsageService {
       const signal = AbortSignal.any([controller.signal, timeout]);
       try {
         signal.throwIfAborted();
+        validateProviderTransport(connection);
         let credential: string | null;
         try { credential = await waitForUsage(this.modelProviders.credential(connection.id, { signal }), signal); }
         catch { throw new UsageQueryError("credential"); }
@@ -63,8 +65,10 @@ export class ProviderUsageService {
         const items = await waitForUsage(provider.query({ connection: { id, endpoint: connection.baseUrl }, credential, signal }), signal);
         current.value = { ...empty, state: "ready", items, updatedAt: Date.now() };
       } catch (error) {
+        if (error instanceof ProviderTransportError) console.warn("Provider usage configuration rejected:", error.message);
         current.value = { ...current.value, state: "error", error: timeout.aborted ? "timeout"
-          : controller.signal.aborted ? "unavailable" : error instanceof UsageQueryError ? error.code : "network" };
+          : controller.signal.aborted ? "unavailable" : error instanceof ProviderTransportError ? "configuration"
+            : error instanceof UsageQueryError ? error.code : "network" };
       } finally { current.pending = undefined; }
       return current.value;
     });

@@ -6,6 +6,7 @@ export interface ShellProcess {
   /** Observes exit and output finalization separately; waiting itself does not terminate the process. */
   exited: Promise<ProcessExit>;
   settled: Promise<ProcessExit>;
+  /** Requests process-scope termination and closes collection; settled drains accepted callbacks. */
   stop(): Promise<void>;
 }
 
@@ -42,8 +43,12 @@ export function startShellProcess(executable: string, args: string[], options: {
   let queue = Promise.resolve();
   let idle: ReturnType<typeof setTimeout> | undefined;
   let stopping: Promise<void> | undefined;
-  const stop = () => stopping ??= child.pid && !exit
-    ? killProcessGroup(child.pid) : Promise.resolve();
+  // A foreground exit does not imply that inherited output or the owned process group has ended.
+  // stop requests termination without awaiting queue settlement: onData failures invoke it from that queue.
+  const stop = () => stopping ??= (async () => {
+    try { if (child.pid) await killProcessGroup(child.pid); }
+    finally { finish(); }
+  })();
   const finish = () => {
     if (done || !exit) return;
     done = true;
@@ -82,7 +87,8 @@ export function startShellProcess(executable: string, args: string[], options: {
   });
   child.once("exit", (exitCode, signal) => {
     exit = { exitCode, signal, error: null };
-    resolveExit(exit); armIdle();
+    resolveExit(exit);
+    if (stopping) finish(); else armIdle();
   });
   child.once("close", finish);
   return { exited, settled, stop };

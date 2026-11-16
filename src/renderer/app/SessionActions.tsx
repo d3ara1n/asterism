@@ -4,6 +4,8 @@ import type { SessionResult } from "../../shared/session";
 import { RenameSession } from "../features/session/RenameSession";
 import { SaveTemplate } from "../features/templates/SaveTemplate";
 import { templateMessages } from "../../shared/template-messages";
+import { DisposalWarningsNotice } from "../features/session/DisposalWarnings";
+import { objectsMessages } from "../messages/objects";
 import { useDisposalWarnings } from "../features/session/disposal";
 import { appMessages } from "../messages/app";
 import { useI18n } from "../shared/i18n";
@@ -113,14 +115,12 @@ export function SessionActions({ sessionId, title, folderId, disabled, sleeping,
           <AlertDialogTitle>{i18n.text(appMessages.archiveConversationTitle)}</AlertDialogTitle>
           <AlertDialogDescription>{i18n.text(appMessages.archiveConversationDescription)}</AlertDialogDescription>
         </AlertDialogHeader>
-        {warnings.length > 0 && <ul className="type-body space-y-1 text-destructive">
-          {warnings.map(item => <li key={item.objectId}><span className="font-medium">{item.title}</span>：{i18n.text(item.warning)}</li>)}
-        </ul>}
+        <DisposalWarningsNotice state={warnings} />
         <AlertDialogFooter>
           <AlertDialogCancel disabled={archiving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={archiving} aria-busy={archiving}
+          <AlertDialogAction variant="destructive" disabled={disabled || archiving || warnings.status === "loading"} aria-busy={archiving}
             onClick={event => { event.preventDefault(); void archive(); }}>
-            {archiving && <Spinner />}{i18n.text(appMessages.archiveConfirm)}
+            {archiving && <Spinner />}{i18n.text(warnings.status === "error" ? objectsMessages.disposalContinue : appMessages.archiveConfirm)}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

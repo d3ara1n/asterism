@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+import { WebError } from "@asterism-app/sdk/runtime";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parallelResponse, parallelSearchOptions, parallelWebProvider } from "./parallel.ts";
 
@@ -5,6 +7,17 @@ const reply = (data: unknown) => new Response(JSON.stringify(data), { headers: {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Parallel search filters and response normalization", () => {
+  it("classifies malformed provider results as protocol errors and retains the invalid field", () => {
+    let error: unknown;
+    try { parallelResponse({ results: [{ url: "not-a-web-url", excerpts: [] }] }); }
+    catch (cause) { error = cause; }
+    expect(error).toBeInstanceOf(WebError);
+    expect(error).toMatchObject({ code: "protocol", message: expect.stringContaining("Parallel") });
+    const cause = (error as WebError).cause;
+    expect(cause).toBeInstanceOf(ZodError);
+    expect((cause as ZodError).issues).toEqual(expect.arrayContaining([expect.objectContaining({ path: ["results", 0, "url"] })]));
+  });
+
   // The API supports a date lower bound and at most 20 results; inclusion overrides exclusion.
   it("reports unsupported filters and converts timestamp bounds to UTC dates", () => {
     const { options, hints } = parallelSearchOptions({ query: "test", maxResults: 30, region: "GB", language: "en",

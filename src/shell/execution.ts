@@ -53,12 +53,12 @@ export class ShellExecutor implements ShellExecution {
       if (args.timeout !== undefined) timeout = setTimeout(() => { reason ??= "timeout"; void stop(); }, args.timeout * 1000);
       // After the main command exits, only finalize output; background programs already started continue according to their own command lifecycles.
       const exit = await process.exited;
-      clearTimeout(timeout);
-      signal.removeEventListener("abort", cancel);
-      await cleanup;
       const settled = await process.settled;
+      publishing = false;
       clearTimeout(update);
       const final = await output.finish();
+      // Cancellation still owns process/output cleanup after the foreground exit.
+      await cleanup;
       const termination = reason ?? (exit.error ? "spawn_error" : settled.error || cleanupError || progressError ? "io_error" : "exited");
       const data: ExecResult = { ...final, shell: shell.executable, termination,
         exitCode: exit.exitCode, signal: exit.signal, durationMs: Math.round(performance.now() - started) };

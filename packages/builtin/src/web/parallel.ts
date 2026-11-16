@@ -4,6 +4,7 @@ import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type
 import { WebError, type WebProviderDefinition } from "@asterism-app/sdk/runtime";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 import { webMessages as messages } from "../messages/web.ts";
+import { parseWebResponse } from "./response.ts";
 
 const BASE_URL = "https://api.parallel.ai";
 
@@ -34,7 +35,7 @@ function mapDocument(result: z.infer<typeof resultSchema>): WebDocument {
 }
 
 export function parallelResponse(raw: unknown, leadingHints: WebHint[] = []): WebResponse {
-  const { results, search_id, extract_id, ...details } = responseSchema.parse(raw);
+  const { results, search_id, extract_id, ...details } = parseWebResponse("Parallel", responseSchema, raw);
   const requestId = search_id ?? extract_id;
   return {
     documents: results.map(mapDocument),

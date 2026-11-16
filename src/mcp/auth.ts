@@ -112,7 +112,11 @@ export class McpOAuth implements OAuthClientProvider {
       start: () => starting ??= (async () => {
         this.signal.throwIfAborted();
         const listener = createServer((request, response) => {
-          const received = new URL(request.url ?? "/", this.redirectUrl);
+          let received: URL;
+          try { received = new URL(request.url ?? "/", this.redirectUrl); }
+          catch {
+            response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" }).end("Invalid authorization callback."); return;
+          }
           if (received.pathname !== "/callback" || received.searchParams.get("state") !== this.nonce) {
             response.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" }).end("Invalid authorization callback."); return;
           }

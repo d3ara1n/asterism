@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { diffPaths, filterPaths, loadedPaths } from "./tree-model.ts";
+import { diffPaths, filterPaths, isKnownMissing, loadedPaths } from "./tree-model.ts";
 
 it("lists only loaded directories, parents before descendants", () => {
   const children = new Map([
@@ -35,4 +35,34 @@ it("does not treat a sibling sharing a name prefix as part of a removed subtree"
     { type: "remove", path: "src/", recursive: true },
     { type: "remove", path: "src-gen.ts", recursive: false },
   ]);
+});
+
+it("retains nested expansion while paused listings reload and prunes it when a loaded ancestor proves deletion", () => {
+  const children = new Map<string, { name: string; directory: boolean }[]>();
+  let expanded = ["a/", "a/b/"];
+  const reconcile = () => { expanded = expanded.filter(path => !isKnownMissing(children, path)); };
+  // Pause releases all directory bodies; neither expansion is known to be absent.
+  reconcile();
+  expect(expanded).toEqual(["a/", "a/b/"]);
+  children.set("", [{ name: "a", directory: true }]);
+  reconcile();
+  expect(expanded).toEqual(["a/", "a/b/"]);
+  children.set("a/", [{ name: "b", directory: true }]);
+  reconcile();
+  expect(expanded).toEqual(["a/", "a/b/"]);
+  // The direct parent's authoritative refresh proves b/ has disappeared.
+  children.set("a/", []);
+  reconcile();
+  expect(expanded).toEqual(["a/"]);
+});
+
+it("prunes nested intent when the root removes its ancestor even without a loaded direct parent", () => {
+  const children = new Map([["", [{ name: "a-other", directory: true }]]]);
+  const expanded = ["a/", "a/b/", "a-other/"];
+  expect(expanded.filter(path => !isKnownMissing(children, path))).toEqual(["a-other/"]);
+});
+
+it("prunes directory intent when an ancestor is replaced by a file with the same name", () => {
+  const children = new Map([["", [{ name: "a", directory: false }]]]);
+  expect(isKnownMissing(children, "a/b/")).toBe(true);
 });

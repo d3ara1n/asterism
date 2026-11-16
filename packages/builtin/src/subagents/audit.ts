@@ -30,8 +30,9 @@ function delivered(entry: AuditEntry): ContentRef[] {
 }
 
 /**
- * Append-only JSONL process record named by run ID. Entries serialize when appended; each line is written independently,
- * so an interrupted process loses at most its last line. Nothing is written for a run that never starts.
+ * Append-only JSONL process record named by run ID. Writes queue in order, each line before its attachment copies.
+ * Normal close awaits the queue; interruption can leave an incomplete line and omit multiple queued entries or copies.
+ * Nothing is written for a run that never starts.
  */
 export class AuditLog {
   private readonly file: string;

@@ -13,4 +13,9 @@ export interface ShellExecution {
 export interface ShellServices extends ShellExecution {
   readonly profiles: ShellProfiles;
   readonly terminals: TerminalSessions;
+  /** Synchronously snapshots shell selection, profile arguments and environment overrides.
+   * Executions use that configuration with the same plugin/host lifetime and caller cancellation.
+   * Executable discovery and external files remain execution-time OS inputs; direct service execution reads current settings.
+   */
+  capture(): ShellExecution;
 }

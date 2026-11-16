@@ -181,6 +181,104 @@ describe("Data preparation", () => {
     expect(listRecoveryPoints(directory)[0]!.notice).toBe(false);
   });
 
+  // Current host data must not clear restoration pause before a later plugin requires migration.
+  it("pauses restored plugin-only migrations before backup or apply until explicit retry", async () => {
+    const directory = root();
+    writeJson(join(directory, "configuration.json"), { version: 2, entries: ["host"] });
+    const file = join(directory, "extensions", "acme.notes", "notes.json");
+    writeJson(file, { version: 1, data: { text: "plugin" } });
+    let applied = 0;
+    const plugin = jsonStorage({ id: "acme.notes/notes.json", file, version: 2, envelope: true,
+      migrations: { 1: raw => { applied++; return raw; } } });
+    const stores = [document(directory, 2, {})];
+    const discover = async () => [{ id: "acme.current", stores: [] }, { id: "acme.notes", stores: [plugin] }];
+    expect(await prepare(directory, stores, discover)).toEqual({ ok: true, plugins: [] });
+    restorePoint(directory, paths, listRecoveryPoints(directory)[0]!.id, "1.0.0");
+    const points = listRecoveryPoints(directory);
+    applied = 0;
+    expect(await prepare(directory, stores, discover)).toMatchObject({ ok: false, paused: true });
+    expect(await prepare(directory, stores, discover)).toMatchObject({ ok: false, paused: true });
+    expect(applied).toBe(0);
+    expect(readJson(file)).toEqual({ version: 1, data: { text: "plugin" } });
+    expect(listRecoveryPoints(directory)).toEqual(points);
+    expect(readJson(join(directory, "recovery", "state.json"))).toEqual({ phase: "restored" });
+    clearPause(directory);
+    expect(await prepare(directory, stores, discover)).toEqual({ ok: true, plugins: [] });
+    expect(applied).toBe(1);
+    expect(readJson(file)).toEqual({ version: 2, data: { text: "plugin" } });
+  });
+
+  // A compatible restored data set may start normally, but the marker must survive until plugin inspection finishes.
+  it("clears restoration pause only after host and plugins need no migration", async () => {
+    const directory = root();
+    writeJson(join(directory, "configuration.json"), { version: 1, text: "host" });
+    await prepare(directory, [document(directory, 2, { 1: toV2 })]);
+    restorePoint(directory, paths, listRecoveryPoints(directory)[0]!.id, "1.0.0");
+    const points = listRecoveryPoints(directory);
+    const file = join(directory, "extensions", "acme.notes", "notes.json");
+    writeJson(file, { version: 1, data: { text: "current" } });
+    const plugin = jsonStorage({ id: "acme.notes/notes.json", file, version: 1, envelope: true, migrations: {} });
+    let pauseAtDiscovery: unknown;
+    expect(await prepare(directory, [document(directory, 1, {})], async () => {
+      pauseAtDiscovery = readJson(join(directory, "recovery", "state.json"));
+      return [{ id: "acme.notes", stores: [plugin] }];
+    })).toEqual({ ok: true, plugins: [] });
+    expect(pauseAtDiscovery).toEqual({ phase: "restored" });
+    expect(existsSync(join(directory, "recovery", "state.json"))).toBe(false);
+    expect(listRecoveryPoints(directory)).toEqual(points);
+    expect(await prepare(directory, [document(directory, 2, { 1: toV2 })])).toEqual({ ok: true, plugins: [] });
+  });
+
+  // Plugin-local failure permits writable startup; a retry must protect unrelated intervening user work.
+  it("takes a fresh full snapshot for plugin-first retries after covered data changes", async () => {
+    const directory = root();
+    writeJson(join(directory, "configuration.json"), { version: 2, entries: ["before startup"] });
+    const file = join(directory, "extensions", "acme.notes", "notes.json");
+    writeJson(file, { version: 1, data: { text: "plugin" } });
+    let fail = true;
+    const plugin = jsonStorage({ id: "acme.notes/notes.json", file, version: 2, envelope: true,
+      migrations: { 1: raw => { if (fail) throw new Error("Plugin conversion failed."); return raw; } } });
+    const stores = [document(directory, 2, {})];
+    const discover = async () => [{ id: "acme.notes", stores: [plugin] }];
+    expect(await prepare(directory, stores, discover)).toEqual({ ok: true, plugins: [{ id: "acme.notes", error: "Plugin conversion failed." }] });
+    const [original] = listRecoveryPoints(directory);
+    writeJson(join(directory, "configuration.json"), { version: 2, entries: ["new user work"] });
+    fail = false;
+    expect(await prepare(directory, stores, discover)).toEqual({ ok: true, plugins: [] });
+    const points = listRecoveryPoints(directory);
+    expect(points).toHaveLength(2);
+    const fresh = points.find(point => point.id !== original!.id)!;
+    expect(readJson(pointFile(directory, fresh.id, "configuration.json"))).toEqual({ version: 2, entries: ["new user work"] });
+    expect(readJson(pointFile(directory, fresh.id, "extensions", "acme.notes", "notes.json"))).toEqual({ version: 1, data: { text: "plugin" } });
+    expect(readJson(pointFile(directory, original!.id, "configuration.json"))).toEqual({ version: 2, entries: ["before startup"] });
+    expect(readJson(join(directory, "configuration.json"))).toEqual({ version: 2, entries: ["new user work"] });
+  });
+
+  // One invocation protects its entire migration batch with one pre-host snapshot, not partially upgraded plugin snapshots.
+  it("shares one complete recovery point across host and multiple plugin migrations", async () => {
+    const directory = root();
+    writeJson(join(directory, "configuration.json"), { version: 1, text: "host" });
+    const groups = ["acme.notes", "acme.tasks"].map(id => {
+      const file = join(directory, "extensions", id, "data.json");
+      writeJson(file, { version: 1, data: { text: id } });
+      return { id, stores: [jsonStorage({ id: `${id}/data.json`, file, version: 2, envelope: true, migrations: { 1: raw => raw } })] };
+    });
+    expect(await prepare(directory, [document(directory, 2, { 1: toV2 })], async () => groups)).toEqual({ ok: true, plugins: [] });
+    const points = listRecoveryPoints(directory);
+    expect(points).toHaveLength(1);
+    const point = points[0]!;
+    expect(point.changes).toEqual([
+      { id: "configuration", from: 1, to: 2 },
+      { id: "acme.notes/data.json", from: 1, to: 2 },
+      { id: "acme.tasks/data.json", from: 1, to: 2 },
+    ]);
+    expect(readJson(pointFile(directory, point.id, "configuration.json"))).toEqual({ version: 1, text: "host" });
+    for (const { id } of groups) {
+      expect(readJson(pointFile(directory, point.id, "extensions", id, "data.json"))).toEqual({ version: 1, data: { text: id } });
+      expect(readJson(join(directory, "extensions", id, "data.json"))).toEqual({ version: 2, data: { text: id } });
+    }
+  });
+
   // New installations and unchanged restarts read versions only without recovery points or prompts.
   it("no migration creates no recovery points", async () => {
     const directory = root();

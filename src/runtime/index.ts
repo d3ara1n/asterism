@@ -60,11 +60,15 @@ try {
   port.on("message", ({ data, ports }) => {
     if (data?.kind === "shutdown") {
       for (const id of [...connections.keys()]) disconnect(id);
-      void service.close().finally(async () => {
+      void (async () => {
+        let exitCode = 0;
+        try { await service.close(); }
+        catch (error) { console.error("Task runtime cleanup failed.", error); exitCode = 1; }
         proxy.close();
-        await network.close();
-        process.exit(0);
-      });
+        try { await network.close(); }
+        catch (error) { console.error("Task runtime network cleanup failed.", error); exitCode = 1; }
+        process.exit(exitCode);
+      })();
       return;
     }
     if (data?.kind === systemResumeMessage) { service.sessions.events.publish(SystemResumed, null, {}); return; }

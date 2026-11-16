@@ -8,7 +8,7 @@ import { modelProtocol } from "./protocols/index.ts";
 export class ProviderTransportError extends ModelFailure {
   constructor() { super("configuration", "API key connections require HTTPS, except on loopback addresses."); }
 }
-export function validateProviderTransport(provider: ModelProviderInput): void {
+export function validateProviderTransport(provider: Pick<ModelProviderInput, "baseUrl" | "auth">): void {
   const endpoint = new URL(provider.baseUrl);
   const loopback = ["localhost", "[::1]", "::1"].includes(endpoint.hostname) || /^127(?:\.\d{1,3}){3}$/.test(endpoint.hostname);
   if (provider.auth === "api_key" && endpoint.protocol !== "https:" && !loopback) throw new ProviderTransportError();

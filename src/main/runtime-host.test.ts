@@ -40,3 +40,36 @@ it("rejects direct port handoff before readiness and transfers it to the task pr
   }
 });
 
+it("rejects failed runtime cleanup, reports the dead child unavailable, and lets a later explicit stop complete without retrying cleanup", async () => {
+  const root = mkdtempSync(join(tmpdir(), "asterism-stop-"));
+  const child = fakeChild();
+  child.postMessage.mockImplementation(() => {});
+  fork.mockReturnValue(child);
+  const statuses: string[] = [];
+  const host = new RuntimeHost((status) => statuses.push(status));
+  try {
+    const ready = host.start(
+      "unused-runtime.js",
+      root,
+      [],
+      join(root, "startup.json"),
+    );
+    child.emit("message", { kind: "ready", version: protocolVersion });
+    await ready;
+    const stopped = host.stop();
+    const rejected = expect(stopped).rejects.toThrow(
+      "cleanup failed with exit code 1",
+    );
+    expect(statuses.at(-1)).toBe("stopping");
+    child.emit("exit", 1);
+    await rejected;
+    expect(statuses.at(-1)).toBe("unavailable");
+    expect(host.ready).toBe(false);
+    const sent = child.postMessage.mock.calls.length;
+    await host.stop();
+    expect(child.postMessage.mock.calls).toHaveLength(sent);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    vi.clearAllMocks();
+  }
+});

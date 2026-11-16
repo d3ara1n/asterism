@@ -1,4 +1,4 @@
-import { implementCall, type CallContribution, type ShellServices, type InteractiveTerminal, type ShellProfiles, type TerminalSessions } from "@asterism-app/sdk/runtime";
+import { implementCall, type CallContribution, type ShellServices, type ShellExecution, type InteractiveTerminal, type ShellProfiles, type TerminalSessions } from "@asterism-app/sdk/runtime";
 import { ReadShellProfiles, type ShellSettings } from "@asterism-app/sdk/contracts";
 import { SharedTerminal } from "./terminal/session.ts";
 import { ShellExecutor } from "./execution.ts";
@@ -12,7 +12,7 @@ export class ShellHost implements ShellServices {
   private readonly execution: ShellExecutor;
   readonly terminals: TerminalSessions;
   readonly calls: readonly CallContribution[];
-  constructor(settings: () => ShellSettings, integrationRoot: string) {
+  constructor(private readonly settings: () => ShellSettings, integrationRoot: string) {
     this.profiles = { get: settings, list: () => listShellProfiles(settings()) };
     this.execution = new ShellExecutor(settings, this.closing.signal);
     this.terminals = { create: (config, events) => {
@@ -23,6 +23,11 @@ export class ShellHost implements ShellServices {
     this.calls = [implementCall(ReadShellProfiles, () => this.profiles.list())];
   }
   execute: ShellServices["execute"] = (cwd, args, options) => this.execution.execute(cwd, args, options);
+
+  capture(): ShellExecution {
+    const settings = structuredClone(this.settings());
+    return new ShellExecutor(() => settings, this.closing.signal);
+  }
 
   /** Ends commands and reaps terminals that their owners did not release. */
   async close(): Promise<void> {

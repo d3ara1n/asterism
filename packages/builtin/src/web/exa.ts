@@ -4,6 +4,7 @@ import { jsonSchema, present, webUrlSchema, type WebDocument, type WebHint, type
 import { WebError, type WebProviderDefinition } from "@asterism-app/sdk/runtime";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 import { webMessages as messages } from "../messages/web.ts";
+import { parseWebResponse } from "./response.ts";
 
 const MAX_TEXT_CHARACTERS = 1_000_000;
 const BASE_URL = "https://api.exa.ai";
@@ -97,7 +98,7 @@ function mapHints(
 }
 
 export function exaResponse(raw: unknown, leadingHints: WebHint[] = []): WebResponse {
-  const { results, requestId, ...details } = responseSchema.parse(raw);
+  const { results, requestId, ...details } = parseWebResponse("Exa", responseSchema, raw);
   const { warnings, notices, statuses, costDollars } = details;
   return {
     documents: results.map(mapDocument),

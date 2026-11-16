@@ -24,6 +24,8 @@ import { branchContains, historyBranches, branchForNode, type HistoryBranch } fr
 import { historyResourceViews, matchesHistoryView, historyEntry, type HistoryDirectory, type HistoryView, type HistoryEntry } from "./history-navigation";
 import { useSession, useSessionActivity } from "./state";
 import { useDisposalWarnings } from "./disposal";
+import { DisposalWarningsNotice } from "./DisposalWarnings";
+import { objectsMessages } from "../../messages/objects";
 import { sessionTimeline } from "../../../shared/session-timeline";
 import { foldWorkbench, workbenchRecordIds } from "../../../session/fold";
 
@@ -279,21 +281,21 @@ function ContinueAction({ controller, nodeId, directory, label }: { controller: 
     const retained = new Set(foldWorkbench(records.map(recordNode)).objects.map(object => object.id));
     return snapshot.workbench.objects.filter(object => !retained.has(object.id)).map(object => object.id);
   }, [target, snapshot?.nodes, snapshot?.workbench.objects]));
-  const warnings = useDisposalWarnings(controller.sessionId, leaving.data);
+  const warnings = useDisposalWarnings(controller.sessionId, target && leaving.status === "ready" ? leaving.data : null);
   if (!snapshot) return null;
   const unsettled = progress.timelineBusy || progress.busyObjectIds.length > 0;
   const wait = i18n.formatMessage(historyMessages.waitForResources, { names: progress.busyObjectIds.map(id => resources?.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource)).join(", ") });
-  const disabled = saving || unsettled || state.navigating || state.status !== "ready" || (target !== null && leaving.status !== "ready");
+  const disabled = saving || unsettled || state.navigating || state.status !== "ready" || (target !== null && leaving.status !== "ready") || warnings.status === "loading";
   return <><span title={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span>
     <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent>
       <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
       <p className="type-body break-words">{label ?? i18n.formatMessage(historyMessages.historyStart)}</p>
       {leaving.error && <p className="type-caption text-destructive">{i18n.text(historyMessages.readFailed)} <Button variant="ghost" size="xs" onClick={leaving.retry}>{i18n.text(commonMessages.retry)}</Button></p>}
-      {warnings.map(item => <p key={item.objectId} className="type-body break-words text-destructive">{item.title}: {i18n.text(item.warning)}</p>)}
+      {leaving.status === "ready" && <DisposalWarningsNotice state={warnings} />}
       {unsettled && <p className="type-caption">{wait}</p>}
       <AlertDialogFooter><AlertDialogCancel disabled={saving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel><AlertDialogAction disabled={disabled} aria-busy={saving} onClick={event => {
         event.preventDefault(); if (!target) return; setSaving(true);
         void controller.branchFrom(target.id).then(result => { if (operationSucceeded(result)) setTarget(null); }).finally(() => setSaving(false));
-      }}>{saving && <Spinner />}{i18n.formatMessage(historyMessages.continueConfirm)}</AlertDialogAction></AlertDialogFooter>
+      }}>{saving && <Spinner />}{i18n.text(warnings.status === "error" ? objectsMessages.disposalContinue : historyMessages.continueConfirm)}</AlertDialogAction></AlertDialogFooter>
     </AlertDialogContent></AlertDialog></>;
 }

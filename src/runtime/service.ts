@@ -60,9 +60,14 @@ export class ApplicationService {
     } catch (error) { this.db.close(); throw error; }
   }
   async close(): Promise<void> {
-    this.configuration.close();
-    await Promise.all([this.sessions.close(), this.content.close()]);
-    this.db.close();
+    const results = await Promise.allSettled([
+      (async () => this.configuration.close())(), this.sessions.close(), this.content.close(),
+    ]);
+    const errors = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+    // Keep storage available until session work and renderer transfers have reached terminal outcomes.
+    try { this.db.close(); } catch (error) { errors.push(error); }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length) throw new AggregateError(errors, "Application cleanup failed.");
   }
   private readonly npmRoot: string;
   configurePlugin(raw: unknown): PluginConfiguration[] {
@@ -129,6 +134,10 @@ export class ApplicationService {
         dependencies: [...startup?.rendererDependencies ?? []] };
     }).filter((plugin, _, all) => plugin.index !== null || !plugin.id || !all.some(item => item.index !== null && item.id === plugin.id));
     return snapshotSchema.parse({ workspace, folders: this.folders.list(), sessions, templates: this.sessions.templates.list(), archivedSessions, plugins,
+      rendererPlugins: this.sessions.packages.flatMap(item => item.status === "loaded" && item.id ? [{
+        id: item.id, source: item.source, metadata: item.metadata, renderer: item.renderer,
+        stylesheet: item.stylesheet, dependencies: [...item.rendererDependencies],
+      }] : []),
       catalogs: (this.options.catalogs ?? []).filter(catalog => this.sessions.packages.some(item => item.id === catalog.owner && item.status === "loaded")),
       restartRequired: JSON.stringify(current) !== this.started,
       ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings().map(({ title, warning }) => ({ title, warning })) } : {}) });

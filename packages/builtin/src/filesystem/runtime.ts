@@ -15,7 +15,7 @@ import { failed, filesystemFailure } from "./errors.ts";
 import { readTextFile, commitTextFile, validateTextSize } from "./text-io.ts";
 import { DirectoryExec } from "./exec-contract.ts";
 import { execToModel } from "../shell/contract.ts";
-import type { ShellExecution } from "@asterism-app/sdk/runtime";
+import type { ShellServices, ShellExecution } from "@asterism-app/sdk/runtime";
 import { searchTools } from "./search.ts";
 import { listFiles, readMetadata, readFileContent, readChildren } from "./read.ts";
 import { readDirectoryStatus } from "./git-status.ts";
@@ -36,7 +36,12 @@ function rootOf(object: ObjectReader): string {
   return Directory.stateSchema.parse(snapshot.data).path;
 }
 
-export function createFilesystemModule(shell: ShellExecution) { return defineModule(plugin => ({
+export function createFilesystemModule(shell: ShellServices) {
+  const exec = (execution: ShellExecution) => implementTool(DirectoryExec, {
+    call: (directory, _target, args, context) => execution.execute(directory.path, args, context),
+    toModel: execToModel,
+  });
+  return defineModule(plugin => ({
   topLevelTools: [inspectPathTool],
   resources: [implementResource(Directory, DirectoryView, {
     card: directoryCard,
@@ -80,10 +85,7 @@ export function createFilesystemModule(shell: ShellExecution) { return defineMod
   })],
   tools: [
     ...searchTools,
-    implementTool(DirectoryExec, {
-      call: (directory, _target, args, context) => shell.execute(directory.path, args, context),
-      toModel: execToModel,
-    }),
+    { ...exec(shell), capture: () => exec(shell.capture()) },
     implementTool(DirectoryList, {
       async call(directory, target, _args, { signal, object }) {
         const result = await listFiles(directory.path, target, signal);

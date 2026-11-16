@@ -1,4 +1,7 @@
 {
+  "objects.disposal.loading": "正在检查资源警告…",
+  "objects.disposal.failed": "无法获取资源警告",
+  "objects.disposal.continue": "仍要继续",
   "common.actions.noLocationActions": "无可用操作",
   "common.actions.openInApp": "在 Asterism 中打开",
   "common.actions.openWithSystem": "用系统应用打开",
@@ -252,6 +255,7 @@
   "providerUsage.resets": "{time} 重置",
   "providerUsage.waiting": "随模型响应更新",
   "providerUsage.empty": "未报告额度",
+  "providerUsage.configuration": "API key 连接须使用 HTTPS，回环地址除外。",
   "providerUsage.credential": "请保存有效的 API key 以查询用量。",
   "providerUsage.authentication": "用量查询服务拒绝了凭据。",
   "providerUsage.rateLimited": "用量查询受到限流。",

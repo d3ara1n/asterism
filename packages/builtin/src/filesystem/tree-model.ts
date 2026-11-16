@@ -15,6 +15,17 @@ export function parentOf(path: string): string {
   return slash < 0 ? "" : trimmed.slice(0, slash + 1);
 }
 
+/** A loaded ancestor listing proves absence; an unloaded parent alone leaves the path unknown. */
+export function isKnownMissing(children: ReadonlyMap<string, readonly TreeEntry[]>, path: string): boolean {
+  while (path !== "") {
+    const parent = parentOf(path);
+    const entries = children.get(parent);
+    if (entries && !entries.some(entry => childPath(parent, entry) === path)) return true;
+    path = parent;
+  }
+  return false;
+}
+
 /** Every path reachable through loaded directories, parents before their descendants. */
 export function loadedPaths(children: ReadonlyMap<string, readonly TreeEntry[]>): string[] {
   const paths: string[] = [];

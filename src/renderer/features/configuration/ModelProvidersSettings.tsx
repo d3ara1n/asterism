@@ -357,19 +357,19 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
           <div className="surface">
             <FieldGroup className="gap-4 p-4">
               <Field orientation="horizontal">
-                <FieldContent><FieldLabel htmlFor="capability-reasoning">{i18n.formatMessage(providersMessages.reasoning)}</FieldLabel></FieldContent>
-                <Switch id="capability-reasoning" checked={value.capabilities.reasoning}
+                <FieldContent><FieldLabel htmlFor={`${form}-capability-reasoning`}>{i18n.formatMessage(providersMessages.reasoning)}</FieldLabel></FieldContent>
+                <Switch id={`${form}-capability-reasoning`} checked={value.capabilities.reasoning}
                   onCheckedChange={reasoning => set("capabilities", { ...value.capabilities, reasoning })} />
               </Field>
-              {value.capabilities.reasoning && <FieldSet className="gap-3" aria-describedby="thinking-levels-description">
+              {value.capabilities.reasoning && <FieldSet className="gap-3" aria-describedby={`${form}-thinking-levels-description`}>
                 <FieldLegend variant="label">{i18n.formatMessage(providersMessages.availableThinkingLevels)}</FieldLegend>
-                <FieldDescription id="thinking-levels-description">{i18n.formatMessage(providersMessages.thinkingLevelsHint)}</FieldDescription>
+                <FieldDescription id={`${form}-thinking-levels-description`}>{i18n.formatMessage(providersMessages.thinkingLevelsHint)}</FieldDescription>
                 <FieldGroup className="grid grid-cols-3 gap-x-4 gap-y-3">
                   {thinkingSchema.options.map(level => <Field key={level} orientation="horizontal">
-                    <Checkbox id={`thinking-${level}`} checked={value.capabilities.thinkingLevels.includes(level)}
+                    <Checkbox id={`${form}-thinking-${level}`} checked={value.capabilities.thinkingLevels.includes(level)}
                       onCheckedChange={checked => set("capabilities", { ...value.capabilities,
                         thinkingLevels: thinkingSchema.options.filter(item => item === level ? checked === true : value.capabilities.thinkingLevels.includes(item)) })} />
-                    <FieldLabel htmlFor={`thinking-${level}`}>{i18n.text(thinkingLabels[level])}</FieldLabel>
+                    <FieldLabel htmlFor={`${form}-thinking-${level}`}>{i18n.text(thinkingLabels[level])}</FieldLabel>
                   </Field>)}
                 </FieldGroup>
                 {value.capabilities.thinkingLevels.length === 0 && <FieldDescription role="status">
@@ -380,8 +380,8 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
             <Separator />
             <FieldGroup className="p-4">
               <Field orientation="horizontal">
-                <FieldContent><FieldLabel htmlFor="capability-tools">{i18n.formatMessage(providersMessages.toolCalls)}</FieldLabel></FieldContent>
-                <Switch id="capability-tools" checked={value.capabilities.tools}
+                <FieldContent><FieldLabel htmlFor={`${form}-capability-tools`}>{i18n.formatMessage(providersMessages.toolCalls)}</FieldLabel></FieldContent>
+                <Switch id={`${form}-capability-tools`} checked={value.capabilities.tools}
                   onCheckedChange={tools => set("capabilities", { ...value.capabilities, tools })} />
               </Field>
             </FieldGroup>

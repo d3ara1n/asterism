@@ -133,21 +133,22 @@ export function AttachFiles({ draft, disabled }: { draft: MessageDraft; disabled
 }
 /** Files are accepted by the conversation entry point, preventing propagation to workbench creation routing; plain-text paste retains input behavior. */
 export function fileInputEvents(draft: MessageDraft, disabled: boolean) {
+  const blocked = () => disabled || draft.getSnapshot().uploading;
   return {
     onPaste(event: ClipboardEvent) {
       const files = Array.from(event.clipboardData.files);
       if (!files.length) return;
       event.preventDefault(); event.stopPropagation();
-      if (!disabled) void draft.add(files);
+      if (!blocked()) void draft.add(files);
     },
     onDragOver(event: DragEvent) {
       if (!event.dataTransfer.types.includes("Files")) return;
-      event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = disabled ? "none" : "copy";
+      event.preventDefault(); event.stopPropagation(); event.dataTransfer.dropEffect = blocked() ? "none" : "copy";
     },
     onDrop(event: DragEvent) {
       if (!event.dataTransfer.types.includes("Files")) return;
       event.preventDefault(); event.stopPropagation();
-      if (!disabled) void draft.add(Array.from(event.dataTransfer.files));
+      if (!blocked()) void draft.add(Array.from(event.dataTransfer.files));
     },
   };
 }

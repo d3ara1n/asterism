@@ -60,7 +60,10 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
       deadlines.close();
       stopCatalog();
       usage.close();
-      await Promise.all([mcp.close(), shell.close()]);
+      const results = await Promise.allSettled([mcp.close(), shell.close()]);
+      const errors = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+      if (errors.length === 1) throw errors[0];
+      if (errors.length) throw new AggregateError(errors, "Shared service cleanup failed.");
     },
   };
 }

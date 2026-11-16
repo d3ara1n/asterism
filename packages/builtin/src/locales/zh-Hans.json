@@ -214,6 +214,7 @@
   "usage.empty": "未报告额度",
   "usage.updated": "更新于 {time}",
   "usage.unavailable": "用量查询提供方不可用。",
+  "usage.configuration": "API key 连接须使用 HTTPS，回环地址除外。",
   "usage.credential": "请在提供商设置中保存有效的 API key。",
   "usage.authentication": "用量查询服务拒绝了凭据。",
   "usage.unsupported": "当前连接不支持所选的用量查询。",

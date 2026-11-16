@@ -94,7 +94,7 @@ Packs can adapt protocol placement, supported file transport, reasoning encoding
 
 Account balance and quota are separate from response token usage and reference cost. A connection explicitly selects a usage provider.
 
-Active providers query using supplied connection credentials. Header providers interpret response metadata supplied by the consumer. The provider catalog exposes those implementations. A separate host usage service obtains the selected connection's credentials, shares active queries, and caches results for consumers.
+Active providers query using supplied connection credentials. Header providers interpret response metadata supplied by the consumer. The provider catalog exposes those implementations. A separate host usage service obtains the selected connection's credentials, shares active queries, and caches results for consumers. Before retrieving credentials for an active query, it applies the same API-key HTTPS-or-loopback transport rule as model execution. Rejection is a configuration error, not a network or unsupported-operation error; header-only reads remain passive.
 
 Usage items distinguish amount balance from quota windows and rate-limit headroom. Unknown limits and reset times remain unknown. An empty successful list is different from failure.
 

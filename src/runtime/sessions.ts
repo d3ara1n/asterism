@@ -34,6 +34,9 @@ import { TemplateStore } from "./templates.ts";
 import { ResourceHolds } from "./resource-holds.ts";
 import type { PluginCandidate, PluginOutcome } from "../shared/plugin-startup.ts";
 
+/** One concrete renderer connection owns its admitted watches. */
+export interface SessionWatchOwner { readonly active: boolean }
+
 export interface SessionServiceOptions {
   onChanged?: (event: SessionChanged) => void;
   adapterFactory?: (settings: ModelSettings) => ModelAdapter;
@@ -58,6 +61,8 @@ export class SessionService {
   readonly channels: LoadedPlugins["channels"];
   readonly events = new EventBus();
   private readonly watching = new Map<string, SessionProgress>();
+  private readonly watchOwners = new Map<string, Set<SessionWatchOwner>>();
+  private readonly localWatchOwner: SessionWatchOwner = { active: true };
   private readonly updates = new Map<string, { nodes: SessionNode[]; completed: Map<string, SessionNode>; objects: Set<string>; workbench: boolean; layout: boolean }>();
   private closed = false;
   private readonly shared: ReturnType<typeof createSharedServices>;
@@ -497,7 +502,19 @@ export class SessionService {
   openFile(ref: FileRef, signal: AbortSignal): AsyncIterable<Uint8Array> {
     return this.resources.openFile(ref, { refOf: id => this.tree.resourceRef(id), workbench: id => this.tree.workbench(id) }, signal);
   }
-  async execute(raw: unknown): Promise<SessionReply> {
+  /** Disconnect releases only this connection's established watches; pending admission checks its active flag. */
+  releaseWatches(owner: SessionWatchOwner): void {
+    for (const sessionId of this.watchOwners.keys()) this.unwatch(sessionId, owner);
+  }
+  private unwatch(sessionId: string, owner: SessionWatchOwner): void {
+    const owners = this.watchOwners.get(sessionId);
+    if (!owners?.delete(owner) || owners.size) return;
+    this.watchOwners.delete(sessionId);
+    this.watching.delete(sessionId);
+    this.refreshSleep();
+    if (this.settled(sessionId)) this.tree.releaseCache(sessionId);
+  }
+  async execute(raw: unknown, watchOwner: SessionWatchOwner = this.localWatchOwner): Promise<SessionReply> {
     if (this.closed) throw new SessionError("unavailable", "The session service is closed.");
     const parsed = sessionCommandSchema.safeParse(raw);
     if (!parsed.success) throw new SessionError("invalid_request", "Invalid session command.");
@@ -522,9 +539,13 @@ export class SessionService {
       case "records.read": return { kind: "records", nodes: this.tree.readRecords(command.sessionId, command.ids) };
       case "watch": {
         await this.deactivations.get(command.sessionId);
+        if (this.closed || !watchOwner.active) throw new SessionError("unavailable", "The watch connection is closed.");
         const woke = this.tree.open(command.sessionId);
         this.sleepPolicy?.opened(command.sessionId);
         // Protect the newly opened session before mounting resources can publish activity.
+        const owners = this.watchOwners.get(command.sessionId) ?? new Set<SessionWatchOwner>();
+        owners.add(watchOwner);
+        this.watchOwners.set(command.sessionId, owners);
         this.watching.set(command.sessionId, { busyObjectIds: [], timelineBusy: false, live: [] });
         if (woke) {
           this.restorePlugins(command.sessionId);
@@ -537,9 +558,7 @@ export class SessionService {
         return { kind: "accepted", sessionId: command.sessionId };
       }
       case "unwatch":
-        this.watching.delete(command.sessionId);
-        this.refreshSleep();
-        if (this.settled(command.sessionId)) this.tree.releaseCache(command.sessionId);
+        this.unwatch(command.sessionId, watchOwner);
         return { kind: "accepted", sessionId: command.sessionId };
       case "select":
         if (!this.settled(command.sessionId)) throw new SessionError("conflict", "Wait for all captured resources to settle before moving through history.");
@@ -713,6 +732,7 @@ export class SessionService {
   }
   private async releaseSession(sessionId: string, reason: "sleep" | "archive"): Promise<void> {
     this.watching.delete(sessionId);
+    this.watchOwners.delete(sessionId);
     this.updates.delete(sessionId);
     for (const [key, controller] of this.creating) if (key.startsWith(`${sessionId}/`)) controller.abort();
     const creations = [...this.pendingCreations.values()].filter(pending => pending.sessionId === sessionId);
@@ -727,12 +747,17 @@ export class SessionService {
     this.closed = true;
     this.sleepPolicy?.close();
     for (const pending of this.pendingCreations.values()) pending.controller.abort();
-    const closingPlugins = this.closePlugins();
-    await Promise.all([closingPlugins, ...this.deactivations.values()]);
-    await this.shared.close();
+    // Archive/sleep release still uses plugin presence and shared services. Join every accepted release before closing them.
+    const deactivated = this.deactivations.size ? await Promise.allSettled(this.deactivations.values()) : [];
+    const errors = deactivated.flatMap(result => result.status === "rejected" ? [result.reason] : []);
+    try { await this.closePlugins(); } catch (error) { errors.push(error); }
+    try { await this.shared.close(); } catch (error) { errors.push(error); }
+    // Failed/cancelled business work is a terminal outcome, not a shutdown failure.
     await Promise.allSettled([...this.pendingCreations.values()].map(pending => pending.done));
     await Promise.allSettled([...this.starting.values()]);
-    await this.content.close();
+    try { await this.content.close(); } catch (error) { errors.push(error); }
     this.writesClosed = true;
+    if (errors.length === 1) throw errors[0];
+    if (errors.length) throw new AggregateError(errors, "Session cleanup failed.");
   }
 }

@@ -1,3 +1,5 @@
+import { ZodError } from "zod";
+import { WebError } from "@asterism-app/sdk/runtime";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { ExaAbortError, ExaError, ExaTimeoutError } from "exa-js";
 import { exaError, exaResponse, exaSearchOptions, exaWebProvider } from "./exa.ts";
@@ -12,6 +14,17 @@ afterEach(() => http.transport.mockReset());
 afterAll(() => { globalThis.fetch = http.original; });
 
 describe("Exa result normalization", () => {
+  it("classifies malformed provider results as protocol errors and retains the invalid field", () => {
+    let error: unknown;
+    try { exaResponse({ results: [{ url: "not-a-web-url", excerpts: [] }] }); }
+    catch (cause) { error = cause; }
+    expect(error).toBeInstanceOf(WebError);
+    expect(error).toMatchObject({ code: "protocol", message: expect.stringContaining("Exa") });
+    const cause = (error as WebError).cause;
+    expect(cause).toBeInstanceOf(ZodError);
+    expect((cause as ZodError).issues).toEqual(expect.arrayContaining([expect.objectContaining({ path: ["results", 0, "url"] })]));
+  });
+
   // The configured search type applies to search only; URL retrieval uses the contents endpoint without a search type.
   it("sends the configured search type to search and leaves content retrieval unaffected", async () => {
     const requests: { path: string; body: Record<string, unknown> }[] = [];

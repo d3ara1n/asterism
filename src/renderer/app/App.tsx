@@ -71,6 +71,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
   const workbench = useRef<WorkbenchHandle>(null);
   const mainScreen = useRef<ScreenHandle>(null);
+  const settingsScreen = useRef<ScreenHandle>(null);
   // Ordinary islands of the main screen; the current workbench restores and persists them while the strip's scope is its session.
   const [mainStrip] = useState(() => new IslandStrip());
   const navigating = useRef(false);
@@ -121,24 +122,29 @@ export function App({ controller }: { controller: ApplicationController }) {
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? i18n.formatMessage(commonMessages.conversation);
 
   const focusMain = () => requestAnimationFrame(() => document.getElementById("screen-main")?.focus({ preventScroll: true }));
-  const go = (next: PageId) => {
+  const go = async (next: PageId) => {
     if (next === "settings") setSettingsTarget(null);
-    if (next === page) return;
-    if (next === "settings") returnFocus.current = document.activeElement as HTMLElement | null;
-    controller.setVisibleSession(next === "main" && view.kind === "conversation" ? view.sessionId : null);
-    setPage(next);
-    requestAnimationFrame(() => {
-      if (next === "main" && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
-      else {
-        const screen = document.getElementById(`screen-${next}`);
-        (screen?.querySelector<HTMLElement>("[data-island]") ?? screen)?.focus({ preventScroll: true });
-      }
-    });
+    if (next === page || navigating.current) return;
+    navigating.current = true;
+    try {
+      if (page === "settings" && !(await settingsScreen.current?.closeAll())) return;
+      if (next === "settings") returnFocus.current = document.activeElement as HTMLElement | null;
+      controller.setVisibleSession(next === "main" && view.kind === "conversation" ? view.sessionId : null);
+      setPage(next);
+      requestAnimationFrame(() => {
+        if (next === "main" && returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true });
+        else {
+          const screen = document.getElementById(`screen-${next}`);
+          (screen?.querySelector<HTMLElement>("[data-island]") ?? screen)?.focus({ preventScroll: true });
+        }
+      });
+    } finally { navigating.current = false; }
   };
   const navigate = async (next: MainView): Promise<boolean> => {
     if (navigating.current) return false;
     navigating.current = true;
     try {
+      if (page === "settings" && !(await settingsScreen.current?.closeAll())) return false;
       const changingSession = next.kind !== view.kind
         || next.kind === "conversation" && view.kind === "conversation" && next.sessionId !== view.sessionId;
       if (changingSession && mainScreen.current) {
@@ -331,7 +337,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Window skipTarget={`screen-${page}`} titlebar={<Titlebar navigation={titleNavigation} actions={actions} actionsHidden={inSettings} />}>
       <Space active={page} screens={[
         { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content:
-          <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SettingsPage active={inSettings} target={settingsTarget} onCancel={() => go("main")} /></SessionArchiveContext.Provider> },
+          <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SettingsPage screenRef={settingsScreen} active={inSettings} target={settingsTarget} onCancel={() => { void go("main"); }} /></SessionArchiveContext.Provider> },
         { id: "main", label: mainTitle, surface: false,
           // Docked sidebars reserve width; Island overflow and focus following stay inside Screen.
           content: <div className="main-page">

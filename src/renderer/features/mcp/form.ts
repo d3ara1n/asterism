@@ -23,7 +23,7 @@ export function parseArgumentLines(text: string): string[] {
 
 /** Server being edited: arguments, idle seconds, and key-value entries retain their raw text until completion; newlines and empty values are not normalized during input. */
 export interface McpDraft {
-  server: McpServerConfig;
+  server: Omit<McpServerConfig, "enabled">;
   args: string;
   idle: string;
   entries: string;
@@ -41,12 +41,14 @@ export function entriesText(values: Record<string, string>): string {
 }
 /** Entries edit environment variables for stdio servers and request headers for HTTP servers. */
 export function draftOf(server: McpServerConfig, create: boolean): McpDraft {
-  return { server: structuredClone(server), args: server.args.join("\n"), idle: String(server.idleSeconds),
+  const { enabled: _enabled, ...details } = server;
+  return { server: structuredClone(details), args: server.args.join("\n"), idle: String(server.idleSeconds),
     entries: entriesText(server.transport === "stdio" ? server.env : server.headers), create, idEdited: false };
 }
 
-/** Reports errors by field; taken contains IDs used by other servers. eager mode hides idle seconds and retains the original value when the idle value is invalid. */
-export function validateDraft(draft: McpDraft, taken: readonly string[]): McpDraftResult {
+/** The detail draft excludes enabling, which belongs to the row. enabled is composed from the current saved entry (or the creation default).
+ * Reports errors by field; taken contains IDs used by other servers. eager mode hides idle seconds and retains the original value when the idle value is invalid. */
+export function validateDraft(draft: McpDraft, taken: readonly string[], enabled: boolean): McpDraftResult {
   const { server } = draft, errors: Partial<Record<McpField, McpFieldError>> = {};
   if (!server.name.trim()) errors.name = "required";
   if (draft.create) {
@@ -66,7 +68,7 @@ export function validateDraft(draft: McpDraft, taken: readonly string[]): McpDra
   let entries: Record<string, string> = {};
   try { entries = parseEntryLines(draft.entries); } catch { errors.entries = "invalidEntries"; }
   if (Object.keys(errors).length) return { ok: false, errors };
-  const parsed = mcpServerSchema.parse({ ...server, name: server.name.trim(), command: server.command.trim(), url: server.url.trim(),
+  const parsed = mcpServerSchema.parse({ ...server, enabled, name: server.name.trim(), command: server.command.trim(), url: server.url.trim(),
     args: parseArgumentLines(draft.args), idleSeconds: idleValid ? idle : server.idleSeconds,
     env: server.transport === "stdio" ? entries : {}, headers: server.transport === "http" ? entries : {} });
   return { ok: true, server: parsed };

@@ -22,7 +22,8 @@ const handleSegment = "flex items-center rounded-md outline-none transition-colo
 const percent = (i18n: I18n, value: number) => i18n.formatNumber(value, { style: "percent", maximumFractionDigits: 0 });
 const itemValue = (i18n: I18n, item: UsageItem) => item.type === "balance"
   ? formatUsageAmount(i18n, item.remaining, item.unit, { compact: true }) : percent(i18n, quotaRemaining(item));
-const errorMessage = (error: NonNullable<ProviderUsageState["error"]>) => error === "credential" ? providersMessages.usageCredential
+const errorMessage = (error: NonNullable<ProviderUsageState["error"]>) => error === "configuration" ? providersMessages.usageConfiguration
+  : error === "credential" ? providersMessages.usageCredential
   : error === "authentication" ? providersMessages.usageAuthentication
   : error === "rate_limit" ? providersMessages.usageRateLimited : providersMessages.usageFailed;
 /** A note for states without items; items speak for themselves. */
