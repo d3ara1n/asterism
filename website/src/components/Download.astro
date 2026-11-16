@@ -16,7 +16,7 @@ interface ReleaseSnapshot {
   assets: { name: string; url: string }[];
 }
 
-// Resolve the newest release at build time so direct download links work even if GitHub's anonymous API is rate-limited in the browser.
+// Resolve release metadata at build time; visitors receive static version and download links.
 async function fetchLatestBuild(): Promise<ReleaseSnapshot | null> {
   const headers: Record<string, string> = { Accept: "application/vnd.github+json", "User-Agent": "asterism-website-build" };
   const token = import.meta.env.GITHUB_TOKEN ?? import.meta.env.GH_TOKEN;
@@ -78,7 +78,6 @@ const quarantineCmd = "xattr -dr com.apple.quarantine /Applications/Asterism.app
         <a
           class="version"
           href={buildRelease ? `${repoUrl}/releases/tag/${buildRelease.tag}` : releasesUrl}
-          data-version
           hidden={!buildRelease}
         >
           {buildRelease?.tag ?? ""}
@@ -86,11 +85,11 @@ const quarantineCmd = "xattr -dr com.apple.quarantine /Applications/Asterism.app
       </p>
     </div>
 
-    <ul class="platforms" data-platforms data-repo={repo} data-repo-url={repoUrl}>
+    <ul class="platforms" data-platforms>
       {
         t.platforms.map(platform => (
           <li class="platform-item" data-os={platform.id}>
-            <a class="platform-main" href={resolveUrl(platform.asset)} data-asset={platform.asset}>
+            <a class="platform-main" href={resolveUrl(platform.asset)}>
               <span class="os-row">
                 <span class="os">{platform.os}</span>
                 <span class="rec" data-rec hidden>{t.recommended}</span>
@@ -130,7 +129,6 @@ const quarantineCmd = "xattr -dr com.apple.quarantine /Applications/Asterism.app
 
 <script>
   const list = document.querySelector<HTMLElement>("[data-platforms]");
-  const version = document.querySelector<HTMLAnchorElement>("[data-version]");
 
   // Highlight the visitor's likely platform without hiding the others.
   const ua = navigator.userAgent.toLowerCase();
@@ -140,48 +138,6 @@ const quarantineCmd = "xattr -dr com.apple.quarantine /Applications/Asterism.app
     const badge = item?.querySelector<HTMLElement>("[data-rec]");
     item?.classList.add("is-detected");
     if (badge) badge.hidden = false;
-  }
-
-  // Refresh release links in the browser with sessionStorage caching so subsequent releases appear immediately without burning rate limits.
-  if (list && version) {
-    const repo = list.dataset.repo!;
-    const repoUrl = list.dataset.repoUrl!;
-    const cacheKey = `asterism-release:${repo}`;
-
-    const applyRelease = (data: { tag_name: string; assets: { name: string; browser_download_url: string }[] }) => {
-      list.querySelectorAll<HTMLAnchorElement>("[data-asset]").forEach(link => {
-        const asset = data.assets.find(item => item.name.endsWith(link.dataset.asset!));
-        if (asset) link.href = asset.browser_download_url;
-      });
-      version.textContent = data.tag_name;
-      version.href = `${repoUrl}/releases/tag/${data.tag_name}`;
-      version.hidden = false;
-    };
-
-    try {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) applyRelease(JSON.parse(cached));
-    } catch {
-      // Ignore storage access errors.
-    }
-
-    fetch(`https://api.github.com/repos/${repo}/releases?per_page=1`, {
-      headers: { Accept: "application/vnd.github+json" },
-    })
-      .then(res => (res.ok ? res.json() : Promise.reject(new Error(String(res.status)))))
-      .then((releases: { tag_name: string; assets: { name: string; browser_download_url: string }[] }[]) => {
-        const release = releases[0];
-        if (!release) return;
-        applyRelease(release);
-        try {
-          sessionStorage.setItem(cacheKey, JSON.stringify(release));
-        } catch {
-          // Ignore storage quota errors.
-        }
-      })
-      .catch(() => {
-        // Keep build-time URLs when rate-limited or offline.
-      });
   }
 
   // Copy helper for the macOS quarantine command.

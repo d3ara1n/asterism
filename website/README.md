@@ -10,6 +10,6 @@ npm run build    # type check and write dist/
 
 `SITE_URL` and `SITE_BASE` override the deployed origin and path. The defaults target the custom domain at `/`; a project page without a custom domain uses `SITE_BASE=/asterism/`.
 
-The constellation mark is rendered from `packages/ui/src/brand/geometry.ts`, so the site builds from a repository checkout that includes that file. Download links bake in the newest published release's asset URLs at build time, refresh from GitHub in the browser when available, and fall back to the releases page.
+The constellation mark is rendered from `packages/ui/src/brand/geometry.ts`, so the site builds from a repository checkout that includes that file. The version label and download links are resolved from the newest published release at build time and embedded in static HTML. Visitors do not query GitHub for release metadata. If release metadata is unavailable, the version label is hidden and download links fall back to the releases page.
 
-`.github/workflows/pages.yml` builds and deploys the site when `main` changes the website, the shared brand geometry, or the workflow itself, and whenever a release is published. It can also be run manually.
+The website workflow builds from `main` when the website, shared brand geometry, or website workflow changes, and on manually published releases. Automated release publication explicitly calls the reusable website workflow after publishing, including prerelease promotion, because release events created with the default `GITHUB_TOKEN` do not trigger another workflow. The website workflow also supports manual runs. Version and download changes become visible after deployment; an already-open page needs a reload.
