@@ -1,4 +1,4 @@
-import { ResourceStatusChanged } from "@asterism-app/sdk/contracts";
+import { ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ExecutionServices, type ResourceRef, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../lifecycle.ts";
 import type { PluginHostServices } from "../loader.ts";
@@ -23,9 +23,25 @@ interface ExecutionBinding {
 /** Resource access, request holds, content handoff, and optional presentation surround the generic runner. */
 export function bindExecution({ owner, host, events, runs, objects: { own, checkRef }, checkAvailable, topLevelTools }: ExecutionBinding) {
   const live = new Map<symbol, { ref: ResourceRef; blocks: LiveBlock[] }>();
+  const bindOwner = (resource: ResourceRef) => {
+    own(resource.kind); checkRef(resource);
+    const ref = Object.freeze({ ...resource });
+    const source = host.sessions.workbench(ref.sessionId).objects.find(object => object.id === ref.id);
+    if (!source) throw new PluginApiError("unavailable", "The execution owner is not on the current session path.");
+    return { ref, source };
+  };
   const execution: ExecutionServices = {
+    withActivity(resource, work, options) {
+      const { ref, source } = bindOwner(resource);
+      return runs.start(async signal => {
+        signal.throwIfAborted();
+        const activity = host.shared.activities.begin(ref, source.title);
+        try { return await work({ signal, progress: activity.progress }); }
+        finally { activity.close(); }
+      }, { object: ref, signal: options?.signal, affectsHistory: false }).done;
+    },
     async withProgress(resource, work) {
-      checkAvailable(); own(resource.kind); checkRef(resource);
+      own(resource.kind); checkRef(resource);
       const ref = { ...resource }, key = Symbol();
       let timer: ReturnType<typeof setTimeout> | undefined;
       live.set(key, { ref, blocks: [] });
@@ -41,12 +57,9 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
       }
     },
     run(request, options) {
-      checkAvailable();
       if (runs.closed) throw new PluginApiError("unavailable", "The execution service is closing.");
-      const ref = Object.freeze({ ...request.access });
-      own(ref.kind); checkRef(ref); request.signal.throwIfAborted();
-      const source = host.sessions.workbench(ref.sessionId).objects.find(object => object.id === ref.id);
-      if (!source) throw new PluginApiError("unavailable", "The access owner is not on the current session path.");
+      const { ref, source } = bindOwner(request.access);
+      request.signal.throwIfAborted();
       const contentAccess = { owner, sessionId: ref.sessionId, objectId: ref.id,
         recordIds: new Set(host.sessions.view(ref.sessionId).timelineIds()), check: checkAvailable };
       const linked = host.sessions.linked(ref.sessionId, ref.id);
@@ -75,7 +88,7 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
           return await host.models.run({ target, system: preparedSystem,
             messages, userAgent, sessionId: ref.sessionId, requestParentId,
             signal, tools: bindModelTools(capabilities, boundTools, handover, () => {
-              events.publish(ResourceStatusChanged, { title: source.title, status: "awaiting" }, { plugin: owner, resource: ref });
+              events.publish(ResourceNoticeRaised, { title: source.title, kind: "attention" }, { plugin: owner, resource: ref });
             }),
             completionExtensions: request.completionExtensions,
             content: values => options?.content

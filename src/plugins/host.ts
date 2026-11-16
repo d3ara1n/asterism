@@ -14,6 +14,7 @@ import type { ModelProviderExtensions } from "../configuration/provider-extensio
 
 /** Application-wide services composed once by the host and shared by every plugin context. */
 export interface SharedServices {
+  activities: import("../runtime/resource-activities.ts").ResourceActivities;
   mcp: McpApplication;
   shell: ShellServices;
   deadlines: import("@asterism-app/sdk/runtime").DeadlineServices;

@@ -8,6 +8,7 @@ export * from "./plugin.ts";
 export * from "./records.ts";
 export * from "./resource-records.ts";
 export * from "./events.ts";
+export * from "./resource-activity.ts";
 export * from "./calls.ts";
 export * from "./channels.ts";
 export * from "./tool-result.ts";

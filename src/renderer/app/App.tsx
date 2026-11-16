@@ -263,7 +263,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /></motion.div> : null}
   </WorkbenchSurface>;
   const sidebar = <Sidebar snapshot={snapshot} status={exiting ? "stopping" : state.status} busy={state.busy}
-    resourceStatuses={state.resourceStatuses}
+    resourceActivities={state.resourceActivities} resourceNotices={state.resourceNotices}
     selectedSessionId={view.kind === "conversation" ? view.sessionId : null}
     renameDisabledSessionId={active && !writable ? active.sessionId : null}
     onRename={renameSession}
@@ -311,7 +311,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   // The workbench persistently displays session read failures; the same entry handles backend unavailability while the workbench is visible.
   const unavailableInWorkbench = view.kind === "conversation" && !inSettings && phase === "unavailable";
-  const appError = exiting || unavailableInWorkbench ? null : state.error;
+  const appError = exiting ? null : (unavailableInWorkbench ? null : state.error) ?? state.resourceActivityError;
   useStateToast(appError ? i18n.text(appError) : null, {
     tone: "error",
     onDismiss: controller.clearError,

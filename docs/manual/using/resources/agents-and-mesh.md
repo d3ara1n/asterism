@@ -12,6 +12,14 @@ Being available as an Agent resource includes investigation of saved conversatio
 
 Input acceptance, execution ending, and acceptance of the deliverable are separate events. A supervisor relationship requires an agreement about reports, evidence, and follow-through; the link alone does not schedule work or make a final response a verified result.
 
+### Running work is broader than a model response
+
+An Agent remains active through its task, including waiting for tools or answers, retry delays, and automatic context compaction. A pause in streaming is not by itself evidence that execution has ended. Stopping requests cancellation; the activity remains until the task and its cleanup have settled. Cancellation does not imply that the Agent needs your attention or that completed external effects were undone.
+
+Manual compaction is separate work on the conversation's context. Its success or error notice concerns that compaction, not whether an earlier answer succeeded. Compaction does not revise the original history or establish that the underlying task is complete.
+
+A tool's attention notice calls you to its occurrence, not necessarily to a blocked task. A question remains unanswered until it is answered, skipped where allowed, or cancelled through its interaction. Viewing the session or dismissing an enlarged question view does not resolve it, even when the session reminder has disappeared.
+
 ### Sharing an excerpt is different from publishing an Agent
 
 A shared excerpt is a static artifact for someone to read outside the workbench, not a connection to the Agent. It does not give its recipient access to the conversation's records or resources. The excerpt keeps the selected messages as they were when sharing opened; later output does not update it. This makes it useful for showing a question and its answer without publishing the full working context.

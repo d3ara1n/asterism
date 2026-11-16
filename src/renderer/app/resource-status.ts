@@ -1,11 +1,11 @@
-import type { ResourceRef, ResourceStatus } from "@asterism-app/sdk/contracts";
+import type { ResourceNotice, ResourceRef } from "@asterism-app/sdk/contracts";
 
-export type ResourceStatusMark = ResourceStatus & {
+export type ResourceNoticeMark = ResourceNotice & {
   resource: ResourceRef;
 };
 
-/** Aggregation selects only the summary; entries from different resources always remain in the details. */
-export function summarizeResourceStatus(marks: readonly ResourceStatusMark[]): ResourceStatus["status"] | undefined {
-  return (["failed", "awaiting", "running", "completed"] as const)
-    .find(status => marks.some(mark => mark.status === status));
+/** Severity selects only the notification summary; every resource and kind remains in the details. */
+export function summarizeResourceNotices(notices: readonly ResourceNoticeMark[]): ResourceNotice["kind"] | undefined {
+  return (["error", "attention", "success"] as const)
+    .find(kind => notices.some(notice => notice.kind === kind));
 }

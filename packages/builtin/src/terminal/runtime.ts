@@ -5,7 +5,7 @@ import { isAbsolute } from "node:path";
 import { randomUUID } from "node:crypto";
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, implementChannel, PluginApiError,
   type CallResult, type ObjectReader, type ResourceRef } from "@asterism-app/sdk/runtime";
-import { ResourceStatusChanged, type Json } from "@asterism-app/sdk/contracts";
+import { ResourceNoticeRaised, type Json } from "@asterism-app/sdk/contracts";
 import { terminalMessages } from "../messages/terminal.ts";
 import { TerminalError, type InteractiveTerminal, type TerminalViewer } from "@asterism-app/sdk/runtime";
 import { keySequence } from "./keys.ts";
@@ -38,7 +38,7 @@ export function createTerminalModule() { return defineModule(plugin => {
       failed(error) {
         if (plugin.lifetime.signal.aborted || terminals.get(ref.id)?.terminal !== created) return;
         plugin.log.warn(`Terminal startup failed: ${error instanceof Error ? error.message : String(error)}`);
-        try { plugin.object(ref.sessionId, TerminalResource, ref.id).events.publish(ResourceStatusChanged, ResourceStatusChanged.schema.parse({ status: "failed", title: terminalMessages.terminal })); }
+        try { plugin.object(ref.sessionId, TerminalResource, ref.id).events.publish(ResourceNoticeRaised, { kind: "error", title: { ...terminalMessages.terminal } }); }
         catch { /* The resource has left the current set. */ }
       },
       log: (message, error) => plugin.log.error(message, error),

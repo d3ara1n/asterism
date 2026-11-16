@@ -19,7 +19,8 @@ import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
 import type { SessionResult } from "../../shared/session";
 import { SessionActions } from "./SessionActions";
 import { SessionStatus } from "./SessionStatus";
-import type { ResourceStatusMark } from "./resource-status";
+import type { ResourceNoticeMark } from "./resource-status";
+import type { ResourceActivity } from "@asterism-app/sdk/contracts";
 import { useFolders } from "../features/folders/context";
 import { groupByFolder, type FolderGroup } from "../features/folders/grouping";
 import { FolderDot } from "../features/folders/marks";
@@ -39,9 +40,10 @@ type FolderAction = { kind: "edit" | "delete"; folder: Folder; trigger: HTMLButt
 const viewLabels = { folders: appMessages.sidebarViewFolders, recent: appMessages.sidebarViewRecent } as const;
 
 /** Application navigation consumes only session summaries; after selecting a session, the application layer explicitly loads the workbench. */
-export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSessionId, renameDisabledSessionId, homeActive, view, onViewChange, collapsed, onToggleGroup, onHome, onSession, onRename, onArchive, onCompletedChange, onKeepAwakeChange, onTemplateSaved, onHide, onRetry }: {
+export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNotices, selectedSessionId, renameDisabledSessionId, homeActive, view, onViewChange, collapsed, onToggleGroup, onHome, onSession, onRename, onArchive, onCompletedChange, onKeepAwakeChange, onTemplateSaved, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
-  resourceStatuses: readonly ResourceStatusMark[];
+  resourceActivities: readonly ResourceActivity[];
+  resourceNotices: readonly ResourceNoticeMark[];
   renameDisabledSessionId: string | null; onRename: (sessionId: string, title: string) => Promise<SessionResult>;
   onArchive: (sessionId: string) => Promise<SessionResult>;
   onTemplateSaved: () => void;
@@ -81,7 +83,8 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
   const marked = folders.length > 0 && !grouped;
   const folderById = new Map(folders.map(folder => [folder.id, folder]));
   const row = (session: SessionSummary) => {
-    const marks = resourceStatuses.filter(mark => mark.resource.sessionId === session.id);
+    const activities = resourceActivities.filter(activity => activity.resource.sessionId === session.id);
+    const notices = resourceNotices.filter(notice => notice.resource.sessionId === session.id);
     const folder = marked && session.folder_id !== null ? folderById.get(session.folder_id) : undefined;
     const icon = session.sleeping ? <Moon className="text-muted-foreground" /> : <MessageSquare className="text-muted-foreground" />;
     // Sessions without a folder keep the dot slot so titles align.
@@ -110,7 +113,7 @@ export function Sidebar({ snapshot, status, busy, resourceStatuses, selectedSess
           {session.title}{folder && <span className="sr-only">, {folder.name}</span>}
           {session.sleeping && <span className="sr-only">, {i18n.text(appMessages.sleeping)}</span>}
         </span>}
-        actions={<><SessionStatus marks={marks} />{trigger}</>} />}
+        actions={<><SessionStatus activities={activities} notices={notices} />{trigger}</>} />}
     </SessionActions>;
   };
   return <aside id="app-sidebar" className="app-sidebar" aria-label={i18n.formatMessage(appMessages.appNavigation)}>

@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { McpChanged, ReadUsage, UsageChanged, SystemResumed } from "@asterism-app/sdk/contracts";
+import { McpChanged, ReadUsage, UsageChanged, SystemResumed, ReadResourceActivities, ResourceActivitiesChanged, ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
 import { implementCall, PluginApiError, type ManualSource } from "@asterism-app/sdk/runtime";
 import type { ConfigurationService } from "../configuration/service.ts";
 import { ProviderUsageService } from "../configuration/usage.ts";
@@ -10,6 +10,7 @@ import { AgentCatalogService, skillDocumentBody } from "../plugins/agent-catalog
 import type { EventBus } from "../plugins/events.ts";
 import type { SharedServices } from "../plugins/host.ts";
 import { DeadlineScheduler } from "./deadline-scheduler.ts";
+import { ResourceActivities } from "./resource-activities.ts";
 import { ShellHost } from "../shell/host.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { ReadSkillDocument, ReadSkills, RefreshSkills, SkillsChanged } from "../shared/skills.ts";
@@ -28,7 +29,8 @@ export interface SharedServiceOptions {
 /** The single composition point for host services shared by all plugins; closing ends their connections, processes and caches. */
 export function createSharedServices(options: SharedServiceOptions): SharedServices & { close(): Promise<void> } {
   const { configuration, events } = options;
-  for (const contract of [McpChanged, SkillsChanged, UsageChanged]) events.declarePublic(contract);
+  for (const contract of [McpChanged, SkillsChanged, UsageChanged, ResourceActivitiesChanged, ResourceNoticeRaised]) events.declarePublic(contract);
+  const activities = new ResourceActivities(() => events.publish(ResourceActivitiesChanged, null, {}));
   const deadlines = new DeadlineScheduler(error => console.error("Deadline callback failed.", error));
   const resume = events.listen(SystemResumed, {}, () => deadlines.recheck());
   const mcp = new McpApplication(options.db, configuration, () => events.publish(McpChanged, null, {}));
@@ -38,11 +40,12 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
   const models = createModelProviderServices(configuration), usages = createUsageProviderServices(configuration);
   const usage = new ProviderUsageService(models, usages, providerId => events.publish(UsageChanged, null, { providerId }));
   return {
-    mcp, shell, deadlines, usage, agentCatalog, modelProviders: models, usageProviders: usages,
+    activities, mcp, shell, deadlines, usage, agentCatalog, modelProviders: models, usageProviders: usages,
     webProviders: configuration.web, messaging: configuration.messaging, extensions: configuration.extensions,
     manualSources: options.manualSources, packageRoots: options.packageRoots,
     calls: [
       ...mcp.calls, ...shell.calls,
+      implementCall(ReadResourceActivities, async () => activities.read()),
       implementCall(ReadSkills, async () => agentCatalog.skills()),
       implementCall(RefreshSkills, async (_input, { signal }) => agentCatalog.refresh(signal)),
       implementCall(ReadSkillDocument, async ({ source, name }, { signal }) => {

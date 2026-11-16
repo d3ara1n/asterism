@@ -1,7 +1,10 @@
 import { z } from "zod";
-import { pluginNamespace, ResourceStatusChanged } from "@asterism-app/sdk/contracts";
-import { defineModule, type ObjectExecutor } from "@asterism-app/sdk/runtime";
-import type { RendererModule } from "@asterism-app/sdk/renderer";
+import {
+  pluginNamespace, ReadResourceActivities, ResourceActivitiesChanged, ResourceNoticeRaised,
+  type ResourceActivity,
+} from "@asterism-app/sdk/contracts";
+import { defineModule, type ExecutionServices, type ObjectExecutor } from "@asterism-app/sdk/runtime";
+import type { RendererModule, RendererPrepareContext } from "@asterism-app/sdk/renderer";
 
 const ns = pluginNamespace("example.downloads");
 export const Progress = ns.event("progress", {
@@ -19,19 +22,46 @@ export const backend = defineModule(plugin => {
 export function report(object: ObjectExecutor): void {
   object.events.publish(Progress, { job: "file", completed: 10, total: 100 });
 }
-/** Public status is registered by the host; plugins publish through their own resource handles. */
-export function reportStatus(object: ObjectExecutor): void {
-  object.events.publish(ResourceStatusChanged, { title: "Download", status: "running" });
-  object.events.publish(ResourceStatusChanged, { title: "Download", status: "running", progress: { value: 0.6 } });
-  object.events.publish(ResourceStatusChanged, { title: "Download", status: "completed" });
+
+/** One scope covers the whole batch; result notification is an explicit, separate decision. */
+export async function downloadFiles(execution: ExecutionServices, object: ObjectExecutor,
+  urls: readonly string[], signal?: AbortSignal): Promise<ArrayBuffer[]> {
+  const files = await execution.withActivity(object.ref, async ({ signal, progress }) => {
+    const downloaded: ArrayBuffer[] = [];
+    progress(null);
+    for (const url of urls) {
+      const response = await fetch(url, { signal });
+      if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
+      downloaded.push(await response.arrayBuffer());
+      progress(downloaded.length / urls.length);
+    }
+    signal.throwIfAborted();
+    return downloaded;
+  }, { signal });
+  // A rejected or cancelled scope never reaches this success notification.
+  object.events.publish(ResourceNoticeRaised, { title: "Downloads ready", kind: "success" });
+  return files;
 }
+
+/** Invoke on each connection, including reconnect: events invalidate, while the call reads live state. */
+export async function observeActivities({ calls, events, signal }: RendererPrepareContext,
+  receive: (activities: readonly ResourceActivity[]) => void) {
+  const read = async () => receive(await calls.invoke(ReadResourceActivities, {}, { signal }));
+  const subscription = events.subscribe(ResourceActivitiesChanged, { delivery: "latest", signal }, read);
+  await subscription.ready;
+  await read();
+  return subscription;
+}
+
+export let activities: readonly ResourceActivity[] = [];
 export const renderer: RendererModule = {
   resources: [], cards: [], tools: [],
-  async prepare({ events }) {
-    const subscription = events.subscribe(Progress, { delivery: "latest" }, event => {
+  async prepare(context) {
+    const subscription = context.events.subscribe(Progress, { delivery: "latest" }, event => {
       const job: string = event.data.job;
       void job;
     });
     await subscription.ready;
+    await observeActivities(context, snapshot => { activities = snapshot; });
   },
 };

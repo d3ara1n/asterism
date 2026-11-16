@@ -32,6 +32,14 @@ Templates are useful for recurring combinations of participants, resources, and 
 
 A template starts a new session rather than copying an ongoing conversation or suspending and resuming its processes. Each resource determines which setup data it can reuse. References to external locations still point into the external world, so review them before treating a new session as an independent copy.
 
+## Read activity and reminders separately
+
+A running indicator means a resource still has live work. An attention, success, or error notice points to something that happened. A session can show both: work may continue after a result or request for attention, and starting more work does not erase an earlier notice. Different kinds of notice from the same resource can remain together, so a summary indicator is not the complete account of its work.
+
+Viewing a session consumes its reminders, not its work or unresolved interactions. Opening the status popup only inspects the details. For example, reading a session with a question does not answer or cancel that question; handle it in the conversation. A cleared reminder is therefore not evidence that all obligations have been resolved.
+
+Activity reflects live work rather than saved history. Returning after a connection loss can recover activity that is still running, but notices missed while disconnected are not replayed. Neither notices nor running indicators are restored from history after an application restart. Use the conversation and affected resources when you need a durable account of results.
+
 ## Decide what should remain active
 
 Switching sessions does not stop their work. Use an explicit stop when the intent is to stop execution, and distinguish that from merely putting a conversation out of sight.

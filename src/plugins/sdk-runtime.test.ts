@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { thinkingLevels, modelToolCallBlockSchema, toolOutcomeSchema, ResourceStatusChanged, type EventEnvelope, type ResourceStatus, type Json } from "@asterism-app/sdk/contracts";
+import { thinkingLevels, modelToolCallBlockSchema, toolOutcomeSchema, ResourceNoticeRaised, ReadResourceActivities, ResourceActivitiesChanged, type EventEnvelope, type ResourceNotice, type Json } from "@asterism-app/sdk/contracts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -337,6 +337,109 @@ describe("Host implementation of the workbench SDK", () => {
     expect(c.context().object(sessionId, Counter, id).get(State)).toBe(6);
   });
 
+  // Activity queries recover live work independently of notices and of how many overlapping scopes the resource owns.
+  it("queries ongoing activities without replay, and ending one scope leaves its peer running", async () => {
+    const c = counter();
+    const { service, sessionId } = open([c.plugin]);
+    const object = c.context().object(sessionId, Counter, await create(service, sessionId));
+    const first = actionGate(), second = actionGate();
+    const context = c.context();
+    const read = () => context.ipc.calls.invoke(ReadResourceActivities, {}, {});
+    let progress!: (value: number | null) => void;
+    const a = context.execution.withActivity(object.ref, async scope => {
+      progress = scope.progress;
+      await first.promise;
+      return "first";
+    });
+    const b = context.execution.withActivity(object.ref, async () => { await second.promise; });
+    progress(0.6);
+    // The query starts after both scopes; no startup event was observed by this reader.
+    const before = await read();
+    expect(before).toHaveLength(2);
+    expect(before[0]).toMatchObject({ resource: object.ref, title: "Counter", progress: { value: 0.6 } });
+    expect(new Set(before.map(entry => entry.id)).size).toBe(2);
+    object.events.publish(ResourceNoticeRaised, { title: "Counter", kind: "attention" });
+    expect(await read()).toEqual(before);
+    const changed = deferred<void>();
+    const subscription = context.ipc.events.subscribe(ResourceActivitiesChanged, {}, () => changed.resolve());
+    await subscription.ready;
+    progress(null);
+    await changed.promise;
+    expect((await read())[0]).not.toHaveProperty("progress");
+    first.resolve();
+    expect(await a).toBe("first");
+    expect((await read()).map(entry => entry.id)).toEqual([before[1]!.id]);
+    // A retained reporter cannot resurrect a closed scope.
+    progress(1);
+    second.resolve(); await b;
+    expect(await read()).toEqual([]);
+    subscription.close();
+  });
+
+  it("releases failed activities and keeps cancelled work visible until cleanup settles", async () => {
+    const c = counter();
+    const { service, sessionId } = open([c.plugin]);
+    const object = c.context().object(sessionId, Counter, await create(service, sessionId));
+    const context = c.context(), cancel = new AbortController(), cleanup = actionGate();
+    const read = () => context.ipc.calls.invoke(ReadResourceActivities, {}, {});
+    await expect(context.execution.withActivity(object.ref, async () => { throw new Error("Work failed"); })).rejects.toThrow("Work failed");
+    expect(await read()).toEqual([]);
+    const run = context.execution.withActivity(object.ref, async ({ signal }) => {
+      await cleanup.promise;
+      signal.throwIfAborted();
+    }, { signal: cancel.signal });
+    const settled = expect(run).rejects.toMatchObject({ name: "AbortError" });
+    cancel.abort();
+    expect(await read()).toHaveLength(1);
+    cleanup.resolve(); await settled;
+    expect(await read()).toEqual([]);
+    const work = vi.fn();
+    await expect(context.execution.withActivity(object.ref, work, { signal: cancel.signal })).rejects.toMatchObject({ name: "AbortError" });
+    expect(work).not.toHaveBeenCalled();
+    expect(await read()).toEqual([]);
+  });
+
+  it("validates activity ownership and cancels owned activity when the resource leaves the workbench", async () => {
+    const c = counter();
+    const { service, sessionId } = open([c.plugin]);
+    const id = await create(service, sessionId), object = c.context().object(sessionId, Counter, id);
+    const context = c.context(), cleanup = actionGate(), cancelled = deferred<void>();
+    const work = vi.fn();
+    expect(() => context.execution.withActivity({ ...object.ref, kind: "foreign/item" }, work)).toThrow(expect.objectContaining({ code: "foreign_resource" }));
+    expect(() => context.execution.withActivity({ ...object.ref, sessionId: "wrong" }, work)).toThrow(expect.objectContaining({ code: "unavailable" }));
+    const run = context.execution.withActivity(object.ref, async ({ signal }) => {
+      signal.addEventListener("abort", () => cancelled.resolve(), { once: true });
+      await cleanup.promise;
+      signal.throwIfAborted();
+    });
+    const settled = expect(run).rejects.toMatchObject({ name: "AbortError" });
+    object.session.remove(object.ref);
+    await cancelled.promise;
+    cleanup.resolve(); await settled;
+    expect(await context.ipc.calls.invoke(ReadResourceActivities, {}, {})).toEqual([]);
+    expect(() => context.execution.withActivity(object.ref, work)).toThrow(expect.objectContaining({ code: "unavailable" }));
+    expect(work).not.toHaveBeenCalled();
+  });
+
+  it("settles visible work during shutdown without publishing to the closed event transport", async () => {
+    const c = counter();
+    const { service, sessionId } = open([c.plugin]);
+    const object = c.context().object(sessionId, Counter, await create(service, sessionId));
+    const cleanup = actionGate(), cancelled = deferred<void>();
+    const run = c.context().execution.withActivity(object.ref, async ({ signal }) => {
+      signal.addEventListener("abort", () => cancelled.resolve(), { once: true });
+      await cleanup.promise;
+      signal.throwIfAborted();
+    });
+    const settled = expect(run).rejects.toMatchObject({ name: "AbortError" });
+    const closing = service.close();
+    await cancelled.promise;
+    cleanup.resolve();
+    await settled;
+    await closing;
+    services.splice(services.indexOf(service), 1);
+  });
+
   // External providers use the same model tool catalog and read-only association facades; tool policy is captured at request start.
   it("external top-level tools bind callers, follow filtering, and attribute start notices to the calling resource", async () => {
     const c = counter(), other = pluginNamespace("test.questions");
@@ -372,8 +475,8 @@ describe("Host implementation of the workbench SDK", () => {
     } }));
     const target = await configureModel(service);
     const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
-    const notices: EventEnvelope<ResourceStatus>[] = [];
-    const subscription = c.context().ipc.events.subscribe(ResourceStatusChanged, {}, event => { notices.push(event); });
+    const notices: EventEnvelope<ResourceNotice>[] = [];
+    const subscription = c.context().ipc.events.subscribe(ResourceNoticeRaised, {}, event => { notices.push(event); });
     await subscription.ready;
     const run = (allow?: string[]) => c.context().execution.run({
       access: object, interactive: true, target, requestParentId: c.context().session(sessionId).snapshot().position.nodeId,
@@ -385,7 +488,7 @@ describe("Host implementation of the workbench SDK", () => {
       model: [{ kind: "text", text: '{"answer":"Answer: Hello"}' }] });
     expect(cached.data).toEqual({ answer: "Answer: Hello" });
     expect(allowed.tools[0]).not.toHaveProperty("resource");
-    expect(notices).toMatchObject([{ source: { plugin: ns.id, resource: object }, data: { title: "Counter", status: "awaiting" } }]);
+    expect(notices).toMatchObject([{ source: { plugin: ns.id, resource: object }, data: { title: "Counter", kind: "attention" } }]);
     const denied = await run([]);
     expect(requests[1]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "resource_script"]);
     expect(denied.tools[0]?.kind).toBe("rejected");
@@ -396,8 +499,8 @@ describe("Host implementation of the workbench SDK", () => {
     emptyEncoding = true;
     const failed = await run(["prompt"]);
     expect(failed.tools[0]).toMatchObject({ kind: "failed", data: "Waiting" });
-    // Progress and completion do not publish replacement running/completed statuses for the caller.
-    expect(notices.map(event => event.data.status)).toEqual(["awaiting", "awaiting", "awaiting"]);
+    // Progress and completion do not raise additional attention notices.
+    expect(notices.map(event => event.data.kind)).toEqual(["attention", "attention", "attention"]);
     subscription.close();
   });
 

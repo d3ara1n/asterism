@@ -22,7 +22,7 @@ export interface ToolContract<A extends ToolInput = ToolInput> extends ContractR
   requiresInteraction?: boolean;
   /**
    * Each validated invocation requests user attention once when execution starts, independently of interaction endpoint requirements.
-   * The host publishes an awaiting reminder for the caller and exposes a transient live-call highlight. Viewing consumes the reminder;
+   * The host raises an attention notification for the caller and exposes a transient live-call highlight. Viewing consumes the reminder;
    * the notice does not change execution state or track unresolved business work.
    */
   requiresNotice?: boolean;

@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { Json } from "./json.ts";
 import type { Source } from "./workspace.ts";
-import { uiTextSchema } from "./i18n.ts";
 
 export type EventSourceKind = "plugin" | "resource" | "any" | "host";
 export interface EventEnvelope<D extends Json = Json> {
@@ -78,21 +77,3 @@ export const ResourcePresenceChanged = defineEvent("asterism/resource-presence",
   source: "host",
   semantics: { kind: "occurrence" },
 });
-
-/** Each publication fully replaces resource status; running remains visible, while other states are consumed when the session is viewed. */
-export const ResourceStatusChanged = defineEvent("asterism/resource-status", {
-  schema: z.discriminatedUnion("status", [
-    z.strictObject({
-      title: uiTextSchema,
-      status: z.literal("running"),
-      progress: z.strictObject({ value: z.number().min(0).max(1) }).optional(),
-    }),
-    z.strictObject({
-      title: uiTextSchema,
-      status: z.enum(["failed", "awaiting", "completed"]),
-    }),
-  ]),
-  source: "resource",
-  semantics: { kind: "snapshot", key: [] },
-});
-export type ResourceStatus = z.infer<typeof ResourceStatusChanged.schema>;

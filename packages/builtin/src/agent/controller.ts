@@ -1,5 +1,5 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices, type ExecutionServices, type ProviderUsage } from "@asterism-app/sdk/runtime";
-import { ResourceStatusChanged, describeError, formatModelExpression, type ResourceStatus, type ModelRunObserver, type ModelRunResult } from "@asterism-app/sdk/contracts";
+import { ResourceNoticeRaised, describeError, formatModelExpression, type ResourceNotice, type ModelRunObserver, type ModelRunResult } from "@asterism-app/sdk/contracts";
 import { Execution, ToolExecution, AgentTurnEnded, type AgentTurnEndReason } from "@asterism-app/builtin-api/contracts";
 import { runAgentLoop } from "./loop.ts";
 import { agentRequestRetries } from "./retry.ts";
@@ -10,7 +10,6 @@ import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { createRequestAssembly } from "./preparation.ts";
 import { projectAgentContext, projectForAgent } from "./projection.ts";
 import { compressContext, compressionDue, estimateContext, planCompression, type PreparedCompression } from "./compression.ts";
-import { projectAgentTurnState } from "./state-projection.ts";
 import { deliverDrafts } from "./drafts.ts";
 import { turnStartRead } from "./input-message.ts";
 import { readRecords } from "../shared/record-reading.ts";
@@ -47,9 +46,12 @@ export function createAgentController(deps: AgentControllerDependencies) {
   const idle = (object: ObjectReader) => {
     if (running(object)) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
   };
-  const publish = (object: ObjectExecutor, status: ResourceStatus["status"]) => object.events.publish(ResourceStatusChanged, {
-    title: object.snapshot()!.title, status,
-  });
+  const noticeKinds = { completed: "success", failed: "error", limited: "attention" } as const satisfies Record<Exclude<AgentTurnEndReason, "cancelled">, ResourceNotice["kind"]>;
+  const publishResult = (object: ObjectExecutor, reason: AgentTurnEndReason) => {
+    if (reason !== "cancelled") object.events.publish(ResourceNoticeRaised, {
+      title: object.snapshot()!.title, kind: noticeKinds[reason],
+    });
+  };
   const report = (object: ObjectExecutor, error: unknown, signal: AbortSignal, interrupted: boolean) => {
     if (signal.aborted) {
       if (interrupted) deps.feedback.report(object, { origin: "model", level: "warning", code: "cancelled", message: "Execution was cancelled." }, true);
@@ -79,8 +81,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
       run.entered = true;
       let reason: AgentTurnEndReason = "failed";
       try {
-        publish(object, "running");
-        reason = await work(signal);
+        reason = await deps.execution.withActivity(object.ref, context => work(context.signal), { signal });
       } catch (error) {
         reason = signal.aborted ? "cancelled" : "failed";
         report(object, error, signal, kind === "conversation");
@@ -142,13 +143,12 @@ export function createAgentController(deps: AgentControllerDependencies) {
       const { target, context, tokensBefore } = compressionContext(object);
       const plan = planCompression(context);
       if (!plan) return false;
-      const turn = projectAgentTurnState(object.session.snapshot(), object.ref.id, deps.feedback.get(object).interruptions);
       startTask(object, "compression", async signal => {
         const completed = await compress(object, target, { plan, tokensBefore }, signal);
         return completed ? "completed" : "failed";
       }, (reason, entered) => {
         if (!entered) deps.feedback.beginCompression(object)(reason === "cancelled" ? "cancelled" : "failed");
-        return () => publish(object, turn === "completed" ? "completed" : "awaiting");
+        return () => publishResult(object, reason);
       });
       return true;
     },
@@ -230,7 +230,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
         deps.feedback.activity(object, null);
         const ended = boundary();
         return () => {
-          publish(object, reason === "completed" || reason === "failed" ? reason : "awaiting");
+          publishResult(object, reason);
           object.events.publish(AgentTurnEnded, { ...ended, reason, settled: true });
         };
       });

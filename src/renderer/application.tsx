@@ -75,7 +75,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
     input: contract => contentInput({ kind: "call", contractId: contract.id }),
     scope: (input, contract) => contentScopeId(input, { kind: "call", contractId: contract.id }),
   });
-  const controller = new ApplicationController({ execute: runtime.execute, session: runtime.session, onStatus: window.host.onStatus }, events);
+  const controller = new ApplicationController({ execute: runtime.execute, session: runtime.session, onStatus: window.host.onStatus }, events, calls);
   const stopEventStatus = window.host.onStatus(status => { if (status !== "ready") { events.disconnect(); calls.disconnect(); } });
   signal.addEventListener("abort", () => { events.close(); calls.close(); stopEventStatus(); }, { once: true });
   const stopController = controller.connect({ read: false });

@@ -489,8 +489,9 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       webProviders.removeOwners(collected.map(entry => entry.plugin.namespace.id));
       messaging.removeOwners(collected.map(entry => entry.plugin.namespace.id));
       for (const entry of collected) entry.events.stop();
-      events.close();
       for (const lifecycle of lifecycles) lifecycle.stop();
+      services.shared.activities.clear();
+      events.close();
       channels.close();
       closing = (async () => {
         await Promise.allSettled(lifecycles.map(lifecycle => lifecycle.close()));

@@ -1,6 +1,6 @@
 import { planSessionSleep, SessionSleepPolicy } from "./session-sleep.ts";
 import { createSharedServices } from "./shared-services.ts";
-import { SessionTitleAssigned, type Presentation, type Source, resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, type FileRef, ResourceStatusChanged, SessionTitleChanged, SystemResumed } from "@asterism-app/sdk/contracts";
+import { SessionTitleAssigned, type Presentation, type Source, resourceCall, resourceTitleSchema, jsonSchema, type ActionContract, type CreationContract, type ResourceCall, type ResourceCreationResult, type Json, type ModelInputPart, type FileRef, SessionTitleChanged, SystemResumed } from "@asterism-app/sdk/contracts";
 import { type ResourceRef, type PluginDefinition, type ResourceCreationOptions, type ResourceActionOptions, type ManualSource, type PreparedCreation, PluginApiError } from "@asterism-app/sdk/runtime";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
@@ -89,7 +89,6 @@ export class SessionService {
     // Expired sessions remain unmounted at startup, rather than briefly exposing their resources.
     for (const id of planSessionSleep(this.tree.active().filter(session => !session.keepAwake), configuration.sessionLifecycle().sleepDays, Date.now()).due) this.tree.sleep(id);
     this.events.declarePublic(SessionTitleChanged);
-    this.events.declarePublic(ResourceStatusChanged);
     this.events.declarePublic(SystemResumed);
     this.shared = createSharedServices({ db, dataRoot, configuration, events: this.events,
       manualSources: () => options.manualSources?.(this.packages) ?? [], packageRoots: options.packageRoots ?? new Map(), skillDirectories: options.skillDirectories ?? [] });

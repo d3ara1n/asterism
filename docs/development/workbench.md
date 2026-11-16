@@ -36,11 +36,15 @@ Current values follow backend processing order. Subscriptions establish change o
 
 View subscriptions and projections follow session visibility. User-created drafts and selected per-item view state follow object presence in frontend memory. Leaving the current projection releases retained object state. Restart does not restore those memory-only values.
 
-## Session notifications
+## Session activity and notices
 
-The sidebar subscribes to title and resource-status events without loading conversations. Resource status is transient domain feedback, distinct from busy occupancy and Agent execution state.
+The sidebar observes titles, live resource activities, and resource notices without loading conversations. Activity describes work still in progress; a notice describes an occurrence worth bringing to the user. Both are independent of timeline occupancy and the Agent's domain execution state.
 
-Running state remains visible, with optional progress. Completed, failed, and awaiting notifications are consumed when the session is viewed. Clicking a status popup inspects it without navigating or consuming it.
+The backend retains independent activity scopes only while their work remains live. The frontend subscribes to activity invalidations before reading the current snapshot, on initial connection and reconnection. Invalidation events carry no activity state, and the event bus does not replay a disconnected interval. Restart reconstructs neither live scopes nor notices from history or persistence.
+
+Running activity, with optional progress, and notices display independently. Starting work does not clear a notice, and raising a notice does not replace running activity. The frontend retains each distinct attention, success, and error kind per resource; a summary's severity does not discard the other kinds. Viewing a session consumes its notices without removing activity or resolving business interactions. Opening the status popup inspects its details without navigating or consuming notices. Notices arriving while their session is viewed are consumed there rather than retained as unread reminders.
+
+Agent activity covers the full task, including tool waits, retry waits, and automatic compaction, rather than only model streaming. Manual compaction has its own task scope and reports its own result, not the outcome of an earlier conversational turn. Cancellation retains activity until work settles and does not manufacture an attention notice. Completion and failure notices are explicit domain decisions, not automatic consequences of ending an activity.
 
 Session row navigation, status access, and the action menu retain separate hit targets within one row. Renaming preserves the local edit draft while background titles change. Archiving confirms the effect on running resources.
 
@@ -170,13 +174,13 @@ Transient inline feedback survives view remount within its resource lifetime but
 
 Structured questions appear in the tool’s execution body. Optional enlargement shares the same draft; closing it neither answers nor cancels. Required answers validate on submission, and optional skips remain explicit.
 
-Question drafts are scoped by session, Agent, and waiting instance. Repeated submissions remain disabled while pending. Runtime answers or cancellation conclude the tool; view lifetime alone does not.
+Question drafts are scoped by session, Agent, and waiting instance. Repeated submissions remain disabled while pending. Runtime answers or cancellation conclude the tool; view lifetime alone does not. Pending questions remain owned by the question service and their tool views, not a sidebar pending list. Consuming an attention notice by viewing the session does not answer or cancel a question.
 
 ## Tool views and Agent extensions
 
 Input, execution, and result use one call shell. Resource-call rendering delegates to the selected implementation rather than nesting another shell. Partial arguments support preview only.
 
-Streaming disclosure begins when previewable content exists and follows the saved preference and manual interaction. Attention opens an execution body once immediately; it remains user-collapsible afterward. Result details appear only after termination.
+Streaming disclosure begins when previewable content exists and follows the saved preference and manual interaction. Attention opens an execution body once immediately; it remains user-collapsible afterward. A tool that declares `requiresNotice` raises attention when its validated invocation starts, independently of running activity; the notice does not suspend the call or track whether a question remains unanswered. Result details appear only after termination.
 
 Built-in views retain target and input identity across phases. Display truncation is separate from saved result truncation. Current limits and component arrangements belong to the renderer source.
 

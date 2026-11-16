@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DataContract, Json, ModelCompletion, ModelEvent, ModelRunResult } from "@asterism-app/sdk/contracts";
-import { ResourceStatusChanged } from "@asterism-app/sdk/contracts";
+import { ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
 import type { ExecutionServices, ModelServices, ObjectExecutor, ObjectWriter, PluginTasks } from "@asterism-app/sdk/runtime";
 import { AgentTurnEnded, ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { sessionSnapshot } from "../../../../src/plugins/records.ts";
@@ -102,7 +102,13 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
     model: "p/m", provider: "p", name: "Model", contextWindow: options.window, cost: null, generation: { maxOutputTokens: null },
     capabilities: { reasoning: false, tools: true, thinkingLevels: [] },
   }] };
+  let activities = 0;
   const execution: ExecutionServices = {
+    async withActivity(_ref, work, options) {
+      activities++;
+      try { return await work({ signal: options?.signal ?? new AbortController().signal, progress() {} }); }
+      finally { activities--; }
+    },
     run: vi.fn<ExecutionServices["run"]>(async () => completedRun),
     withProgress: (_ref, work) => work({ event() {} }),
   };
@@ -114,9 +120,9 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
   const controller = createAgentController({ selection, tasks: driver.tasks, models, execution, feedback, userAgent: "test",
     prepareRequest: () => () => ({ blocks: [], skills: [], system: { blocks: [] } }),
   });
-  return { controller, object, path, snapshot, driver, feedback, stream, execution, publish,
+  return { activities: () => activities, controller, object, path, snapshot, driver, feedback, stream, execution, publish,
     turn: () => projectAgentTurnState(snapshot(), "a", feedback.get(object).interruptions),
-    statuses: () => publish.mock.calls.filter(([contract]) => contract === ResourceStatusChanged).map(([, value]) => value.status),
+    notices: () => publish.mock.calls.filter(([contract]) => contract === ResourceNoticeRaised).map(([, value]) => value.kind),
     turnEnds: () => publish.mock.calls.filter(([contract]) => contract === AgentTurnEnded),
   };
 }
@@ -138,7 +144,7 @@ describe("Agent controller manual compaction", () => {
     expect(f.execution.run).not.toHaveBeenCalled();
     expect(f.turnEnds()).toEqual([]);
     expect(f.turn()).toBe(completed ? "completed" : "incomplete");
-    expect(f.statuses()).toEqual(["running", completed ? "completed" : "awaiting"]);
+    expect(f.notices()).toEqual(["success"]);
     expect(f.feedback.get(f.object).compressions).toEqual([]);
     expect(f.controller.running(f.object)).toBe(false);
   });
@@ -187,7 +193,7 @@ describe("Agent controller manual compaction", () => {
     expect(f.feedback.get(f.object).compressions).toEqual([expect.objectContaining({ status: "failed", afterNodeId: "3" })]);
     expect(projectForAgent(f.snapshot(), "a")).toEqual(before);
     expect(f.turn()).toBe(completed ? "completed" : "incomplete");
-    expect(f.statuses().at(-1)).toBe(completed ? "completed" : "awaiting");
+    expect(f.notices()).toEqual(["error"]);
     expect(f.controller.running(f.object)).toBe(false);
   });
 
@@ -198,6 +204,7 @@ describe("Agent controller manual compaction", () => {
     const task = f.driver.enter();
     await hold.entered.promise;
     expect(f.feedback.get(f.object).compressions).toEqual([expect.objectContaining({ status: "running", afterNodeId: "3" })]);
+    expect(f.activities()).toBe(1);
     const settled = f.controller.settled(f.object, new AbortController().signal);
     f.controller.cancel(f.object);
     hold.release.resolve();
@@ -209,7 +216,8 @@ describe("Agent controller manual compaction", () => {
     expect(f.turn()).toBe(completed ? "completed" : "incomplete");
     expect(f.feedback.get(f.object).interruptions).toEqual([]);
     expect(f.feedback.get(f.object).compressions).toEqual([expect.objectContaining({ status: "cancelled", afterNodeId: "3" })]);
-    expect(f.statuses()).toEqual(["running", completed ? "completed" : "awaiting"]);
+    expect(f.notices()).toEqual([]);
+    expect(f.activities()).toBe(0);
     expect(f.controller.running(f.object)).toBe(false);
     expect(f.execution.run).not.toHaveBeenCalled();
     expect(f.turnEnds()).toEqual([]);
@@ -230,7 +238,7 @@ describe("Agent controller manual compaction", () => {
     expect(f.feedback.get(f.object).compressions).toEqual([expect.objectContaining({ status: "cancelled", afterNodeId: "3" })]);
     expect(f.stream).not.toHaveBeenCalled();
     expect(f.turnEnds()).toEqual([]);
-    expect(f.statuses()).toEqual([completed ? "completed" : "awaiting"]);
+    expect(f.notices()).toEqual([]);
     expect(f.controller.compact(f.object)).toBe(true);
     await f.driver.enter();
     expect(f.path.at(-1)?.contract).toBe(ContextSummary.id);
