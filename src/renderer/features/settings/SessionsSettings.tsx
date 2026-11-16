@@ -17,6 +17,7 @@ import { sessionLifecycleDays, sessionLifecycleDaysSchema, type SessionLifecycle
 import { useConfigurationAction, useSettingsConfiguration } from "../configuration/state";
 import { ConfigurationActionError, ReadStatus } from "../configuration/forms";
 import { Section, Row } from "./layout";
+import { existingFolder } from "../folders/context";
 
 /** Application data needed for session management: the application layer owns the session catalog and rereads it after restoration. */
 export interface SessionArchive {
@@ -97,19 +98,22 @@ function RecycleBin() {
     <PanelList entries={entries}
       state={!snapshot ? <PanelListState icon={<Spinner />} label={i18n.text(commonMessages.loading)} />
         : !sessions.length ? <PanelListState icon={<Trash2 />} label={i18n.text(settingsMessages.recycleBinEmpty)} /> : null}
-      renderItem={session => <Item size="sm">
-        <ItemContent className="min-w-0">
-          <TooltipHint content={session.title}><ItemTitle className="block truncate">{session.title}</ItemTitle></TooltipHint>
-          <ItemDescription className="truncate">{i18n.formatMessage(settingsMessages.archivedAt,
-            { date: i18n.formatDate(Date.parse(session.archived_at), { dateStyle: "medium", timeStyle: "short" }) })}</ItemDescription>
-        </ItemContent>
-        <ItemActions>
-          <Button size="sm" variant="ghost" disabled={pending !== null} aria-busy={pending === session.id}
-            aria-label={i18n.formatMessage(settingsMessages.restoreConversationLabel, { title: session.title })}
-            onClick={() => { setPending(session.id); void restore(session.id).finally(() => setPending(null)); }}>
-            {pending === session.id ? <Spinner /> : <ArchiveRestore />}{i18n.text(settingsMessages.restoreConversation)}
-          </Button>
-        </ItemActions>
-      </Item>} />
+      renderItem={session => {
+        const folder = existingFolder(snapshot?.folders ?? [], session.folder_id);
+        return <Item size="sm">
+          <ItemContent className="min-w-0">
+            <TooltipHint content={session.title}><ItemTitle className="block truncate">{session.title}</ItemTitle></TooltipHint>
+            <ItemDescription className="truncate">{folder ? <>{folder.name}{" · "}</> : null}{i18n.formatMessage(settingsMessages.archivedAt,
+              { date: i18n.formatDate(Date.parse(session.archived_at), { dateStyle: "medium", timeStyle: "short" }) })}</ItemDescription>
+          </ItemContent>
+          <ItemActions>
+            <Button size="sm" variant="ghost" disabled={pending !== null} aria-busy={pending === session.id}
+              aria-label={i18n.formatMessage(settingsMessages.restoreConversationLabel, { title: session.title })}
+              onClick={() => { setPending(session.id); void restore(session.id).finally(() => setPending(null)); }}>
+              {pending === session.id ? <Spinner /> : <ArchiveRestore />}{i18n.text(settingsMessages.restoreConversation)}
+            </Button>
+          </ItemActions>
+        </Item>;
+      }} />
   </IslandPanel>;
 }

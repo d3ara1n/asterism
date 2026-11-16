@@ -107,7 +107,7 @@ export class ApplicationService {
     const workspace = this.db.prepare("SELECT * FROM workspace LIMIT 1").get();
     const membership = this.folders.sessionFolders();
     const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, completed: session.completed, sleeping: session.sleeping, keepAwake: session.keepAwake, folder_id: membership.get(session.id) ?? null }));
-    const archivedSessions = this.sessions.tree.archived().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, archived_at: session.archivedAt }));
+    const archivedSessions = this.sessions.tree.archived().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, archived_at: session.archivedAt, folder_id: session.folderId }));
     const current = this.list.read();
     const entries = [
       ...current.map((entry, index) => ({ entry, index })),

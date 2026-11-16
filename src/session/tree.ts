@@ -116,10 +116,10 @@ export class SessionTree {
       throw new SessionError("not_found", "Session not found.");
   }
   /** Trash catalog: lists sessions themselves without reading their contents. */
-  archived(): { id: string; title: string; createdAt: string; archivedAt: string }[] {
-    return (this.db.prepare("SELECT id, title, created_at, archived_at FROM sessions WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, rowid DESC").all() as
-      { id: string; title: string; created_at: string; archived_at: string }[])
-      .map(r => ({ id: r.id, title: r.title, createdAt: r.created_at, archivedAt: r.archived_at }));
+  archived(): { id: string; title: string; createdAt: string; archivedAt: string; folderId: string | null }[] {
+    return (this.db.prepare("SELECT id, title, created_at, archived_at, folder_id FROM sessions WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, rowid DESC").all() as
+      { id: string; title: string; created_at: string; archived_at: string; folder_id: string | null }[])
+      .map(r => ({ id: r.id, title: r.title, createdAt: r.created_at, archivedAt: r.archived_at, folderId: r.folder_id }));
   }
   /** Mark archived; subsequent reads, writes, and object identity resolution treat the session as absent. */
   archive(sessionId: string, at = new Date().toISOString()): void {

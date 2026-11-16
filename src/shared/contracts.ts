@@ -45,7 +45,7 @@ export const snapshotSchema = z.strictObject({
   sessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), folder_id: folderIdSchema, completed: z.boolean(), sleeping: z.boolean(), keepAwake: z.boolean() })),
   templates: z.array(templateSummarySchema),
   /** Trash catalog containing sessions themselves only, used for settings counts and restoration. */
-  archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string() })),
+  archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string(), folder_id: folderIdSchema })),
   /** Current list with startup outcomes and available bundled packages (null index); renderer paths are under asterism-plugin://. */
   plugins: z.array(z.strictObject({ index: z.number().int().nonnegative().nullable(), bundled: z.boolean().default(false), id: z.string().nullable(), source: z.string(),
     status: z.enum(["loaded", "disabled", "invalid", "failed", "pending", "available"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
