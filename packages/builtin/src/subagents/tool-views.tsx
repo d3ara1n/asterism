@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { inputText, toolTextTail } from "../shared/tool-preview";
 import { ActivityTail, InstructionList } from "./ActivityTail";
@@ -37,7 +37,7 @@ function DelegateBody({ args, phase }: DelegateProps) {
     const task = inputText(args, "task");
     return task ? <StreamingPreview><p className="type-body whitespace-pre-wrap break-words">{toolTextTail(task)}</p></StreamingPreview> : null;
   }
-  return <p className="type-body whitespace-pre-wrap break-words">{args.task}</p>;
+  return <ToolScrollArea><p className="type-body whitespace-pre-wrap break-words">{args.task}</p></ToolScrollArea>;
 }
 export const delegateViews = {
   label: messages.delegate,
@@ -68,8 +68,8 @@ function CheckBody({ result }: CheckProps) {
       {current.subject && <> · <span className="font-mono">{current.subject}</span></>}
     </p>}
     {status.phase === "finished" && status.message && <p className="type-caption">{status.message}</p>}
-    {finished && (task.output.result ? <Markdown>{task.output.result}</Markdown> : <p className="type-caption">{i18n.text(messages.noReport)}</p>)}
-    <InstructionList activity={[]} undelivered={task.output.undelivered} />
+    {finished && (task.output.result ? <ToolScrollArea><Markdown>{task.output.result}</Markdown></ToolScrollArea> : <p className="type-caption">{i18n.text(messages.noReport)}</p>)}
+    {task.output.undelivered.length > 0 && <ToolScrollArea><InstructionList activity={[]} undelivered={task.output.undelivered} /></ToolScrollArea>}
     <Usage usage={task.output.usage} live={false} />
   </div>;
 }
@@ -93,13 +93,14 @@ function WaitHeader({ phase, target, result }: WaitProps) {
 function WaitBody({ phase, result }: WaitProps) {
   const tasks = result?.data?.tasks;
   if (!tasks?.length) return null;
-  return <div className="flex min-w-0 flex-col gap-4">{tasks.map(task => <section key={task.id} className="flex min-w-0 flex-col gap-2">
+  const content = <div className="flex min-w-0 flex-col gap-4">{tasks.map(task => <section key={task.id} className="flex min-w-0 flex-col gap-2">
     <TaskLine task={task} />
     {phase === "executing" && task.status.phase === "running" && <>
       <ActivityTail entries={task.activity} total={task.steps} />
       <Usage usage={task.usage} live />
     </>}
   </section>)}</div>;
+  return phase === "settled" ? <ToolScrollArea>{content}</ToolScrollArea> : content;
 }
 export const waitViews = {
   label: messages.wait,
@@ -119,7 +120,7 @@ function SteerBody({ phase, args }: SteerProps) {
     const message = inputText(args, "message");
     return message ? <StreamingPreview><p className="type-body whitespace-pre-wrap break-words">{toolTextTail(message)}</p></StreamingPreview> : null;
   }
-  return <p className="type-body whitespace-pre-wrap break-words">{args.message}</p>;
+  return <ToolScrollArea><p className="type-body whitespace-pre-wrap break-words">{args.message}</p></ToolScrollArea>;
 }
 export const steerViews = {
   label: messages.steer,
@@ -135,7 +136,7 @@ function CancelHeader({ phase, target, result }: CancelProps) {
     meta={status && <TaskStateText status={status} />} />;
 }
 function CancelBody({ phase, args }: CancelProps) {
-  return phase === "input" || !args.reason ? null : <p className="type-body whitespace-pre-wrap break-words">{args.reason}</p>;
+  return phase === "input" || !args.reason ? null : <ToolScrollArea><p className="type-body whitespace-pre-wrap break-words">{args.reason}</p></ToolScrollArea>;
 }
 export const cancelViews = {
   label: messages.cancel,
@@ -158,11 +159,11 @@ function ListBody({ result }: ListProps) {
   const i18n = useI18n(), tasks = result?.data?.tasks;
   if (!tasks) return null;
   if (!tasks.length) return <p className="type-caption">{i18n.text(messages.noTasks)}</p>;
-  return <ul className="flex max-h-80 min-w-0 flex-col gap-1 overflow-y-auto">
+  return <ToolScrollArea className="max-h-80"><ul className="flex min-w-0 flex-col gap-1">
     {tasks.toReversed().map(task => <li key={task.id} className="min-w-0">
       <TaskLine task={task} showStatus={false} leading={<TaskStateIcon status={task.status} />} />
     </li>)}
-  </ul>;
+  </ul></ToolScrollArea>;
 }
 export const listViews = {
   label: messages.list,

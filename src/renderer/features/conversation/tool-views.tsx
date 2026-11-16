@@ -10,7 +10,7 @@ import { toolsMessages } from "../../messages/tools";
 import { useModuleViews } from "../../modules/views";
 import type { ViewRegistry } from "../../modules/registry";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
@@ -32,7 +32,7 @@ function ResourceListBody({ result }: ListProps) {
   if (!result?.data) return null;
   if (!result.data.resources.length) return <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoResources)}</p>;
   const restricted = i18n.formatMessage(toolsMessages.toolResourceRestricted);
-  return <TooltipProvider delayDuration={300}><ul className="flex flex-col">
+  return <TooltipProvider delayDuration={300}><ToolScrollArea className="max-h-80"><ul className="flex flex-col">
     {result.data.resources.map(resource => {
       const description = registry.resource(resource.type);
       return <li key={resource.resource_id} className="flex h-7 min-w-0 items-center gap-2 text-sm [&>svg]:size-4 [&>svg]:shrink-0">
@@ -52,7 +52,7 @@ function ResourceListBody({ result }: ListProps) {
         <span className="ml-auto shrink-0 type-caption text-muted-foreground">{i18n.text(description.label)}</span>
       </li>;
     })}
-  </ul></TooltipProvider>;
+  </ul></ToolScrollArea></TooltipProvider>;
 }
 const listView = { headerRenderer: ResourceListHeader, bodyRenderer: ResourceListBody };
 const list = toolRenderer(ResourceListResult, {
@@ -131,7 +131,7 @@ function ToolChips({ tools }: { tools: readonly InspectedTool[] }) {
   const i18n = useI18n();
   const registry = useModuleViews();
   const interaction = i18n.formatMessage(toolsMessages.toolRequiresInteraction);
-  return <TooltipProvider delayDuration={300}><ul className="flex flex-wrap gap-1.5">
+  return <TooltipProvider delayDuration={300}><ToolScrollArea className="max-h-80"><ul className="flex flex-wrap gap-1.5">
     {tools.map(tool => {
       const label = registry.toolLabel(tool.implementation.id);
       return <li key={tool.name} className="min-w-0"><Tooltip>
@@ -149,7 +149,7 @@ function ToolChips({ tools }: { tools: readonly InspectedTool[] }) {
         </TooltipContent>
       </Tooltip></li>;
     })}
-  </ul></TooltipProvider>;
+  </ul></ToolScrollArea></TooltipProvider>;
 }
 
 function ResourceInspectBody({ invocation, args, result }: InspectProps) {
@@ -161,7 +161,7 @@ function ResourceInspectBody({ invocation, args, result }: InspectProps) {
   return <div className="space-y-4 select-text">
     {fields.length > 0 && <section className="space-y-2">
       <p className="type-label">{i18n.formatMessage(toolsMessages.toolResourceState)}</p>
-      <StateFields fields={fields} path="" />
+      <ToolScrollArea><StateFields fields={fields} path="" /></ToolScrollArea>
     </section>}
     {notice && <p className="type-caption">{notice}</p>}
     {showTools && <section className="space-y-2">

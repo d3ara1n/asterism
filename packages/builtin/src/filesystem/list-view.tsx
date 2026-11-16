@@ -2,7 +2,7 @@ import { useI18n, useRendererObject, useRendererResourceNavigation, useRendererV
 import type { z } from "zod";
 import { File, FileQuestion, Folder } from "lucide-react";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { Button } from "@asterism-app/ui/ui/button";
 import { cn } from "@asterism-app/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
@@ -54,11 +54,11 @@ export function DirectoryListing({ data, resource }: { data: z.infer<typeof Dire
   const entries = sortEntries(data.entries);
   const shown = expanded ? entries : entries.slice(0, TOOL_BODY_LINE_LIMIT);
   return <div className="flex flex-col gap-1.5">
-    <ul className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-1">
+    <ToolScrollArea className="max-h-80"><ul className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,10rem),1fr))] gap-x-1">
       {shown.map(entry => <li key={entry.name} className="min-w-0">
         <EntryRow entry={entry} path={resource ? entryPath(data.path, entry.name) : entry.name} resource={resource} />
       </li>)}
-    </ul>
+    </ul></ToolScrollArea>
     {shown.length < entries.length && <Button variant="ghost" size="xs" className="self-start text-muted-foreground" onClick={() => setExpanded(true)}>
       {i18n.formatMessage(filesystemMessages.toolDirectoryShowMore, { count: entries.length - shown.length })}
     </Button>}

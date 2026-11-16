@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { z } from "zod";
 import { ListPlus, ScanSearch, CirclePlus, CircleMinus, Users, Bot, MessageSquareText, PenLine, Link } from "lucide-react";
 import { toolRenderer, useI18n, useRendererResources, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
-import { useToolResourceTypeSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceTypeSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ItemGroup, Item, ItemContent, ItemTitle, ItemMedia } from "@asterism-app/ui/ui/item";
 import { StatusText } from "@asterism-app/ui/ui/status";
@@ -52,7 +52,7 @@ function AgentListBody({ result }: AgentListProps) {
   if (!entries) return null;
   if (!entries.length) return <p className="type-caption">{i18n.text(messages.noAgents)}</p>;
   return <div className="@container/agents space-y-3">
-    <ItemGroup className="grid grid-cols-1 items-stretch gap-3 @min-[36rem]/agents:grid-cols-2">
+    <ToolScrollArea className="max-h-80"><ItemGroup className="grid grid-cols-1 items-stretch gap-3 @min-[36rem]/agents:grid-cols-2">
       {entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry => <Item key={entry.id} role="listitem"
         variant="outline" size="sm" className="min-w-0 flex-col items-stretch gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -80,7 +80,7 @@ function AgentListBody({ result }: AgentListProps) {
           </ul>
         </div>}
       </Item>)}
-    </ItemGroup>
+    </ItemGroup></ToolScrollArea>
     {entries.length > TOOL_BODY_LINE_LIMIT && <p className="type-caption text-muted-foreground">
       {i18n.formatMessage(messages.omitted, { count: entries.length - TOOL_BODY_LINE_LIMIT })}
     </p>}
@@ -112,9 +112,9 @@ function ListBody({ result }: ListProps) {
   if (!entries) return null;
   if (!entries.length) return <p className="type-caption">{i18n.text(messages.empty)}</p>;
   return <div className="@container/creations space-y-2">
-    <ItemGroup className="grid grid-cols-1 items-stretch gap-2 @min-[36rem]/creations:grid-cols-2">
+    <ToolScrollArea className="max-h-80"><ItemGroup className="grid grid-cols-1 items-stretch gap-2 @min-[36rem]/creations:grid-cols-2">
       {entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry => <CreationCard key={entry.id} entry={entry} />)}
-    </ItemGroup>
+    </ItemGroup></ToolScrollArea>
     {entries.length > TOOL_BODY_LINE_LIMIT && <p className="type-caption text-muted-foreground">
       {i18n.formatMessage(messages.omitted, { count: entries.length - TOOL_BODY_LINE_LIMIT })}
     </p>}
@@ -131,7 +131,7 @@ function InspectBody({ result }: InspectProps) {
   const i18n = useI18n();
   const entry = result?.data;
   if (!entry) return null;
-  return <div className="space-y-3">
+  return <ToolScrollArea contentClassName="flex flex-col gap-3">
     <p className="type-caption whitespace-pre-wrap break-words">{entry.description}</p>
     {!!entry.guidelines.length && <section className="space-y-2">
       <p className="type-label">{i18n.text(messages.guidelines)}</p>
@@ -139,7 +139,7 @@ function InspectBody({ result }: InspectProps) {
         {entry.guidelines.map((line, index) => <li key={index}>{line}</li>)}
       </ul>
     </section>}
-  </div>;
+  </ToolScrollArea>;
 }
 
 type CreateProps = ToolRenderProps<z.infer<typeof ResourceCreateResult.schema>>;

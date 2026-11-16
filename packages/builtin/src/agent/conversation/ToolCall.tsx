@@ -58,12 +58,12 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
       {diagnostic && <p className={cn("type-caption whitespace-pre-wrap", "error" in result && "text-destructive")}>{diagnostic}</p>}
       {view?.details !== false && (state.phase === "settled" || state.phase === "incomplete") && <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
         { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails),
-          render: () => <JsonView value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /> },
+          render: () => <JsonView scrollable={false} value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /> },
         ...(hasResultDetails ? [{ value: "result", label: i18n.formatMessage(toolsMessages.toolResultDetails),
-          render: () => <JsonView value={JSON.stringify(outcome.data, null, 2)} /> }] : []),
+          render: () => <JsonView scrollable={false} value={JSON.stringify(outcome.data, null, 2)} /> }] : []),
         ...(outcome && outcome.model.length > 0 ? [{ value: "model", label: i18n.formatMessage(toolsMessages.toolModelDetails),
           render: () => <div className="flex flex-col gap-2">{outcome.model.map((part, index) =>
-            <JsonView key={index} value={part.kind === "text" ? part.text : part} />)}</div> }] : []),
+            <JsonView key={index} scrollable={false} value={part.kind === "text" ? part.text : part} />)}</div> }] : []),
       ]} />}
     </div>
   </Disclosure>;

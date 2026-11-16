@@ -10,7 +10,7 @@ import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared
 import { displayText } from "./shared/text-row";
 import { CodeDiff, CodeRows } from "@asterism-app/ui/code-view";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 
 function TextReadHeader({ target, invocation, result }: ToolRenderProps<TextRead>) {
@@ -108,7 +108,7 @@ function TextReadBody({ result, target }: ToolRenderProps<TextRead>) {
   const data = result?.data;
   const rows = data?.rows.slice(0, TOOL_BODY_LINE_LIMIT).map(row => ({ line: row.line, content: displayText(row) }));
   return data ? <div className="flex flex-col gap-2">
-    <CodeRows rows={rows ?? []} filename={inputText(target, "path")} />
+    <ToolScrollArea><CodeRows rows={rows ?? []} filename={inputText(target, "path")} /></ToolScrollArea>
     <OmittedLines count={data.rows.length - (rows?.length ?? 0)} />
     {data.noFinalNewline && <p className="type-caption">{i18n.formatMessage(textMessages.toolTextNoFinalNewline)}</p>}
     {data.nextOffset !== null && <p className="type-caption">{i18n.formatMessage(textMessages.toolTextMore, { line: data.nextOffset })}</p>}
@@ -130,7 +130,7 @@ function OmittedLines({ count }: { count: number }) {
 function TextBodyPreview({ text, filename }: { text: string; filename?: string }) {
   const preview = useMemo(() => textBodyPreview(text), [text]);
   return <div className="space-y-2">
-    <CodeRows rows={preview.rows} filename={filename} />
+    <ToolScrollArea><CodeRows rows={preview.rows} filename={filename} /></ToolScrollArea>
     <OmittedLines count={preview.omitted} />
   </div>;
 }
@@ -138,7 +138,7 @@ function DiffBodyPreview({ diff }: { diff: string }) {
   const preview = useMemo(() => diffBodyPreview(diff), [diff]);
   if (!preview) return <TextBodyPreview text={diff} />;
   return <div className="space-y-2">
-    <CodeDiff diff={preview.fileDiff} />
+    <ToolScrollArea><CodeDiff diff={preview.fileDiff} /></ToolScrollArea>
     <OmittedLines count={preview.omitted} />
   </div>;
 }

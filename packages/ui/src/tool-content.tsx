@@ -4,9 +4,12 @@ import { useId, type ReactNode } from "react";
 import { toolsMessages } from "./messages/tools";
 import { JsonView } from "./json-view";
 import { ToolHeader } from "./tool-header";
+import { ToolScrollArea } from "./tool-scroll-area";
 import { Button } from "./ui/button";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "./ui/toggle-group";
+
+export { ToolScrollArea } from "./tool-scroll-area";
 
 /** When stateKey is unique within the containing item, expansion state survives item remounts; when omitted, it is only component state. */
 export function ToolDetails({ label, stateKey = null, children }: { label: string; stateKey?: string | null; children: ReactNode }) {
@@ -16,6 +19,7 @@ export function ToolDetails({ label, stateKey = null, children }: { label: strin
     <CollapsibleContent className="space-y-2 pt-2">{children}</CollapsibleContent>
   </Collapsible>;
 }
+/** The selected panel owns scrolling; its blocks render without independent vertical scroll areas. */
 export function ToolDetailsSwitcher({ items, stateKey = null }: {
   items: readonly { value: string; label: string; render(): ReactNode }[]; stateKey?: string | null;
 }) {
@@ -28,7 +32,9 @@ export function ToolDetailsSwitcher({ items, stateKey = null }: {
       {items.map(item => <ToggleGroupItem key={item.value} value={item.value} id={`${panelId}-${item.value}`}
         aria-controls={panelId} aria-expanded={selected === item}>{item.label}</ToggleGroupItem>)}
     </ToggleGroup>
-    {selected && <div id={panelId} role="region" aria-labelledby={`${panelId}-${selected.value}`}>{selected.render()}</div>}
+    {selected && <ToolScrollArea key={selected.value} className="max-h-80" viewportProps={{ id: panelId, role: "region", "aria-labelledby": `${panelId}-${selected.value}` }}>
+      {selected.render()}
+    </ToolScrollArea>}
   </div>;
 }
 function resourceSubject(icon: ReactNode, title: string): ReactNode {

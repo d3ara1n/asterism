@@ -8,6 +8,7 @@ import { RadioGroup, RadioGroupItem } from "@asterism-app/ui/ui/radio-group";
 import { Textarea } from "@asterism-app/ui/ui/textarea";
 import { InputGroup, InputGroupTextarea } from "@asterism-app/ui/ui/input-group";
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet, FieldTitle } from "@asterism-app/ui/ui/field";
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { Markdown } from "@asterism-app/ui/markdown";
 import { questionMessages as messages } from "../messages/questions";
@@ -25,9 +26,12 @@ function OptionDetail({ label, detail }: { label: string; detail: string }) {
       </Button>
     </PopoverTrigger>
     <PopoverContent align="start" collisionPadding={8} aria-label={label}
-      className="w-[min(28rem,calc(100vw-2rem))] max-h-[min(24rem,60dvh)] space-y-2 overflow-y-auto">
-      <p className="type-label break-words">{label}</p>
-      <Markdown>{detail}</Markdown>
+      className="w-[min(28rem,calc(100vw-2rem))] overflow-hidden p-0">
+      <ScrollArea className="max-h-[min(24rem,60dvh,calc(var(--radix-popover-content-available-height)-2px))]"
+        viewportClassName="h-auto" contentClassName="flex flex-col gap-2 p-4">
+        <p className="type-label break-words">{label}</p>
+        <Markdown>{detail}</Markdown>
+      </ScrollArea>
     </PopoverContent>
   </Popover>;
 }

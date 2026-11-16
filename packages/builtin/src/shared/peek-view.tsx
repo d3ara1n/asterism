@@ -1,7 +1,7 @@
 import { ScanSearch } from "lucide-react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import type { PeekResult } from "@asterism-app/builtin-api/contracts";
 import { peekMessages as messages } from "../messages/peek";
@@ -25,7 +25,7 @@ function Body({ phase, result }: ToolRenderProps<PeekResult>) {
   const streaming = phase === "executing";
   return streaming
     ? <StreamingPreview><Markdown streaming>{report}</Markdown></StreamingPreview>
-    : <Markdown>{report}</Markdown>;
+    : <ToolScrollArea><Markdown>{report}</Markdown></ToolScrollArea>;
 }
 
 export const peekViews = {

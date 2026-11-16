@@ -7,6 +7,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";
 import { ActionMenu, ActionMenuContent, ActionMenuGroup, ActionMenuItem, ActionMenuTarget, ActionMenuTrigger } from "@asterism-app/ui/ui/action-menu";
 import { JsonView } from "@asterism-app/ui/json-view";
+import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { conversationMessages as messages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";
 import { MessageTimestamp } from "./MessageTimestamp";
@@ -60,10 +61,10 @@ export function MessageFooter({ node, text, children }: {
       onCloseAutoFocus={event => { event.preventDefault(); more.current?.focus(); }}
       className="nodrag nopan nokey flex max-h-[calc(100dvh-2rem)] min-w-0 flex-col overflow-hidden sm:max-w-3xl">
       <DialogHeader className="shrink-0 pr-6"><DialogTitle>{i18n.text(messages.inputDetails)}</DialogTitle></DialogHeader>
-      <div tabIndex={0} role="region" aria-label={i18n.text(messages.inputDetails)}
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pr-2 select-text outline-offset-[-2px]">
-        {detailsOpen && <JsonView className="max-h-none overflow-visible" value={details()} />}
-      </div>
+      <ScrollArea className="-m-1 min-h-0 min-w-0 flex-1" contentClassName="p-1 pr-3 select-text" viewportClassName="focus-visible:outline-offset-[-2px]"
+        viewportProps={{ tabIndex: 0, role: "region", "aria-label": i18n.text(messages.inputDetails) }}>
+        {detailsOpen && <JsonView scrollable={false} value={details()} />}
+      </ScrollArea>
       <DialogFooter className="shrink-0">
         <Button variant="outline" disabled={copying} onClick={() => { void copy(JSON.stringify(details(), null, 2)); }}><Copy />{i18n.text(messages.copyInputDetails)}</Button>
       </DialogFooter>

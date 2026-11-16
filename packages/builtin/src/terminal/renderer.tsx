@@ -7,7 +7,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { Field, FieldLabel } from "@asterism-app/ui/ui/field";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@asterism-app/ui/ui/select";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { CreationForm } from "../shared/creation-form";
 import { commonMessages } from "../messages/common";
@@ -55,7 +55,7 @@ function TerminalCreation({ initialInput, busy, resolve, cancel }: CreationInput
 }
 function ReadBody({ result }: ToolRenderProps<z.infer<typeof TerminalRead.schema>>) {
   const data = result?.data;
-  return data ? <pre className="type-code max-h-96 overflow-auto whitespace-pre-wrap wrap-anywhere">{data.source === "raw" ? JSON.stringify(data.text) : data.text}</pre> : null;
+  return data ? <ToolScrollArea><pre className="type-code m-0 whitespace-pre-wrap wrap-anywhere">{data.source === "raw" ? JSON.stringify(data.text) : data.text}</pre></ToolScrollArea> : null;
 }
 function ImageBody({ result }: ToolRenderProps<z.infer<typeof TerminalSee.schema>>) {
   const i18n = useI18n();
@@ -119,7 +119,7 @@ function InputBody({ args, result, phase }: ToolRenderProps<z.infer<typeof Termi
   </StreamingPreview> : null;
   if (display === undefined && !data) return null;
   return <div className="flex flex-col gap-3">
-    {display !== undefined && <pre className="type-code m-0 max-h-48 overflow-auto whitespace-pre-wrap break-all">{display}</pre>}
+    {display !== undefined && <ToolScrollArea className="max-h-48"><pre className="type-code m-0 whitespace-pre-wrap break-all">{display}</pre></ToolScrollArea>}
     {data && <StatusRow data={data} />}
   </div>;
 }

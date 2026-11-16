@@ -4,6 +4,7 @@ import { FileSearch, ListTree, Plug, Search, Zap } from "lucide-react";
 import { toolRenderer, useI18n, useRendererObject, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { ToolScrollArea } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { McpList, McpSearch, McpInspect, McpConnect, McpCall, type McpCallData } from "./contract";
@@ -108,7 +109,7 @@ function ListBody({ result }: ToolRenderProps) {
   if (!("server" in data)) return data.items.length
     ? <div className="flex flex-col gap-1.5">
       <PageNote shown={data.items.length} total={data.total} />
-      <ServerItems servers={data.items.map(server => toSummary(server))} />
+      <ToolScrollArea><ServerItems servers={data.items.map(server => toSummary(server))} /></ToolScrollArea>
     </div>
     : <Empty text={messages.empty} />;
   return <div className="flex flex-col gap-2">
@@ -116,7 +117,7 @@ function ListBody({ result }: ToolRenderProps) {
     {!data.server.indexed ? <Empty text={messages.unindexedHint} />
       : data.items.length ? <>
         <PageNote shown={data.items.length} total={data.total} />
-        <ToolList tools={data.items.map(tool => toTool(tool, false))} />
+        <ToolScrollArea><ToolList tools={data.items.map(tool => toTool(tool, false))} /></ToolScrollArea>
       </> : <Empty text={messages.noTools} />}
   </div>;
 }
@@ -128,7 +129,7 @@ function SearchBody({ result }: ToolRenderProps) {
   return <div className="flex flex-col gap-2">
     {items.length ? <>
       <PageNote shown={items.length} total={total} />
-      <ToolList tools={items.map(tool => toTool(tool, true))} />
+      <ToolScrollArea><ToolList tools={items.map(tool => toTool(tool, true))} /></ToolScrollArea>
     </> : <Empty text={messages.noMatches} />}
     {data.unindexed_servers.length > 0 && <p className="type-caption text-muted-foreground">
       {i18n.formatMessage(messages.unindexedServers, { names: data.unindexed_servers.map(server => server.name).join(", ") })}
@@ -142,10 +143,10 @@ function InspectBody({ result }: ToolRenderProps) {
   const params = Object.entries(data.inputSchema?.properties ?? {});
   const required = data.inputSchema?.required ?? [];
   return <div className="flex flex-col gap-3 select-text">
-    {data.description && <p className="type-caption whitespace-pre-wrap break-words">{data.description}</p>}
+    {data.description && <ToolScrollArea><p className="type-caption whitespace-pre-wrap break-words">{data.description}</p></ToolScrollArea>}
     <div className="flex flex-col gap-1.5">
       <p className="type-label">{i18n.text(messages.parameters)}</p>
-      {params.length ? <ul className="flex flex-col gap-2">
+      {params.length ? <ToolScrollArea><ul className="flex flex-col gap-2">
         {params.map(([name, param]) => {
           const type = parameterType(param.type);
           return <li key={name} className="flex min-w-0 flex-col gap-0.5">
@@ -157,7 +158,7 @@ function InspectBody({ result }: ToolRenderProps) {
             {param.description && <span className="type-caption line-clamp-2 text-muted-foreground" title={param.description}>{param.description}</span>}
           </li>;
         })}
-      </ul> : <Empty text={messages.noParameters} />}
+      </ul></ToolScrollArea> : <Empty text={messages.noParameters} />}
     </div>
     {data.server_instructions && <Instructions text={data.server_instructions} />}
   </div>;
@@ -176,7 +177,7 @@ function Section({ label, children }: { label: UiText; children: ReactNode }) {
     {children}
   </section>;
 }
-const codeBlock = "type-code m-0 max-h-96 overflow-auto whitespace-pre-wrap break-all";
+const codeBlock = "type-code m-0 whitespace-pre-wrap break-all";
 
 /** Arguments come from the call itself; results show text and files in part order, appending structured output only when the text contains no equivalent JSON. */
 function CallBody({ args, phase, result }: ToolRenderProps<McpCallData>) {
@@ -191,17 +192,17 @@ function CallBody({ args, phase, result }: ToolRenderProps<McpCallData>) {
   return <div className="flex flex-col gap-3">
     {data && <p className="type-caption min-w-0 break-all text-muted-foreground">{data.serverName} · <span className="type-code">{data.toolName}</span></p>}
     {callArguments !== undefined && <Section label={messages.arguments}>
-      <pre className={codeBlock}>{JSON.stringify(callArguments, null, 2)}</pre>
+      <ToolScrollArea><pre className={codeBlock}>{JSON.stringify(callArguments, null, 2)}</pre></ToolScrollArea>
     </Section>}
     {progress && <p className="type-caption text-muted-foreground">{progress}</p>}
     {settled && data && <Section label={messages.output}>
-      {data.parts.length || extra ? <div className="flex flex-col gap-2">
+      {data.parts.length || extra ? <ToolScrollArea><div className="flex flex-col gap-2">
         {data.parts.map((part, index) => part.kind === "text"
           ? <pre key={index} className={codeBlock}>{displayText(part.text)}</pre>
           : <FilePreview key={index} part={part} content={object.content} />)}
-      </div> : <p className="type-caption text-muted-foreground">{i18n.text(messages.noContent)}</p>}
+      </div></ToolScrollArea> : <p className="type-caption text-muted-foreground">{i18n.text(messages.noContent)}</p>}
     </Section>}
-    {extra && <Section label={messages.structured}><pre className={codeBlock}>{JSON.stringify(extra.value, null, 2)}</pre></Section>}
+    {extra && <Section label={messages.structured}><ToolScrollArea><pre className={codeBlock}>{JSON.stringify(extra.value, null, 2)}</pre></ToolScrollArea></Section>}
   </div>;
 }
 

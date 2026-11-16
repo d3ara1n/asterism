@@ -3,7 +3,7 @@ import { Terminal, FileText } from "lucide-react";
 import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { DirectoryExec } from "./exec-contract";
 import type { ExecResult } from "@asterism-app/sdk/contracts";
@@ -39,7 +39,7 @@ function Body({ args, phase, result }: ToolRenderProps<ExecResult>) {
   return <div className="flex flex-col gap-3">
     {settled && command !== undefined && <section className="min-w-0 space-y-1 text-xs leading-relaxed">
       <h4 className="type-caption">{i18n.text(messages.input)}</h4>
-      <pre className="type-code m-0 max-h-96 overflow-auto whitespace-pre-wrap break-all">{command}</pre>
+      <ToolScrollArea><pre className="type-code m-0 whitespace-pre-wrap break-all">{command}</pre></ToolScrollArea>
     </section>}
     {settled && data && <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 type-caption">
       <span className="min-w-0 break-all">{i18n.text(messages.title)}: <span className="type-code">{data.shell}</span></span>
@@ -51,7 +51,7 @@ function Body({ args, phase, result }: ToolRenderProps<ExecResult>) {
       {settled && <h4 className="type-caption">{i18n.text(messages.output)}</h4>}
       {phase === "executing"
         ? <StreamingPreview><pre className="type-code m-0 whitespace-pre-wrap break-all">{data.output}</pre></StreamingPreview>
-        : <pre className="type-code m-0 max-h-96 overflow-auto whitespace-pre-wrap break-all">{data.output || i18n.text(messages.empty)}</pre>}
+        : <ToolScrollArea><pre className="type-code m-0 whitespace-pre-wrap break-all">{data.output || i18n.text(messages.empty)}</pre></ToolScrollArea>}
     </section>}
     {data?.truncation && <div className="flex flex-wrap items-center gap-x-3 gap-y-1 type-caption">
       <span>{i18n.formatMessage(messages.truncated, { retained: data.truncation.retainedChars, total: data.truncation.totalChars })}</span>

@@ -3,7 +3,7 @@ import { Globe, Search, Download } from "lucide-react";
 import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { webResponseSchema, type Json, type WebDocument, type WebResponse } from "@asterism-app/sdk/contracts";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract";
 import { webMessages as messages } from "../messages/web";
 import { Markdown } from "@asterism-app/ui/markdown";
@@ -31,7 +31,7 @@ function SearchBody({ result }: ToolRenderProps) {
   const data = parseResponse(result?.data);
   if (!data) return null;
   return <ResponseFrame data={data}>
-    <ol className="flex flex-col gap-2.5">
+    <ToolScrollArea><ol className="flex flex-col gap-2.5">
       {data.documents.map((document, index) => {
         const preview = document.content[0]?.text.replace(/\s+/gu, " ").trim();
         return <li key={index} className="flex min-w-0 flex-col gap-0.5">
@@ -41,7 +41,7 @@ function SearchBody({ result }: ToolRenderProps) {
           {preview && <p className="type-caption line-clamp-2 text-muted-foreground" title={preview}>{preview}</p>}
         </li>;
       })}
-    </ol>
+    </ol></ToolScrollArea>
   </ResponseFrame>;
 }
 
@@ -57,9 +57,9 @@ function FetchBody({ result }: ToolRenderProps) {
         <a href={document.url} target="_blank" rel="noopener noreferrer" title={document.url}
           className="type-label break-words text-primary-text hover:underline">{document.title || document.url}</a>
         <p className="type-caption truncate text-muted-foreground">{sourceLine(document)}</p>
-        {part && <div className="max-h-96 overflow-auto rounded-md border px-3 py-2">
+        {part && <ToolScrollArea className="m-0 rounded-md border" contentClassName="px-3 py-2 pr-4">
           {part.format === "markdown" ? <Markdown>{part.text}</Markdown> : <p className="type-body whitespace-pre-wrap break-words">{part.text}</p>}
-        </div>}
+        </ToolScrollArea>}
         {part?.truncated && <p className="type-caption text-muted-foreground">{i18n.text(messages.truncated)}</p>}
       </article>;
     })}

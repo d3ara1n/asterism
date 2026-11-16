@@ -4,7 +4,7 @@ import { ArrowRight, Users } from "lucide-react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Markdown } from "@asterism-app/ui/markdown";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
@@ -33,7 +33,7 @@ function MutationMeta({ data }: { data: Mutation | null | undefined }) {
   </span>;
 }
 function MarkdownBody({ text }: { text: string }) {
-  return <div className="select-text"><SkillReferences><Markdown>{text}</Markdown></SkillReferences></div>;
+  return <ToolScrollArea className="select-text"><SkillReferences><Markdown>{text}</Markdown></SkillReferences></ToolScrollArea>;
 }
 /** Who holds the task after the change; the header already names the task and its status. */
 function Holder({ actor }: { actor: Actor | null }) {
@@ -110,13 +110,13 @@ function FilterIcons({ target }: { target: Json }) {
 }
 function TaskRows({ todos }: { todos: readonly TodoSummary[] }) {
   const i18n = useI18n();
-  return <ul className="flex max-h-80 min-w-0 flex-col gap-1 overflow-y-auto">
+  return <ToolScrollArea className="max-h-80"><ul className="flex min-w-0 flex-col gap-1">
     {todos.map(todo => <li key={todo.id} className="flex min-w-0 items-center gap-2">
       <TodoStatusIcon status={todo.status} />
       <span className="min-w-0 flex-1 truncate" title={todo.title}>{todo.title}</span>
       {todo.assignee && <span className="type-caption shrink-0 truncate">{actorName(i18n, todo.assignee)}</span>}
     </li>)}
-  </ul>;
+  </ul></ToolScrollArea>;
 }
 
 type PageProps = ToolRenderProps<z.output<typeof TodoListItems.schema>>;
@@ -177,7 +177,7 @@ function GrepBody({ result }: GrepProps) {
   if (!data) return null;
   if (!data.matches.length) return <p className="type-caption">{i18n.text(messages.noMatches)}</p>;
   let budget = TOOL_BODY_LINE_LIMIT;
-  return <div className="flex min-w-0 flex-col gap-3">{data.matches.map(group => {
+  return <ToolScrollArea><div className="flex min-w-0 flex-col gap-3">{data.matches.map(group => {
     const rows = group.rows.slice(0, Math.max(0, budget)); budget -= rows.length;
     if (!rows.length) return null;
     const segments: (typeof rows)[] = [];
@@ -191,7 +191,7 @@ function GrepBody({ result }: GrepProps) {
         rows={segment.map(row => ({ line: row.line, content: displayText(row) }))}
         dimmed={segment.flatMap((row, index) => row.match ? [] : [index])} />)}
     </section>;
-  })}</div>;
+  })}</div></ToolScrollArea>;
 }
 export const grepViews = {
   input: { headerRenderer: GrepHeader }, execution: { headerRenderer: GrepHeader }, result: { headerRenderer: GrepHeader, bodyRenderer: GrepBody },
@@ -213,9 +213,9 @@ function ListsBody({ result }: ListsProps) {
   const i18n = useI18n(), lists = result?.data;
   if (!lists) return null;
   if (!lists.length) return <p className="type-caption">{i18n.text(messages.noLists)}</p>;
-  return <ul className="flex max-h-80 min-w-0 flex-col gap-1 overflow-y-auto">{lists.map(list => <li key={list.id} className="flex min-w-0 items-center gap-2">
+  return <ToolScrollArea className="max-h-80"><ul className="flex min-w-0 flex-col gap-1">{lists.map(list => <li key={list.id} className="flex min-w-0 items-center gap-2">
     <span className="min-w-0 flex-1 truncate" title={list.title}>{list.title}</span><ListCounts list={list} />
-  </li>)}</ul>;
+  </li>)}</ul></ToolScrollArea>;
 }
 export const listsViews = {
   input: { headerRenderer: ListsHeader }, execution: { headerRenderer: ListsHeader }, result: { headerRenderer: ListsHeader, bodyRenderer: ListsBody },

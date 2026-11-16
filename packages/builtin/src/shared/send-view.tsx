@@ -1,7 +1,7 @@
 import { Send } from "lucide-react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { inputFileName, type SendResult } from "@asterism-app/builtin-api/contracts";
 import { fileReferencePartSchema, type Json } from "@asterism-app/sdk/contracts";
@@ -35,7 +35,7 @@ function Body({ args, phase }: Props) {
     const file = fileReferencePartSchema.safeParse(part);
     return file.success ? <p key={index}>{inputFileName(file.data)}</p> : null;
   })}</>;
-  return streaming ? <StreamingPreview>{content}</StreamingPreview> : content;
+  return streaming ? <StreamingPreview>{content}</StreamingPreview> : <ToolScrollArea contentClassName="flex flex-col gap-2">{content}</ToolScrollArea>;
 }
 export const sendViews = {
   label: messages.title, icon: <Send className="size-3.5" />,

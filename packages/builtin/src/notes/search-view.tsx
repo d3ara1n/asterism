@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { CodeRows } from "@asterism-app/ui/code-view";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
@@ -34,8 +34,10 @@ function Body({ args, target, result }: Props) {
   const segments = data && grepSegments(data.rows, TOOL_BODY_LINE_LIMIT);
   return <div className="flex flex-col gap-2">
     <SearchOptions args={args} target={target} />
-    {segments?.map(segment => <CodeRows key={segment.rows[0].line} rows={segment.rows}
-      dimmed={segment.rows.flatMap((row, index) => row.match ? [] : [index])} />)}
+    {!!segments?.length && <ToolScrollArea contentClassName="flex flex-col gap-2">
+      {segments.map(segment => <CodeRows key={segment.rows[0].line} rows={segment.rows}
+        dimmed={segment.rows.flatMap((row, index) => row.match ? [] : [index])} />)}
+    </ToolScrollArea>}
     {data && <>
       {!data.rows.length && <p className="type-caption">{i18n.text(data.stopReason === null
         ? messages.toolSearchNoLines : messages.toolSearchEmptyIncomplete)}</p>}

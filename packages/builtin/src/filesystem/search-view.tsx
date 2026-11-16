@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { ChevronRight, FileSearch, TextSearch } from "lucide-react";
 import { toolRenderer, useI18n, useRendererViewState, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
 import { cn } from "@asterism-app/ui/utils";
@@ -127,7 +127,7 @@ function Results({ data, selection }: { data: FindResult | GrepResult; selection
     content = <DirectoryGroups groups={grouped.groups}>{({ name }) => <span className="break-all">{name}</span>}</DirectoryGroups>;
   }
   return <>
-    {summary.empty === null ? content : <p className="type-caption">{i18n.text(summary.empty === "incomplete"
+    {summary.empty === null ? <ToolScrollArea className="max-h-80">{content}</ToolScrollArea> : <p className="type-caption">{i18n.text(summary.empty === "incomplete"
       ? messages.toolSearchEmptyIncomplete : summary.unit === "rows" ? messages.toolSearchNoLines : messages.directoryNoMatches)}</p>}
     {summary.empty === "no_matches" && filters && <p className="type-caption text-muted-foreground">
       {i18n.formatMessage(messages.toolSearchFiltered, { filters })}</p>}

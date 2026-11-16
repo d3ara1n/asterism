@@ -3,6 +3,7 @@ import type { Json } from "@asterism-app/sdk/contracts";
 import { toolRenderer, useI18n, type ToolExecutionRenderProps, type ToolResultRenderProps } from "@asterism-app/sdk/renderer";
 import { StatusText } from "@asterism-app/ui/ui/status";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { ToolScrollArea } from "@asterism-app/ui/tool-content";
 import { questionMessages as messages } from "../messages/questions";
 import { AnswerSummary } from "./answer-summary";
 import { askUserArgs, AskUserResult, type Answer, type Question } from "./contract";
@@ -52,12 +53,12 @@ function ExecutionBody(props: ExecutionProps) {
 function ResultBody({ args, result }: ResultProps) {
   const i18n = useI18n();
   const data = result.data;
-  if (data && "answers" in data) return <AnswerSummary rows={resultRows(parseQuestions(args), data)} message={data.message} />;
+  if (data && "answers" in data) return <ToolScrollArea><AnswerSummary rows={resultRows(parseQuestions(args), data)} message={data.message} /></ToolScrollArea>;
   if (data && "answer" in data) {
     const title = questionTitles(args)[0];
-    return <div className="space-y-1 type-body whitespace-pre-wrap break-words">
+    return <ToolScrollArea contentClassName="flex flex-col gap-1 type-body whitespace-pre-wrap break-words">
       {title && <p className="type-label">{title}</p>}<p>{data.answer}</p>
-    </div>;
+    </ToolScrollArea>;
   }
   return <div className="space-y-3">
     <Titles args={args} />

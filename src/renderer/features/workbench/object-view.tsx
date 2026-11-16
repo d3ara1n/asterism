@@ -21,7 +21,7 @@ export function useObjectView(object: WorkbenchObject) {
   const context = useObjectContext(object);
   const view = registry.card(object.presentation, context) ?? {
     ...fallbackCardAppearance,
-    body: <div className="min-h-0 flex-1 select-text overflow-auto p-3"><JsonView value={object.presentation.data} /></div>,
+    body: <div className="min-h-0 flex-1 select-text overflow-auto p-3"><JsonView scrollable={false} value={object.presentation.data} /></div>,
     actions: undefined,
     panels: undefined,
   };

@@ -2,6 +2,7 @@ import type { z } from "zod";
 import { BookOpen, FileText, RefreshCw } from "lucide-react";
 import { toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { ToolScrollArea } from "@asterism-app/ui/tool-content";
 import { CodeRows, prepareCodeView } from "@asterism-app/ui/code-view";
 import { inputField, inputText } from "../shared/tool-preview";
 import { displayText } from "../shared/text-row";
@@ -25,7 +26,7 @@ function SkillReadHeader({ args, result }: ReadProps) {
 }
 function SkillReadBody({ result }: ReadProps) {
   const data = result?.data;
-  return data ? <CodeRows rows={data.rows.map(row => ({ line: row.line, content: displayText(row) }))} filename={data.path} /> : null;
+  return data ? <ToolScrollArea><CodeRows rows={data.rows.map(row => ({ line: row.line, content: displayText(row) }))} filename={data.path} /></ToolScrollArea> : null;
 }
 function RefreshHeader({ result }: RefreshProps) {
   const i18n = useI18n();
@@ -35,9 +36,9 @@ function RefreshHeader({ result }: RefreshProps) {
 /** Refresh results save only skill counts and discovery issues; the full catalog is available in settings. */
 function RefreshBody({ result }: RefreshProps) {
   const data = result?.data;
-  return data?.issues.length ? <div className="space-y-1">
+  return data?.issues.length ? <ToolScrollArea className="max-h-80" contentClassName="flex flex-col gap-1">
     {data.issues.map((issue, index) => <p key={index} className="type-caption break-all text-destructive select-text">{issue.file}: {issue.message}</p>)}
-  </div> : null;
+  </ToolScrollArea> : null;
 }
 const readHeader = { headerRenderer: SkillReadHeader };
 const refreshHeader = { headerRenderer: RefreshHeader };

@@ -6,7 +6,7 @@ import type { Json } from "@asterism-app/sdk/contracts";
 import { CodeText } from "@asterism-app/ui/code-view";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
-import { ToolDetailsSwitcher } from "@asterism-app/ui/tool-content";
+import { ToolDetailsSwitcher, ToolScrollArea } from "@asterism-app/ui/tool-content";
 import { IconSummary } from "@asterism-app/ui/icon-summary";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { toolOutcomeLabels, toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
@@ -96,10 +96,12 @@ function GroupRow({ group, now }: { group: ScriptCallGroup; now: number }) {
   </li>;
 }
 
-function CallList({ calls }: { calls: readonly ScriptCall[] }) {
+function CallList({ calls, settled }: { calls: readonly ScriptCall[]; settled: boolean }) {
   const groups = groupScriptCalls(calls);
   const now = useNow(groups.some(group => group.running > 0));
-  return groups.length ? <ul className="space-y-1.5">{groups.map(group => <GroupRow key={group.key} group={group} now={now} />)}</ul> : null;
+  if (!groups.length) return null;
+  const content = <ul className="space-y-1.5">{groups.map(group => <GroupRow key={group.key} group={group} now={now} />)}</ul>;
+  return settled ? <ToolScrollArea className="max-h-80">{content}</ToolScrollArea> : content;
 }
 
 function ResultScriptCode({ code }: { code: string }) {
@@ -116,10 +118,10 @@ function ResultScriptCode({ code }: { code: string }) {
 
 /** Each entry is one log() emission; numbering keeps multiline values and repeated shapes distinct. */
 function ScriptLogs({ logs }: { logs: readonly Json[] }) {
-  return <ol className="flex min-w-0 max-h-80 flex-col gap-3 overflow-auto">
+  return <ol className="flex min-w-0 flex-col gap-3">
     {logs.map((entry, index) => <li key={index} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
       <span aria-hidden="true" className="font-mono text-xs leading-relaxed tabular-nums text-muted-foreground">#{index + 1}</span>
-      <JsonView value={entry} className="max-h-none overflow-visible" />
+      <JsonView value={entry} scrollable={false} />
     </li>)}
   </ol>;
 }
@@ -131,7 +133,7 @@ function Body(props: Props) {
   const logs = props.result?.data?.logs ?? [];
   const value = props.phase === "settled" ? props.result.data?.value : undefined;
   return <div className="flex flex-col gap-3">
-    <CallList calls={scriptCalls(props)} />
+    <CallList calls={scriptCalls(props)} settled={props.phase === "settled"} />
     {(code || logs.length > 0 || value !== undefined) && <ToolDetailsSwitcher stateKey="asterism/resource-script-details" items={[
       ...(code ? [{ value: "code", label: i18n.text(messages.toolScriptCode),
         render: () => props.phase === "settled" ? <ResultScriptCode code={code} />
@@ -139,7 +141,7 @@ function Body(props: Props) {
       ...(logs.length > 0 ? [{ value: "logs", label: i18n.text(messages.toolScriptLogs),
         render: () => <ScriptLogs logs={logs} /> }] : []),
       ...(value !== undefined ? [{ value: "result", label: i18n.text(messages.toolScriptValue),
-        render: () => <JsonView value={value} /> }] : []),
+        render: () => <JsonView value={value} scrollable={false} /> }] : []),
     ]} />}
   </div>;
 }

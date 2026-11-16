@@ -6,7 +6,7 @@ import { fileReferencePartSchema, messagingText, type Json, type MessagingConnec
   type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { inputFileName } from "@asterism-app/builtin-api/contracts";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { useToolResourceSubject } from "@asterism-app/ui/tool-content";
+import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Marker, MarkerContent } from "@asterism-app/ui/ui/marker";
@@ -55,7 +55,7 @@ function ListBody({ target, result }: ListProps) {
   if (!rows.length) return <Note>{i18n.text(data.kind === "connections" ? messages.noConnections
     : inputText(target, "since") === undefined ? messages.noConversations : messages.noChanges)}</Note>;
   return <div className="flex min-w-0 flex-col gap-2">
-    <ul className="flex min-w-0 flex-col">{rows.slice(0, TOOL_BODY_LINE_LIMIT)}</ul>
+    <ToolScrollArea className="max-h-80"><ul className="flex min-w-0 flex-col">{rows.slice(0, TOOL_BODY_LINE_LIMIT)}</ul></ToolScrollArea>
     <Omitted count={rows.length - TOOL_BODY_LINE_LIMIT} />
     {data.truncated && <Note>{i18n.text(messages.truncated)}</Note>}
   </div>;
@@ -116,7 +116,7 @@ function ReadBody({ target, result }: ReadProps) {
   if (!data) return null;
   if (!data.messages.length) return <Note>{i18n.text(inputText(target, "since") === undefined ? messages.noMessages : messages.noNewMessages)}</Note>;
   return <div className="flex min-w-0 flex-col gap-3">
-    <Transcript items={data.messages} content={object.content} />
+    <ToolScrollArea><Transcript items={data.messages} content={object.content} /></ToolScrollArea>
     {data.truncated && <Note>{i18n.text(messages.truncated)}</Note>}
   </div>;
 }
@@ -184,9 +184,9 @@ function SendHeader({ phase, target, invocation, result }: SendProps) {
 }
 function SendBody({ args, result, phase }: SendProps) {
   const object = useRendererObject(), data = result?.data;
-  if (data) return <MessageBody message={data} content={object.content} />;
+  if (data) return <ToolScrollArea><MessageBody message={data} content={object.content} /></ToolScrollArea>;
   const draft = <DraftParts args={args} />;
-  return phase === "input" ? <StreamingPreview>{draft}</StreamingPreview> : draft;
+  return phase === "input" ? <StreamingPreview>{draft}</StreamingPreview> : <ToolScrollArea>{draft}</ToolScrollArea>;
 }
 function DraftParts({ args }: { args: Json }) {
   return <div className="flex min-w-0 flex-col gap-1.5">{partsOf(args).map((part, index) => {

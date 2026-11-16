@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { Brain, Check, Minus, Wrench } from "lucide-react";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
+import { ToolScrollArea } from "@asterism-app/ui/tool-content";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { formatCount } from "@asterism-app/ui/format-count";
@@ -42,7 +43,7 @@ function ListBody({ result }: ListProps) {
   if (!data.length) return <p className="type-caption">{i18n.text(messages.empty)}</p>;
   const groups = groupByProvider(data.slice(0, TOOL_BODY_LINE_LIMIT));
   return <div className="@container/models space-y-2">
-    <div className="grid grid-cols-1 items-start gap-2 @min-[36rem]/models:grid-cols-2">
+    <ToolScrollArea className="max-h-80"><div className="grid grid-cols-1 items-start gap-2 @min-[36rem]/models:grid-cols-2">
       {groups.map(group => <section key={group.provider} className="min-w-0 rounded-md border">
         <header className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-1.5">
           <h4 className="min-w-0 truncate type-label text-foreground" title={group.provider}>{names.provider(group.provider)}</h4>
@@ -56,7 +57,7 @@ function ListBody({ result }: ListProps) {
           </li>;
         })}</ul>
       </section>)}
-    </div>
+    </div></ToolScrollArea>
     {data.length > TOOL_BODY_LINE_LIMIT && <p className="type-caption">
       {i18n.formatMessage(resourceMessages.omitted, { count: data.length - TOOL_BODY_LINE_LIMIT })}
     </p>}
