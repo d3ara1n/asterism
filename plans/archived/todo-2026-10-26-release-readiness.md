@@ -1,8 +1,16 @@
 # Stable-release readiness
 
+## Closure on 2026-11-17
+
+Archived by explicit user decision after synchronizing implemented work. This closes the broad readiness checklist rather than asserting that a stable release has been published, every historical acceptance scenario has passed, or stable public compatibility has been established.
+
+Unchecked entries below are the historical checklist, not open tasks in this record. Long-tail ideas and general acceptance aspirations are not copied into new tasks. Existing release automation, plugin follow-up, Sentry, and other independently scoped plans keep their own status. The first-user-distribution migration obligation remains an engineering rule, not a feature-completeness gate maintained by this checklist. Previously recorded acceptance caveats are preserved.
+
+## Historical scope and evidence
+
 Filed on 2026-10-26.
 
-Prereleases so far are maintainer test releases with no other users; no stable release exists yet. This plan tracks the work before a stable release. Current storage migration and recovery acceptance are complete in `plans/archived/todo-2026-10-12-storage-migration.md`; future distribution-baseline obligations are tracked below. New feature interaction and protocol decisions remain separate; a computed version number does not establish product readiness.
+Prereleases so far are maintainer test releases with no other users; no stable release exists yet. At filing, this plan collected work to consider before a stable release. Current storage migration and recovery acceptance are complete in `plans/archived/todo-2026-10-12-storage-migration.md`; distribution-baseline obligations were recorded below. New feature interaction and protocol decisions remain separate; a computed version number does not establish product readiness.
 
 ## Prerelease channel
 
@@ -21,8 +29,8 @@ The stable release date/version remains undecided.
 
 ## Plugin delivery
 
-- [ ] Complete acquisition and installation without manually preparing a source directory, including exact versions and integrity.
-- [ ] Complete upgrade, compatibility feedback, enablement, removal, and restart behavior.
+- [x] Implement managed npm acquisition and installation without a manually prepared source directory (`fe35b967`), including exact resolved versions and integrity information. The installation checks integrity when the inspected package provides it; integrity is not mandatory for every package.
+- [x] Implement plugin update, enablement, removal, and restart feedback. Actual management-UI and cross-platform acceptance remain distinct from implementation and are recorded in `plans/todo-2026-10-12-plugin-system.md`.
 - [ ] Decide private-data and credential cleanup choices while preserving session history.
 - [ ] Verify a real external plugin through installation, use, upgrade, migration, disablement, and removal.
 
@@ -33,7 +41,7 @@ A marketplace service is outside the confirmed initial scope.
 - [x] Publish initial public packages: `@asterism-app/sdk@0.47.0` and `@asterism-app/builtin-api@0.19.1`, manually published from `e861a14`.
 - [x] Integrate public-package publication into the application Release workflow, with independent package versions and channel dist-tags.
 - [x] Verify automated package publication: workflow-run prereleases publish changed packages under the `next` dist-tag, checked against the registry on 2026-11-05.
-- [ ] Verify automated promotion and its dist-tag move once a stable candidate exists, and complete external-plugin acceptance in `plans/todo-2026-10-27-public-api-stability.md` before declaring stable public interfaces.
+- [ ] Verify automated promotion and its dist-tag move once a stable candidate exists, and complete external-plugin acceptance in `plans/archived/todo-2026-10-27-public-api-stability.md` before declaring stable public interfaces.
 
 Confirmed SDK boundary defects and the template-copy participation boundary are resolved. Protocol, authentication, output, and external-message extensions remain driven by concrete integrations. Shared-environment and unchanged-plugin evidence accumulate during internal development; future feature completeness is not a condition for delivering the current SDK.
 
@@ -63,8 +71,8 @@ The user confirmed desktop build/platform behavior, cross-platform behavior, and
 - [ ] Complete the remaining installed-update scenarios on each release platform.
 - [ ] Verify plugin compatibility and failure isolation across application updates.
 - [ ] Provide installation and issue-reporting information for the accepted platforms: application version, platform, reproduction, and logs. Models can consult the internal manual for in-product usage guidance.
-- [ ] Complete and accept official branding and platform icons.
+- [x] Adopt the user-approved official constellation branding and SVG/PNG/ICNS/ICO assets (`3dd383a3`). `plans/archived/todo-2026-10-01-app-icon.md` preserves approval and validation; actual installed Dock/taskbar presentation was not independently verified.
 - [x] Integrate the English internal manual through resources/tools and verify direct discovery and reading. Application guides and public-package guides/examples are included in application packaging.
 - [x] Accept manual creation, linking, discovery, and reading through the GUI and an installed application.
 
-Plugin prompt/skill contributions and the paradigm layering are implemented; `plans/archived/ref-2026-10-28-plugin-paradigm-layering.md` and its archived implementation records retain the decisions, verification, and manual acceptance caveats. Captured-resource restore, provider OAuth, additional protocols, skill picking, manual compaction, media/export/sync, and a search-library replacement remain separate scope decisions.
+Plugin prompt/skill contributions and the paradigm layering are implemented; `plans/archived/ref-2026-10-28-plugin-paradigm-layering.md` and its archived implementation records retain the decisions, verification, and manual acceptance caveats. Manual compaction and composer skill picking are implemented. Broader reference conveniences, provider authentication, and search-library evaluation have independent records. Captured-resource restoration, additional protocols, and media/export/sync are not commitments maintained by this closed umbrella plan.

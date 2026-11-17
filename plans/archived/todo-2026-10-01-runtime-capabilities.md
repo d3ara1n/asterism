@@ -1,5 +1,13 @@
 # Remaining runtime and resource work
 
+## Closure on 2026-11-17
+
+Archived by user decision. The implemented runtime/resource foundation is accepted as the disposition of this umbrella plan. The user confirmed that the resource-access, restoration, and cloning questions are settled; they are not outstanding generic redesign requirements. This closure does not add checkpoint rollback or external-instance cloning capabilities.
+
+Unchecked entries below preserve the earlier scope, not a remaining backlog. Hypothetical protocols, media, sharing, recovery scenarios, and scale work do not keep this plan open and are not copied into replacement tasks. Revisit a concrete requirement or observed defect when one exists. Existing independently scoped plans retain their own status. Previously recorded implementation and acceptance limits remain historical evidence.
+
+## Historical scope and evidence
+
 Filed on 2026-10-01.
 
 The implementation now includes model requests, tool batches, persistent drafts and steering, agent creation/communication, cross-session Mesh channels, Subagent Pool execution, context compaction, filesystem search and commands, terminals, MCP, Web, skills, naming, archiving, and conversation virtualization. These capabilities must not be treated as absent because early task notes predated their implementation.
@@ -17,12 +25,12 @@ Mesh provides member discovery, messaging, saved-record investigation, task prof
 
 Subagent Pool execution is asynchronous, with pool-owned resource access and AgentRole configuration. The obsolete role-level tool policies and fallback-role configuration have been removed. Additional relay behavior and skill composition require concrete needs beyond the implemented pool and Mesh capabilities.
 
-Plugin prompt contributions and plugin-carried skills are implemented. Skills settings-page acceptance remains pending. Explicit composer skill picking remains deferred in `plans/todo-2026-10-25-skill-picker.md`.
+Plugin prompt contributions and plugin-carried skills are implemented. Skills settings-page acceptance remains pending. Composer skill selection and reference chips are implemented. Remaining reference conveniences are tracked in `plans/todo-2026-11-05-composer-reference-chips.md`; the superseded skill-picker record is archived.
 
 ## Model and context follow-up
 
 - [ ] Add native-protocol continuation namespaces when introducing another protocol, including selection and opaque-data whitelists.
-- [ ] Add manual compaction or configurable budgets when justified by usage.
+- [x] Add manual conversation compaction. Commit `3502988c` implements the command, independent compression task, and cancellation handling. Configurable budgets remain a possible demand-driven extension, not an open task in this record.
 - [ ] Evaluate over-window retry and repeated-compaction behavior.
 - [ ] Measure budget accuracy with small windows, media, and changing environments, including actual cache effects.
 - [ ] Decide server-side tools, dynamic plugin-loading requirements, complete request retention, and sensitive-content retention.
@@ -47,6 +55,6 @@ Current content collection and application recovery are implemented. Storage mig
 - [x] Accept narrow windows, keyboard access, focus, and both schemes for object/access/history panels.
 - [ ] Measure large history queries, branch density, and many simultaneously visible cards. Conversation virtualization does not establish bounded database reads.
 - [x] Exercise real Agent/Mesh collaboration and tasks using MCP, Web, terminals, and skills.
-- [ ] Decide log retention and remaining diagnostic needs.
+- [x] Decide and implement runtime log retention: daily/20 MiB rotation with a fifteen-day retention policy (`6869cd02`), recorded in `plans/archived/todo-2026-11-10-log-rotation.md`. Other diagnostic ideas are not committed work in this record.
 
 The checked workbench and real-task items are user-confirmed acceptance. Large-scale measurements and long-conversation compaction quality remain separate follow-up.

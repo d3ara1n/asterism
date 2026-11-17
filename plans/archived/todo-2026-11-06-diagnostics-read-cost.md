@@ -1,6 +1,14 @@
 # Diagnostics panel read cost
 
-Filed on 2026-11-06. Deferred until a performance problem is observed; no measurement has been taken.
+## Closure on 2026-11-17
+
+Closed without optimization by user decision. The diagnostics body mounts only for the active auxiliary panel (`ObjectSurface.tsx` renders `AuxiliaryPanel` conditionally); it is not a continuously mounted background reader while the panel is closed. Exit animation may briefly retain the outgoing body. The user accepts higher read/derivation/render cost while explicitly using diagnostics and does not consider that an optimization requirement.
+
+No benchmark or virtualization work is claimed. The hypotheses and unchecked investigation entries below are retained as historical context, not open tasks. Reopen investigation only for a concrete observed problem, rather than the mere existence of panel-open costs.
+
+## Historical scope and evidence
+
+Filed on 2026-11-06. The original investigation was deferred pending an observed performance problem; no measurement was taken.
 
 ## Candidates
 

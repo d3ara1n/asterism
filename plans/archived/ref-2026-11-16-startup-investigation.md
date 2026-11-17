@@ -1,5 +1,7 @@
 # Startup investigation: verified findings
 
+Archived on 2026-11-17 after the user accepted current startup and exit performance and closed `plans/archived/todo-2026-11-16-startup-lifecycle.md`. The findings below describe the historical investigated revision, not the current prebuilt-artifact implementation. No new benchmark or residual-process root cause is claimed.
+
 Filed on 2026-11-16. This record contains observed behavior and measured conclusions, not an adopted solution, recommendation or implementation direction. Runtime experiments and their implementation/documentation changes were removed during workspace cleanup; the repository implementation was restored to `983d1355566626b6b81095dc1ad6acf575ed7f2f` for the affected files.
 
 ## Existing implementation at the investigated revision

@@ -1,5 +1,13 @@
 # Provider-specific tool schema compatibility packs
 
+## Closure on 2026-11-17
+
+Closed as reference-only by user decision, not implemented. The useful candidate transforms, lossiness/decode caveats, and endpoint-validation considerations are retained in `plans/ref-2026-11-04-tool-schema-provider-compatibility.md`. There is no outstanding compatibility-pack backlog or automatic implementation trigger. A concrete endpoint failure or selected protocol integration can justify new work later.
+
+The original proposal below is retained as historical evidence; its prescriptive wording does not authorize or require work after closure.
+
+## Historical scope and evidence
+
 Filed on 2026-11-04. Status: deferred. No endpoint has rejected a current tool declaration, so no pack can be validated yet. Background and sources: `plans/ref-2026-11-04-tool-schema-provider-compatibility.md`.
 
 ## Start conditions

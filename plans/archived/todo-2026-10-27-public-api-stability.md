@@ -1,5 +1,13 @@
 # Public SDK readiness and iteration
 
+## Closure on 2026-11-17
+
+Archived by explicit user decision. The implemented SDK foundation and package-delivery work close this umbrella plan; continuous development and hypothetical future compatibility cases do not make it a permanent unfinished task.
+
+Unchecked entries below preserve historical acceptance leads and evidence limits, not an active backlog. They are not all claimed as executed and are not copied into replacement tasks. Future concrete plugin failures or integration requirements can establish their own scope. This closure does not establish universal old-plugin compatibility, manual external-plugin GUI acceptance, or successful stable promotion. Existing independent release and plugin-management plans keep their own status.
+
+## Historical scope and evidence
+
 Filed on 2026-10-27. Initial inspection: main at `262be7e`.
 
 ## Goal and accepted scope
@@ -37,7 +45,7 @@ These tasks concern actual package delivery, not future feature completeness.
 - [x] Verify the first automated prerelease publication: workflow-run prereleases publish changed packages under `next` (`@asterism-app/sdk` 1.6.0, `@asterism-app/builtin-api` 0.25.1 checked on the registry on 2026-11-05).
 - [ ] Verify the first automated promotion once a stable candidate exists.
 
-Application-side npm acquisition, exact versions/integrity, upgrade, removal, and private-data cleanup remain delivery work in `plans/todo-2026-10-12-plugin-system.md` and `plans/todo-2026-10-26-release-readiness.md`. They are distinct from publishing the SDK package. A marketplace is outside the current scope.
+Application-side managed npm acquisition, exact-version installation, available integrity checks, upgrade, and removal are implemented (`fe35b967`). Plugin-management GUI and cross-platform acceptance, and optional private-data/credential cleanup decisions, retain their own scope in `plans/todo-2026-10-12-plugin-system.md`. These operations are distinct from publishing the SDK package. A marketplace is outside the current scope.
 
 ## Internal development and compatibility evidence
 
@@ -65,7 +73,7 @@ The earlier API-02 through API-06 labels are retained here as ownership referenc
 
 Future extensions may add contracts, services, or explicitly selected capabilities. Their implementation must decide how existing consumers continue to behave. An unimplemented extension is neither an existing public API nor evidence that a foundational rewrite is required.
 
-The implemented plugin paradigm layering (`plans/archived/ref-2026-10-28-plugin-paradigm-layering.md`) reclassifies prompt contributions, plugin-carried skills, MCP, manuals, roles, and Agent configuration. It changes published 0.x SDK contracts, including the model target and prompt blocks; those changes are intentional breaks before stable public interfaces. Explicit skill picking, broader content sharing, hot reload, separate plugin processes, and persistent jobs remain independently scoped work. On 2026-11-10, the notification follow-up was closed with a decision not to build a unified notification service or impose a common notification form. Each feature owns its feedback form and lifecycle; existing frontend feedback does not require blanket migration.
+The implemented plugin paradigm layering (`plans/archived/ref-2026-10-28-plugin-paradigm-layering.md`) reclassifies prompt contributions, plugin-carried skills, MCP, manuals, roles, and Agent configuration. It changes published 0.x SDK contracts, including the model target and prompt blocks; those changes are intentional breaks before stable public interfaces. Composer skill picking is implemented; remaining reference conveniences have their own plan. Broader content sharing, hot reload, separate plugin processes, and persistent jobs are not commitments maintained by this closed record. On 2026-11-10, the notification follow-up was closed with a decision not to build a unified notification service or impose a common notification form. Each feature owns its feedback form and lifecycle; existing frontend feedback does not require blanket migration.
 
 ## Validation record
 
