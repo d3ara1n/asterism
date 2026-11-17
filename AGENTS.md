@@ -37,6 +37,7 @@ Reuse maintained libraries for general controls, animation, layout, drag, and vi
 - `dialog`, `popover`: accept a `motionPreset="command"` opt-in for shared command-surface motion; dialog applies matching scrim timing.
 - `command`: `CommandDialog` opts into command-surface motion; `CommandList` animates content height by default and accepts `animateHeight={false}` when a parent owns sizing.
 - `dialog`, `command`, `spinner`: built-in labels come from `useI18n()` and `commonMessages`; `DialogContent` accepts `closeLabel`, and `CommandDialog` title and description default to localized messages.
+- `tooltip`: Provider defaults to a 700 ms hover delay with no skip-delay window; explicit timing props remain supported.
 - `progress`: forwards `value` to the Radix root so the value attributes are exposed.
 - `scroll-area`: exposes viewport refs/props and content styling; supports both axes; uses an explicit Radix content element with caller-controlled display, a transparent track, and a semantic overlay thumb; normalizes Radix pointer coordinates for scaled canvases.
 - `message-scroller`: the jump button's screen-reader label comes from `commonMessages`; a nested Radix root preserves the primitive root's ref registration, while Viewport and Content compose through `asChild` so the same viewport owns scrolling and an overlay scrollbar; the viewport drops `scroll-fade-b` and native scrollbar styling.
