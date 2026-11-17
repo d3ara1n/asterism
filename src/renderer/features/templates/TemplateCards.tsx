@@ -16,7 +16,7 @@ import { StatusText } from "@asterism-app/ui/ui/status";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { ActionMenu, ActionMenuContent, ActionMenuGroup, ActionMenuItem, ActionMenuTrigger, ActionMenuTarget } from "@asterism-app/ui/ui/action-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
-import { TemplateObjectLabel } from "./TemplateObjects";
+import { TemplateObjectLabel, templateKinds } from "./TemplateObjects";
 import { RenameTemplate } from "./RenameTemplate";
 import { folderMessages } from "../../../shared/folder-messages";
 import { existingFolder, useFolders } from "../folders/context";
@@ -44,7 +44,7 @@ export function TemplateCards({ templates, ready, onStart, onChanged }: {
 /** Kind-signature preview: one icon per resource type; object counts belong to the details tooltip. */
 function TemplatePreview({ objects }: { objects: readonly TemplateObjectSummary[] }) {
   const registry = useModuleViews();
-  const kinds = useMemo(() => [...new Set(objects.map(object => object.kind))], [objects]);
+  const kinds = useMemo(() => templateKinds(objects), [objects]);
   const shown = kinds.slice(0, KIND_PREVIEW_LIMIT);
   const overflow = kinds.length - shown.length;
   if (!shown.length) {
