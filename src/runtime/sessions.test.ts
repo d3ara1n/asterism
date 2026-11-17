@@ -8,13 +8,12 @@ import type { RendererFrame, RuntimeFrame } from "../shared/connection.ts";
 import type { PluginCandidate } from "../shared/plugin-startup.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { join } from "node:path";
+import { afterEach, expect, it, vi } from "vitest";
 import { ApplicationService } from "./service.ts";
 import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
 import { applicationPackages } from "../plugins/distribution.ts";
-import { applicationDirectory } from "../plugins/package-modules.ts";
-import * as artifactResolver from "../plugins/artifact-resolver.ts";
+import type { Distribution } from "../plugins/packages.ts";
 
 const roots: string[] = [], services: ApplicationService[] = [];
 const emptyArtifact = (id: string) => ({ format: 2 as const, id, public: { runtime: {}, renderer: {} },
@@ -23,14 +22,15 @@ function publishFixtureArtifact(root: string, id: string): void {
   mkdirSync(join(root, "dist"), { recursive: true });
   writeFileSync(join(root, "dist/artifact.json"), JSON.stringify(emptyArtifact(id)));
 }
-// Application-list tests exercise selection, not the separate process-backed distribution build contract.
-// Bundled and path sources reach the builtin root with and without a trailing separator; both must avoid built output.
-const captureArtifact = artifactResolver.captureArtifact;
-const builtinRoot = resolve(applicationDirectory("packages/builtin"));
-beforeEach(() => {
-  vi.spyOn(artifactResolver, "captureArtifact").mockImplementation((root, id) => resolve(root) === builtinRoot
-    ? { artifact: emptyArtifact(id), artifactRoot: root } : captureArtifact(root, id));
-});
+/** A one-package distribution inside the test root, so selection tests do not depend on the repository's built plugins. */
+function fixtureDistribution(root: string): Distribution {
+  const directory = join(root, "distribution"), bundle = join(directory, "bundle");
+  mkdirSync(bundle, { recursive: true });
+  writeFileSync(join(bundle, "package.json"), JSON.stringify({ name: "bundle", description: "Bundled fixture description",
+    asterism: { id: "fixture.bundled", displayName: "Bundled fixture" } }));
+  publishFixtureArtifact(bundle, "fixture.bundled");
+  return { packages: [{ source: { kind: "bundled", name: "bundle" }, enabled: true }], directory };
+}
 
 afterEach(async () => {
   vi.restoreAllMocks();
@@ -41,13 +41,13 @@ afterEach(async () => {
 // Bundled packages and user-added packages share the same persisted enablement and removal operations.
 it("application commands register and remove plugin packages and represent restart markers correctly", () => {
   const root = mkdtempSync(join(tmpdir(), "core-session-")); roots.push(root);
-  const service = new ApplicationService(root); services.push(service);
+  const service = new ApplicationService(root, { distribution: fixtureDistribution(root) }); services.push(service);
   const dir = join(root, "pkg"); mkdirSync(dir);
   writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { displayName: "Test plugin", id: "acme.p" } }));
   publishFixtureArtifact(dir, "acme.p");
   const added = service.execute({ type: "plugin.add", path: dir });
-  expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([["bundled:builtin", "pending", true], [dir, "pending", true]]);
-  expect(added.plugins[0]).toMatchObject({ id: "asterism.builtin", index: 0, bundled: true });
+  expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([["bundled:bundle", "pending", true], [dir, "pending", true]]);
+  expect(added.plugins[0]).toMatchObject({ id: "fixture.bundled", index: 0, bundled: true });
   expect(added.restartRequired).toBe(true);
   expect(service.execute({ type: "plugin.remove", index: 1 }).restartRequired).toBe(false);
   expect(service.execute({ type: "plugin.enable", index: 0, enabled: false }).plugins[0]?.enabled).toBe(false);
@@ -56,59 +56,62 @@ it("application commands register and remove plugin packages and represent resta
 // Removing a distribution entry must retain its recovery card without silently restoring persistence.
 it("keeps removed bundled packages discoverable and adds them back through the ordinary loading list", () => {
   const root = mkdtempSync(join(tmpdir(), "bundled-plugin-")); roots.push(root);
-  const service = new ApplicationService(root); services.push(service);
+  const distribution = fixtureDistribution(root);
+  const service = new ApplicationService(root, { distribution }); services.push(service);
   const removed = service.execute({ type: "plugin.remove", index: 0 });
   expect(removed.plugins).toHaveLength(1);
   expect(removed.plugins[0]).toMatchObject({
-    source: "bundled:builtin", id: "asterism.builtin", index: null, bundled: true,
+    source: "bundled:bundle", id: "fixture.bundled", index: null, bundled: true,
     status: "available", enabled: false, renderer: null,
-    metadata: { name: { defaultMessage: "Asterism Essentials" }, description: { defaultMessage: "Agents, conversations, notes, files and interactive tools." } },
+    metadata: { name: "Bundled fixture", description: "Bundled fixture description" },
   });
   expect(removed.restartRequired).toBe(true);
-  expect(applicationPackages(root).read()).toEqual([]);
-  const restored = service.execute({ type: "plugin.add-bundled", source: "bundled:builtin" });
+  expect(applicationPackages(root, distribution).read()).toEqual([]);
+  const restored = service.execute({ type: "plugin.add-bundled", source: "bundled:bundle" });
   expect(restored.plugins).toHaveLength(1);
   expect(restored.plugins[0]).toMatchObject({ index: 0, enabled: true, status: "pending" });
-  expect(applicationPackages(root).read()).toEqual([{ source: { kind: "bundled", name: "builtin" }, enabled: true }]);
+  expect(applicationPackages(root, distribution).read()).toEqual([{ source: { kind: "bundled", name: "bundle" }, enabled: true }]);
   expect(restored.restartRequired).toBe(false);
 });
 
 // Recovery comes from the distribution, including when a user edits the file before startup.
 it("discovers bundled packages absent from the saved list without shifting configured indices", () => {
   const root = mkdtempSync(join(tmpdir(), "bundled-plugin-")); roots.push(root);
+  const distribution = fixtureDistribution(root);
   const dir = join(root, "external"); mkdirSync(dir);
   writeFileSync(join(dir, "package.json"), JSON.stringify({ asterism: { id: "acme.external", displayName: "External plugin" } }));
   publishFixtureArtifact(dir, "acme.external");
-  applicationPackages(root).add({ source: { kind: "path", path: dir } }, root);
+  applicationPackages(root, distribution).add({ source: { kind: "path", path: dir } }, root);
   const file = join(root, "plugins.json");
   const saved = JSON.parse(readFileSync(file, "utf8"));
   saved.packages.splice(0, 1);
   writeFileSync(file, JSON.stringify(saved));
-  const service = new ApplicationService(root); services.push(service);
+  const service = new ApplicationService(root, { distribution }); services.push(service);
   const snapshot = service.execute({ type: "workspace.read" });
   expect(snapshot.plugins.map(plugin => [plugin.source, plugin.index, plugin.status])).toEqual([
-    [dir, 0, "pending"], ["bundled:builtin", null, "available"],
+    [dir, 0, "pending"], ["bundled:bundle", null, "available"],
   ]);
   expect(snapshot.restartRequired).toBe(false);
   expect(JSON.parse(readFileSync(file, "utf8"))).toEqual(saved);
-  const restored = service.execute({ type: "plugin.add-bundled", source: "bundled:builtin" });
+  const restored = service.execute({ type: "plugin.add-bundled", source: "bundled:bundle" });
   expect(restored.restartRequired).toBe(true);
-  expect(restored.plugins.map(plugin => [plugin.source, plugin.index])).toEqual([[dir, 0], ["bundled:builtin", 1]]);
-  expect(service.execute({ type: "plugin.remove", index: 0 }).plugins.map(plugin => plugin.source)).toEqual(["bundled:builtin"]);
+  expect(restored.plugins.map(plugin => [plugin.source, plugin.index])).toEqual([[dir, 0], ["bundled:bundle", 1]]);
+  expect(service.execute({ type: "plugin.remove", index: 0 }).plugins.map(plugin => plugin.source)).toEqual(["bundled:bundle"]);
 });
 
 // The same plugin can be registered by path; recovery must respect plugin identity, not just source labels.
 it("hides recovery for a bundled identity already added by path and rejects duplicate or unknown additions", () => {
   const root = mkdtempSync(join(tmpdir(), "bundled-plugin-")); roots.push(root);
-  const list = applicationPackages(root);
+  const distribution = fixtureDistribution(root);
+  const list = applicationPackages(root, distribution);
   list.remove(0);
-  list.add({ source: { kind: "path", path: applicationDirectory("packages/builtin") } }, root);
-  const service = new ApplicationService(root); services.push(service);
+  list.add({ source: { kind: "path", path: join(distribution.directory, "bundle") } }, root);
+  const service = new ApplicationService(root, { distribution }); services.push(service);
   expect(service.execute({ type: "workspace.read" }).plugins).toHaveLength(1);
-  expect(() => service.execute({ type: "plugin.add-bundled", source: "bundled:builtin" })).toThrow("already added");
+  expect(() => service.execute({ type: "plugin.add-bundled", source: "bundled:bundle" })).toThrow("already added");
   expect(() => service.execute({ type: "plugin.add-bundled", source: "bundled:missing" })).toThrow("No such bundled package");
   expect(list.read()).toHaveLength(1);
-  expect(service.execute({ type: "plugin.remove", index: 0 }).plugins[0]).toMatchObject({ source: "bundled:builtin", status: "available" });
+  expect(service.execute({ type: "plugin.remove", index: 0 }).plugins[0]).toMatchObject({ source: "bundled:bundle", status: "available" });
 });
 
 function gate() {

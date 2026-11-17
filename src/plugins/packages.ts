@@ -80,9 +80,12 @@ export class PluginPackageError extends Error {
   constructor(readonly code: "not_a_package" | "invalid_manifest" | "duplicate" | "build_failed" | "invalid_entry", message: string) { super(message); }
 }
 
+/** Packages shipped with the application: default selections and the directory containing them by name. */
+export interface Distribution { packages: readonly PackageEntry[]; directory: string }
+
 /** Source adapter: yields only a package root; later stages no longer distinguish sources. */
-export function packageRoot(entry: PackageEntry, npmRoot: string): string {
-  if (entry.source.kind === "bundled") return applicationDirectory(`packages/${entry.source.name}`);
+export function packageRoot(entry: PackageEntry, npmRoot: string, bundledDirectory: string): string {
+  if (entry.source.kind === "bundled") return join(bundledDirectory, entry.source.name);
   return entry.source.kind === "path" ? resolve(entry.source.path) : entry.source.installation ? join(npmRoot, applicationStorage.pluginInstallationsDirectory, entry.source.installation, "node_modules", entry.source.name) : join(npmRoot, "node_modules", entry.source.name);
 }
 
@@ -151,11 +154,12 @@ function packageManuals(root: string, manifest: PluginPackageManifest, artifact:
   return sources.map(source => ({ ...source, path: `plugins/${manifest.id}/${source.path}` }));
 }
 
-/** Package list persistence: `<data>/plugins.json`; changes take effect after restart. */
+/** Package list persistence: `<data>/plugins.json`; changes take effect after restart. The distribution supplies defaults and bundled roots. */
 export class PackageList {
-  constructor(private readonly file: string, private readonly defaults: readonly PackageEntry[] = []) {}
+  constructor(private readonly file: string, readonly distribution: Distribution = { packages: [], directory: applicationDirectory("packages") }) {}
+  root(entry: PackageEntry, npmRoot: string): string { return packageRoot(entry, npmRoot, this.distribution.directory); }
   read(): PackageEntry[] {
-    if (!existsSync(this.file)) return structuredClone([...this.defaults]);
+    if (!existsSync(this.file)) return structuredClone([...this.distribution.packages]);
     return listSchema.parse(JSON.parse(readFileSync(this.file, "utf8"))).packages;
   }
   private write(packages: PackageEntry[]): void {
@@ -166,10 +170,10 @@ export class PackageList {
   }
   /** Validate on addition: invalid packages fail without entries; new entries are enabled by default. */
   add(entry: Omit<PackageEntry, "enabled">, npmRoot: string): PluginPackageManifest {
-    const manifest = validatePackageArtifact(packageRoot({ ...entry, enabled: true }, npmRoot));
+    const manifest = validatePackageArtifact(this.root({ ...entry, enabled: true }, npmRoot));
     const packages = this.read();
     for (const existing of packages) {
-      try { if (readManifest(packageRoot(existing, npmRoot)).id === manifest.id) throw new PluginPackageError("duplicate", `Plugin ${manifest.id} is already added.`); }
+      try { if (readManifest(this.root(existing, npmRoot)).id === manifest.id) throw new PluginPackageError("duplicate", `Plugin ${manifest.id} is already added.`); }
       catch (error) { if (error instanceof PluginPackageError && error.code === "duplicate") throw error; }
     }
     this.write([...packages, { ...entry, enabled: true }]);
@@ -179,10 +183,10 @@ export class PackageList {
   replace(index: number, entry: PackageEntry, npmRoot: string): PluginPackageManifest {
     const packages = this.read();
     if (!packages[index]) throw new PluginPackageError("invalid_entry", "No such package entry.");
-    const manifest = validatePackageArtifact(packageRoot(entry, npmRoot));
+    const manifest = validatePackageArtifact(this.root(entry, npmRoot));
     for (const [otherIndex, existing] of packages.entries()) {
       if (otherIndex === index) continue;
-      try { if (readManifest(packageRoot(existing, npmRoot)).id === manifest.id) throw new PluginPackageError("duplicate", `Plugin ${manifest.id} is already added.`); }
+      try { if (readManifest(this.root(existing, npmRoot)).id === manifest.id) throw new PluginPackageError("duplicate", `Plugin ${manifest.id} is already added.`); }
       catch (error) { if (error instanceof PluginPackageError && error.code === "duplicate") throw error; }
     }
     packages[index] = entry;
@@ -262,7 +266,7 @@ export async function buildPackages(list: PackageList, npmRoot: string, reserved
   const result: BuiltPackage[] = [];
   const ids = new Map<string, number>();
   for (const entry of list.read()) {
-    const root = packageRoot(entry, npmRoot);
+    const root = list.root(entry, npmRoot);
     let metadata: PluginMetadata = {}, metadataError: string | undefined;
     try { metadata = readPackageMetadata(root); } catch (error) { metadataError = pluginErrorMessage(error); }
     const item: BuiltPackage = { entry, root, manifest: null, metadata, metadataError, status: "invalid",

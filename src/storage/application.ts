@@ -1,5 +1,5 @@
 import { pathWithin } from "./paths.ts";
-import { applicationPackages } from "../plugins/distribution.ts";
+import { applicationPackages, applicationDistribution } from "../plugins/distribution.ts";
 import { join, resolve } from "node:path";
 import type { PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
 import { configurationStorage } from "../configuration/store.ts";
@@ -69,12 +69,12 @@ async function discoverPluginStorage(root: string, built: readonly BuiltPackage[
 }
 
 export async function prepareApplicationData(root: string, version: string, onHost?: (status: "migrating" | "ready") => void,
-  onProgress?: (progress: PreparationProgress) => void, decrypt?: (ciphertext: string) => Promise<string>): Promise<PreparationResult> {
+  onProgress?: (progress: PreparationProgress) => void, decrypt?: (ciphertext: string) => Promise<string>, distribution = applicationDistribution): Promise<PreparationResult> {
   let pluginBuild: string | undefined;
   const result = await prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root, decrypt), onHost, onProgress,
     discover: async () => {
       const cache = join(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory);
-      const built = await buildPackages(applicationPackages(root), join(root, applicationStorage.pluginPackagesDirectory), [],
+      const built = await buildPackages(applicationPackages(root, distribution), join(root, applicationStorage.pluginPackagesDirectory), [],
         id => onProgress?.({ stage: "dataPlugins", detail: id }));
       collectManagedInstallations(join(root, applicationStorage.pluginPackagesDirectory), new Set(built.flatMap(item =>
         item.entry.source.kind === "npm" && item.entry.source.installation ? [item.entry.source.installation] : [])));

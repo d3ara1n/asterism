@@ -82,8 +82,8 @@ describe("Plugin packages", () => {
     writeFileSync(file, JSON.stringify({ version: 2, packages }));
     const entries = new PackageList(file).read();
     expect(entries).toEqual(packages);
-    expect(packageRoot(entries[2]!, data)).toBe(join(data, "node_modules/@example/plugin"));
-    expect(packageRoot(entries[3]!, data)).toBe(join(data, "installations/captured-id/node_modules/@example/next"));
+    expect(packageRoot(entries[2]!, data, data)).toBe(join(data, "node_modules/@example/plugin"));
+    expect(packageRoot(entries[3]!, data, data)).toBe(join(data, "installations/captured-id/node_modules/@example/next"));
   });
 
 });

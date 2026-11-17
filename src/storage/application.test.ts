@@ -8,7 +8,6 @@ import { readJson, writeJson } from "./files.ts";
 import { PluginStorage } from "../plugins/storage.ts";
 import builtinStorage from "../../packages/builtin/src/storage.ts";
 import { BuiltinSettings } from "../../packages/builtin/src/settings/contract.ts";
-import { applicationPackages } from "../plugins/distribution.ts";
 
 const roots: string[] = [];
 function root() { const directory = mkdtempSync(join(tmpdir(), "asterism-prepare-")); roots.push(directory); return directory; }
@@ -17,8 +16,8 @@ afterEach(() => { for (const directory of roots.splice(0)) rmSync(directory, { r
 // Business logic creates new persistent stores; preparation may build plugins without reporting a data migration.
 it("preparation leaves new persistent stores uncreated and does not record a migration", async () => {
   const directory = root();
-  applicationPackages(directory).setEnabled(0, false);
-  expect((await prepareApplicationData(directory, "0.1.0")).ok).toBe(true);
+  // An empty distribution keeps host preparation independent of the repository's built plugins.
+  expect((await prepareApplicationData(directory, "0.1.0", undefined, undefined, undefined, { packages: [], directory })).ok).toBe(true);
   expect(existsSync(join(directory, "configuration.json"))).toBe(false);
   expect(existsSync(join(directory, "recovery"))).toBe(false);
 });

@@ -6,10 +6,10 @@ import type { DatabaseSync } from "node:sqlite";
 import { ConfigurationService } from "../configuration/service.ts";
 import { applicationStorage } from "../shared/application.ts";
 import type { ModelAdapter } from "../model/contract.ts";
-import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot, packageSource, type PackageEntry } from "../plugins/packages.ts";
+import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageSource, type Distribution, type PackageEntry } from "../plugins/packages.ts";
 import { readManagedPluginId } from "../plugins/npm-records.ts";
 import { NpmInstallations } from "../plugins/npm-installation.ts";
-import { applicationPackages, applicationManuals, bundledPackages } from "../plugins/distribution.ts";
+import { applicationPackages, applicationManuals } from "../plugins/distribution.ts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { ModelSettings } from "../shared/model.ts";
@@ -41,10 +41,10 @@ export class ApplicationService {
   private readonly started: string;
   private readonly startedEntries: readonly PackageEntry[];
   private readonly npm: NpmInstallations;
-  constructor(root: string, private readonly options: { rendererImportMap?: Record<string, string>; packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
+  constructor(root: string, private readonly options: { rendererImportMap?: Record<string, string>; packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage; distribution?: Distribution } = {}) {
     this.db = openDatabase(root);
     this.folders = new FolderStore(this.db);
-    this.list = applicationPackages(root);
+    this.list = applicationPackages(root, options.distribution);
     this.startedEntries = options.packageEntries ?? this.list.read();
     this.started = JSON.stringify(this.startedEntries);
     this.npmRoot = join(root, applicationStorage.pluginPackagesDirectory);
@@ -105,7 +105,7 @@ export class ApplicationService {
           const entry = this.list.read().find(entry => packageSource(entry) === command.targetSource);
           if (!entry || entry.source.kind !== "npm") throw new Error("No such managed npm package.");
           const retainedId = entry.source.installation ? readManagedPluginId(this.npmRoot, entry.source.installation) : null;
-          target = { source: command.targetSource, name: entry.source.name, installation: entry.source.installation, version: entry.source.version, id: retainedId ?? readManifest(packageRoot(entry, this.npmRoot)).id };
+          target = { source: command.targetSource, name: entry.source.name, installation: entry.source.installation, version: entry.source.version, id: retainedId ?? readManifest(this.list.root(entry, this.npmRoot)).id };
         }
         this.npm.preview(command.spec, target);
       } else if (command.type === "plugin.npm.install") this.npm.install(command.operationId);
@@ -113,7 +113,7 @@ export class ApplicationService {
       else if (command.type === "plugin.npm.cancel") this.npm.cancel(command.operationId);
       else if (command.type === "plugin.add") this.list.add({ source: { kind: "path", path: command.path } }, this.npmRoot);
       else if (command.type === "plugin.add-bundled") {
-        const entry = bundledPackages.find(entry => packageSource(entry) === command.source);
+        const entry = this.list.distribution.packages.find(entry => packageSource(entry) === command.source);
         if (!entry) throw new PluginPackageError("invalid_entry", "No such bundled package.");
         this.list.add(entry, this.npmRoot);
       } else if (command.type === "plugin.enable") this.list.setEnabled(command.index, command.enabled);
@@ -138,7 +138,7 @@ export class ApplicationService {
     const current = this.list.read();
     const entries = [
       ...current.map((entry, index) => ({ entry, index })),
-      ...bundledPackages.filter(entry => !current.some(item => packageSource(item) === packageSource(entry)))
+      ...this.list.distribution.packages.filter(entry => !current.some(item => packageSource(item) === packageSource(entry)))
         .map(entry => ({ entry, index: null })),
     ];
     // Available distribution entries describe packages without adding them to the loading list.
@@ -148,7 +148,7 @@ export class ApplicationService {
       const capturedEntry = this.startedEntries.find(item => packageSource(item) === source);
       const pending = !startup || startup.enabled !== entry.enabled || JSON.stringify(capturedEntry) !== JSON.stringify(entry);
       let metadata = startup?.metadata ?? {}, id = startup?.id ?? null, metadataError = startup?.metadataError ?? null;
-      const root = packageRoot(entry, this.npmRoot);
+      const root = this.list.root(entry, this.npmRoot);
       if (pending || index === null) {
         try { metadata = readPackageMetadata(root); metadataError = null; }
         catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
