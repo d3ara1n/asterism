@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
-import { describeError } from "./error-details.ts";
+import { z } from "zod";
+import { describeError, errorMessage } from "./error-details.ts";
 
 // SDK exceptions put request parameters and responses in the same object; save only error and response data in diagnostics.
 it("error details preserve raw responses and cause chains while excluding request fields and credential response headers", () => {
@@ -25,4 +26,27 @@ it("ordinary server error data and existing diagnostics retain their original te
   const details = describeError(original);
   expect(details.data).toBe(JSON.stringify(original));
   expect(describeError(Object.assign(new Error("wrapper"), { details }))).toEqual(details);
+});
+
+// A missing message must not promote the complete server object into the summary.
+it("missing and empty messages use the caller's summary while diagnostics preserve server data", () => {
+  const raw = { type: "error", error: { code: "overloaded", retry_after: 5 } };
+  expect(errorMessage(raw, "Provider request failed.")).toBe("Provider request failed.");
+  expect(describeError(raw).data).toBe(JSON.stringify(raw));
+  expect(errorMessage(new Error("  "), "Agent execution failed.")).toBe("Agent execution failed.");
+  expect(errorMessage("", "Agent execution failed.")).toBe("Agent execution failed.");
+  expect(errorMessage({ message: 400 }, "Provider request failed.")).toBe("Provider request failed.");
+  expect(errorMessage({ message: "Upstream overloaded", data: raw }, "Provider request failed.")).toBe("Upstream overloaded");
+  expect(errorMessage("Connection refused", "Provider request failed.")).toBe("Connection refused");
+});
+
+// Zod's message is a serialized issue tree, not the summary consumed by notices and diagnostics.
+it("validation errors separate the failure summary from the original issue tree", () => {
+  const parsed = z.object({ count: z.number() }).safeParse({ count: "invalid" });
+  if (parsed.success) throw new Error("Expected validation to fail.");
+  expect(errorMessage(parsed.error, "Agent execution failed.")).toBe("Validation failed.");
+  expect(describeError(parsed.error).message).toBe(parsed.error.message);
+  expect(JSON.parse(describeError(parsed.error).message)).toEqual([
+    expect.objectContaining({ code: "invalid_type", path: ["count"], expected: "number" }),
+  ]);
 });

@@ -44,6 +44,14 @@ Builtin uses bounded automatic recovery for upstream model failures before tool 
 
 Each retry is a new request projected from the current history and captures its own environment. Completed usable blocks remain input; incomplete blocks do not. Recovery does not fabricate a user message or continue an unfinished JSON argument. Provider restrictions on the resulting conversation remain visible as upstream errors. The Agent's live activity represents requesting, generating, tool execution, and waiting to retry.
 
+## Failure summaries and diagnostic details
+
+An execution failure carries a standalone English `message` that identifies the failure and optional `details` that preserve the original exception and response evidence. The error producer or adapter owns this separation. Existing meaningful error messages remain summaries; errors without a message receive a hardcoded summary of their error type at the boundary that translates them. Serialized objects, validation issue trees, response bodies, and stacks belong in diagnostics rather than being used to fill a missing summary.
+
+Third-party exceptions can already embed received values and validation issues in their message. The owning adapter recognizes these error types and supplies a failure summary while retaining the original exception text in `details.message`. Zod validation failures follow the same separation at execution boundaries. This is semantic error translation, not truncation, first-line extraction, or localization of diagnostics. Error codes, origins, retry eligibility, and original diagnostic data retain their independent meanings.
+
+Execution diagnostics, response termination metadata, and Agent feedback propagate the producer's summary alongside its details. Conversation notices display that message directly; they do not infer an error type, substitute a generic title, or copy raw details into the message. The error-details view and copy action retain the original diagnostic text and response evidence. These rules apply to newly produced failures; completed historical records remain immutable.
+
 ## Observation boundaries
 
 Input preparation is independent of loop startup. Idle input, steering, follow-ups, and Home's first input all pass through the same action preparers. Preparation can replace or reject an attempt and is distinct from committed acceptance.

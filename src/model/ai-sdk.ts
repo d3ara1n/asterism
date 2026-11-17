@@ -9,7 +9,7 @@ import { projectHistory, validateProjection } from "./projection.ts";
 import { modelProtocol, type ModelProtocol } from "./protocols/index.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
-import { describeError, type ModelResponse } from "@asterism-app/sdk/contracts";
+import { describeError, errorMessage, type ModelResponse } from "@asterism-app/sdk/contracts";
 import { ZodError } from "zod";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
@@ -23,8 +23,11 @@ function providerFailure(error: unknown, upstream = false): ModelFailure {
   const details = describeError(error);
   const parsing = responseParsingFailure(error);
   const remote = upstream || APICallError.isInstance(error) || StreamProviderError.isInstance(error);
+  // SDK parsing/validation messages embed received values and issue trees; retain them only in details.
+  const message = parsing ? "Model response parsing failed."
+    : errorMessage(error, remote ? "Provider request failed." : "Model processing failed.");
   return new ModelFailure(parsing ? "response_parsing" : remote ? "provider_error" : "processing_error",
-    details.message, details, remote ? "model" : "software", remote);
+    message, details, remote ? "model" : "software", remote);
 }
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
@@ -163,7 +166,6 @@ export class AiSdkAdapter implements ModelAdapter {
           responseHeaders: failure.details.responseHeaders
             ?? describeError({ message: "", responseHeaders: received.headers }).responseHeaders! };
       }
-      if (!failure.message) failure.message = received ? `HTTP ${received.status}` : failure.details.name ?? "Error";
       failure.response = responseMetadata;
       failure.usage = measured.usage;
       failure.providerResponseId = measured.responseId;
@@ -245,7 +247,7 @@ export class AiSdkAdapter implements ModelAdapter {
           }
           yield { type: "part.end", partId: `tool:${event.toolCallId}`, arguments: json(event.input), continuation: protocol.capture(event.providerMetadata) }; break;
         case "error":
-          // Server and transport errors retain original diagnostics; programmatic classification does not replace their messages or response bodies.
+          // Server and transport errors retain raw diagnostics separately from the failure summary.
           {
             const failure = providerFailure(event.error, rawFailure !== undefined || (receivedResponse() && responseParsingFailure(event.error)));
             failure.details ??= describeError(event.error);

@@ -3,6 +3,7 @@ import { z } from "zod";
 /** Transferable raw error data; response bodies and additional data remain text to avoid being scanned as business references. */
 export type ErrorDetails = {
   name?: string;
+  /** Original diagnostic text, which may include serialized values and validation issues; not a failure summary. */
   message: string;
   code?: string | number;
   statusCode?: number;
@@ -24,6 +25,17 @@ export const errorDetailsSchema: z.ZodType<ErrorDetails> = z.strictObject({
   responseHeaders: z.record(z.string(), z.string()).optional(), data: z.string().optional(),
   stack: z.string().optional(), causes: z.lazy(() => errorDetailsSchema.array()).optional(),
 });
+
+/** Select an English failure summary, using the caller's error-type fallback when no message exists.
+ * Zod messages serialize validation issues; their original text belongs in describeError(), not the summary.
+ * Other integration-specific diagnostic messages are summarized by their owning adapter before propagation.
+ */
+export function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof z.ZodError) return "Validation failed.";
+  const message = typeof error === "string" ? error
+    : error && typeof error === "object" && "message" in error ? error.message : undefined;
+  return typeof message === "string" && message.trim() ? message : fallback;
+}
 
 /** Extract the error itself and response data; request bodies, request headers, and credentials are not error details. */
 export function describeError(error: unknown): ErrorDetails {

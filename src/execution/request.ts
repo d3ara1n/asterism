@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   presentationSchema, type ModelRunRequest, type ModelRunResult, type ModelRunEvent, type ModelSource,
   type ModelCompletion, type ModelResponse, type SystemPrompt, type ModelRequestIdentity, type RequestTiming, type ModelTermination,
-  describeError, type ErrorDetails, type ModelTools, type Usage,
+  describeError, errorMessage, type ErrorDetails, type ModelTools, type Usage,
 } from "@asterism-app/sdk/contracts";
 import { modelExpression, modelScope, type ModelSettings, type ToolOutcome } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ResolvedModelItem } from "../model/contract.ts";
@@ -145,7 +145,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
       const code = error instanceof ModelFailure ? error.code : "execution_failed";
       const details = describeError(error);
       const origin = error instanceof ModelFailure ? error.origin : "software";
-      const message = error instanceof Error ? error.message : details.message;
+      const message = errorMessage(error, "Model execution failed.");
       const retryable = !generationCompleted && error instanceof ModelFailure && error.retryable;
       failureDiagnostic = { type: "diagnostic", origin, code, message, level: "error", details };
       termination = { reason: "failed", code, details, retryable };

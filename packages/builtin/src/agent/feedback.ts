@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { errorDetailsSchema } from "@asterism-app/sdk/contracts";
 
+/** message is the producer's summary; details preserve raw diagnostics without being copied into message. */
 export const agentFeedbackSchema = z.strictObject({
   origin: z.enum(["model", "software"]), code: z.string(), message: z.string(),
   level: z.enum(["warning", "error"]), details: errorDetailsSchema.optional(),

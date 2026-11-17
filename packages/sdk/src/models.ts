@@ -40,6 +40,7 @@ export type ModelEvent =
   | { type: "part.end"; partId: string; arguments?: Json; continuation?: Json }
   | { type: "finish"; reason: string; usage: Usage | null; responseId?: string; rawFinishReason?: string; source?: ModelSource; timing?: RequestTiming; response?: ModelResponse | null };
 export type ModelSource = { model: string; adapter: string; scope: string };
+/** Failure message is a standalone English summary; details preserve original diagnostic text and response data. */
 export type ModelTermination =
   | { reason: "completed" }
   | { reason: "cancelled" }
@@ -77,6 +78,7 @@ export type ModelLiveBlock = { id: string; responseId: string; ordinal: number }
       /** One-shot attention time, present only in live execution; history does not replay notices. */
       noticeAt?: number }
 );
+/** Diagnostic message is a failure/warning summary; raw exception text and payloads belong in details. */
 export type ModelRunEvent =
   | { type: "block"; block: ModelBlock }
   | { type: "tool.begin"; block: Extract<ModelBlock, { kind: "toolcall" }> }

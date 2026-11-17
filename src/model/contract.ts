@@ -1,13 +1,14 @@
 import type { Json, ModelSettings } from "../shared/model.ts";
 import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming, ErrorDetails, Usage } from "@asterism-app/sdk/contracts";
 
+/** message is a failure summary; details retain the original exception and response diagnostics. */
 export class ModelFailure extends Error {
   timing?: RequestTiming;
   response?: ModelResponse | null;
   usage?: Usage | null;
   providerResponseId?: string;
   constructor(readonly code: string, message: string, public details?: ErrorDetails,
-    readonly origin: "model" | "software" = "software", readonly retryable = false) { super(message); }
+    readonly origin: "model" | "software" = "software", readonly retryable = false) { super(message.trim() ? message : "Model execution failed."); }
 }
 export interface ToolDeclaration { name: string; description: string; parameters: Json }
 export type { ModelEvent, StreamPart } from "@asterism-app/sdk/contracts";

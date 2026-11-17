@@ -52,8 +52,19 @@ describe("AI SDK adaptation contract", () => {
     current.settings.provider.protocol = "openai-chat";
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(
       `data: ${chunk}\n\n`, { headers: { "content-type": "text/event-stream" } }));
-    await expect(consume(adapter.prepare(current).stream(new AbortController().signal)))
-      .rejects.toMatchObject({ origin: "model", retryable: true, code: "response_parsing", details: { httpStatus: 200 } });
+    const failure = await consume(adapter.prepare(current).stream(new AbortController().signal)).catch(error => error);
+    expect(failure).toMatchObject({ origin: "model", retryable: true, code: "response_parsing",
+      message: "Model response parsing failed.", details: { httpStatus: 200 } });
+    // Received data and validation issues remain diagnostic text instead of being copied into the failure summary.
+    expect(failure.details.message).not.toBe(failure.message);
+    expect(failure.details.rawResponse).toContain(chunk);
+  });
+  it("message-less SDK errors get a processing summary without serializing their data into it", async () => {
+    const raw = { code: "adapter_failure", diagnostic: { value: [1, 2, 3] } };
+    const model = new MockLanguageModelV4({ doStream: async () => { throw raw; } });
+    const adapter = new AiSdkAdapter(async () => "credential", () => model);
+    await expect(consume(adapter.prepare(input).stream(new AbortController().signal)))
+      .rejects.toMatchObject({ message: "Model processing failed.", details: { data: JSON.stringify(raw) } });
   });
   // The Anthropic SDK consumes the first error in doStream and trims fields; the transport prefix retains data actually received.
   it("preserves the original response when the first SSE event fails and distinguishes actual HTTP from SDK-inferred status", async () => {

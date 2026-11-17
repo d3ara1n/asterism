@@ -1,5 +1,5 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices, type ExecutionServices, type ProviderUsage } from "@asterism-app/sdk/runtime";
-import { ResourceNoticeRaised, describeError, formatModelExpression, type ResourceNotice, type ModelRunObserver, type ModelRunResult } from "@asterism-app/sdk/contracts";
+import { ResourceNoticeRaised, describeError, errorMessage, formatModelExpression, type ResourceNotice, type ModelRunObserver, type ModelRunResult } from "@asterism-app/sdk/contracts";
 import { Execution, ToolExecution, AgentTurnEnded, type AgentTurnEndReason } from "@asterism-app/builtin-api/contracts";
 import { runAgentLoop } from "./loop.ts";
 import { agentRequestRetries } from "./retry.ts";
@@ -60,7 +60,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
     const details = describeError(error);
     deps.feedback.report(object, { origin: feedbackOrigin(error), level: "error",
       code: error instanceof PluginApiError ? error.code : "execution_failed",
-      message: error instanceof Error ? error.message : details.message, details }, interrupted);
+      message: errorMessage(error, "Agent execution failed."), details }, interrupted);
   };
   // Task registration is synchronous; callers check their domain conditions before handing off owned work.
   const startTask = (object: ObjectExecutor, kind: "conversation" | "compression",
