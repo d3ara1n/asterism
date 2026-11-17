@@ -8,7 +8,7 @@ import type { RendererFrame, RuntimeFrame } from "../shared/connection.ts";
 import type { PluginCandidate } from "../shared/plugin-startup.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ApplicationService } from "./service.ts";
 import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
@@ -24,9 +24,11 @@ function publishFixtureArtifact(root: string, id: string): void {
   writeFileSync(join(root, "dist/artifact.json"), JSON.stringify(emptyArtifact(id)));
 }
 // Application-list tests exercise selection, not the separate process-backed distribution build contract.
+// Bundled and path sources reach the builtin root with and without a trailing separator; both must avoid built output.
 const captureArtifact = artifactResolver.captureArtifact;
+const builtinRoot = resolve(applicationDirectory("packages/builtin"));
 beforeEach(() => {
-  vi.spyOn(artifactResolver, "captureArtifact").mockImplementation((root, id) => root === applicationDirectory("packages/builtin")
+  vi.spyOn(artifactResolver, "captureArtifact").mockImplementation((root, id) => resolve(root) === builtinRoot
     ? { artifact: emptyArtifact(id), artifactRoot: root } : captureArtifact(root, id));
 });
 
