@@ -104,7 +104,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
       keepAwake={session.keepAwake} onKeepAwakeChange={value => onKeepAwakeChange(session.id, value)}
       completed={session.completed} onCompletedChange={completed => onCompletedChange(session.id, completed)}
       renameDisabled={renameDisabledSessionId === session.id}
-      onRename={title => onRename(session.id, title)} onArchive={() => onArchive(session.id)} onTemplateSaved={onTemplateSaved}>
+      onRename={title => onRename(session.id, title)} onArchive={() => onArchive(session.id)} onTemplateSaved={onTemplateSaved} templates={snapshot?.templates ?? []}>
       {trigger => <ListRow variant="navigation"
         selected={selectedSessionId === session.id} disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
         tooltip={session.title}

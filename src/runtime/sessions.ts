@@ -523,6 +523,9 @@ export class SessionService {
       case "template.source": return { kind: "template.source", objects: this.templates.source(command.sessionId) };
       case "template.save": return { kind: "template.saved", templateId: this.transaction(() =>
         this.templates.save(command.sessionId, command.title, command.objectIds, command.folderId)) };
+      case "template.replace":
+        this.transaction(() => this.templates.replace(command.templateId, command.sessionId, command.objectIds));
+        return { kind: "template.saved", templateId: command.templateId };
       case "template.rename":
         this.transaction(() => this.templates.rename(command.templateId, command.title));
         return { kind: "template.renamed" };

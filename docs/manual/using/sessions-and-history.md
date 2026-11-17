@@ -30,6 +30,8 @@ Before continuing an old approach, reconcile its assumptions with the present ma
 
 Templates are useful for recurring combinations of participants, resources, and links. Save the parts of a setup that express how you want to begin similar work, then supply the new task's goal and material separately.
 
+Replacing an existing template updates the starting arrangement for future sessions, not sessions already created from it. The replacement is a complete snapshot rather than a merge: objects omitted from the new selection are no longer part of that template. Its name and folder stay the same, and changes in a source session do not update it automatically.
+
 A template starts a new session rather than copying an ongoing conversation or suspending and resuming its processes. Each resource determines which setup data it can reuse. References to external locations still point into the external world, so review them before treating a new session as an independent copy.
 
 ## Read activity and reminders separately

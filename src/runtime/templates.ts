@@ -46,13 +46,28 @@ export class TemplateStore {
   }
   save(sessionId: string, title: string, objectIds: readonly string[], folderId: string | null): string {
     requireFolder(this.db, folderId);
+    const value = this.capture(sessionId, objectIds);
+    const id = randomUUID();
+    this.db.prepare("INSERT INTO templates (id, title, created_at, data_json, folder_id) VALUES (?, ?, ?, ?, ?)").run(id, title, new Date().toISOString(), JSON.stringify(value), folderId);
+    this.bindContent(id, sessionId, value);
+    return id;
+  }
+  replace(id: string, sessionId: string, objectIds: readonly string[]): void {
+    if (!this.db.prepare("SELECT 1 FROM templates WHERE id = ?").get(id))
+      throw new SessionError("not_found", "Template not found.", templateMessages.notFound);
+    const value = this.capture(sessionId, objectIds);
+    this.db.prepare("UPDATE templates SET data_json = ? WHERE id = ?").run(JSON.stringify(value), id);
+    this.content.releaseTemplate(id);
+    this.bindContent(id, sessionId, value);
+  }
+  private capture(sessionId: string, objectIds: readonly string[]): TemplateData {
     const state = this.tree.workbench(sessionId);
     const selected = new Set(objectIds);
     const objects = state.objects.filter(object => selected.has(object.id));
     if (objects.length !== selected.size)
       throw new SessionError("not_found", "A selected template object is no longer present.", templateMessages.sourceChanged);
     const layout = this.workbench.layout(sessionId);
-    const value: TemplateData = {
+    return {
       objects: objects.map(object => {
         const template = this.resources.template(object.kind);
         const contracts = new Set(template?.current.map(contract => contract.id));
@@ -65,12 +80,11 @@ export class TemplateStore {
       islands: layout.islands.flatMap(island => island.view.kind === "object" && selected.has(island.view.objectId)
         ? [{ objectId: island.view.objectId, size: island.size }] : []),
     };
-    const id = randomUUID();
-    this.db.prepare("INSERT INTO templates (id, title, created_at, data_json, folder_id) VALUES (?, ?, ?, ?, ?)").run(id, title, new Date().toISOString(), JSON.stringify(value), folderId);
+  }
+  private bindContent(id: string, sessionId: string, value: TemplateData): void {
     const recordIds = new Set(this.tree.view(sessionId).timelineIds());
     for (const object of value.objects)
       this.content.bindTemplate(id, { sessionId, objectId: object.id, recordIds }, { data: object.data, current: object.current });
-    return id;
   }
   instantiate(templateId: string, sessionId: string): void {
     const row = this.db.prepare("SELECT title, data_json, folder_id FROM templates WHERE id = ?").get(templateId) as

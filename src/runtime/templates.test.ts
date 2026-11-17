@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -212,6 +213,132 @@ it("persists template renames for future conversations while preserving existing
   await second.app.sessions.execute({ type: "template.delete", templateId });
   await expect(second.app.sessions.execute({ type: "template.rename", templateId, title: "Missing" }))
     .rejects.toMatchObject({ code: "not_found" });
+});
+
+// Replacement writes a new snapshot under the same catalog identity, not a merge or an update to earlier instances.
+it("replaces a template snapshot while preserving its metadata, same-name neighbors, and existing sessions", async () => {
+  const first = open();
+  const sourceId = first.app.sessions.tree.create("Original source");
+  const source = first.plugin.session(sourceId);
+  const old = await source.create(Create, { title: "Old", seed: "old" });
+  const templateId = await save(first.app, sourceId, [old]);
+  const neighborId = await save(first.app, sourceId, [old]);
+  const folderId = randomUUID();
+  first.app.execute({ type: "folder.create", id: folderId, name: "Projects", color: "blue" });
+  first.app.execute({ type: "template.move", templateId, folderId });
+  const before = first.app.execute({ type: "workspace.read" }).templates;
+  const original = before.find(template => template.id === templateId)!;
+  const existingId = await start(first.app, templateId);
+
+  const replacementId = first.app.sessions.tree.create("Different source");
+  const replacement = first.plugin.session(replacementId);
+  const a = await replacement.create(Create, { title: "New A", seed: "new a" });
+  const b = await replacement.create(Create, { title: "New B", seed: "new b" });
+  const excluded = await replacement.create(Create, { title: "Excluded", seed: "excluded" });
+  replacement.link(a, b); replacement.link(a, excluded);
+  await first.app.sessions.execute({ type: "view.set", sessionId: replacementId, objectId: a.id,
+    position: { x: 320, y: 640 }, collapsed: true });
+  await first.app.sessions.execute({ type: "islands.set", sessionId: replacementId, islands: [
+    { id: "new-b", owner: null, size: 800, view: { kind: "object", objectId: b.id } },
+  ] });
+  await first.app.sessions.execute({ type: "template.replace", templateId, sessionId: replacementId, objectIds: [a.id, b.id] });
+  const after = first.app.execute({ type: "workspace.read" }).templates;
+  expect(after).toHaveLength(2);
+  expect(after.find(template => template.id === templateId)).toEqual({ ...original, objects: [
+    { id: a.id, kind: a.kind, title: "New A" }, { id: b.id, kind: b.kind, title: "New B" },
+  ] });
+  expect(after.find(template => template.id === neighborId)).toEqual(before.find(template => template.id === neighborId));
+  await close(first.app);
+
+  const second = open(first.root);
+  const createdId = await start(second.app, templateId);
+  const created = second.app.sessions.current(createdId);
+  expect(created.title).toBe("Reusable workbench");
+  expect(second.app.execute({ type: "workspace.read" }).sessions.find(session => session.id === createdId)?.folder_id).toBe(folderId);
+  expect(created.workbench.objects.map(object => object.title)).toEqual(["New A", "New B"]);
+  const [newA, newB] = created.workbench.objects;
+  expect(second.plugin.object(createdId, Item, newA!.id).get(State)).toEqual({ text: "new a", file: null });
+  expect(created.workbench.links).toEqual([{ receiverId: newA!.id, resourceId: newB!.id }]);
+  expect(created.workbench.views.find(view => view.objectId === newA!.id)).toMatchObject({ position: { x: 320, y: 640 }, collapsed: true });
+  expect(created.workbench.islands).toEqual([
+    { id: `object:${newB!.id}`, owner: null, size: 800, view: { kind: "object", objectId: newB!.id } },
+  ]);
+  const existing = second.app.sessions.current(existingId).workbench.objects;
+  expect(existing.map(object => object.title)).toEqual(["Old"]);
+  expect(second.plugin.object(existingId, Item, existing[0]!.id).get(State)).toEqual({ text: "old", file: null });
+});
+
+it("replaces attachment roots, retaining reused files and releasing superseded files", async () => {
+  const first = open();
+  const sourceId = first.app.sessions.tree.create("Source");
+  const source = first.plugin.session(sourceId);
+  const item = await source.create(Create, { title: "File", seed: "" });
+  const object = first.plugin.object(sourceId, Item, item.id);
+  await source.invoke(Generate, item, "old attachment");
+  const oldFile = object.get(State)!.file!;
+  const templateId = await save(first.app, sourceId, [item]);
+  await source.invoke(Generate, item, "replacement attachment");
+  const newFile = object.get(State)!.file!;
+  for (let i = 0; i < 2; i++)
+    await first.app.sessions.execute({ type: "template.replace", templateId, sessionId: sourceId, objectIds: [item.id] });
+  await close(first.app);
+  const db = openDatabase(first.root);
+  try { db.prepare("DELETE FROM sessions WHERE id = ?").run(sourceId); } finally { db.close(); }
+
+  const second = open(first.root);
+  const createdId = await start(second.app, templateId);
+  const copied = second.app.sessions.current(createdId).workbench.objects[0]!;
+  const reader = second.plugin.object(createdId, Item, copied.id);
+  expect(reader.get(State)!.file).toEqual(newFile);
+  expect(new TextDecoder().decode(await reader.content.read(newFile))).toBe("replacement attachment");
+  const stored = openDatabase(first.root);
+  try {
+    expect(stored.prepare("SELECT 1 FROM contents WHERE id = ?").get(oldFile["$asterism.content"])).toBeUndefined();
+  } finally { stored.close(); }
+});
+
+// An unauthorized file fails while binding content, after the snapshot update and old-root release have begun.
+it("rolls back both snapshot and attachment roots when replacement content cannot be bound", async () => {
+  const first = open();
+  const sourceId = first.app.sessions.tree.create("Source");
+  const source = first.plugin.session(sourceId);
+  const original = await source.create(Create, { title: "Original", seed: "" });
+  await source.invoke(Generate, original, "original attachment");
+  const originalFile = first.plugin.object(sourceId, Item, original.id).get(State)!.file!;
+  const templateId = await save(first.app, sourceId, [original]);
+  const candidate = await source.create(Create, { title: "Candidate", seed: "" });
+  const privateItem = await source.create(Create, { title: "Private", seed: "" });
+  await source.invoke(Generate, privateItem, "private attachment");
+  const foreignFile = first.plugin.object(sourceId, Item, privateItem.id).get(State)!.file!;
+  const before = first.app.execute({ type: "workspace.read" }).templates;
+  const db = openDatabase(first.root);
+  try {
+    db.prepare("UPDATE session_data SET data_json = ? WHERE session_id = ? AND object_id = ? AND contract_id = ?")
+      .run(JSON.stringify({ savedText: "invalid ownership", file: foreignFile }), sourceId, candidate.id, State.id);
+  } finally { db.close(); }
+  await expect(first.app.sessions.execute({ type: "template.replace", templateId, sessionId: sourceId, objectIds: [candidate.id] }))
+    .rejects.toThrow("does not belong");
+  expect(first.app.execute({ type: "workspace.read" }).templates).toEqual(before);
+  await close(first.app);
+  const cleanup = openDatabase(first.root);
+  try { cleanup.prepare("DELETE FROM sessions WHERE id = ?").run(sourceId); } finally { cleanup.close(); }
+  const second = open(first.root);
+  const createdId = await start(second.app, templateId);
+  const copied = second.app.sessions.current(createdId).workbench.objects[0]!;
+  expect(copied.title).toBe("Original");
+  const reader = second.plugin.object(createdId, Item, copied.id);
+  expect(new TextDecoder().decode(await reader.content.read(originalFile))).toBe("original attachment");
+});
+
+it("rejects replacement of a deleted template without creating another template", async () => {
+  const { app, plugin } = open();
+  const sourceId = app.sessions.tree.create("Source");
+  const item = await plugin.session(sourceId).create(Create, { title: "Item", seed: "seed" });
+  const templateId = await save(app, sourceId, [item]);
+  await app.sessions.execute({ type: "template.delete", templateId });
+  await expect(app.sessions.execute({ type: "template.replace", templateId, sessionId: sourceId, objectIds: [item.id] }))
+    .rejects.toMatchObject({ code: "not_found" });
+  expect(app.execute({ type: "workspace.read" }).templates).toEqual([]);
 });
 
 it("omits generated titles from storage and previews and generates each instance title only when starting", async () => {

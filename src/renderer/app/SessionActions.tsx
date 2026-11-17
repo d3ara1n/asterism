@@ -1,5 +1,6 @@
 import { Archive, Coffee, LayoutTemplate, ListChecks, MoreHorizontal, Pencil } from "lucide-react";
 import { useRef, useState, type ReactElement, type ReactNode } from "react";
+import type { TemplateSummary } from "../../shared/templates";
 import type { SessionResult } from "../../shared/session";
 import { RenameSession } from "../features/session/RenameSession";
 import { SaveTemplate } from "../features/templates/SaveTemplate";
@@ -34,12 +35,13 @@ function ToggleItem({ icon, label, checked, disabled, onCheckedChange }: {
 }
 
 /** Session row menu: rename, folder membership, save as template, and archive; actions are independent of session navigation. */
-export function SessionActions({ sessionId, title, folderId, disabled, sleeping, renameDisabled, onRename, onArchive, onTemplateSaved, completed, onCompletedChange, keepAwake, onKeepAwakeChange, children }: {
+export function SessionActions({ sessionId, title, folderId, disabled, sleeping, renameDisabled, onRename, onArchive, onTemplateSaved, templates, completed, onCompletedChange, keepAwake, onKeepAwakeChange, children }: {
   children: (trigger: ReactNode) => ReactElement;
   sessionId: string; title: string; folderId: string | null; disabled: boolean; sleeping: boolean; renameDisabled: boolean;
   onRename: (title: string) => Promise<SessionResult>;
   onArchive: () => Promise<SessionResult>;
   onTemplateSaved: () => void;
+  templates: readonly TemplateSummary[];
   completed: boolean; onCompletedChange: (completed: boolean) => Promise<void>;
   keepAwake: boolean; onKeepAwakeChange: (keepAwake: boolean) => Promise<void>;
 }) {
@@ -105,7 +107,7 @@ export function SessionActions({ sessionId, title, folderId, disabled, sleeping,
     </ActionMenu>
     {renaming && <RenameSession title={title} disabled={cannotRename} onSave={onRename}
       onClose={() => setRenaming(false)} onRestoreFocus={() => trigger.current?.focus({ preventScroll: true })} />}
-    {savingTemplate && <SaveTemplate sessionId={sessionId} title={title} folderId={folderId} disabled={disabled} onSaved={onTemplateSaved}
+    {savingTemplate && <SaveTemplate sessionId={sessionId} title={title} folderId={folderId} templates={templates} disabled={disabled} onSaved={onTemplateSaved}
       onClose={() => setSavingTemplate(false)} onRestoreFocus={() => trigger.current?.focus({ preventScroll: true })} />}
     {creatingFolder && <FolderDialog onSaved={target => { void move(target); }} onClose={() => setCreatingFolder(false)}
       onRestoreFocus={() => trigger.current?.focus({ preventScroll: true })} />}
