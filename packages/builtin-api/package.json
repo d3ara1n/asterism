@@ -15,7 +15,12 @@
     "registry": "https://registry.npmjs.org/"
   },
   "type": "module",
-  "asterism": { "manual": ["docs", "examples"] },
+  "asterism": {
+    "manual": [
+      "docs",
+      "examples"
+    ]
+  },
   "exports": {
     "./contracts": "./src/contracts.ts",
     "./renderer": "./src/renderer.ts",
@@ -27,13 +32,17 @@
     "zod": "^4.6.5"
   },
   "peerDependenciesMeta": {
-    "react": { "optional": true }
+    "react": {
+      "optional": true
+    }
   },
   "files": [
     "src",
     "!**/*.test.*",
     "docs",
     "examples",
-    "README.md"
+    "README.md",
+    "!examples/**/dist/**",
+    "!examples/dist/**"
   ]
 }

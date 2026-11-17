@@ -19,6 +19,7 @@ export interface PluginCandidate {
   metadataError?: string;
   renderer: string | null;
   stylesheet: string | null;
+  stylesheets?: readonly string[];
   dependencies: readonly string[];
   rendererDependencies: readonly string[];
 }

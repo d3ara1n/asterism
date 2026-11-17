@@ -1,109 +1,138 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
-import type { PluginDefinition } from "@asterism-app/sdk/runtime";
-import { PackageList, loadPackages } from "./packages.ts";
+import { afterEach, describe, it } from "vitest";
+import { fixture } from "./artifact-fixtures.integration.ts";
 
-const roots: string[] = [];
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
-function directory() { const root = mkdtempSync(join(tmpdir(), "asterism-public-")); roots.push(root); return root; }
-function file(root: string, path: string, content: string) {
-  const target = join(root, path);
-  mkdirSync(join(target, ".."), { recursive: true });
-  writeFileSync(target, content);
+const fixtures: Awaited<ReturnType<typeof fixture>>[] = [];
+afterEach(() => { for (const f of fixtures.splice(0)) f.close(); });
+async function setup() {
+  const f = await fixture(); fixtures.push(f);
+  await f.plugin("provider", {
+    runtime: "runtime.ts", renderer: "renderer.ts",
+    public: { runtime: { "@fixture/api/contracts": "public.ts", "@fixture/api/relay": "relay.ts" },
+      renderer: { "@fixture/api/contracts": "public.ts", "@fixture/api/relay": "relay.ts" } },
+  }, {
+    "public.ts": "export const registry=new Set();export class Token{};export let count=0;export function increment(){count++;}",
+    "relay.ts": "export {registry,Token,count,increment} from '@fixture/api/contracts';",
+    "runtime.ts": "import {registry,Token} from '@fixture/api/contracts';export default {namespace:{id:'fixture.provider'},probe:{registry,Token}};",
+    "renderer.ts": "export {registry,Token,count,increment} from '@fixture/api/relay';export default {modules:[]};",
+  });
+  for (const name of ["one", "two"]) await f.plugin(name, {
+    runtime: "runtime.ts", renderer: "renderer.ts", publicDependencies: ["@fixture/api"],
+  }, {
+    "runtime.ts": `import {registry,Token,count,increment} from '@fixture/api/relay';
+      export {count,increment};export default {namespace:{id:'fixture.${name}'},probe:{registry,Token,count:()=>count}};`,
+    "renderer.ts": "export {registry,Token,count,increment} from '@fixture/api/contracts';export default {modules:[]};",
+    "node_modules/@fixture/api/package.json": JSON.stringify({ name: "@fixture/api", type: "module", exports: { "./contracts": "./private.js", "./relay": "./private.js" } }),
+    "node_modules/@fixture/api/private.js": "throw new Error('A consumer-private public copy must never execute');",
+  });
+  return f;
 }
-function fixture() {
-  const data = directory(), provider = directory(), consumers = [directory(), directory()];
-  const list = new PackageList(join(data, "plugins.json")), cache = join(data, "cache");
-  file(provider, "package.json", JSON.stringify({ name: "@example/provider", type: "module",
-    asterism: { displayName: "Test plugin", id: "example.provider", runtime: "runtime.ts", renderer: "renderer.ts", publicPackages: ["@example/paradigm"] } }));
-  file(provider, "node_modules/@example/paradigm/package.json", JSON.stringify({
-    name: "@example/paradigm", type: "module", exports: { "./contracts": "./contracts.js" },
-  }));
-  file(provider, "node_modules/@example/paradigm/contracts.js", "export const registry = new Set();");
-  for (const [index, root] of [provider, ...consumers].entries()) {
-    const id = index ? `example.consumer${index}` : "example.provider";
-    if (index) {
-      file(root, "package.json", JSON.stringify({ name: `@example/consumer${index}`, type: "module",
-        asterism: { displayName: "Test plugin", id, runtime: "runtime.ts", renderer: "renderer.ts" } }));
-      file(root, "node_modules/@example/paradigm/package.json", JSON.stringify({
-        name: "@example/paradigm", type: "module", exports: { "./contracts": "./private.js" },
-      }));
-      file(root, "node_modules/@example/paradigm/private.js", 'throw new Error("A private copy must not replace the provider API.");');
-    }
-    file(root, "runtime.ts", `
-      import { pluginNamespace } from "@asterism-app/sdk/contracts";
-      import { definePlugin } from "@asterism-app/sdk/runtime";
-      import { registry } from "@example/paradigm/contracts";
-      export default { ...definePlugin({ namespace: pluginNamespace(${JSON.stringify(id)}) }), probe: registry };
-    `);
-    file(root, "renderer.ts", `
-      import { registry } from "@example/paradigm/contracts";
-      export { registry };
-      export default { modules: [], async prepare() { registry.add(${JSON.stringify(id)}); } };
-    `);
-    list.add({ source: { kind: "path", path: root } }, data);
-  }
-  return { data, provider, consumers, list, cache, load: () => loadPackages(list, data, cache, []) };
-}
-describe("Plugin-owned public packages", () => {
-  it("shares provider-owned registration state across consumers and keeps frontend and backend instances separate", async () => {
-    const fixture_ = fixture(), packages = await fixture_.load();
-    expect(packages.map(item => item.status)).toEqual(["ready", "ready", "ready"]);
-    const registries = packages.map(item => (item.definition as PluginDefinition & { probe: Set<string> }).probe);
-    registries[1]!.add("backend");
-    expect([...registries[0]!]).toEqual(["backend"]);
-    expect([...registries[2]!]).toEqual(["backend"]);
-    expect(packages.slice(1).map(item => item.runtimeDependencies)).toEqual([["example.provider"], ["example.provider"]]);
-    const renderers = await Promise.all(packages.map(item => import(pathToFileURL(join(fixture_.cache, item.renderer!)).href)));
-    for (const renderer of renderers) await renderer.default.prepare();
-    expect([...renderers[0]!.registry]).toEqual(["example.provider", "example.consumer1", "example.consumer2"]);
-    expect(renderers[1]!.registry).toBe(renderers[2]!.registry);
-    expect([...registries[0]!]).toEqual(["backend"]);
+
+describe("Native plugin-public ESM linking", () => {
+  it("preserves provider ownership, mutable live bindings, re-exports, registration state, and class identity", async () => {
+    const f = await setup();
+    await f.run(`add('one');add('provider');add('two');const items=await loader.loadPackages(list,root,cache,[]);
+      assert.deepEqual(items.map(item=>item.status),['ready','ready','ready']);
+      const [one,provider,two]=items.map(item=>item.definition.probe);
+      assert.equal(one.registry,provider.registry);assert.equal(two.Token,provider.Token);
+      const a=await import(pathToFileURL(items[0].runtime).href),b=await import(pathToFileURL(items[2].runtime).href);
+      assert.equal(a.count,0);a.increment();assert.equal(a.count,1);assert.equal(b.count,1);assert.equal(two.count(),1);
+      one.registry.add('shared');assert.deepEqual([...two.registry],['shared']);
+      assert.deepEqual(items[0].runtimeDependencies,['fixture.provider']);`);
   });
-  it("rejects consumers of a disabled API provider without executing their private copies", async () => {
-    const fixture_ = fixture();
-    fixture_.list.setEnabled(0, false);
-    const packages = await fixture_.load();
-    expect(packages.map(item => item.status)).toEqual(["disabled", "failed", "failed"]);
-    expect(packages[1]!.diagnostic?.message).toContain("no available enabled provider");
+
+  it("keeps browser and backend native ESM graphs independent while each browser consumer shares its provider", async () => {
+    const f = await setup();
+    await f.run(`add('provider');add('one');add('two');const items=await loader.loadPackages(list,root,cache,[]);
+      const bindings=loader.rendererImportMap(items),roots=loader.artifactRoots(items);
+      // Node's native linker exercises the emitted browser ESM in a separate realm graph without a GUI/timing smoke test.
+      const {registerHooks}=await import('node:module');
+      const hooks=registerHooks({resolve(specifier,context,next){
+        const bound=bindings[specifier];
+        if(bound){const u=new URL(bound);return {url:pathToFileURL(join(roots[u.hostname],u.pathname)).href,shortCircuit:true};}
+        return next(specifier,context);
+      }});
+      try {
+        const browser=await Promise.all(items.map(item=>import(pathToFileURL(join(item.artifactRoot,item.artifact.renderer)).href)));
+        assert.equal(browser[0].registry,browser[1].registry);assert.equal(browser[1].Token,browser[2].Token);
+        assert.notEqual(browser[0].registry,items[0].definition.probe.registry);
+        browser[0].increment();assert.equal(browser[1].count,1);assert.equal(browser[2].count,1);
+        assert.equal(items[1].definition.probe.count(),0);
+      }finally{hooks.deregister();}`);
   });
-  it("rejects conflicting ownership between a public library and a plugin public export", async () => {
-    const fixture_ = fixture(), root = directory();
-    file(root, "package.json", JSON.stringify({ name: "@example/paradigm", type: "module",
-      exports: { "./public": "./public.ts" }, asterism: { displayName: "Test plugin", id: "example.other" } }));
-    file(root, "public.ts", "export const registry = new Set();");
-    fixture_.list.add({ source: { kind: "path", path: root } }, fixture_.data);
-    const packages = await fixture_.load();
-    for (const id of ["example.provider", "example.other"]) {
-      const entry = packages.find(item => item.manifest?.id === id)!;
-      expect(entry.status).toBe("failed");
-      expect(entry.diagnostic?.message).toContain("Multiple plugins provide public package @example/paradigm");
-    }
-    expect(packages.filter(item => item.manifest?.id.startsWith("example.consumer")).map(item => item.status)).toEqual(["failed", "failed"]);
+
+  it("rejects disabled providers without falling back to consumer-private copies", async () => {
+    const f = await setup();
+    await f.run(`add('provider');add('one');add('two');list.setEnabled(0,false);
+      const items=await loader.loadPackages(list,root,cache,[]);
+      assert.deepEqual(items.map(item=>item.status),['disabled','failed','failed']);
+      assert.match(items[1].diagnostic.message,/no available enabled provider/);`);
   });
-  it("preserves package-relative assets for explicitly external runtime dependencies", async () => {
-    const data = directory(), root = directory(), list = new PackageList(join(data, "plugins.json"));
-    file(root, "package.json", JSON.stringify({ name: "@example/native-consumer", type: "module",
-      asterism: { displayName: "Test plugin", id: "example.native", runtime: "runtime.ts", runtimeExternals: ["native-library"] } }));
-    file(root, "node_modules/native-library/package.json", JSON.stringify({ name: "native-library", type: "module",
-      exports: { import: "./index.js", require: "./index.cjs" } }));
-    file(root, "node_modules/native-library/data.txt", "package asset");
-    file(root, "node_modules/native-library/index.js", 'import { readFileSync } from "node:fs"; export const value = readFileSync(new URL("./data.txt", import.meta.url), "utf8");');
-    file(root, "node_modules/native-library/index.cjs",
-      'exports.value = require("node:fs").readFileSync(require("node:path").join(__dirname, "data.txt"), "utf8");');
-    file(root, "wrapper.cjs", 'module.exports = require("native-library");');
-    file(root, "runtime.ts", `
-      import { pluginNamespace } from "@asterism-app/sdk/contracts";
-      import { value } from "native-library";
-      import commonjs from "./wrapper.cjs";
-      export default { namespace: pluginNamespace("example.native"), probe: [value, commonjs.value] };
-    `);
-    list.add({ source: { kind: "path", path: root } }, data);
-    const [loaded] = await loadPackages(list, data, join(data, "cache"), []);
-    expect(loaded?.diagnostic?.message).toBeUndefined();
-    expect((loaded!.definition as PluginDefinition & { probe: string[] }).probe).toEqual(["package asset", "package asset"]);
+
+  it("rejects conflicting providers and propagates failure through consumers", async () => {
+    const f = await setup();
+    await f.plugin("duplicate", { public: { runtime: { "@fixture/api/contracts": "public.ts" } } }, { "public.ts": "export const registry=new Set();" });
+    await f.run(`add('provider');add('one');add('duplicate');
+      const items=await loader.loadPackages(list,root,cache,[]);
+      assert.deepEqual(items.map(item=>item.status),['failed','failed','failed']);
+      assert.match(items[0].diagnostic.message,/Multiple plugins provide/);`);
   });
+
+  it.each(["runtime", "renderer"] as const)("rejects package ownership split across disjoint %s subpaths", async realm => {
+    const f = await fixture(); fixtures.push(f);
+    await f.plugin("contracts", { public: { runtime: { "@fixture/split/contracts": "public.ts" } } }, {
+      "public.ts": "export class Token{};",
+    });
+    await f.plugin("implementation", { public: { [realm]: { "@fixture/split/implementation": "public.ts" } } }, {
+      "public.ts": "class Token{};export const token=new Token();",
+    });
+    await f.plugin("consumer", { runtime: "runtime.ts", publicDependencies: ["@fixture/split"] }, {
+      "runtime.ts": "import {Token} from '@fixture/split/contracts';export default {namespace:{id:'fixture.consumer'},probe:Token};",
+    });
+    await f.plugin("independent", {});
+    await f.run(`add('contracts');add('implementation');add('consumer');add('independent');
+      const items=await loader.loadPackages(list,root,cache,[]);
+      assert.deepEqual(items.map(item=>item.status),['failed','failed','failed','ready']);
+      assert.match(items[0].diagnostic.message,/Multiple plugins provide public package/);`);
+  });
+
+  it("does not execute unused public entries and links required public entries normally", async () => {
+    const f = await fixture(); fixtures.push(f);
+    await f.plugin("provider", { public: { runtime: { "@fixture/lazy/used": "used.ts", "@fixture/lazy/unused": "unused.ts" } } }, {
+      "used.ts": "export const value=7;",
+      "unused.ts": "throw new Error('Unused public entry executed');export const unused=1;",
+    });
+    await f.plugin("consumer", { runtime: "runtime.ts", publicDependencies: ["@fixture/lazy"] }, {
+      "runtime.ts": "import {value} from '@fixture/lazy/used';export default {namespace:{id:'fixture.consumer'},probe:value};",
+    });
+    await f.run(`add('consumer');add('provider');const items=await loader.loadPackages(list,root,cache,[]);
+      assert.deepEqual(items.map(item=>item.status),['ready','ready']);assert.equal(items[0].definition.probe,7);`);
+  });
+
+  it("propagates a provider runtime failure before earlier-listed consumers execute", async () => {
+    const f = await fixture(); fixtures.push(f);
+    await f.plugin("provider", { runtime: "runtime.ts", public: { runtime: { "@fixture/failure/contracts": "public.ts" } } }, {
+      "public.ts": "export const value=1;", "runtime.ts": "throw new Error('Provider failed');",
+    });
+    await f.plugin("consumer", { runtime: "runtime.ts", publicDependencies: ["@fixture/failure"] }, { "runtime.ts": "import '@fixture/failure/contracts';throw new Error('Consumer executed');" });
+    await f.run(`add('consumer');add('provider');const items=await loader.loadPackages(list,root,cache,[]);
+      assert.equal(items[1].diagnostic.stage,'import');assert.match(items[1].diagnostic.message,/Provider failed/);
+      assert.equal(items[0].diagnostic.stage,'dependency');assert.equal(items[0].definition,undefined);`);
+  });
+  it("keeps reverse browser dependencies out of backend setup order", async () => {
+    const f = await fixture(); fixtures.push(f);
+    await f.plugin("a", { runtime: "runtime.ts", publicDependencies: ["@fixture/b"], public: { renderer: { "@fixture/a/browser": "browser.ts" } } }, {
+      "runtime.ts": "import {value} from '@fixture/b/contracts';export default {namespace:{id:'fixture.a'},probe:value};",
+      "browser.ts": "export const value='browser';",
+    });
+    await f.plugin("b", { runtime: "runtime.ts", renderer: "renderer.ts", publicDependencies: ["@fixture/a"], public: { runtime: { "@fixture/b/contracts": "public.ts" } } }, {
+      "runtime.ts": "export default {namespace:{id:'fixture.b'}};",
+      "public.ts": "export const value='backend';",
+      "renderer.ts": "export {value} from '@fixture/a/browser';export default {modules:[]};",
+    });
+    await f.run(`add('a');add('b');const items=await loader.loadPackages(list,root,cache,[]);
+      assert.deepEqual(items.map(item=>item.status),['ready','ready']);
+      assert.deepEqual(items[0].dependencies,['fixture.b']);assert.deepEqual(items[1].dependencies,['fixture.a']);
+      assert.deepEqual([...loader.runtimeDependencies(items)],[['fixture.a',['fixture.b']],['fixture.b',[]]]);`);
+  });
+
 });

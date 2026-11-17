@@ -20,6 +20,12 @@ Decide whether each new piece of state is a current value, a historical fact, a 
 
 A Home entry can start a session around the counter without introducing an Agent or a first message. Keep that independence when adapting the example unless conversation is part of the new plugin's domain.
 
+## Build the package you will load
+
+The counter's package manifest separates source entries under `asterism.build` from the generated artifact selected by `asterism.artifact`. Its build script invokes `asterism-plugin-build`. Install dependencies, typecheck, and build explicitly; add the package directory to Asterism and restart. Rebuild and restart after source changes rather than expecting the application to compile them.
+
+The counter intentionally exposes its contracts as `asterism-example-counter/contracts` in both realms. Its internal relative imports and public entry share one build graph per realm. Consumers need the provider enabled and must classify that public package in their own build inputs; installing a declaration package alone is not enough.
+
 ## Check the adapted design
 
 Use a compatible application and public SDK for development. Type checking checks contract agreement; loading the package and exercising it checks the integration.

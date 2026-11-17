@@ -1,10 +1,10 @@
 # Investigate application startup cost and shutdown completion
 
-Filed on 2026-11-16. Deferred, unresolved. No implementation approach or change to plugin behavior has been selected.
+Filed on 2026-11-16. Startup measurements, application acceptance, and the reported shutdown residual remain unresolved. The user selected explicit, source-independent plugin artifacts on 2026-11-17; the builder and replacement loader are implemented.
 
 ## Problems
 
-Plugin compilation is a substantial part of the recorded startup cost. The unresolved question is how to reduce that cost reliably for multiple independent and interdependent plugins, without stale code or unapproved changes to plugin behavior. A single-package improvement does not establish behavior or performance for a larger plugin composition.
+Plugin compilation was a substantial part of the recorded startup cost. It now belongs to an explicit per-plugin build operation rather than application startup. Independent provider/consumer graphs, captured immutable artifacts, native module identities, and packaged builtin loading have process-backed evidence. Comparable end-to-end application measurements and manual acceptance are still needed; compiler or Node-process timings alone do not establish startup performance.
 
 The user also reported a window disappearing after a quit request while a process remained. Business cleanup completed in the observed logs, but the cause of the reported residual process was not established. This is a separate issue; a causal relationship with startup failure or frontend loading was not demonstrated.
 
@@ -12,8 +12,8 @@ The user also reported a window disappearing after a quit request while a proces
 
 - [ ] Establish comparable development and installed-application startup measurements, distinguishing process launch, window availability, backend readiness and frontend usability. Include any build work performed before application launch.
 - [ ] Determine how plugin count, shared dependencies and frontend contributions affect startup work across separate process lifetimes.
-- [ ] Investigate reliable ways to reduce repeated work. Establish the expected behavior for source, configuration, dependency and plugin-selection changes before accepting an implementation.
-- [ ] Evaluate correctness across shared declaration identity, ESM live bindings, host singletons, CSS/assets, plugin failure isolation and current-data admission/migration.
+- [x] Select and implement source-independent prebuilt artifacts, explicit source builds, immutable output publication, and restart-bound plugin selection.
+- [x] Obtain focused process-backed evidence for shared declaration identity, ESM live bindings, host singletons, CSS/assets, plugin failure isolation and current-data admission. Browser/CSP and target-platform acceptance remain part of the application check below.
 - [ ] Reproduce the reported shutdown residual and identify which process and lifecycle boundary remain incomplete after the window disappears.
 - [ ] Validate any eventual change with process-backed integration evidence and manual application acceptance, including failure cases. Record remaining platform and packaging limitations.
 
@@ -24,3 +24,5 @@ The causes and relevant lifecycle behavior are understood, any required product 
 ## Reference
 
 - `plans/ref-2026-11-16-startup-investigation.md` records verified behavior, measurements and their limits. It does not select a compiler, cache mechanism or plugin lifecycle.
+
+- `plans/archived/ref-2026-11-17-plugin-artifacts-and-distribution.md` records the selected replacement design and implementation disposition.

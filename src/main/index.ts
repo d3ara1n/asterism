@@ -1,3 +1,6 @@
+import { serveRendererDocument } from "./renderer-document.ts";
+import { pluginArtifactRoot } from "../plugins/protocol-roots.ts";
+import { hostModuleSource } from "../shared/public-modules.ts";
 import { pathWithin } from "../storage/paths.ts";
 import { app, BrowserWindow, dialog, ipcMain, MessageChannelMain, net, powerMonitor, protocol, session, shell } from "electron";
 import { randomUUID } from "node:crypto";
@@ -10,7 +13,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { pickDirectoryChannel, openLocalFileChannel, showLocalFileChannel, showLocalFileSchema, openLogsChannel, localFilePathSchema, statusChannel } from "../shared/contracts.ts";
 import { connectionRequestChannel } from "../shared/connection.ts";
 import { RuntimeHost } from "./runtime-host.ts";
-import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage } from "../shared/application.ts";
+import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage, applicationRendererUrl } from "../shared/application.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
 import { applyThemeSource, readAppearance, serveAppearance } from "./appearance.ts";
 import { initialWindowState, trackWindowState } from "./window-state.ts";
@@ -135,9 +138,8 @@ function applicationIconFile(name: string): string {
 
 function createWindow(): void {
   applyThemeSource();
-  const rendererFile = join(here, "../renderer/index.html");
   const developmentURL = !app.isPackaged ? process.env.ELECTRON_RENDERER_URL : undefined;
-  const allowedURL = new URL(developmentURL ?? pathToFileURL(rendererFile).href).href;
+  const allowedURL = new URL(developmentURL ?? applicationRendererUrl).href;
   trustedURL = allowedURL.split("#")[0]!;
   const state = initialWindowState();
   const titleBar = titleBarMode();
@@ -349,20 +351,33 @@ function createWindow(): void {
     window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(showLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
     stopAppearance(); stopPreferences(); stopLanguage(); stopUpdates(); stopNetwork();
   });
-  const loading = developmentURL ? current.loadURL(developmentURL) : current.loadFile(rendererFile);
+  const loading = current.loadURL(developmentURL ?? applicationRendererUrl);
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });
 }
 
-// Plugin artifact protocol: read-only access to the plugin cache directory bundled at startup, with no access to other paths.
+// Plugin output is served only through the immutable roots captured by this startup's preparation.
 protocol.registerSchemesAsPrivileged([{ scheme: "asterism-plugin", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
-function servePluginArtifacts(root: string): void {
-  const cache = resolve(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory);
-  protocol.handle("asterism-plugin", request => {
+function servePluginArtifacts(_root: string): void {
+  protocol.handle("asterism-plugin", async request => {
     const url = new URL(request.url);
-    const file = resolve(cache, url.hostname, `.${decodeURIComponent(url.pathname)}`);
-    const inside = pathWithin(cache, file);
+    if (url.hostname === "app") return serveRendererDocument(request, resolve(here, "../renderer"));
+    if (url.hostname === "host") {
+      const headers = { "Content-Type": "text/javascript", "Access-Control-Allow-Origin": "*" };
+      // The page supplies its actual host namespace's export names; only stable-value facades are generated here.
+      const specifier = decodeURIComponent(url.pathname.slice(1));
+      const names: unknown = JSON.parse(url.searchParams.get("exports") ?? "null");
+      if (!Array.isArray(names) || names.some(name => typeof name !== "string")) return new Response(null, { status: 400 });
+      return new Response(hostModuleSource("__asterismRendererModules", specifier, names), { headers });
+    }
+    const root = pluginArtifactRoot(url.hostname);
+    if (!root) return new Response(null, { status: 404 });
+    const file = resolve(root, `.${decodeURIComponent(url.pathname)}`);
+    const inside = pathWithin(root, file);
     if (!inside || inside.includes(":")) return new Response(null, { status: 404 });
-    return net.fetch(pathToFileURL(file).href);
+    const response = await net.fetch(pathToFileURL(file).href);
+    const headers = new Headers(response.headers);
+    headers.set("Access-Control-Allow-Origin", "*");
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   });
 }
 
@@ -421,7 +436,7 @@ if (!app.requestSingleInstanceLock()) {
     if (quitting || quitRequest) return;
     powerMonitor.on("resume", () => runtime.resume());
     // Permission checks and requests share one policy, allowing only trusted main-frame font enumeration and clipboard writes.
-    // Determine trust from the window's current URL: file:// origins can be "null", so origin strings are insufficient.
+    // Permissions use the exact trusted document URL, not just an origin string.
     const permitted = (contents: Electron.WebContents | null, permission: string, isMainFrame: boolean) =>
       allowRendererPermission({ permission, isMainFrame, contents, mainContents: window?.webContents, trustedURL });
     session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) =>

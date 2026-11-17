@@ -5,7 +5,7 @@ export default defineConfig({
   ...configuration,
   test: {
     ...configuration.test,
-    include: ["src/plugins/**/*.integration.test.ts"],
+    include: ["src/plugins/**/*.integration.test.ts", "scripts/**/*.integration.test.ts"],
     exclude: configDefaults.exclude,
   },
 });

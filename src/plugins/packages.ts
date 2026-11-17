@@ -1,7 +1,7 @@
 import { pathWithin } from "../storage/paths.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, statSync, writeFileSync } from "node:fs";
-import { extname, join, relative, resolve, posix, win32 } from "node:path";
+import { extname, join, resolve, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { z } from "zod";
@@ -9,13 +9,16 @@ import * as zod from "zod";
 import * as sdkContracts from "@asterism-app/sdk/contracts";
 import * as sdkRuntime from "@asterism-app/sdk/runtime";
 import type { PluginDefinition, PluginStorageDeclaration, ManualSource } from "@asterism-app/sdk/runtime";
-import type { Plugin } from "esbuild";
-import { applicationDirectory, compileModules, packageModule, type PackageModule } from "./package-modules.ts";
+import { applicationDirectory } from "./package-modules.ts";
+import { captureArtifact, artifactPath } from "./artifact-resolver.ts";
+import { registerArtifactModules, rendererImportMap, artifactRoots } from "./native-modules.ts";
+import { artifactSchema } from "@asterism-app/plugin-build/artifact";
+export { rendererImportMap, artifactRoots };
 import { loadCatalogs } from "./catalogs.ts";
 import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@asterism-app/sdk/contracts";
-import type { PublicProvider } from "../shared/public-modules.ts";
 import { jsonStorage } from "../storage/migrations.ts";
-import { isRendererShared } from "../shared/renderer-modules.ts";
+import { isRendererShared, rendererSharedModules, sharedUiPackage } from "../shared/renderer-modules.ts";
+import { randomUUID } from "node:crypto";
 import { translationCatalogSchema } from "../shared/language.ts";
 import { pluginDiagnosticSchema, pluginErrorMessage, type PluginCandidate } from "../shared/plugin-startup.ts";
 import { PluginAvailability } from "./availability.ts";
@@ -23,14 +26,10 @@ import { PluginAvailability } from "./availability.ts";
 /** Plugin package manifest: the asterism field in package.json, shared by source and release artifacts. */
 export const manifestSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+$/u),
-  runtime: z.string().min(1).optional(),
-  renderer: z.string().min(1).optional(),
-  /** Storage declaration entry: default export `defineStorage([...])`, imported separately by the host before plugin runtime. */
-  storage: z.string().min(1).optional(),
-  /** Public dependency packages whose exports form this plugin's API. */
+  artifact: z.string().min(1),
   publicPackages: z.array(z.string().min(1)).optional(),
-  /** Runtime packages kept intact so native binaries and package-relative assets retain their locations. */
-  runtimeExternals: z.array(z.string().min(1)).optional(),
+  /** Authoring configuration is owned by the build tool, not interpreted by the host. */
+  build: z.unknown().optional(),
   /** Package-relative directories exposed by the manual without executing plugin code. */
   manual: z.array(z.string().min(1)).optional(),
   /** The plugin name shown wherever the application names this plugin. */
@@ -70,7 +69,7 @@ export const packageEntrySchema = z.strictObject({
   source: z.discriminatedUnion("kind", [
     z.strictObject({ kind: z.literal("bundled"), name: z.string().regex(/^[a-z0-9-]+$/u) }),
     z.strictObject({ kind: z.literal("path"), path: z.string().min(1) }),
-    z.strictObject({ kind: z.literal("npm"), name: z.string().min(1), version: z.string().min(1) }),
+    z.strictObject({ kind: z.literal("npm"), name: z.string().min(1), version: z.string().min(1), installation: z.string().regex(/^[A-Za-z0-9_-]+$/u).optional() }),
   ]),
   enabled: z.boolean(),
 });
@@ -89,7 +88,7 @@ export class PluginPackageError extends Error {
 /** Source adapter: yields only a package root; later stages no longer distinguish sources. */
 export function packageRoot(entry: PackageEntry, npmRoot: string): string {
   if (entry.source.kind === "bundled") return applicationDirectory(`packages/${entry.source.name}`);
-  return entry.source.kind === "path" ? resolve(entry.source.path) : join(npmRoot, "node_modules", entry.source.name);
+  return entry.source.kind === "path" ? resolve(entry.source.path) : entry.source.installation ? join(npmRoot, applicationStorage.pluginInstallationsDirectory, entry.source.installation, "node_modules", entry.source.name) : join(npmRoot, "node_modules", entry.source.name);
 }
 
 /** Read and validate the package root manifest; paths must be package roots without downward search. */
@@ -105,10 +104,15 @@ export function readManifest(root: string): PluginPackageManifest {
     throw new PluginPackageError("invalid_manifest", `Package at ${root} has no valid Asterism manifest: ${fields}.`);
   }
   const manifest = parsed.data;
-  for (const entry of [manifest.runtime, manifest.renderer, manifest.storage]) {
-    if (entry && !pathWithin(root, resolve(root, entry))) throw new PluginPackageError("invalid_entry", `Entry ${entry} is outside the package.`);
-  }
+  artifactPath(root, manifest.artifact);
   manualDirectories(root, manifest.manual ?? []);
+  return manifest;
+}
+
+/** Acquisition validates the selected completed output without importing runtime or migration entries. */
+export function validatePackageArtifact(root: string): PluginPackageManifest {
+  const manifest = readManifest(root);
+  captureArtifact(root, manifest.artifact, manifest.id);
   return manifest;
 }
 
@@ -137,7 +141,8 @@ function manualDirectories(root: string, declared: readonly string[]): ManualSou
 function packageManuals(root: string, manifest: PluginPackageManifest): ManualSource[] {
   const sources = manualDirectories(root, manifest.manual ?? []);
   const require = createRequire(join(root, "package.json"));
-  for (const name of manifest.publicPackages ?? []) {
+  const owned = manifest.publicPackages ?? [];
+  for (const name of owned) {
     const directory = require.resolve.paths(name)?.map(path => join(path, name)).find(path => existsSync(join(path, "package.json")));
     if (!directory) throw new PluginPackageError("invalid_entry", `Public package ${name} is not installed for ${manifest.id}.`);
     const metadata = z.object({ asterism: z.object({ manual: z.array(z.string()).optional() }).optional() })
@@ -164,13 +169,27 @@ export class PackageList {
   }
   /** Validate on addition: invalid packages fail without entries; new entries are enabled by default. */
   add(entry: Omit<PackageEntry, "enabled">, npmRoot: string): PluginPackageManifest {
-    const manifest = readManifest(packageRoot({ ...entry, enabled: true }, npmRoot));
+    const manifest = validatePackageArtifact(packageRoot({ ...entry, enabled: true }, npmRoot));
     const packages = this.read();
     for (const existing of packages) {
       try { if (readManifest(packageRoot(existing, npmRoot)).id === manifest.id) throw new PluginPackageError("duplicate", `Plugin ${manifest.id} is already added.`); }
       catch (error) { if (error instanceof PluginPackageError && error.code === "duplicate") throw error; }
     }
     this.write([...packages, { ...entry, enabled: true }]);
+    return manifest;
+  }
+  /** Replace a selected installation after acquisition; validate identity conflicts before publishing. */
+  replace(index: number, entry: PackageEntry, npmRoot: string): PluginPackageManifest {
+    const packages = this.read();
+    if (!packages[index]) throw new PluginPackageError("invalid_entry", "No such package entry.");
+    const manifest = validatePackageArtifact(packageRoot(entry, npmRoot));
+    for (const [otherIndex, existing] of packages.entries()) {
+      if (otherIndex === index) continue;
+      try { if (readManifest(packageRoot(existing, npmRoot)).id === manifest.id) throw new PluginPackageError("duplicate", `Plugin ${manifest.id} is already added.`); }
+      catch (error) { if (error instanceof PluginPackageError && error.code === "duplicate") throw error; }
+    }
+    packages[index] = entry;
+    this.write(packages);
     return manifest;
   }
   setEnabled(index: number, enabled: boolean): void {
@@ -182,41 +201,12 @@ export class PackageList {
   remove(index: number): void { this.write(this.read().filter((_, i) => i !== index)); }
 }
 
-/**
- * Host shared modules: forward these imports to already loaded instances;
- * package-modules builds plugin public modules and other dependencies into an ESM graph.
- */
-const shared: Record<string, Record<string, unknown>> = {
+/** Host facades preserve stable exported values, while plugin-public entries remain native ESM. */
+export const sharedRuntimeModules: Record<string, Record<string, unknown>> = {
   zod: zod as Record<string, unknown>,
   "@asterism-app/sdk/contracts": sdkContracts as Record<string, unknown>,
   "@asterism-app/sdk/runtime": sdkRuntime as Record<string, unknown>,
 };
-const sharedGlobal = "__asterismSharedModules";
-(globalThis as Record<string, unknown>)[sharedGlobal] = shared;
-function sharedModuleSource(id: string): string {
-  const names = Object.keys(shared[id]!).filter(name => name !== "default" && /^[A-Za-z_$][\w$]*$/u.test(name));
-  return [`const m = globalThis[${JSON.stringify(sharedGlobal)}][${JSON.stringify(id)}];`,
-    `export default m.default ?? m;`, ...names.map((name, index) =>
-      `const shared${index} = m[${JSON.stringify(name)}]; export { shared${index} as ${name} };`)].join("\n");
-}
-
-/** Renderer shared modules: the host page supplies the same instances through window.__asterismRendererModules. */
-function rendererModuleSource(id: string): string {
-  // CJS forwarding: esbuild interop reads named imports as properties of the same instance.
-  return `const m = globalThis.__asterismRendererModules[${JSON.stringify(id)}];`
-    + ` if (!m) throw new Error(${JSON.stringify(`The host does not provide renderer module ${id}.`)}); module.exports = m;`;
-}
-
-/** Host libraries retain existing instances; plugin public modules share the same ESM graph. */
-function hostModules(realm: "runtime" | "renderer"): Plugin {
-  return { name: "asterism-host-modules", setup(build) {
-    build.onResolve({ filter: /.*/ }, args => (realm === "runtime" ? args.path in shared : isRendererShared(args.path))
-      ? { path: args.path, namespace: "asterism-host" } : undefined);
-    build.onLoad({ filter: /.*/, namespace: "asterism-host" }, args => ({
-      contents: realm === "runtime" ? sharedModuleSource(args.path) : rendererModuleSource(args.path), loader: "js",
-    }));
-  } };
-}
 
 /** Serializable build result shared by storage preparation and the task process within one startup. */
 export const builtPackageSchema = z.object({
@@ -228,7 +218,8 @@ export const builtPackageSchema = z.object({
   manualSources: z.array(z.object({ path: z.string(), directory: z.string() })).optional(),
   catalogs: z.array(translationCatalogSchema).optional(),
   runtime: z.string().optional(), storageEntry: z.string().optional(),
-  renderer: z.string().optional(), stylesheet: z.string().optional(),
+  renderer: z.string().optional(), stylesheet: z.string().optional(), stylesheets: z.array(z.string()).default([]),
+  artifact: artifactSchema.optional(), artifactRoot: z.string().optional(), artifactKey: z.string().optional(),
 });
 export type BuiltPackage = z.infer<typeof builtPackageSchema>;
 export interface ResolvedPackage extends BuiltPackage {
@@ -239,7 +230,7 @@ export interface ResolvedPackage extends BuiltPackage {
 export function packageCandidates(packages: readonly BuiltPackage[]): PluginCandidate[] {
   return packages.map(item => ({
     source: packageSource(item.entry), enabled: item.entry.enabled, id: item.manifest?.id ?? null,
-    status: item.status, diagnostic: item.diagnostic, renderer: item.renderer ?? null, stylesheet: item.stylesheet ?? null,
+    status: item.status, diagnostic: item.diagnostic, renderer: item.renderer ?? null, stylesheet: item.stylesheet ?? null, stylesheets: item.stylesheets,
     metadata: item.metadata, metadataError: item.metadataError,
     dependencies: item.dependencies, rendererDependencies: item.rendererDependencies,
   }));
@@ -273,55 +264,78 @@ function storageDeclarations(id: string, value: unknown): readonly PluginStorage
   return value as readonly PluginStorageDeclaration[];
 }
 
-/** Discover and compile once per startup. No executable entry runs during this stage. */
-export async function buildPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[] = [],
-  publicProviders: readonly PublicProvider[] = [], progress: (id: string) => void = () => {}): Promise<BuiltPackage[]> {
+/** Capture completed builds once per startup. This stage executes no plugin entries and performs no source transformation. */
+export async function buildPackages(list: PackageList, npmRoot: string, _cacheRoot: string, reserved: readonly string[] = [],
+  progress: (id: string) => void = () => {}): Promise<BuiltPackage[]> {
   const result: BuiltPackage[] = [];
   const ids = new Map<string, number>();
   for (const entry of list.read()) {
     const root = packageRoot(entry, npmRoot);
     let metadata: PluginMetadata = {}, metadataError: string | undefined;
     try { metadata = readPackageMetadata(root); } catch (error) { metadataError = pluginErrorMessage(error); }
+    const item: BuiltPackage = { entry, root, manifest: null, metadata, metadataError, status: "invalid",
+      dependencies: [], runtimeDependencies: [], rendererDependencies: [], stylesheets: [] };
+    result.push(item);
     try {
-      const manifest = readManifest(root);
-      result.push({ entry, root, manifest, metadata, metadataError, status: entry.enabled ? "ready" : "disabled", dependencies: [], runtimeDependencies: [], rendererDependencies: [] });
-      ids.set(manifest.id, (ids.get(manifest.id) ?? 0) + 1);
+      item.manifest = readManifest(root);
+      const id = item.manifest.id;
+      ids.set(id, (ids.get(id) ?? 0) + 1);
+      item.status = entry.enabled ? "ready" : "disabled";
+      if (!entry.enabled) continue;
+      progress(id);
+      Object.assign(item, captureArtifact(root, item.manifest.artifact, id));
+      item.artifactKey = randomUUID();
+      const artifact = item.artifact!;
+      item.runtime = artifact.runtime && artifactPath(item.artifactRoot!, artifact.runtime);
+      item.storageEntry = artifact.storage && artifactPath(item.artifactRoot!, artifact.storage);
+      item.renderer = artifact.renderer && `${item.artifactKey}/${artifact.renderer}`;
+      item.stylesheets = artifact.stylesheets.map(path => `${item.artifactKey}/${path}`);
+      item.manualSources = packageManuals(root, item.manifest);
+      if (item.manifest.i18n) item.catalogs = loadCatalogs(root, id, item.manifest.i18n.catalogs);
     } catch (error) {
-      result.push({ entry, root, manifest: null, metadata, metadataError, status: "invalid", diagnostic: { stage: "discovery", message: pluginErrorMessage(error) },
-        dependencies: [], runtimeDependencies: [], rendererDependencies: [] });
+      item.status = item.manifest ? "failed" : "invalid";
+      item.diagnostic = { stage: "discovery", message: pluginErrorMessage(error) };
     }
   }
-  const modules: PackageModule[] = [];
-  for (const item of result) {
-    if (!item.manifest) continue;
-    const id = item.manifest.id;
-    try {
-      if (item.status === "ready" && (reserved.includes(id) || (ids.get(id) ?? 0) > 1))
-        throw new PluginPackageError("duplicate", `Plugin ID ${id} is reserved or registered more than once.`);
-      modules.push(packageModule(item.root, item.manifest));
-    } catch (error) {
-      item.status = "failed"; item.diagnostic = { stage: "discovery", message: pluginErrorMessage(error) };
+  const fail = (item: BuiltPackage, message: string) => { item.status = "failed"; item.diagnostic = { stage: "dependency", message }; };
+  for (const item of result) if (item.status === "ready" && (reserved.includes(item.manifest!.id) || ids.get(item.manifest!.id)! > 1))
+    fail(item, `Plugin ID ${item.manifest!.id} is reserved or registered more than once.`);
+  // A package is one public API owner even when different subpaths are used in different realms.
+  const packageName = (specifier: string) => /^(?:@[^/]+\/)?[^/]+/u.exec(specifier)![0];
+  const hostPackages = new Set([...Object.keys(sharedRuntimeModules), ...rendererSharedModules, sharedUiPackage].map(packageName));
+  const owners = new Map<string, BuiltPackage>();
+  for (const item of result) if (item.status === "ready") {
+    const names = new Set([...Object.keys(item.artifact!.public.runtime), ...Object.keys(item.artifact!.public.renderer)]
+      .map(packageName));
+    for (const name of names) {
+      if (hostPackages.has(name)) { fail(item, `Plugin cannot provide host package ${name}.`); continue; }
+      const previous = owners.get(name);
+      if (previous && previous !== item) {
+        fail(previous, `Multiple plugins provide public package ${name}.`);
+        fail(item, `Multiple plugins provide public package ${name}.`);
+      } else owners.set(name, item);
     }
   }
-  const compiled = await compileModules(modules, new Set(result.filter(item => item.status === "ready").map(item => item.manifest!.id)),
-    cacheRoot, hostModules, publicProviders, progress);
-  const artifact = (file: string | undefined) => file ? relative(cacheRoot, file).split("\\").join("/") : undefined;
-  for (const item of result) {
-    if (item.status !== "ready") continue;
-    const id = item.manifest!.id;
-    item.dependencies = [...compiled.dependencies.get(id) ?? []];
-    item.runtimeDependencies = [...compiled.runtimeDependencies.get(id) ?? []];
-    item.rendererDependencies = [...compiled.rendererDependencies.get(id) ?? []];
-    try {
-      if (compiled.failures.has(id)) throw new PluginPackageError("build_failed", compiled.failures.get(id)!);
-      item.manualSources = packageManuals(item.root, item.manifest!);
-      item.renderer = artifact(compiled.renderer.get(id));
-      item.stylesheet = artifact(compiled.stylesheets.get(id));
-      item.storageEntry = artifact(compiled.storage.get(id));
-      item.runtime = artifact(compiled.runtime.get(id));
-      if (item.manifest!.i18n) item.catalogs = loadCatalogs(item.root, id, item.manifest!.i18n.catalogs);
-    } catch (error) {
-      item.status = "failed"; item.diagnostic = { stage: "build", message: pluginErrorMessage(error) };
+  for (const realm of ["runtime", "renderer"] as const) {
+    const providers = new Map<string, BuiltPackage>();
+    for (const item of result) if (item.status === "ready") for (const specifier of Object.keys(item.artifact!.public[realm])) {
+      if (realm === "runtime" ? Object.hasOwn(sharedRuntimeModules, specifier) : isRendererShared(specifier)) {
+        fail(item, `Plugin cannot provide host module ${specifier}.`); continue;
+      }
+      const previous = providers.get(specifier);
+      if (previous && previous !== item) { fail(previous, `Multiple plugins provide ${specifier} in ${realm}.`); fail(item, `Multiple plugins provide ${specifier} in ${realm}.`); }
+      else providers.set(specifier, item);
+    }
+    for (const item of result) if (item.artifact && item.entry.enabled) {
+      const dependencies = new Set<string>();
+      for (const specifier of item.artifact.imports[realm]) {
+        if (realm === "runtime" ? Object.hasOwn(sharedRuntimeModules, specifier) : isRendererShared(specifier)) continue;
+        const provider = providers.get(specifier);
+        if (!provider || provider.status !== "ready") { if (item.status === "ready") fail(item, `Public module ${specifier} has no available enabled provider in ${realm}.`); }
+        else if (provider !== item) dependencies.add(provider.manifest!.id);
+      }
+      item[realm === "runtime" ? "runtimeDependencies" : "rendererDependencies"] = [...dependencies];
+      item.dependencies = [...new Set([...item.dependencies, ...dependencies])];
     }
   }
   applyAvailability(result, packageAvailability(result));
@@ -332,18 +346,27 @@ export async function buildPackages(list: PackageList, npmRoot: string, cacheRoo
 export async function importPackages(packages: readonly BuiltPackage[], cacheRoot: string,
   options: { runtime?: boolean; storageFailures?: ReadonlyMap<string, string>; progress?: (id: string) => void } = {}): Promise<ResolvedPackage[]> {
   const result: ResolvedPackage[] = structuredClone([...packages]);
+  registerArtifactModules(result, sharedRuntimeModules);
   const availability = packageAvailability(result);
   for (const [id, message] of options.storageFailures ?? []) availability.fail(id, { stage: "storage", message });
-  for (const item of result) {
-    if (item.status !== "ready" || availability.get(item.manifest!.id)) continue;
-    const id = item.manifest!.id;
+  const visited = new Set<string>();
+  const visit = async (item: ResolvedPackage): Promise<void> => {
+    if (!item.manifest || visited.has(item.manifest.id)) return;
+    const id = item.manifest.id;
+    visited.add(id); // Native ESM handles module cycles; service setup ordering is checked separately.
+    for (const dependency of item.runtimeDependencies) {
+      const provider = result.find(candidate => candidate.manifest?.id === dependency);
+      if (provider) await visit(provider);
+    }
+    if (item.status !== "ready" || availability.get(id)) return;
     let stage: "storage" | "import" = "storage";
     try {
-      if (item.storageEntry) item.storage = storageDeclarations(id, await importEntry(id, resolve(cacheRoot, item.storageEntry), "storage"));
-      if (!item.runtime || options.runtime === false) continue;
+      if (item.storageEntry) item.storage = storageDeclarations(id, await importEntry(id, item.storageEntry, "storage"));
+      if (options.runtime === false) return;
       stage = "import";
+      if (!item.runtime) return;
       options.progress?.(id);
-      const definition = await importEntry(id, resolve(cacheRoot, item.runtime), "runtime") as PluginDefinition | undefined;
+      const definition = await importEntry(id, item.runtime, "runtime") as PluginDefinition | undefined;
       if (!definition || typeof definition !== "object" || definition.namespace?.id !== id
         || (definition.setup !== undefined && typeof definition.setup !== "function")
         || (definition.modules !== undefined && (!Array.isArray(definition.modules) || definition.modules.some(module => !module || typeof module.setup !== "function"))))
@@ -352,20 +375,21 @@ export async function importPackages(packages: readonly BuiltPackage[], cacheRoo
     } catch (error) {
       availability.fail(id, { stage, message: pluginErrorMessage(error) });
     }
-  }
+  };
+  for (const item of result) await visit(item);
   applyAvailability(result, availability);
   for (const item of result) if (item.status !== "ready") { delete item.definition; delete item.storage; }
   return result;
 }
 
 /** Collapse public-only intermediaries for backend setup order without importing frontend dependency edges. */
-export function runtimeDependencies(packages: readonly ResolvedPackage[], publicProviders: readonly PublicProvider[] = []): Map<string, string[]> {
+export function runtimeDependencies(packages: readonly ResolvedPackage[]): Map<string, string[]> {
   // Pure public packages have no setup; traverse dependencies so actual service providers initialize first.
   const dependenciesOf = (id: string, visited = new Set<string>()): string[] => {
     if (visited.has(id)) return [];
     visited.add(id);
     return (packages.find(item => item.manifest?.id === id)?.runtimeDependencies ?? []).flatMap(dependency =>
-      publicProviders.some(provider => provider.pluginId === dependency) || packages.some(item => item.manifest?.id === dependency && item.definition)
+      packages.some(item => item.manifest?.id === dependency && item.definition)
         ? [dependency] : dependenciesOf(dependency, visited));
   };
   return new Map(packages.flatMap(item => item.definition ? [[item.manifest!.id, dependenciesOf(item.manifest!.id)] as const] : []));
@@ -373,8 +397,8 @@ export function runtimeDependencies(packages: readonly ResolvedPackage[], public
 
 /** Standalone package loading for tools and isolated contract checks. Application startup shares build results across processes. */
 export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[],
-  publicProviders: readonly PublicProvider[] = [], progress: (id: string) => void = () => {}): Promise<ResolvedPackage[]> {
-  return importPackages(await buildPackages(list, npmRoot, cacheRoot, reserved, publicProviders, progress), cacheRoot, { progress });
+  progress: (id: string) => void = () => {}): Promise<ResolvedPackage[]> {
+  return importPackages(await buildPackages(list, npmRoot, cacheRoot, reserved, progress), cacheRoot, { progress });
 }
 
 /** Stable source identity is independent of the installed application directory. */

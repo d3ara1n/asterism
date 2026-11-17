@@ -81,4 +81,63 @@ describe("Plugin frontend entry", () => {
       diagnostics: [{ stage: "module", module: 1, message: "Optional view data is unavailable." }] });
     expect(result.outcomes.get("consumer")).toEqual({ status: "ready", diagnostics: [] });
   });
+  it("loads the complete public-only provider style closure before consumers without evaluating unused public modules", async () => {
+    const seen: string[] = [];
+    const result = await loadPluginRenderers([
+      { id: "consumer", renderer: "consumer.js", dependencies: ["public"] },
+      { id: "public", renderer: null, stylesheet: "shared.css", stylesheets: ["shared.css", "public.css"], dependencies: [] },
+    ], {
+      async loadStylesheet(path) { seen.push(path); return () => {}; },
+      async load(path) { seen.push(path); return { default: {} }; },
+    });
+    expect(seen).toEqual(["shared.css", "public.css", "consumer.js"]);
+    expect(result.outcomes.get("public")).toEqual({ status: "ready", diagnostics: [] });
+  });
+
+  it.each([false, true])("rejects mixed public-only initialization cycles before loading styles or entries (reverse=%s)", async reverse => {
+    const entries = [
+      { id: "api", renderer: null, stylesheets: ["api.css"], dependencies: ["plugin"] },
+      { id: "plugin", renderer: "plugin.mjs", dependencies: ["api"] },
+    ];
+    const loaded: string[] = [];
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await loadPluginRenderers(reverse ? entries.reverse() : entries, {
+        async loadStylesheet(path) { loaded.push(path); throw new Error("A cycle must fail before styles load"); },
+        async load(path) { loaded.push(path); return { default: {} }; },
+      });
+      expect(loaded).toEqual([]);
+      expect(result.outcomes.get("api")?.status).toBe("failed");
+      expect(result.outcomes.get("plugin")?.status).toBe("failed");
+    } finally { log.mockRestore(); }
+  });
+
+  it("leaves module-only cycles to native ESM before a consumer initializes", async () => {
+    const loaded: string[] = [];
+    const result = await loadPluginRenderers([
+      { id: "consumer", renderer: "consumer.mjs", dependencies: ["api-a"] },
+      { id: "api-a", renderer: null, dependencies: ["api-b"] },
+      { id: "api-b", renderer: null, dependencies: ["api-a"] },
+    ], { async load(path) { loaded.push(path); return { default: {} }; } });
+    expect(loaded).toEqual(["consumer.mjs"]);
+    expect(result.outcomes.get("consumer")?.status).toBe("ready");
+  });
+
+  it("releases the already loaded provider stylesheet closure when a later stylesheet fails and blocks consumers", async () => {
+    const removed: string[] = [], imported: string[] = [];
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await loadPluginRenderers([
+        { id: "consumer", renderer: "consumer.js", dependencies: ["public"] },
+        { id: "public", renderer: null, stylesheets: ["first.css", "missing.css"], dependencies: [] },
+      ], {
+        async loadStylesheet(path) { if (path === "missing.css") throw new Error("Missing style"); return () => { removed.push(path); }; },
+        async load(path) { imported.push(path); return { default: {} }; },
+      });
+      expect(removed).toEqual(["first.css"]);
+      expect(imported).toEqual([]);
+      expect(result.outcomes.get("consumer")?.status).toBe("failed");
+    } finally { log.mockRestore(); }
+  });
+
 });

@@ -4,9 +4,6 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
-    "./runtime": "./src/runtime.ts",
-    "./storage": "./src/storage.ts",
-    "./renderer": "./src/renderer.ts",
     "./locales/zh-Hans.json": "./src/locales/zh-Hans.json"
   },
   "dependencies": {
@@ -64,9 +61,6 @@
   "author": "Asterism",
   "asterism": {
     "id": "asterism.builtin",
-    "runtime": "src/runtime.ts",
-    "renderer": "src/renderer.ts",
-    "storage": "src/storage.ts",
     "displayName": {
       "owner": "asterism.builtin",
       "id": "plugin.name",
@@ -89,9 +83,32 @@
     "publicPackages": [
       "@asterism-app/builtin-api"
     ],
-    "runtimeExternals": [
-      "@vscode/ripgrep",
-      "@parcel/watcher"
-    ]
+    "artifact": "dist/plugin.json",
+    "build": {
+      "runtime": "src/runtime.ts",
+      "renderer": "src/renderer.ts",
+      "storage": "src/storage.ts",
+      "runtimeExternals": [
+        "@vscode/ripgrep",
+        "@parcel/watcher"
+      ],
+      "public": {
+        "runtime": {
+          "@asterism-app/builtin-api/contracts": "../builtin-api/src/contracts.ts",
+          "@asterism-app/builtin-api/runtime": "../builtin-api/src/runtime.ts"
+        },
+        "renderer": {
+          "@asterism-app/builtin-api/contracts": "../builtin-api/src/contracts.ts",
+          "@asterism-app/builtin-api/renderer": "../builtin-api/src/renderer.ts"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "asterism-plugin-build",
+    "watch": "asterism-plugin-build --watch"
+  },
+  "devDependencies": {
+    "@asterism-app/plugin-build": "*"
   }
 }

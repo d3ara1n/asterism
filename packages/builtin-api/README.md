@@ -14,6 +14,12 @@ Develop against compatible SDK and builtin API packages. Development dependencie
 
 Import original contracts so extensions compose with the provider's operations rather than recreate them by convention. Validate the integration in an application with the intended provider enabled.
 
+## Build an extension artifact
+
+Declare `@asterism-app/builtin-api` in `asterism.build.publicDependencies` so the standalone builder keeps builtin public imports external throughout the graph. Development and peer dependencies alone do not classify those imports. The enabled builtin provider supplies their native ESM modules; a private copy cannot replace its runtime identity.
+
+Use `@asterism-app/plugin-build` and an explicit `asterism-plugin-build` build script. Build before adding the package directory to Asterism, then restart. `asterism.artifact` selects generated output; source entries remain authoring inputs under `asterism.build`. Rebuild and restart after changes, and validate the delivered package against the intended application and provider rather than treating a successful build as integration acceptance.
+
 ## Explain integration choices
 
 The package includes domain guides and source examples. Prose explains when to submit, prepare, observe, or present work and which participant owns each decision. Types and maintained examples express the concrete contracts and composition.

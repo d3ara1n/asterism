@@ -3,7 +3,11 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "scripts": { "typecheck": "tsc --noEmit" },
+  "scripts": {
+    "build": "asterism-plugin-build",
+    "watch": "asterism-plugin-build --watch",
+    "typecheck": "tsc --noEmit"
+  },
   "peerDependencies": {
     "@asterism-app/sdk": "*",
     "react": "^19.3.0",
@@ -11,17 +15,37 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@asterism-app/sdk": "0.48.0",
+    "@asterism-app/sdk": "1.13.2",
     "typescript": "^7.0.2",
     "@types/node": "^26.6.1",
-    "@types/react": "^19.3.0"
+    "@types/react": "^19.3.0",
+    "@asterism-app/plugin-build": "0.1.0"
   },
   "asterism": {
     "id": "example.counter",
     "displayName": "Example counter",
-    "runtime": "src/runtime.ts",
-    "renderer": "src/renderer.tsx",
-    "storage": "src/storage.ts",
-    "manual": ["docs"]
+    "manual": [
+      "docs"
+    ],
+    "artifact": "dist/plugin.json",
+    "build": {
+      "runtime": "src/runtime.ts",
+      "storage": "src/storage.ts",
+      "renderer": "src/renderer.tsx",
+      "public": {
+        "runtime": {
+          "asterism-example-counter/contracts": "src/contracts.ts"
+        },
+        "renderer": {
+          "asterism-example-counter/contracts": "src/contracts.ts"
+        }
+      },
+      "publicDependencies": [],
+      "runtimeExternals": [],
+      "assets": []
+    }
+  },
+  "exports": {
+    "./contracts": "./src/contracts.ts"
   }
 }

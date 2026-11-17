@@ -1,0 +1,44 @@
+{
+  "name": "asterism-example-agent-observation",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "asterism-plugin-build",
+    "watch": "asterism-plugin-build --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@asterism-app/sdk": "*",
+    "@asterism-app/builtin-api": "*",
+    "react": "^19.3.0",
+    "zod": "^4.6.5",
+    "react-intl": "^12.1.4"
+  },
+  "devDependencies": {
+    "@asterism-app/sdk": "1.13.2",
+    "@asterism-app/builtin-api": "0.29.0",
+    "@asterism-app/plugin-build": "0.1.0",
+    "typescript": "^7.0.2",
+    "@types/node": "^26.6.1",
+    "@types/react": "^19.3.0",
+    "nanoid": "^6.0.2"
+  },
+  "asterism": {
+    "id": "example.agent-observation",
+    "displayName": "Example Agent observation",
+    "artifact": "dist/plugin.json",
+    "build": {
+      "runtime": "agent-observation.ts",
+      "public": {
+        "runtime": {},
+        "renderer": {}
+      },
+      "publicDependencies": [
+        "@asterism-app/builtin-api"
+      ],
+      "runtimeExternals": [],
+      "assets": []
+    }
+  }
+}

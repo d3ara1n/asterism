@@ -4,9 +4,11 @@ Plugin development starts with a capability users need, not a complete framework
 
 ## Target a real application
 
-Choose the application release your plugin supports and develop against compatible public packages. Development declarations help the editor and type checker; they do not upgrade the APIs supplied by a running application.
+Choose the application release your plugin supports and develop against compatible public packages. Development declarations help the editor and type checker; they do not upgrade the APIs supplied by a running application. Use the exact development-dependency pins in the complete examples supplied by that target application, or its release's listed public-package versions. Release preparation pairs those examples with their target build. Registry tags such as `latest` and `next` identify channel heads, not the appropriate declarations for every installed or development application.
 
-Host-provided public packages are shared boundaries, not private libraries to bundle into a plugin. Use development dependencies for authoring and peer dependencies to express that relationship. Ordinary runtime libraries remain the plugin's dependencies.
+Validate a copied project outside the application checkout. Workspace dependencies can hide missing authoring dependencies; an independent install and typecheck reveal what an external author actually receives.
+
+Host-provided public packages are shared boundaries, not private libraries to bundle into a plugin. Use development dependencies for authoring and peer dependencies to express that relationship. Ordinary private libraries remain the plugin's dependencies. The explicit build leaves supported host imports external. Declare other plugins' public packages in `asterism.build.publicDependencies` so their imports also bind to the selected provider rather than being bundled from an authoring installation. Peer dependencies describe the installation relationship, not this build classification.
 
 Preserve imports of original shared contracts. A copied declaration can look identical in TypeScript while no longer identifying the same operation at runtime.
 
@@ -18,6 +20,14 @@ Choose a stable plugin identity before sharing the package. Treat its display na
 
 Avoid scaffolding unused services, views, and persistence. A small working capability makes ownership and cleanup easier to verify; an empty abstraction says little about whether the plugin works.
 
+## Build before loading
+
+A plugin directory contains package metadata and a completed artifact. Source entries are authoring inputs under `asterism.build`; `asterism.artifact` selects the generated pointer used for loading. The official `@asterism-app/plugin-build` package supplies the `asterism-plugin-build` command. Keep it as a development dependency and expose an explicit package build script.
+
+Install authoring dependencies, typecheck, and build before adding the package directory to Asterism. Then restart to activate the selection. Repeat the build and restart after source changes. A checkout is a user-owned package directory, not a separate plugin mode: the application neither compiles changed source at startup nor silently substitutes source when output is missing.
+
+A successful build publishes a pointer to completed output. It does not change a graph already captured by a running application. Keep old completed builds until that application's use has ended; do not clean output still needed by lazy imports.
+
 ## Validate distinct boundaries
 
 Type checking establishes agreement with the declarations. Loading and exercising the plugin in the target application establishes whether its contributions and dependencies work together. Neither replaces the other.
@@ -26,6 +36,6 @@ Check the normal path, meaningful invalid input, visible failures, and cleanup w
 
 ## Verify what users receive
 
-Test the distributed package in an installed application, not only the source checkout. Include the entries, generated assets, and dependencies that the plugin actually uses. Files available only on the author's machine should not be necessary.
+Test the distributed package in an installed application, not only the source checkout. Build before packing, and inspect the actual tarball. Use a clean release checkout so retained local build history is not published; clean local output only after running applications no longer use it. Include the artifact pointer and selected completed output, generated assets, root metadata, documentation, translation catalogs, and dependencies that the plugin actually uses. Installation must not need to compile plugin source. Files available only on the author's machine should not be necessary.
 
 Update public package versions intentionally and repeat the relevant integration checks. A compatible editor view is useful evidence, but the application remains the provider of runtime capabilities.

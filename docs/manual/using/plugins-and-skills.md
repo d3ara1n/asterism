@@ -12,6 +12,22 @@ Add capabilities for a concrete need. A new division of responsibilities between
 
 Removing a plugin is not the same as undoing its work. Historical records and external effects can outlive the implementation that created them. Before relying on plugin removal as cleanup, distinguish saved material from active services and from changes made outside Asterism.
 
+## Separate selection from activation
+
+Asterism loads completed plugin artifacts, not source projects. Adding or changing a selected package takes effect after restart. A successful download, build, or metadata inspection does not establish that the plugin's storage and contributions will initialize successfully.
+
+For a local directory, choose the package root with its completed build. You own that directory, its dependencies, and any Git workflow. Build changes explicitly before restarting; source edits alone do not update the running plugin. Removing the registration does not delete your directory. Keep files used by a running application intact until its use has ended.
+
+Bundled packages arrive with the application. Removing one from the selection does not remove the distribution's copy; adding it back still uses the restart boundary. The difference is source ownership, not execution format or lifecycle.
+
+For npm-managed packages, the application owns the downloaded installation and records an exact version. Updating prepares another installation for the next restart; the running plugin keeps its current files. An installation failure leaves the previous selection intact, while an initialization failure after restart is reported rather than silently downgrading code or data. Restarting does not follow a registry tag or fetch missing packages.
+
+Prebuilt JavaScript can still depend on native packages with installation scripts. Unreviewed dependency builds pause installation for an explicit decision. Those scripts run with the current user's permissions, not inside a plugin sandbox. Approval does not establish that a package supports the application's Electron runtime or the current operating system; missing tools and incompatible native binaries remain visible failures.
+
+A data recovery point retains managed package selections and dependency lockfiles, not every downloaded package. If an installation is missing, explicitly reinstall its recorded version. Reacquisition can reuse retained dependency choices, but it still depends on the registry or local package store having those files. Uninstalling managed code retains plugin data, credentials, session objects, and history.
+
+A plugin can depend on a public capability supplied by another enabled plugin. Installing an authoring API package or an ordinary npm dependency does not activate that provider. An unavailable provider can therefore make a consumer unavailable even when all its package files are present. This preserves shared contract identity instead of silently substituting a private copy.
+
 ## Use skills for selected methods
 
 A skill is useful when you want to reuse a procedure, evaluation standard, or handoff convention. It can carry supporting material so the Agent can consult a method when relevant instead of burdening every task with its full instructions.

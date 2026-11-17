@@ -36,6 +36,8 @@
     "!**/*.test.*",
     "docs",
     "examples",
-    "README.md"
+    "README.md",
+    "!examples/**/dist/**",
+    "!examples/dist/**"
   ]
 }

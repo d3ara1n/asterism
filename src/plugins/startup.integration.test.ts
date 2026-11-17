@@ -1,83 +1,57 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
 import { afterEach, expect, it } from "vitest";
-import type { PluginContext } from "@asterism-app/sdk/runtime";
-import { PackageList, buildPackages, importPackages, packageCandidates } from "./packages.ts";
-import { readPluginBuild, savePluginBuild } from "./artifacts.ts";
-import { loadPlugins } from "./loader.ts";
-import { testHostServices } from "./testing.ts";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { buildPlugin } from "@asterism-app/plugin-build";
+import { fixture, put } from "./artifact-fixtures.integration.ts";
 
-const roots: string[] = [];
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
-function put(file: string, source: string) { mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, source); }
-function fixture() {
-  const root = mkdtempSync(join(process.cwd(), ".plugin-startup-")); roots.push(root);
-  const cache = join(root, "artifacts"), list = new PackageList(join(root, "plugins.json"));
-  const add = (name: string, manifest: Record<string, unknown> = {}, metadata: Record<string, unknown> = {}) => {
-    const path = join(root, name);
-    put(join(path, "package.json"), JSON.stringify({ name: `@fixture/${name}`, type: "module", ...metadata,
-      asterism: { id: `fixture.${name}`, displayName: name, ...manifest } }));
-    list.add({ source: { kind: "path", path } }, root);
-    return path;
-  };
-  return { root, cache, list, add, build: () => buildPackages(list, root, cache) };
-}
-const runtime = (id: string, text: string) => `export default { namespace: {id: ${JSON.stringify(id)}}, setup: () => ({agentInstructions: [{id:'version',text:${JSON.stringify(text)}}]}) };`;
-const instructions = (plugin: Awaited<ReturnType<typeof importPackages>>[number]) =>
-  plugin.definition!.setup!({} as PluginContext)?.agentInstructions;
+const fixtures: Awaited<ReturnType<typeof fixture>>[] = [];
+afterEach(() => { for (const f of fixtures.splice(0)) f.close(); });
+async function setup() { const f = await fixture(); fixtures.push(f); return f; }
+const source = (value: string) => `export default {namespace:{id:'fixture.snapshot'},probe:${JSON.stringify(value)}};`;
 
-// Preparation and runtime must agree on executable artifacts even when author files or the managed list change between stages.
-it("imports the captured build and list, then resolves changed source on the next startup and reclaims obsolete artifacts", async () => {
-  const f = fixture(), path = f.add("snapshot", { runtime: "runtime.js" });
-  put(join(path, "runtime.js"), runtime("fixture.snapshot", "before"));
-  const initial = await f.build();
-  const file = savePluginBuild(f.cache, initial);
-  put(join(path, "runtime.js"), runtime("fixture.snapshot", "after"));
-  f.add("later");
-  const imported = await importPackages(readPluginBuild(file), f.cache);
-  expect(imported.map(item => item.manifest!.id)).toEqual(["fixture.snapshot"]);
-  expect(instructions(imported[0]!)).toEqual([{ id: "version", text: "before" }]);
-  const next = await f.build();
-  savePluginBuild(f.cache, next);
-  expect(next.map(item => item.manifest!.id)).toEqual(["fixture.snapshot", "fixture.later"]);
-  expect(instructions((await importPackages(next, f.cache))[0]!)).toEqual([{ id: "version", text: "after" }]);
-  expect(existsSync(join(f.cache, initial[0]!.runtime!))).toBe(false);
-  expect(existsSync(join(f.cache, next[0]!.runtime!))).toBe(true);
+it("keeps preparation's captured selection across processes and pointer publication without scanning source or deleting live builds", async () => {
+  const f = await setup();
+  const directory = await f.plugin("snapshot", { runtime: "runtime.js" }, { "runtime.js": source("before") });
+  const pointer = JSON.parse(readFileSync(join(directory, "dist/plugin.json"), "utf8"));
+  await f.run(`add('snapshot');const built=await loader.buildPackages(list,root,cache);loader.savePluginBuild(cache,built);`);
+  put(directory, "runtime.js", source("after"));
+  await f.run(`const [captured]=await loader.importPackages(loader.readPluginBuild(join(cache,'startup.json')),cache);
+    assert.equal(captured.definition.probe,'before');
+    const [next]=await loader.loadPackages(list,root,cache,[]);assert.equal(next.definition.probe,'before');`);
+  await buildPlugin({ root: directory });
+  await f.run(`const [captured]=await loader.importPackages(loader.readPluginBuild(join(cache,'startup.json')),cache);
+    assert.equal(captured.definition.probe,'before');
+    const [next]=await loader.loadPackages(list,root,cache,[]);assert.equal(next.definition.probe,'after');
+    loader.savePluginBuild(cache,[next]);`);
+  expect(existsSync(join(directory, "dist", pointer.build, "artifact.json"))).toBe(true);
 });
 
-// A nearer scoped package does not change node_modules' immediate entries when the scope already exists.
-it("resolves a newly installed nearer scoped dependency on every startup", async () => {
-  const f = fixture(), path = f.add("consumer", { runtime: "runtime.js" });
-  put(join(path, "runtime.js"), `import {value} from '@fixture/dependency'; export default {namespace:{id:'fixture.consumer'},setup:()=>({agentInstructions:[{id:'version',text:value}]})};`);
-  const dependency = (base: string, value: string) => {
-    put(join(base, "node_modules/@fixture/dependency/package.json"), JSON.stringify({ name: "@fixture/dependency", type: "module", main: "index.js" }));
-    put(join(base, "node_modules/@fixture/dependency/index.js"), `export const value = ${JSON.stringify(value)};`);
-  };
-  dependency(f.root, "ancestor");
-  put(join(path, "node_modules/@fixture/other/index.js"), "export const other = true;");
-  expect(instructions((await importPackages(await f.build(), f.cache))[0]!)).toEqual([{ id: "version", text: "ancestor" }]);
-  dependency(path, "nearest");
-  expect(instructions((await importPackages(await f.build(), f.cache))[0]!)).toEqual([{ id: "version", text: "nearest" }]);
+it("blocks storage-rejected public-only providers and consumers before runtime import while preserving unrelated packages", async () => {
+  const f = await setup();
+  await f.plugin("provider", { storage: "storage.ts", public: { runtime: { "@fixture/api/public": "public.ts" } } }, {
+    "storage.ts": "export default [{kind:'json',path:'state.json',version:2,migrations:{}}];",
+    "public.ts": "export const value=1;",
+  });
+  await f.plugin("consumer", { runtime: "runtime.ts", publicDependencies: ["@fixture/api"] }, {
+    "runtime.ts": "import '@fixture/api/public';throw new Error('Consumer must not execute');",
+  });
+  await f.plugin("independent", {});
+  await f.run(`add('provider');add('consumer');add('independent');
+    const built=await loader.buildPackages(list,root,cache);
+    const storage=await loader.importPackages(built,cache,{runtime:false});assert.equal(storage[0].storage[0].version,2);
+    const items=await loader.importPackages(built,cache,{storageFailures:new Map([['fixture.provider','Migration failed.']])});
+    assert.deepEqual(items.map(item=>[item.status,item.diagnostic?.stage]),[['failed','storage'],['failed','dependency'],['ready',undefined]]);
+    assert.equal(items[1].definition,undefined);`);
 });
 
-// Storage admission belongs to the package graph, including public-only providers, and runs before backend imports.
-it("blocks a public-only provider and its consumers after storage failure without importing their runtime", async () => {
-  const f = fixture();
-  const provider = f.add("provider", { storage: "storage.js" }, { exports: { "./public": "./public.js" } });
-  put(join(provider, "storage.js"), "export default [{kind:'json',path:'state.json',version:2,migrations:{}}];");
-  put(join(provider, "public.js"), "export const value = 1;");
-  const consumer = f.add("consumer", { runtime: "runtime.js" });
-  put(join(consumer, "runtime.js"), "export {value} from '@fixture/provider/public'; throw new Error('Runtime must not execute');");
-  f.add("independent");
-  const packages = await importPackages(await f.build(), f.cache, { storageFailures: new Map([["fixture.provider", "Migration failed."]]) });
-  expect(packages.map(item => [item.manifest!.id, item.status, item.diagnostic?.stage])).toEqual([
-    ["fixture.provider", "failed", "storage"], ["fixture.consumer", "failed", "dependency"], ["fixture.independent", "ready", undefined],
-  ]);
-  expect(packages[1]!.definition).toBeUndefined();
-  const loaded = loadPlugins([], { ...testHostServices(), packages: packageCandidates(packages) });
-  try {
-    expect(loaded.packages.map(item => [item.id, item.status])).toEqual([
-      ["fixture.provider", "failed"], ["fixture.consumer", "failed"], ["fixture.independent", "loaded"],
-    ]);
-  } finally { await loaded.close(); }
+it("shares storage, runtime, and public graph state within a process without promising cross-process memory", async () => {
+  const f = await setup();
+  await f.plugin("state", { runtime: "runtime.ts", storage: "storage.ts", public: { runtime: { "@fixture/state/contracts": "state.ts" } } }, {
+    "state.ts": "export const state=new Map();",
+    "storage.ts": "import {state} from '@fixture/state/contracts';export default [{kind:'json',path:'state.json',version:2,migrations:{1:()=>state}}];",
+    "runtime.ts": "import {state} from '@fixture/state/contracts';export default {namespace:{id:'fixture.state'},probe:state};",
+  });
+  await f.run(`add('state');const [item]=await loader.loadPackages(list,root,cache,[]);
+    assert.equal(item.status,'ready',item.diagnostic?.message);
+    assert.equal(item.storage[0].migrations[1](),item.definition.probe);`);
 });

@@ -8,21 +8,27 @@
   "main": "dist/main/index.js",
   "type": "module",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=22.15.0"
   },
   "scripts": {
     "postinstall": "install-electron && node scripts/prepare-native.mjs && node scripts/prepare-signing.mjs",
     "test": "vitest run",
-    "test:plugins": "vitest run --config vitest.plugins.config.ts",
+    "test:plugins": "vitest run --config vitest.plugins.config.ts && npm run test:integration --workspace @asterism-app/plugin-build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.renderer.json",
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "dev": "npm run build:plugins && electron-vite dev",
+    "build": "npm run build:plugins && electron-vite build",
     "preview": "electron-vite preview",
     "package": "npm run build && electron-builder --config electron-builder.config.ts --dir --publish never",
     "make": "npm run build && electron-builder --config electron-builder.config.ts --publish never",
     "i18n:extract": "node scripts/i18n.ts extract",
     "i18n:check": "node scripts/i18n.ts check",
-    "icon": "node scripts/app-icon.ts"
+    "icon": "node scripts/app-icon.ts",
+    "build:plugin-tool": "npm run build --workspace @asterism-app/plugin-build",
+    "build:plugins": "npm run build:plugin-tool && asterism-plugin-build --root packages/builtin",
+    "pretypecheck": "npm run build:plugin-tool",
+    "pretest": "npm run build:plugin-tool",
+    "pretest:plugins": "npm run build:plugins",
+    "check": "npm run typecheck && npm test --ignore-scripts && npm run i18n:check"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.91",
@@ -53,7 +59,6 @@
     "electron-store": "12.0.0",
     "electron-updater": "6.8.11",
     "elkjs": "^0.12.1",
-    "esbuild": "0.28.2",
     "katex": "0.19.1",
     "lucide-react": "1.64.0",
     "mermaid": "12.2.0",
@@ -61,6 +66,7 @@
     "nanoid": "6.0.2",
     "node-pty": "1.1.0",
     "partial-json": "0.1.7",
+    "pnpm": "10.34.9",
     "prettier": "3.9.10",
     "quickjs-emscripten-core": "0.32.0",
     "radix-ui": "1.8.1",
@@ -83,6 +89,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@asterism-app/plugin-build": "*",
     "@formatjs/cli": "6.16.36",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "^26.6.6",
@@ -93,6 +100,7 @@
     "electron": "45.1.0",
     "electron-builder": "26.18.0",
     "electron-vite": "6.0.0",
+    "esbuild": "0.28.2",
     "tailwindcss": "4.3.3",
     "typescript": "^7.0.2",
     "vite": "8.3.5",
@@ -124,5 +132,13 @@
     "fsevents@2.3.3": true,
     "electron@45.1.0": true,
     "@parcel/watcher@2.6.0": true
+  },
+  "asterismRelease": {
+    "format": 1,
+    "packages": [
+      "packages/plugin-build",
+      "packages/sdk",
+      "packages/builtin-api"
+    ]
   }
 }

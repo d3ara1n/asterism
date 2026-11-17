@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { unpackedArchivePath } from "./package-modules.ts";
 
-// In packaged builds this is the sole path conversion for esbuild loading; incorrect archive rewrites reproduce spawn ENOTDIR
-// or incorrectly rewrite ordinary development paths.
+// Bundled plugin output and native dependencies require physical unpacked paths; development paths stay unchanged.
 describe("asar unpacked path rewriting", () => {
   it("rewrites archive segments to .asar.unpacked and leaves other paths unchanged", () => {
     expect(unpackedArchivePath("/Applications/A.app/Contents/Resources/app.asar/node_modules/esbuild/lib/main.js"))

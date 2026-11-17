@@ -33,6 +33,7 @@ jobs:
       prerelease: ${{ steps.version.outputs.prerelease }}
       source_sha: ${{ steps.version.outputs.source_sha }}
       packages: ${{ steps.version.outputs.packages }}
+      publish_packages: ${{ steps.version.outputs.publish_packages }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,18 +50,26 @@ jobs:
         run: |
           mode=prerelease
           if [[ -n "$SOURCE_TAG" ]]; then mode=release; fi
-          node scripts/collect-release.ts "$mode" "$SOURCE_TAG"
+          node scripts/collect-release.ts "$mode" "$SOURCE_TAG" "$RUNNER_TEMP/release-input.json"
+      - uses: actions/checkout@v4
+        if: steps.collect.outputs.skip != 'true'
+        with:
+          ref: ${{ steps.collect.outputs.source_sha }}
       - if: steps.collect.outputs.skip != 'true'
         run: npm ci
       - id: version
         if: steps.collect.outputs.skip != 'true'
-        run: node scripts/prepare-release.ts
+        run: node scripts/prepare-release.ts "$RUNNER_TEMP/release-input.json"
+      - name: Apply planned public package versions
+        if: steps.collect.outputs.skip != 'true'
+        env:
+          RELEASE_PACKAGES: ${{ steps.version.outputs.packages }}
+        run: node scripts/publish-packages.ts version
       - if: steps.collect.outputs.skip != 'true'
-        run: npm run typecheck
-      - if: steps.collect.outputs.skip != 'true'
-        run: npm test
-      - if: steps.collect.outputs.skip != 'true'
-        run: npm run i18n:check
+        run: npm run check
+      - name: Validate plugin build and loading contracts
+        if: steps.collect.outputs.skip != 'true'
+        run: npm run test:plugins
       - uses: actions/upload-artifact@v4
         if: steps.collect.outputs.skip != 'true'
         with:
@@ -182,10 +191,14 @@ jobs:
         with:
           name: notes
           path: release-notes
+      - name: Install publication dependencies
+        if: needs.prepare.outputs.prerelease == 'true' && needs.prepare.outputs.publish_packages == 'true'
+        run: npm ci --ignore-scripts
       - name: Publish plugin packages
         env:
           RELEASE_PACKAGES: ${{ needs.prepare.outputs.packages }}
           RELEASE_PRERELEASE: ${{ needs.prepare.outputs.prerelease }}
+          RELEASE_SOURCE_SHA: ${{ needs.prepare.outputs.source_sha }}
         run: |
           node scripts/publish-packages.ts version
           node scripts/publish-packages.ts publish

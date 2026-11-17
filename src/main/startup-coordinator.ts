@@ -1,3 +1,4 @@
+import { capturePluginArtifactRoots } from "../plugins/protocol-roots.ts";
 import { join } from "node:path";
 import type { StartupStage, StartupState } from "../shared/startup.ts";
 import type { PluginStorageFailure, PreparationResult, RecoveryAction, RecoveryPoint } from "../shared/recovery.ts";
@@ -96,6 +97,7 @@ export class StartupCoordinator {
       this.lifetime.signal.throwIfAborted();
       this.stage("plugins");
       if (!result.pluginBuild) throw new Error("Data preparation did not provide a plugin build.");
+      capturePluginArtifactRoots(result.pluginBuild);
       await this.options.startRuntime(result.plugins, result.pluginBuild);
     } catch (error) {
       if (this.lifetime.signal.aborted) return;

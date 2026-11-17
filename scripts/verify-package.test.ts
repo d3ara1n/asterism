@@ -14,9 +14,12 @@ function fixture() {
     writeFileSync(target, content);
   };
   file("packages/plugin/package.json", JSON.stringify({
-    name: "@example/plugin", asterism: { runtime: "runtime.js", publicPackages: ["@example/api"] },
+    name: "@example/plugin", asterism: { id: "example.plugin", artifact: "dist/plugin.json", publicPackages: ["@example/api"] },
   }));
-  file("packages/plugin/runtime.js", "export default {};");
+  file("packages/plugin/dist/plugin.json", JSON.stringify({ format: 1, build: "builds/first" }));
+  file("packages/plugin/dist/builds/first/artifact.json", JSON.stringify({ format: 1, id: "example.plugin", buildId: "first",
+    runtime: "backend/runtime.mjs", public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, runtimeExternals: [], stylesheets: [] }));
+  file("packages/plugin/dist/builds/first/backend/runtime.mjs", "export default {};");
   return { root, file };
 }
 
@@ -34,7 +37,7 @@ describe("Packaged plugin assets", () => {
 
   it("fails when an executable entry is omitted from the package", () => {
     const { root } = fixture();
-    rmSync(join(root, "packages/plugin/runtime.js"));
+    rmSync(join(root, "packages/plugin/dist/builds/first/backend/runtime.mjs"));
     expect(() => verifyPackagedPlugins(root)).toThrow("Packaged entry is missing: @example/plugin");
   });
 

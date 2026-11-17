@@ -2,6 +2,7 @@ import type { Configuration } from "electron-builder";
 import { applicationBrand, applicationId, applicationRepository } from "./src/shared/application.ts";
 import { join } from "node:path";
 import { verifyPackagedPlugins } from "./scripts/verify-package.ts";
+import { pluginDistributionFiles } from "./scripts/plugin-distribution.ts";
 import { testFileGlob } from "./src/shared/runtime-modules.ts";
 
 const config: Configuration = {
@@ -9,13 +10,15 @@ const config: Configuration = {
   productName: applicationBrand.en,
   directories: { output: "out", buildResources: "assets/icon" },
   files: [
-    "dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md", `!${testFileGlob}`, "!**/*.map",
+    "dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md", "!node_modules/@asterism-app/builtin/dist{,/**}", "!node_modules/@asterism-app/{sdk,builtin-api}/examples/**/dist{,/**}", `!${testFileGlob}`, "!**/*.map",
     // Explicit directory mappings preserve example declarations that the default application filter excludes.
-    ...["docs/manual", ...["sdk", "ui", "builtin-api", "builtin"].map(name => `packages/${name}`)]
-      .map(path => ({ from: path, to: path, filter: ["**/*", "!**/node_modules{,/**}", `!${testFileGlob}`, "!**/*.map"] })),
+    ...["docs/manual", ...["sdk", "ui", "builtin-api"].map(name => `packages/${name}`)]
+      .map(path => ({ from: path, to: path, filter: ["**/*", "!**/node_modules{,/**}", "!**/dist{,/**}", `!${testFileGlob}`, "!**/*.map"] })),
+    { from: "packages/builtin", to: "packages/builtin", filter: pluginDistributionFiles("packages/builtin") },
+    { from: "packages/plugin-build", to: "packages/plugin-build", filter: ["package.json", "docs/**"] },
     // Public libraries resolve through node_modules, whose default dependency filter omits examples.
     ...["sdk", "builtin-api"].flatMap(name => ["docs", "examples"].map(directory => ({
-      from: `packages/${name}/${directory}`, to: `node_modules/@asterism-app/${name}/${directory}`, filter: ["**/*", `!${testFileGlob}`, "!**/*.map"],
+      from: `packages/${name}/${directory}`, to: `node_modules/@asterism-app/${name}/${directory}`, filter: ["**/*", "!**/dist{,/**}", `!${testFileGlob}`, "!**/*.map"],
     }))),
   ],
   asarUnpack: ["docs/manual/**", "packages/**", "node_modules/**"],

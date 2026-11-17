@@ -12,6 +12,16 @@ import type { NetworkBridge } from "./network.ts";
 import type { RendererFailure } from "./renderer-failure.ts";
 import { pluginDiagnosticSchema } from "./plugin-startup.ts";
 
+/** One host-owned npm operation. Long-running work is polled through workspace.read. */
+export const npmPreviewSchema = z.strictObject({ name: z.string(), version: z.string(), description: z.string().nullable(), integrity: z.string().nullable() });
+export const npmOperationSchema = z.strictObject({
+  id: z.string().uuid(), spec: z.string(), targetSource: z.string().nullable(),
+  phase: z.enum(["inspecting", "preview", "installing", "awaiting-approval", "cancelling", "succeeded", "failed", "cancelled"]),
+  preview: npmPreviewSchema.nullable(), output: z.string(), blockedBuilds: z.array(z.string()), error: z.string().nullable(),
+});
+export type NpmPreview = z.infer<typeof npmPreviewSchema>;
+export type NpmOperation = z.infer<typeof npmOperationSchema>;
+
 export const protocolVersion = 17;
 export const systemResumeMessage = "system.resume";
 export const statusChannel = coreChannel("runtime-status");
@@ -31,6 +41,10 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("plugin.add-bundled"), source: z.string().min(1) }),
   z.strictObject({ type: z.literal("plugin.enable"), index: z.number().int().nonnegative(), enabled: z.boolean() }),
   z.strictObject({ type: z.literal("plugin.remove"), index: z.number().int().nonnegative() }),
+  z.strictObject({ type: z.literal("plugin.npm.preview"), spec: z.string().trim().min(1).max(512), targetSource: z.string().min(1).optional() }),
+  z.strictObject({ type: z.literal("plugin.npm.install"), operationId: id }),
+  z.strictObject({ type: z.literal("plugin.npm.approve"), operationId: id, packages: z.array(z.string().min(1)).min(1) }),
+  z.strictObject({ type: z.literal("plugin.npm.cancel"), operationId: id }),
   // Folder catalog and membership changes return the refreshed snapshot so navigation regroups at once.
   ...folderCommands,
   z.strictObject({ type: z.literal("session.set-keep-awake"), sessionId: id, keepAwake: z.boolean() }),
@@ -50,12 +64,17 @@ export const snapshotSchema = z.strictObject({
   plugins: z.array(z.strictObject({ index: z.number().int().nonnegative().nullable(), bundled: z.boolean().default(false), id: z.string().nullable(), source: z.string(),
     status: z.enum(["loaded", "disabled", "invalid", "failed", "pending", "available"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
     diagnostic: pluginDiagnosticSchema.nullable().default(null),
-    stylesheet: z.string().nullable(),
+    stylesheet: z.string().nullable(), stylesheets: z.array(z.string()).optional(),
+    sourceKind: z.enum(["path", "bundled", "npm"]).optional(),
+    npm: z.strictObject({ name: z.string(), version: z.string(), installation: z.string().optional() }).optional(),
+    runningVersion: z.string().nullable().optional(),
     metadata: pluginMetadataSchema.default({}),
     dependencies: z.array(z.string()).default([]) })),
+  npmOperation: npmOperationSchema.nullable().optional(),
   /** Captured loaded composition for every renderer in this runtime, independent of next-start management edits. */
   rendererPlugins: z.array(z.strictObject({ id: z.string(), source: z.string(), metadata: pluginMetadataSchema,
-    renderer: z.string().nullable(), stylesheet: z.string().nullable(), dependencies: z.array(z.string()) })),
+    renderer: z.string().nullable(), stylesheet: z.string().nullable(), stylesheets: z.array(z.string()).optional(), dependencies: z.array(z.string()) })),
+  rendererImportMap: z.record(z.string(), z.string()).optional(),
   /** Package lists differing from this startup require restart to take effect. */
   restartRequired: z.boolean(),
   catalogs: z.array(translationCatalogSchema).optional(),

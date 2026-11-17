@@ -7,6 +7,8 @@ import { ConfigurationService } from "../configuration/service.ts";
 import { applicationStorage } from "../shared/application.ts";
 import type { ModelAdapter } from "../model/contract.ts";
 import { PackageList, PluginPackageError, readManifest, readPackageMetadata, packageRoot, packageSource, type PackageEntry } from "../plugins/packages.ts";
+import { readManagedPluginId } from "../plugins/npm-records.ts";
+import { NpmInstallations } from "../plugins/npm-installation.ts";
 import { applicationPackages, applicationManuals, bundledPackages } from "../plugins/distribution.ts";
 import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
@@ -37,12 +39,24 @@ export class ApplicationService {
   private readonly folders: FolderStore;
   private readonly list: PackageList;
   private readonly started: string;
-  constructor(root: string, private readonly options: { packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
+  private readonly startedEntries: readonly PackageEntry[];
+  private readonly npm: NpmInstallations;
+  constructor(root: string, private readonly options: { rendererImportMap?: Record<string, string>; packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage } = {}) {
     this.db = openDatabase(root);
     this.folders = new FolderStore(this.db);
     this.list = applicationPackages(root);
-    this.started = JSON.stringify(options.packageEntries ?? this.list.read());
+    this.startedEntries = options.packageEntries ?? this.list.read();
+    this.started = JSON.stringify(this.startedEntries);
     this.npmRoot = join(root, applicationStorage.pluginPackagesDirectory);
+    this.npm = new NpmInstallations({ npmRoot: this.npmRoot, publish: (source, target) => {
+      if (!target) this.list.add({ source }, this.npmRoot);
+      else {
+        const entries = this.list.read();
+        const index = entries.findIndex(entry => packageSource(entry) === target.source);
+        if (index < 0) throw new Error("The plugin selection was removed. Inspect the package again to add it.");
+        this.list.replace(index, { ...entries[index]!, source }, this.npmRoot);
+      }
+    } });
     try {
       this.configuration = new ConfigurationService(root, () => {
         this.sessions?.refreshSleep();
@@ -61,7 +75,7 @@ export class ApplicationService {
   }
   async close(): Promise<void> {
     const results = await Promise.allSettled([
-      (async () => this.configuration.close())(), this.sessions.close(), this.content.close(),
+      this.npm.close(), (async () => this.configuration.close())(), this.sessions.close(), this.content.close(),
     ]);
     const errors = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
     // Keep storage available until session work and renderer transfers have reached terminal outcomes.
@@ -85,7 +99,19 @@ export class ApplicationService {
     if (!parsed.success) throw new ApplicationError("invalid_request", "Invalid application command.");
     const command = parsed.data;
     try {
-      if (command.type === "plugin.add") this.list.add({ source: { kind: "path", path: command.path } }, this.npmRoot);
+      if (command.type === "plugin.npm.preview") {
+        let target = null;
+        if (command.targetSource) {
+          const entry = this.list.read().find(entry => packageSource(entry) === command.targetSource);
+          if (!entry || entry.source.kind !== "npm") throw new Error("No such managed npm package.");
+          const retainedId = entry.source.installation ? readManagedPluginId(this.npmRoot, entry.source.installation) : null;
+          target = { source: command.targetSource, name: entry.source.name, installation: entry.source.installation, version: entry.source.version, id: retainedId ?? readManifest(packageRoot(entry, this.npmRoot)).id };
+        }
+        this.npm.preview(command.spec, target);
+      } else if (command.type === "plugin.npm.install") this.npm.install(command.operationId);
+      else if (command.type === "plugin.npm.approve") this.npm.approve(command.operationId, command.packages);
+      else if (command.type === "plugin.npm.cancel") this.npm.cancel(command.operationId);
+      else if (command.type === "plugin.add") this.list.add({ source: { kind: "path", path: command.path } }, this.npmRoot);
       else if (command.type === "plugin.add-bundled") {
         const entry = bundledPackages.find(entry => packageSource(entry) === command.source);
         if (!entry) throw new PluginPackageError("invalid_entry", "No such bundled package.");
@@ -101,6 +127,7 @@ export class ApplicationService {
       else if (command.type === "template.move") this.folders.moveTemplate(command.templateId, command.folderId);
     } catch (error) {
       if (error instanceof PluginPackageError) throw new ApplicationError(error.code === "duplicate" ? "conflict" : "invalid_request", error.message);
+      if (command.type.startsWith("plugin.npm.")) throw new ApplicationError("invalid_request", error instanceof Error ? error.message : String(error));
       if (error instanceof SessionError) throw new ApplicationError(error.code, error.message, error.display);
       throw error;
     }
@@ -118,25 +145,32 @@ export class ApplicationService {
     const plugins: AppSnapshot["plugins"] = entries.map(({ entry, index }): AppSnapshot["plugins"][number] => {
       const source = packageSource(entry);
       const startup = this.sessions.packages.find(item => item.source === source);
-      const pending = !startup || startup.enabled !== entry.enabled;
+      const capturedEntry = this.startedEntries.find(item => packageSource(item) === source);
+      const pending = !startup || startup.enabled !== entry.enabled || JSON.stringify(capturedEntry) !== JSON.stringify(entry);
       let metadata = startup?.metadata ?? {}, id = startup?.id ?? null, metadataError = startup?.metadataError ?? null;
       const root = packageRoot(entry, this.npmRoot);
       if (pending || index === null) {
         try { metadata = readPackageMetadata(root); metadataError = null; }
         catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
       }
-      if (!id) { try { id = readManifest(root).id; } catch { /* Loading state retains package validation failure reasons. */ } }
-      if (index === null) return { index, source, bundled: true, metadata, enabled: false, id, status: "available",
-        error: metadataError, diagnostic: null, renderer: null, stylesheet: null, dependencies: [] };
-      return { index, source, bundled: entry.source.kind === "bundled", metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
+      if (!id) {
+        try { id = (entry.source.kind === "npm" && entry.source.installation ? readManagedPluginId(this.npmRoot, entry.source.installation) : null) ?? readManifest(root).id; }
+        catch { /* Loading state retains package validation failure reasons. */ }
+      }
+      const running = this.sessions.packages.find(item => item.id === id && item.status === "loaded");
+      const sourceInfo = { sourceKind: entry.source.kind, ...(entry.source.kind === "npm" ? { npm: { name: entry.source.name, version: entry.source.version, installation: entry.source.installation } } : {}), runningVersion: running?.metadata.version ?? null };
+      if (index === null) return { ...sourceInfo, index, source, bundled: true, metadata, enabled: false, id, status: "available",
+        error: metadataError, diagnostic: null, renderer: null, stylesheet: null, stylesheets: [], dependencies: [] };
+      return { ...sourceInfo, index, source, bundled: entry.source.kind === "bundled", metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
         error: (pending ? null : startup.diagnostic?.message) ?? metadataError, diagnostic: pending ? null : startup.diagnostic ?? null, renderer: pending ? null : startup.renderer,
-        stylesheet: pending ? null : startup.stylesheet,
+        stylesheet: pending ? null : startup.stylesheet, stylesheets: pending ? [] : [...startup.stylesheets ?? []],
         dependencies: [...startup?.rendererDependencies ?? []] };
     }).filter((plugin, _, all) => plugin.index !== null || !plugin.id || !all.some(item => item.index !== null && item.id === plugin.id));
     return snapshotSchema.parse({ workspace, folders: this.folders.list(), sessions, templates: this.sessions.templates.list(), archivedSessions, plugins,
+      npmOperation: this.npm.snapshot(), rendererImportMap: this.options.rendererImportMap ?? {},
       rendererPlugins: this.sessions.packages.flatMap(item => item.status === "loaded" && item.id ? [{
         id: item.id, source: item.source, metadata: item.metadata, renderer: item.renderer,
-        stylesheet: item.stylesheet, dependencies: [...item.rendererDependencies],
+        stylesheet: item.stylesheet, stylesheets: [...item.stylesheets ?? []], dependencies: [...item.rendererDependencies],
       }] : []),
       catalogs: (this.options.catalogs ?? []).filter(catalog => this.sessions.packages.some(item => item.id === catalog.owner && item.status === "loaded")),
       restartRequired: JSON.stringify(current) !== this.started,

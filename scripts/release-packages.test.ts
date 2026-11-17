@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseCommit } from "./release-commits.ts";
-import { planPackage, type PackageInput } from "./release-packages.ts";
+import { planPackage, planPackages, type PackageInput } from "./release-packages.ts";
 
 const commit = (sha: string, message: string) => parseCommit(sha, message);
 const pkg = (published: PackageInput["published"], touched: string[]): PackageInput =>
@@ -34,4 +34,127 @@ describe("Plugin package versions", () => {
     expect(() => planPackage(pkg({ "0.47.0": "base", "0.48.0": "elsewhere" }, ["head"]), commits, "prerelease"))
       .toThrow("already published");
   });
+});
+
+const managed = (name: string, published: PackageInput["published"], touched: string[] = [], dependencies?: string[]): PackageInput =>
+  ({ directory: `packages/${name}`, name, published, touched,
+    ...(dependencies ? { examples: [{ path: `packages/${name}/examples/package.json`, dependencies }] } : {}) });
+
+describe("Release-aligned examples", () => {
+  it("propagates generated pin changes through the catalog, patching each owner only once", () => {
+    const commits = [commit("head", "feat: builder API"), commit("docs", "docs: example notes"), commit("base", "feat: initial")];
+    const sdk = managed("sdk", { "2.5.4": "base" }, ["docs"], ["builder", "sdk"]);
+    sdk.examples!.push({ path: "packages/sdk/examples/second/package.json", dependencies: ["builder"] });
+    const plans = planPackages([
+      managed("builder", { "1.3.0": "base" }, ["head"]), sdk,
+      managed("api", { "3.2.0": "base" }, [], ["sdk", "api"]),
+    ], commits, "prerelease");
+    expect(plans).toMatchObject([
+      { name: "builder", version: "1.4.0", publish: true },
+      { name: "sdk", version: "2.5.5", publish: true,
+        examples: ["packages/sdk/examples/package.json", "packages/sdk/examples/second/package.json"] },
+      { name: "api", version: "3.2.1", publish: true },
+    ]);
+  });
+
+  it("keeps the owner's direct minor bump instead of adding a derived patch", () => {
+    const commits = [commit("head", "feat: new interfaces"), commit("base", "feat: initial")];
+    expect(planPackages([
+      managed("builder", { "1.3.0": "base" }, ["head"]),
+      managed("sdk", { "2.5.4": "base" }, ["head"], ["builder", "sdk"]),
+      managed("api", { "3.2.0": "base" }, [], ["sdk", "api"]),
+    ], commits, "prerelease")).toMatchObject([
+      { version: "1.4.0", publish: true },
+      { version: "2.6.0", publish: true },
+      { version: "3.2.1", publish: true },
+    ]);
+  });
+
+  it.each([1, 2, 3])("resumes an exact candidate after %i catalog packages were published", publishedCount => {
+    const commits = [commit("candidate", "feat: builder API"), commit("base", "feat: initial")];
+    const builder = managed("builder", { "1.3.0": "base", "1.4.0": "candidate" }, ["candidate"]);
+    const sdk = managed("sdk", { "2.5.4": "base" }, [], ["builder", "sdk"]);
+    const api = managed("api", { "3.2.0": "base" }, [], ["sdk", "api"]);
+    if (publishedCount >= 2) sdk.published["2.5.5"] = "candidate";
+    if (publishedCount >= 3) api.published["3.2.1"] = "candidate";
+    expect(planPackages([builder, sdk, api], commits, "prerelease")).toMatchObject([
+      { version: "1.4.0", publish: false },
+      { version: "2.5.5", publish: publishedCount < 2 },
+      { version: "3.2.1", publish: publishedCount < 3 },
+    ]);
+    if (publishedCount === 3) expect(planPackages([builder, sdk, api], commits, "release")).toMatchObject([
+      { version: "1.4.0", publish: false },
+      { version: "2.5.5", publish: false },
+      { version: "3.2.1", publish: false },
+    ]);
+  });
+
+  it("compares against dependency publications at the owner baseline, not their latest registry version", () => {
+    const commits = [commit("candidate", "chore: candidate"), commit("upstream", "fix: builder"),
+      commit("owner", "feat: SDK"), commit("older", "feat: initial")];
+    expect(planPackages([
+      managed("builder", { "1.0.0": "older", "1.1.0": "owner", "1.1.1": "upstream", "2.0.0": "elsewhere" }),
+      managed("sdk", { "2.5.4": "owner" }, [], ["builder", "sdk"]),
+    ], commits, "prerelease")).toMatchObject([
+      { version: "1.1.1", publish: false },
+      { version: "2.5.5", publish: true },
+    ]);
+  });
+
+  it("leaves an owner unchanged when its paired dependency versions still match, including older dependency sources", () => {
+    const commits = [commit("candidate", "feat: application only"), commit("owner", "fix: SDK"),
+      commit("dependency", "fix: builder"), commit("older", "feat: initial")];
+    const inputs = [
+      managed("builder", { "1.0.0": "older", "1.1.0": "dependency", "1.2.0": "elsewhere", "2.0.0-stage": "candidate" }),
+      managed("sdk", { "2.5.3": "older", "2.5.4": "owner" }, ["owner"], ["builder", "sdk"]),
+    ];
+    for (const mode of ["prerelease", "release"] as const) expect(planPackages(inputs, commits, mode)).toMatchObject([
+      { version: "1.1.0", publish: false },
+      { version: "2.5.4", publish: false },
+    ]);
+  });
+
+  it("does not treat a self-pin as an external change before or after publishing a direct bump", () => {
+    const commits = [commit("candidate", "fix: example behavior"), commit("base", "feat: initial")];
+    const sdk = managed("sdk", { "2.5.4": "base" }, ["candidate"], ["sdk"]);
+    expect(planPackages([sdk], commits, "prerelease")).toMatchObject([{ version: "2.5.5", publish: true }]);
+    sdk.published["2.5.5"] = "candidate";
+    expect(planPackages([sdk], commits, "prerelease")).toMatchObject([{ version: "2.5.5", publish: false }]);
+    expect(planPackages([sdk], commits, "release")).toMatchObject([{ version: "2.5.5", publish: false }]);
+  });
+
+  it("rejects promotion when an upstream publication left an example owner unpublished", () => {
+    const commits = [commit("candidate", "fix: builder"), commit("base", "feat: initial")];
+    expect(() => planPackages([
+      managed("builder", { "1.3.0": "base", "1.3.1": "candidate" }, ["candidate"]),
+      managed("sdk", { "2.5.4": "base" }, [], ["builder", "sdk"]),
+    ], commits, "release")).toThrow("sdk has changes that its prerelease did not publish");
+  });
+
+  it("rejects a derived patch version already published from another source", () => {
+    const commits = [commit("candidate", "fix: builder"), commit("base", "feat: initial")];
+    expect(() => planPackages([
+      managed("builder", { "1.3.0": "base", "1.3.1": "candidate" }, ["candidate"]),
+      managed("sdk", { "2.5.4": "base", "2.5.5": "elsewhere" }, [], ["builder", "sdk"]),
+    ], commits, "prerelease")).toThrow("sdk@2.5.5 is already published from another commit");
+  });
+
+  it("versions a new dependency pairing when the public package did not exist at the owner baseline", () => {
+    const commits = [commit("candidate", "feat: builder"), commit("base", "feat: SDK")];
+    expect(planPackages([
+      managed("builder", { "1.0.0": "candidate" }),
+      managed("sdk", { "2.5.4": "base" }, [], ["builder", "sdk"]),
+    ], commits, "prerelease")).toMatchObject([
+      { version: "1.0.0", publish: false }, { version: "2.5.5", publish: true },
+    ]);
+  });
+});
+
+
+it("rejects catalogue order that would miss an upstream generated version change", () => {
+  const commits = [commit("head", "fix: builder"), commit("base", "feat: initial")];
+  expect(() => planPackages([
+    managed("sdk", { "2.0.0": "base" }, [], ["builder"]),
+    managed("builder", { "1.0.0": "base" }, ["head"]),
+  ], commits, "prerelease")).toThrow("must precede sdk");
 });

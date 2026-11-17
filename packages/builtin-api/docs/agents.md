@@ -8,6 +8,14 @@ Use the public Agent boundary when the work belongs in an existing Agent convers
 
 Import original contracts from the domain package. Shared declaration identity lets an extension participate in existing behavior; a copied schema or an implementation import is not an equivalent integration. Depending on the public API also means depending on its enabled implementation provider.
 
+## Build against the enabled provider
+
+Keep builtin API imports external in the completed artifact by declaring `@asterism-app/builtin-api` in `asterism.build.publicDependencies`. This applies to contracts, runtime helpers, and renderer exports, including imports reached through other bundled modules. Peer and development dependencies supply installation information and authoring declarations; they do not classify public imports for the standalone builder or activate builtin.
+
+Build explicitly with `asterism-plugin-build` before adding the package directory to Asterism, then restart. The package's `asterism.artifact` points to generated output; its source entries belong in `asterism.build`. A source checkout and a distributed package use the same loading contract. Rebuilding does not replace a graph already running in the application.
+
+Binding to the provider's native ESM exports preserves the original operation declarations and renderer services. A consumer-local copy is not a fallback when builtin is disabled or unavailable. Validate with the intended provider enabled; successful typechecking or artifact generation alone does not establish that integration.
+
 ## Make messages readable and attributable
 
 Sender attribution explains where input came from independently of the Agent that receives it. It is not authority to access the source or a guarantee of a reply route. Preserve that distinction when bridging external systems or forwarding another Agent's message.

@@ -3,7 +3,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { hasReleasableChanges, parseGitLog, type PublishedRelease, type ReleaseInput } from "./release-commits.ts";
 import type { PackageInput } from "./release-packages.ts";
-import { publicPackages, registryPublished } from "./release-registry.ts";
+import { releaseCatalogue, registryPublished } from "./release-registry.ts";
 
 // Uses only Node built-ins, gh, and the public npm registry; the check for new qualifying commits finishes before npm ci.
 const [mode = "prerelease", sourceTag = "", outputFile = ".local/release/input.json"] = process.argv.slice(2);
@@ -24,10 +24,23 @@ const published: PublishedRelease[] = releases.flatMap(release => {
   if (!mainHistory.has(sha)) return [];
   return [{ tag: release.tag_name, sha, prerelease: release.prerelease, publishedAt: release.published_at }];
 });
-const packages: PackageInput[] = await Promise.all(publicPackages.map(async directory => {
-  const { name } = JSON.parse(git("show", `${sourceSha}:${directory}/package.json`)) as { name: string };
+// Catalogue and example manifests belong to the selected source, not the workflow checkout.
+const directories = releaseCatalogue(JSON.parse(git("show", `${sourceSha}:package.json`)));
+const manifests = directories.map(directory => {
+  const metadata = JSON.parse(git("show", `${sourceSha}:${directory}/package.json`));
+  if (metadata.private || typeof metadata.name !== "string") throw new Error(`${directory} is not a public package in the release source.`);
+  return { directory, name: metadata.name as string };
+});
+const publicNames = new Set(manifests.map(item => item.name));
+const packages: PackageInput[] = await Promise.all(manifests.map(async ({ directory, name }) => {
   const touched = git("log", "--first-parent", "--format=%H", sourceSha, "--", directory).split("\n").filter(Boolean);
-  return { directory, name, published: await registryPublished(name), touched };
+  const examples = git("ls-tree", "-r", "--name-only", sourceSha, "--", `${directory}/examples`).split("\n")
+    .filter(path => path.endsWith("/package.json")).flatMap(path => {
+      const example = JSON.parse(git("show", `${sourceSha}:${path}`));
+      if (!example.asterism?.id || !example.asterism?.artifact) return [];
+      return [{ path, dependencies: Object.keys(example.devDependencies ?? {}).filter(name => publicNames.has(name)) }];
+    });
+  return { directory, name, published: await registryPublished(name), touched, examples };
 }));
 const input: ReleaseInput & { packages: PackageInput[] } = {
   mode, repository, sourceSha, sourceTag: sourceRelease?.tag_name ?? null, releases: published,

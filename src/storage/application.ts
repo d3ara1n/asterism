@@ -5,6 +5,7 @@ import type { PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
 import { configurationStorage } from "../configuration/store.ts";
 import { workspaceStorage } from "../runtime/storage.ts";
 import { buildPackages, importPackages, packageListStorage, type BuiltPackage } from "../plugins/packages.ts";
+import { collectManagedInstallations } from "../plugins/npm-installation.ts";
 import { savePluginBuild } from "../plugins/artifacts.ts";
 import { applicationStorage, preferenceVersion } from "../shared/application.ts";
 import { jsonStorage, sqliteStorage, type StorageDefinition } from "./migrations.ts";
@@ -19,6 +20,7 @@ export const applicationDataPaths: readonly DataPath[] = [
   { path: applicationStorage.databaseDirectory },
   { path: applicationStorage.configurationFile },
   { path: applicationStorage.pluginListFile },
+  { path: join(applicationStorage.pluginPackagesDirectory, applicationStorage.pluginInstallationRecordsDirectory) },
   { path: `${applicationStorage.appearanceStore}.json` },
   { path: `${applicationStorage.languageStore}.json` },
   { path: `${applicationStorage.updatesStore}.json` },
@@ -50,12 +52,12 @@ export function pluginStorages(root: string, id: string, declarations: readonly 
   });
 }
 
-/** Build and import storage entries only; task processes own plugin runtime and setup. */
+/** Import captured storage entries only; task processes own plugin runtime and setup. */
 async function discoverPluginStorage(root: string, built: readonly BuiltPackage[]): Promise<PluginStorageGroup[]> {
   const packages = await importPackages(built, join(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory), { runtime: false });
   const groups: PluginStorageGroup[] = [];
   for (const item of packages) {
-    if (!item.manifest?.storage || item.status === "disabled") continue;
+    if (!item.manifest || !item.storageEntry || item.status === "disabled") continue;
     const id = item.manifest.id;
     if (item.status === "ready" && item.storage) {
       try { groups.push({ id, stores: pluginStorages(root, id, item.storage) }); }
@@ -71,8 +73,10 @@ export async function prepareApplicationData(root: string, version: string, onHo
   const result = await prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root, decrypt), onHost, onProgress,
     discover: async () => {
       const cache = join(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory);
-      const built = await buildPackages(applicationPackages(root), join(root, applicationStorage.pluginPackagesDirectory), cache, [], [],
+      const built = await buildPackages(applicationPackages(root), join(root, applicationStorage.pluginPackagesDirectory), cache, [],
         id => onProgress?.({ stage: "dataPlugins", detail: id }));
+      collectManagedInstallations(join(root, applicationStorage.pluginPackagesDirectory), new Set(built.flatMap(item =>
+        item.entry.source.kind === "npm" && item.entry.source.installation ? [item.entry.source.installation] : [])));
       pluginBuild = savePluginBuild(cache, built);
       return discoverPluginStorage(root, built);
     } });

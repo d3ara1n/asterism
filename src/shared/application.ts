@@ -4,6 +4,8 @@ import packageMetadata from "../../package.json" with { type: "json" };
 export const applicationId = "dev.dearain.asterism";
 export const applicationBrand = { en: "Asterism", zh: "星图" } as const;
 export const applicationSlug = "asterism";
+/** Packaged renderer document served through the application-owned artifact protocol. */
+export const applicationRendererUrl = "asterism-plugin://app/index.html";
 export const applicationRepository = { owner: "d3ara1n", name: "asterism" } as const;
 export const applicationVersion = packageMetadata.version;
 /** Built-in model calls declare the actual app identity; third-party callers may supply their own UA. */
@@ -25,6 +27,8 @@ export const applicationStorage = {
   pluginListFile: "plugins.json",
   pluginPackagesDirectory: "plugins",
   pluginCacheDirectory: ".cache", // Within pluginPackagesDirectory.
+  pluginInstallationsDirectory: "installations", // Within pluginPackagesDirectory.
+  pluginInstallationRecordsDirectory: "records", // Reproducibility metadata, within pluginPackagesDirectory.
   pluginDataDirectory: "extensions",
   credentialsDirectory: "credentials", // Legacy encrypted values retained for migration and recovery.
   configurationFile: "configuration.json",

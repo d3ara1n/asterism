@@ -1,4 +1,6 @@
 import { resolve } from "node:path";
+import { randomBytes } from "node:crypto";
+import { rendererDocument } from "./src/shared/renderer-document.ts";
 import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -16,13 +18,15 @@ function runtimeModules(): Plugin {
   };
 }
 
+const developmentNonce = randomBytes(24).toString("base64");
+
 export default defineConfig({
   main: {
     plugins: [runtimeModules()],
     build: {
       // Workspace source packages are compiled statically with the app; release artifacts do not read repository .ts files at runtime.
       externalizeDeps: {
-        exclude: ["@asterism-app/sdk", "@asterism-app/builtin-api", "@asterism-app/builtin", "@asterism-app/ui"],
+        exclude: ["@asterism-app/sdk", "@asterism-app/builtin-api", "@asterism-app/builtin", "@asterism-app/ui", "@asterism-app/plugin-build"],
         include: ["node-pty", "@xterm/headless", "@xterm/addon-serialize", "@vscode/ripgrep"],
       },
       outDir: resolve("dist/main"),
@@ -64,8 +68,9 @@ export default defineConfig({
       {
         name: coreId("development-csp"),
         apply: "serve",
-        // The React Fast Refresh development entry includes an inline preamble; release builds keep the script policy unchanged.
-        transformIndexHtml: html => html.replace("script-src 'self' asterism-plugin:;", "script-src 'self' asterism-plugin: 'unsafe-inline';"),
+        // Vite gives its own development scripts the same nonce as the document import map.
+        config: () => ({ html: { cspNonce: developmentNonce } }),
+        transformIndexHtml: { order: "post", handler: html => rendererDocument(html, developmentNonce) },
       },
     ],
     server: { host: "127.0.0.1" },

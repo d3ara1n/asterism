@@ -1,13 +1,13 @@
 import type { RendererModule, RendererPlugin } from "@asterism-app/sdk/renderer";
 import { awaitStartup } from "../app/boot.ts";
 import { loadPluginStylesheet } from "./plugin-styles.ts";
-import { hostRendererModules } from "./shared-modules.ts";
+import { hostRendererModules, installPluginImportMap } from "./shared-modules.ts";
 import type { RendererDiagnostic, RendererOutcome } from "./plugin-outcome";
 import { pluginErrorMessage } from "../../shared/plugin-startup";
 
 (globalThis as Record<string, unknown>).__asterismRendererModules = hostRendererModules;
 
-export interface RendererEntry { id: string; renderer: string | null; stylesheet?: string | null; dependencies: readonly string[] }
+export interface RendererEntry { id: string; renderer: string | null; stylesheet?: string | null; stylesheets?: readonly string[]; dependencies: readonly string[] }
 export function validateRendererPlugin(plugin: RendererPlugin | undefined): asserts plugin is RendererPlugin {
   if (!plugin || typeof plugin !== "object" || "resources" in plugin || "cards" in plugin || "tools" in plugin
     || (plugin.modules !== undefined && !Array.isArray(plugin.modules))
@@ -61,6 +61,7 @@ export function validateRendererPlugin(plugin: RendererPlugin | undefined): asse
 /** Assemble by public dependencies; import failures, view conflicts, or provider failures block consumers. */
 export async function loadPluginRenderers(entries: readonly RendererEntry[], options: {
   available?: readonly string[];
+  importMap?: Readonly<Record<string, string>>;
   signal?: AbortSignal;
   progress?(id: string): void;
   accept?(plugin: RendererPlugin, id: string): void | readonly RendererDiagnostic[] | Promise<void | readonly RendererDiagnostic[]>;
@@ -68,10 +69,11 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
   loadStylesheet?(path: string, signal: AbortSignal): Promise<() => void>;
 } = {}):
   Promise<{ modules: RendererModule[]; outcomes: ReadonlyMap<string, RendererOutcome> }> {
+  if (!options.load) installPluginImportMap(options.importMap ?? {});
   const modules: RendererModule[] = [];
   const outcomes = new Map<string, RendererOutcome>();
   const available = new Set(options.available);
-  const visiting = new Set<string>();
+  const visiting: string[] = [];
   const failed = new Set<string>();
   const load = options.load ?? (path => import(/* @vite-ignore */ `asterism-plugin://${path}`));
   const loadStylesheet = options.loadStylesheet ?? loadPluginStylesheet;
@@ -79,27 +81,38 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
     options.signal?.throwIfAborted();
     if (available.has(id)) return;
     if (failed.has(id)) throw new Error(`Public renderer dependency ${id} is unavailable.`);
-    if (visiting.has(id)) throw new Error(`Circular renderer dependency: ${id}.`);
+    const cycleStart = visiting.indexOf(id);
+    if (cycleStart !== -1) {
+      const cycle = visiting.slice(cycleStart);
+      // Only module-only cycles can defer entirely to ESM. Styles also need ordered admission.
+      if (cycle.every(member => {
+        const entry = entries.find(candidate => candidate.id === member)!;
+        return !entry.renderer && !entry.stylesheet && !entry.stylesheets?.length;
+      })) return;
+      throw new Error(`Circular renderer initialization dependency: ${cycle.join(" -> ")} -> ${id}.`);
+    }
     const entry = entries.find(entry => entry.id === id);
     if (!entry) throw new Error(`Public renderer dependency ${id} is unavailable.`);
-    visiting.add(id);
-    let releaseStylesheet: (() => void) | undefined;
+    visiting.push(id);
+    const releaseStylesheets: (() => void)[] = [];
     let stage: RendererDiagnostic["stage"] = "dependency";
     try {
       for (const dependency of entry.dependencies) await visit(dependency);
-      if (!entry.renderer) { available.add(id); outcomes.set(id, { status: "ready", diagnostics: [] }); return; }
       options.progress?.(id);
       const deadline = new AbortController();
       const timer = setTimeout(() => deadline.abort(new Error(`Plugin ${id} renderer loading timed out.`)), 10_000);
       const signal = options.signal ? AbortSignal.any([options.signal, deadline.signal]) : deadline.signal;
-      let loaded: { default?: RendererPlugin };
+      let loaded: { default?: RendererPlugin } = {};
       try {
         stage = "style";
-        if (entry.stylesheet) releaseStylesheet = await loadStylesheet(entry.stylesheet, signal);
+        for (const path of new Set([...(entry.stylesheets ?? []), ...entry.stylesheet ? [entry.stylesheet] : []]))
+          releaseStylesheets.push(await loadStylesheet(path, signal));
         stage = "import";
-        loaded = await awaitStartup(load(entry.renderer), signal);
+        if (entry.renderer) loaded = await awaitStartup(load(entry.renderer), signal);
       } finally { clearTimeout(timer); }
       options.signal?.throwIfAborted();
+      if (options.signal) options.signal.addEventListener("abort", () => { for (const release of releaseStylesheets) release(); }, { once: true });
+      if (!entry.renderer) { available.add(id); outcomes.set(id, { status: "ready", diagnostics: [] }); return; }
       const plugin = loaded.default;
       validateRendererPlugin(plugin);
       stage = "prepare";
@@ -107,12 +120,12 @@ export async function loadPluginRenderers(entries: readonly RendererEntry[], opt
       outcomes.set(id, { status: diagnostics.length ? "partial" : "ready", diagnostics });
       modules.push(...plugin.modules ?? []); available.add(id);
     } catch (error) {
-      releaseStylesheet?.();
+      for (const release of releaseStylesheets.reverse()) release();
       console.error(`Plugin ${entry.id} renderer could not be loaded.`, error);
       failed.add(id);
       outcomes.set(id, { status: "failed", diagnostics: [{ stage, message: pluginErrorMessage(error) }] });
       throw error;
-    } finally { visiting.delete(id); }
+    } finally { visiting.pop(); }
   };
   for (const entry of entries) {
     try { await visit(entry.id); }

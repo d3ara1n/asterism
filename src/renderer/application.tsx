@@ -99,7 +99,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
       try { await close(); } catch (error) { console.error("Renderer plugin cleanup failed.", error); }
     }
   })(); }, { once: true });
-  const rendererPlugins = await loadPluginRenderers(plugins, { signal,
+  const rendererPlugins = await loadPluginRenderers(plugins, { signal, importMap: initial.snapshot.rendererImportMap,
     progress: id => progress(startupMessages.plugins, id), async accept(plugin, id) {
       new ViewRegistry([...accepted, ...plugin.modules ?? []]);
       const prepared = await preparePlugin(plugin, events, signal, undefined, close => cleanup.push(close), calls);

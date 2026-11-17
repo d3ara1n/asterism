@@ -9,13 +9,28 @@ import type { PluginCandidate } from "../shared/plugin-startup.ts";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ApplicationService } from "./service.ts";
 import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
 import { applicationPackages } from "../plugins/distribution.ts";
 import { applicationDirectory } from "../plugins/package-modules.ts";
+import * as artifactResolver from "../plugins/artifact-resolver.ts";
 
 const roots: string[] = [], services: ApplicationService[] = [];
+const emptyArtifact = (id: string) => ({ format: 1 as const, id, buildId: "fixture", public: { runtime: {}, renderer: {} },
+  imports: { runtime: [], renderer: [] }, runtimeExternals: [], stylesheets: [] });
+function publishFixtureArtifact(root: string, id: string): void {
+  mkdirSync(join(root, "dist/builds/fixture"), { recursive: true });
+  writeFileSync(join(root, "dist/plugin.json"), JSON.stringify({ format: 1, build: "builds/fixture" }));
+  writeFileSync(join(root, "dist/builds/fixture/artifact.json"), JSON.stringify(emptyArtifact(id)));
+}
+// Application-list tests exercise selection, not the separate process-backed distribution build contract.
+const captureArtifact = artifactResolver.captureArtifact;
+beforeEach(() => {
+  vi.spyOn(artifactResolver, "captureArtifact").mockImplementation((root, pointer, id) => root === applicationDirectory("packages/builtin")
+    ? { artifact: emptyArtifact(id), artifactRoot: root } : captureArtifact(root, pointer, id));
+});
+
 afterEach(async () => {
   vi.restoreAllMocks();
   for (const service of services.splice(0)) await service.close();
@@ -27,7 +42,8 @@ it("application commands register and remove plugin packages and represent resta
   const root = mkdtempSync(join(tmpdir(), "core-session-")); roots.push(root);
   const service = new ApplicationService(root); services.push(service);
   const dir = join(root, "pkg"); mkdirSync(dir);
-  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { displayName: "Test plugin", id: "acme.p" } }));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ name: "p", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { displayName: "Test plugin", id: "acme.p", artifact: "dist/plugin.json" } }));
+  publishFixtureArtifact(dir, "acme.p");
   const added = service.execute({ type: "plugin.add", path: dir });
   expect(added.plugins.map(p => [p.source, p.status, p.enabled])).toEqual([["bundled:builtin", "pending", true], [dir, "pending", true]]);
   expect(added.plugins[0]).toMatchObject({ id: "asterism.builtin", index: 0, bundled: true });
@@ -60,7 +76,8 @@ it("keeps removed bundled packages discoverable and adds them back through the o
 it("discovers bundled packages absent from the saved list without shifting configured indices", () => {
   const root = mkdtempSync(join(tmpdir(), "bundled-plugin-")); roots.push(root);
   const dir = join(root, "external"); mkdirSync(dir);
-  writeFileSync(join(dir, "package.json"), JSON.stringify({ asterism: { id: "acme.external", displayName: "External plugin" } }));
+  writeFileSync(join(dir, "package.json"), JSON.stringify({ asterism: { id: "acme.external", displayName: "External plugin", artifact: "dist/plugin.json" } }));
+  publishFixtureArtifact(dir, "acme.external");
   applicationPackages(root).add({ source: { kind: "path", path: dir } }, root);
   const file = join(root, "plugins.json");
   const saved = JSON.parse(readFileSync(file, "utf8"));
@@ -346,9 +363,10 @@ it.each(["disable", "remove"] as const)(
     writeFileSync(
       join(dir, "package.json"),
       JSON.stringify({
-        asterism: { id: "test.renderer", displayName: "Renderer" },
+        asterism: { id: "test.renderer", displayName: "Renderer", artifact: "dist/plugin.json" },
       }),
     );
+    publishFixtureArtifact(dir, "test.renderer");
     applicationPackages(root).add(
       { source: { kind: "path", path: dir } },
       root,
@@ -376,6 +394,7 @@ it.each(["disable", "remove"] as const)(
         metadata: { name: "Captured name" },
         renderer: candidate.renderer,
         stylesheet: candidate.stylesheet,
+        stylesheets: [],
         dependencies: ["test.public"],
       },
     ]);

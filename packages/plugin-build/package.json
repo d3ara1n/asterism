@@ -1,0 +1,56 @@
+{
+  "name": "@asterism-app/plugin-build",
+  "version": "0.1.0",
+  "description": "Standalone artifact builder for Asterism plugins",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "asterism-plugin-build": "./dist/cli.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs"
+    },
+    "./artifact": {
+      "types": "./dist/artifact.d.ts",
+      "import": "./dist/artifact.mjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "docs"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "pack:check": "npm run build && node scripts/verify-pack.mjs",
+    "test:integration": "node --test test/*.integration.test.mjs",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "vite": "^8.3.5",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "author": "Chien Zhang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d3ara1n/asterism.git",
+    "directory": "packages/plugin-build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "next",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

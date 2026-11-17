@@ -20,6 +20,7 @@ import { Switch } from "@asterism-app/ui/ui/switch";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { AlertDialog, AlertDialogTrigger, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism-app/ui/ui/alert-dialog";
 import { usePluginSettingsRegistry } from "../../modules/settings";
+import { NpmPluginInstaller } from "./NpmPluginInstaller";
 import type { RendererOutcome } from "../../modules/plugin-outcome";
 
 export type PluginInfo = AppSnapshot["plugins"][number];
@@ -52,12 +53,30 @@ export function usePlugins(active: boolean) {
     } catch { setError(messages.operationFailed); }
     finally { pending.current = false; setBusy(false); }
   }, []);
+  const operation = snapshot?.npmOperation ?? null;
+  const polling = operation && ["inspecting", "installing", "cancelling"].includes(operation.phase);
+  useEffect(() => {
+    if (!active || !polling) return;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const result = await runtime.execute({ type: "workspace.read" });
+        if (disposed) return;
+        if (!result.ok) { setError(errorDisplay(result.error)); return; }
+        setSnapshot(result.snapshot);
+        if (result.snapshot.npmOperation && ["inspecting", "installing", "cancelling"].includes(result.snapshot.npmOperation.phase)) timer = setTimeout(() => { void poll(); }, 350);
+      } catch { if (!disposed) setError(messages.operationFailed); }
+    };
+    timer = setTimeout(() => { void poll(); }, 350);
+    return () => { disposed = true; clearTimeout(timer); };
+  }, [active, polling, operation?.id]);
   useEffect(() => { if (active) void run({ type: "workspace.read" }); }, [active, run]);
   const add = async () => {
     try { const path = await window.host.pickDirectory(); if (path) await run({ type: "plugin.add", path }); }
     catch { setError(messages.operationFailed); }
   };
-  return { list: snapshot?.plugins ?? [], restartRequired: snapshot?.restartRequired ?? false, busy, error, run, add };
+  return { operation, list: snapshot?.plugins ?? [], restartRequired: snapshot?.restartRequired ?? false, busy, error, run, add };
 }
 export type PluginManager = ReturnType<typeof usePlugins>;
 
@@ -66,6 +85,8 @@ export function PluginsSettings({ manager }: { manager: PluginManager }) {
   const { renderers } = usePluginSettingsRegistry();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [installer, setInstaller] = useState<{ targetSource?: string; name?: string } | null>(null);
+  const npmPending = manager.operation && ["inspecting", "installing", "awaiting-approval", "cancelling"].includes(manager.operation.phase);
   const search = query.trim().toLocaleLowerCase();
   const list = manager.list.filter(plugin => {
     const status = pluginStatus(plugin, renderers);
@@ -81,6 +102,13 @@ export function PluginsSettings({ manager }: { manager: PluginManager }) {
       </Select>
       <Button size="sm" disabled={manager.busy} onClick={() => { void manager.add(); }}>{manager.busy ? <Spinner /> : <Plus />}{i18n.text(messages.addPackage)}</Button>
     </div>
+    <div className="flex flex-wrap gap-3">
+      <Button variant="outline" size="sm" disabled={manager.busy || Boolean(npmPending)} onClick={() => setInstaller({})}>{i18n.text(messages.installNpm)}</Button>
+      {manager.operation && <Button variant="ghost" size="sm" onClick={() => setInstaller({ ...(manager.operation?.targetSource ? { targetSource: manager.operation.targetSource } : {}) })}>
+        {i18n.text(npmPending ? messages.installationProgress : messages.installationResult)}
+      </Button>}
+    </div>
+    {installer && <NpmPluginInstaller key={installer.targetSource ?? "new"} manager={manager} target={installer} onClose={() => setInstaller(null)} />}
     {manager.restartRequired && <Alert role="status"><AlertDescription>{i18n.text(messages.restartHint)}</AlertDescription></Alert>}
     {manager.error && <Alert variant="destructive"><AlertDescription>{i18n.text(manager.error)}<Button variant="outline" size="sm" disabled={manager.busy} onClick={() => { void manager.run({ type: "workspace.read" }); }}><RefreshCw />{i18n.text(messages.retry)}</Button></AlertDescription></Alert>}
     <ItemGroup>
@@ -98,6 +126,10 @@ export function PluginsSettings({ manager }: { manager: PluginManager }) {
                 message: diagnostic.message,
               })).join("\n") : undefined)}
           manager={manager}
+          onUpdate={() => {
+            setInstaller({ targetSource: plugin.source, name: plugin.npm?.name });
+            if (plugin.npm && !npmPending) void manager.run({ type: "plugin.npm.preview", spec: `${plugin.npm.name}@latest`, targetSource: plugin.source });
+          }}
         />
       ))}
     </ItemGroup>
@@ -105,16 +137,17 @@ export function PluginsSettings({ manager }: { manager: PluginManager }) {
   </div>;
 }
 
-function PluginListItem({ plugin, status, failure, manager }: {
+function PluginListItem({ plugin, status, failure, manager, onUpdate }: {
   plugin: PluginInfo;
   status: DisplayStatus;
   failure?: string;
   manager: PluginManager;
+  onUpdate(): void;
 }) {
   const i18n = useI18n();
   const name = i18n.text(pluginName(plugin));
   const { index, metadata } = plugin;
-  const details = [metadata.author, metadata.version, plugin.id, plugin.source].filter(Boolean).join(" · ");
+  const details = [metadata.author, plugin.npm ? null : metadata.version, plugin.id, plugin.npm?.name ?? plugin.source].filter(Boolean).join(" · ");
 
   return (
     <Item size="sm" className="flex-nowrap items-start border-b last:border-b-0">
@@ -132,6 +165,7 @@ function PluginListItem({ plugin, status, failure, manager }: {
                 <Plus data-icon="inline-start" />{i18n.text(messages.addBack)}
               </Button>
             ) : <>
+              {plugin.npm && <Button variant="outline" size="sm" disabled={manager.busy || Boolean(manager.operation && ["inspecting", "installing", "awaiting-approval", "cancelling"].includes(manager.operation.phase))} onClick={onUpdate}>{i18n.text(messages.checkUpdates)}</Button>}
               <Switch
                 checked={plugin.enabled}
                 disabled={manager.busy}
@@ -147,7 +181,7 @@ function PluginListItem({ plugin, status, failure, manager }: {
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>{i18n.text(messages.removeTitle)}</AlertDialogTitle>
-                    <AlertDialogDescription>{i18n.text(plugin.bundled ? messages.removeBundledHint : messages.removeHint)}</AlertDialogDescription>
+                    <AlertDialogDescription>{i18n.text(plugin.bundled ? messages.removeBundledHint : plugin.npm ? messages.removeNpmHint : messages.removeHint)}</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>{i18n.text(messages.cancel)}</AlertDialogCancel>
@@ -167,6 +201,11 @@ function PluginListItem({ plugin, status, failure, manager }: {
           <ItemDescription className="text-wrap wrap-anywhere">{i18n.text(metadata.description)}</ItemDescription>
         )}
         <p className="type-caption select-text wrap-anywhere">{details}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline">{i18n.text(plugin.npm ? messages.npmSource : plugin.bundled ? messages.bundledSource : messages.localSource)}</Badge>
+          {plugin.npm && <span className="type-caption">{i18n.formatMessage(messages.selectedVersion, { version: plugin.npm.version })}</span>}
+          {plugin.runningVersion && plugin.runningVersion !== (plugin.npm?.version ?? metadata.version) && <span className="type-caption">{i18n.formatMessage(messages.runningVersion, { version: plugin.runningVersion })}</span>}
+        </div>
         {index === null && <p className="type-caption">{i18n.text(messages.availableHint)}</p>}
         {status === "frontendFailed" && <p className="type-caption">{i18n.text(messages.frontendFailedHint)}</p>}
         {failure && (

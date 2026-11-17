@@ -13,5 +13,6 @@ export function applicationPackages(root: string): PackageList {
 }
 export const applicationManuals: readonly ManualSource[] = [
   { path: "app", directory: directory("docs/manual") },
+  { path: "plugin-build", directory: directory("packages/plugin-build/docs") },
   ...["docs", "examples"].map(path => ({ path: `sdk/${path}`, directory: directory(`packages/sdk/${path}`) })),
 ];

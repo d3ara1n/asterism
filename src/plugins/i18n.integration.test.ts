@@ -1,76 +1,48 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { afterEach, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
-import { PackageList, loadPackages } from "./packages.ts";
-import { MessageFormatter } from "../shared/i18n.ts";
-import { ApplicationService } from "../runtime/service.ts";
-import { servePluginConfiguration } from "../runtime/dispatch.ts";
-import sdkMetadata from "@asterism-app/sdk/package.json" with { type: "json" };
-import * as sdkContracts from "@asterism-app/sdk/contracts";
-import * as ReactIntl from "react-intl";
-import { pathToFileURL } from "node:url";
+import { fixture, put } from "./artifact-fixtures.integration.ts";
 
-const roots: string[] = [], services: ApplicationService[] = [];
-const temp = () => { const root = mkdtempSync(join(tmpdir(), "asterism-i18n-")); roots.push(root); return root; };
-afterEach(async () => { for (const service of services.splice(0)) await service.close(); for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+const fixtures: Awaited<ReturnType<typeof fixture>>[] = [];
+afterEach(() => { for (const f of fixtures.splice(0)) f.close(); });
 
-describe("Plugin catalogs and presentation IPC", () => {
-  it("public messages retain provider ownership and renderer React Intl comes from the host instance", async () => {
-    const provider = temp(), consumer = temp(), data = temp(), cache = join(data, "cache");
-    writeFileSync(join(provider, "package.json"), JSON.stringify({ name: "@example/messages", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, exports: { "./public": "./public.ts" },
-      asterism: { displayName: "Test plugin", id: "example.messages", i18n: { catalogs: { "zh-Hans": "zh.json" } } } }));
-    writeFileSync(join(provider, "public.ts"), `import {pluginNamespace,defineMessages} from '@asterism-app/sdk/contracts';
-      export const messages=pluginNamespace('example.messages').messages('en',defineMessages({title:{id:'title',defaultMessage:'Shared title'}}));`);
-    writeFileSync(join(provider, "zh.json"), JSON.stringify({ title: "共享标题" }));
-    writeFileSync(join(consumer, "package.json"), JSON.stringify({ name: "@example/consumer", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, dependencies: { "@example/messages": "*" },
-      asterism: { displayName: "Test plugin", id: "example.consumer", renderer: "renderer.ts" } }));
-    writeFileSync(join(consumer, "renderer.ts"), `export {messages} from '@example/messages/public';
-      export {IntlProvider, useIntl} from 'react-intl'; export default {modules:[{resources:[],cards:[],tools:[]}]};`);
-    const list = new PackageList(join(data, "plugins.json"));
-    for (const root of [provider, consumer]) list.add({ source: { kind: "path", path: root } }, data);
-    const packages = await loadPackages(list, data, cache, []);
-    expect(packages.map(item => item.status)).toEqual(["ready", "ready"]);
-    const globals = globalThis as Record<string, unknown>, previous = globals.__asterismRendererModules;
-    globals.__asterismRendererModules = { "@asterism-app/sdk/contracts": sdkContracts, "react-intl": ReactIntl };
-    try {
-      const renderer = await import(pathToFileURL(join(cache, packages[1]!.renderer!)).href);
-      expect(renderer.IntlProvider).toBe(ReactIntl.IntlProvider); expect(renderer.useIntl).toBe(ReactIntl.useIntl);
-      expect(renderer.messages.title.owner).toBe("example.messages");
-      expect(new MessageFormatter("zh-Hans", packages[0]!.catalogs).text(renderer.messages.title)).toBe("共享标题");
-    } finally { if (previous === undefined) delete globals.__asterismRendererModules; else globals.__asterismRendererModules = previous; }
+it("keeps provider message ownership and renderer host export identities through native ESM facades", async () => {
+  const f = await fixture(); fixtures.push(f);
+  await f.plugin("messages", { public: { renderer: { "@fixture/messages/public": "public.ts" } } }, {
+    "public.ts": "import {pluginNamespace,defineMessages} from '@asterism-app/sdk/contracts';export const messages=pluginNamespace('fixture.messages').messages('en',defineMessages({title:{id:'title',defaultMessage:'Shared title'}}));",
   });
-  it("source plugins without renderers declare messages and configuration through the public SDK with independently updated catalog content", async () => {
-    const root = temp(), data = temp(); mkdirSync(join(root, "locales"));
-    writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@example/backend", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` }, asterism: { displayName: "Test plugin", id: "example.backend",
-      runtime: "runtime.ts", i18n: { catalogs: { "zh-Hans": "locales/zh.json" } } } }));
-    writeFileSync(join(root, "runtime.ts"), `import { z } from 'zod';
-      import {pluginNamespace,defineMessages} from '@asterism-app/sdk/contracts';
-      import { definePlugin, defineModule, PluginApiError } from '@asterism-app/sdk/runtime';
-      const ns = pluginNamespace('example.backend');
-      const messages = ns.messages('en', defineMessages({ limit: { id: 'limit', defaultMessage: 'Limit' } }));
-      export default definePlugin({namespace: ns, modules: [defineModule(plugin => {
-        plugin.config(ns.config(z.object({limit: z.number().max(10)}).superRefine(value => {
-          if (value.limit > 5) throw new PluginApiError('rejected', 'The limit exceeds the policy.', 'policy_limit', messages.limit);
-        }), {limit: 3})); return {};
-      })]});`);
-    writeFileSync(join(root, "locales/zh.json"), JSON.stringify({ limit: "上限", broken: "{bad" }));
-    const list = new PackageList(join(data, "plugins.json")); list.add({ source: { kind: "path", path: root } }, data);
-    const [item] = await loadPackages(list, data, join(data, "cache"), []);
-    expect(item!.status).toBe("ready"); expect(item!.renderer).toBeUndefined(); expect(item!.catalogs![0]!.messages).toEqual({ limit: "上限" });
-    const service = new ApplicationService(data, { plugins: [item!.definition!], catalogs: item!.catalogs }); services.push(service);
-    const reply = servePluginConfiguration(service, { type: "read" });
-    if (!reply.ok) throw new Error("Configuration read failed.");
-    expect(reply.configurations.find(item => item.id === "example.backend")!.value).toEqual({ limit: 3 });
-    const rejected = servePluginConfiguration(service, { type: "save", id: "example.backend", value: { limit: 6 } });
-    if (rejected.ok) throw new Error("Expected policy rejection.");
-    const title = rejected.error.display!;
-    expect(title).toMatchObject({ owner: "example.backend", sourceLocale: "en", defaultMessage: "Limit" });
-    expect(new MessageFormatter("zh-Hans", item!.catalogs).text(title)).toBe("上限");
-    expect(new MessageFormatter("en", item!.catalogs).text(title)).toBe("Limit");
-    writeFileSync(join(root, "locales/zh.json"), JSON.stringify({ limit: "最大数量" }));
-    const [next] = await loadPackages(list, data, join(data, "cache"), []);
-    expect(next!.catalogs![0]!.revision).not.toBe(item!.catalogs![0]!.revision);
-    expect(new MessageFormatter("zh-Hans", next!.catalogs).text(title)).toBe("最大数量");
+  await f.plugin("consumer", { renderer: "renderer.ts", publicDependencies: ["@fixture/messages"] }, {
+    "renderer.ts": "export {messages} from '@fixture/messages/public';export {IntlProvider,useIntl} from 'react-intl';export default {modules:[]};",
   });
+  await f.run(`add('messages');add('consumer');const items=await loader.loadPackages(list,root,cache,[]);
+    const {createRequire,registerHooks}=await import('node:module');
+    const requireHost=createRequire(${JSON.stringify(join(process.cwd(), "package.json"))});
+    const intl=requireHost('react-intl');
+    globalThis.__asterismRendererModules={'@asterism-app/sdk/contracts':loader.sharedRuntimeModules['@asterism-app/sdk/contracts'],'react-intl':intl};
+    const bindings=loader.rendererImportMap(items),roots=loader.artifactRoots(items);
+    const hooks=registerHooks({resolve(specifier,context,next){
+      const host=globalThis.__asterismRendererModules[specifier];
+      if(host)return {url:'data:text/javascript,'+encodeURIComponent(loader.hostModuleSource('__asterismRendererModules',specifier,Object.keys(host))),shortCircuit:true};
+      if(bindings[specifier]){const u=new URL(bindings[specifier]);return {url:pathToFileURL(join(roots[u.hostname],u.pathname)).href,shortCircuit:true};}
+      return next(specifier,context);
+    }});
+    try{const renderer=await import(pathToFileURL(join(items[1].artifactRoot,items[1].artifact.renderer)).href);
+      assert.equal(renderer.IntlProvider,intl.IntlProvider);assert.equal(renderer.useIntl,intl.useIntl);
+      assert.equal(renderer.messages.title.owner,'fixture.messages');
+    }finally{hooks.deregister();}`);
+});
+
+it("captures catalogs from owner-managed source files independently of immutable executable publication", async () => {
+  const f = await fixture(); fixtures.push(f);
+  const root = await f.plugin("catalog", { runtime: "runtime.ts" }, { "runtime.ts": "export default {namespace:{id:'fixture.catalog'}};" });
+  const metadata = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+  metadata.asterism.i18n = { catalogs: { "zh-Hans": "locales/zh.json" } };
+  put(root, "package.json", JSON.stringify(metadata));
+  put(root, "locales/zh.json", JSON.stringify({ limit: "上限", broken: "{bad" }));
+  await f.run(`add('catalog');const [item]=await loader.loadPackages(list,root,cache,[]);
+    assert.equal(item.status,'ready');assert.deepEqual(item.catalogs[0].messages,{limit:'上限'});
+    writeFileSync(join(root,'catalog/locales/zh.json'),JSON.stringify({limit:'最大数量'}));
+    const [next]=await loader.loadPackages(list,root,cache,[]);
+    assert.notEqual(next.catalogs[0].revision,item.catalogs[0].revision);
+    assert.deepEqual(next.catalogs[0].messages,{limit:'最大数量'});`);
 });

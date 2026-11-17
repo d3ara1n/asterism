@@ -20,3 +20,23 @@ for (const id of rendererSharedModules) if (!fixed[id]) throw new Error(`The hos
 
 /** Plugin bundles resolve these imports to the host instances, keeping React, Radix providers, toasts and motion settings single. */
 export const hostRendererModules: Record<string, Record<string, unknown>> = { ...fixed, ...uiModules };
+
+let installed = false;
+/** Install one complete map before plugin linking. The nonce authorizes this map, not arbitrary inline application scripts. */
+export function installPluginImportMap(publicModules: Readonly<Record<string, string>>): void {
+  if (installed) throw new Error("The plugin import map is already installed for this page.");
+  (globalThis as Record<string, unknown>).__asterismRendererModules = hostRendererModules;
+  const imports: Record<string, string> = { ...publicModules };
+  for (const [specifier, exports] of Object.entries(hostRendererModules)) {
+    const query = new URLSearchParams({ exports: JSON.stringify(Object.keys(exports)) });
+    imports[specifier] = `asterism-plugin://host/${encodeURIComponent(specifier)}?${query}`;
+  }
+  const map = document.createElement("script");
+  map.type = "importmap";
+  const nonce = document.querySelector<HTMLMetaElement>('meta[name="asterism-importmap-nonce"]')?.content;
+  if (!nonce) throw new Error("The document does not provide an import-map CSP nonce.");
+  map.nonce = nonce;
+  map.textContent = JSON.stringify({ imports });
+  document.head.append(map);
+  installed = true;
+}

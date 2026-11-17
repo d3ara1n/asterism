@@ -4,7 +4,7 @@ import { protocolVersion, systemResumeMessage } from "../shared/contracts.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { SystemResumed } from "@asterism-app/sdk/contracts";
 import { join } from "node:path";
-import { importPackages, packageCandidates, runtimeDependencies } from "../plugins/packages.ts";
+import { importPackages, packageCandidates, runtimeDependencies, rendererImportMap } from "../plugins/packages.ts";
 import { readPluginBuild } from "../plugins/artifacts.ts";
 import { userSkillDirectory } from "../plugins/agent-catalog.ts";
 import { DatabaseVersionError } from "./storage.ts";
@@ -44,7 +44,7 @@ try {
   for (const item of packages) if (item.diagnostic) console.error(`Plugin package ${item.root} failed during ${item.diagnostic.stage}: ${item.diagnostic.message}`);
   port.postMessage({ kind: "startup", stage: "workspace" });
   service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []),
-    packages: packageCandidates(packages), packageEntries: packages.map(item => item.entry),
+    packages: packageCandidates(packages), rendererImportMap: rendererImportMap(packages), packageEntries: packages.map(item => item.entry),
     skillDirectories: [userSkillDirectory()],
     packageRoots: new Map(packages.flatMap(item => item.manifest ? [[item.manifest.id, item.root] as const] : [])),
     manualSources: packages.flatMap(item => item.status === "ready" && item.manifest

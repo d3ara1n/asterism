@@ -10,7 +10,7 @@ Read package metadata independently of executable entries so disabled or failed 
 
 The distribution catalog remains discoverable independently of the user's loading list. Removed bundled packages retain metadata and an explicit add action in plugin management; displaying them does not restore their list entries or load their code. Adding a bundled package uses the same identity validation and restart boundary as adding a local package.
 
-Assembly freezes the registered contributions. Package installation, enablement, and upgrades take effect after restart. Package discovery, build, storage, import, and backend assembly failures exclude the affected packages and their dependents before the backend catalog is published. Unrelated plugins continue. The published package outcomes and registered contributions come from the same assembly result.
+Assembly freezes the registered contributions. Package installation, enablement, and upgrades take effect after restart. Package discovery, artifact admission, storage, import, and backend assembly failures exclude the affected packages and their dependents before the backend catalog is published. Unrelated plugins continue. The published package outcomes and registered contributions come from the same assembly result.
 
 Storage admission covers every package, including packages without backend setup. Backend setup uses provisional registrations so later setup callbacks can consume provider services. Contribution validation and dependency failure propagation remove excluded owners and cancel their managed work before publication. Cleanup runs under the existing lifetime rules. Setup effects such as committed data, file writes, and external operations are not transactional and are not rolled back.
 
@@ -26,9 +26,38 @@ Model protocols, authentication methods, generated outputs, and external senders
 
 The host attributes contribution identities to the plugin namespace and rejects conflicting declarations. Missing implementations retain saved data and use missing-resource or raw-data presentation.
 
+## Completed artifacts and source ownership
+
+Plugin source transformation is an explicit author/build operation. The application loader consumes completed native ESM artifacts; it has no startup compiler, source fallback, or source-change detection. Bundled packages, user-owned local directories, and managed npm installations share this execution contract. Acquisition and file ownership do not create different plugin modes.
+
+Package metadata remains readable without importing executable entries. The root manifest owns release identity, display metadata, translations, and manuals. `asterism.artifact` selects a generated pointer; `asterism.build` is authoring configuration for the standalone builder, not input to startup transformation. Build inputs distinguish source entries, owned public exports per realm, public dependency packages, private backend externals, and copied assets.
+
+The pointer has a fixed format version and a portable relative path to the completed build directory containing `artifact.json`. The descriptor identifies the plugin and build, relative executable and stylesheet paths, exact public exports per realm, used external import requests, and private runtime external requirements. Descriptor paths resolve relative to completed output, never to the builder's checkout. The npm release version and artifact format version answer different questions.
+
+The builder publishes the pointer only after a successful build. Completed build directories remain unchanged and are not automatically removed while a running application may need them. Startup captures descriptors, paths, public bindings, and dependency graphs once. Preparation and runtime consume that same captured selection; rebuilding a local package does not switch later lazy imports to a new graph. Private external dependencies and root manuals remain owner-managed files, not a recursive byte snapshot.
+
+Build runtime, storage, and owned runtime public entries together in one backend graph. Build renderer and owned browser public entries together in a separate graph. Shared chunks preserve provider declaration identity within each realm. Storage preparation and task execution do not share process memory, even when both select the same backend output.
+
+Build before distribution. A package must include its pointer, selected completed output, required root metadata and material, and installed private runtime dependencies. Installation does not need to compile plugin source. Relocatable JavaScript does not make native dependencies platform- or ABI-independent. Typechecks, build checks, and process-backed integration tests establish their respective boundaries; installed Electron behavior, production CSP, and target-platform operation require their own acceptance. A source-checkout check is not evidence for a delivered installation.
+
+
+## Managed package acquisition
+
+The host's plugin settings own npm acquisition; no paradigm plugin participates. A pinned, bundled pnpm distribution runs through the application's Node environment, including a scoped Node command shim for dependency scripts. Registry and proxy behavior follows the package-manager environment rather than assuming a system npm executable is present. The installer's version preview uses script-free lockfile resolution because the bundled pnpm version delegates its registry view command to external npm.
+
+Each concrete installation has an owned directory, private dependency tree, and lockfile. Selection changes only after the exact inspected package identity/integrity and completed artifact have been validated. Dependency builds require explicit approval through pnpm's supported policy. Installation and cancellation own and settle their subprocess work; third-party script effects are not transactional. No downloaded dependency is activated merely because its package metadata declares a plugin.
+
+Running and next-start selections remain distinct. Updates preserve active installation files, and a fresh startup reclaims unselected owned installations. Local paths are never reclaimed. Recovery retains selections and installation records, including lockfiles and build approvals, but not the downloaded trees. Reinstalling a missing exact version can reuse its retained record; startup does not silently acquire missing code or change a version after failure.
+
 ## Public modules
 
-Public imports establish dependencies. The host resolves environment-specific exports and binds consumers to the provider's actual exports. Backend and frontend graphs independently determine initialization order. Startup failure propagation follows all public dependencies, including public-only intermediaries. Opposite dependency directions across environments do not constitute an initialization cycle; cycles within an environment's initialization order fail explicitly. These graphs belong to host loading metadata, separate from author-provided runtime definitions. Package-manager dependency declarations describe how to acquire those packages, without becoming a second runtime admission policy.
+Public imports establish dependencies. The standalone builder classifies supported host imports and explicit `publicDependencies` throughout the bundled graph, preserving those imports as external requests. Package-manager peer dependencies alone do not classify plugin-public imports. Owned public entries map exact specifiers to source files per realm; generated metadata records exports and imports used for admission.
+
+The host resolves environment-specific exports and binds consumers to the provider's actual native ESM modules. Backend resolution hooks select canonical host/provider module URLs before plugin imports; the renderer receives its complete import map before plugin modules load. Relative chunks and private backend dependencies retain ordinary module resolution. Public imports and re-exports preserve ESM live bindings rather than copying values into a global export table. Supported host facades preserve shared values without promising arbitrary reassignment or module-namespace identity.
+
+Missing, disabled, or failed providers never fall back to consumer-private copies. ESM imports, re-exports, and literal dynamic public imports belong to the recorded public boundary; arbitrary computed public requests and CommonJS public linking are not implied by private CommonJS dependency support.
+
+Backend and frontend graphs independently determine initialization order. Startup failure propagation follows all public dependencies, including public-only intermediaries. Opposite dependency directions across environments do not constitute an initialization cycle; cycles within an environment's initialization order fail explicitly, including frontend cycles requiring ordered stylesheet admission. Module-only public cycles defer linking to native ESM. These graphs belong to host loading metadata, separate from author-provided runtime definitions. Package-manager dependency declarations describe how to acquire those packages, without becoming a second runtime admission policy.
 
 A plugin can provide its own public export or declare separate public libraries. Both mechanisms share package-name ownership, so competing enabled providers fail explicitly. A disabled library declaration does not displace an enabled public provider.
 
@@ -178,11 +207,11 @@ A Home session entry receives the host's folder selection and folder control. Th
 
 Frontend activation runs after backend publication. A stylesheet, import, or plugin preparation failure makes that frontend and its frontend dependents unavailable without deactivating accepted backend services. Module preparation failures retain the plugin's views and report partial initialization. Frontend outcomes belong to the current page and remain distinct from startup package outcomes; management presents both with stage-specific diagnostics.
 
-Imported styles are frontend build dependencies. The host preserves each entry's CSS association through compilation, artifact handoff, and startup projection, and loads styles in dependency and registration order before preparing the frontend. Initialization failures and frontend shutdown release the associated styles; individual view mounting does not own them.
+Imported styles are explicit build dependencies. The builder records the admitted browser stylesheet closure, including styles reached through public entries. Startup preserves its association with the captured artifact, and the renderer loads it in dependency and registration order before preparing the frontend. Initialization failures and frontend shutdown release the associated styles; individual view mounting does not own them.
 
-Individual preflight builds isolate source errors and exclude failed providers and their consumers. Ready renderer entries then compile together so CSS Modules receive distinct names across the shared document. A failure of this final shared build affects its frontend-bearing packages; unrelated backend-only packages retain their successful builds.
+Plugins build independently. CSS Module names incorporate plugin identity and package-relative stylesheet identity so independent artifacts can share a document without relying on a final grouped renderer compilation. Artifact admission and provider failures exclude affected consumers without recompiling unrelated packages.
 
-Plugins share the document's CSS cascade and host theme variables. CSS Modules localize class names without creating a separate rendering environment. Preprocessors remain the plugin's responsibility; the host consumes their CSS output and serves bundled assets with their relative paths intact.
+Plugins share the document's CSS cascade and host theme variables. CSS Modules localize class names without creating a separate rendering environment. Preprocessors remain the plugin's build responsibility; the host consumes completed CSS and serves bundled assets with their relative paths intact. Lazy chunks and supported URL assets remain bound to the captured build directory. This does not imply support for every computed resource path or arbitrary worker dependency graph.
 
 Resource descriptions supply stable type presentation and optional location-opening behavior. The host resolves current resource identity and delegates opaque locations to the resource implementation, independently of model-request authorization. Target plugins own the resulting operations and views. Cards and auxiliary panels consume projected data; the host owns their surrounding layout, focus, and lifecycle.
 
