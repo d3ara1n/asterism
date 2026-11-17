@@ -4,8 +4,8 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { build } from "esbuild";
 import { buildPlugin } from "@asterism-app/plugin-build";
+import { buildHost, fixtureManifest, type FixtureConfig } from "../src/plugins/artifact-fixtures.integration.ts";
 import { afterEach, expect, test } from "vitest";
 
 const require = createRequire(import.meta.url);
@@ -23,11 +23,12 @@ function put(root: string, path: string, contents: string) {
   writeFileSync(file, contents);
 }
 async function host(root: string) {
-  const outfile = join(root, "app.asar.unpacked/dist/main/plugin-runtime-host.mjs");
+  const outdir = join(root, "app.asar.unpacked/dist/main");
   // Bundle the current host/SDK, not mocks or a TS import trampoline. Keep application output depth.
-  await build({ entryPoints: [resolve("scripts/testing/plugin-runtime-host.ts")], outfile,
-    bundle: true, platform: "node", format: "esm", target: "node22", logLevel: "silent" });
-  return outfile;
+  // Host modules are separate entries sharing chunks with the harness, as in the application build.
+  const modules = await buildHost(outdir, { "plugin-runtime-host": resolve("scripts/testing/plugin-runtime-host.ts") });
+  writeFileSync(join(outdir, "host-modules.json"), JSON.stringify(modules));
+  return join(outdir, "plugin-runtime-host.mjs");
 }
 async function run(root: string, mode: string, directories: string[] = [], environment: NodeJS.ProcessEnv = {}) {
   const home = join(root, "home");
@@ -40,10 +41,9 @@ async function run(root: string, mode: string, directories: string[] = [], envir
   });
   expect(stdout).toContain(`${mode} passed`);
 }
-async function plugin(root: string, name: string, config: object, files: Record<string, string>) {
+async function plugin(root: string, name: string, config: FixtureConfig, files: Record<string, string>) {
   const source = join(root, "authoring", name);
-  put(source, "package.json", JSON.stringify({ name: `@fixture/${name}`, version: "1.0.0", type: "module",
-    asterism: { id: `fixture.${name}`, displayName: name, artifact: "dist/plugin.json", build: config } }));
+  put(source, "package.json", JSON.stringify(fixtureManifest(name, config)));
   for (const [path, contents] of Object.entries(files)) put(source, path, contents);
   await buildPlugin({ root: source });
   const shipped = join(root, "relocated", name);
@@ -63,7 +63,7 @@ test("compiled host loads relocated source-free artifacts with native public/hos
   const root = temporary();
   const provider = await plugin(root, "provider", {
     runtime: "runtime.ts", storage: "storage.ts",
-    public: { runtime: { "@fixture/api/contracts": "public.ts", "@fixture/api/relay": "relay.ts" } },
+    provides: { runtime: { "@fixture/api/contracts": "public.ts", "@fixture/api/relay": "relay.ts" } },
   }, {
     "public.ts": "export class Token{};export const registry=new Set();export const stored={value:'shared'};export let count=0;export function increment(){count++;}",
     "relay.ts": "export {Token,registry,count,increment} from '@fixture/api/contracts';",
@@ -72,7 +72,7 @@ test("compiled host loads relocated source-free artifacts with native public/hos
   });
   const consumers: string[] = [];
   for (const name of ["one", "two"]) consumers.push(await plugin(root, name, {
-    runtime: "runtime.ts", publicDependencies: ["@fixture/api"], runtimeExternals: ["@fixture/private"],
+    runtime: "runtime.ts", peers: ["@fixture/api"], dependencies: ["@fixture/private"],
   }, {
     "runtime.ts": `import {Token,registry} from '@fixture/api/relay';
       export {count,increment} from '@fixture/api/relay';
@@ -81,7 +81,8 @@ test("compiled host loads relocated source-free artifacts with native public/hos
       import {mode as importMode} from '@fixture/private';
       import json from '@fixture/private/data' with {type:'json'};
       const {mode:requireMode}=createRequire(import.meta.url)('@fixture/private');
-      export const evidence={Token,registry,PluginApiError,zString,importMode,requireMode,json};
+      const requiredZod=createRequire(import.meta.url)('zod').string;
+      export const evidence={Token,registry,PluginApiError,zString,importMode,requireMode,json,requiredZod};
       export default {namespace:{id:'fixture.${name}'}};`,
     "node_modules/@fixture/api/package.json": JSON.stringify({ name: "@fixture/api", type: "module", exports: { "./relay": "./wrong.mjs" } }),
     "node_modules/@fixture/api/wrong.mjs": "throw new Error('Consumer-private public copy executed');",
@@ -98,7 +99,7 @@ test("compiled host loads relocated source-free artifacts with native public/hos
 test("compiled host executes the built-in distribution and its public consumer in Electron Node mode", async () => {
   const root = temporary();
   const consumer = await plugin(root, "builtin-consumer", {
-    runtime: "runtime.ts", publicDependencies: ["@asterism-app/builtin-api"],
+    runtime: "runtime.ts", peers: ["@asterism-app/builtin-api"],
   }, {
     "runtime.ts": `import {builtin} from '@asterism-app/builtin-api/contracts';
       import {agentCreations} from '@asterism-app/builtin-api/runtime';

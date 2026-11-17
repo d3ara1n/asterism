@@ -54,9 +54,9 @@ function checkAuthorFiles(source: string, packed: string) {
 const validate = String.raw`
 import assert from 'node:assert/strict';
 import { readFileSync, realpathSync, statSync } from 'node:fs';
-import { dirname, join, relative, isAbsolute } from 'node:path';
+import { join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pointerSchema, artifactSchema } from '@asterism-app/plugin-build/artifact';
+import { artifactDirectory, artifactFile, artifactSchema } from '@asterism-app/plugin-build/artifact';
 const root = realpathSync(process.cwd());
 const json = path => JSON.parse(readFileSync(path, 'utf8'));
 const installed = join(root, 'node_modules');
@@ -70,10 +70,8 @@ for (const expected of json(process.argv[2])) {
   assert.ok(path !== '..' && !path.startsWith('../') && !path.startsWith('..\\') && !isAbsolute(path), request + ' escaped its installed package');
 }
 const manifest = json(join(root, 'package.json'));
-const pointerFile = join(root, manifest.asterism.artifact);
-const pointer = pointerSchema.parse(json(pointerFile));
-const build = join(dirname(pointerFile), pointer.build);
-const artifact = artifactSchema.parse(json(join(build, 'artifact.json')));
+const build = join(root, artifactDirectory);
+const artifact = artifactSchema.parse(json(join(build, artifactFile)));
 assert.equal(artifact.id, manifest.asterism.id);
 // Validate the selected graph's files, including the counter's renderer/CSS and public entries.
 const entries = [artifact.runtime, artifact.storage, artifact.renderer,
@@ -83,7 +81,7 @@ for (const entry of ['runtime', 'storage', 'renderer']) {
   if (manifest.asterism.build[entry]) assert.ok(artifact[entry], 'Missing built ' + entry);
 }
 for (const realm of ['runtime', 'renderer']) {
-  for (const request of Object.keys(manifest.asterism.build.public[realm])) {
+  for (const request of manifest.asterism.build.public?.[realm] ?? []) {
     assert.ok(artifact.public[realm][request], 'Missing built public entry ' + request);
   }
 }

@@ -10,9 +10,9 @@ Import original contracts from the domain package. Shared declaration identity l
 
 ## Build against the enabled provider
 
-Keep builtin API imports external in the completed artifact by declaring `@asterism-app/builtin-api` in `asterism.build.publicDependencies`. This applies to contracts, runtime helpers, and renderer exports, including imports reached through other bundled modules. Peer and development dependencies supply installation information and authoring declarations; they do not classify public imports for the standalone builder or activate builtin.
+Declare `@asterism-app/builtin-api` as a peer dependency. The builder then keeps builtin API imports external in the completed artifact, including contracts, runtime helpers, and renderer exports reached through other modules of the plugin. A development dependency supplies the authoring declarations; neither declaration activates builtin.
 
-Build explicitly with `asterism-plugin-build` before adding the package directory to Asterism, then restart. The package's `asterism.artifact` points to generated output; its source entries belong in `asterism.build`. A source checkout and a distributed package use the same loading contract. Rebuilding does not replace a graph already running in the application.
+Build explicitly with `asterism-plugin-build` before adding the package directory to Asterism, then restart. The build writes loaded output into `dist`; source entries belong in `asterism.build`. A source checkout and a distributed package use the same loading contract. Rebuilding does not replace a graph already running in the application.
 
 Binding to the provider's native ESM exports preserves the original operation declarations and renderer services. A consumer-local copy is not a fallback when builtin is disabled or unavailable. Validate with the intended provider enabled; successful typechecking or artifact generation alone does not establish that integration.
 

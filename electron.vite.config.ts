@@ -9,6 +9,7 @@ import { coreId } from "./src/shared/core.ts";
 import type { Plugin } from "vite";
 import { assertRuntimeModules } from "./src/shared/runtime-modules.ts";
 import { sharedUiModules } from "./scripts/shared-ui-modules.ts";
+import { runtimeHostModules } from "./scripts/runtime-host-modules.ts";
 
 function runtimeModules(): Plugin {
   return {
@@ -22,7 +23,7 @@ const developmentNonce = randomBytes(24).toString("base64");
 
 export default defineConfig({
   main: {
-    plugins: [runtimeModules()],
+    plugins: [runtimeModules(), runtimeHostModules()],
     build: {
       // Workspace source packages are compiled statically with the app; release artifacts do not read repository .ts files at runtime.
       externalizeDeps: {

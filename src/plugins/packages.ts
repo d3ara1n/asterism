@@ -5,19 +5,16 @@ import { extname, join, resolve, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { z } from "zod";
-import * as zod from "zod";
-import * as sdkContracts from "@asterism-app/sdk/contracts";
-import * as sdkRuntime from "@asterism-app/sdk/runtime";
 import type { PluginDefinition, PluginStorageDeclaration, ManualSource } from "@asterism-app/sdk/runtime";
 import { applicationDirectory } from "./package-modules.ts";
 import { captureArtifact, artifactPath } from "./artifact-resolver.ts";
 import { registerArtifactModules, rendererImportMap, artifactRoots } from "./native-modules.ts";
-import { artifactSchema } from "@asterism-app/plugin-build/artifact";
+import { artifactSchema, type PluginArtifact } from "@asterism-app/plugin-build/artifact";
 export { rendererImportMap, artifactRoots };
 import { loadCatalogs } from "./catalogs.ts";
 import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@asterism-app/sdk/contracts";
 import { jsonStorage } from "../storage/migrations.ts";
-import { isRendererShared, rendererSharedModules, sharedUiPackage } from "../shared/renderer-modules.ts";
+import { hostPackageNames, isHostModule } from "../shared/host-modules.ts";
 import { randomUUID } from "node:crypto";
 import { translationCatalogSchema } from "../shared/language.ts";
 import { pluginDiagnosticSchema, pluginErrorMessage, type PluginCandidate } from "../shared/plugin-startup.ts";
@@ -26,8 +23,6 @@ import { PluginAvailability } from "./availability.ts";
 /** Plugin package manifest: the asterism field in package.json, shared by source and release artifacts. */
 export const manifestSchema = z.strictObject({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+$/u),
-  artifact: z.string().min(1),
-  publicPackages: z.array(z.string().min(1)).optional(),
   /** Authoring configuration is owned by the build tool, not interpreted by the host. */
   build: z.unknown().optional(),
   /** Package-relative directories exposed by the manual without executing plugin code. */
@@ -104,7 +99,6 @@ export function readManifest(root: string): PluginPackageManifest {
     throw new PluginPackageError("invalid_manifest", `Package at ${root} has no valid Asterism manifest: ${fields}.`);
   }
   const manifest = parsed.data;
-  artifactPath(root, manifest.artifact);
   manualDirectories(root, manifest.manual ?? []);
   return manifest;
 }
@@ -112,7 +106,7 @@ export function readManifest(root: string): PluginPackageManifest {
 /** Acquisition validates the selected completed output without importing runtime or migration entries. */
 export function validatePackageArtifact(root: string): PluginPackageManifest {
   const manifest = readManifest(root);
-  captureArtifact(root, manifest.artifact, manifest.id);
+  captureArtifact(root, manifest.id);
   return manifest;
 }
 
@@ -138,10 +132,13 @@ function manualDirectories(root: string, declared: readonly string[]): ManualSou
   return sources;
 }
 
-function packageManuals(root: string, manifest: PluginPackageManifest): ManualSource[] {
+/** Public packages provided by the artifact contribute their own manuals; the plugin's own package is already covered. */
+function packageManuals(root: string, manifest: PluginPackageManifest, artifact: PluginArtifact): ManualSource[] {
   const sources = manualDirectories(root, manifest.manual ?? []);
   const require = createRequire(join(root, "package.json"));
-  const owned = manifest.publicPackages ?? [];
+  const own = z.object({ name: z.string().optional() }).parse(JSON.parse(readFileSync(join(root, "package.json"), "utf8"))).name;
+  const owned = new Set([...Object.keys(artifact.public.runtime), ...Object.keys(artifact.public.renderer)].map(packageName));
+  owned.delete(own ?? "");
   for (const name of owned) {
     const directory = require.resolve.paths(name)?.map(path => join(path, name)).find(path => existsSync(join(path, "package.json")));
     if (!directory) throw new PluginPackageError("invalid_entry", `Public package ${name} is not installed for ${manifest.id}.`);
@@ -201,12 +198,7 @@ export class PackageList {
   remove(index: number): void { this.write(this.read().filter((_, i) => i !== index)); }
 }
 
-/** Host facades preserve stable exported values, while plugin-public entries remain native ESM. */
-export const sharedRuntimeModules: Record<string, Record<string, unknown>> = {
-  zod: zod as Record<string, unknown>,
-  "@asterism-app/sdk/contracts": sdkContracts as Record<string, unknown>,
-  "@asterism-app/sdk/runtime": sdkRuntime as Record<string, unknown>,
-};
+const packageName = (specifier: string) => /^(?:@[^/]+\/)?[^/]+/u.exec(specifier)![0];
 
 /** Serializable build result shared by storage preparation and the task process within one startup. */
 export const builtPackageSchema = z.object({
@@ -265,7 +257,7 @@ function storageDeclarations(id: string, value: unknown): readonly PluginStorage
 }
 
 /** Capture completed builds once per startup. This stage executes no plugin entries and performs no source transformation. */
-export async function buildPackages(list: PackageList, npmRoot: string, _cacheRoot: string, reserved: readonly string[] = [],
+export async function buildPackages(list: PackageList, npmRoot: string, reserved: readonly string[] = [],
   progress: (id: string) => void = () => {}): Promise<BuiltPackage[]> {
   const result: BuiltPackage[] = [];
   const ids = new Map<string, number>();
@@ -283,14 +275,14 @@ export async function buildPackages(list: PackageList, npmRoot: string, _cacheRo
       item.status = entry.enabled ? "ready" : "disabled";
       if (!entry.enabled) continue;
       progress(id);
-      Object.assign(item, captureArtifact(root, item.manifest.artifact, id));
+      Object.assign(item, captureArtifact(root, id));
       item.artifactKey = randomUUID();
       const artifact = item.artifact!;
       item.runtime = artifact.runtime && artifactPath(item.artifactRoot!, artifact.runtime);
       item.storageEntry = artifact.storage && artifactPath(item.artifactRoot!, artifact.storage);
       item.renderer = artifact.renderer && `${item.artifactKey}/${artifact.renderer}`;
       item.stylesheets = artifact.stylesheets.map(path => `${item.artifactKey}/${path}`);
-      item.manualSources = packageManuals(root, item.manifest);
+      item.manualSources = packageManuals(root, item.manifest, artifact);
       if (item.manifest.i18n) item.catalogs = loadCatalogs(root, id, item.manifest.i18n.catalogs);
     } catch (error) {
       item.status = item.manifest ? "failed" : "invalid";
@@ -301,14 +293,12 @@ export async function buildPackages(list: PackageList, npmRoot: string, _cacheRo
   for (const item of result) if (item.status === "ready" && (reserved.includes(item.manifest!.id) || ids.get(item.manifest!.id)! > 1))
     fail(item, `Plugin ID ${item.manifest!.id} is reserved or registered more than once.`);
   // A package is one public API owner even when different subpaths are used in different realms.
-  const packageName = (specifier: string) => /^(?:@[^/]+\/)?[^/]+/u.exec(specifier)![0];
-  const hostPackages = new Set([...Object.keys(sharedRuntimeModules), ...rendererSharedModules, sharedUiPackage].map(packageName));
   const owners = new Map<string, BuiltPackage>();
   for (const item of result) if (item.status === "ready") {
     const names = new Set([...Object.keys(item.artifact!.public.runtime), ...Object.keys(item.artifact!.public.renderer)]
       .map(packageName));
     for (const name of names) {
-      if (hostPackages.has(name)) { fail(item, `Plugin cannot provide host package ${name}.`); continue; }
+      if (hostPackageNames.has(name)) { fail(item, `Plugin cannot provide host package ${name}.`); continue; }
       const previous = owners.get(name);
       if (previous && previous !== item) {
         fail(previous, `Multiple plugins provide public package ${name}.`);
@@ -319,9 +309,6 @@ export async function buildPackages(list: PackageList, npmRoot: string, _cacheRo
   for (const realm of ["runtime", "renderer"] as const) {
     const providers = new Map<string, BuiltPackage>();
     for (const item of result) if (item.status === "ready") for (const specifier of Object.keys(item.artifact!.public[realm])) {
-      if (realm === "runtime" ? Object.hasOwn(sharedRuntimeModules, specifier) : isRendererShared(specifier)) {
-        fail(item, `Plugin cannot provide host module ${specifier}.`); continue;
-      }
       const previous = providers.get(specifier);
       if (previous && previous !== item) { fail(previous, `Multiple plugins provide ${specifier} in ${realm}.`); fail(item, `Multiple plugins provide ${specifier} in ${realm}.`); }
       else providers.set(specifier, item);
@@ -329,7 +316,7 @@ export async function buildPackages(list: PackageList, npmRoot: string, _cacheRo
     for (const item of result) if (item.artifact && item.entry.enabled) {
       const dependencies = new Set<string>();
       for (const specifier of item.artifact.imports[realm]) {
-        if (realm === "runtime" ? Object.hasOwn(sharedRuntimeModules, specifier) : isRendererShared(specifier)) continue;
+        if (isHostModule(realm, specifier)) continue;
         const provider = providers.get(specifier);
         if (!provider || provider.status !== "ready") { if (item.status === "ready") fail(item, `Public module ${specifier} has no available enabled provider in ${realm}.`); }
         else if (provider !== item) dependencies.add(provider.manifest!.id);
@@ -343,10 +330,10 @@ export async function buildPackages(list: PackageList, npmRoot: string, _cacheRo
 }
 
 /** Import the captured artifacts; storage admission applies to every package, including packages without runtime entries. */
-export async function importPackages(packages: readonly BuiltPackage[], cacheRoot: string,
+export async function importPackages(packages: readonly BuiltPackage[], hostModules: Readonly<Record<string, string>>,
   options: { runtime?: boolean; storageFailures?: ReadonlyMap<string, string>; progress?: (id: string) => void } = {}): Promise<ResolvedPackage[]> {
   const result: ResolvedPackage[] = structuredClone([...packages]);
-  registerArtifactModules(result, sharedRuntimeModules);
+  registerArtifactModules(result, hostModules);
   const availability = packageAvailability(result);
   for (const [id, message] of options.storageFailures ?? []) availability.fail(id, { stage: "storage", message });
   const visited = new Set<string>();
@@ -396,9 +383,9 @@ export function runtimeDependencies(packages: readonly ResolvedPackage[]): Map<s
 }
 
 /** Standalone package loading for tools and isolated contract checks. Application startup shares build results across processes. */
-export async function loadPackages(list: PackageList, npmRoot: string, cacheRoot: string, reserved: readonly string[],
+export async function loadPackages(list: PackageList, npmRoot: string, hostModules: Readonly<Record<string, string>>, reserved: readonly string[] = [],
   progress: (id: string) => void = () => {}): Promise<ResolvedPackage[]> {
-  return importPackages(await buildPackages(list, npmRoot, cacheRoot, reserved, progress), cacheRoot, { progress });
+  return importPackages(await buildPackages(list, npmRoot, reserved, progress), hostModules, { progress });
 }
 
 /** Stable source identity is independent of the installed application directory. */

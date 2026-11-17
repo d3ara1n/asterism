@@ -14,12 +14,14 @@ function fixture() {
     writeFileSync(target, content);
   };
   file("packages/plugin/package.json", JSON.stringify({
-    name: "@example/plugin", asterism: { id: "example.plugin", artifact: "dist/plugin.json", publicPackages: ["@example/api"] },
+    name: "@example/plugin", dependencies: { "private-lib": "1.0.0" }, asterism: { id: "example.plugin" },
   }));
-  file("packages/plugin/dist/plugin.json", JSON.stringify({ format: 1, build: "builds/first" }));
-  file("packages/plugin/dist/builds/first/artifact.json", JSON.stringify({ format: 1, id: "example.plugin", buildId: "first",
-    runtime: "backend/runtime.mjs", public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, runtimeExternals: [], stylesheets: [] }));
-  file("packages/plugin/dist/builds/first/backend/runtime.mjs", "export default {};");
+  file("packages/plugin/dist/artifact.json", JSON.stringify({ format: 2, id: "example.plugin",
+    runtime: "backend/runtime.mjs", public: { runtime: { "@example/api/contracts": "backend/public-0.mjs" }, renderer: {} },
+    imports: { runtime: [], renderer: [] }, stylesheets: [] }));
+  file("packages/plugin/dist/backend/runtime.mjs", "export default {};");
+  file("packages/plugin/dist/backend/public-0.mjs", "export {};");
+  file("node_modules/private-lib/package.json", JSON.stringify({ name: "private-lib" }));
   return { root, file };
 }
 
@@ -37,12 +39,20 @@ describe("Packaged plugin assets", () => {
 
   it("fails when an executable entry is omitted from the package", () => {
     const { root } = fixture();
-    rmSync(join(root, "packages/plugin/dist/builds/first/backend/runtime.mjs"));
+    rmSync(join(root, "packages/plugin/dist/backend/runtime.mjs"));
     expect(() => verifyPackagedPlugins(root)).toThrow("Packaged entry is missing: @example/plugin");
   });
 
-  it("fails when a declared public library cannot be resolved", () => {
+  it("fails when a provided public library cannot be resolved", () => {
     const { root } = fixture();
-    expect(() => verifyPackagedPlugins(root)).toThrow("Packaged public library is missing: @example/plugin -> @example/api");
+    expect(() => verifyPackagedPlugins(root)).toThrow("Packaged public library is missing: plugin -> @example/api");
+  });
+
+  // Backend output leaves installed packages external; a filtered distribution would fail only at import time.
+  it("fails when a runtime dependency is absent from the packaged tree", () => {
+    const { root, file } = fixture();
+    file("node_modules/@example/api/package.json", JSON.stringify({ name: "@example/api" }));
+    rmSync(join(root, "node_modules/private-lib"), { recursive: true });
+    expect(() => verifyPackagedPlugins(root)).toThrow("Packaged dependency is missing: @example/plugin -> private-lib");
   });
 });

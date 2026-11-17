@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "build": "asterism-plugin-build",
-    "watch": "asterism-plugin-build --watch",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -27,18 +26,8 @@
   "asterism": {
     "id": "example.agent-observation",
     "displayName": "Example Agent observation",
-    "artifact": "dist/plugin.json",
     "build": {
-      "runtime": "agent-observation.ts",
-      "public": {
-        "runtime": {},
-        "renderer": {}
-      },
-      "publicDependencies": [
-        "@asterism-app/builtin-api"
-      ],
-      "runtimeExternals": [],
-      "assets": []
+      "runtime": "agent-observation.ts"
     }
   }
 }

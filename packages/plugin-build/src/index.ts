@@ -1,11 +1,12 @@
 import { realpathSync } from "node:fs";
-import { randomUUID, createHash } from "node:crypto";
-import { cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { isBuiltin } from "node:module";
+import { join, relative, resolve } from "node:path";
 import { build as esbuild } from "esbuild";
 import { build as viteBuild, esmExternalRequirePlugin, type Plugin as VitePlugin } from "vite";
-import { artifactSchema, pointerSchema, type ArtifactPointer, type PluginArtifact } from "./artifact.js";
-import { manifestSchema, rendererExternals, isHostPackage, isSharedImport, matchesPackage, type BuildConfig, type Realm } from "./config.js";
+import { artifactDirectory, artifactFile, artifactSchema, hostModules, hostPackageNames, isHostModule, sharedUiPackage, type PluginArtifact } from "./artifact.js";
+import { isBareRequest, manifestSchema, matchesPackage, packageName, type Realm } from "./config.js";
 import { rendererAssets } from "./renderer-assets.js";
 import { assertRuntimeModules } from "./inputs.js";
 
@@ -17,158 +18,183 @@ export interface BuildPluginOptions {
 }
 export interface BuildPluginResult {
   root: string;
-  buildDirectory: string;
-  pointerPath: string;
-  pointer: ArtifactPointer;
+  /** The package's dist directory, replaced as a whole by each successful build. */
+  outputDirectory: string;
   artifact: PluginArtifact;
 }
 const portable = (path: string) => path.replaceAll("\\", "/");
-interface Entries { input: Record<string, string>; publicNames: Map<string, string> }
-function entries(root: string, realm: Realm, config: BuildConfig): Entries {
-  const input: Record<string, string> = {};
-  if (config[realm]) input[realm] = realpathSync(resolve(root, config[realm]));
-  if (realm === "runtime" && config.storage) input.storage = realpathSync(resolve(root, config.storage));
-  const publicNames = new Map<string, string>();
-  for (const [index, [specifier, source]] of Object.entries(config.public?.[realm] ?? {}).entries()) {
-    const name = `public-${index}`;
-    input[name] = realpathSync(resolve(root, source)); publicNames.set(specifier, name);
-  }
-  return { input, publicNames };
+const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
+/** Owned public specifiers resolve through ordinary package resolution, including package self-references. */
+async function resolvePublic(root: string, realm: Realm, specifiers: readonly string[]): Promise<Map<string, string>> {
+  const files = new Map<string, string>();
+  if (!specifiers.length) return files;
+  await esbuild({
+    absWorkingDir: root, bundle: true, write: false, logLevel: "silent", platform: realm === "runtime" ? "node" : "browser",
+    stdin: { contents: specifiers.map(specifier => `import ${JSON.stringify(specifier)};`).join("\n"), resolveDir: root },
+    plugins: [{ name: "asterism-public-entries", setup(build) {
+      build.onResolve({ filter: /.*/ }, async args => {
+        if (args.pluginData) return;
+        if (args.importer !== "<stdin>") return { path: args.path, external: true };
+        const resolved = await build.resolve(args.path, { kind: args.kind, resolveDir: args.resolveDir, pluginData: true });
+        if (resolved.errors.length) return { errors: resolved.errors };
+        files.set(args.path, realpathSync(resolved.path));
+        return { path: args.path, external: true };
+      });
+    } }],
+  });
+  for (const specifier of specifiers) if (!files.has(specifier)) throw new Error(`Public entry ${specifier} could not be resolved in ${realm}`);
+  return files;
 }
 
 /** Build one package without reading application configuration or executing plugin entries. */
 export async function buildPlugin({ root: requestedRoot }: BuildPluginOptions): Promise<BuildPluginResult> {
   const root = realpathSync(resolve(requestedRoot));
-  const { asterism: manifest } = manifestSchema.parse(JSON.parse(await readFile(join(root, "package.json"), "utf8")));
-  const config = manifest.build;
-  for (const realm of ["runtime", "renderer"] as const) {
-    for (const request of Object.keys(config.public?.[realm] ?? {})) {
-      if (isHostPackage(request)) throw new Error(`Public entry ${request} is owned by the host in ${realm}`);
-    }
+  const pkg = manifestSchema.parse(JSON.parse(await readFile(join(root, "package.json"), "utf8")));
+  const { id, build: config } = pkg.asterism;
+  // Peer dependencies are the shared boundary: the host or another enabled plugin supplies them at load time.
+  const peers = new Set(Object.keys(pkg.peerDependencies ?? {}));
+  const installed = new Set([...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.optionalDependencies ?? {}), ...peers, ...pkg.name ? [pkg.name] : []]);
+  // Public ownership is package-wide: an own public package is never also a private or peer import.
+  const ownedPackages = new Set([...config.public?.runtime ?? [], ...config.public?.renderer ?? []].map(packageName));
+  for (const name of ownedPackages) {
+    if (peers.has(name)) throw new Error(`Public package ${name} cannot also be a peer dependency`);
+    if (hostPackageNames.has(name)) throw new Error(`Public package ${name} is owned by the application`);
   }
-  const buildId = randomUUID();
-  const pointerPath = join(root, manifest.artifact);
-  const buildDirectory = join(dirname(pointerPath), "builds", buildId);
-  await mkdir(buildDirectory, { recursive: true });
-  const artifact: PluginArtifact = {
-    format: 1, id: manifest.id, buildId, public: { runtime: {}, renderer: {} },
-    imports: { runtime: [], renderer: [] }, runtimeExternals: [], stylesheets: [],
+  const assertBoundary = (realm: Realm, request: string, owned: ReadonlyMap<string, string>) => {
+    if (matchesPackage(request, ownedPackages) && !owned.has(request))
+      throw new Error(`${request} belongs to a public package of this plugin; declare it in build.public.${realm}`);
+    if (matchesPackage(request, hostPackageNames)) {
+      if (!isHostModule(realm, request)) throw new Error(`${request} is not a module the application supplies in ${realm}`);
+      if (!matchesPackage(request, peers)) throw new Error(`${request} is supplied by the application; declare ${packageName(request)} in peerDependencies`);
+    }
   };
-  const runtime = entries(root, "runtime", config);
-  if (Object.keys(runtime.input).length) {
-    const owned = config.public?.runtime ?? {};
-    const result = await esbuild({
-      absWorkingDir: root, entryPoints: runtime.input, outdir: join(buildDirectory, "backend"),
-      bundle: true, splitting: true, format: "esm", platform: "node", target: "node22",
-      outExtension: { ".js": ".mjs" }, entryNames: "[name]", chunkNames: "chunks/[name]-[hash]",
-      metafile: true, sourcemap: false, logLevel: "silent", jsx: "automatic",
-      // CommonJS private dependencies retain Node's require conditions and native addon loading.
-      banner: { js: 'import { createRequire as __asterismCreateRequire } from "node:module"; const require = __asterismCreateRequire(import.meta.url);' },
-      plugins: [{ name: "asterism-runtime-boundaries", setup(build) {
-        build.onResolve({ filter: /.*/ }, async args => {
-          if (args.pluginData?.nativeResolution) return;
-          if (Object.hasOwn(owned, args.path)) return { path: realpathSync(resolve(root, owned[args.path]!)) };
-          if (isSharedImport("runtime", args.path, config) || matchesPackage(args.path, config.runtimeExternals))
-            return { path: args.path, external: true };
-          if (args.path.endsWith(".node")) {
-            const resolved = await build.resolve(args.path, { kind: args.kind, resolveDir: args.resolveDir,
-              importer: args.importer, pluginData: { nativeResolution: true } });
-            if (resolved.errors.length) return resolved;
-            // Extensionless requests such as grammy's ./platform.node can resolve to .node.js.
-            if (resolved.path.endsWith(".node")) return { errors: [{ text: `Native dependency ${args.path} must remain inside a declared runtimeExternals package` }] };
-            return resolved;
-          }
-        });
-      } }],
-    });
-    assertRuntimeModules(Object.keys(result.metafile.inputs));
-    const shared = new Set<string>(), privateImports = new Set<string>();
-    for (const [path, output] of Object.entries(result.metafile.outputs)) {
-      const outputPath = portable(relative(buildDirectory, resolve(root, path)));
-      if (output.entryPoint) {
-        for (const [name, source] of Object.entries(runtime.input)) {
-          if (resolve(root, output.entryPoint) !== source) continue;
-          if (name === "runtime" || name === "storage") artifact[name] = outputPath;
-          for (const [specifier, publicName] of runtime.publicNames) if (name === publicName) artifact.public.runtime[specifier] = outputPath;
-        }
+  const temporary = join(root, `.asterism-build-${randomUUID()}`);
+  const artifact: PluginArtifact = { format: 2, id, public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, stylesheets: [] };
+  try {
+    await mkdir(temporary, { recursive: true });
+    const runtimePublic = await resolvePublic(root, "runtime", config.public?.runtime ?? []);
+    const runtimeInput: Record<string, string> = {};
+    if (config.runtime) runtimeInput.runtime = realpathSync(resolve(root, config.runtime));
+    if (config.storage) runtimeInput.storage = realpathSync(resolve(root, config.storage));
+    [...runtimePublic.values()].forEach((file, index) => { runtimeInput[`public-${index}`] = file; });
+    if (Object.keys(runtimeInput).length) {
+      const owned = new Map(runtimePublic);
+      const result = await esbuild({
+        absWorkingDir: root, entryPoints: runtimeInput, outdir: join(temporary, "backend"),
+        // Installed packages stay external: Node resolves them from this package, with their own conditions and files.
+        bundle: true, splitting: true, packages: "external", format: "esm", platform: "node", target: "node22",
+        outExtension: { ".js": ".mjs" }, entryNames: "[name]", chunkNames: "chunks/[name]-[hash]",
+        metafile: true, sourcemap: false, logLevel: "silent", jsx: "automatic",
+        plugins: [{ name: "asterism-owned-public", setup(build) {
+          if (!owned.size) return;
+          // esbuild filters use Go regular expression syntax without JavaScript flags.
+          build.onResolve({ filter: new RegExp(`^(?:${[...owned.keys()].map(escape).join("|")})$`) }, args => ({ path: owned.get(args.path)! }));
+        } }],
+      });
+      const external = Object.values(result.metafile.outputs).flatMap(output => output.imports.filter(item => item.external).map(item => item.path));
+      assertRuntimeModules([...Object.keys(result.metafile.inputs), ...external]);
+      const shared = new Set<string>();
+      for (const request of external) {
+        if (!isBareRequest(request) || isBuiltin(request)) continue;
+        assertBoundary("runtime", request, owned);
+        if (matchesPackage(request, peers)) shared.add(request);
+        else if (!matchesPackage(request, installed))
+          throw new Error(`Backend import ${request} is not declared in dependencies or peerDependencies`);
       }
-      for (const request of output.imports.filter(item => item.external).map(item => item.path)) {
-        if (isSharedImport("runtime", request, config)) shared.add(request);
-        else if (matchesPackage(request, config.runtimeExternals)) privateImports.add(request);
+      artifact.imports.runtime = [...shared].sort();
+      for (const [path, output] of Object.entries(result.metafile.outputs)) {
+        if (!output.entryPoint) continue;
+        const file = portable(relative(temporary, resolve(root, path)));
+        const source = realpathSync(resolve(root, output.entryPoint));
+        if (source === runtimeInput.runtime) artifact.runtime = file;
+        if (source === runtimeInput.storage) artifact.storage = file;
+        for (const [specifier, entry] of runtimePublic) if (entry === source) artifact.public.runtime[specifier] = file;
       }
     }
-    artifact.imports.runtime = [...shared].sort(); artifact.runtimeExternals = [...privateImports].sort();
-  }
-  const renderer = entries(root, "renderer", config);
-  if (Object.keys(renderer.input).length) {
-    const owned = config.public?.renderer ?? {};
-    const shared = new Set<string>(), styles = new Set<string>();
-    const metadata: VitePlugin = {
-      name: "asterism-renderer-boundaries", enforce: "pre",
-      resolveId(source) {
-        if (Object.hasOwn(owned, source)) return realpathSync(resolve(root, owned[source]!));
-        if (isSharedImport("renderer", source, config)) return { id: source, external: true };
-      },
-      generateBundle: { order: "post", handler(_options, bundle) {
-        assertRuntimeModules(this.getModuleIds());
-        for (const output of Object.values(bundle)) {
-          if (output.type === "asset") {
-            if (output.fileName.endsWith(".css")) styles.add(`renderer/${output.fileName}`);
-            continue;
-          }
-          if (output.isEntry) {
-            if (output.name === "renderer") artifact.renderer = `renderer/${output.fileName}`;
-            for (const [specifier, name] of renderer.publicNames) if (output.name === name) artifact.public.renderer[specifier] = `renderer/${output.fileName}`;
-          }
-          for (const request of [...output.imports, ...output.dynamicImports]) {
-            if (isSharedImport("renderer", request, config)) shared.add(request);
-          }
-        }
-      } },
-    };
-    await viteBuild({
-      root, configFile: false, envDir: false, publicDir: false, base: "./", logLevel: "warn",
-      // Browser dependencies may use CommonJS internally; shared boundaries still load as ESM.
-      plugins: [esmExternalRequirePlugin({ external: rendererExternals(config) }), metadata, rendererAssets(root)],
-      worker: { rolldownOptions: { cwd: root } },
-      css: { modules: { generateScopedName(name, filename) {
-        const namespace = createHash("sha256").update(`${manifest.id}\0${portable(relative(root, filename.split("?")[0]!))}\0${name}`).digest("hex").slice(0, 20);
-        return `asterism_${namespace}_${name}`;
-      } } },
-      build: {
-        outDir: join(buildDirectory, "renderer"), emptyOutDir: false, copyPublicDir: false,
-        target: "es2022", minify: false, sourcemap: false, modulePreload: false,
-        cssCodeSplit: false, assetsInlineLimit: 0,
-        rolldownOptions: {
-          cwd: root, input: renderer.input, preserveEntrySignatures: "strict",
-          onwarn(warning, report) {
-            // React client directives have no boundary semantics in this browser-only graph.
-            if (warning.code === "MODULE_LEVEL_DIRECTIVE" && warning.message.includes('"use client"')) return;
-            report(warning);
-          },
-          output: { format: "es", entryFileNames: "[name].mjs", chunkFileNames: "chunks/[name]-[hash].mjs", assetFileNames: "assets/[name]-[hash][extname]" },
+    const rendererPublic = await resolvePublic(root, "renderer", config.public?.renderer ?? []);
+    const rendererInput: Record<string, string> = {};
+    if (config.renderer) rendererInput.renderer = realpathSync(resolve(root, config.renderer));
+    const publicNames = new Map<string, string>();
+    [...rendererPublic].forEach(([specifier, file], index) => { rendererInput[`public-${index}`] = file; publicNames.set(`public-${index}`, specifier); });
+    if (Object.keys(rendererInput).length) {
+      const owned = new Map(rendererPublic);
+      // Peers stay external except host-package subpaths the application does not supply; dependencies bundle those privately.
+      const externalPeer = (request: string) => matchesPackage(request, peers)
+        && (!matchesPackage(request, hostPackageNames) || isHostModule("renderer", request));
+      const peerMatchers = [...peers].flatMap(name => hostPackageNames.has(name)
+        ? hostModules.renderer.filter(specifier => packageName(specifier) === name).map(specifier => new RegExp(`^${escape(specifier)}$`, "u"))
+          .concat(name === sharedUiPackage ? [new RegExp(`^${escape(name)}/`, "u")] : [])
+        : [new RegExp(`^${escape(name)}(?:$|/)`, "u")]);
+      const shared = new Set<string>(), styles = new Set<string>();
+      const boundaries: VitePlugin = {
+        name: "asterism-renderer-boundaries", enforce: "pre",
+        resolveId(source, importer) {
+          if (owned.has(source)) return owned.get(source)!;
+          if (!isBareRequest(source)) return;
+          // The boundary contract applies to the plugin's own sources; installed dependencies follow ordinary resolution.
+          if (!importer || !/[\\/]node_modules[\\/]/u.test(importer)) assertBoundary("renderer", source, owned);
+          if (externalPeer(source)) return { id: source, external: true };
         },
-      },
-    });
-    artifact.imports.renderer = [...shared].sort(); artifact.stylesheets = [...styles].sort();
+        generateBundle: { order: "post", handler(_options, bundle) {
+          assertRuntimeModules(this.getModuleIds());
+          for (const output of Object.values(bundle)) {
+            if (output.type === "asset") {
+              if (output.fileName.endsWith(".css")) styles.add(`renderer/${output.fileName}`);
+              continue;
+            }
+            if (output.isEntry) {
+              if (output.name === "renderer") artifact.renderer = `renderer/${output.fileName}`;
+              const specifier = publicNames.get(output.name);
+              if (specifier) artifact.public.renderer[specifier] = `renderer/${output.fileName}`;
+            }
+            for (const request of [...output.imports, ...output.dynamicImports])
+              if (isBareRequest(request) && externalPeer(request)) shared.add(request);
+          }
+        } },
+      };
+      await viteBuild({
+        root, configFile: false, envDir: false, publicDir: false, base: "./", logLevel: "warn",
+        plugins: [
+          // CommonJS dependencies bundled for the browser reach shared peers through ESM imports, not a browser require.
+          esmExternalRequirePlugin({ external: peerMatchers }),
+          boundaries, rendererAssets(root),
+        ],
+        // Artifacts are production output regardless of the caller's NODE_ENV; the development JSX runtime is not supplied.
+        oxc: { jsx: { runtime: "automatic", development: false } },
+        worker: { rolldownOptions: { cwd: root } },
+        css: { modules: { generateScopedName(name, filename) {
+          // All plugins share one document; names include plugin and stylesheet identity.
+          const namespace = createHash("sha256").update(`${id}\0${portable(relative(root, filename.split("?")[0]!))}\0${name}`).digest("hex").slice(0, 20);
+          return `asterism_${namespace}_${name}`;
+        } } },
+        build: {
+          outDir: join(temporary, "renderer"), emptyOutDir: false, copyPublicDir: false,
+          target: "es2022", minify: false, sourcemap: false, modulePreload: false,
+          cssCodeSplit: false, assetsInlineLimit: 0,
+          rolldownOptions: {
+            cwd: root, input: rendererInput, preserveEntrySignatures: "strict",
+            onwarn(warning, report) {
+              // React client directives have no boundary semantics in this browser-only graph.
+              if (warning.code === "MODULE_LEVEL_DIRECTIVE" && warning.message.includes('"use client"')) return;
+              report(warning);
+            },
+            output: { format: "es", entryFileNames: "[name].mjs", chunkFileNames: "chunks/[name]-[hash].mjs", assetFileNames: "assets/[name]-[hash][extname]" },
+          },
+        },
+      });
+      artifact.imports.renderer = [...shared].sort(); artifact.stylesheets = [...styles].sort();
+    }
+    artifactSchema.parse(artifact);
+    await writeFile(join(temporary, artifactFile), `${JSON.stringify(artifact, null, 2)}\n`);
+    // Replace the previous output only after this build completed; a failed build leaves it untouched.
+    const outputDirectory = join(root, artifactDirectory);
+    const previous = `${temporary}-previous`;
+    await rename(outputDirectory, previous).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
+    await rename(temporary, outputDirectory);
+    await rm(previous, { recursive: true, force: true });
+    return { root, outputDirectory, artifact };
+  } finally {
+    await rm(temporary, { recursive: true, force: true });
   }
-  for (const asset of config.assets ?? []) {
-    // Asset rules keep their package-relative layout inside the immutable build tree.
-    const normalized = portable(asset).replace(/^\.\//u, "");
-    if (normalized === "artifact.json" || /^(?:backend|renderer)(?:\/|$)/u.test(normalized))
-      throw new Error(`Asset ${asset} conflicts with reserved build output paths`);
-    await cp(resolve(root, asset), join(buildDirectory, normalized), { recursive: true, force: false, errorOnExist: true });
-  }
-  artifactSchema.parse(artifact);
-  await writeFile(join(buildDirectory, "artifact.json"), `${JSON.stringify(artifact, null, 2)}\n`);
-  const pointer = pointerSchema.parse({ format: 1, build: `builds/${buildId}` });
-  const temporaryPointer = `${pointerPath}.${buildId}.tmp`;
-  try {
-    await writeFile(temporaryPointer, `${JSON.stringify(pointer, null, 2)}\n`);
-    await rename(temporaryPointer, pointerPath);
-  } catch (error) {
-    await rm(temporaryPointer, { force: true });
-    throw error;
-  }
-  return { root, buildDirectory, pointerPath, pointer, artifact };
 }

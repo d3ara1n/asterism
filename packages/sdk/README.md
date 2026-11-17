@@ -16,9 +16,9 @@ Validate both contract agreement and actual integration. Type checking cannot es
 
 ## Deliver an explicit build
 
-Use `@asterism-app/plugin-build` as an authoring dependency and run its `asterism-plugin-build` CLI explicitly. Source entries belong under `asterism.build`; `asterism.artifact` selects the generated artifact loaded by the application. Build, add the package directory, and restart. Later source changes require another build and restart, not a different plugin mode.
+Use `@asterism-app/plugin-build` as an authoring dependency and run its `asterism-plugin-build` CLI explicitly. Source entries belong under `asterism.build`; the build writes the loaded artifact into `dist`. Build, add the package directory, and restart. Later source changes require another build and restart, not a different plugin mode.
 
-Supported host imports stay external. Classify other plugins' public packages in `publicDependencies` so the artifact retains imports of the provider's actual ESM exports. Keep private backend packages external only when their installed layout or native resources require it, and include those dependencies in the delivered installation.
+Declare host packages and other plugins' public packages as peer dependencies; the artifact keeps those imports external so they bind to the running instances. Ordinary dependencies stay private, and the backend loads them from the installed package.
 
 Build before packing and inspect the tarball. Typechecking and a successful build do not establish installed-application or platform compatibility.
 

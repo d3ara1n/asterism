@@ -355,7 +355,7 @@ function createWindow(): void {
   loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });
 }
 
-// Plugin output is served only through the immutable roots captured by this startup's preparation.
+// Plugin output is served only through the roots captured by this startup's preparation.
 protocol.registerSchemesAsPrivileged([{ scheme: "asterism-plugin", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
 function servePluginArtifacts(_root: string): void {
   protocol.handle("asterism-plugin", async request => {

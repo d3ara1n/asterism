@@ -22,9 +22,9 @@ A Home entry can start a session around the counter without introducing an Agent
 
 ## Build the package you will load
 
-The counter's package manifest separates source entries under `asterism.build` from the generated artifact selected by `asterism.artifact`. Its build script invokes `asterism-plugin-build`. Install dependencies, typecheck, and build explicitly; add the package directory to Asterism and restart. Rebuild and restart after source changes rather than expecting the application to compile them.
+The counter's package manifest keeps source entries under `asterism.build`; the build writes the loaded artifact into `dist`. Its build script invokes `asterism-plugin-build`. Install dependencies, typecheck, and build explicitly; add the package directory to Asterism and restart. Rebuild and restart after source changes rather than expecting the application to compile them.
 
-The counter intentionally exposes its contracts as `asterism-example-counter/contracts` in both realms. Its internal relative imports and public entry share one build graph per realm. Consumers need the provider enabled and must classify that public package in their own build inputs; installing a declaration package alone is not enough.
+The counter intentionally exposes its contracts as `asterism-example-counter/contracts` in both realms. Its internal relative imports and public entry share one build graph per realm. Consumers need the provider enabled and declare that package as a peer dependency; installing a declaration package alone is not enough.
 
 ## Check the adapted design
 

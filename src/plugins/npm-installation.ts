@@ -64,7 +64,7 @@ export class NpmInstallations {
     this.process = options.process ?? createNpmProcess();
     this.validate = options.validate ?? (root => {
       const manifest = readManifest(root);
-      captureArtifact(root, manifest.artifact, manifest.id);
+      captureArtifact(root, manifest.id);
       return manifest;
     });
   }

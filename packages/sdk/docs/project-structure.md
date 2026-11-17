@@ -24,13 +24,11 @@ Import original public values. Shared contracts carry runtime identity as well a
 
 ## Separate source inputs from delivered code
 
-The package root owns identity, release metadata, translations, and manual declarations. Its `asterism.artifact` selects generated loading metadata; `asterism.build` holds source inputs. Keeping those roles separate lets a source checkout and a published package use the same loader without requiring the application to transform TypeScript.
+The package root owns identity, release metadata, translations, and manual declarations. `asterism.build` holds source inputs, and the build writes loading metadata into `dist`. Keeping those roles separate lets a source checkout and a published package use the same loader without requiring the application to transform TypeScript.
 
-Owned public entries use exact import specifiers mapped to source files separately for runtime and renderer. Compile each realm's implementation and owned public entries together so the provider uses the same declarations as its consumers. A separate authoring API package can supply types without becoming a separately activated plugin.
+Owned public entries are listed as exact import specifiers per realm and resolve through the package's own `exports`. Compile each realm's implementation and owned public entries together so the provider uses the same declarations as its consumers. A separate authoring API package can supply types without becoming a separately activated plugin.
 
-Classify consumer imports of other plugin APIs with `publicDependencies`. Those imports stay external throughout the bundled graph and resolve to the enabled provider's native ESM exports. Backend and renderer graphs are separate: identity is shared within a realm, not memory shared between processes or with the browser.
-
-Bundle ordinary private implementation libraries when appropriate. Keep a backend dependency external when it must retain its installed layout, native binary, or package-relative files; declare that choice in `runtimeExternals` and ship its ordinary dependency installation. Assets copied by the build belong to completed output. Root documentation and translation metadata remain with the package rather than moving into executable loading metadata.
+Package dependency declarations carry the boundary. Peer dependencies name what the application or other plugins supply; imports of them stay external and resolve to the running instances. Ordinary dependencies are private: the backend loads them from the installed package with their own files and native binaries, and the browser build bundles them. Backend and renderer graphs are separate: identity is shared within a realm, not memory shared between processes or with the browser. Root documentation and translation metadata remain with the package rather than moving into executable loading metadata.
 
 ## Keep service ownership with the provider
 

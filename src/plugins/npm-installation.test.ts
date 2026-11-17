@@ -16,10 +16,9 @@ function previewFixture(directory: string) {
 }
 const ok: NpmProcessResult = { code: 0, stdout: "", stderr: "" };
 function installed(directory: string, options: { version?: string; id?: string; missingArtifact?: boolean } = {}) {
-  const root = join(directory, "node_modules/test-plugin"); mkdirSync(join(root, "builds/one"), { recursive: true });
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "test-plugin", version: options.version ?? "2.0.0", asterism: { id: options.id ?? "test.plugin", displayName: "Test", artifact: "artifact.json" } }));
-  writeFileSync(join(root, "artifact.json"), JSON.stringify({ format: 1, build: "builds/one" }));
-  if (!options.missingArtifact) writeFileSync(join(root, "builds/one/artifact.json"), JSON.stringify({ format: 1, id: options.id ?? "test.plugin", buildId: "one", public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, runtimeExternals: [], stylesheets: [] }));
+  const root = join(directory, "node_modules/test-plugin"); mkdirSync(join(root, "dist"), { recursive: true });
+  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "test-plugin", version: options.version ?? "2.0.0", asterism: { id: options.id ?? "test.plugin", displayName: "Test" } }));
+  if (!options.missingArtifact) writeFileSync(join(root, "dist/artifact.json"), JSON.stringify({ format: 2, id: options.id ?? "test.plugin", public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, stylesheets: [] }));
   writeFileSync(join(directory, "pnpm-lock.yaml"), "packages:\n  test-plugin@2.0.0:\n    resolution:\n      integrity: sha512-registry-integrity\n");
   return root;
 }

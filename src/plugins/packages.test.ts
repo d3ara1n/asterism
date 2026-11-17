@@ -10,12 +10,11 @@ afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, 
 function temp() { const r = mkdtempSync(join(tmpdir(), "plugin-pkg-")); roots.push(r); return r; }
 function pkg(root: string, asterism: object | undefined) {
   writeFileSync(join(root, "package.json"), JSON.stringify({ name: "x", version: "1.0.0", peerDependencies: { "@asterism-app/sdk": `^${sdkMetadata.version}` },
-    ...(asterism && { asterism: { displayName: "Test plugin", artifact: "dist/plugin.json", ...asterism } }) }));
+    ...(asterism && { asterism: { displayName: "Test plugin", ...asterism } }) }));
   if (asterism && "id" in asterism) {
-    mkdirSync(join(root, "dist/builds/unit"), { recursive: true });
-    writeFileSync(join(root, "dist/plugin.json"), JSON.stringify({ format: 1, build: "builds/unit" }));
-    writeFileSync(join(root, "dist/builds/unit/artifact.json"), JSON.stringify({ format: 1, id: (asterism as { id: string }).id, buildId: "unit",
-      public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, runtimeExternals: [], stylesheets: [] }));
+    mkdirSync(join(root, "dist"), { recursive: true });
+    writeFileSync(join(root, "dist/artifact.json"), JSON.stringify({ format: 2, id: (asterism as { id: string }).id,
+      public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, stylesheets: [] }));
   }
 }
 
@@ -42,7 +41,7 @@ describe("Plugin packages", () => {
     writeFileSync(join(root, "package.json"), JSON.stringify({
       name: "@example/info", version: "1.2.3", description: "Package description", author: { name: "Author" },
       peerDependencies: { "@asterism-app/sdk": "^0.1.0" },
-      asterism: { id: "example.info", displayName: "Display name", icon: "icon.svg", artifact: "dist/plugin.json", build: { runtime: "runtime.ts" } },
+      asterism: { id: "example.info", displayName: "Display name", icon: "icon.svg", build: { runtime: "runtime.ts" } },
     }));
     writeFileSync(join(root, "runtime.ts"), 'throw new Error("Must not execute.");');
     writeFileSync(join(root, "icon.svg"), '<svg xmlns="http://www.w3.org/2000/svg"/>');

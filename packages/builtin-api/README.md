@@ -16,9 +16,9 @@ Import original contracts so extensions compose with the provider's operations r
 
 ## Build an extension artifact
 
-Declare `@asterism-app/builtin-api` in `asterism.build.publicDependencies` so the standalone builder keeps builtin public imports external throughout the graph. Development and peer dependencies alone do not classify those imports. The enabled builtin provider supplies their native ESM modules; a private copy cannot replace its runtime identity.
+Declare `@asterism-app/builtin-api` as a peer dependency so the standalone builder keeps builtin public imports external throughout the graph. The enabled builtin provider supplies their native ESM modules; a private copy cannot replace its runtime identity.
 
-Use `@asterism-app/plugin-build` and an explicit `asterism-plugin-build` build script. Build before adding the package directory to Asterism, then restart. `asterism.artifact` selects generated output; source entries remain authoring inputs under `asterism.build`. Rebuild and restart after changes, and validate the delivered package against the intended application and provider rather than treating a successful build as integration acceptance.
+Use `@asterism-app/plugin-build` and an explicit `asterism-plugin-build` build script. Build before adding the package directory to Asterism, then restart. The build writes loaded output into `dist`; source entries remain authoring inputs under `asterism.build`. Rebuild and restart after changes, and validate the delivered package against the intended application and provider rather than treating a successful build as integration acceptance.
 
 ## Explain integration choices
 

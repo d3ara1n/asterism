@@ -4,18 +4,31 @@ The standalone authoring tool for prebuilt Asterism plugins. Building does not r
 
 The builder requires Node.js 22.15.0 or newer on the authoring machine. The installed application supplies its own runtime; this authoring requirement does not require application users to install Node.js.
 
-Install `@asterism-app/plugin-build` as a development dependency and run `asterism-plugin-build` in the plugin package directory. `--root <directory>` selects another package directory. Programmatic callers use `await buildPlugin({ root })` from `@asterism-app/plugin-build`; the result contains `root`, `buildDirectory`, `pointerPath`, `pointer`, and `artifact`.
+Install `@asterism-app/plugin-build` as a development dependency and run `asterism-plugin-build` in the plugin package directory. `--root <directory>` selects another package directory. Programmatic callers use `await buildPlugin({ root })` from `@asterism-app/plugin-build`; the result contains `root`, `outputDirectory`, and `artifact`.
 
-The exported `BuildConfig` type describes the authoring inputs. Author configuration lives in `package.json.asterism.build`. The manifest's `artifact` is `dist/plugin.json`. Runtime and storage sources share one backend graph; the renderer and its public entries share a separate browser graph. Declare each owned public source under `build.public.runtime` or `build.public.renderer`. Sources can refer to installed authoring packages or sibling workspace sources. Owned bare imports resolve to these explicit entries, preserving shared state within each realm. The builder does not discover exports by executing code.
+## Inputs
 
-`publicDependencies` classifies consumer public requests as external. Each declaration matches its exact request and slash-separated descendants. Host integration imports are external automatically. Private runtime packages that require native binaries or package-relative resources belong in `runtimeExternals`. Their imports remain bare requests, including Node's distinct import and require conditions; the installed dependency tree must accompany the artifact. A missing provider is a host loading error, not permission to use a consumer's private API copy.
+Author configuration lives in `package.json.asterism.build`; the exported `BuildConfig` type describes it. `runtime`, `storage`, and `renderer` are package-relative source entries. Runtime and storage share one backend graph; the renderer and its public entries share a separate browser graph. `public.runtime` and `public.renderer` list the bare specifiers this plugin provides in each realm. Each specifier resolves through ordinary package resolution: the plugin's own package `exports` (a self-reference), or an installed API package. Browser public entries use the `browser` export condition when present. Public ownership is package-wide, so every subpath of a provided package that the plugin imports must be listed.
 
-Both executable graphs reject test-source files and the Vitest runner. Every successful build creates a new `dist/builds/<build-id>/artifact.json` and publishes `dist/plugin.json` last. Existing builds remain intact, including chunks needed by an already-running application. Build failures leave the prior pointer selected. Cleanup is an explicit author operation after old builds are no longer in use. Produce releases from a clean checkout: install authoring dependencies, build once, and pack that package. This includes the selected build and its required package files/dependencies rather than accumulated local build history. Clean an existing output tree only after running applications no longer use it.
+The package's dependency declarations define the remaining boundaries:
+
+- `peerDependencies` are supplied at load time, either by the application or by another enabled plugin's public entries. Their imports stay external in both graphs and are recorded in the artifact. Imports of application-supplied modules (the SDK, shared UI, React, React Intl, Zod, Sonner, and Motion) must be declared as peers; the build fails otherwise, because a private copy would split their shared instances.
+- `dependencies` and `optionalDependencies` are private. The backend graph does not bundle them: Node resolves them from the installed package, with their own export conditions, package-relative files, and native binaries. A backend import of an undeclared package fails the build. The browser graph bundles them, and CommonJS code inside them reaches peers through ESM imports.
+
+A missing provider is a host loading error, not permission to use a consumer's private API copy. A peer import inside an installed dependency's own code follows ordinary npm resolution, so only the plugin's own code is guaranteed to share the provider's instance.
+
+## Output
+
+Each successful build writes a new tree and then replaces the package's `dist` directory with it; a failed build leaves the previous `dist` untouched. `dist/artifact.json` describes the output: entry files, public entry files per realm, recorded peer imports, and stylesheets. All paths are portable and relative to `dist`. Rebuilding while an application runs from the same directory replaces files that application may still load lazily; restart it after building.
+
+Both executable graphs reject test-source files and the Vitest runner. Output is production code regardless of the caller's `NODE_ENV`.
 
 CSS Modules use plugin and stylesheet identity in their generated names. All CSS emitted by browser entries, public entries, and lazy chunks is recorded as an eager, deduplicated stylesheet closure. Global styles still share the document cascade. Browser outputs have no HTML entry or module-preload dependency.
 
-Vite handles browser workers and ordinary assets. Explicit `?url` file/directory imports preserve resource names and directory topology, including sibling files fetched by a worker. `build.assets` copies package-relative files/directories into the build directory at the same relative paths; `artifact.json`, `backend/`, and `renderer/` are reserved output locations. This does not rewrite arbitrary computed paths or backend `import.meta.url` resource references.
+Vite handles browser workers and ordinary assets. Explicit `?url` file/directory imports preserve resource names and directory topology, including sibling files fetched by a worker. This does not rewrite arbitrary computed paths. Backend code reads package files through ordinary paths relative to its installed package.
 
-`--watch` rebuilds on changes below the selected package root, excluding `dist`, `node_modules`, and `.git`. Sources outside that tree and dependency changes require another explicit build. Changes during a build queue another build; watch errors are reported without replacing the last successful pointer.
+The host-facing Zod schema and type are available from `@asterism-app/plugin-build/artifact` as `artifactSchema` and `PluginArtifact`, together with `artifactDirectory`, `artifactFile`, and the application-supplied module list `hostModules`.
 
-The host-facing Zod schemas and types are available from `@asterism-app/plugin-build/artifact`: `pointerSchema`, `artifactSchema`, `ArtifactPointer`, and `PluginArtifact`. All emitted descriptor paths are portable and relative to their descriptor's build directory (or to the pointer directory for the build pointer).
+## Distribution
+
+Produce releases from a clean checkout: install authoring dependencies, build once, and pack that package. The tarball must contain `package.json`, `dist`, and the files the manifest references; runtime dependencies install through the package's ordinary `dependencies`.

@@ -1,4 +1,4 @@
-import { createRequire } from "node:module";
+import { findPackageJSON } from "node:module";
 import { dirname, join, delimiter } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { unpackedArchivePath } from "./package-modules.ts";
@@ -11,9 +11,9 @@ export interface NpmProcess {
 
 /** Package resolution works in development and in the packaged application's unpacked dependencies. */
 export function pnpmLauncher(): string {
-  const require = createRequire(import.meta.url);
-  // pnpm 10 exports its manifest at the root specifier, not at the package.json subpath.
-  const file = join(dirname(require.resolve("pnpm")), "bin/pnpm.cjs");
+  const manifest = findPackageJSON("pnpm", import.meta.url);
+  if (!manifest) throw new Error("The bundled pnpm package is missing.");
+  const file = join(dirname(manifest), "bin/pnpm.cjs");
   return unpackedArchivePath(file) ?? file;
 }
 

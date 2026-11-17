@@ -1,11 +1,9 @@
 import type { RendererModule, RendererPlugin } from "@asterism-app/sdk/renderer";
 import { awaitStartup } from "../app/boot.ts";
 import { loadPluginStylesheet } from "./plugin-styles.ts";
-import { hostRendererModules, installPluginImportMap } from "./shared-modules.ts";
+import { installPluginImportMap } from "./shared-modules.ts";
 import type { RendererDiagnostic, RendererOutcome } from "./plugin-outcome";
 import { pluginErrorMessage } from "../../shared/plugin-startup";
-
-(globalThis as Record<string, unknown>).__asterismRendererModules = hostRendererModules;
 
 export interface RendererEntry { id: string; renderer: string | null; stylesheet?: string | null; stylesheets?: readonly string[]; dependencies: readonly string[] }
 export function validateRendererPlugin(plugin: RendererPlugin | undefined): asserts plugin is RendererPlugin {

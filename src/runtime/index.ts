@@ -1,11 +1,10 @@
 import { ApplicationService } from "./service.ts";
 import { dispatch } from "./dispatch.ts";
 import { protocolVersion, systemResumeMessage } from "../shared/contracts.ts";
-import { applicationStorage } from "../shared/application.ts";
 import { SystemResumed } from "@asterism-app/sdk/contracts";
-import { join } from "node:path";
 import { importPackages, packageCandidates, runtimeDependencies, rendererImportMap } from "../plugins/packages.ts";
 import { readPluginBuild } from "../plugins/artifacts.ts";
+import runtimeHostModules from "virtual:asterism/runtime-host-modules";
 import { userSkillDirectory } from "../plugins/agent-catalog.ts";
 import { DatabaseVersionError } from "./storage.ts";
 import { RendererConnection } from "./connection.ts";
@@ -37,7 +36,7 @@ try {
   port.postMessage({ kind: "startup", stage: "plugins" });
   const pluginBuild = process.argv[4];
   if (!pluginBuild) throw new Error("The task runtime requires a prepared plugin build.");
-  const packages = await importPackages(readPluginBuild(pluginBuild), join(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory), {
+  const packages = await importPackages(readPluginBuild(pluginBuild), runtimeHostModules, {
     storageFailures, progress: detail => port.postMessage({ kind: "startup", stage: "plugins", detail }),
   });
   console.info(`Plugin package preparation completed in ${Math.round(performance.now() - started)} ms.`);

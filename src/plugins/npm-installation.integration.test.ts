@@ -43,12 +43,11 @@ test.each(["node", "electron-node"])("%s: pnpm blocks dependency scripts and exe
     }
     pack("fixture-native", { scripts: { install: `node -e "require('node:fs').writeFileSync('script-built.txt', 'approved')"` } }, {});
     pack("fixture-plugin", {
-      asterism: { id: "fixture.plugin", displayName: "Fixture", artifact: "artifact.json" },
+      asterism: { id: "fixture.plugin", displayName: "Fixture" },
       dependencies: { "fixture-native": "1.0.0" }, devDependencies: { "must-not-fetch-dev": "1.0.0" },
     }, {
-      "artifact.json": JSON.stringify({ format: 1, build: "builds/one" }),
-      "builds/one/artifact.json": JSON.stringify({ format: 1, id: "fixture.plugin", buildId: "one", runtime: "runtime.mjs", public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, runtimeExternals: [], stylesheets: [] }),
-      "builds/one/runtime.mjs": "throw new Error('Installation must never import plugin code');\n",
+      "dist/artifact.json": JSON.stringify({ format: 2, id: "fixture.plugin", runtime: "runtime.mjs", public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, stylesheets: [] }),
+      "dist/runtime.mjs": "throw new Error('Installation must never import plugin code');\n",
     });
     const systemBin = join(root, "system-bin"); mkdirSync(systemBin);
     if (process.platform !== "win32") symlinkSync("/bin/sh", join(systemBin, "sh"));

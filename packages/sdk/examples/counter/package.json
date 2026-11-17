@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "build": "asterism-plugin-build",
-    "watch": "asterism-plugin-build --watch",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -27,22 +26,18 @@
     "manual": [
       "docs"
     ],
-    "artifact": "dist/plugin.json",
     "build": {
       "runtime": "src/runtime.ts",
       "storage": "src/storage.ts",
       "renderer": "src/renderer.tsx",
       "public": {
-        "runtime": {
-          "asterism-example-counter/contracts": "src/contracts.ts"
-        },
-        "renderer": {
-          "asterism-example-counter/contracts": "src/contracts.ts"
-        }
-      },
-      "publicDependencies": [],
-      "runtimeExternals": [],
-      "assets": []
+        "runtime": [
+          "asterism-example-counter/contracts"
+        ],
+        "renderer": [
+          "asterism-example-counter/contracts"
+        ]
+      }
     }
   },
   "exports": {

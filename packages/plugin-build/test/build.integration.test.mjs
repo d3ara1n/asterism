@@ -16,40 +16,39 @@ async function put(root, path, contents) {
   await mkdir(dirname(join(root, path)), { recursive: true });
   await writeFile(join(root, path), contents);
 }
-async function manifest(root, id, build) {
-  await put(root, 'package.json', JSON.stringify({ name: id, type: 'module', asterism: { id, artifact: 'dist/plugin.json', build } }));
+async function manifest(root, id, build, metadata = {}) {
+  await put(root, 'package.json', JSON.stringify({ name: id, type: 'module', ...metadata, asterism: { id, build } }));
 }
-const load = (build, path) => import(pathToFileURL(join(build.buildDirectory, path)).href);
+const load = (build, path) => import(pathToFileURL(join(build.outputDirectory, path)).href);
 async function files(root) {
   return (await Promise.all((await readdir(root, { withFileTypes: true })).map(async entry => entry.isDirectory()
-    ? (await files(join(root, entry.name))).map(path => `${entry.name}/${path}`) : [entry.name]))).flat();
+    ? (await files(join(root, entry.name))).map(path => entry.name + '/' + path) : [entry.name]))).flat();
 }
+const hooksFor = map => registerHooks({ resolve(specifier, context, next) {
+  return map[specifier] ? { url: map[specifier], shortCircuit: true } : next(specifier, context);
+} });
 
 test('independent provider graphs share objects, classes and live exports with runtime, storage and two consumers in both realms', async t => {
   const root = await fixture(t);
   const provider = join(root, 'provider');
-  await put(root, 'author-api/state.ts', 'export const state = {}; export class Token {}; export let count = 0; export function increment() { count++; }');
-  await put(root, 'author-api/renderer.ts', 'export * from "./state.ts";');
-  await manifest(provider, 'fixture.provider', {
-    runtime: 'runtime.ts', storage: 'storage.ts', renderer: 'renderer.ts',
-    public: { runtime: { '@fixture/api': '../author-api/state.ts' }, renderer: { '@fixture/api': '../author-api/renderer.ts' } },
-  });
-  for (const entry of ['runtime', 'storage', 'renderer']) await put(provider, `${entry}.ts`, 'export * from "@fixture/api";');
+  await manifest(provider, 'fixture.provider', { runtime: 'runtime.ts', storage: 'storage.ts', renderer: 'renderer.ts',
+    public: { runtime: ['@fixture/api'], renderer: ['@fixture/api'] } },
+  { name: '@fixture/api', exports: { '.': { browser: './api/renderer.ts', default: './api/state.ts' } } });
+  await put(provider, 'api/state.ts', 'export const state = {}; export class Token {}; export let count = 0; export function increment() { count++; }');
+  await put(provider, 'api/renderer.ts', 'export * from "./state.ts";');
+  for (const entry of ['runtime', 'storage', 'renderer']) await put(provider, entry + '.ts', 'export * from "@fixture/api";');
   const provided = await buildPlugin({ root: provider });
   const consumers = [];
   for (const name of ['one', 'two']) {
     const consumer = join(root, name);
-    await manifest(consumer, `fixture.${name}`, { runtime: 'entry.ts', renderer: 'entry.ts', publicDependencies: ['@fixture/api'] });
+    await manifest(consumer, 'fixture.' + name, { runtime: 'entry.ts', renderer: 'entry.ts' }, { peerDependencies: { '@fixture/api': '*' } });
     await put(consumer, 'entry.ts', 'import { state, Token, count, increment } from "@fixture/api"; export { state, Token, increment }; export const read = () => count;');
     await put(consumer, 'node_modules/@fixture/api/package.json', JSON.stringify({ name: '@fixture/api', type: 'module', exports: './index.js' }));
     await put(consumer, 'node_modules/@fixture/api/index.js', 'throw new Error("Consumer-private API must never be selected");');
     consumers.push(await buildPlugin({ root: consumer }));
   }
   for (const realm of ['runtime', 'renderer']) {
-    const hooks = registerHooks({ resolve(specifier, context, next) {
-      if (specifier === '@fixture/api') return { url: pathToFileURL(join(provided.buildDirectory, provided.artifact.public[realm]['@fixture/api'])).href, shortCircuit: true };
-      return next(specifier, context);
-    } });
+    const hooks = hooksFor({ '@fixture/api': pathToFileURL(join(provided.outputDirectory, provided.artifact.public[realm]['@fixture/api'])).href });
     try {
       const api = await load(provided, provided.artifact.public[realm]['@fixture/api']);
       const implementation = await load(provided, provided.artifact[realm]);
@@ -68,11 +67,11 @@ test('independent provider graphs share objects, classes and live exports with r
   assert.deepEqual(consumers[0].artifact.imports, { runtime: ['@fixture/api'], renderer: ['@fixture/api'] });
 });
 
-test('nested helpers record only used realm-specific host/public requests; public-only entries do not execute during build', async t => {
+test('nested helpers record only used realm-specific peer requests; public-only entries do not execute during build', async t => {
   const root = await fixture(t);
-  await manifest(root, 'fixture.public', {
-    public: { runtime: { '@fixture/api/runtime': 'runtime.ts' }, renderer: { '@fixture/api/renderer': 'renderer.ts' } },
-    publicDependencies: ['@other/api', '@unused/api'],
+  await manifest(root, 'fixture.public', { public: { runtime: ['@fixture/api/runtime'], renderer: ['@fixture/api/renderer'] } }, {
+    name: '@fixture/api', exports: { './runtime': './runtime.ts', './renderer': './renderer.ts' },
+    peerDependencies: { '@other/api': '*', '@unused/api': '*', zod: '*', react: '*', '@asterism-app/sdk': '*', '@asterism-app/ui': '*' },
   });
   await put(root, 'runtime.ts', 'export * from "./runtime-helper.ts"; throw new Error("Never execute at build time");');
   await put(root, 'runtime-helper.ts', 'export { external } from "@other/api/contracts"; export { z } from "zod"; export { definePlugin } from "@asterism-app/sdk/runtime";');
@@ -87,58 +86,66 @@ test('nested helpers record only used realm-specific host/public requests; publi
   assert.deepEqual(Object.keys(result.artifact.public.renderer), ['@fixture/api/renderer']);
 });
 
+// Without the peer declaration the plugin would bundle or resolve a private copy, splitting React context or Zod classes.
+test('application-supplied modules must be peer dependencies; undeclared backend packages fail the build', async t => {
+  const root = await fixture(t);
+  await manifest(root, 'fixture.boundaries', { runtime: 'entry.ts' });
+  await put(root, 'entry.ts', 'export { z } from "zod";');
+  await assert.rejects(buildPlugin({ root }), /zod is supplied by the application; declare zod in peerDependencies/u);
+  await put(root, 'entry.ts', 'export { thing } from "undeclared";');
+  await assert.rejects(buildPlugin({ root }), /Backend import undeclared is not declared/u);
+  await assert.rejects(readFile(join(root, 'dist/artifact.json')), { code: 'ENOENT' });
+});
+
 test('renderer CommonJS dependencies consume host and provider ESM values without a browser require', async t => {
   const root = await fixture(t);
-  await manifest(root, 'fixture.cjs-renderer', { renderer: 'entry.ts', publicDependencies: ['@fixture/api'],
-    public: { renderer: { '@fixture/api/local': 'local.ts' } } });
+  await manifest(root, 'fixture.cjs-renderer', { renderer: 'entry.ts', public: { renderer: ['@fixture/local'] } },
+    { dependencies: { 'private-cjs': '*', '@fixture/local': '*' }, peerDependencies: { react: '*', '@fixture/api': '*' } });
   await put(root, 'entry.ts', 'export { state, Token, local, lazy } from "private-cjs";');
   await put(root, 'node_modules/private-cjs/package.json', JSON.stringify({ name: 'private-cjs', main: 'index.cjs' }));
   await put(root, 'node_modules/private-cjs/index.cjs', `
     exports.state = require("react").state;
     exports.Token = require("@fixture/api/contracts").Token;
-    exports.local = require("@fixture/api/local").local;
+    exports.local = require("@fixture/local").local;
     exports.lazy = () => import("./lazy.cjs");
   `);
   await put(root, 'node_modules/private-cjs/lazy.cjs', 'exports.state = require("react").state;');
   await put(root, 'node_modules/react/package.json', JSON.stringify({ name: 'react', main: 'index.cjs' }));
   await put(root, 'node_modules/react/index.cjs', 'throw new Error("Private React must not be bundled");');
-  await put(root, 'local.ts', 'export const local = {};');
+  await put(root, 'node_modules/@fixture/local/package.json', JSON.stringify({ name: '@fixture/local', type: 'module', exports: './local.js' }));
+  await put(root, 'node_modules/@fixture/local/local.js', 'export const local = {};');
   await put(root, 'host.mjs', 'export const state = {}; export class Token {}');
   const result = await buildPlugin({ root });
   const hostUrl = pathToFileURL(await realpath(join(root, 'host.mjs'))).href;
   const host = await import(hostUrl);
-  const hooks = registerHooks({ resolve(specifier, context, next) {
-    if (specifier === 'react' || specifier === '@fixture/api/contracts') return { url: hostUrl, shortCircuit: true };
-    return next(specifier, context);
-  } });
+  const hooks = hooksFor({ react: hostUrl, '@fixture/api/contracts': hostUrl });
   try {
     // Native ESM has no require, just like the browser. Loading executes the bundled CJS wrapper.
     const output = await load(result, result.artifact.renderer);
     assert.equal(output.state, host.state);
-    assert.equal(output.local, (await load(result, result.artifact.public.renderer['@fixture/api/local'])).local);
+    assert.equal(output.local, (await load(result, result.artifact.public.renderer['@fixture/local'])).local);
     assert.ok(new output.Token() instanceof host.Token);
     assert.equal((await output.lazy()).state, host.state);
     assert.deepEqual(result.artifact.imports.renderer, ['@fixture/api/contracts', 'react']);
   } finally { hooks.deregister(); }
 });
 
-test('private external package specifiers remain relocatable and preserve import versus require conditions', async t => {
+test('backend output keeps installed packages as bare imports that resolve from a relocated package with their own conditions', async t => {
   const root = await fixture(t);
   const original = join(root, 'original');
-  await manifest(original, 'fixture.private', { runtime: 'entry.ts', runtimeExternals: ['dual'] });
-  await put(original, 'entry.ts', 'import { mode } from "dual"; export const imported = mode; export const required = require("dual").mode;');
+  await manifest(original, 'fixture.private', { runtime: 'entry.ts' }, { dependencies: { dual: '*' } });
+  await put(original, 'entry.ts', 'import { createRequire } from "node:module"; import { mode } from "dual"; export const imported = mode; export const required = createRequire(import.meta.url)("dual").mode;');
   await put(original, 'node_modules/dual/package.json', JSON.stringify({ name: 'dual', type: 'module', exports: { import: './index.js', require: './index.cjs' } }));
   await put(original, 'node_modules/dual/index.js', 'export const mode = "import";');
   await put(original, 'node_modules/dual/index.cjs', 'exports.mode = "require";');
   const built = await buildPlugin({ root: original });
+  assert.ok((await readFile(join(built.outputDirectory, built.artifact.runtime), 'utf8')).includes('from "dual"'));
   const relocated = join(root, 'relocated');
   await cp(original, relocated, { recursive: true });
   await rm(original, { recursive: true });
-  const selected = JSON.parse(await readFile(join(relocated, 'dist/plugin.json'), 'utf8'));
-  const artifact = JSON.parse(await readFile(join(relocated, 'dist', selected.build, 'artifact.json'), 'utf8'));
-  const result = await import(pathToFileURL(join(relocated, 'dist', selected.build, artifact.runtime)).href);
+  const artifact = JSON.parse(await readFile(join(relocated, 'dist/artifact.json'), 'utf8'));
+  const result = await import(pathToFileURL(join(relocated, 'dist', artifact.runtime)).href);
   assert.equal(result.imported, 'import'); assert.equal(result.required, 'require');
-  assert.deepEqual(built.artifact.runtimeExternals, ['dual']);
   assert.deepEqual(built.artifact.imports.runtime, []);
   for (const path of (await files(join(relocated, 'dist'))).filter(path => path.endsWith('.mjs'))) {
     assert.ok(!(await readFile(join(relocated, 'dist', path), 'utf8')).includes(original));
@@ -150,7 +157,8 @@ test('renderer CSS namespace includes plugin and stylesheet identity; public and
   const results = [];
   for (const id of ['one', 'two']) {
     const dir = join(root, id);
-    await manifest(dir, `fixture.${id}`, { renderer: 'entry.ts', public: { renderer: { '@fixture/css': 'public.ts' } } });
+    await manifest(dir, 'fixture.' + id, { renderer: 'entry.ts', public: { renderer: ['@fixture/css-' + id] } },
+      { name: '@fixture/css-' + id, exports: './public.ts' });
     await put(dir, 'entry.ts', 'import css from "./one.module.css"; export const className = css.shared; export const lazy = () => import("./lazy.ts");');
     await put(dir, 'one.module.css', '.shared { color: red; }');
     await put(dir, 'public.ts', 'import css from "./two.module.css"; export const publicClassName = css.shared;');
@@ -159,11 +167,11 @@ test('renderer CSS namespace includes plugin and stylesheet identity; public and
     await put(dir, 'lazy.css', '.lazy-only { color: green; }');
     const result = await buildPlugin({ root: dir });
     const entry = await load(result, result.artifact.renderer);
-    const pub = await load(result, result.artifact.public.renderer['@fixture/css']);
+    const pub = await load(result, result.artifact.public.renderer['@fixture/css-' + id]);
     assert.notEqual(entry.className, pub.publicClassName);
     assert.ok(result.artifact.stylesheets.length > 0, 'CSS emitted after Vite generation must be recorded');
     assert.equal(new Set(result.artifact.stylesheets).size, result.artifact.stylesheets.length);
-    const css = (await Promise.all(result.artifact.stylesheets.map(path => readFile(join(result.buildDirectory, path), 'utf8')))).join('\n');
+    const css = (await Promise.all(result.artifact.stylesheets.map(path => readFile(join(result.outputDirectory, path), 'utf8')))).join('\n');
     assert.ok(css.includes(entry.className)); assert.ok(css.includes(pub.publicClassName)); assert.ok(css.includes('.lazy-only'));
     await entry.lazy();
     results.push(entry.className);
@@ -173,66 +181,45 @@ test('renderer CSS namespace includes plugin and stylesheet identity; public and
 
 test('URL directory assets retain sibling resources, normal URL imports and Vite workers are emitted', async t => {
   const root = await fixture(t);
-  await manifest(root, 'fixture.assets', { renderer: 'entry.ts', assets: ['data'] });
+  await manifest(root, 'fixture.assets', { renderer: 'entry.ts' });
   await put(root, 'entry.ts', 'import directory from "./resources/?url"; import file from "./resources/worker.js?url"; export { directory, file }; export const worker = () => new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });');
   await put(root, 'resources/worker.js', 'fetch("./nested/table.bin");');
   await put(root, 'resources/nested/table.bin', 'table-data');
   await put(root, 'worker.ts', 'postMessage("worker-payload");');
-  await put(root, 'data/config.json', '{"copied":true}');
   const result = await buildPlugin({ root });
   const output = await load(result, result.artifact.renderer);
   assert.equal(await readFile(new URL('nested/table.bin', output.directory), 'utf8'), 'table-data');
   assert.equal(await readFile(new URL('worker.js', output.directory), 'utf8'), 'fetch("./nested/table.bin");');
   assert.equal(await readFile(new URL(output.file), 'utf8'), 'fetch("./nested/table.bin");');
-  assert.equal(await readFile(join(result.buildDirectory, 'data/config.json'), 'utf8'), '{"copied":true}');
-  assert.ok((await files(result.buildDirectory)).some(path => path.includes('worker-') && path.endsWith('.js')));
-  for (const file of (await files(result.buildDirectory)).filter(path => /\.(?:mjs|js)$/u.test(path))) {
-    const text = await readFile(join(result.buildDirectory, file), 'utf8');
+  assert.ok((await files(result.outputDirectory)).some(path => path.includes('worker-') && path.endsWith('.js')));
+  for (const file of (await files(result.outputDirectory)).filter(path => /\.(?:mjs|js)$/u.test(path))) {
+    const text = await readFile(join(result.outputDirectory, file), 'utf8');
     assert.ok(!text.includes(await realpath(root)), 'Virtual asset IDs must not leak author-machine paths into output comments');
   }
 });
 
-test('failed builds leave the successful pointer and old lazy graph untouched; later builds preserve old outputs', async t => {
+test('a successful build replaces the whole output; a failed build leaves the previous output and no temporary directory', async t => {
   const root = await fixture(t);
   await manifest(root, 'fixture.publish', { runtime: 'entry.ts' });
   await put(root, 'entry.ts', 'export const lazy = () => import("./lazy.ts");');
   await put(root, 'lazy.ts', 'export const value = "old";');
   const first = await buildPlugin({ root });
-  const captured = await load(first, first.artifact.runtime);
-  const pointer = await readFile(first.pointerPath, 'utf8');
+  const before = await files(first.outputDirectory);
   await put(root, 'entry.ts', 'this is invalid javascript !');
   await assert.rejects(buildPlugin({ root }));
-  assert.equal(await readFile(first.pointerPath, 'utf8'), pointer);
-  await put(root, 'entry.ts', 'export const lazy = () => import("./lazy.ts");');
-  await put(root, 'lazy.ts', 'export const value = "new";');
+  assert.deepEqual(await files(first.outputDirectory), before);
+  assert.deepEqual((await readdir(root)).filter(name => name.startsWith('.asterism-build-')), []);
+  await put(root, 'entry.ts', 'export const value = "new";');
   const second = await buildPlugin({ root });
-  assert.notEqual(first.artifact.buildId, second.artifact.buildId);
-  assert.equal((await captured.lazy()).value, 'old');
-  assert.equal((await (await load(second, second.artifact.runtime)).lazy()).value, 'new');
+  assert.equal(second.outputDirectory, first.outputDirectory);
+  // Earlier chunks do not accumulate: the output holds exactly the latest build.
+  assert.deepEqual((await files(second.outputDirectory)).sort(), ['artifact.json', 'backend/runtime.mjs']);
 });
 
-
-test('extensionless .node requests resolve to JavaScript while real native binaries require external ownership', async t => {
+test('public specifiers resolve through the providing package exports, including installed authoring packages', async t => {
   const root = await fixture(t);
-  await manifest(root, 'fixture.native', { runtime: 'entry.ts' });
-  await put(root, 'entry.ts', 'export { value } from "./platform.node";');
-  await put(root, 'platform.node.js', 'export const value = "javascript-platform-adapter";');
-  const result = await buildPlugin({ root });
-  assert.equal((await load(result, result.artifact.runtime)).value, 'javascript-platform-adapter');
-  const pointer = await readFile(result.pointerPath, 'utf8');
-  await put(root, 'entry.ts', 'import addon from "./addon.node"; export default addon;');
-  await put(root, 'addon.node', 'not-a-real-binary');
-  await assert.rejects(buildPlugin({ root }), /must remain inside a declared runtimeExternals package/u);
-  assert.equal(await readFile(result.pointerPath, 'utf8'), pointer);
-});
-
-
-test('provider-installed authoring sources and nested own imports resolve through explicit public entries', async t => {
-  const root = await fixture(t);
-  await manifest(root, 'fixture.installed-provider', {
-    runtime: 'entry.ts',
-    public: { runtime: { '@fixture/installed/contracts': './node_modules/@fixture/installed/src/contracts.ts', '@fixture/installed/runtime': './node_modules/@fixture/installed/src/runtime.ts' } },
-  });
+  await manifest(root, 'fixture.installed-provider', { runtime: 'entry.ts', public: { runtime: ['@fixture/installed/contracts', '@fixture/installed/runtime'] } },
+    { dependencies: { '@fixture/installed': '*' } });
   await put(root, 'entry.ts', 'export { singleton } from "@fixture/installed/runtime";');
   await put(root, 'node_modules/@fixture/installed/package.json', JSON.stringify({ name: '@fixture/installed', type: 'module', exports: { './contracts': './src/contracts.ts', './runtime': './src/runtime.ts' } }));
   await put(root, 'node_modules/@fixture/installed/src/contracts.ts', 'export const singleton = {};');
@@ -244,16 +231,18 @@ test('provider-installed authoring sources and nested own imports resolve throug
   assert.equal(implementation.singleton, contracts.singleton);
   assert.equal(runtime.singleton, contracts.singleton);
   assert.deepEqual(result.artifact.imports.runtime, []);
+  // Another subpath of an owned public package cannot become a private copy.
+  await put(root, 'entry.ts', 'export { singleton } from "@fixture/installed/other";');
+  await assert.rejects(buildPlugin({ root }), /belongs to a public package of this plugin/u);
 });
-
 
 test('both executable realms reject imported test sources before publishing an artifact', async t => {
   for (const realm of ['runtime', 'renderer']) {
     const root = await fixture(t);
-    await manifest(root, `fixture.${realm}`, { [realm]: 'entry.ts' });
+    await manifest(root, 'fixture.' + realm, { [realm]: 'entry.ts' });
     await put(root, 'entry.ts', 'import "./helper.test.ts"; export default {};');
     await put(root, 'helper.test.ts', 'globalThis.testCodeExecuted = true;');
     await assert.rejects(buildPlugin({ root }), /Runtime entry imports a test module/);
-    await assert.rejects(readFile(join(root, 'dist/plugin.json')), { code: 'ENOENT' });
+    await assert.rejects(readFile(join(root, 'dist/artifact.json')), { code: 'ENOENT' });
   }
 });

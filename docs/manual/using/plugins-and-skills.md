@@ -16,7 +16,7 @@ Removing a plugin is not the same as undoing its work. Historical records and ex
 
 Asterism loads completed plugin artifacts, not source projects. Adding or changing a selected package takes effect after restart. A successful download, build, or metadata inspection does not establish that the plugin's storage and contributions will initialize successfully.
 
-For a local directory, choose the package root with its completed build. You own that directory, its dependencies, and any Git workflow. Build changes explicitly before restarting; source edits alone do not update the running plugin. Removing the registration does not delete your directory. Keep files used by a running application intact until its use has ended.
+For a local directory, choose the package root with its completed build. You own that directory, its dependencies, and any Git workflow. Build changes explicitly before restarting; source edits alone do not update the running plugin. Removing the registration does not delete your directory. Rebuilding replaces the plugin's output; a running application can then fail to load parts it had not loaded yet, until you restart it.
 
 Bundled packages arrive with the application. Removing one from the selection does not remove the distribution's copy; adding it back still uses the restart boundary. The difference is source ownership, not execution format or lifecycle.
 

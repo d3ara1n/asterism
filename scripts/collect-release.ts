@@ -37,7 +37,7 @@ const packages: PackageInput[] = await Promise.all(manifests.map(async ({ direct
   const examples = git("ls-tree", "-r", "--name-only", sourceSha, "--", `${directory}/examples`).split("\n")
     .filter(path => path.endsWith("/package.json")).flatMap(path => {
       const example = JSON.parse(git("show", `${sourceSha}:${path}`));
-      if (!example.asterism?.id || !example.asterism?.artifact) return [];
+      if (!example.asterism?.id || !example.asterism?.build) return [];
       return [{ path, dependencies: Object.keys(example.devDependencies ?? {}).filter(name => publicNames.has(name)) }];
     });
   return { directory, name, published: await registryPublished(name), touched, examples };

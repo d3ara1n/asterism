@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { PackageList, buildPackages, importPackages, sharedRuntimeModules, type ResolvedPackage } from "../../src/plugins/packages.ts";
+import { PackageList, buildPackages, importPackages, type ResolvedPackage } from "../../src/plugins/packages.ts";
+import * as sdkRuntime from "@asterism-app/sdk/runtime";
+import * as zod from "zod";
 import { savePluginBuild, readPluginBuild } from "../../src/plugins/artifacts.ts";
 import { createNpmProcess, pnpmLauncher } from "../../src/plugins/npm-process.ts";
 
@@ -13,14 +15,16 @@ assert.equal(process.features.typescript, false, "TypeScript execution must be d
 const [mode, root, ...directories] = process.argv.slice(2);
 assert.ok(root);
 const cache = join(root, "cache");
+// The compiling test supplies the host-module files emitted beside this harness; they share chunks with it.
+const hostModules = JSON.parse(readFileSync(join(import.meta.dirname, "host-modules.json"), "utf8")) as Record<string, string>;
 
 async function load(): Promise<ResolvedPackage[]> {
   const list = new PackageList(join(root, "plugins.json"));
   for (const path of directories) list.add({ source: { kind: "path", path } }, root!);
-  const built = await buildPackages(list, root!, cache);
+  const built = await buildPackages(list, root!);
   for (const item of built) assert.equal(item.status, "ready", JSON.stringify(item.diagnostic));
   // Exercise the compiled preparation -> runtime serialization boundary as well as native entry imports.
-  const items = await importPackages(readPluginBuild(savePluginBuild(cache, built)), cache);
+  const items = await importPackages(readPluginBuild(savePluginBuild(cache, built)), hostModules);
   for (const item of items) assert.equal(item.status, "ready", `${item.manifest?.id}: ${JSON.stringify(item.diagnostic)}`);
   return items;
 }
@@ -46,10 +50,10 @@ if (mode === "fixtures") {
   assert.equal(storage.kind, "json");
   assert.ok(storage.kind === "json");
   assert.equal(storage.migrations[1]!({}), p.evidence.stored);
-  assert.equal(a.evidence.PluginApiError, sharedRuntimeModules["@asterism-app/sdk/runtime"]!.PluginApiError);
-  assert.equal(a.evidence.zString, sharedRuntimeModules.zod!.string);
-  assert.ok(new a.evidence.PluginApiError("invalid_argument", "probe") instanceof
-    (sharedRuntimeModules["@asterism-app/sdk/runtime"]!.PluginApiError as typeof Error));
+  assert.equal(a.evidence.PluginApiError, sdkRuntime.PluginApiError, "Plugins must share the host's own SDK instance.");
+  assert.equal(a.evidence.zString, zod.string);
+  assert.equal(a.evidence.requiredZod, zod.string, "Plugin code requiring a host module must reach the host instance.");
+  assert.ok(new a.evidence.PluginApiError("invalid_argument", "probe") instanceof sdkRuntime.PluginApiError);
   assert.equal(a.evidence.importMode, "import");
   assert.equal(a.evidence.requireMode, "require");
   assert.deepEqual(a.evidence.json, { shipped: "json-import-attributes" });

@@ -14,18 +14,16 @@ npm run build
 
 Add this package directory to Asterism, then restart the application. Register the directory containing `package.json`, not `src` or `dist`. After changing source, build explicitly and restart again. Source edits alone do not change the running plugin.
 
-The package manifest selects `dist/plugin.json`; the builder publishes that pointer only after a completed build. Asterism loads the selected JavaScript artifact, not the TypeScript entries in `asterism.build`. Keep completed builds used by a running application until that application has stopped using them.
-
-`npm run watch` keeps the author-side builder running. A successful watched rebuild still takes effect in Asterism only after restart; it is not application hot reload.
+The builder replaces `dist` only after a completed build. Asterism loads that JavaScript artifact, not the TypeScript entries in `asterism.build`.
 
 ## Preserve the public boundary
 
-The exact `asterism-example-counter/contracts` specifier is provided in both runtime and renderer realms. Each realm builds its own graph; the backend's runtime, storage, and public entry share that graph rather than independent copies of the contracts. The package's `exports` points to `src/contracts.ts`, which must remain included when distributing this example; `asterism.build.public` identifies what the plugin actually provides at runtime.
+The exact `asterism-example-counter/contracts` specifier is provided in both runtime and renderer realms. Each realm builds its own graph; the backend's runtime, storage, and public entry share that graph rather than independent copies of the contracts. `asterism.build.public` lists the specifier, and the builder resolves it through the package's `exports` entry for `./contracts`. Keep `src/contracts.ts` in the distributed package for consumers' type declarations.
 
-A consumer declares `asterism-example-counter` in its `asterism.build.publicDependencies` and leaves imports of `asterism-example-counter/contracts` external. Installing declarations alone does not enable this provider. SDK, React, React Intl, and Zod imports also remain external to use the host instances.
+A consumer declares `asterism-example-counter` as a peer dependency, which keeps imports of `asterism-example-counter/contracts` external. Installing declarations alone does not enable this provider. SDK, React, React Intl, and Zod imports also remain external to use the host instances.
 
 The manual stays in the root-level `asterism.manual` declaration. Executable output does not replace documentation or translation metadata.
 
 ## Distribute the built package
 
-Build before packing. Include `package.json`, the published pointer and its selected completed build, documentation, and any declarations needed by consumers. Check the actual tarball with `npm pack --dry-run`; copying source without output is not a loadable distribution. Avoid shipping accumulated local build history. Private external dependencies, if added later, must remain installed with the package; platform-dependent dependencies need validation in the target runtime.
+Build before packing. Include `package.json`, `dist`, documentation, and any declarations needed by consumers. Check the actual tarball with `npm pack --dry-run`; copying source without output is not a loadable distribution. Private dependencies, if added later, install through `dependencies`; platform-dependent dependencies need validation in the target runtime.

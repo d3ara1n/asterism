@@ -7,6 +7,7 @@ import { workspaceStorage } from "../runtime/storage.ts";
 import { buildPackages, importPackages, packageListStorage, type BuiltPackage } from "../plugins/packages.ts";
 import { collectManagedInstallations } from "../plugins/npm-installation.ts";
 import { savePluginBuild } from "../plugins/artifacts.ts";
+import runtimeHostModules from "virtual:asterism/runtime-host-modules";
 import { applicationStorage, preferenceVersion } from "../shared/application.ts";
 import { jsonStorage, sqliteStorage, type StorageDefinition } from "./migrations.ts";
 import { prepareData, restorePoint, startFresh, type DataPath, type PluginStorageGroup } from "./preparation.ts";
@@ -54,7 +55,7 @@ export function pluginStorages(root: string, id: string, declarations: readonly 
 
 /** Import captured storage entries only; task processes own plugin runtime and setup. */
 async function discoverPluginStorage(root: string, built: readonly BuiltPackage[]): Promise<PluginStorageGroup[]> {
-  const packages = await importPackages(built, join(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory), { runtime: false });
+  const packages = await importPackages(built, runtimeHostModules, { runtime: false });
   const groups: PluginStorageGroup[] = [];
   for (const item of packages) {
     if (!item.manifest || !item.storageEntry || item.status === "disabled") continue;
@@ -73,7 +74,7 @@ export async function prepareApplicationData(root: string, version: string, onHo
   const result = await prepareData(root, { version, paths: applicationDataPaths, stores: hostStorages(root, decrypt), onHost, onProgress,
     discover: async () => {
       const cache = join(root, applicationStorage.pluginPackagesDirectory, applicationStorage.pluginCacheDirectory);
-      const built = await buildPackages(applicationPackages(root), join(root, applicationStorage.pluginPackagesDirectory), cache, [],
+      const built = await buildPackages(applicationPackages(root), join(root, applicationStorage.pluginPackagesDirectory), [],
         id => onProgress?.({ stage: "dataPlugins", detail: id }));
       collectManagedInstallations(join(root, applicationStorage.pluginPackagesDirectory), new Set(built.flatMap(item =>
         item.entry.source.kind === "npm" && item.entry.source.installation ? [item.entry.source.installation] : [])));
