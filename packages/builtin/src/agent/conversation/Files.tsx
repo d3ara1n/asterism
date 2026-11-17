@@ -65,8 +65,10 @@ function DraftFile({ file, content, disabled, onRemove }: {
     </AttachmentContent>
     <Tooltip delayDuration={400}>
       <TooltipTrigger asChild><AttachmentTrigger aria-label={pending ? `${name}, ${i18n.text(mediaMessages.uploading)}` : name} /></TooltipTrigger>
-      <TooltipContent side="top" sideOffset={8} aria-label={name} className="max-h-(--radix-tooltip-content-available-height) max-w-[min(18rem,var(--radix-tooltip-content-available-width))] overflow-y-auto">
-        {part?.kind === "file" ? <DraftFileDetails part={part} content={content} /> : <p>{name}</p>}
+      <TooltipContent side="top" sideOffset={8} aria-label={name} className="max-w-[min(18rem,var(--radix-tooltip-content-available-width))]">
+        <div className="max-h-[calc(var(--radix-tooltip-content-available-height)-var(--spacing)*3)] overflow-y-auto">
+          {part?.kind === "file" ? <DraftFileDetails part={part} content={content} /> : <p>{name}</p>}
+        </div>
       </TooltipContent>
     </Tooltip>
     <AttachmentActions><TooltipHint content={action}><AttachmentAction type="button" className="size-5" disabled={disabled} onClick={onRemove}

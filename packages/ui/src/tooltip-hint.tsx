@@ -6,6 +6,9 @@ export function TooltipHint({ content, children }: { content?: ReactNode; childr
   if (content == null || content === false || content === "") return children;
   return <Tooltip>
     <TooltipTrigger asChild>{children}</TooltipTrigger>
-    <TooltipContent className="max-w-[min(24rem,var(--radix-tooltip-content-available-width))] max-h-(--radix-tooltip-content-available-height) overflow-y-auto whitespace-pre-wrap break-words text-left">{content}</TooltipContent>
+    <TooltipContent className="max-w-[min(24rem,var(--radix-tooltip-content-available-width))] whitespace-pre-wrap break-words text-left">
+      {/* The arrow stays outside the scroll owner; available height includes the shell's py-1.5 padding. */}
+      <div className="max-h-[calc(var(--radix-tooltip-content-available-height)-var(--spacing)*3)] overflow-y-auto">{content}</div>
+    </TooltipContent>
   </Tooltip>;
 }

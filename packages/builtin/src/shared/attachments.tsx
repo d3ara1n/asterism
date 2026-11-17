@@ -121,8 +121,10 @@ function PreviewDialog({ open, onOpenChange, name, details, url, onError, saving
 function FilePreviewTrigger({ name, details, label, onOpen }: { name: string; details: string; label: string; onOpen(): void }) {
   return <Tooltip>
     <TooltipTrigger asChild><AttachmentTrigger aria-label={label} onClick={onOpen} /></TooltipTrigger>
-    <TooltipContent className="max-h-(--radix-tooltip-content-available-height) max-w-[min(24rem,var(--radix-tooltip-content-available-width))] overflow-y-auto whitespace-pre-wrap wrap-anywhere">
-      <p>{name}</p><p>{details}</p>
+    <TooltipContent className="max-w-[min(24rem,var(--radix-tooltip-content-available-width))] whitespace-pre-wrap wrap-anywhere">
+      <div className="max-h-[calc(var(--radix-tooltip-content-available-height)-var(--spacing)*3)] overflow-y-auto">
+        <p>{name}</p><p>{details}</p>
+      </div>
     </TooltipContent>
   </Tooltip>;
 }
