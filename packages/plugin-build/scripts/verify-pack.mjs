@@ -7,7 +7,7 @@ const result = execFileSync(process.execPath, [process.env.npm_execpath, 'pack',
 });
 const [packed] = Object.values(JSON.parse(result));
 const files = new Set(packed.files.map(file => file.path));
-for (const path of ['package.json', 'README.md', 'dist/index.mjs', 'dist/index.d.ts', 'dist/artifact.mjs', 'dist/artifact.d.ts', 'dist/cli.mjs']) {
+for (const path of ['package.json', 'README.md', 'dist/index.mjs', 'dist/index.d.ts', 'dist/artifact.mjs', 'dist/artifact.d.ts', 'dist/cli.mjs', 'bin/asterism-plugin-build.mjs']) {
   assert.ok(files.has(path), `Packed package is missing ${path}`);
 }
 assert.ok(![...files].some(path => path.startsWith('src/') || path.startsWith('test/')), 'Published tool contains build output rather than source fixtures');

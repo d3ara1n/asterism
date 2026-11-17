@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { buildPlugin } from "./index.js";

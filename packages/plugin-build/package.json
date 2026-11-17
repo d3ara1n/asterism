@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "bin": {
-    "asterism-plugin-build": "./dist/cli.mjs"
+    "asterism-plugin-build": "./bin/asterism-plugin-build.mjs"
   },
   "exports": {
     ".": {
@@ -19,6 +19,7 @@
     "./package.json": "./package.json"
   },
   "files": [
+    "bin",
     "dist",
     "README.md",
     "docs"
