@@ -4,7 +4,7 @@ Compaction is built-in Agent policy. It summarizes an older input prefix while r
 
 ## Budget and boundaries
 
-The Agent checks its context budget between work requests and after a final response. Automatic triggering applies the configured window reserve; manual compaction bypasses that threshold, including when the window is unknown. Both paths use the same retention policy and summary operation. Compaction does not consume a work-request count.
+The Agent checks its context budget between work requests and after a final response. Automatic triggering reserves a share of the model window with a fixed minimum; manual compaction bypasses that threshold, including when the window is unknown. The trigger and diagnostic displays share the reserve calculation. Both paths use the same retention policy and summary operation. Compaction does not consume a work-request count.
 
 Budget estimation prefers the current model’s most recent eligible reported input usage, then estimates additions. After compaction, usage from before the summary is no longer an eligible anchor. Unknown windows do not trigger automatic compaction.
 

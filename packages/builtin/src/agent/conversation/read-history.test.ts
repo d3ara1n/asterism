@@ -38,8 +38,8 @@ describe("Conversation display reads", () => {
     expect(new Set(reads)).toEqual(new Set(["input", "operation", "reply"]));
     const timeline = withLive(conversationTimeline(result.projection, false, [
       { id: "notice", afterNodeId: "unrelated", origin: "software", code: "info", level: "warning", message: "At this position" },
-    ], [{ id: "compressing", afterNodeId: "other", status: "running" }]), []);
-    expect(timeline.map(item => item.id)).toEqual(["input", "operation", "notice", "compressing", "reply", "turn-metrics:input"]);
+    ], [{ id: "compression-failed", afterNodeId: "other", status: "failed" }]), []);
+    expect(timeline.map(item => item.id)).toEqual(["input", "operation", "notice", "compression-failed", "reply", "turn-metrics:input"]);
     expect(timeline.at(-1)).toMatchObject({ incomplete: false, replyMarkdown: "Done", metrics: { count: 2, usage: { input: { value: 100 } } } });
     expect(timeline.find(item => item.id === "operation")).toMatchObject({ kind: "toolcall", outcome });
   });
@@ -56,8 +56,32 @@ describe("Conversation display reads", () => {
     const result = await readConversation(remote, "a", new ConversationHistoryWindow());
     expect(reads).not.toContain("kept");
     const timeline = withLive(conversationTimeline(result.projection, false), []);
-    expect(timeline.map(item => item.id)).toEqual(["compression-boundary:summary", "reply", "turn-metrics:input"]);
+    expect(timeline.map(item => item.id)).toEqual(["compression-boundary:summary", "reply", "summary", "turn-metrics:input"]);
     expect(timeline.at(-1)).toMatchObject({ metrics: { count: 2 }, replyMarkdown: "Retained answer" });
+    expect(timeline[0]).toMatchObject({ kind: "compression-summary", text: "Compacted" });
+  });
+
+  // The live model has moved to a new summary while the existing reader still owns an earlier boundary.
+  it("reads the summary belonging to the retained reading window rather than substituting the latest summary", async () => {
+    const summary = (body: string, keptFrom: string) => event(ContextSummary.id,
+      { summary: body, keptFrom, model: "p/m", tokensBefore: 1000, completion }, { source: agentSource("a") });
+    const path = [
+      node("old", null, message("a", "Earlier")),
+      node("kept", "old", message("a", "Retained")),
+      node("first-summary", "kept", summary("First handoff", "kept")),
+    ];
+    const window = new ConversationHistoryWindow();
+    await readConversation(fixture(path).remote, "a", window);
+    path.push(node("newer", "first-summary", message("a", "Newer")),
+      node("second-summary", "newer", summary("Second handoff", "newer")));
+    const { remote } = fixture(path);
+    const existing = await readConversation(remote, "a", window);
+    const reopened = await readConversation(remote, "a", new ConversationHistoryWindow());
+    const items = (result: typeof existing) => withLive(conversationTimeline(result.projection, false), []);
+    expect(items(existing)[0]).toMatchObject({ kind: "compression-summary", text: "First handoff" });
+    expect(items(reopened)[0]).toMatchObject({ kind: "compression-summary", text: "Second handoff" });
+    expect(items(existing).some(item => item.id === "kept")).toBe(true);
+    expect(items(reopened).some(item => item.id === "kept")).toBe(false);
   });
 
   // Provider continuations and completion extensions can duplicate entire requests; only user-visible text and aggregate measurements survive the read.

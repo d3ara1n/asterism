@@ -116,8 +116,8 @@ export function Conversation({ feedback, compressions, activity = null, executio
           onResize={() => { onResize(); navigation.current?.update(); }} onScrollEnd={onScrollEnd} onProcessMount={onProcessMount}
           onToggleProcess={id => { preserveItem(id); toggle(id); }} />
         <div className="px-4 pb-4">
-          {running && !timeline.some(item => item.kind === "compression" && item.status === "running") &&
-            <ExecutionStatus activity={activity} startedAt={executionStartedAt} />}
+          {running && <ExecutionStatus activity={activity} compressing={compressions.some(item => item.status === "running")}
+            startedAt={executionStartedAt} />}
         </div>
       </ScrollArea>
       {read.status === "ready" && !timeline.length && !running && <Empty className="pointer-events-none absolute inset-0 p-6">
@@ -149,8 +149,8 @@ export function Conversation({ feedback, compressions, activity = null, executio
   </ConversationSharing>;
 }
 
-/** Elapsed time spans requests and retry waits; clock updates stay within this status row. */
-function ExecutionStatus({ activity, startedAt }: { activity: AgentActivity | null; startedAt: number | null }) {
+/** Elapsed time spans requests, compaction, and retry waits; clock updates stay within this status row. */
+function ExecutionStatus({ activity, compressing, startedAt }: { activity: AgentActivity | null; compressing: boolean; startedAt: number | null }) {
   const i18n = useI18n();
   const [now, setNow] = useState(Date.now);
   const resumeAt = activity?.resumeAt ?? null;
@@ -160,7 +160,7 @@ function ExecutionStatus({ activity, startedAt }: { activity: AgentActivity | nu
     return () => clearInterval(timer);
   }, [resumeAt, startedAt]);
   const duration = formatElapsedTime(startedAt, now);
-  const label = !activity ? i18n.formatMessage(conversationMessages.workingHint)
+  const label = compressing ? i18n.text(conversationMessages.compressing) : !activity ? i18n.formatMessage(conversationMessages.workingHint)
     : resumeAt !== null
       ? i18n.formatMessage(conversationMessages.retryWaiting, { attempt: activity.attempt, max: activity.max, seconds: Math.max(0, Math.ceil((resumeAt - now) / 1000)) })
       : i18n.formatMessage(conversationMessages.retrying, { attempt: activity.attempt, max: activity.max });

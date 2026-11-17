@@ -35,14 +35,6 @@ describe("Exiting item order in the virtual list", () => {
     expect(result[0]).toBe(updated);
   });
 
-  // Compression activity and successful records have different identities; the exiting running row must precede the new completed row so local stacking can replace them in place.
-  it("When successful compression replaces the running indicator, the exiting activity sits immediately before the success record", () => {
-    const running: TimelineItem = { kind: "compression", id: "activity", status: "running" };
-    const completed: TimelineItem = { kind: "compression", id: "saved", status: "completed" };
-    expect(retainExitingItems([running], [completed], new Set(["activity"]), new Map()).map(item => item.id))
-      .toEqual(["activity", "saved"]);
-  });
-
   // Path switches also remove visible items; without a folding summary, position them relative to their original successor, keeping trailing exit items at the end.
   it("Ordinary removal preserves relative order and newly added items in the target", () => {
     const a = text("a"), b = text("b"), c = text("c"), d = text("d"), added = text("new");

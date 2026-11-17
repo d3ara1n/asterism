@@ -15,13 +15,32 @@ const snapshot = (path: ReturnType<typeof node>[]) => sessionSnapshot(nodeView("
 function project(path: ReturnType<typeof node>[], window: ConversationHistoryWindow, compressions: readonly CompressionActivity[] = []) {
   const view = snapshot(path);
   const latest = view.records.last(ContextSummary, { scope: "timeline", source: "a" });
-  const { boundary } = window.observe(view.records.index({ scope: "timeline" }), latest?.status === "known"
+  const range = window.observe(view.records.index({ scope: "timeline" }), latest?.status === "known"
     ? { summaryId: latest.record.id, keptFrom: latest.data.keptFrom } : null);
-  return savedTimeline(view.records.all({ scope: "timeline" }), "a", false, [], { boundary, compressions });
+  return savedTimeline(view.records.all({ scope: "timeline" }), "a", false, [], { ...range, compressions });
 }
 const ids = (saved: ReturnType<typeof project>) => withLive(saved, []).map(item => item.id);
 
 describe("Conversation reading range after compression", () => {
+  // The summary's logical position predates its saved event, and neither belongs at an arbitrary page start.
+  it("loads the summary only on reaching keptFrom while keeping its distant occurrence in chronological order", () => {
+    const path = Array.from({ length: 350 }, (_, index) => node(String(index), index ? String(index - 1) : null, message("a", "Input")));
+    path.push(node("summary", "349", summary("100")));
+    const window = new ConversationHistoryWindow();
+    const first = project(path, window);
+    expect(ids(first)[0]).toBe("251");
+    expect(first.items.some(item => item.kind === "compression-summary")).toBe(false);
+    expect(ids(first).at(-1)).toBe("summary");
+    window.expand(snapshot(path).records.index({ scope: "timeline" }));
+    expect(ids(project(path, window))[0]).toBe("151");
+    window.expand(snapshot(path).records.index({ scope: "timeline" }));
+    const expanded = project(path, window);
+    expect(expanded.items[0]).toEqual({ kind: "compression-summary", id: "compression-boundary:summary", text: "Internal handoff" });
+    expect(ids(expanded).slice(0, 2)).toEqual(["compression-boundary:summary", "100"]);
+    expect(ids(expanded)).not.toContain("99");
+    expect(ids(expanded).at(-1)).toBe("summary");
+  });
+
   it("expands a fork without moving the original reader or losing its compression boundary", () => {
     const path = Array.from({ length: 350 }, (_, index) => node(String(index), index ? String(index - 1) : null, message("a", "Input")));
     path.push(node("summary", "349", summary("100")));
@@ -65,12 +84,12 @@ describe("Conversation reading range after compression", () => {
       node("summary", "reply", summary("kept")),
     ];
     const saved = project(path, new ConversationHistoryWindow());
-    expect(ids(saved)).toEqual(["compression-boundary:summary", "kept", "reply", "turn-metrics:u"]);
+    expect(ids(saved)).toEqual(["compression-boundary:summary", "kept", "reply", "summary", "turn-metrics:u"]);
     const grouped = groupConversationProcesses(withLive(saved, []), false);
     expect(visibleConversationProcesses(grouped, new Set()).map(item => item.id))
-      .toEqual(["compression-boundary:summary", "conversation-process:final", "reply", "turn-metrics:u"]);
+      .toEqual(["compression-boundary:summary", "conversation-process:final", "reply", "summary", "turn-metrics:u"]);
     expect(visibleConversationProcesses(grouped, new Set(["conversation-process:final"])).map(item => item.id))
-      .toEqual(["compression-boundary:summary", "kept", "conversation-process:final", "reply", "turn-metrics:u"]);
+      .toEqual(["compression-boundary:summary", "kept", "conversation-process:final", "reply", "summary", "turn-metrics:u"]);
   });
 
   // Completion is a fact of the full response, even when the reading window omits its initial blocks.
@@ -96,12 +115,12 @@ describe("Conversation reading range after compression", () => {
     expect(ids(project(path, window))).toEqual(["u", "reply", "summary", "turn-metrics:u"]);
     expect(project(path, window).items.find(item => item.id === "summary")).toEqual({ kind: "compression", id: "summary", status: "completed" });
     const reloaded = new ConversationHistoryWindow();
-    expect(ids(project(path, reloaded))).toEqual(["compression-boundary:summary", "reply", "turn-metrics:u"]);
+    expect(ids(project(path, reloaded))).toEqual(["compression-boundary:summary", "reply", "summary", "turn-metrics:u"]);
     path.push(node("next", "summary", message("a", "Next")));
     path.push(node("next-reply", "next", text("a", "next", 0, "Next reply", { completion })));
     path.push(node("summary2", "next-reply", summary("next")));
-    expect(ids(project(path, reloaded))).toEqual(["compression-boundary:summary", "reply", "turn-metrics:u", "next", "next-reply", "summary2", "turn-metrics:next"]);
-    expect(ids(project(path, new ConversationHistoryWindow()))).toEqual(["compression-boundary:summary2", "next", "next-reply", "turn-metrics:next"]);
+    expect(ids(project(path, reloaded))).toEqual(["compression-boundary:summary", "reply", "summary", "turn-metrics:u", "next", "next-reply", "summary2", "turn-metrics:next"]);
+    expect(ids(project(path, new ConversationHistoryWindow()))).toEqual(["compression-boundary:summary2", "next", "next-reply", "summary2", "turn-metrics:next"]);
   });
 
   // History navigation switches the actual path; the previous branch's compression boundary must not keep trimming content after rewinding.
@@ -118,7 +137,7 @@ describe("Conversation reading range after compression", () => {
   });
 
   // Failure and cancellation have only transient state and produce no successful summary; these states appear at their original positions, and activity outside the branch cannot enter the current conversation.
-  it("Running and incomplete activities remain visible without establishing a trimming boundary", () => {
+  it("Only failed and cancelled activities enter history; running compression belongs to execution status", () => {
     const path = [node("u", null, message("a", "Work"))];
     const compressions: CompressionActivity[] = [
       { id: "failed", afterNodeId: "u", status: "failed" },
@@ -127,7 +146,7 @@ describe("Conversation reading range after compression", () => {
       { id: "elsewhere", afterNodeId: "other", status: "running" },
     ];
     const saved = project(path, new ConversationHistoryWindow(), compressions);
-    expect(ids(saved)).toEqual(["u", "failed", "cancelled", "running"]);
-    expect(saved.items.filter(item => item.kind === "compression").map(item => item.status)).toEqual(["failed", "cancelled", "running"]);
+    expect(ids(saved)).toEqual(["u", "failed", "cancelled"]);
+    expect(saved.items.filter(item => item.kind === "compression").map(item => item.status)).toEqual(["failed", "cancelled"]);
   });
 });

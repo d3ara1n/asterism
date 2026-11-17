@@ -3,13 +3,13 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { cn } from "@asterism-app/ui/utils";
 import { contextMessages as messages } from "../../messages/context";
-import { COMPRESSION_RESERVE } from "../context-budget";
+import { compressionReserve } from "../context-budget";
 import { ease, percent, stripes, Swatch } from "../panel-kit";
 
 /** Window occupancy: used capacity comes from reported input; free space and the compression reserve require a known window. `fill` colors the used segment and its swatch. */
 export function WindowMeter({ input, window, fill = "bg-chart-1" }: { input: number; window: number | null; fill?: string }) {
   const i18n = useI18n();
-  const reserve = window ? Math.min(COMPRESSION_RESERVE, window) : 0;
+  const reserve = window ? Math.min(compressionReserve(window), window) : 0;
   const used = window ? Math.min(input, window) : input;
   const free = window ? Math.max(window - reserve - used, 0) : 0;
   const share = (value: number) => window ? `${value / window * 100}%` : "0%";

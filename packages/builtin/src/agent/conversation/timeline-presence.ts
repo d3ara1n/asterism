@@ -8,8 +8,6 @@ export function retainExitingItems(
 ): TimelineItem[] {
   const keys = new Set(target.map(timelineKey));
   const positions = new Map(target.map((item, index) => [timelineKey(item), index]));
-  const previousKeys = new Set(previous.map(timelineKey));
-  const completedCompression = target.find(item => item.kind === "compression" && item.status === "completed" && !previousKeys.has(timelineKey(item)));
   const before = new Map<string | null, TimelineItem[]>();
   let next: string | null = null;
   for (let index = previous.length - 1; index >= 0; index--) {
@@ -18,8 +16,7 @@ export function retainExitingItems(
     if (!mounted.has(key)) continue;
     // Automatic folding adds a summary row; exiting process items stay above it.
     const owner = owners.get(key);
-    const replacement = owner && keys.has(owner) ? owner
-      : item.kind === "compression" && item.status === "running" && completedCompression ? timelineKey(completedCompression) : null;
+    const replacement = owner && keys.has(owner) ? owner : null;
     // If a still-visible successor such as an intervening supplemental message comes earlier, process items stay before it, preserving reading order during exit.
     const anchor = replacement && (next === null || positions.get(replacement)! < positions.get(next)!) ? replacement : next;
     const entries = before.get(anchor) ?? [];

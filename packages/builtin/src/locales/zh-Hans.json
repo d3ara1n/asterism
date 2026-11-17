@@ -304,7 +304,7 @@
   "agentPanels.context": "上下文",
   "conversation.compression.completed": "上下文已压缩",
   "conversation.compression.active": "正在压缩上下文…",
-  "conversation.compression.historyCompacted": "更早的对话已压缩",
+  "conversation.compression.historyCompacted": "压缩摘要",
   "conversation.compression.failed": "上下文压缩失败",
   "conversation.compression.cancelled": "已取消上下文压缩",
   "conversation.process.title": "执行过程",

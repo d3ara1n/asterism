@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ContextSummary, Execution } from "@asterism-app/builtin-api/contracts";
 import { projectAgentContext, projectForAgent, contextMessages } from "./projection.ts";
-import { estimateContext, planCompression } from "./compression.ts";
+import { compressionDue, estimateContext, planCompression } from "./compression.ts";
 import { serializeForSummary, summaryPrompt } from "./compression-prompt.ts";
 import { sessionView } from "../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../src/session/view.ts";
@@ -137,5 +137,20 @@ describe("Context compression boundaries", () => {
     expect(serialized).toContain("4000 characters omitted");
     expect(serialized).toContain("src/main.ts");
     expect(serialized).not.toMatch(/Hidden thinking|encrypted|GUI only/);
+  });
+});
+
+// The reserve scales with large windows but retains headroom on smaller windows; unknown capacity cannot supply a trigger.
+describe("Automatic compression threshold", () => {
+  it.each([
+    { window: 1_000_000, threshold: 900_000 },
+    { window: 128_000, threshold: 111_616 },
+    { window: 200_001, threshold: 180_000 },
+  ])("triggers only above $threshold for a $window-token window", ({ window, threshold }) => {
+    expect(compressionDue(threshold, window)).toBe(false);
+    expect(compressionDue(threshold + 1, window)).toBe(true);
+  });
+  it.each([null, undefined])("does not invent capacity when the window is %s", window => {
+    expect(compressionDue(2_000_000, window)).toBe(false);
   });
 });

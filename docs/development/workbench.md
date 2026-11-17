@@ -152,7 +152,7 @@ Manual expansion preserves the summary’s reading position. Automatic collapse 
 
 ## Compaction and diagnostics
 
-Compaction shows an activity or recorded marker without changing original history. On a fresh frontend load, the latest retained boundary determines the initial conversation reading window. Later compaction does not discard already visible earlier material in that mounted session.
+Compaction uses the ordinary execution status and task-wide elapsed time while running. Its saved record appears as an occurrence at the actual timeline position, without acting as a content divider. On a fresh frontend load, the latest retained boundary determines the initial conversation reading window. A collapsible summary occupies the logical position immediately before the first retained record; it enters the loaded range only when pagination reaches that boundary. Expanding it shows the saved summary, not the replaced original content. The occurrence and the boundary summary come from the same saved record without rewriting history. Later compaction does not discard already visible earlier material in that mounted session.
 
 Diagnostics read saved requests and completion data. They do not reconstruct historical prompts from current configuration or start new requests.
 

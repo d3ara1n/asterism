@@ -4,10 +4,10 @@ import { decodeExecution, ContextSummary } from "@asterism-app/builtin-api/contr
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, type AgentContext } from "./projection.ts";
 
-import { COMPRESSION_KEEP_RECENT, COMPRESSION_RESERVE } from "./context-budget.ts";
+import { COMPRESSION_KEEP_RECENT, compressionReserve } from "./context-budget.ts";
 
 // Window reserve and recent-content retention budgets; tool results are excerpted only for the separate summary material.
-export { COMPRESSION_KEEP_RECENT, COMPRESSION_RESERVE } from "./context-budget.ts";
+export { COMPRESSION_KEEP_RECENT, compressionReserve } from "./context-budget.ts";
 
 /** Character-based estimates are used only for selection and triggering; they are not persisted as provider-reported measurements. */
 function estimateItems(items: readonly ModelItem[]): number {
@@ -60,7 +60,7 @@ export function planCompression(context: AgentContext): CompressionPlan | null {
 }
 /** Automatic triggering is separate from the compression operation; an unknown window never triggers automatically. */
 export function compressionDue(tokens: number, window: number | null | undefined): boolean {
-  return window != null && tokens > window - COMPRESSION_RESERVE;
+  return window != null && tokens > window - compressionReserve(window);
 }
 
 export interface PreparedCompression { plan: CompressionPlan; tokensBefore: number }

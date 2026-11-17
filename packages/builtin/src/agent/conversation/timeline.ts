@@ -15,7 +15,8 @@ type SavedBlock = DisplayBlock & {
 export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "message"; id: string; createdAt: string; parts: readonly AgentInputPart[]; sender: AgentMessageSender; startsTurn?: boolean }
   | { kind: "summary"; id: string; text: string }
-  | { kind: "compression"; id: string; status: CompressionActivity["status"] | "completed" | "boundary"; details?: CompressionActivity["details"] }
+  | { kind: "compression-summary"; id: string; text: string }
+  | { kind: "compression"; id: string; status: Exclude<CompressionActivity["status"], "running"> | "completed"; details?: CompressionActivity["details"] }
   | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null; replyCreatedAt: string | null }
   | { kind: "conversation-process"; id: string; content: readonly ("text" | "thinking")[]; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; incomplete: boolean; open: boolean }
   | ({ kind: "notice" } & InlineFeedback);
@@ -69,7 +70,6 @@ export function projectConversation(path: readonly RecordInfo[], agentId: string
   const byId = new Map(bodies.map(record => [record.id, record]));
   const startId = options.from ?? options.boundary?.keptFrom;
   const start = startId ? path.findIndex(record => record.id === startId) : 0;
-  const summaryIndex = options.boundary ? path.findIndex(record => record.id === options.boundary!.summaryId) : -1;
   if (start < 0) throw new Error("The conversation compression boundary is not on the current timeline.");
   const values = path.map(info => { const record = byId.get(info.id); return record ? item(record, agentId) : null; });
   const responses = new Map<string, ObservedBlock[]>();
@@ -102,6 +102,14 @@ export function projectConversation(path: readonly RecordInfo[], agentId: string
   const keys = new Set<string>();
   const visibleTurns = new Set<string>();
   const entries: { id: string; value: TimelineItem | null }[] = [];
+  // The summary belongs immediately before keptFrom, not at the top of every loaded page.
+  if (options.boundary && startId === options.boundary.keptFrom) {
+    const record = byId.get(options.boundary.summaryId);
+    const summary = record ? ContextSummary.decode(record) : null;
+    if (summary?.status !== "known") throw new Error("The conversation boundary summary could not be decoded.");
+    const id = `compression-boundary:${options.boundary.summaryId}`;
+    entries.push({ id, value: { kind: "compression-summary", id, text: summary.data.summary } });
+  }
   let inputId: string | null = null;
   for (const [index, record] of path.entries()) {
     const original = values[index]!;
@@ -111,7 +119,7 @@ export function projectConversation(path: readonly RecordInfo[], agentId: string
     if (value?.kind === "message" && value.startsTurn) inputId = value.id;
     if (index < start) continue;
     if (value && value.kind !== "compression" && inputId) visibleTurns.add(inputId);
-    entries.push({ id: record.id, value: value?.kind === "compression" && index <= summaryIndex ? null : value });
+    entries.push({ id: record.id, value });
   }
   return { entries, keys, notices, failedResponses, boundary: options.boundary ?? null,
     turns: turnMetrics(bodies, agentId, false).filter(turn => visibleTurns.has(turn.inputId)) };
@@ -123,6 +131,7 @@ export function conversationTimeline(projection: ConversationProjection, running
   const after = new Map<string | null, TimelineItem[]>();
   for (const notice of projection.notices) after.set(notice.afterNodeId, [...after.get(notice.afterNodeId) ?? [], notice]);
   for (const value of compressions) {
+    if (value.status === "running") continue;
     const items = after.get(value.afterNodeId) ?? [];
     items.push({ kind: "compression", id: value.id, status: value.status, ...(value.details ? { details: value.details } : {}) });
     after.set(value.afterNodeId, items);
@@ -132,9 +141,7 @@ export function conversationTimeline(projection: ConversationProjection, running
     const items = after.get(value.afterNodeId) ?? [];
     items.push({ ...value, kind: "notice" }); after.set(value.afterNodeId, items);
   }
-  const saved: TimelineItem[] = projection.boundary
-    ? [{ kind: "compression", id: `compression-boundary:${projection.boundary.summaryId}`, status: "boundary" }]
-    : [...(after.get(null) ?? [])];
+  const saved: TimelineItem[] = projection.boundary ? [] : [...(after.get(null) ?? [])];
   for (const entry of projection.entries) {
     if (entry.value) saved.push(entry.value);
     saved.push(...(after.get(entry.id) ?? []));

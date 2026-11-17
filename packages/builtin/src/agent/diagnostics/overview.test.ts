@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import type { AgentRequestContextData } from "@asterism-app/builtin-api/contracts";
-import { COMPRESSION_RESERVE } from "../context-budget.ts";
 import type { DiagnosticRequest } from "./history.ts";
 import { diagnosticOverview } from "./overview.ts";
 
@@ -36,7 +35,7 @@ describe("Diagnostic overview", () => {
     const window = 100_000;
     const open = diagnosticOverview([request(1, 1000), compression(2, 900), request(3, 4000)], () => window);
     expect(open.cache).toEqual({ read: 500 + 2000, input: 5000 });
-    expect(open.headroom).toEqual({ input: 4000, window, threshold: window - COMPRESSION_RESERVE, remaining: window - COMPRESSION_RESERVE - 4000 });
+    expect(open.headroom).toEqual({ input: 4000, window, threshold: 83_616, remaining: 79_616 });
     expect(diagnosticOverview([request(1, 1000), compression(2, 900)], () => window).headroom).toBe("compressed");
     expect(diagnosticOverview([request(1, 1000)], () => null).headroom).toBe("unknown");
     expect(diagnosticOverview([request(1, null)], () => window)).toMatchObject({ cache: null, trend: [], headroom: null });

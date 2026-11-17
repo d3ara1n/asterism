@@ -13,7 +13,7 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
   eventSource: { id: "conversation.events.source", defaultMessage: "Event · {name}" },
   executionProcess: { id: "conversation.process.title", defaultMessage: "Execution process" },
   compressing: { id: "conversation.compression.active", defaultMessage: "Compacting context…" },
-  compressedHistory: { id: "conversation.compression.historyCompacted", defaultMessage: "Earlier conversation compacted" },
+  compressedHistory: { id: "conversation.compression.historyCompacted", defaultMessage: "Compaction summary" },
   compressionFailed: { id: "conversation.compression.failed", defaultMessage: "Context compaction failed" },
   compressionCancelled: { id: "conversation.compression.cancelled", defaultMessage: "Context compaction cancelled" },
   processText: { id: "conversation.process.text", defaultMessage: "Text output" },

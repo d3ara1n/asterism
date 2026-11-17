@@ -22,6 +22,7 @@ import { TimelineViewState, viewStateKeys } from "./view-state";
 import { ExecutionErrorDetails } from "../ErrorDetails";
 import { ConversationProcess } from "./ConversationProcess";
 import { CompressionMarker } from "./CompressionMarker";
+import { CompressionSummary } from "./CompressionSummary";
 import type { useTimelinePresence } from "./timeline-presence";
 import { conversationTransition, immediateTransition } from "./motion";
 import { blockShell } from "./block-shell";
@@ -64,7 +65,6 @@ export function VirtualConversationTimeline({ items, target, presence, reducedMo
     {node => {
       const key = timelineKey(node);
       return <TimelinePresenceItem key={key} itemKey={key} present={present.has(key)} enter={presence.entering.has(key)}
-        overlayExit={node.kind === "compression"}
         reducedMotion={reducedMotion} onMount={presence.onMount} onExitComplete={presence.onExitComplete}>{node.kind === "conversation-process"
         ? <ConversationProcess node={node} onToggle={() => onToggleProcess(node.id)} onMount={onProcessMount} />
         : <NodeView node={node} entry={viewState.entry(key)} />}</TimelinePresenceItem>;
@@ -72,14 +72,14 @@ export function VirtualConversationTimeline({ items, target, presence, reducedMo
   </Virtualizer>;
 }
 
-function TimelinePresenceItem({ itemKey, present, enter, overlayExit, reducedMotion, onMount, onExitComplete, children }: {
-  itemKey: string; present: boolean; enter: boolean; overlayExit: boolean; reducedMotion: boolean; children: ReactNode;
+function TimelinePresenceItem({ itemKey, present, enter, reducedMotion, onMount, onExitComplete, children }: {
+  itemKey: string; present: boolean; enter: boolean; reducedMotion: boolean; children: ReactNode;
   onMount(key: string): () => void; onExitComplete(key: string): void;
 }) {
   const [animateEntrance] = useState(enter);
   useLayoutEffect(() => onMount(itemKey), [itemKey, onMount]);
   return <div className="relative" inert={!present} aria-hidden={!present || undefined}>
-    <AnimatePresence initial={animateEntrance} mode={overlayExit ? "popLayout" : "sync"} onExitComplete={() => onExitComplete(itemKey)}>
+    <AnimatePresence initial={animateEntrance} mode="sync" onExitComplete={() => onExitComplete(itemKey)}>
       {present && <motion.div key={itemKey} className="px-4 pt-2"
         initial={reducedMotion ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -109,6 +109,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
     case "toolcall": return <ToolCall node={node} />;
     case "summary": return <Summary text={node.text} />;
+    case "compression-summary": return <CompressionSummary text={node.text} />;
     case "compression": return <CompressionMarker node={node} />;
     case "turn-metrics": return <TurnFooter inputId={node.inputId} metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} replyCreatedAt={node.replyCreatedAt} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>

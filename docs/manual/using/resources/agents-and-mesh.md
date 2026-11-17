@@ -18,6 +18,8 @@ An Agent remains active through its task, including waiting for tools or answers
 
 Manual compaction is separate work on the conversation's context. Its success or error notice concerns that compaction, not whether an earlier answer succeeded. Compaction does not revise the original history or establish that the underlying task is complete.
 
+The compaction event marks when the summary was created, not where retained original messages begin. A freshly loaded conversation starts its readable range with that summary followed by the retained originals; pagination can initially hide the summary along with other earlier content. An already open reading window keeps its older material after another compaction, so seeing originals there and a summary after reloading are both expected. Expanding the summary reveals its text rather than restoring the older messages. The independent history view preserves the actual sequence of records.
+
 A tool's attention notice calls you to its occurrence, not necessarily to a blocked task. A question remains unanswered until it is answered, skipped where allowed, or cancelled through its interaction. Viewing the session or dismissing an enlarged question view does not resolve it, even when the session reminder has disappeared.
 
 ### Sharing an excerpt is different from publishing an Agent

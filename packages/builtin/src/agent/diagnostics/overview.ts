@@ -1,4 +1,4 @@
-import { COMPRESSION_RESERVE } from "../context-budget.ts";
+import { compressionReserve } from "../context-budget.ts";
 import type { DiagnosticRequest } from "./history.ts";
 import { cacheUsage } from "./usage";
 
@@ -46,7 +46,7 @@ export function diagnosticOverview<R extends DiagnosticRequest>(requests: readon
     if (compressions.some(item => item.sequence > latest.sequence)) headroom = "compressed";
     else if (!window) headroom = "unknown";
     else {
-      const input = latest.completion!.usage!.input!, threshold = Math.max(window - COMPRESSION_RESERVE, 0);
+      const input = latest.completion!.usage!.input!, threshold = Math.max(window - compressionReserve(window), 0);
       headroom = { input, window, threshold, remaining: threshold - input };
     }
   }
