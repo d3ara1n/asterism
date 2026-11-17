@@ -11,8 +11,8 @@ import type { ToolCaller } from "@asterism-app/sdk/runtime";
 /** External tool policy; support relationships, resource links, and this policy are checked independently. */
 export type ToolPolicy = (name: string) => boolean;
 const denied = (): PreparedResult => ({ kind: "rejected", error: { code: "access_denied", message: "Resource access requires a link to the executing object." } });
-/** Inspection views: everyday guidance and inputs, guidance only, or input and result schemas. */
-export type InspectDetail = "default" | "prompt" | "schema";
+/** Inspection views: guidance with call inputs, or call inputs with result schemas. */
+export type InspectDetail = "default" | "schema";
 export interface InspectSelection { tools?: readonly string[]; detail?: InspectDetail }
 
 /** Per-request capability view: linked resources × tool support, filtered by external policy. Resource and tool catalogs are independent. */
@@ -55,8 +55,9 @@ export class AgentCapabilities {
     return chosen.map((implementation): Json => {
       const { name, description, guidelines, args, requiresInteraction, requiresNotice } = projectTool(implementation.tool);
       const tool: Record<string, Json> = { name, implementation: implementation.reference };
-      if (detail !== "schema") { tool.description = description; tool.guidelines = guidelines; }
-      if (detail !== "prompt") { tool.args = args; tool.target = schemaOf(implementation.targetSchema); }
+      if (detail === "default") { tool.description = description; tool.guidelines = guidelines; }
+      tool.args = args;
+      tool.target = schemaOf(implementation.targetSchema);
       // Scripts receive encoded data, which is the decoding input of the result contract.
       if (detail === "schema") tool.result = schemaOf(implementation.resultSchema, "input");
       if (requiresInteraction) tool.requiresInteraction = true;

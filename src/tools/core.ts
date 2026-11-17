@@ -14,10 +14,10 @@ export const ResourceInspectResult = defineData(coreId("resource-inspect"), z.st
   notice: z.string().optional(),
   tools: z.array(z.strictObject({
     name: z.string(),
-    description: z.string().optional().describe("Present unless the inspection requested schemas only."),
-    guidelines: z.array(z.string()).optional().describe("Present unless the inspection requested schemas only."),
-    args: jsonSchema.optional().describe("Present unless the inspection requested guidance only."),
-    target: jsonSchema.optional().describe("Present unless the inspection requested guidance only."),
+    description: z.string().optional().describe("Present in the default view."),
+    guidelines: z.array(z.string()).optional().describe("Present in the default view."),
+    args: jsonSchema.optional().describe("Present in the default and schema views."),
+    target: jsonSchema.optional().describe("Present in the default and schema views."),
     result: jsonSchema.optional().describe("Schema for encoded result data, present only in the schema view."),
     requiresInteraction: z.boolean().optional().describe("True when this tool requires a user interaction surface."),
     requiresNotice: z.boolean().optional().describe("True when starting this tool requests user attention once."),
@@ -85,16 +85,15 @@ export const ResourceInspect = defineTool({
   name: "resource_inspect",
   description: "Inspect a linked resource's live state and available tools.",
   guidelines: [
-    "Omitting tools returns all available tool definitions for the resource. tools: [] returns resource state without tool definitions.",
-    "A non-empty tools array selects exact tool names from a previously discovered catalog.",
-    'In the schema view, result describes encoded outcome.data, not the outcome envelope or its model-facing text.',
+    "Omitting tools returns all available tool definitions for the resource. A non-empty tools array selects exact tool names from a previously discovered catalog; tools: [] returns resource state without tool definitions.",
+    "The default view contains each tool's description, guidelines, and args and target schemas, which together define a call. The schema view replaces description and guidelines with the result schema; result describes encoded outcome.data, as received by resource_script code, not the outcome envelope or its model-facing text.",
     "Resource state is read at inspection time. The tool catalog is captured for the request; resource state changes do not by themselves change tool definitions.",
     "Previously returned definitions remain usable without another inspection. Links, configuration, and execution policy are captured at request boundaries.",
   ],
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
     tools: z.array(z.string().min(1)).optional().describe("Exact names of previously discovered tools to include. Omit to discover all available tools; [] returns state only."),
-    detail: z.enum(["default", "prompt", "schema"]).optional().describe("Inspection view. default (also when omitted) returns description, guidelines, args and target schemas; prompt returns description and guidelines; schema returns args, target and result data schemas."),
+    detail: z.enum(["default", "schema"]).optional().describe("Inspection view. default (also when omitted) returns description, guidelines, args and target schemas; schema returns args, target and result data schemas."),
   }).describe("Identify the linked resource, and optionally narrow which tool definitions and which view of each definition to return."),
 });
 
