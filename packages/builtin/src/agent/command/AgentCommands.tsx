@@ -2,14 +2,12 @@ import { useRef, useState, type ReactNode } from "react";
 import { Dialog } from "radix-ui";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useI18n } from "@asterism-app/sdk/renderer";
+import { commandMotion, commandSurfaceMotion } from "@asterism-app/ui/command-motion";
 import { cn } from "@asterism-app/ui/utils";
 import { commandMessages } from "../../messages/command";
 import { CommandPalette, firstEntry, type CommandHost, type CommandPage } from "./CommandPalette";
 import { useSavedTextCommands } from "./saved-text";
 import { useConversationCommands } from "./conversation";
-
-const panelTransition = { duration: 0.18, ease: [0.2, 0.8, 0.2, 1] } as const;
-const immediate = { duration: 0 } as const;
 
 /** Each Agent view owns its keyboard scope and a command surface that is modal only within that view. */
 export function AgentCommands({ children, composerHidden }: { children: ReactNode; composerHidden: boolean }) {
@@ -72,8 +70,8 @@ export function AgentCommands({ children, composerHidden }: { children: ReactNod
       <AnimatePresence>
         {open && <motion.div key="scrim" ref={scrim} aria-hidden
           className="nodrag nopan absolute inset-0 z-30 bg-background/40 backdrop-blur-[2px]"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          transition={reducedMotion ? immediate : panelTransition} />}
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: reducedMotion ? 0 : commandMotion.exit, ease: commandMotion.exitEase } }}
+          transition={{ duration: reducedMotion ? 0 : commandMotion.enter, ease: commandMotion.ease }} />}
         {open && <Dialog.Content key="panel" forceMount asChild aria-describedby={undefined}
           onKeyDown={event => event.stopPropagation()}
           onEscapeKeyDown={event => { event.preventDefault(); close(); }}
@@ -93,10 +91,7 @@ export function AgentCommands({ children, composerHidden }: { children: ReactNod
             <motion.div key={panel ?? "list"}
               className={cn("surface-floating pointer-events-auto absolute flex min-h-0 flex-col overflow-hidden",
                 panel ? "inset-3" : "inset-x-3 top-[12%] mx-auto max-h-[calc(100%-12%-0.75rem)] max-w-lg")}
-              initial={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: -6 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={reducedMotion ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: -4, transition: { duration: 0.12, ease: [0.4, 0, 1, 1] } }}
-              transition={reducedMotion ? immediate : panelTransition}>
+              {...commandSurfaceMotion(!!reducedMotion)}>
               {panel ? panels[panel]() : <>
                 <Dialog.Title className="sr-only">{i18n.text(commandMessages.title)}</Dialog.Title>
                 <CommandPalette page={page} depth={stack.length - 1} disabled={busy} search={search} onSearch={setSearch}

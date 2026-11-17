@@ -213,14 +213,14 @@ export function ConversationNavigation({ timeline, scroll, list, startMargin, on
           </div>
         </div>
       </PopoverAnchor>
-      <PopoverContent side="bottom" sideOffset={6} collisionPadding={12} aria-label={outlineLabel} onOpenAutoFocus={reveal}
+      <PopoverContent motionPreset="command" side="bottom" sideOffset={6} collisionPadding={12} aria-label={outlineLabel} onOpenAutoFocus={reveal}
         className="w-80 max-w-(--radix-popover-content-available-width) overflow-hidden p-0">
         <Command label={outlineLabel} value={highlighted} onValueChange={setHighlighted} loop
           filter={(_, query, keywords) => keywords?.join("\n").toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) ? 1 : 0}>
           {chapters.length > searchThreshold && <CommandInput ref={search} placeholder={i18n.text(conversationMessages.outlineSearch)} />}
           <ScrollArea className="min-h-0" viewportRef={outline} viewportProps={{ tabIndex: -1 }}
             viewportClassName="max-h-[min(24rem,calc(var(--radix-popover-content-available-height)-3rem))] scroll-py-1 overscroll-contain outline-hidden">
-            <CommandList label={outlineLabel} className="max-h-none overflow-visible p-1">
+            <CommandList animateHeight={false} label={outlineLabel} className="max-h-none overflow-visible p-1">
               <CommandEmpty>{i18n.text(commonMessages.noMatches)}</CommandEmpty>
               {chapters.map(chapter => {
                 const isCurrent = chapter.id === current.id;

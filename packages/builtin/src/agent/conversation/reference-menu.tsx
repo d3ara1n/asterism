@@ -1,3 +1,6 @@
+import { motion, useIsPresent, useReducedMotion } from "motion/react";
+import { commandMotionStyle, commandResizeTransition, commandSurfaceMotion, useCommandContentHeight } from "@asterism-app/ui/command-motion";
+import { useCommandPageMotion } from "@asterism-app/ui/command-page";
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import type { VirtualizerHandle } from "virtua";
@@ -27,6 +30,8 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
   onActiveChange(id: string | null): void;
 }) {
   const i18n = useI18n(), calls = useRendererCalls();
+  const present = useIsPresent();
+  const reducedMotion = useReducedMotion();
   const [skills, setSkills] = useState<readonly MenuSkill[] | null>(null);
   const [view, setView] = useState<MenuView>({ level: "root" });
   // The active row resets whenever the view or query changes the visible rows.
@@ -34,15 +39,21 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
   const [activeState, setActiveState] = useState({ key: rowsKey, index: 0 });
   const list = useRef<VirtualizerHandle>(null);
 
-  // The catalog can change between openings; read it each time the menu opens.
+  // Presence can reverse an exit before unmounting; each opening still starts a fresh catalog and root view.
   useEffect(() => {
+    if (!present) return;
+    setSkills(null);
+    setView({ level: "root" });
+    setActiveState(state => ({ ...state, index: 0 }));
     const controller = new AbortController();
     calls.invoke(SkillList, {}, { signal: controller.signal })
       .then(setSkills, () => { if (!controller.signal.aborted) setSkills([]); });
     return () => controller.abort();
-  }, [calls]);
+  }, [calls, present]);
 
   const rows = skills ? menuRows(view, query, skills) : [];
+  const body = useCommandPageMotion<HTMLDivElement>(view.level, view.level === "category" ? 1 : 0);
+  const { ref: contentRef, height } = useCommandContentHeight(rowsKey);
   const active = rows.length ? Math.min(activeState.key === rowsKey ? activeState.index : 0, rows.length - 1) : -1;
   const activeRow = active >= 0 ? rows[active] : undefined;
   const optionId = (index: number) => `${listId}-${index}`;
@@ -52,8 +63,8 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
   const activeId = active >= 0 ? optionId(active) : null;
   useEffect(() => {
     if (active >= 0) list.current?.scrollToIndex(active, { align: "nearest" });
-    onActiveChange(activeId);
-  }, [active, activeId, onActiveChange]);
+    onActiveChange(present ? activeId : null);
+  }, [active, activeId, onActiveChange, present]);
   useEffect(() => () => onActiveChange(null), [onActiveChange]);
 
   const activate = (row: MenuRow) => {
@@ -63,6 +74,7 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
 
   useImperativeHandle(ref, () => ({
     keyDown(event) {
+      if (!present) return false;
       // Swallow submission while the catalog loads so Enter does not send a half-typed `@query`.
       if (skills === null) return event.key === "Enter" || event.key === "Tab";
       const inCategory = view.level === "category";
@@ -84,45 +96,52 @@ export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: 
 
   const skillLabel = i18n.text(skillsMessages.category);
 
-  return <div className="surface-floating absolute inset-x-0 bottom-full z-50 mb-1 overflow-hidden"
+  return <motion.div className="surface-floating absolute inset-x-0 bottom-full z-50 mb-1 origin-bottom overflow-hidden"
+    {...commandSurfaceMotion(!!reducedMotion, "top")}
+    inert={!present} aria-hidden={!present || undefined}
+    style={{ ...commandMotionStyle, boxSizing: "content-box", height, transition: reducedMotion ? "none" : commandResizeTransition }}
     // Clicking the menu must not blur the editor, which would dismiss the suggestion.
     onMouseDown={event => event.preventDefault()}>
-    {view.level === "category" && <div className="flex h-8 items-center gap-1 border-b px-1">
-      <TooltipHint content={i18n.text(commonMessages.back)}><button type="button" tabIndex={-1} aria-label={i18n.text(commonMessages.back)}
-        className="inline-flex size-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-        onClick={() => setView({ level: "root" })}><ChevronLeft className="size-4" /></button></TooltipHint>
-      <BookOpen className="size-3.5 text-folder-violet" />
-      <span className="type-label">{skillLabel}</span>
-      {skills && <span className="type-caption ml-auto px-2 tabular-nums">{skills.length}</span>}
-    </div>}
-    {skills === null
-      ? <p className="type-caption p-2" role="status">{i18n.text(commonMessages.loading)}</p>
-      : !rows.length
-        ? <p className="type-caption p-2">{i18n.text(commonMessages.noMatches)}</p>
-        // Padding sits outside the virtualized viewport so its height equals the rows' total and never scrolls early.
-        : <div className="p-1"><VirtualList ref={list} data={rows} itemSize={rowHeight}
-          viewportProps={{ id: listId, role: "listbox", "aria-label": i18n.text(conversationMessages.referenceMenu) }}
-          style={{ height: Math.min(rows.length * rowHeight, maxListHeight) }}>
-          {(row, index) => <div key={row.kind === "category" ? row.category : row.skill.name}
-            id={optionId(index)} role="option" aria-selected={index === active}
-            style={{ height: rowHeight }}
-            className={cn("flex cursor-default items-center gap-2 rounded-sm px-2 text-sm select-none",
-              index === active && "bg-accent text-accent-foreground")}
-            onPointerMove={() => { if (index !== active) setActive(index); }}
-            onClick={() => activate(row)}>
-            <BookOpen className="size-4 shrink-0 text-folder-violet" />
-            {row.kind === "category"
-              ? <>
-                <span className="min-w-0 flex-1 truncate">{skillLabel}</span>
-                <span className="type-caption tabular-nums">{row.count}</span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </>
-              // The row stays one fixed height; the tooltip exposes the full description.
-              : <TooltipHint content={row.skill.description}><span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium leading-tight" translate="no">{row.skill.name}</span>
-                <span className="type-caption truncate leading-tight">{row.skill.description}</span>
-              </span></TooltipHint>}
-          </div>}
-        </VirtualList></div>}
-  </div>;
+    <div ref={contentRef} className="w-full" style={height === undefined ? undefined : { position: "absolute", bottom: 0 }}>
+      <div ref={body}>
+        {view.level === "category" && <div className="flex h-8 items-center gap-1 border-b px-1">
+          <TooltipHint content={i18n.text(commonMessages.back)}><button type="button" tabIndex={-1} aria-label={i18n.text(commonMessages.back)}
+            className="inline-flex size-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            onClick={() => setView({ level: "root" })}><ChevronLeft className="size-4" /></button></TooltipHint>
+          <BookOpen className="size-3.5 text-folder-violet" />
+          <span className="type-label">{skillLabel}</span>
+          {skills && <span className="type-caption ml-auto px-2 tabular-nums">{skills.length}</span>}
+        </div>}
+        {skills === null
+          ? <p className="type-caption p-2" role="status">{i18n.text(commonMessages.loading)}</p>
+          : !rows.length
+            ? <p className="type-caption p-2">{i18n.text(commonMessages.noMatches)}</p>
+            // Padding sits outside the virtualized viewport so its height equals the rows' total and never scrolls early.
+            : <div className="p-1"><VirtualList ref={list} data={rows} itemSize={rowHeight}
+              viewportProps={{ id: listId, role: "listbox", "aria-label": i18n.text(conversationMessages.referenceMenu) }}
+              style={{ height: Math.min(rows.length * rowHeight, maxListHeight) }}>
+              {(row, index) => <div key={row.kind === "category" ? row.category : row.skill.name}
+                id={optionId(index)} role="option" aria-selected={index === active}
+                style={{ height: rowHeight }}
+                className={cn("flex cursor-default items-center gap-2 rounded-sm px-2 text-sm select-none",
+                  index === active && "bg-accent text-accent-foreground")}
+                onPointerMove={() => { if (index !== active) setActive(index); }}
+                onClick={() => activate(row)}>
+                <BookOpen className="size-4 shrink-0 text-folder-violet" />
+                {row.kind === "category"
+                  ? <>
+                    <span className="min-w-0 flex-1 truncate">{skillLabel}</span>
+                    <span className="type-caption tabular-nums">{row.count}</span>
+                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                  </>
+                  // The row stays one fixed height; the tooltip exposes the full description.
+                  : <TooltipHint content={row.skill.description}><span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate font-medium leading-tight" translate="no">{row.skill.name}</span>
+                    <span className="type-caption truncate leading-tight">{row.skill.description}</span>
+                  </span></TooltipHint>}
+              </div>}
+            </VirtualList></div>}
+      </div>
+    </div>
+  </motion.div>;
 }

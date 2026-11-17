@@ -69,7 +69,7 @@ function ResourcePicker({ objects, selected, onSelect, label }: { objects: Workb
   return <div className="space-y-1"><p className="type-label">{label}</p><Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild>
     <Button variant="outline" className="w-full justify-start" role="combobox" aria-expanded={open} aria-label={label} disabled={!objects.length}>
       {selected && <span aria-hidden="true">{registry.resource(selected.kind).icon}</span>}<span className="min-w-0 flex-1 truncate text-left">{selected?.title ?? i18n.formatMessage(objectsMessages.noObjects)}</span><ChevronDown />
-    </Button></PopoverTrigger><PopoverContent align="start" className="w-72 p-0"><Command>
+    </Button></PopoverTrigger><PopoverContent motionPreset="command" align="start" className="w-72 p-0"><Command>
       <CommandInput placeholder={i18n.formatMessage(objectsMessages.searchObjects)} /><CommandList><CommandEmpty>{i18n.formatMessage(commonMessages.noMatches)}</CommandEmpty><CommandGroup>
         {objects.map(object => { const descriptor = registry.resource(object.kind); return <CommandItem key={object.id} value={object.id} keywords={[object.title, i18n.text(descriptor.label)]} onSelect={() => { onSelect(object.id); setOpen(false); }}>
           <span aria-hidden="true">{descriptor.icon}</span><span className="min-w-0 flex-1 truncate">{object.title}</span>{selected?.id === object.id && <Check />}

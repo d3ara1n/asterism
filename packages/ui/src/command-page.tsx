@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, type KeyboardEvent, type RefObject } from "rea
 import { ChevronLeft } from "lucide-react";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { commonMessages } from "./messages/common";
+import { commandMotion } from "./command-motion";
 import { Button } from "./ui/button";
 
 /** Return control naming the current nested page. Pointer presses keep focus in the search input. */
@@ -29,10 +30,11 @@ export function useCommandPageMotion<T extends HTMLElement>(page: string, depth:
     const from = previous.current;
     previous.current = { page, depth };
     if (from.page === page || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    ref.current?.animate([
-      { opacity: 0, transform: `translateX(${depth >= from.depth ? 10 : -10}px)` },
+    const animation = ref.current?.animate([
+      { opacity: 0, transform: `translateX(${(depth >= from.depth ? 1 : -1) * commandMotion.pageOffset}px)` },
       { opacity: 1, transform: "none" },
-    ], { duration: 160, easing: "cubic-bezier(0, 0, 0.2, 1)" });
+    ], { duration: commandMotion.page * 1000, easing: `cubic-bezier(${commandMotion.pageEase.join(",")})` });
+    return () => animation?.cancel();
   }, [page, depth]);
   return ref;
 }

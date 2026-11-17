@@ -34,6 +34,8 @@ Reuse maintained libraries for general controls, animation, layout, drag, and vi
 - `input-group`: `InputGroupAddon` click focuses `[data-slot=input-group-control]` instead of the first `input`, so textareas receive focus and hidden file inputs are skipped.
 - `button`, `badge`: `destructive` uses `text-destructive-foreground` without dark overrides, `link` uses `text-primary-text`; button adds the `selected` variant, badge adds `success` and `warning`.
 - `empty`, `field`, `item`: link hover uses `text-primary-text`.
+- `dialog`, `popover`: accept a `motionPreset="command"` opt-in for shared command-surface motion; dialog applies matching scrim timing.
+- `command`: `CommandDialog` opts into command-surface motion; `CommandList` animates content height by default and accepts `animateHeight={false}` when a parent owns sizing.
 - `dialog`, `command`, `spinner`: built-in labels come from `useI18n()` and `commonMessages`; `DialogContent` accepts `closeLabel`, and `CommandDialog` title and description default to localized messages.
 - `progress`: forwards `value` to the Radix root so the value attributes are exposed.
 - `scroll-area`: exposes viewport refs/props and content styling; supports both axes; uses an explicit Radix content element with caller-controlled display, a transparent track, and a semantic overlay thumb; normalizes Radix pointer coordinates for scaled canvases.

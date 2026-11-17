@@ -33,7 +33,7 @@ export function ConfigurationOptions({ label, options, selected, initialActive =
     onActiveChange?.(value);
   }} loop className="min-h-0 flex-1" aria-busy={disabled}>
     {searchPlaceholder && <CommandInput ref={input} placeholder={searchPlaceholder} />}
-    <CommandList ref={list} label={label} className={cn("min-h-0 overscroll-contain", fill && "max-h-none flex-1")}>
+    <CommandList animateHeight={false} ref={list} label={label} className={cn("min-h-0 overscroll-contain", fill && "max-h-none flex-1")}>
       <CommandEmpty>{i18n.text(commonMessages.noMatches)}</CommandEmpty>
       <CommandGroup>
         {options.map(option => <CommandItem key={option.value} value={option.value}

@@ -3,6 +3,7 @@ import { Command as CommandPrimitive } from "cmdk";
 import { SearchIcon } from "lucide-react";
 import * as React from "react";
 
+import { commandMotionStyle } from "../command-motion";
 import { commonMessages } from "../messages/common";
 import { cn } from "../utils";
 import { DialogHeader, DialogTitle, DialogDescription, DialogContent, Dialog } from "./dialog";
@@ -44,6 +45,7 @@ function CommandDialog({
         <DialogDescription>{description ?? i18n.text(commonMessages.commandSearch)}</DialogDescription>
       </DialogHeader>
       <DialogContent
+        motionPreset="command"
         className={cn("overflow-hidden p-0", className)}
         showCloseButton={showCloseButton}
       >
@@ -79,13 +81,17 @@ function CommandInput({
 
 function CommandList({
   className,
+  animateHeight = true,
+  style,
   ...props
-}: React.ComponentProps<typeof CommandPrimitive.List>) {
+}: React.ComponentProps<typeof CommandPrimitive.List> & { animateHeight?: boolean }) {
   return (
     <CommandPrimitive.List
       data-slot="command-list"
+      style={{ ...commandMotionStyle, ...style }}
       className={cn(
         "max-h-[300px] scroll-py-1 overflow-x-hidden overflow-y-auto",
+        animateHeight && "h-(--cmdk-list-height) transition-[height] duration-(--command-resize-duration) ease-(--command-ease) motion-reduce:transition-none",
         className
       )}
       {...props}

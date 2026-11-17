@@ -59,6 +59,12 @@ Feature code requests island operations through the shared interface. Layout cal
 
 Use Motion for presence, layout changes, and shared elements. Public motion tokens own timing and curves. Respect reduced motion in both Motion and CSS.
 
+Command and searchable-choice surfaces share one motion definition across application palettes, Agent palettes, command popovers, and the composer's reference suggestions. Presence uses a short fade with restrained scale and translation: 180 ms to open and 120 ms to close. Anchored surfaces enter from the trigger-facing edge, including when collision placement changes their side; unanchored palettes enter from above. Scrims fade with the same timing. Ordinary dialogs and menus retain their own motion.
+
+Command content resizes over 150 ms. One container owns sizing: ordinary cmdk lists follow their measured content height, while fill-layout lists and lists inside an independently scrolling or animated shell leave sizing to that owner. Virtualized suggestions retain explicit viewport heights and animate the surrounding shell rather than the virtualizer's measurements. Nested pages enter over 160 ms with a small horizontal offset that reverses on return; filtering does not replay page entry. Page transitions preserve the focus and state ownership of their control rather than remounting an editor or restarting its focus scope.
+
+Shared command tokens project into Radix CSS animations, Motion presence, and in-place page animations. Feature views choose their surface and layout, not separate durations or easing curves. Reduced motion removes command presence, resize, and navigation animation; exiting suggestions become inert immediately while their visual exit completes.
+
 Home/workbench transitions retain the same workbench backing container while content loads. Initial Home display does not play a navigation entrance.
 
 Streaming Markdown uses the renderer library’s own pacing. Virtual lists own item measurement and positioning; disclosure transitions animate content without adding a second layout or scroll compensation system.

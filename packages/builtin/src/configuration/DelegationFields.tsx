@@ -37,7 +37,7 @@ export function DelegationFields({ value, agents, onChange, modified, onRestore 
         <PopoverTrigger asChild><Button type="button" variant="outline" className="w-full justify-between" aria-expanded={open}>
           {i18n.formatMessage(agentsMessages.chooseDelegates)}<ChevronDown data-icon="inline-end" />
         </Button></PopoverTrigger>
-        <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0"><Command>
+        <PopoverContent motionPreset="command" align="start" className="w-[var(--radix-popover-trigger-width)] p-0"><Command>
           <CommandInput placeholder={i18n.formatMessage(agentsMessages.searchDelegates)} />
           <CommandList><CommandEmpty>{i18n.formatMessage(commonMessages.noMatches)}</CommandEmpty><CommandGroup>
             {agents.filter(agent => agent.enabled && agent.availableToAgents).map(agent => <CommandItem key={agent.id} value={agent.id} keywords={[agent.description]} onSelect={() => toggle(agent.id)}>

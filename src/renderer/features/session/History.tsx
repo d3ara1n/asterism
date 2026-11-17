@@ -252,7 +252,7 @@ function HistoryViewPicker({ entries, value, onChange }: { entries: HistoryEntry
       <span aria-hidden="true">{icon}</span><span className="min-w-0 flex-1 truncate text-left">{label}</span><ChevronDown />
     </Button></TooltipTrigger></PopoverTrigger>
     <TooltipContent className="max-w-[min(24rem,var(--radix-tooltip-content-available-width))] whitespace-pre-wrap break-words text-left">{label}</TooltipContent>
-    </Tooltip><PopoverContent align="start" className="w-80 p-0"><Command>
+    </Tooltip><PopoverContent motionPreset="command" align="start" className="w-80 p-0"><Command>
       <CommandInput placeholder={i18n.formatMessage(historyMessages.searchHistoryViews)} /><CommandList><CommandEmpty>{i18n.formatMessage(commonMessages.noMatches)}</CommandEmpty>
         <CommandGroup>{presets.map(item => <CommandItem key={item.kind} value={`view:${item.kind}`} keywords={[item.label]} onSelect={() => choose({ kind: item.kind })}>
           <span aria-hidden="true">{item.icon}</span><span className="flex-1">{item.label}</span>{value.kind === item.kind && <Check aria-hidden="true" />}

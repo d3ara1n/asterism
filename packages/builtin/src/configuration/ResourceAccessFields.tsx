@@ -48,7 +48,7 @@ export function ResourceAccessFields({ value, onChange, modified, onRestore }: {
             {i18n.formatMessage(agentsMessages.chooseResourceTypes)}<ChevronDown data-icon="inline-end" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+        <PopoverContent motionPreset="command" align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
           <Command>
             <CommandInput placeholder={i18n.formatMessage(agentsMessages.searchResourceTypes)} />
             <CommandList>

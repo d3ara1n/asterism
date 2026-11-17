@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogTitle } from "@asterism-app/ui/ui/dialog";
 import { cn } from "@asterism-app/ui/utils";
 import { filterCommandLabels } from "@asterism-app/ui/command-filter";
 import { CommandBack, isCommandBackKey, useCommandPageMotion } from "@asterism-app/ui/command-page";
-import { commandDetail, commandEmpty, commandHeading, commandListMotion, commandRow } from "@asterism-app/ui/command-styles";
+import { commandDetail, commandEmpty, commandHeading, commandRow } from "@asterism-app/ui/command-styles";
 import type { AppSnapshot } from "../../../shared/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { appMessages } from "../../messages/app";
@@ -169,7 +169,7 @@ function CommandContent({ session, ready, sessions, close }: {
             event.preventDefault(); back();
           }
         }} />
-      <CommandList className={`max-h-[calc(70dvh-7rem)] min-h-0 scroll-py-2 ${commandListMotion}`}>
+      <CommandList className="max-h-[calc(70dvh-7rem)] min-h-0 scroll-py-2">
         <div ref={body} className="p-1.5">
           <CommandEmpty className={commandEmpty}>{i18n.text(messages.empty)}</CommandEmpty>
           <SessionSection sessions={sessions} navigation={navigation} close={close} />
@@ -209,7 +209,7 @@ export function ApplicationCommands({ open, onOpenChange, session, ready, sessio
   }, [open, onOpenChange, returnFocus]);
 
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent showCloseButton={false} aria-describedby={undefined}
+    <DialogContent motionPreset="command" showCloseButton={false} aria-describedby={undefined}
       className="top-[15%] flex max-h-[70dvh] translate-y-0 flex-col gap-0 overflow-hidden bg-popover p-0 text-popover-foreground shadow-md sm:max-w-xl"
       onCloseAutoFocus={event => { event.preventDefault(); if (returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true }); }}>
       <DialogTitle className="sr-only">{i18n.text(messages.title)}</DialogTitle>

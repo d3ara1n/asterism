@@ -1,4 +1,5 @@
 import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { AnimatePresence } from "motion/react";
 import { Extension, type Editor, type Range } from "@tiptap/core";
 import { useEditor, EditorContent } from "@tiptap/react";
 import Document from "@tiptap/extension-document";
@@ -175,13 +176,15 @@ export function ComposerEditor({ ref, value, placeholder, label, disabled, onCha
 
   return <div className="relative w-full min-w-0">
     <EditorContent editor={editor} />
-    {suggestion && <ReferenceMenu ref={menu => { bridge.current.menu = menu; }} listId={listId} query={suggestion.query}
-      onActiveChange={setActiveId}
-      onSelect={skill => {
-        editor.chain().focus()
-          .insertContentAt(suggestion.range, [
-            { type: referenceNodeName, attrs: { label: skill.name, href: skillUrl(skill.name) } }, { type: "text", text: " " }])
-          .run();
-      }} />}
+    <AnimatePresence>
+      {suggestion && <ReferenceMenu key="references" ref={menu => { bridge.current.menu = menu; }} listId={listId} query={suggestion.query}
+        onActiveChange={setActiveId}
+        onSelect={skill => {
+          editor.chain().focus()
+            .insertContentAt(suggestion.range, [
+              { type: referenceNodeName, attrs: { label: skill.name, href: skillUrl(skill.name) } }, { type: "text", text: " " }])
+            .run();
+        }} />}
+    </AnimatePresence>
   </div>;
 }

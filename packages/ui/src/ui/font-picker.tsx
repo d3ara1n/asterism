@@ -87,7 +87,7 @@ export function FontPicker({ value, onValueChange, monospaceOnly = false, defaul
         <ChevronsUpDownIcon className="opacity-50" />
       </Button>
     </PopoverTrigger>
-    <PopoverContent align="end" className="w-72 p-0">
+    <PopoverContent motionPreset="command" align="end" className="w-72 p-0">
       <Command>
         <CommandInput placeholder={searchPlaceholder} />
         <CommandList>

@@ -153,6 +153,48 @@
 }
 /* The only two surfaces: content matches Card (solid + 1px border), overlays match Popover (solid + border + shadow).
    Use these utilities where Card components cannot be used, such as window parts, island bases, and animated elements. */
+/* Command surfaces share tokens projected by commandMotionStyle; ordinary dialogs and menus keep their own motion. */
+@utility command-surface-motion {
+  --command-enter-x: 0px;
+  --command-exit-x: 0px;
+  --command-enter-y: calc(-1 * var(--command-enter-offset));
+  --command-exit-y: calc(-1 * var(--command-exit-offset));
+  &[data-side="top"] {
+    --command-enter-y: var(--command-enter-offset);
+    --command-exit-y: var(--command-exit-offset);
+  }
+  &[data-side="left"] {
+    --command-enter-x: var(--command-enter-offset);
+    --command-exit-x: var(--command-exit-offset);
+    --command-enter-y: 0px;
+    --command-exit-y: 0px;
+  }
+  &[data-side="right"] {
+    --command-enter-x: calc(-1 * var(--command-enter-offset));
+    --command-exit-x: calc(-1 * var(--command-exit-offset));
+    --command-enter-y: 0px;
+    --command-exit-y: 0px;
+  }
+  &[data-state="open"] { animation: command-enter var(--command-enter-duration) var(--command-ease); }
+  &[data-state="closed"] { animation: command-exit var(--command-exit-duration) var(--command-exit-ease); }
+  @media (prefers-reduced-motion: reduce) { &[data-state] { animation: none; } }
+}
+@utility command-scrim-motion {
+  &[data-state="open"] { animation: command-fade-in var(--command-enter-duration) var(--command-ease); }
+  &[data-state="closed"] { animation: command-fade-out var(--command-exit-duration) var(--command-exit-ease); }
+  @media (prefers-reduced-motion: reduce) { &[data-state] { animation: none; } }
+}
+@keyframes command-enter {
+  from { opacity: 0; transform: translate(var(--command-enter-x), var(--command-enter-y)) scale(var(--command-enter-scale)); }
+  to { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+@keyframes command-exit {
+  from { opacity: 1; transform: translate(0, 0) scale(1); }
+  to { opacity: 0; transform: translate(var(--command-exit-x), var(--command-exit-y)) scale(var(--command-exit-scale)); }
+}
+@keyframes command-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes command-fade-out { from { opacity: 1; } to { opacity: 0; } }
+
 @utility surface { @apply rounded-lg border bg-card text-card-foreground; }
 @utility surface-floating { @apply rounded-lg border bg-popover text-popover-foreground shadow-md; }
 @layer base {

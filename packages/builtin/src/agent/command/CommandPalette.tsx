@@ -4,7 +4,7 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@asterism-app/ui/ui/command";
 import { filterCommandLabels } from "@asterism-app/ui/command-filter";
 import { CommandBack, isCommandBackKey, useCommandPageMotion } from "@asterism-app/ui/command-page";
-import { commandDetail, commandEmpty, commandHeading, commandListMotion, commandRow } from "@asterism-app/ui/command-styles";
+import { commandDetail, commandEmpty, commandHeading, commandRow } from "@asterism-app/ui/command-styles";
 import { cn } from "@asterism-app/ui/utils";
 import { commandMessages as messages } from "../../messages/command";
 
@@ -78,7 +78,7 @@ export function CommandPalette({ page, depth, disabled, search, onSearch, value,
       onKeyDown={event => {
         if (page.title && isCommandBackKey(event, search)) { event.preventDefault(); onBack(); }
       }} />
-    <CommandList className={`max-h-[min(24rem,calc(100cqh-9rem))] min-h-0 scroll-py-2 ${commandListMotion}`}>
+    <CommandList className="max-h-[min(24rem,calc(100cqh-9rem))] min-h-0 scroll-py-2">
       <div ref={body} className="p-1.5">
         <CommandEmpty className={commandEmpty}>{i18n.text(messages.empty)}</CommandEmpty>
         {/* The heading element carries the shared style; cmdk's wrapper keeps only its accessible labelling. */}

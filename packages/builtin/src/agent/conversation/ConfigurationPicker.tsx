@@ -12,6 +12,7 @@ import { modelSelectionMessages, thinkingLabels } from "@asterism-app/ui/message
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
+import { commandPageVariants, reducedCommandPageVariants, useCommandContentHeight } from "@asterism-app/ui/command-motion";
 import { Separator } from "@asterism-app/ui/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { formatCount } from "@asterism-app/ui/format-count";
@@ -22,29 +23,6 @@ import { ProviderOptions, ProviderModels } from "./ModelPicker";
 
 type Page = "agent" | "model" | "thinking";
 const FOLLOW = "__agent_default";
-
-/** forward(+1): the new page enters from the right and the old page exits to the left; back(-1): the reverse. */
-const SLIDE_X = 8;
-const PAGE_DURATION = 0.18;
-const PAGE_EASE = [0, 0, 0.2, 1] as const;
-
-const pageVariants = {
-  enter: (dir: number) => ({ opacity: 0, x: dir * SLIDE_X }),
-  center: {
-    opacity: 1, x: 0, pointerEvents: "auto",
-    transition: { type: "tween", duration: PAGE_DURATION, ease: PAGE_EASE },
-  },
-  exit: (dir: number) => ({
-    opacity: 0, x: dir * -SLIDE_X, pointerEvents: "none",
-    transition: { type: "tween", duration: 0.1, ease: [0.4, 0, 1, 1] },
-  } as const),
-} as const;
-
-const reducedPageVariants = {
-  enter: () => ({ opacity: 1, x: 0 }),
-  center: { opacity: 1, x: 0, pointerEvents: "auto", transition: { duration: 0 } },
-  exit: () => ({ opacity: 0, x: 0, pointerEvents: "none", transition: { duration: 0 } }),
-} as const;
 
 export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   selection: AgentSelection; disabled: boolean;
@@ -63,7 +41,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
   const rows = useRef<Partial<Record<Page, HTMLButtonElement | null>>>({});
   const direction = useRef<1 | -1>(1);
   const prefersReducedMotion = useReducedMotion();
-  const variants = prefersReducedMotion ? reducedPageVariants : pageVariants;
+  const variants = prefersReducedMotion ? reducedCommandPageVariants : commandPageVariants;
   const blocked = disabled || saving || !configuration;
   const selectedAgent = configuration?.agents.find(agent => agent.id === selection.agent && agent.enabled);
   const model = resolved?.model ?? null;
@@ -223,24 +201,15 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
 function ConfigurationPopover({ wide, pageKey, reducedMotion, children, ...props }: Omit<ComponentProps<typeof PopoverContent>, "className" | "style" | "asChild"> & {
   wide: boolean; pageKey: string; reducedMotion: boolean;
 }) {
-  const [content, setContent] = useState<HTMLDivElement | null>(null);
-  const [height, setHeight] = useState<number>();
-  useLayoutEffect(() => {
-    if (!content) { setHeight(undefined); return; }
-    const measure = () => setHeight(content.offsetHeight);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, [content, pageKey]);
+  const { ref: setContent, height } = useCommandContentHeight(pageKey);
 
-  return <PopoverContent {...props}
+  return <PopoverContent {...props} motionPreset="command"
     className="nodrag nopan relative max-h-(--radix-popover-content-available-height) max-w-[calc(100vw-1rem)] overflow-hidden p-0"
     style={{
       boxSizing: "content-box",
       width: wide ? "42rem" : "20rem",
       height,
-      transition: reducedMotion ? "none" : `width ${PAGE_DURATION}s cubic-bezier(${PAGE_EASE.join(",")}), height ${PAGE_DURATION}s cubic-bezier(${PAGE_EASE.join(",")})`,
+      transition: reducedMotion ? "none" : "width var(--command-resize-duration) var(--command-ease), height var(--command-resize-duration) var(--command-ease)",
     }}>
     <div ref={setContent} className="flex max-h-(--radix-popover-content-available-height) w-full flex-col"
       style={height === undefined ? undefined : { position: "absolute", bottom: 0 }}>

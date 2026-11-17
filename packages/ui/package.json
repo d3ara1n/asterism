@@ -36,7 +36,8 @@
     "./messages/model-selection": "./src/messages/model-selection.ts",
     "./ui/*": "./src/ui/*.tsx",
     "./messages/shell": "./src/messages/shell.ts",
-    "./messages/mcp": "./src/messages/mcp.ts"
+    "./messages/mcp": "./src/messages/mcp.ts",
+    "./command-motion": "./src/command-motion.ts"
   },
   "dependencies": {
     "@asterism-app/sdk": "*",
