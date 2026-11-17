@@ -4,6 +4,7 @@ import { useId, type ReactNode } from "react";
 import { TooltipHint } from "./tooltip-hint";
 import { toolsMessages } from "./messages/tools";
 import { JsonView } from "./json-view";
+import { formatCount } from "./format-count";
 import { ToolHeader } from "./tool-header";
 import { ToolScrollArea } from "./tool-scroll-area";
 import { Button } from "./ui/button";
@@ -22,7 +23,7 @@ export function ToolDetails({ label, stateKey = null, children }: { label: strin
 }
 /** The selected panel owns scrolling; its blocks render without independent vertical scroll areas. */
 export function ToolDetailsSwitcher({ items, stateKey = null }: {
-  items: readonly { value: string; label: string; render(): ReactNode }[]; stateKey?: string | null;
+  items: readonly { value: string; label: string; characterCount?: number; render(): ReactNode }[]; stateKey?: string | null;
 }) {
   const [value, setValue] = useRendererViewState(stateKey, "");
   const panelId = useId();
@@ -31,7 +32,9 @@ export function ToolDetailsSwitcher({ items, stateKey = null }: {
     <ToggleGroup type="single" size="sm" value={selected?.value ?? ""} onValueChange={setValue}
       aria-label={items.map(item => item.label).join(", ")}>
       {items.map(item => <ToggleGroupItem key={item.value} value={item.value} id={`${panelId}-${item.value}`}
-        aria-controls={panelId} aria-expanded={selected === item}>{item.label}</ToggleGroupItem>)}
+        aria-controls={panelId} aria-expanded={selected === item}>{item.label}
+        {item.characterCount !== undefined && <span className="text-muted-foreground tabular-nums">{formatCount(item.characterCount)}</span>}
+      </ToggleGroupItem>)}
     </ToggleGroup>
     {selected && <ToolScrollArea key={selected.value} className="max-h-80" viewportProps={{ id: panelId, role: "region", "aria-labelledby": `${panelId}-${selected.value}` }}>
       {selected.render()}

@@ -1,4 +1,5 @@
 import { useI18n, useRendererTools, useRendererConfig } from "@asterism-app/sdk/renderer";
+import { useMemo } from "react";
 import { TextCursorInput, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -16,6 +17,7 @@ import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { viewStateKeys } from "./view-state";
 import { blockShell } from "./block-shell";
 import { IconSwap } from "./IconSwap";
+import { characterCount } from "../../shared/tool-preview";
 
 /** The shell manages only lifecycle and expansion; the two content entry points fall back independently, and updates or persistence do not reset expansion. */
 export function ToolCall({ node }: { node: ToolCallNode }) {
@@ -31,8 +33,6 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const disclosure = useStreamingDisclosure(viewStateKeys.disclosure, stage,
     view?.streaming === true && view.body != null, preferences, view?.attention === true && view.body != null);
   const result = state.props?.result;
-  const outcome = "outcome" in node ? node.outcome : null;
-  const hasResultDetails = outcome && outcome.data !== null && outcome.model.every(part => part.kind === "text");
   const diagnostic = result && ("error" in result ? result.error.message : "message" in result ? result.message : null);
   const settled = result && result.kind !== "running" ? result.kind : null;
   // Request-level failure belongs to the outer shell and notice; the badge reports how local execution ended.
@@ -56,15 +56,32 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     <div className="space-y-3 [--code-font-size:var(--text-xs)]">
       {view && (view.body ?? (!filling && state.phase !== "incomplete" && <DefaultToolBody {...view.props} />))}
       {diagnostic && <p className={cn("type-caption whitespace-pre-wrap", "error" in result && "text-destructive")}>{diagnostic}</p>}
-      {view?.details !== false && (state.phase === "settled" || state.phase === "incomplete") && <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
-        { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails),
-          render: () => <JsonView scrollable={false} value={{ tool: node.name, arguments: node.arguments ?? node.argumentsText }} /> },
-        ...(hasResultDetails ? [{ value: "result", label: i18n.formatMessage(toolsMessages.toolResultDetails),
-          render: () => <JsonView scrollable={false} value={JSON.stringify(outcome.data, null, 2)} /> }] : []),
-        ...(outcome && outcome.model.length > 0 ? [{ value: "model", label: i18n.formatMessage(toolsMessages.toolModelDetails),
-          render: () => <div className="flex flex-col gap-2">{outcome.model.map((part, index) =>
-            <JsonView key={index} scrollable={false} value={part.kind === "text" ? part.text : part} />)}</div> }] : []),
-      ]} />}
+      {view?.details !== false && (state.phase === "settled" || state.phase === "incomplete") && <ToolCallDetails node={node} />}
     </div>
   </Disclosure>;
+}
+
+function ToolCallDetails({ node }: { node: ToolCallNode }) {
+  const i18n = useI18n();
+  const outcome = "outcome" in node ? node.outcome : null;
+  const { call, result, model, counts } = useMemo(() => {
+    const call = JSON.stringify({ tool: node.name, arguments: node.arguments ?? node.argumentsText }, null, 2);
+    const result = outcome && outcome.data !== null && outcome.model.every(part => part.kind === "text")
+      ? JSON.stringify(outcome.data, null, 2) : null;
+    const model = outcome?.model.map(part => part.kind === "text" ? part.text : JSON.stringify(part, null, 2)) ?? [];
+    return { call, result, model, counts: {
+      call: characterCount(call),
+      result: result === null ? 0 : characterCount(result),
+      model: model.reduce((sum, text) => sum + characterCount(text), 0),
+    } };
+  }, [node.name, node.arguments, node.argumentsText, outcome]);
+  return <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
+    { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails), characterCount: counts.call,
+      render: () => <JsonView scrollable={false} value={call} /> },
+    ...(result !== null ? [{ value: "result", label: i18n.formatMessage(toolsMessages.toolResultDetails), characterCount: counts.result,
+      render: () => <JsonView scrollable={false} value={result} /> }] : []),
+    ...(model.length > 0 ? [{ value: "model", label: i18n.formatMessage(toolsMessages.toolModelDetails), characterCount: counts.model,
+      render: () => <div className="flex flex-col gap-2">{model.map((text, index) =>
+        <JsonView key={index} scrollable={false} value={text} />)}</div> }] : []),
+  ]} />;
 }
