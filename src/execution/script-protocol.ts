@@ -1,4 +1,4 @@
-import type { Json } from "@asterism-app/sdk/contracts";
+import type { Json, ToolCompletion } from "@asterism-app/sdk/contracts";
 
 export interface ScriptInput {
   code: string;
@@ -10,7 +10,9 @@ export type ScriptRequest =
   | { type: "log"; value: Json }
   | { type: "done"; value: Json }
   | { type: "error"; message: string };
+/** Private bridge payload; script code receives only result, with text retained by object identity. */
 export interface ScriptReply {
   id: number;
-  value: Json;
+  result: ToolCompletion;
+  text: string;
 }

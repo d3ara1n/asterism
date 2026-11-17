@@ -1,11 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { defineData, defineImplementation, defineResource, defineTool, type Json, type ToolOutcome } from "@asterism-app/sdk/contracts";
+import { defineData, defineImplementation, defineResource, defineTool, type Json, type ToolModelOutput, type ToolOutcome } from "@asterism-app/sdk/contracts";
 import type { CallResult } from "@asterism-app/sdk/runtime";
 import { implement, toolCaller } from "../tools/testing.ts";
 import { ToolRegistry } from "../tools/registry.ts";
 import { ResourceRegistry } from "../resources/registry.ts";
 import { ResourceScriptResult } from "../tools/core.ts";
+import { executeResourceScript } from "./script.ts";
 import { AgentCapabilities } from "./capabilities.ts";
 import { executeCoreBatch, type PendingCall, type ToolObserver } from "./core.ts";
 
@@ -18,10 +19,11 @@ const contract = defineImplementation({
     argsSchema: z.strictObject({ value: z.number() }).describe("The step input.") }),
   targetSchema: z.null().describe("The resource."), effect: "write", execution: "sequential",
 });
-function capabilities(handler: (value: number, signal: AbortSignal) => Promise<CallResult<{ value: number }>>) {
+function capabilities(handler: (value: number, signal: AbortSignal) => Promise<CallResult<{ value: number }>>,
+  toModel: (data: { value: number }) => ToolModelOutput = data => `visible ${data.value}`) {
   const step = implement(contract, {
     call: (_state, _target, args, context) => handler(args.value, context.signal),
-    toModel: data => `visible ${data.value}`,
+    toModel,
   });
   return new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([step]), [resource], () => true, toolCaller);
 }
@@ -62,6 +64,74 @@ describe("Resource script execution", () => {
     expect(progress.some(value => ResourceScriptResult.schema.parse(value).calls.some(call => call.kind === "running"))).toBe(true);
   });
 
+  // The worker bridge selects public fields, rather than passing through current or future execution metadata.
+  it.each(['resources.get("r").step({ args: { value: 3 } })', 'tools.step({ value: 3 })'])(
+    "keeps private outcome fields out of returned and logged results from %s", async call => {
+      const outcome = {
+        kind: "succeeded" as const, data: { value: 3, model: "Domain data" },
+        model: [{ kind: "text" as const, text: "Selected view" }],
+        resource: { id: "r", kind: "test", title: "Captured" }, startedAt: 1, finishedAt: 2,
+        futureMetadata: "Private execution detail",
+      };
+      const result = await executeResourceScript({
+        id: "script", tools: ["step"], signal: new AbortController().signal, publish() {},
+        execute: async () => outcome,
+        code: `
+          const result = await ${call};
+          log(result);
+          log([typeof result.model, typeof result.resource, typeof result.futureMetadata]);
+          return result;
+        `,
+      });
+      const saved = ResourceScriptResult.schema.parse(result.data);
+      const expected = { kind: "succeeded", data: { value: 3, model: "Domain data" } };
+      expect(saved.value).toEqual(expected);
+      expect(saved.logs).toEqual([expected, ["undefined", "undefined", "undefined"]]);
+      expect(saved.calls[0]).toMatchObject({ resource: outcome.resource, startedAt: 1, finishedAt: 2 });
+    },
+  );
+
+  // Data mutations and fabricated model fields must not substitute for the projection fixed at completion.
+  it("reuses the completed projection synchronously without reexecuting or reprojecting", async () => {
+    const execute = vi.fn(async (value: number) => ({ kind: "succeeded" as const, data: { value } }));
+    const project = vi.fn((data: { value: number }) => `Captured ${data.value}`);
+    const result = await script(`
+      const result = await resources.get("r").step({ args: { value: 8 } });
+      const first = text(result);
+      result.data.value = 99;
+      result.model = [{ kind: "text", text: "Replacement" }];
+      const retained = [result];
+      return { first, second: text(retained[0]), value: result.data.value };
+    `, capabilities(execute, project));
+    expect(modelText(result)).toBe('{"first":"Captured 8","second":"Captured 8","value":99}');
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(project).toHaveBeenCalledExactlyOnceWith({ value: 8 });
+  });
+
+  // Structural similarity cannot recover an invocation's private projection, even if a copy has a model field.
+  it("rejects copies and ordinary values while retaining the original result association", async () => {
+    const result = await script(`
+      const original = await resources.get("r").step({ args: { value: 5 } });
+      const values = [{ ...original }, JSON.parse(JSON.stringify(original)), original.data,
+        { kind: "succeeded", data: {}, model: [{ kind: "text", text: "Invented" }] }, null, "plain"];
+      const rejected = values.map(value => {
+        try { text(value); return false; } catch (error) { return error instanceof TypeError; }
+      });
+      return { rejected, original: text(original) };
+    `);
+    expect(modelText(result)).toBe('{"rejected":[true,true,true,true,true,true],"original":"visible 5"}');
+  });
+
+  // Empty projections remain valid associated values; they are not mistaken for a missing result.
+  it("accepts an empty saved text projection", async () => {
+    const result = await script(`
+      const result = await resources.get("r").step({ args: { value: 1 } });
+      return text(result);
+    `, capabilities(async value => ({ kind: "succeeded", data: { value } }), () => ""));
+    expect(result.kind).toBe("succeeded");
+    expect(ResourceScriptResult.schema.parse(result.data).value).toBe("");
+  });
+
   it("publishes logs before completion and captures values before later mutations", async () => {
     const started = deferred<void>(), release = deferred<void>();
     const progress: Json[] = [];
@@ -94,7 +164,6 @@ describe("Resource script execution", () => {
   it.each([
     ["JavaScript exceptions", 'throw new Error("Stopped");'],
     ["return serialization failures", "return 1n;"],
-    ["log serialization failures", "log(1n);"],
   ])("retains earlier logs after %s", async (_name, ending) => {
     const result = await script(`log("Recorded"); ${ending}`);
     expect(result).toMatchObject({ kind: "failed", error: { code: "script_failed" } });
@@ -104,20 +173,56 @@ describe("Resource script execution", () => {
     expect(modelText(result)).toMatch(/^failed \(script_failed\): .+\nLogs:\nRecorded$/);
   });
 
-  it.each([
-    ["BigInt", "1n"],
-    ["undefined", "undefined"],
-    ["cyclic objects", "(() => { const value = {}; value.self = value; return value; })()"],
-  ])("lets scripts catch log serialization errors for %s", async (_name, expression) => {
+  // Missing fields must remain observable, including inside objects where JSON would otherwise omit them.
+  it("logs missing fields and nested undefined values without losing null or stopping result consumption", async () => {
     const result = await script(`
-      let caught = false;
-      try { log(${expression}); } catch (error) { caught = error instanceof TypeError; }
-      log("Recovered");
-      return caught;
+      const result = await resources.get("r").step({ args: { value: 2 } });
+      log(result.data.missing);
+      log({ missing: result.data?.missing?.name, nested: { value: undefined }, values: [undefined, null, 0] });
+      return text(result);
     `);
     expect(result.kind).toBe("succeeded");
-    expect(ResourceScriptResult.schema.parse(result.data).logs).toEqual(["Recovered"]);
-    expect(modelText(result)).toBe("Logs:\nRecovered\n\nReturn value:\ntrue");
+    expect(ResourceScriptResult.schema.parse(result.data)).toMatchObject({
+      logs: ["[undefined]", { missing: "[undefined]", nested: { value: "[undefined]" }, values: ["[undefined]", null, 0] }],
+      value: "visible 2",
+    });
+    expect(modelText(result)).toBe([
+      "Logs:", "[undefined]",
+      '{"missing":"[undefined]","nested":{"value":"[undefined]"},"values":["[undefined]",null,0]}',
+      "", "Return value:", "visible 2",
+    ].join("\n"));
+  });
+
+  it.each([
+    ["BigInt", "1n"],
+    ["cyclic objects", "(() => { const value = {}; value.self = value; return value; })()"],
+    ["unsupported root values", "() => {}"],
+    ["throwing serialization hooks", '({ toJSON() { throw new Error("Unavailable"); } })'],
+  ])("records a diagnostic and continues after logging %s", async (_name, expression) => {
+    const result = await script(`
+      log("Before");
+      log(${expression});
+      log("After");
+      return 7;
+    `);
+    expect(result.kind).toBe("succeeded");
+    const saved = ResourceScriptResult.schema.parse(result.data);
+    expect(saved.logs).toEqual(["Before", "[Log serialization failed: value is not JSON-serializable.]", "After"]);
+    expect(saved.value).toBe(7);
+  });
+
+  // Parameter evaluation happens outside the logger; a broken property access must still expose a script defect.
+  it("preserves argument evaluation errors before log is entered", async () => {
+    const result = await script(`
+      log("Before");
+      const data = {};
+      log(data.missing.name);
+      return "Not reached";
+    `);
+    expect(result).toMatchObject({ kind: "failed", error: { code: "script_failed" } });
+    const saved = ResourceScriptResult.schema.parse(result.data);
+    expect(saved.logs).toEqual(["Before"]);
+    expect(saved).not.toHaveProperty("value");
   });
 
   it("retains logs alongside the existing null result for an omitted return", async () => {
@@ -132,10 +237,25 @@ describe("Resource script execution", () => {
       const denied = await resources.get("unlinked").step({ args: { value: 1 } });
       const invalid = await resources.get("r").step({ args: { value: "bad" } });
       const failed = await resources.get("r").step({ args: { value: 1 } });
-      return [denied.kind, denied.error.code, invalid.kind, failed.kind, failed.error.code];
+      return { branches: [denied.kind, denied.error.code, invalid.kind], failed, text: text(failed) };
     `, cap);
-    expect(modelText(result)).toBe(JSON.stringify(["rejected", "access_denied", "rejected", "failed", "unavailable"]));
+    expect(ResourceScriptResult.schema.parse(result.data).value).toEqual({
+      branches: ["rejected", "access_denied", "rejected"],
+      failed: { kind: "failed", data: null, error: { code: "unavailable", message: "Unavailable." } },
+      text: "failed (unavailable): Unavailable.",
+    });
     expect(ResourceScriptResult.schema.parse(result.data).calls.map(call => call.kind)).toEqual(["rejected", "rejected", "failed"]);
+  });
+
+  it("preserves a partial result's message and data alongside its saved text", async () => {
+    const result = await script(`
+      const result = await resources.get("r").step({ args: { value: 6 } });
+      return { result, text: text(result) };
+    `, capabilities(async value => ({ kind: "partial", data: { value }, message: "Incomplete work." })));
+    expect(ResourceScriptResult.schema.parse(result.data).value).toEqual({
+      result: { kind: "partial", data: { value: 6 }, message: "Incomplete work." },
+      text: "partial: Incomplete work.\nvisible 6",
+    });
   });
 
   it("preserves completed effects and their summaries when later script code throws", async () => {

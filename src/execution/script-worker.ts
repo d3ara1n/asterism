@@ -94,12 +94,26 @@ try {
     const log = globalThis.__log;
     delete globalThis.__log;
     const parse = JSON.parse, stringify = JSON.stringify;
+    const logFailure = stringify("[Log serialization failed: value is not JSON-serializable.]");
     globalThis.log = value => {
-      const serialized = stringify(value);
-      if (serialized === undefined) throw new TypeError("Log values must be JSON-serializable.");
-      log(serialized);
+      let serialized;
+      try {
+        serialized = stringify(value, (_key, entry) => entry === undefined ? "[undefined]" : entry);
+      } catch {
+        // A diagnostic replaces unrepresentable log values; script return serialization remains strict.
+        serialized = undefined;
+      }
+      log(serialized ?? logFailure);
     };
-    const call = async (name, args) => parse(await invoke(name, stringify(args)));
+    // Completion data is public; the saved model text is associated by object identity only.
+    const projections = new WeakMap();
+    const getText = projections.get.bind(projections);
+    const setText = projections.set.bind(projections);
+    const call = async (name, args) => {
+      const reply = parse(await invoke(name, stringify(args)));
+      setText(reply.result, reply.text);
+      return reply.result;
+    };
     const tools = Object.create(null);
     for (const name of ${JSON.stringify(input.tools)}) {
       tools[name] = (args = {}) => call(name, args);
@@ -114,8 +128,11 @@ try {
         },
       }),
     };
-    globalThis.text = result => result.model
-      .filter(part => part.kind === "text").map(part => part.text).join("\\n");
+    globalThis.text = result => {
+      const projected = getText(result);
+      if (projected === undefined) throw new TypeError("text() requires an original tool-call result from this script.");
+      return projected;
+    };
     return async run => stringify((await run()) ?? null);
   })()`, "resource-script-bootstrap.js");
   wrap = vm.unwrapResult(bootstrap);
@@ -130,7 +147,7 @@ try {
     const promise = pending.get(reply.id);
     if (!promise) return;
     pending.delete(reply.id);
-    const value = vm.newString(JSON.stringify(reply.value));
+    const value = vm.newString(JSON.stringify({ result: reply.result, text: reply.text }));
     promise.resolve(value);
     value.dispose();
     promise.dispose();

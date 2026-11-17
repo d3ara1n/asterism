@@ -1,5 +1,5 @@
 import { Worker } from "node:worker_threads";
-import { defaultToolModel, type Json, type ToolOutcome } from "@asterism-app/sdk/contracts";
+import { defaultToolModel, modelInputText, type Json, type ToolCompletion, type ToolOutcome } from "@asterism-app/sdk/contracts";
 import type { CallResult } from "../tools/contract.ts";
 import { ResourceCall, ResourceScriptResult, type ScriptCall } from "../tools/core.ts";
 import type { PendingCall, ToolObserver } from "./core.ts";
@@ -34,6 +34,13 @@ function settledSummary(outcome: ToolOutcome): Partial<ScriptCall> {
     error: "error" in outcome ? outcome.error : undefined,
     message: "message" in outcome ? outcome.message : undefined,
   });
+}
+
+/** The script API selects completion fields explicitly; new execution metadata stays private by default. */
+function scriptResult(outcome: ToolOutcome): ToolCompletion {
+  if ("error" in outcome) return { kind: outcome.kind, data: outcome.data, error: outcome.error };
+  if ("message" in outcome) return { kind: outcome.kind, data: outcome.data, message: outcome.message };
+  return { kind: outcome.kind, data: outcome.data };
 }
 
 /** The script owns its VM and outstanding calls; resources operated on retain their own lifetime. */
@@ -95,7 +102,10 @@ export async function executeResourceScript(options: ScriptOptions): Promise<Cal
             });
             Object.assign(summary, settledSummary(outcome));
             publish();
-            if (!finished) worker!.postMessage({ id: message.id, value: outcome } satisfies ScriptReply);
+            if (!finished) worker!.postMessage({
+              id: message.id, result: scriptResult(outcome),
+              text: modelInputText(outcome.model),
+            } satisfies ScriptReply);
           })().catch(error => {
             const diagnostic = { code: "script_dispatch_failed", message: error instanceof Error ? error.message : String(error) };
             if (summary.kind === "queued" || summary.kind === "running")
