@@ -8,6 +8,7 @@ import { contentSchemaSql } from "./content-store.ts";
 import { templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 import { mcpSchemaSql } from "../mcp/storage.ts";
+import { tutorialTemplate } from "./tutorial-template.ts";
 
 export const workspaceDatabaseVersion = 34;
 
@@ -68,6 +69,9 @@ function initializeWorkspace(db: DatabaseSync): void {
       ${templateSchemaSql}
       ${contentSchemaSql}`);
   db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
+  // Seed an ordinary user template only when the workspace is created, never on reopen or upgrade.
+  db.prepare("INSERT INTO templates (id, title, created_at, data_json, folder_id) VALUES (?, ?, ?, ?, NULL)")
+    .run(randomUUID(), tutorialTemplate.title, new Date().toISOString(), JSON.stringify(tutorialTemplate.data));
 }
 
 /** Restorable ordinary island arrangement per session, validated as a whole when written and read. */

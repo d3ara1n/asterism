@@ -107,11 +107,14 @@ it("keeps completion independent of history selection, new records, and archival
 it("upgrades the preceding workspace format without rewriting existing history", () => {
   const { root, db, tree } = setup(), sessionId = tree.create("Existing");
   const original = tree.appendToTimeline(sessionId, event("example/final", { text: "Saved response" }));
+  // Represent an existing workspace created before the bundled template was introduced.
+  db.exec("DELETE FROM templates;");
   revertSleeping(db); revertIslands(db); revertFolders(db);
   db.exec("DROP INDEX session_nodes_pending; PRAGMA user_version = 29;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
   const reopened = openDatabase(root); databases.push(reopened);
+  expect(reopened.prepare("SELECT id FROM templates").all()).toEqual([]);
   const next = new SessionTree(reopened);
   expect(next.nodes(sessionId)).toEqual([original]);
   const pending = next.appendToTimeline(sessionId, { ...event("example/operation", { input: "task", output: null }), pending: true });

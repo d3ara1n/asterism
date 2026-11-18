@@ -74,6 +74,35 @@ async function start(app: ApplicationService, templateId: string) {
   return reply.sessionId;
 }
 
+it("adds an ordinary Tutorial template once and keeps the started session after template deletion", async () => {
+  const first = open();
+  const catalog = first.app.execute({ type: "workspace.read" }).templates;
+  expect(catalog).toMatchObject([{ title: "Tutorial", folderId: null }]);
+  expect(first.app.sessions.tree.list()).toEqual([]);
+  const templateId = catalog[0]!.id;
+  await close(first.app);
+
+  const second = open(first.root);
+  expect(second.app.execute({ type: "workspace.read" }).templates.map(template => template.id)).toEqual([templateId]);
+  const sessionId = await start(second.app, templateId);
+  const { objects, links, islands } = second.app.sessions.current(sessionId).workbench;
+  const agent = objects.find(object => object.kind === "asterism.builtin/agent")!;
+  const readMe = objects.find(object => object.title === "Tour Guide (Read Me)")!;
+  const instructions = objects.find(object => object.title === "Tour Instructions (Agent Only)")!;
+  expect(links).toEqual([{ receiverId: agent.id, resourceId: instructions.id }]);
+  expect(islands.map(island => island.view)).toEqual([
+    { kind: "object", objectId: readMe.id }, { kind: "object", objectId: agent.id },
+  ]);
+  expect(agent.presentation.data).toMatchObject({ selection: { model: null }, executionState: "empty" });
+  expect(instructions.presentation.data).toMatchObject({ text: expect.stringContaining("Release Brief") });
+  await second.app.sessions.execute({ type: "template.delete", templateId });
+  await close(second.app);
+
+  const third = open(first.root);
+  expect(third.app.execute({ type: "workspace.read" }).templates).toEqual([]);
+  expect(third.app.sessions.current(sessionId).workbench.links).toEqual(links);
+});
+
 // Creation records omit note bodies and agent selections; copying only creation data loses values, while copying sessions includes history.
 // Templates use current object values at save time, with independent new identities and links while preserving selected subgraphs and layout.
 it("saves declared reusable data and selected relationships; reuse excludes undeclared current data and history", async () => {
@@ -243,7 +272,7 @@ it("replaces a template snapshot while preserving its metadata, same-name neighb
   ] });
   await first.app.sessions.execute({ type: "template.replace", templateId, sessionId: replacementId, objectIds: [a.id, b.id] });
   const after = first.app.execute({ type: "workspace.read" }).templates;
-  expect(after).toHaveLength(2);
+  expect(after).toHaveLength(before.length);
   expect(after.find(template => template.id === templateId)).toEqual({ ...original, objects: [
     { id: a.id, kind: a.kind, title: "New A" }, { id: b.id, kind: b.kind, title: "New B" },
   ] });
@@ -332,13 +361,14 @@ it("rolls back both snapshot and attachment roots when replacement content canno
 
 it("rejects replacement of a deleted template without creating another template", async () => {
   const { app, plugin } = open();
+  const initial = app.execute({ type: "workspace.read" }).templates;
   const sourceId = app.sessions.tree.create("Source");
   const item = await plugin.session(sourceId).create(Create, { title: "Item", seed: "seed" });
   const templateId = await save(app, sourceId, [item]);
   await app.sessions.execute({ type: "template.delete", templateId });
   await expect(app.sessions.execute({ type: "template.replace", templateId, sessionId: sourceId, objectIds: [item.id] }))
     .rejects.toMatchObject({ code: "not_found" });
-  expect(app.execute({ type: "workspace.read" }).templates).toEqual([]);
+  expect(app.execute({ type: "workspace.read" }).templates).toEqual(initial);
 });
 
 it("omits generated titles from storage and previews and generates each instance title only when starting", async () => {
@@ -397,6 +427,7 @@ it("rejects a template with no saved title when its resource withdraws title gen
 // Templates retain files outside source sessions; record/current-data roots alone would allow startup reclamation to delete content after source-session deletion.
 it("templates retain files after source-session deletion and restart and can be independently deleted once new sessions take over content roots", async () => {
   const first = open();
+  const initial = first.app.execute({ type: "workspace.read" }).templates;
   const sourceId = first.app.sessions.tree.create("Source");
   const source = await first.plugin.session(sourceId).create(Create, { title: "File", seed: "", file: null });
   const object = first.plugin.object(sourceId, Item, source.id);
@@ -422,7 +453,7 @@ it("templates retain files after source-session deletion and restart and can be 
   const third = open(first.root);
   const reader = third.plugin.object(sessionId, Item, copied[0]!.id);
   expect(new TextDecoder().decode(await reader.content.read(file))).toBe("retained bytes");
-  expect(third.app.execute({ type: "workspace.read" }).templates).toEqual([]);
+  expect(third.app.execute({ type: "workspace.read" }).templates).toEqual(initial);
 });
 
 // Host rename and template identity replacement must leave plugin fields intact. Null must not become an empty object;
@@ -474,6 +505,7 @@ it.each([
 // Unsupported resources must be excluded from the picker and rejected at the write boundary, including mixed selections.
 it("requires explicit template support before saving", async () => {
   const { app, plugin } = open(undefined, true, null);
+  const initial = app.execute({ type: "workspace.read" }).templates;
   const sessionId = app.sessions.tree.create("Source");
   const session = plugin.session(sessionId);
   const item = await session.create(Create, { title: "External instance", seed: "external-id", file: null });
@@ -482,7 +514,7 @@ it("requires explicit template support before saving", async () => {
     kind: "template.source", objects: [{ id: note.id, kind: note.kind, title: note.title }],
   });
   await expect(save(app, sessionId, [note, item])).rejects.toThrow("does not support templates");
-  expect(app.execute({ type: "workspace.read" }).templates).toEqual([]);
+  expect(app.execute({ type: "workspace.read" }).templates).toEqual(initial);
 });
 
 // New policy and schema declarations govern instantiation; saved entries cannot bypass withdrawal or quietly disappear.
@@ -491,12 +523,13 @@ it.each(["withdrawn", "removed-data", "invalid-data"] as const)("rejects %s befo
   const sessionId = first.app.sessions.tree.create("Source");
   const item = await first.plugin.session(sessionId).create(Create, { title: "Source", seed: "seed", file: null });
   const templateId = await save(first.app, sessionId, [item]);
+  const before = first.app.execute({ type: "workspace.read" }).templates.map(item => item.id);
   await close(first.app);
   const template = mode === "withdrawn" ? null : { current: mode === "removed-data" ? [] : [ns.data("state", z.number())] };
   const second = open(first.root, true, template);
   await expect(start(second.app, templateId)).rejects.toThrow(mode === "withdrawn" ? "does not support templates" : "invalid");
   expect(second.app.sessions.tree.list().map(session => session.id)).toEqual([sessionId]);
-  expect(second.app.execute({ type: "workspace.read" }).templates.map(item => item.id)).toEqual([templateId]);
+  expect(second.app.execute({ type: "workspace.read" }).templates.map(item => item.id)).toEqual(before);
 });
 
 // Plugin updates may withdraw link reception; link failures after object writes must still roll back the entire template creation.
@@ -508,20 +541,22 @@ it("link failures leave no partial sessions and templates remain readable", asyn
   const b = await session.create(Create, { title: "B", seed: "", file: null });
   session.link(a, b);
   const templateId = await save(first.app, sessionId, [a, b]);
+  const before = first.app.execute({ type: "workspace.read" }).templates;
   await close(first.app);
   const second = open(first.root, false);
   await expect(start(second.app, templateId)).rejects.toThrow("receiver that supports links");
   expect(second.app.sessions.tree.list().map(session => session.id)).toEqual([sessionId]);
-  expect(second.app.execute({ type: "workspace.read" }).templates.map(template => template.id)).toEqual([templateId]);
+  expect(second.app.execute({ type: "workspace.read" }).templates).toEqual(before);
 });
 
 // Save against the current path at processing time; removed objects cannot reappear in templates from history or leftover session_data.
 it("rejects saving selected objects that have left the current path", async () => {
   const { app, plugin } = open();
+  const initial = app.execute({ type: "workspace.read" }).templates;
   const sessionId = app.sessions.tree.create("Source");
   const session = plugin.session(sessionId);
   const object = await session.create(Create, { title: "Gone", seed: "old data", file: null });
   session.remove(object);
   await expect(save(app, sessionId, [object])).rejects.toThrow("no longer present");
-  expect(app.execute({ type: "workspace.read" }).templates).toEqual([]);
+  expect(app.execute({ type: "workspace.read" }).templates).toEqual(initial);
 });
