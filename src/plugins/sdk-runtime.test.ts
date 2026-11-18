@@ -376,6 +376,26 @@ describe("Host implementation of the workbench SDK", () => {
     subscription.close();
   });
 
+  it("keeps an open instance visible without a session watch or timeline occupancy", async () => {
+    const c = counter();
+    const { service, sessionId } = open([c.plugin]);
+    const context = c.context();
+    const ref = context.object(sessionId, Counter, await create(service, sessionId)).ref;
+    const read = () => context.ipc.calls.invoke(ReadResourceActivities, {}, {});
+    await service.sessions.execute({ type: "watch", sessionId });
+    const close = context.execution.openInstanceActivity(ref);
+    await service.sessions.execute({ type: "unwatch", sessionId });
+    expect(await read()).toEqual([{ id: expect.any(String), kind: "instance", resource: ref, title: "Counter" }]);
+    expect(service.sessions.current(sessionId).progress.busyObjectIds).toEqual([]);
+
+    close();
+    const closeReopened = context.execution.openInstanceActivity(ref);
+    close(); // An old close callback must not remove a reopened instance.
+    expect(await read()).toHaveLength(1);
+    closeReopened();
+    expect(await read()).toEqual([]);
+  });
+
   it("releases failed activities and keeps cancelled work visible until cleanup settles", async () => {
     const c = counter();
     const { service, sessionId } = open([c.plugin]);

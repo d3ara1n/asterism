@@ -29,6 +29,8 @@ export interface ExecutionServices {
    */
   withActivity<T>(resource: ResourceRef, work: (context: { signal: AbortSignal; progress(value: number | null): void }) => Promise<T>,
     options?: { signal?: AbortSignal }): Promise<T>;
+  /** Publish an open instance of an owned resource. Release the returned marker when the instance ends or is disposed. */
+  openInstanceActivity(resource: ResourceRef): () => void;
   /** Capture the owner's environment and hold resources through one request and tool batch. Callers own any timeline busy scope. */
   run(request: ResourceModelRequest, options?: ExecutionContentOptions): Promise<ModelRunResult>;
   /** Optional workbench output sink; the caller decides which execution events to send to it. */

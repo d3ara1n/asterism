@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import { descendantsOf } from "../process-tree.ts";
+import type { TerminalSessions } from "@asterism-app/sdk/runtime";
 import type { ShellSettings } from "@asterism-app/sdk/contracts";
 import { resolveShell } from "../profiles.ts";
 import { prepareLaunch, type IntegrationMode } from "./integration.ts";
@@ -29,6 +30,7 @@ interface InstanceHooks {
   output(data: string): void;
   resize(cols: number, rows: number): void;
   changed(status: TerminalStatus): void;
+  aliveChanged(alive: boolean): void;
 }
 
 /** One shell process and its backend screen; retains the final screen for reading after exit until replaced or closed. */
@@ -139,7 +141,9 @@ export class ShellInstance {
         clearTimeout(this.watchdog);
         this.flush();
         void this.chain.then(() => { this.setState("exited", { exitCode }); resolveExit(); });
+        this.hooks.aliveChanged(false);
       });
+      this.hooks.aliveChanged(true);
       if (launch.mode === "none") { this.ready = true; this.setState("unknown"); return; }
       this.watchdog = setTimeout(() => {
         if (this.statusValue.integration || !this.alive) return;
@@ -304,8 +308,9 @@ export class SharedTerminal {
   private readonly viewers = new Set<ViewerState>();
   private size = { cols: DEFAULT_COLS, rows: DEFAULT_ROWS };
   private closed = false;
+  private liveShells = 0;
   constructor(private readonly config: TerminalConfig, private readonly settings: () => ShellSettings, private readonly root: string,
-    private readonly events: { failed(error: unknown): void; log(message: string, error: unknown): void }, private readonly released: () => void = () => {}) {}
+    private readonly events: Parameters<TerminalSessions["create"]>[1], private readonly released: () => void = () => {}) {}
   get status(): TerminalStatus { return this.instance?.status ?? { ...inactiveStatus }; }
   get started(): boolean { return this.instance !== null; }
 
@@ -326,6 +331,15 @@ export class SharedTerminal {
   }
   private hooks(current: () => ShellInstance): InstanceHooks {
     return {
+      aliveChanged: alive => {
+        // A replacement may start while the previous shell is still closing. Report the terminal once, until all exit.
+        const wasAlive = this.liveShells > 0;
+        this.liveShells += alive ? 1 : -1;
+        const isAlive = this.liveShells > 0;
+        if (wasAlive === isAlive) return;
+        try { this.events.aliveChanged?.(isAlive); }
+        catch (error) { this.events.log("Terminal activity could not be published.", error); }
+      },
       output: data => {
         if (this.instance !== current()) return;
         for (const state of this.viewers) if (state.live) { state.unacked += data.length; this.send(state, { type: "output", data }); }

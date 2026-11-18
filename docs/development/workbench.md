@@ -38,9 +38,9 @@ View subscriptions and projections follow session visibility. User-created draft
 
 ## Session activity and notices
 
-The sidebar observes titles, live resource activities, and resource notices without loading conversations. Activity describes work still in progress; a notice describes an occurrence worth bringing to the user. Both are independent of timeline occupancy and the Agent's domain execution state.
+The sidebar observes titles, live resource activities, and resource notices without loading conversations. Activity describes work still in progress or an instance that is still open; a notice describes an occurrence worth bringing to the user. Open instances remain visible without implying task progress. Both are independent of timeline occupancy and the Agent's domain execution state.
 
-The backend retains independent activity scopes only while their work remains live. The frontend subscribes to activity invalidations before reading the current snapshot, on initial connection and reconnection. Invalidation events carry no activity state, and the event bus does not replay a disconnected interval. Restart reconstructs neither live scopes nor notices from history or persistence.
+The backend retains independent activity scopes for the lifetime of the work or instance, regardless of whether the session is being viewed. The frontend subscribes to activity invalidations before reading the current snapshot, on initial connection and reconnection. Invalidation events carry no activity state, and the event bus does not replay a disconnected interval. Restart reconstructs neither live scopes nor notices from history or persistence.
 
 Running activity, with optional progress, and notices display independently. Starting work does not clear a notice, and raising a notice does not replace running activity. The frontend retains each distinct attention, success, and error kind per resource; a summary's severity does not discard the other kinds. Viewing a session consumes its notices without removing activity or resolving business interactions. Opening the status popup inspects its details without navigating or consuming notices. Notices arriving while their session is viewed are consumed there rather than retained as unread reminders.
 

@@ -20,5 +20,10 @@ export interface InteractiveTerminal {
   waitIdle(timeout: number | undefined, signal: AbortSignal): Promise<TerminalStatus & { reason: string; elapsedMs: number }>;
 }
 export interface TerminalSessions {
-  create(config: TerminalConfig, events: { failed(error: unknown): void; log(message: string, error: unknown): void }): InteractiveTerminal;
+  create(config: TerminalConfig, events: {
+    /** Whether this terminal owns a live shell process, independent of viewers or foreground command state. */
+    aliveChanged?(alive: boolean): void;
+    failed(error: unknown): void;
+    log(message: string, error: unknown): void;
+  }): InteractiveTerminal;
 }

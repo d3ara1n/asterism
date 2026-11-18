@@ -31,6 +31,10 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
     return { ref, source };
   };
   const execution: ExecutionServices = {
+    openInstanceActivity(resource) {
+      const { ref, source } = bindOwner(resource);
+      return host.shared.activities.openInstance(ref, source.title);
+    },
     withActivity(resource, work, options) {
       const { ref, source } = bindOwner(resource);
       return runs.start(async signal => {

@@ -23,7 +23,7 @@ export function invalidEvents(plugin: PluginContext, object: ObjectExecutor) {
 export async function activityTypes(execution: ExecutionServices, plugin: PluginContext, object: ObjectExecutor) {
   const activities: ResourceActivity[] = await plugin.ipc.calls.invoke(ReadResourceActivities, {}, {});
   for (const activity of activities) {
-    const value: number | undefined = activity.progress?.value;
+    const value: number | undefined = activity.kind === "work" ? activity.progress?.value : undefined;
     // @ts-expect-error An activity is a live scope, not a terminal status marker.
     activity.status;
     void value;

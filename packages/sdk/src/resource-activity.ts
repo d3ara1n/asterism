@@ -3,13 +3,16 @@ import { defineCall } from "./calls.ts";
 import { defineEvent } from "./events.ts";
 import { uiTextSchema } from "./i18n.ts";
 
-/** One live work scope, independent of timeline occupancy and notification consumption. */
-export const resourceActivitySchema = z.strictObject({
+const activityBase = z.strictObject({
   id: z.string(),
   resource: z.strictObject({ sessionId: z.string(), id: z.string(), kind: z.string() }),
   title: uiTextSchema,
-  progress: z.strictObject({ value: z.number().min(0).max(1) }).optional(),
 });
+/** Live work or an open instance, independent of timeline occupancy and notification consumption. */
+export const resourceActivitySchema = z.discriminatedUnion("kind", [
+  activityBase.extend({ kind: z.literal("work"), progress: z.strictObject({ value: z.number().min(0).max(1) }).optional() }),
+  activityBase.extend({ kind: z.literal("instance") }),
+]);
 export type ResourceActivity = z.infer<typeof resourceActivitySchema>;
 
 /** Read live scopes without loading session bodies. Subscribe to changes before reading, including after reconnection. */

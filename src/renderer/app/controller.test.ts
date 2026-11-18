@@ -59,7 +59,7 @@ function deferred<T>() {
 
 function resource(id: string, sessionId = "a"): ResourceRef { return { id, sessionId, kind: "test.resources/agent" }; }
 function activity(id: string, owner: ResourceRef = resource("one"), progress?: number): ResourceActivity {
-  return { id, resource: owner, title: id, ...(progress === undefined ? {} : { progress: { value: progress } }) };
+  return { id, kind: "work", resource: owner, title: id, ...(progress === undefined ? {} : { progress: { value: progress } }) };
 }
 
 function resourceHarness(activityReady: Promise<void> = Promise.resolve()) {
@@ -172,7 +172,7 @@ describe("Resource activities and notices", () => {
     try {
       await Promise.resolve();
       await h.finish(0, [activity("first", resource("one"), 0.6), activity("second")]);
-      expect(h.controller.getSnapshot().resourceActivities[0]?.progress?.value).toBe(0.6);
+      expect(h.controller.getSnapshot().resourceActivities[0]).toMatchObject({ progress: { value: 0.6 } });
       h.notice(resource("one"), "success");
       h.emit(ResourceActivitiesChanged, {});
       await h.finish(1, [activity("first")]);

@@ -16,7 +16,7 @@ Cancelling an observation or wait does not stop the foreground program. This dis
 
 ## A saved resource is not a saved process
 
-Hiding a Terminal card or viewing another session leaves its shell available while the resource's session remains running. Removing the resource, sleeping or archiving its session, or exiting Asterism ends that shell instance and its child processes.
+Hiding a Terminal card or viewing another session leaves its shell available while the resource's session remains running. The session list marks terminals whose shells are still open, even when they are waiting at a prompt. Removing the resource, sleeping or archiving its session, or exiting Asterism ends that shell instance and its child processes.
 
 The saved resource retains its configuration, not a suspended shell or a permanent terminal transcript. Restoring the resource after restart or session restoration does not recover the previous process, shell variables, or screen buffers. A newly started shell is a new instance. Preserve important output in files when it must outlive the terminal.
 

@@ -490,7 +490,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       messaging.removeOwners(collected.map(entry => entry.plugin.namespace.id));
       for (const entry of collected) entry.events.stop();
       for (const lifecycle of lifecycles) lifecycle.stop();
-      services.shared.activities.clear();
+      services.shared.activities.close();
       events.close();
       channels.close();
       closing = (async () => {

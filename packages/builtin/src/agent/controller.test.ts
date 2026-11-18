@@ -104,6 +104,7 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
   }] };
   let activities = 0;
   const execution: ExecutionServices = {
+    openInstanceActivity: () => () => {},
     async withActivity(_ref, work, options) {
       activities++;
       try { return await work({ signal: options?.signal ?? new AbortController().signal, progress() {} }); }

@@ -18,7 +18,7 @@ import { TerminalResource, CreateTerminal, TerminalView, TerminalInput, Terminal
  * it remains unopened after application restart, rewind, or session restoration. The instance ends with the object lifecycle (removal, leaving the current set, archival, exit).
  */
 export function createTerminalModule() { return defineModule(plugin => {
-  const terminals = new Map<string, { ref: ResourceRef; terminal: InteractiveTerminal }>();
+  const terminals = new Map<string, { ref: ResourceRef; terminal: InteractiveTerminal; closeActivity(): void }>();
   /** Resources newly created in this run and awaiting an appearance notification; start automatically when they appear. */
   const pendingStart = new Set<string>();
   const images = new Map<string, { resolve(png: Uint8Array): void; reject(error: Error): void }>();
@@ -28,13 +28,19 @@ export function createTerminalModule() { return defineModule(plugin => {
     const terminal = terminals.get(id);
     if (!terminal) return Promise.resolve();
     terminals.delete(id);
-    return terminal.terminal.dispose();
+    return terminal.terminal.dispose().finally(terminal.closeActivity);
   };
   function terminal(config: TerminalConfig, ref: ObjectReader["ref"]): InteractiveTerminal {
     const existing = terminals.get(ref.id);
     if (existing) return existing.terminal;
+    let endActivity: (() => void) | undefined;
+    const closeActivity = () => { endActivity?.(); endActivity = undefined; };
     const created = plugin.shell.terminals.create(config, {
-      // The session list marks only startup failures; individual interactive shell commands do not create completion or persistent-running markers.
+      aliveChanged(alive) {
+        if (!alive) { closeActivity(); return; }
+        if (plugin.lifetime.signal.aborted || terminals.get(ref.id)?.terminal !== created) return;
+        endActivity = plugin.execution.openInstanceActivity(ref);
+      },
       failed(error) {
         if (plugin.lifetime.signal.aborted || terminals.get(ref.id)?.terminal !== created) return;
         plugin.log.warn(`Terminal startup failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -43,7 +49,7 @@ export function createTerminalModule() { return defineModule(plugin => {
       },
       log: (message, error) => plugin.log.error(message, error),
     });
-    terminals.set(ref.id, { ref, terminal: created });
+    terminals.set(ref.id, { ref, terminal: created, closeActivity });
     return created;
   }
   function get(object: ObjectReader): InteractiveTerminal {

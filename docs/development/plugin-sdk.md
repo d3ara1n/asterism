@@ -125,6 +125,8 @@ Resource-owned busy work blocks session cursor changes and removal of that resou
 
 Visible activity has a separate lifetime from timeline occupancy, model requests, and notices. An execution activity scope belongs to an owned resource and remains registered until its work settles, including cancellation cleanup. Ending the resource or plugin lifetime signals cancellation and awaits that work; it does not remove the activity merely because cancellation was requested. Concurrent scopes remain independent, so one finishing does not erase another's activity. Activity registration alone neither occupies history nor emits a result notice.
 
+An open instance can also publish activity without implying work in progress. Its owner releases the marker when the instance ends; changing viewers does not end that scope.
+
 The consumer chooses the work boundary. An Agent wraps the whole task, including tool waits, retries, and compaction, rather than registering only individual model requests. Model-output streaming and activity progress are separate projections. Progress can describe a known fraction or return to indeterminate work without ending the scope. Success, error, and attention notices are explicit domain occurrences; cancellation alone is not a request for attention.
 
 Object-bound managed tasks protect the timeline by default. External runtime tasks can opt out of history occupancy while retaining object ownership, cancellation, and cleanup. Busy scopes and request holds remain until real completion. Directed request holds account for concurrent consumers independently of Agent ancestry. Read-only communication does not become busy merely because it references an object.
