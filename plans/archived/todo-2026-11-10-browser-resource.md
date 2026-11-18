@@ -1,7 +1,16 @@
 # Agent-operated browser resources
 
 Filed: 2026-11-10
-Status: Deferred. Product scope recorded; implementation and GUI acceptance have not started.
+Closed: 2026-11-18
+Status: Closed after failed GUI acceptance. No Browser resource shipped; the uncommitted prototype was removed.
+
+## Disposition
+
+The prototype displayed a real Chromium page using Electron `WebContentsView`. In the `https://google.com` preview, the user reported blank output at some canvas zoom levels despite the page having loaded, and the page did not visually scale with the card. Native-view placement and overlap workarounds did not produce an acceptable embedded-card experience. The user chose to stop rather than expand the prototype into a compositor or adopt an unsupported embedding path.
+
+The separately completed Terminal open-instance activity remains in the application (`825719b3`). No browser dependency was adopted. The [embedding reference](../ref-2026-11-18-electron-browser-embedding.md) records the alternatives, observed limits, and what would justify a new investigation.
+
+Everything below is historical scope, not an active backlog or a record of accepted behavior.
 
 ## Purpose
 
@@ -70,7 +79,7 @@ Cookies and normal website storage do not require a custom permission-prompt pro
 ## Implementation boundaries to investigate
 
 - Keep resource state, creation, tools, views, and model-facing text in the owning plugin. Keep platform-native browser hosting and any required SDK capability generic; the host and SDK must not import builtin browser behavior.
-- Evaluate WebContentsView as the native page host. Verify placement, clipping, stacking, focus, input, and movement between resource views and islands against the actual UI layout. Native views are not ordinary DOM elements.
+- Use WebContentsView as the native page host. Verify placement, clipping, stacking, focus, input, and movement between resource views and islands against the actual UI layout. Native views are not ordinary DOM elements.
 - Define the host/runtime connection needed to control and observe the same WebContents. Avoid turning this concrete feature into a speculative general automation framework.
 - Keep remote pages sandboxed and isolated from application preload capabilities and privileged IPC. Preserve normal web security rather than disabling it to make pages work.
 - Fit the shared persistent session into the application's centralized Chromium data layout. The current application already sets a Chromium session-data root and has a permission policy for its own default session; website sessions need their own explicit handling.
@@ -99,15 +108,6 @@ Electron provides the browser engine and storage primitives, not a complete brow
 - Bookmarks, a general history manager, password filling, extensions, account sync, Chrome-profile import, and other general-browser features.
 - Claims of complete Chrome compatibility, including DRM, specialized device access, and authentication mechanisms not required by the confirmed tasks.
 
-## Deferred implementation and acceptance
+## Acceptance at closure
 
-- [ ] Inspect existing plugin, resource creation, native hosting, island, file, and content contracts; present the implementation scope and unresolved product decisions before coding.
-- [ ] Resolve the decisions needed for the first implementation without expanding the product into a general browser.
-- [ ] Implement the shared website session, per-resource live pages, embedded display, and viewport-following resize behavior.
-- [ ] Implement the approved observation, interaction, creation, and derived-page contracts.
-- [ ] Add the required upload/download panel behavior and approved website permission handling.
-- [ ] Update concise model-facing usage guidance and bilingual application copy.
-- [ ] Run appropriate typechecks and builds. Add focused tests only for meaningful pure logic and owning-boundary contracts, such as actor-attribution rules if they contain substantive branching; do not add UI/process/timing tests or assertions that merely repeat Electron behavior.
-- [ ] Obtain user GUI acceptance: local development and hot updates; real scrolling and animation observation; resizing and island movement; user intervention in the same page; shared website state; actor-dependent derived-page links; uploads and downloads.
-
-GUI acceptance remains manual. Implementation does not authorize automatic launch-wait-kill smoke cycles, real-data cleanup, or a commit.
+Typechecks, builds, and plugin integration checks passed for the prototype; they did not exercise native view composition. The macOS GUI preview failed the zoom and visibility requirements above. The full walkthrough—local development and hot updates, viewport observation, card/island handoff with live state, user/Agent interaction, and shared site data—was not accepted. Derived pages, uploads/downloads, and website-permission controls were not implemented. No GUI acceptance was recorded on Windows or Linux.
