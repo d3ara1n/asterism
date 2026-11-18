@@ -94,7 +94,7 @@ export function WebProvidersSettings() {
           }}>
           {handle => <>
             {index > 0 && <ItemSeparator />}
-            <ListRow leadingActions={handle} className="isolate rounded-none" disabled={busy} inactive={!state.enabled}
+            <ListRow leadingActions={handle} className="rounded-none" disabled={busy} inactive={!state.enabled}
               mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{initial(label)}</span>}
               title={label} description={type && capabilities(type)}
               selected={island.has(webProviderIslandKey(state.id))} onOpen={origin => open(state.id, origin)}

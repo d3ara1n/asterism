@@ -1,13 +1,27 @@
-import type { ComponentProps, ReactNode } from "react";
+import { useId, useRef, type ComponentProps, type MouseEvent, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "../utils";
 import { TooltipHint } from "../tooltip-hint";
-import { Button, buttonVariants } from "./button";
+import { Button } from "./button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "./item";
 
+/** Elements that keep their own click behavior inside a row; action slots are excluded as a whole, including the gaps between their controls. */
+const ownClickSelector = [
+  "[data-slot=item-actions]", "button", "a[href]", "input", "select", "textarea", "label", "summary",
+  "[contenteditable]:not([contenteditable=false])", "[role=button]", "[role=link]", "[role=checkbox]", "[role=switch]",
+].join(",");
+
+/** Hover and keyboard focus of the primary control share one tone; selection replaces both. */
+const highlightTones = {
+  default: "hover:bg-accent/60 has-[[data-slot=list-row-open]:focus-visible]:bg-accent/60",
+  navigation: "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 has-[[data-slot=list-row-open]:focus-visible]:bg-accent has-[[data-slot=list-row-open]:focus-visible]:text-accent-foreground dark:has-[[data-slot=list-row-open]:focus-visible]:bg-accent/50",
+} as const;
+
 /**
- * Compose an openable row from Item primitives. The title's hit area spans the row;
- * action slots sit above it, keeping interactive controls separate from decorative media.
+ * An openable row composed from Item primitives. The row is the interactive surface: it owns the hover,
+ * focus, selection, and disabled tones, and a click on an inert area such as padding, media, or description
+ * activates the primary button. The primary button carries the accessible name, keyboard focus, and the open
+ * action; action slots are sibling controls with their own behavior.
  */
 export function ListRow({ title, description, descriptionLines = 1, details, media, mediaVariant, leadingActions, actions, opens = false, selected = false, disabled, inactive, onOpen, className, contentClassName, variant = "default", buttonProps, tooltip }: {
   title: ReactNode; tooltip?: string; description?: ReactNode; media?: ReactNode; mediaVariant?: "default" | "icon"; leadingActions?: ReactNode; actions?: ReactNode;
@@ -20,21 +34,38 @@ export function ListRow({ title, description, descriptionLines = 1, details, med
   buttonProps?: Omit<ComponentProps<"button">, "children" | "onClick" | "disabled">;
 }) {
   const navigation = variant === "navigation";
-  return <Item size="sm" className={cn("group/list-row relative transition-colors hover:bg-accent/60 has-[[data-slot=list-row-open]:focus-visible]:bg-accent/60",
-    selected && "bg-selected text-selected-foreground hover:bg-selected has-[[data-slot=list-row-open]:focus-visible]:bg-selected", inactive && "opacity-70",
-    navigation && cn(buttonVariants({ variant: selected ? "selected" : "ghost" }), "flex w-full min-w-0 flex-nowrap gap-0 border-0 px-3"),
-    className)}>
-    {leadingActions && <ItemActions className="relative z-10 shrink-0">{leadingActions}</ItemActions>}
-    {media && <ItemMedia variant={mediaVariant} className={cn(navigation && "mr-2 [&_svg]:size-4")}>{media}</ItemMedia>}
-    <ItemContent className={cn("min-w-0", contentClassName)}>
-      <TooltipHint content={tooltip}><button type="button" data-slot="list-row-open" disabled={disabled} aria-current={selected || undefined}
-        {...buttonProps}
-        className={cn("min-w-0 text-left outline-none after:absolute after:inset-0 focus-visible:underline", disabled && "opacity-50", buttonProps?.className)}
+  const primary = useRef<HTMLButtonElement>(null);
+  const descriptionId = useId(), detailsId = useId();
+  const describedBy = [description && descriptionId, details && detailsId].filter(Boolean).join(" ") || undefined;
+  const activate = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    // React also bubbles clicks from portaled menus and tooltips; only clicks inside the row's DOM count.
+    if (event.defaultPrevented || !(target instanceof Element) || !event.currentTarget.contains(target)) return;
+    const control = target.closest(ownClickSelector);
+    if (control && event.currentTarget.contains(control)) return;
+    // Dragging across row text selects it instead of opening the row; selections elsewhere do not block opening.
+    const selection = target.ownerDocument.getSelection();
+    if (selection && !selection.isCollapsed && selection.containsNode(event.currentTarget, true)) return;
+    // Focus first, as a direct button click would, so keyboard navigation continues from this row.
+    // A disabled button ignores focus() and click(), so disabled rows stay inert.
+    primary.current?.focus({ preventScroll: true });
+    primary.current?.click();
+  };
+  return <Item size="sm" onClick={activate} className={cn("group/list-row transition-colors",
+    navigation && "h-9 w-full min-w-0 flex-nowrap gap-0 border-0 px-3 py-2 text-sm font-medium whitespace-nowrap [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+    selected ? "bg-selected text-selected-foreground" : !disabled && highlightTones[variant],
+    inactive && "opacity-70", className)}>
+    {leadingActions && <ItemActions className="shrink-0">{leadingActions}</ItemActions>}
+    {media && <ItemMedia variant={mediaVariant} className={cn(navigation && "mr-2 [&_svg]:size-4", disabled && "opacity-50")}>{media}</ItemMedia>}
+    <ItemContent className={cn("min-w-0", disabled && "opacity-50", contentClassName)}>
+      <TooltipHint content={tooltip}><button ref={primary} type="button" data-slot="list-row-open" disabled={disabled} aria-current={selected || undefined}
+        aria-describedby={describedBy} {...buttonProps}
+        className={cn("min-w-0 text-left outline-none focus-visible:underline", buttonProps?.className)}
         onClick={event => onOpen(event.currentTarget)}>{navigation ? <span className="block min-w-0">{title}</span> : <ItemTitle>{title}</ItemTitle>}</button></TooltipHint>
-      {description && <ItemDescription className={descriptionLines === 1 ? "truncate" : "line-clamp-2 text-pretty"}>{description}</ItemDescription>}
-      {details && <ItemDescription className="type-caption truncate">{details}</ItemDescription>}
+      {description && <ItemDescription id={descriptionId} className={descriptionLines === 1 ? "truncate" : "line-clamp-2 text-pretty"}>{description}</ItemDescription>}
+      {details && <ItemDescription id={detailsId} className="type-caption truncate">{details}</ItemDescription>}
     </ItemContent>
-    {actions && <ItemActions className={cn("relative shrink-0", navigation && "gap-0")}>{actions}</ItemActions>}
+    {actions && <ItemActions className={cn("shrink-0", navigation && "gap-0")}>{actions}</ItemActions>}
     {opens && <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-colors group-hover/list-row:text-foreground" aria-hidden="true" />}
   </Item>;
 }

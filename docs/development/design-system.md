@@ -123,7 +123,7 @@ Switches express immediate booleans, checkboxes express form or multi-selection,
 
 A two-state menu item is one checkbox item. Its identity icon sits in the shared leading column, a trailing switch-shaped indicator shows the state, and the label names the state rather than an action. Icon and label stay fixed across states, and the row contains no separately interactive control.
 
-List rows keep one hit surface with separate actions. Editors group related fields and operations in shared sections and expose reset where values override their baseline.
+A list row is one hit surface with separate actions. The row owns hover, focus, selection, and disabled tones, and a click on inert content opens it; its primary button carries the accessible name, keyboard focus, and the open action. Actions are sibling controls in their own slot rather than layers above an overlay. Editors group related fields and operations in shared sections and expose reset where values override their baseline.
 
 An island whose whole content is a list uses the shared panel list body in a fill-layout panel. The list sits flush inside the island rather than in a nested card: rows keep a small inset so hover and selection fills stay inside the island border, row text aligns with the panel title, and hairlines separate consecutive rows. The title bar carries the item count; a search toolbar appears when the list can grow long. Optional group headings use the label role with a trailing count. Empty, loading, failed, and no-match states replace the list with one centered icon and short label, with a recovery action where one exists. Issues that affect the listed items scroll with the list as its first row.
 

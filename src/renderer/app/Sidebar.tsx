@@ -91,8 +91,8 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
     const media = !marked ? icon : <span className="flex items-center gap-1.5">
       {folder ? <Tooltip>
         <TooltipTrigger asChild>
-          {/* Above the row's open overlay so hovering reaches the tooltip; a click still opens the session. */}
-          <span className="relative z-10 -m-1 flex p-1" onClick={() => { if (!disabled) onSession(session.id); }}>
+          {/* The padded hover target keeps the tooltip reachable; a click falls through to the row and opens the session. */}
+          <span className="-m-1 flex p-1">
             <FolderDot color={folder.color} />
           </span>
         </TooltipTrigger>
