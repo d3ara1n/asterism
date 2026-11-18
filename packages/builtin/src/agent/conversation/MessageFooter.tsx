@@ -61,7 +61,7 @@ export function MessageFooter({ node, text, children }: {
       onCloseAutoFocus={event => { event.preventDefault(); more.current?.focus(); }}
       className="nodrag nopan nokey flex max-h-[calc(100dvh-2rem)] min-w-0 flex-col overflow-hidden sm:max-w-3xl">
       <DialogHeader className="shrink-0 pr-6"><DialogTitle>{i18n.text(messages.inputDetails)}</DialogTitle></DialogHeader>
-      <ScrollArea className="-m-1 min-h-0 min-w-0 flex-1" contentClassName="p-1 pr-3 select-text" viewportClassName="focus-visible:outline-offset-[-2px]"
+      <ScrollArea className="-m-1 flex min-h-0 min-w-0 flex-1 flex-col" contentClassName="p-1 pr-3 select-text" viewportClassName="h-auto flex-auto focus-visible:outline-offset-[-2px]"
         viewportProps={{ tabIndex: 0, role: "region", "aria-label": i18n.text(messages.inputDetails) }}>
         {detailsOpen && <JsonView scrollable={false} value={details()} />}
       </ScrollArea>

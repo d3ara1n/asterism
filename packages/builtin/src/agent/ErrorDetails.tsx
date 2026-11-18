@@ -30,7 +30,8 @@ export function ExecutionErrorDetails({ code, details }: { code: string; details
         <DialogHeader className="shrink-0 pr-6">
           <DialogTitle>{i18n.text(messages.title)}{details.httpStatus !== undefined && ` · HTTP ${details.httpStatus}`}</DialogTitle>
         </DialogHeader>
-        <ScrollArea className="-m-1 min-h-0 min-w-0 flex-1" contentClassName="p-1 pr-3" viewportClassName="focus-visible:outline-offset-[-2px]"
+        {/* Shrink the viewport with the body; a percentage height can stay indefinite in a max-height dialog. */}
+        <ScrollArea className="-m-1 flex min-h-0 min-w-0 flex-1 flex-col" contentClassName="p-1 pr-3" viewportClassName="h-auto flex-auto focus-visible:outline-offset-[-2px]"
           viewportProps={{ tabIndex: 0, role: "region", "aria-label": i18n.text(messages.title) }}>
           <div className="flex min-w-0 flex-col gap-5 select-text">
             <DialogDescription className="whitespace-pre-wrap wrap-anywhere">{details.message}</DialogDescription>
