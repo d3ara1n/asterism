@@ -1,7 +1,7 @@
 import { lazy, Suspense, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { ListRow } from "@asterism-app/ui/ui/list-row";
+import { ListRow, ListRowAction } from "@asterism-app/ui/ui/list-row";
 import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { ActionMenu, ActionMenuContent, ActionMenuItem, ActionMenuSeparator, ActionMenuTrigger, ActionMenuTarget } from "@asterism-app/ui/ui/action-menu";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
@@ -165,17 +165,14 @@ function SidebarGroupHeader({ group, open, spaced, onToggle, onAction }: {
 }) {
   const i18n = useI18n();
   const name = group.folder?.name ?? i18n.text(folderMessages.noFolder);
-  const toggle = <Button type="button" data-action-menu-primary variant="ghost" aria-expanded={open} onClick={onToggle}
-    className="h-full min-w-0 flex-1 justify-start gap-2 py-0 pl-2 pr-1 has-[>svg]:pl-2 has-[>svg]:pr-1 text-left font-normal">
-    <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground motion-safe:transition-transform", open && "rotate-90")} />
-    {group.folder ? <FolderDot color={group.folder.color} className="mx-0.5" /> : <FolderIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />}
-    <span className={cn("min-w-0 flex-1 truncate", group.folder ? "font-medium" : "text-muted-foreground")}>{name}</span>
-    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{group.items.length}</span>
-  </Button>;
-  const header = (trigger: ReactNode) => <div className="group/folder flex h-8 items-center rounded-md pr-1 transition-colors hover:bg-accent/60 has-[:focus-visible]:bg-accent/60">
-    {toggle}
-    {trigger}
-  </div>;
+  const header = (actions: ReactNode) => <ListRow variant="navigation" onOpen={onToggle} buttonProps={{ "aria-expanded": open }}
+    className="h-8 px-2 pr-1 font-normal" title={<span className="flex items-center gap-2 pr-1">
+      <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground motion-safe:transition-transform", open && "rotate-90")} />
+      {group.folder ? <FolderDot color={group.folder.color} className="mx-0.5" /> : <FolderIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />}
+      <span className={cn("min-w-0 flex-1 truncate", group.folder ? "font-medium" : "text-muted-foreground")}>{name}</span>
+      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{group.items.length}</span>
+    </span>}
+    actions={actions} />;
   return <div className={cn(spaced && "pt-1")}>
     {group.folder ? <FolderGroupActions folder={group.folder} onAction={onAction}>{header}</FolderGroupActions> : header(null)}
   </div>;
@@ -191,12 +188,11 @@ function FolderGroupActions({ folder, onAction, children }: {
   const openingDialog = useRef(false);
   return <ActionMenu modal={false} onOpenChange={open => { if (open) openingDialog.current = false; }}>
     <ActionMenuTarget asChild disabled={!ready}>
-      {children(<ActionMenuTrigger asChild>
-        <Button ref={trigger} variant="ghost" size="icon-xs" disabled={!ready} aria-label={i18n.formatMessage(folderMessages.actions, { name: folder.name })}
-          className="w-0 overflow-hidden p-0 opacity-0 group-hover/folder:w-6 group-hover/folder:opacity-100 group-focus-within/folder:w-6 group-focus-within/folder:opacity-100 data-[state=open]:w-6 data-[state=open]:opacity-100">
+      <div>{children(<ActionMenuTrigger asChild>
+        <ListRowAction ref={trigger} disabled={!ready} aria-label={i18n.formatMessage(folderMessages.actions, { name: folder.name })}>
           <MoreHorizontal />
-        </Button>
-      </ActionMenuTrigger>)}
+        </ListRowAction>
+      </ActionMenuTrigger>)}</div>
     </ActionMenuTarget>
     <ActionMenuContent align="end" onCloseAutoFocus={event => { if (openingDialog.current) event.preventDefault(); }}>
       <ActionMenuItem onSelect={() => { openingDialog.current = true; onAction("edit", folder, trigger.current); }}><Pencil />{i18n.text(folderMessages.edit)}…</ActionMenuItem>
