@@ -107,5 +107,10 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
     id: "conversation.participant.you",
     defaultMessage: "You",
   },
+  referenceResources: { id: "conversation.references.resources", defaultMessage: "Resources" },
+  referenceEnterResource: { id: "conversation.references.enterResource", defaultMessage: "Browse {name} references" },
+  referenceSearchHint: { id: "conversation.references.searchHint", defaultMessage: "Type to search" },
+  referenceSearchLimited: { id: "conversation.references.searchLimited", defaultMessage: "Refine your search" },
+  referenceUnavailable: { id: "conversation.references.unavailable", defaultMessage: "References unavailable" },
   referenceMenu: { id: "conversation.references.title", defaultMessage: "References" },
 }));

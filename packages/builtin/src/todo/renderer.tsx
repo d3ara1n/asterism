@@ -5,7 +5,7 @@ import { todoMessages as messages } from "../messages/todo";
 import { todoListCard as appearance } from "../shared/card-appearance";
 import { textWriteViews, textEditViews } from "../text-view";
 import { BrowseTodoLists, CreateSharedTodoList, DeleteSharedTodoList, TodoListResource, TodoListView, CreateTodoListResource, TodoListItems, TodoRead, TodoGrep, TodoWrite, TodoEdit,
-  TodoCreate, TodoClaim, TodoRelease, TodoComplete, TodoReopen, TodoDelete } from "./contract";
+  ListTodoReferenceItems, todoItemLocation, TodoCreate, TodoClaim, TodoRelease, TodoComplete, TodoReopen, TodoDelete } from "./contract";
 import { TodoListCard } from "./TodoListCard";
 import { TodoListInput } from "./creation";
 import { claimViews, completeViews, createListViews, createViews, deleteListViews, deleteViews, grepViews, listsViews, pageViews,
@@ -13,7 +13,15 @@ import { claimViews, completeViews, createListViews, createViews, deleteListView
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: TodoListResource.kind, label: messages.list, icon: <ListTodo className="size-4" />, card: appearance }],
+  resources: [{ kind: TodoListResource.kind, label: messages.list, icon: <ListTodo className="size-4" />, card: appearance,
+    referenceTargets: {
+      kind: "list",
+      async list({ calls, resource, signal }) {
+        const tasks = await calls.invoke(ListTodoReferenceItems, {}, { object: resource, signal });
+        return tasks.map(task => ({ label: task.title, location: todoItemLocation(task.id), keywords: [task.id], detail: messages[task.status] }));
+      },
+    },
+  }],
   cards: [cardRenderer(TodoListView, { ...appearance, Body: TodoListCard })],
   creations: [creationEntry(CreateTodoListResource, { id: CreateTodoListResource.id, label: messages.list, icon: <ListTodo className="size-4" />,
     group: "resources", InputView: TodoListInput, triggers: { menu: {} } })],

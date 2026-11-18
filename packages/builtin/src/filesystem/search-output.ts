@@ -61,17 +61,24 @@ class Budget {
   }
 }
 
-export function findOutput(path: string, prefix: string | (() => string), limit: number) {
+export function findOutput(path: string, prefix: string | (() => string), limit: number, accepts?: (path: string) => boolean) {
   const result: FindResult = { path, files: [], stopReason: null };
   const budget = new Budget(limit);
   const records = new SearchRecords(0, record => {
     const file = searchPath(prefix, utf8(record));
+    if (accepts && !accepts(file)) return null;
     const stopReason = budget.add(file);
     if (stopReason !== null) return stopReason;
     result.files.push(file);
     return null;
   });
   return { result, records };
+}
+
+/** Match full resource-relative paths literally, before consuming the small picker budget. */
+export function referencePathOutput(prefix: () => string, query: string) {
+  const needle = query.toLowerCase();
+  return findOutput(".", prefix, 20, path => path.toLowerCase().includes(needle));
 }
 
 interface RgEvent {

@@ -142,6 +142,11 @@ export class TodoStore {
     const next = filter.offset + rows.length;
     return { todos: rows.map(summary), total, nextOffset: next < total ? next : null };
   }
+  referenceItems(listId: string): Pick<Todo, "id" | "title" | "status">[] {
+    this.requireExists(listId);
+    return this.db.prepare("SELECT id, title, status FROM todo_items WHERE list_id = ? ORDER BY created_at, id")
+      .all(listId) as Pick<Todo, "id" | "title" | "status">[];
+  }
   contents(listId: string, filter: TodoFilter, self: Actor): Todo[] {
     this.requireExists(listId);
     const { sql, values } = this.where(listId, filter, self);

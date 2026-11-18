@@ -9,7 +9,6 @@ import HardBreak from "@tiptap/extension-hard-break";
 import { CharacterCount, Placeholder, UndoRedo } from "@tiptap/extensions";
 import { Suggestion, exitSuggestion, findSuggestionMatch } from "@tiptap/suggestion";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import { skillUrl } from "@asterism-app/sdk/contracts";
 import { hasReferenceDrag, readReferenceDrag } from "@asterism-app/sdk/renderer";
 import { ReferenceChip } from "./reference-node";
 import { parseComposerInline, parseComposerText, referenceNodeName, referenceTriggerAllowedAfter, serializeDoc } from "./reference-serialization";
@@ -30,6 +29,7 @@ interface EditorBridge {
   change(text: string): void;
   suggestion(value: { query: string; range: Range } | null): void;
   menu: ReferenceMenuHandle | null;
+  inResource: boolean;
   /** Listbox id while the menu is open, and its active option for aria-activedescendant. */
   listId: string | null;
   activeId: string | null;
@@ -48,7 +48,7 @@ function referenceSuggestion(bridge: { current: EditorBridge }) {
         char: "@",
         allowedPrefixes: null,
         findSuggestionMatch: config => {
-          const match = findSuggestionMatch(config);
+          const match = findSuggestionMatch({ ...config, allowSpaces: bridge.current.inResource });
           if (!match) return null;
           const doc = config.$position.doc;
           const previous = match.range.from > 0 ? doc.textBetween(match.range.from - 1, match.range.from, "\n", "\uFFFC") : "";
@@ -58,7 +58,7 @@ function referenceSuggestion(bridge: { current: EditorBridge }) {
         render: () => ({
           onStart: ({ query, range }) => bridge.current.suggestion({ query, range }),
           onUpdate: ({ query, range }) => bridge.current.suggestion({ query, range }),
-          onExit: () => bridge.current.suggestion(null),
+          onExit: () => { bridge.current.inResource = false; bridge.current.suggestion(null); },
           onKeyDown: ({ event }) => bridge.current.menu?.keyDown(event) ?? false,
         }),
       })];
@@ -147,10 +147,11 @@ export function ComposerEditor({ ref, value, placeholder, label, disabled, onCha
   onChange(text: string): void; onSubmit(): void;
 }) {
   const [suggestion, setSuggestion] = useState<{ query: string; range: Range } | null>(null);
+  const [composing, setComposing] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const listId = useId();
   const bridge = useRef<EditorBridge>(null!);
-  bridge.current ??= { placeholder, label, submit: onSubmit, change: onChange, suggestion: setSuggestion, menu: null, listId: null, activeId: null };
+  bridge.current ??= { placeholder, label, submit: onSubmit, change: onChange, suggestion: setSuggestion, menu: null, inResource: false, listId: null, activeId: null };
   Object.assign(bridge.current, { placeholder, label, submit: onSubmit, change: onChange,
     listId: suggestion ? listId : null, activeId: suggestion ? activeId : null });
   // Options stay referentially stable so the React binding never resets the editor's view props.
@@ -174,15 +175,22 @@ export function ComposerEditor({ ref, value, placeholder, label, disabled, onCha
   useEffect(() => { editor.view.dispatch(editor.state.tr.setMeta("addToHistory", false)); },
     [editor, placeholder, label, open, activeId]);
 
-  return <div className="relative w-full min-w-0">
+  return <div className="relative w-full min-w-0" onCompositionStartCapture={() => setComposing(true)}
+    onCompositionEndCapture={() => setComposing(false)} onBlur={() => setComposing(false)}>
     <EditorContent editor={editor} />
     <AnimatePresence>
-      {suggestion && <ReferenceMenu key="references" ref={menu => { bridge.current.menu = menu; }} listId={listId} query={suggestion.query}
+      {suggestion && <ReferenceMenu key="references" ref={menu => { bridge.current.menu = menu; }} listId={listId} query={suggestion.query} composing={composing}
         onActiveChange={setActiveId}
-        onSelect={skill => {
+        onNavigate={scope => {
+          bridge.current.inResource = scope;
+          // The old query addressed a different scope. Keep the trigger, but clear its text.
+          const { from, to } = suggestion.range;
+          if (to > from + 1) editor.chain().focus().deleteRange({ from: from + 1, to }).run();
+        }}
+        onSelect={(label, href) => {
           editor.chain().focus()
             .insertContentAt(suggestion.range, [
-              { type: referenceNodeName, attrs: { label: skill.name, href: skillUrl(skill.name) } }, { type: "text", text: " " }])
+              { type: referenceNodeName, attrs: { label, href } }, { type: "text", text: " " }])
             .run();
         }} />}
     </AnimatePresence>

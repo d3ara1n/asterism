@@ -1,3 +1,5 @@
+import { fileReferenceProvider } from "./reference-provider";
+import { SearchDirectoryReferences } from "./search-contract";
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { lazy } from "react";
 import { useI18n, useRendererApplication, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
@@ -82,7 +84,7 @@ function DirectoryTreeBody() {
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: Directory.kind, label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance, open: fileOpener(DirectoryFile),
+  resources: [{ kind: Directory.kind, label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance, referenceTargets: fileReferenceProvider(SearchDirectoryReferences), open: fileOpener(DirectoryFile),
     actions: (location, { resource, calls, application }) => [
       { id: "open-system", label: commonMessages.openWithSystem, icon: <ExternalLink />, async run() {
         const file = await calls.invoke(ResolveDirectoryLocation, { path: location }, { object: resource });

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineAction, defineCall, defineCreation, defineImplementation, defineTool, type Json, type ToolInput } from "@asterism-app/sdk/contracts";
 import { builtin, List, Read, Write, Edit, Grep, textReadSchema, textReadTargetSchema, textChangeSchema, textRowSchema } from "@asterism-app/builtin-api/contracts";
 import { stopReasonSchema } from "../filesystem/search-contract.ts";
-import { listCreationSchema, listDeletionSchema, todoCreationSchema, todoFilterSchema, todoListSchema, todoPageSchema, todoPageResultSchema, todoSchema } from "./model.ts";
+import { listCreationSchema, listDeletionSchema, todoCreationSchema, todoFilterSchema, todoListSchema, todoPageSchema, todoPageResultSchema, todoSchema, todoStatusSchema } from "./model.ts";
 
 export const TodoListResource = builtin.resource("todo-list", z.strictObject({ listId: z.string().min(1) }));
 export const CreateTodoListResource = defineCreation(TodoListResource, {
@@ -17,6 +17,11 @@ export const BrowseTodoLists = defineCall(builtin.name("todo.lists"), { scope: "
 export const CreateSharedTodoList = defineCall(builtin.name("todo.create-list"), { scope: "plugin", input: listCreationSchema, output: todoListSchema });
 export const DeleteSharedTodoList = defineCall(builtin.name("todo.delete-list"), { scope: "plugin", input: listDeletionSchema, output: z.strictObject({ deletedListId: z.string(), transferred: z.number().int().nonnegative() }) });
 export const ReadTodoPage = defineCall(builtin.name("todo.page"), { scope: "object", input: todoPageSchema, output: todoPageResultSchema });
+export const todoItemLocation = (id: string) => `items/${id}`;
+export const ListTodoReferenceItems = defineCall(builtin.name("todo.reference-items"), {
+  scope: "object", input: z.strictObject({}),
+  output: z.array(z.strictObject({ id: z.string(), title: z.string(), status: todoStatusSchema })),
+});
 export const ReadTodoItem = defineCall(builtin.name("todo.item"), { scope: "object", input: z.strictObject({ id: z.string().min(1) }), output: todoSchema });
 export const MutateTodo = defineAction(TodoListResource, { id: builtin.name("todo.mutate"), schema: z.discriminatedUnion("action", [
   todoCreationSchema.extend({ action: z.literal("create") }),
@@ -24,7 +29,7 @@ export const MutateTodo = defineAction(TodoListResource, { id: builtin.name("tod
   z.strictObject({ action: z.enum(["claim", "release", "reopen", "delete"]), id: z.string().min(1) }),
   z.strictObject({ action: z.literal("complete"), id: z.string().min(1), note: z.string().optional() }),
 ]) });
-const itemTarget = z.strictObject({ id: z.string().min(1).describe("Task ID returned by list, read, grep, or todo_create within this resource's bound list.") }).describe("Select an existing task in this resource's bound shared list.");
+const itemTarget = z.strictObject({ id: z.string().min(1).describe("Task ID returned by list, read, grep, or todo_create within this resource's bound list. For a resource reference with location 'items/<id>', pass <id> as id.") }).describe("Select an existing task in this resource's bound shared list.");
 export const TodoListItems = defineImplementation({
   ...builtin.data("todo.list", todoPageResultSchema.describe("Task summaries ordered by creation time then ID, with total matching count and nextOffset for another page.")),
   resource: TodoListResource, tool: List, targetSchema: todoPageSchema.nullable().describe("Filter this bound list by status and assignee. Conditions intersect. Null uses all tasks, offset 0, limit 100. nextOffset continues the current view; concurrent changes can shift pages."),

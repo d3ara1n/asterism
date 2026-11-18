@@ -1,8 +1,9 @@
 import { defineModule, implementResource, implementCreation, implementTool, implementCall, PluginApiError, type ObjectReader } from "@asterism-app/sdk/runtime";
-import { CreateManual, Manual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep, ManualChildren, ReadManualFile } from "./contract.ts";
+import { CreateManual, Manual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep, ManualChildren, ReadManualFile, SearchManualReferences } from "./contract.ts";
 import { manualCard } from "../shared/card-appearance.ts";
 import type { ManualSource } from "@asterism-app/sdk/runtime";
 import { listManual, readManual, findManual, grepManual } from "./files.ts";
+import { searchReferencePaths } from "../filesystem/reference-search.ts";
 import { findToModel, grepToModel } from "../filesystem/search-presentation.ts";
 import { readToModel } from "../shared/text.ts";
 import { readManualChildren, readManualFile } from "./browser.ts";
@@ -26,6 +27,10 @@ export function createManualModule(sources: () => readonly ManualSource[], appli
       }),
     })],
     calls: [
+      implementCall(SearchManualReferences, ({ query }, { object, signal }) => {
+        requireManual(object);
+        return searchReferencePaths(sources().map(source => ({ root: source.directory, prefix: source.path })), query, signal);
+      }),
       implementCall(ManualChildren, async ({ path }, { object, signal }) => {
         requireManual(object);
         try { return await readManualChildren(sources(), path, signal); }

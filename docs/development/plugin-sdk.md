@@ -219,6 +219,8 @@ Plugins share the document's CSS cascade and host theme variables. CSS Modules l
 
 Resource descriptions supply stable type presentation and optional location-opening behavior. The host resolves current resource identity and delegates opaque locations to the resource implementation, independently of model-request authorization. Target plugins own the resulting operations and views. Cards and auxiliary panels consume projected data; the host owns their surrounding layout, focus, and lifecycle.
 
+A resource description can also provide targets for citation. A list provider suits a finite catalog whose entries can be filtered locally; a search provider suits a source whose candidates should not be enumerated up front. Search hits are already selected and ordered by the provider. The picker handles the interaction and encoding, while the resource owns the meaning of every location. Listing a target does not fetch its content or grant model access.
+
 Retained object view state survives virtualized item remounts and container changes while that object remains present. Component-local state and persistent resource data remain separate.
 
 Creation entries coordinate menu and drop input through the same host creation pipeline. Settings pages can open deeper host-managed islands and declare unsaved-state behavior.

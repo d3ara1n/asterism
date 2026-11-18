@@ -7,7 +7,8 @@ export const CreateMcpHost = defineCreation(McpHost, { id: builtin.name("mcp.cre
 export const McpHostView = builtin.data("mcp.card", z.object({ servers: z.array(mcpServerStateSchema) }));
 
 const page = { offset: z.number().int().nonnegative().default(0).describe("Zero-based offset in the matching entries."), limit: z.number().int().min(1).max(50).default(20).describe("Maximum entries returned in this page.") };
-const serverId = z.string().min(1).describe("Server ID returned by mcp_list or mcp_search.");
+export const mcpServerLocation = (id: string) => `servers/${id}`;
+const serverId = z.string().min(1).describe("Server ID returned by mcp_list or mcp_search. For a resource reference with location 'servers/<id>', pass <id> as server_id.");
 const toolId = z.string().min(1).describe("Tool ID in the form server_id/tool_name, as returned by mcp_list or mcp_search.");
 const targetSchema = z.null().describe("The MCP Host resource selects the shared server collection.");
 const resultSchema = jsonSchema.describe("MCP directory entries, connection state, or operation result.");

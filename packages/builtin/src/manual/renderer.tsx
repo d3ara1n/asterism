@@ -1,7 +1,8 @@
+import { fileReferenceProvider } from "../filesystem/reference-provider";
 import { lazy } from "react";
 import { BookOpen, FileText, FileSearch, ListTree, TextSearch } from "lucide-react";
 import { cardRenderer, creationEntry, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
-import { Manual, CreateManual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep, ManualChildren } from "./contract";
+import { Manual, CreateManual, ManualView, ManualList, ManualRead, ManualFind, ManualGrep, ManualChildren, SearchManualReferences } from "./contract";
 import { manualMessages as messages } from "../messages/manual";
 import { filesystemMessages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
@@ -31,7 +32,7 @@ function ManualActions() {
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: Manual.kind, label: messages.title, icon: <BookOpen className="size-4" />, card: appearance, open: fileOpener(ManualFile) }],
+  resources: [{ kind: Manual.kind, label: messages.title, icon: <BookOpen className="size-4" />, card: appearance, referenceTargets: fileReferenceProvider(SearchManualReferences), open: fileOpener(ManualFile) }],
   cards: [cardRenderer(ManualView, { ...appearance, Body: ManualBody, Actions: ManualActions })],
   creations: [creationEntry(CreateManual, {
     id: "asterism.builtin/manual.open", label: messages.title, icon: <BookOpen className="size-4" />,

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { defineImplementation } from "@asterism-app/sdk/contracts";
+import { defineCall, defineImplementation } from "@asterism-app/sdk/contracts";
 import { builtin, Find, Grep, textRowSchema } from "@asterism-app/builtin-api/contracts";
 import { Directory } from "./contract.ts";
 
@@ -55,3 +55,10 @@ export const DirectoryGrep = defineImplementation({
 export type FindResult = z.infer<typeof DirectoryFind.schema>;
 export type GrepResult = z.infer<typeof DirectoryGrep.schema>;
 export type SearchStopReason = z.infer<typeof stopReasonSchema>;
+
+export const referencePathCall = {
+  scope: "object",
+  input: z.strictObject({ query: z.string().trim().min(1) }),
+  output: z.strictObject({ paths: z.array(path), limited: z.boolean() }),
+} as const;
+export const SearchDirectoryReferences = defineCall(builtin.name("directory.reference-search"), referencePathCall);

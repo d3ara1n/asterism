@@ -6,8 +6,8 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { cn } from "@asterism-app/ui/utils";
-import { McpHost, CreateMcpHost, McpHostView } from "./contract";
-import type { McpServerState } from "@asterism-app/sdk/contracts";
+import { McpHost, CreateMcpHost, McpHostView, mcpServerLocation } from "./contract";
+import { ReadMcp, withValues, type McpServerState } from "@asterism-app/sdk/contracts";
 import { mcpMessages as messages } from "@asterism-app/ui/messages/mcp";
 import { useMcpTools } from "@asterism-app/ui/mcp-status";
 import { Instructions, ServerError, ServerSummary, ToolEntry, type ToolEntryData } from "./views";
@@ -120,7 +120,16 @@ function HostBody({ data }: { data: { servers: McpServerState[] } }) {
 }
 
 export default {
-  resources: [{ kind: McpHost.kind, label: messages.title, icon: <Server className="size-4" />, card: appearance }],
+  resources: [{ kind: McpHost.kind, label: messages.title, icon: <Server className="size-4" />, card: appearance,
+    referenceTargets: {
+      kind: "list",
+      async list({ calls, signal }) {
+        const servers = await calls.invoke(ReadMcp, {}, { signal });
+        return servers.map(server => ({ label: server.name, location: mcpServerLocation(server.id), keywords: [server.id],
+          detail: server.enabled ? withValues(messages.state, { state: server.connection }) : messages.disabled }));
+      },
+    },
+  }],
   cards: [cardRenderer(McpHostView, { ...appearance, Body: HostBody, Actions: HostActions })],
   tools: mcpToolRenderers,
   creations: [creationEntry(CreateMcpHost, { id: "asterism.builtin/mcp.blank", label: messages.title, icon: <Server className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "MCP Host" } } } })],

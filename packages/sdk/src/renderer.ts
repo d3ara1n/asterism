@@ -35,6 +35,7 @@ import type { EventSubscriber } from "./events.ts";
 import type { PluginCalls } from "./calls.ts";
 import type { RendererCalls } from "./renderer-calls.ts";
 import type { ChannelContract, ChannelEnd, ChannelValue } from "./channels.ts";
+import type { ReferenceTargetProvider } from "./renderer-references.ts";
 import type { RendererResourceOpener, RendererResourceLocationActions } from "./renderer-resource-open.ts";
 
 /** The frontend end of a channel: messages are delivered in order and buffered until a listener registers; closed resolves when either end terminates. */
@@ -95,6 +96,8 @@ export interface ResourceDescription {
   card?: CardAppearance;
   /** Open an opaque location using this resource's own operation or content surface. */
   open?: RendererResourceOpener;
+  /** Selectable internal reference targets. A resource root needs no provider. */
+  referenceTargets?: ReferenceTargetProvider;
   /** Additional user actions for a location, independent of its in-app preview format. The ID "open" is reserved for the host. */
   actions?: RendererResourceLocationActions;
 }

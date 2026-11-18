@@ -1,3 +1,4 @@
+import { resourceUrl } from "@asterism-app/sdk/contracts";
 import { describe, expect, it } from "vitest";
 import { serializeDoc, parseComposerText, parseComposerInline, referenceTriggerAllowedAfter } from "./reference-serialization";
 
@@ -64,6 +65,15 @@ describe("Reference serialization", () => {
       { type: "text", text: " here" },
     ]);
     expect(serializeDoc(doc)).toBe(input);
+  });
+
+  it("round-trips a picked filename with Markdown punctuation and spaces", () => {
+    const label = "[Draft] notes (2).md";
+    const href = resourceUrl("dir", `reports/${label}`);
+    const node = { type: "referenceChip", attrs: { label, href } };
+    const text = serializeDoc({ type: "doc", content: [{ type: "paragraph", content: [node] }] });
+    expect(text).toBe(String.raw`[\[Draft\] notes (2).md](resource:dir/reports/%5BDraft%5D%20notes%20%282%29.md)`);
+    expect(parseComposerInline(text)).toEqual([node]);
   });
 
   it("keeps incomplete model references as literal text", () => {

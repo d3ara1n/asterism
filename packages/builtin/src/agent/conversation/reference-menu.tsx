@@ -2,145 +2,187 @@ import { motion, useIsPresent, useReducedMotion } from "motion/react";
 import { commandMotionStyle, commandResizeTransition, commandSurfaceMotion, useCommandContentHeight } from "@asterism-app/ui/command-motion";
 import { useCommandPageMotion } from "@asterism-app/ui/command-page";
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 import type { VirtualizerHandle } from "virtua";
 import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
-import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
-import { useI18n, useRendererCalls } from "@asterism-app/sdk/renderer";
+import { BookOpen, ChevronLeft, ChevronRight, Link2, Shapes } from "lucide-react";
+import { useI18n, useRendererCalls, useRendererObject, useRendererResources, useSessionRead, type RendererSessionSnapshot } from "@asterism-app/sdk/renderer";
+import { resourceUrl, skillUrl, type ResourceSnapshot } from "@asterism-app/sdk/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { cn } from "@asterism-app/ui/utils";
 import { SkillList } from "../../skills/contract";
 import { skillsMessages } from "../../messages/skills";
-import { conversationMessages } from "../../messages/conversation";
-import { menuRows, type MenuRow, type MenuSkill, type MenuView } from "./reference-menu-model";
+import { conversationMessages as messages } from "../../messages/conversation";
+import { menuRows, type MenuCategory, type MenuRow, type MenuSkill, type MenuView } from "./reference-menu-model";
+import { useReferenceTargets } from "./reference-targets";
 
 /** Keyboard input forwarded from the editor while the menu is open; focus stays in the editor. */
 export interface ReferenceMenuHandle {
-  /** Returns true when the key was consumed by the menu. */
   keyDown(event: KeyboardEvent): boolean;
 }
 
 const rowHeight = 40;
 const maxListHeight = 7 * rowHeight;
 
-export function ReferenceMenu({ ref, listId, query, onSelect, onActiveChange }: {
-  ref: Ref<ReferenceMenuHandle>; listId: string; query: string;
-  onSelect(skill: MenuSkill): void;
-  /** DOM id of the active option for the editor's aria-activedescendant; null when nothing is active. */
+export function ReferenceMenu({ ref, listId, query, composing, onNavigate, onSelect, onActiveChange }: {
+  ref: Ref<ReferenceMenuHandle>; listId: string; query: string; composing: boolean;
+  onNavigate(scope: boolean): void;
+  onSelect(label: string, href: string): void;
   onActiveChange(id: string | null): void;
 }) {
-  const i18n = useI18n(), calls = useRendererCalls();
+  const i18n = useI18n(), calls = useRendererCalls(), descriptions = useRendererResources(), object = useRendererObject();
   const present = useIsPresent();
   const reducedMotion = useReducedMotion();
-  const [skills, setSkills] = useState<readonly MenuSkill[] | null>(null);
+  const [skills, setSkills] = useState<{ items: readonly MenuSkill[]; failed: boolean }>();
   const [view, setView] = useState<MenuView>({ level: "root" });
-  // The active row resets whenever the view or query changes the visible rows.
-  const rowsKey = `${view.level}\u0000${query}`;
-  const [activeState, setActiveState] = useState({ key: rowsKey, index: 0 });
   const list = useRef<VirtualizerHandle>(null);
+  const receiver = object.ref;
+  const readLinks = useCallback((snapshot: RendererSessionSnapshot, signal: AbortSignal) =>
+    snapshot.resources.linkedTo(receiver, { signal }), [receiver]);
+  const links = useSessionRead(present ? object.session.snapshot() : null, readLinks);
 
-  // Presence can reverse an exit before unmounting; each opening still starts a fresh catalog and root view.
+  // Presence can reverse an exit before unmounting; each opening starts at the root with fresh catalogs.
   useEffect(() => {
     if (!present) return;
-    setSkills(null);
+    setSkills(undefined);
     setView({ level: "root" });
-    setActiveState(state => ({ ...state, index: 0 }));
+    setActiveState({ key: "", index: 0 });
     const controller = new AbortController();
-    calls.invoke(SkillList, {}, { signal: controller.signal })
-      .then(setSkills, () => { if (!controller.signal.aborted) setSkills([]); });
+    const { signal } = controller;
+    void calls.invoke(SkillList, {}, { signal }).then(items => {
+      if (!signal.aborted) setSkills({ items, failed: false });
+    }, () => { if (!signal.aborted) setSkills({ items: [], failed: true }); });
     return () => controller.abort();
   }, [calls, present]);
 
-  const rows = skills ? menuRows(view, query, skills) : [];
-  const body = useCommandPageMotion<HTMLDivElement>(view.level, view.level === "category" ? 1 : 0);
+  const selected = view.level === "resource" ? links.data?.find(resource => resource.ref.id === view.id) : undefined;
+  const provider = selected ? descriptions.get(selected.ref.kind).referenceTargets : undefined;
+  const targets = useReferenceTargets(present ? provider : undefined, selected?.ref, query, composing, calls);
+  const rows: MenuRow[] = view.level === "resource"
+    ? targets.status === "ready" ? targets.items.map(target => ({ kind: "target", target })) : []
+    : menuRows(view, query, skills?.items ?? [], links.data ?? []);
+  const page = view.level === "resource" ? `resource:${view.id}` : view.level === "category" ? view.category : "root";
+  const rowsKey = `${page}\u0000${query}`;
+  const [activeState, setActiveState] = useState({ key: rowsKey, index: 0 });
+  const body = useCommandPageMotion<HTMLDivElement>(page, view.level === "resource" ? 2 : view.level === "category" ? 1 : 0);
   const { ref: contentRef, height } = useCommandContentHeight(rowsKey);
   const active = rows.length ? Math.min(activeState.key === rowsKey ? activeState.index : 0, rows.length - 1) : -1;
   const activeRow = active >= 0 ? rows[active] : undefined;
   const optionId = (index: number) => `${listId}-${index}`;
   const setActive = (index: number) => setActiveState({ key: rowsKey, index });
-
-  // onActiveChange is stable for the menu's lifetime; only the active option drives this effect.
   const activeId = active >= 0 ? optionId(active) : null;
   useEffect(() => {
     if (active >= 0) list.current?.scrollToIndex(active, { align: "nearest" });
     onActiveChange(present ? activeId : null);
-  }, [active, activeId, onActiveChange, present]);
+  }, [active, activeId, onActiveChange, present, rowsKey]);
   useEffect(() => () => onActiveChange(null), [onActiveChange]);
 
-  const activate = (row: MenuRow) => {
-    if (row.kind === "category") setView({ level: "category", category: row.category });
-    else onSelect(row.skill);
+  const navigate = (next: MenuView) => {
+    setView(next);
+    onNavigate(next.level === "resource");
   };
+  const back = () => navigate(view.level === "resource" && view.back === "resources"
+    ? { level: "category", category: "resources" } : { level: "root" });
+  const enterResource = (resource: ResourceSnapshot) => navigate({ level: "resource", id: resource.ref.id,
+    back: view.level === "root" ? "root" : "resources" });
+  const activate = (row: MenuRow) => {
+    switch (row.kind) {
+      case "category": navigate({ level: "category", category: row.category }); break;
+      case "skill": onSelect(row.skill.name, skillUrl(row.skill.name)); break;
+      case "resource": onSelect(row.resource.title, resourceUrl(row.resource.ref.id, "")); break;
+      case "target":
+        if (selected) onSelect(`${selected.title}:${row.target.label}`, resourceUrl(selected.ref.id, row.target.location));
+        break;
+    }
+  };
+  const relevant = view.level === "root" ? (query.trim() ? "both" : "none") : view.level === "category" ? view.category : "targets";
+  const loading = (relevant === "skills" || relevant === "both") && !skills
+    || (relevant === "resources" || relevant === "both") && links.status === "loading"
+    || relevant === "targets" && (links.status === "loading" || targets.status === "loading");
+  const failed = (relevant === "skills" || relevant === "both") && skills?.failed
+    || (relevant === "resources" || relevant === "both") && links.status === "error"
+    || relevant === "targets" && (targets.status === "error" || (links.status !== "loading" && !provider));
 
   useImperativeHandle(ref, () => ({
     keyDown(event) {
-      if (!present) return false;
-      // Swallow submission while the catalog loads so Enter does not send a half-typed `@query`.
-      if (skills === null) return event.key === "Enter" || event.key === "Tab";
-      const inCategory = view.level === "category";
-      if (inCategory && !query && (event.key === "ArrowLeft" || event.key === "Backspace")) {
-        setView({ level: "root" });
-        return true;
+      if (!present || composing || event.isComposing) return false;
+      if (view.level !== "root" && !query.trim() && (event.key === "ArrowLeft" || event.key === "Backspace")) { back(); return true; }
+      if (activeRow) {
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          setActive((active + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length);
+          return true;
+        }
+        if (event.key === "Enter" || event.key === "Tab") { activate(activeRow); return true; }
+        if (event.key === "ArrowRight") {
+          if (activeRow.kind === "category") { activate(activeRow); return true; }
+          if (activeRow.kind === "resource" && descriptions.get(activeRow.resource.ref.kind).referenceTargets) {
+            enterResource(activeRow.resource); return true;
+          }
+        }
       }
-      if (!activeRow) return false;
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        const step = event.key === "ArrowDown" ? 1 : -1;
-        setActive((active + step + rows.length) % rows.length);
-        return true;
-      }
-      if (event.key === "Enter" || event.key === "Tab") { activate(activeRow); return true; }
-      if (event.key === "ArrowRight" && activeRow.kind === "category") { activate(activeRow); return true; }
-      return false;
+      // Inside a resource, Enter is for selection even when there is no result to select.
+      return (event.key === "Enter" && (loading || view.level === "resource")) || (event.key === "Tab" && loading);
     },
   }));
 
-  const skillLabel = i18n.text(skillsMessages.category);
-
+  const categoryLabel = (category: MenuCategory) => i18n.text(category === "skills" ? skillsMessages.category : messages.referenceResources);
+  const categoryIcon = (category: MenuCategory) => category === "skills"
+    ? <BookOpen className="size-4 shrink-0 text-folder-violet" /> : <Shapes className="size-4 shrink-0 text-muted-foreground" />;
+  const title = view.level === "category" ? categoryLabel(view.category) : selected?.title ?? i18n.text(messages.referenceResources);
+  const hint = loading ? commonMessages.loading : failed ? messages.referenceUnavailable
+    : provider?.kind === "search" && targets.status === "idle" ? provider.prompt ?? messages.referenceSearchHint : commonMessages.noMatches;
   return <motion.div className="surface-floating absolute inset-x-0 bottom-full z-50 mb-1 origin-bottom overflow-hidden"
     {...commandSurfaceMotion(!!reducedMotion, "top")}
     inert={!present} aria-hidden={!present || undefined}
     style={{ ...commandMotionStyle, boxSizing: "content-box", height, transition: reducedMotion ? "none" : commandResizeTransition }}
-    // Clicking the menu must not blur the editor, which would dismiss the suggestion.
     onMouseDown={event => event.preventDefault()}>
     <div ref={contentRef} className="w-full" style={height === undefined ? undefined : { position: "absolute", bottom: 0 }}>
       <div ref={body}>
-        {view.level === "category" && <div className="flex h-8 items-center gap-1 border-b px-1">
+        {view.level !== "root" && <div className="flex h-8 min-w-0 items-center gap-1 border-b px-1">
           <TooltipHint content={i18n.text(commonMessages.back)}><button type="button" tabIndex={-1} aria-label={i18n.text(commonMessages.back)}
-            className="inline-flex size-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            onClick={() => setView({ level: "root" })}><ChevronLeft className="size-4" /></button></TooltipHint>
-          <BookOpen className="size-3.5 text-folder-violet" />
-          <span className="type-label">{skillLabel}</span>
-          {skills && <span className="type-caption ml-auto px-2 tabular-nums">{skills.length}</span>}
+            className="inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            onClick={back}><ChevronLeft className="size-4" /></button></TooltipHint>
+          {view.level === "category" ? categoryIcon(view.category) : selected && descriptions.get(selected.ref.kind).icon}
+          <span className="type-label truncate">{title}</span>
         </div>}
-        {skills === null
-          ? <p className="type-caption p-2" role="status">{i18n.text(commonMessages.loading)}</p>
-          : !rows.length
-            ? <p className="type-caption p-2">{i18n.text(commonMessages.noMatches)}</p>
-            // Padding sits outside the virtualized viewport so its height equals the rows' total and never scrolls early.
-            : <div className="p-1"><VirtualList ref={list} data={rows} itemSize={rowHeight}
-              viewportProps={{ id: listId, role: "listbox", "aria-label": i18n.text(conversationMessages.referenceMenu) }}
-              style={{ height: Math.min(rows.length * rowHeight, maxListHeight) }}>
-              {(row, index) => <div key={row.kind === "category" ? row.category : row.skill.name}
-                id={optionId(index)} role="option" aria-selected={index === active}
+        {!rows.length
+          ? <p id={listId} className="type-caption p-2" role="status">{i18n.text(hint)}</p>
+          // Padding sits outside the virtualized viewport so its height equals the rows' total and never scrolls early.
+          : <div className="p-1"><VirtualList ref={list} data={rows} itemSize={rowHeight}
+            viewportProps={{ id: listId, role: "listbox", "aria-label": i18n.text(messages.referenceMenu) }}
+            style={{ height: Math.min(rows.length * rowHeight, maxListHeight) }}>
+            {(row, index) => {
+              const description = row.kind === "resource" ? descriptions.get(row.resource.ref.kind) : undefined;
+              const icon = row.kind === "category" ? categoryIcon(row.category) : row.kind === "skill" ? categoryIcon("skills")
+                : row.kind === "resource" ? description?.icon : <Link2 className="size-4 text-muted-foreground" />;
+              const label = row.kind === "category" ? categoryLabel(row.category) : row.kind === "skill" ? row.skill.name
+                : row.kind === "resource" ? row.resource.title : row.target.label;
+              const detail = row.kind === "skill" ? row.skill.description : row.kind === "resource" && description ? i18n.text(description.label)
+                : row.kind === "target" && row.target.detail ? i18n.text(row.target.detail) : undefined;
+              const key = row.kind === "category" ? row.category : row.kind === "skill" ? row.skill.name
+                : row.kind === "resource" ? row.resource.ref.id : row.target.location;
+              return <div key={`${row.kind}:${key}`} id={optionId(index)} role="option" aria-selected={index === active}
                 style={{ height: rowHeight }}
-                className={cn("flex cursor-default items-center gap-2 rounded-sm px-2 text-sm select-none",
-                  index === active && "bg-accent text-accent-foreground")}
-                onPointerMove={() => { if (index !== active) setActive(index); }}
-                onClick={() => activate(row)}>
-                <BookOpen className="size-4 shrink-0 text-folder-violet" />
-                {row.kind === "category"
-                  ? <>
-                    <span className="min-w-0 flex-1 truncate">{skillLabel}</span>
-                    <span className="type-caption tabular-nums">{row.count}</span>
-                    <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                  </>
-                  // The row stays one fixed height; the tooltip exposes the full description.
-                  : <TooltipHint content={row.skill.description}><span className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate font-medium leading-tight" translate="no">{row.skill.name}</span>
-                    <span className="type-caption truncate leading-tight">{row.skill.description}</span>
-                  </span></TooltipHint>}
-              </div>}
-            </VirtualList></div>}
+                className={cn("flex cursor-default items-center gap-2 rounded-sm px-2 text-sm select-none", index === active && "bg-accent text-accent-foreground")}
+                onPointerMove={() => { if (index !== active) setActive(index); }} onClick={() => activate(row)}>
+                <span className="shrink-0">{icon}</span>
+                <TooltipHint content={detail || label}><span className="flex min-w-0 flex-1 flex-col">
+                  <span className={cn("truncate leading-tight", row.kind !== "category" && "font-medium")} translate={row.kind === "category" ? undefined : "no"}>{label}</span>
+                  {detail && <span className="type-caption truncate leading-tight text-muted-foreground">{detail}</span>}
+                </span></TooltipHint>
+                {row.kind === "category" && <>
+                  <span className="type-caption tabular-nums">{row.count}</span><ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </>}
+                {row.kind === "resource" && description?.referenceTargets && <TooltipHint content={i18n.formatMessage(messages.referenceEnterResource, { name: label })}>
+                  <button type="button" tabIndex={-1} aria-label={i18n.formatMessage(messages.referenceEnterResource, { name: label })}
+                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:bg-background hover:text-foreground"
+                    onClick={event => { event.stopPropagation(); enterResource(row.resource); }}><ChevronRight className="size-4" /></button>
+                </TooltipHint>}
+              </div>;
+            }}
+          </VirtualList></div>}
+        {targets.status === "ready" && targets.limited && <p role="status" className="type-caption px-2 pb-2">{i18n.text(provider?.kind === "search" && provider.refineHint ? provider.refineHint : messages.referenceSearchLimited)}</p>}
+        {!!rows.length && failed && <p role="status" className="type-caption px-2 pb-2">{i18n.text(messages.referenceUnavailable)}</p>}
       </div>
     </div>
   </motion.div>;

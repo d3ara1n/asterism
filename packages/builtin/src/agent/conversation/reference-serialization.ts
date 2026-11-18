@@ -1,3 +1,4 @@
+import { referenceMarkdown } from "@asterism-app/sdk/contracts";
 import type { JSONContent } from "@tiptap/core";
 import { referenceKind } from "@asterism-app/ui/references";
 
@@ -5,7 +6,7 @@ import { referenceKind } from "@asterism-app/ui/references";
 export const referenceNodeName = "referenceChip";
 
 /** Markdown link whose destination uses an app-defined reference scheme. */
-const referencePattern = /\[([^\]\r\n]*)\]\(((?:resource|skill|model):[^()\s]+)\)/gu;
+const referencePattern = /\[((?:\\[^\r\n]|[^\\\]\r\n])*)\]\(((?:resource|skill|model):[^()\s]+)\)/gu;
 
 /** Whether a destination addresses a resource location, skill, or configured model. */
 export function isReferenceHref(href: string): boolean {
@@ -30,7 +31,7 @@ function serializeInline(node: JSONContent): string {
   switch (node.type) {
     case "text": return node.text ?? "";
     case "hardBreak": return "\n";
-    case referenceNodeName: return `[${node.attrs?.label ?? ""}](${node.attrs?.href ?? ""})`;
+    case referenceNodeName: return referenceMarkdown(node.attrs?.label ?? "", node.attrs?.href ?? "");
     default: return (node.content ?? []).map(serializeInline).join("");
   }
 }
@@ -56,7 +57,7 @@ function parseLine(line: string): JSONContent[] {
     const [source, label = "", href = ""] = match;
     if (!isReferenceHref(href)) continue;
     text(line.slice(last, match.index));
-    content.push({ type: referenceNodeName, attrs: { label, href } });
+    content.push({ type: referenceNodeName, attrs: { label: label.replace(/\\([\\[\]])/gu, "$1"), href } });
     last = match.index + source.length;
   }
   text(line.slice(last));

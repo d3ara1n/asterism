@@ -16,6 +16,8 @@ import { readTextFile, commitTextFile, validateTextSize } from "./text-io.ts";
 import { DirectoryExec } from "./exec-contract.ts";
 import { execToModel } from "../shell/contract.ts";
 import type { ShellServices, ShellExecution } from "@asterism-app/sdk/runtime";
+import { searchReferencePaths } from "./reference-search.ts";
+import { SearchDirectoryReferences } from "./search-contract.ts";
 import { searchTools } from "./search.ts";
 import { listFiles, readMetadata, readFileContent, readChildren } from "./read.ts";
 import { readDirectoryStatus } from "./git-status.ts";
@@ -186,6 +188,8 @@ export function createFilesystemModule(shell: ShellServices) {
   calls: [
     ...editorCalls,
     implementCall(ReadDirectoryDefaults, async () => ({ path: homedir() })),
+    implementCall(SearchDirectoryReferences, ({ query }, { object, signal }) =>
+      searchReferencePaths([{ root: rootOf(object), prefix: "" }], query, signal)),
     implementCall(DirectoryChildren, async ({ path }, { object, signal }) => {
       try { return await readChildren(rootOf(object), path, signal); }
       catch (error) { signal.throwIfAborted(); return fileFailure(error); }

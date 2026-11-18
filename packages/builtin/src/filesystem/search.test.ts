@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readText, editText } from "../shared/text.ts";
-import { findOutput, grepOutput, SearchRecords } from "./search-output.ts";
+import { findOutput, grepOutput, referencePathOutput, SearchRecords } from "./search-output.ts";
 import { excerptWindow } from "../shared/text-row.ts";
 import { computeLineHash } from "../shared/hashline/hash.ts";
 import { findToModel, grepToModel, searchSummary } from "./search-presentation.ts";
@@ -24,6 +24,15 @@ function collect<T extends { stopReason: SearchStopReason }>(output: { result: T
 }
 
 describe("Search output protocol", () => {
+  it("matches qualified paths literally and case-insensitively before counting them against the picker limit", () => {
+    const output = referencePathOutput(() => "SDK/Guide", "guide/design [draft]");
+    const unrelated = Array.from({ length: 25 }, (_, index) => `./design d${index}.md`);
+    const matching = Array.from({ length: 21 }, (_, index) => `./Design [Draft] ${21 - index}.md`);
+    const result = collect(output, Buffer.from([...unrelated, ...matching, ""].join("\0")));
+    expect(result.files).toEqual(matching.slice(0, 20).map(path => `SDK/Guide/${path.slice(2)}`));
+    expect(result.stopReason).toBe("limit");
+  });
+
   // Federated manual searches share one budget while each process reports paths relative to a different source.
   it("qualifies equal filenames across sources and shares find and grep limits", () => {
     let prefix = "sdk/docs";

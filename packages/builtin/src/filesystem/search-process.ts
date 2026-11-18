@@ -15,8 +15,10 @@ export function executablePath(path: string): string {
   return path.replace(/([\\/])([^\\/]+\.asar)(?=[\\/])/g, "$1$2.unpacked");
 }
 
+const baseSearchArguments = () => ["--no-config", "--no-follow", "--no-require-git", "--color=never", "--path-separator=/"];
+
 export function searchArguments(kind: "find" | "grep", args: FindOptions | GrepOptions, operand: string): string[] {
-  const flags = ["--no-config", "--no-follow", "--no-require-git", "--color=never", "--path-separator=/"];
+  const flags = baseSearchArguments();
   if (args.hidden) flags.push("--hidden");
   if (args.noIgnore) flags.push("--no-ignore");
   if (kind === "find") flags.push("--files", "--null", "--glob", args.pattern);
@@ -36,6 +38,11 @@ export function searchArguments(kind: "find" | "grep", args: FindOptions | GrepO
   // Place after user globs so hidden/ignore switches cannot include Git metadata in recursive searches.
   flags.push("--glob", "!.git", "--", operand);
   return flags;
+}
+
+/** Discover paths with normal ignore rules. A positive glob would override those rules. */
+export function referencePathArguments(operand: string): string[] {
+  return [...baseSearchArguments(), "--files", "--null", "--line-buffered", "--glob", "!.git", "--", operand];
 }
 
 /** A single rg subprocess without a shell; cancellation or reaching the output budget ends the process, and results are delivered after pipes close. */

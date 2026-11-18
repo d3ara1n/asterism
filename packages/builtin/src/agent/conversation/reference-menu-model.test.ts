@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { menuRows, rankSkills } from "./reference-menu-model";
+import { filterTargets, menuRows, rankSkills } from "./reference-menu-model";
 
 const skill = (name: string, description = "") => ({ name, description });
 
@@ -14,10 +14,21 @@ describe("Reference menu", () => {
     expect(rankSkills(skills, "PRI").map(s => s.name)).toEqual(["pricing-b", "pricing-a"]);
   });
 
-  it("lists categories at an empty root and searches items otherwise", () => {
+  it("matches resource titles at the root and keeps Skills isolated in its category", () => {
     const skills = [skill("ads"), skill("pricing")];
-    expect(menuRows({ level: "root" }, "", skills)).toEqual([{ kind: "category", category: "skills", count: 2 }]);
-    expect(menuRows({ level: "root" }, "ad", skills)).toEqual([{ kind: "skill", skill: skills[0] }]);
-    expect(menuRows({ level: "category", category: "skills" }, "", skills)).toHaveLength(2);
+    const directory = { ref: { sessionId: "s", id: "r", kind: "directory" }, title: "Ad assets", data: {} };
+    expect(menuRows({ level: "root" }, "ad", skills, [directory])).toEqual([
+      { kind: "skill", skill: skills[0] }, { kind: "resource", resource: directory },
+    ]);
+    expect(menuRows({ level: "category", category: "skills" }, "ad", skills, [directory])).toEqual([{ kind: "skill", skill: skills[0] }]);
+  });
+
+  it("filters the label and explicit keywords in source order, not presentation detail or locations", () => {
+    const items = [
+      { label: "Write tests", keywords: ["QA-17"], location: "items/17" },
+      { label: "QA follow-up", location: "items/18" },
+      { label: "Review", detail: "QA", location: "items/QA" },
+    ];
+    expect(filterTargets(items, " QA ")).toEqual(items.slice(0, 2));
   });
 });

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { defineCall, defineCreation, defineImplementation } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 import { DirectoryList, DirectoryRead, directoryReadTargetSchema, treeChildrenInput, treeChildrenOutput } from "../filesystem/contract.ts";
-import { DirectoryFind, DirectoryGrep, directoryFindTargetSchema, directoryGrepTargetSchema } from "../filesystem/search-contract.ts";
+import { DirectoryFind, DirectoryGrep, directoryFindTargetSchema, directoryGrepTargetSchema, referencePathCall } from "../filesystem/search-contract.ts";
 import { ReadDirectoryFile } from "../filesystem/editor-contract.ts";
 
 export const Manual = builtin.resource("manual", z.strictObject({}));
@@ -14,6 +14,7 @@ export const ManualView = builtin.data("manual.card", z.strictObject({}));
 export const ManualChildren = defineCall(builtin.name("manual.children"), {
   scope: "object", input: treeChildrenInput, output: treeChildrenOutput,
 });
+export const SearchManualReferences = defineCall(builtin.name("manual.reference-search"), referencePathCall);
 export const ReadManualFile = defineCall(builtin.name("manual.file.read"), {
   scope: "object", input: z.strictObject({ path: z.string().min(1) }), output: ReadDirectoryFile.output,
 });

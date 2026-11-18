@@ -16,7 +16,8 @@ const encodePath = (path: string) => path.split("/").map(encodeURIComponent).joi
 const decodePath = (path: string) => path.split("/").map(decodeURIComponent).join("/");
 
 export function resourceUrl(resourceId: string, location: string): string {
-  return `resource:${encodeURIComponent(resourceId)}/${encodePath(location)}`;
+  // Parentheses are URI-safe but delimit the Markdown destination used by references.
+  return `resource:${encodeURIComponent(resourceId)}/${encodePath(location)}`.replaceAll("(", "%28").replaceAll(")", "%29");
 }
 
 export function parseResourceUrl(value: string): ResourceUrl | null {
@@ -55,5 +56,5 @@ export function parseModelUrl(value: string): ModelExpression | null {
 
 /** The text form of a reference: a Markdown link whose label is display text and whose destination is the URL. */
 export function referenceMarkdown(label: string, url: string): string {
-  return `[${label}](${url})`;
+  return `[${label.replace(/[\r\n]+/gu, " ").replace(/[\\[\]]/gu, "\\$&")}](${url})`;
 }

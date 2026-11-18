@@ -4,7 +4,7 @@ Filed on 2026-11-05. Supersedes `todo-2026-10-25-skill-picker.md`, which posed t
 
 ## Goal
 
-Let users attach structured references — to skills and, in future, to resource locations — inside the composer text flow, so the model receives them as markdown links it can act on. Separate this from binary file attachments, which already exist as a distinct input part type.
+Let users attach structured references — to skills and resource locations — inside the composer text flow, so the model receives them as markdown links it can act on. Separate this from binary file attachments, which already exist as a distinct input part type.
 
 ## Design decisions
 
@@ -32,7 +32,7 @@ Tiptap packages: `@tiptap/core`, `@tiptap/react`, `@tiptap/pm`, `@tiptap/extensi
 
 ### Two insertion paths
 
-`@` trigger: typing `@` opens a reference menu organized as categories that drill down. Skills is currently the only category; future categories (such as linked resources) join the same root. An empty query at the root lists categories; any query searches items across categories, ranked by name exactness (exact, prefix, word boundary, substring) before description matches. Inside a category, ArrowLeft or Backspace on an empty query returns to the root. Lists are virtualized for catalogs of hundreds of items. Rows have one fixed height; a skill row shows a one-line description with the full text as a native tooltip. Focus stays in the editor; the menu is a listbox referenced through `aria-controls` and `aria-activedescendant`. Selecting an item replaces the `@query` text with a chip. Manually typed `[label](skill:name)` stays as text (the model understands it regardless).
+`@` trigger: typing `@` opens a reference menu organized as categories that drill down. The root offers Skills and linked Resources. A root query matches skill metadata and resource titles. Resource rows can be cited directly or opened as a scope when they supply internal reference targets; root queries do not search inside resources. Inside a category, ArrowLeft or Backspace on an empty query returns to the root. Lists are virtualized for catalogs of hundreds of items. Rows have one fixed height; a skill row shows a one-line description with the full text as a native tooltip. Focus stays in the editor; the menu is a listbox referenced through `aria-controls` and `aria-activedescendant`. Selecting an item replaces the `@query` text with a chip. Manually typed `[label](skill:name)` stays as text (the model understands it regardless).
 
 Chips show the reference kind by icon and tone: skills use a violet book icon; resource locations use a blue folder (resource root or trailing slash) or file icon. Rendered messages keep `skill:` links and show them as read-only chips with the same presentation; resource links remain navigable anchors.
 
@@ -72,4 +72,4 @@ Unsent drafts currently store text and re-parse reference links into chips; stor
 - [ ] `+` button reference menu: a reference option beside the file attachment picker.
 - [ ] Drag sources: directory file tree rows and resource cards call `setReferenceDrag`.
 - [ ] Draft JSON storage for exact chip round-trip in unsent drafts. Sent messages store text only.
-- [ ] Resource reference browsing: directory resources are hierarchical; drag-and-drop from directory cards is the intended path.
+- [x] Resource reference selection: scope the picker to a linked resource. Directory and Manual provide bounded flat path search; MCP and Todo provide filterable catalogs.

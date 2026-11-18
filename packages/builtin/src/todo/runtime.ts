@@ -9,7 +9,7 @@ import { todoListCard } from "../shared/card-appearance.ts";
 import { TextError, readText, editText, textChange, editToModel, writeToModel } from "../shared/text.ts";
 import { FilesystemError } from "../filesystem/errors.ts";
 import { BrowseTodoLists, CreateSharedTodoList, CreateTodoListResource, DeleteSharedTodoList, MutateTodo,
-  ReadTodoItem, ReadTodoPage, TodoClaim, TodoComplete, TodoCreate, TodoDelete, TodoEdit, TodoGrep, TodoListItems,
+  ListTodoReferenceItems, ReadTodoItem, ReadTodoPage, TodoClaim, TodoComplete, TodoCreate, TodoDelete, TodoEdit, TodoGrep, TodoListItems,
   TodoListResource, TodoListView, TodoRead, TodoRelease, TodoReopen, TodoWrite } from "./contract.ts";
 import { actorKey, listCreationSchema, listDeletionSchema, todoListSchema, todoPageSchema,
   type Actor, type TodoChange } from "./model.ts";
@@ -115,6 +115,7 @@ export default defineModule(plugin => {
       implementCall(BrowseTodoLists, async (_input, { signal }) => { signal.throwIfAborted(); return store.lists(); }),
       implementCall(CreateSharedTodoList, async (input, { signal }) => { signal.throwIfAborted(); return store.createList(input); }),
       implementCall(DeleteSharedTodoList, async (input, { signal }) => { signal.throwIfAborted(); return store.deleteList(input); }),
+      implementCall(ListTodoReferenceItems, async (_input, { object, signal }) => { signal.throwIfAborted(); return store.referenceItems(binding(object)); }),
       implementCall(ReadTodoPage, async (input, { object, signal }) => { signal.throwIfAborted(); return store.page(binding(object), input, user); }),
       implementCall(ReadTodoItem, async ({ id }, { object, signal }) => { signal.throwIfAborted(); return store.get(binding(object), id); }),
     ],

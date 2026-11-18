@@ -1,5 +1,6 @@
 import { Node, mergeAttributes } from "@tiptap/core";
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from "@tiptap/react";
+import { referenceMarkdown } from "@asterism-app/sdk/contracts";
 import { useRendererObject } from "@asterism-app/sdk/renderer";
 import { ReferenceChip as ReferenceChipControl } from "@asterism-app/ui/reference-chip";
 import { referenceNodeName } from "./reference-serialization";
@@ -49,7 +50,7 @@ export const ReferenceChip = Node.create({
 
   renderText({ node }) {
     const { label, href } = node.attrs as ReferenceAttrs;
-    return `[${label}](${href})`;
+    return referenceMarkdown(label, href);
   },
 
   addNodeView() {
