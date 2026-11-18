@@ -70,7 +70,8 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     const active = latest.current.controller;
     if (!active) return false;
     const kind = entry.contract.resource.kind;
-    const placement = position ?? canvas()?.findPlacement({ kind })?.position ?? null;
+    const targetCanvas = canvas();
+    const placement = position ?? targetCanvas?.findPlacement({ kind })?.position ?? null;
     if (!placement) { setError(creationMessages.workbenchNotReady); return false; }
     const requestId = crypto.randomUUID();
     setError(null); setBusy(true);
@@ -81,6 +82,8 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
       const result = await active.execute({ type: "resource.create", sessionId: active.sessionId, kind,
         creation: reference(entry.contract), input: value, position: placement, requestId, contentScopeId: scopeId });
       if (!result.ok) setError(errorDisplay(result.error));
+      else if (result.reply.kind === "resource.created" && targetCanvas === canvas())
+        void targetCanvas?.locateCreatedObject(result.reply.objectId);
       return result.ok;
     } catch (error) {
       setError(errorDisplay({ code: "unavailable", message: error instanceof Error ? error.message : "Content input is unavailable." }));

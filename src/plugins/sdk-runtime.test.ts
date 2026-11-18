@@ -648,6 +648,21 @@ describe("Host implementation of the workbench SDK", () => {
     expect(service.sessions.tree.nodes(sessionId).map(flat)).toHaveLength(before);
     expect(c.context().object(sessionId, Counter, objectId).get(State)).toBe(1);
   });
+  it("publishes the new card before replying to its creation request", async () => {
+    const changed = vi.fn<(event: SessionChanged) => void>();
+    const { service, sessionId } = open([counter().plugin], undefined, changed);
+    const existing = await create(service, sessionId);
+    await service.sessions.execute({ type: "watch", sessionId });
+    const reply = await service.sessions.execute({ type: "resource.create", sessionId, kind: Counter.kind,
+      creation: { id: CreateCounter.id }, input: 2, position: { x: 800, y: 0 } });
+    if (reply.kind !== "resource.created") throw new Error("Expected the new resource identity.");
+    expect(reply.objectId).not.toBe(existing);
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ kind: "session.changed",
+      workbench: expect.objectContaining({ objects: expect.arrayContaining([
+        expect.objectContaining({ id: reply.objectId, presentation: expect.objectContaining({ data: { value: 2 } }) }),
+      ]) }),
+    }));
+  });
   it("creation inputs parse once and create uses transformed results after preparation acceptance", async () => {
     const transform = vi.fn((value: number) => value + 1);
     const contract = defineCreation(Counter, { id: ns.name("transform"), schema: z.number().transform(transform) });

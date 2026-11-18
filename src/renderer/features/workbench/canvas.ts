@@ -18,6 +18,8 @@ export type ObjectPlacement = { sessionId: string; position: Point; selectedObje
 export interface WorkbenchCanvas {
   /** Find the nearest free position when none is specified; return null when not ready. Capture the selection when obtaining the position. */
   findPlacement: (options?: { kind?: string; size?: CardSize }) => ObjectPlacement | null;
+  /** Frame the new card with the sole selected card, if any, without changing selection. */
+  locateCreatedObject: (objectId: string) => Promise<void>;
   /** Open hidden objects, wait for projection and measurement, then frame them together; empty lists or invalid objects do not move the viewport. */
   locateObjects: (objectIds: readonly string[], options?: { select?: boolean }) => Promise<void>;
   /** Explicitly arrange currently visible cards, save all positions, then frame them together. */
@@ -96,6 +98,11 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
     if (valid()) setLocating({ objectIds, select: options?.select ?? false, token });
   }, [controller]);
 
+  const locateCreatedObject = useCallback<WorkbenchCanvas["locateCreatedObject"]>(objectId => {
+    const selected = flow.getNodes().filter(node => node.selected && node.id !== objectId);
+    return locateObjects(selected.length === 1 ? [selected[0].id, objectId] : [objectId]);
+  }, [flow, locateObjects]);
+
   const arrange = useCallback(async () => {
     const state = controller.getSnapshot();
     const current = flow.getNodes();
@@ -158,6 +165,7 @@ export function useWorkbenchCanvas(nodes: ObjectNodeType[], setNodes: Dispatch<S
   const minZoom = width && height
     ? overviewMinZoom(flow.getNodesBounds(nodes), width, height)
     : Math.min(defaultOverviewMinZoom, session.viewport.zoom);
-  const api = useMemo<WorkbenchCanvas>(() => ({ findPlacement, locateObjects, arrange }), [findPlacement, locateObjects, arrange]);
+  const api = useMemo<WorkbenchCanvas>(() => ({ findPlacement, locateCreatedObject, locateObjects, arrange }),
+    [findPlacement, locateCreatedObject, locateObjects, arrange]);
   return { api, minZoom };
 }

@@ -90,6 +90,7 @@ export const sessionReplySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("view"), data: sessionDataSchema }),
   z.strictObject({ kind: z.literal("records"), nodes: z.array(sessionNodeSchema) }),
   z.strictObject({ kind: z.literal("accepted"), sessionId: id }),
+  z.strictObject({ kind: z.literal("resource.created"), sessionId: id, objectId: id }),
   z.strictObject({ kind: z.literal("warnings"), warnings: z.array(z.strictObject({ objectId: id, title: z.string(), warning: uiTextSchema })) }),
 ]);
 export type SessionReply = z.infer<typeof sessionReplySchema>;

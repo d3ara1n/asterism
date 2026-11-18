@@ -604,9 +604,9 @@ export class SessionService {
         const content = this.content.fork(command.contentScopeId, { kind: "resource", sessionId: command.sessionId, resourceKind: command.kind, contractId: command.creation.id });
         if (requestKey) this.creating.set(requestKey, abort);
         try {
-          await this.createResource(command.sessionId, command.kind, { ...command.creation, input: command.input }, content,
+          const resource = await this.createResource(command.sessionId, command.kind, { ...command.creation, input: command.input }, content,
             { signal: abort.signal, position: command.position });
-          return { kind: "accepted", sessionId: command.sessionId };
+          return { kind: "resource.created", sessionId: command.sessionId, objectId: resource.id };
         } catch (error) {
           if (abort.signal.aborted) throw new SessionError("conflict", "The creation was cancelled.");
           throw error;
