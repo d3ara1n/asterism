@@ -1,4 +1,3 @@
-import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import { ArrowLeft, Bot, Brain, ChevronDown, ChevronRight, Cpu, type LucideIcon } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -10,7 +9,6 @@ import { useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { modelSelectionMessages, thinkingLabels } from "@asterism-app/ui/messages/model-selection";
 import { Button } from "@asterism-app/ui/ui/button";
-import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { commandPageVariants, reducedCommandPageVariants, useCommandContentHeight } from "@asterism-app/ui/command-motion";
 import { Separator } from "@asterism-app/ui/ui/separator";
@@ -163,7 +161,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
                 }} />)}
             </div> : <>
               <div className="flex shrink-0 items-center gap-2 px-2 py-1.5">
-                <IconButton label={i18n.text(commonMessages.back)} size="icon-xs" onClick={back}><ArrowLeft /></IconButton>
+                <Button variant="ghost" size="icon-xs" aria-label={i18n.text(commonMessages.back)} onClick={back}><ArrowLeft /></Button>
                 <span className="type-label truncate">{browsingModels ? provider?.name ?? providerId : labels[page]}</span>
               </div>
               <Separator />
@@ -182,6 +180,7 @@ export function AgentConfigurationPicker({ selection, disabled, onChange }: {
                       }} />
               ) : (
                 <ConfigurationOptions label={labels[page]} options={options[page]} selected={selected[page]}
+                  showDescriptionTooltip={page === "agent"}
                   disabled={blocked || (page === "thinking" && unsupported)}
                   onSelect={value => { void choose(page, value); }} />
               )}
@@ -218,13 +217,13 @@ function ConfigurationPopover({ wide, pageKey, reducedMotion, children, ...props
   </PopoverContent>;
 }
 
-function ConfigurationRow({ icon: Icon, label, value, title, ...props }: React.ComponentProps<typeof Button> & {
+function ConfigurationRow({ icon: Icon, label, value, ...props }: ComponentProps<typeof Button> & {
   icon: LucideIcon; label: string; value: string;
 }) {
-  return <TooltipHint content={title ?? `${label}: ${value}`}><Button variant="ghost" size="sm" className="w-full justify-start gap-2" {...props}>
+  return <Button variant="ghost" size="sm" className="w-full justify-start gap-2" {...props}>
     <Icon data-icon="inline-start" className="text-muted-foreground" />
     <span className="shrink-0">{label}</span>
     <span className="ml-auto truncate text-muted-foreground">{value}</span>
     <ChevronRight data-icon="inline-end" className="text-muted-foreground" />
-  </Button></TooltipHint>;
+  </Button>;
 }

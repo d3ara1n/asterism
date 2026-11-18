@@ -16,12 +16,13 @@ export interface ConfigurationChoice {
 }
 
 /** Local selection list shared by configuration pages; browsing highlights and saved selections are represented separately. */
-export function ConfigurationOptions({ label, options, selected, initialActive = selected, active, disabled, searchPlaceholder, onSelect, onActiveChange, fill = false }: {
+export function ConfigurationOptions({ label, options, selected, initialActive = selected, active, disabled, searchPlaceholder, onSelect, onActiveChange, fill = false, showDescriptionTooltip = false }: {
   label: string; options: ConfigurationChoice[]; selected: string; initialActive?: string; disabled: boolean; searchPlaceholder?: string;
   active?: string;
   onSelect(value: string): void;
   onActiveChange?(value: string): void;
   fill?: boolean;
+  showDescriptionTooltip?: boolean;
 }) {
   const i18n = useI18n();
   const list = useRef<HTMLDivElement>(null);
@@ -41,7 +42,9 @@ export function ConfigurationOptions({ label, options, selected, initialActive =
           disabled={disabled} onSelect={() => onSelect(option.value)}>
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="wrap-anywhere">{option.label}</span>
-            {option.description && <TooltipHint content={option.description}><span className="type-caption line-clamp-2 wrap-anywhere text-muted-foreground">{option.description}</span></TooltipHint>}
+            {option.description && <TooltipHint content={showDescriptionTooltip ? option.description : undefined}>
+              <span className="type-caption line-clamp-2 wrap-anywhere text-muted-foreground">{option.description}</span>
+            </TooltipHint>}
           </span>
           {option.navigation ? <ChevronRight aria-hidden="true" className="ml-auto" />
             : <Check aria-hidden="true" className={cn("ml-auto", selected !== option.value && "invisible")} />}
