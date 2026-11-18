@@ -1,9 +1,9 @@
 import type { ParadigmSnapshot } from "./contract.ts";
 import {
-  agentSchema, agentOverridesSchema, modelRoleSchema, modelRoleOverridesSchema,
+  defaultAgentPreset, agentSchema, agentOverridesSchema, modelRoleSchema, modelRoleOverridesSchema,
   type AgentOverrides, type ModelRoleOverrides,
 } from "@asterism-app/builtin-api/contracts";
-import { defaultAgents, defaultRoles, workerAgentId } from "./defaults.ts";
+import { defaultAgents, defaultRoles } from "./defaults.ts";
 
 type ConfigurationIdentity = { id: string; builtin: boolean };
 export type RoleConfigurationEntry = ConfigurationIdentity & { overrides: ModelRoleOverrides };
@@ -32,7 +32,7 @@ function normalizeFields(value: object): Record<string, unknown> {
 
 /** Built-in entries inherit their own defaults; custom and new entries inherit only behavior fields from a fixed baseline, and users supply their identities. */
 export const roleBaseId = (role?: ConfigurationIdentity) => role?.builtin ? role.id : "default";
-export const agentBaseId = (agent?: ConfigurationIdentity) => agent?.builtin ? agent.id : workerAgentId;
+export const agentBaseId = (agent?: ConfigurationIdentity) => agent?.builtin ? agent.id : defaultAgentPreset;
 export function resolveRoleConfiguration(role: RoleConfigurationEntry, defaults = configurationDefaults) {
   const overrides = modelRoleOverridesSchema.parse(role.overrides);
   const base = roleBaseId(role);

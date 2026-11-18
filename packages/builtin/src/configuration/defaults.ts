@@ -1,7 +1,7 @@
 import type { AgentConfiguration, ModelRole } from "@asterism-app/builtin-api/contracts";
 import { defaultAgentPreset } from "@asterism-app/builtin-api/contracts";
 
-/** General-purpose built-in agent; custom agents inherit its definition, and saved settings without a default selection resolve to it. */
+/** Built-in task role and the default conversation selection for legacy settings. */
 export const workerAgentId = "worker";
 
 // Built-in agents supply purpose-specific defaults used as the original resolution baseline.

@@ -23,8 +23,8 @@ describe("Builtin configuration ownership", () => {
     expect(snapshot.agents.filter(agent => ["general", "worker", "custom"].includes(agent.id)).map(agent => agent.id)).toEqual(["general", "worker", "custom"]);
     expect(snapshot.agents.find(agent => agent.id === "general")).toMatchObject({ builtin: true, systemPrompt: "", availableToAgents: false });
     expect(snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ systemPrompt: "User instructions", enabled: false, availableToAgents: true });
-    expect(snapshot.agents.find(agent => agent.id === "custom")).toMatchObject({ systemPrompt: "General-purpose agent. Carry out the requested task using the available context and capabilities.",
-      availableToAgents: true, delegates: [], subagent: { budget: { maxRequests: 17, maxDurationSeconds: 2400 } } });
+    expect(snapshot.agents.find(agent => agent.id === "custom")).toMatchObject({ systemPrompt: "",
+      availableToAgents: false, delegates: [], subagent: { budget: { maxRequests: 17, maxDurationSeconds: 2400 } } });
     expect(snapshot.overrides.agents).toEqual(Object.fromEntries(saved.agents.map(agent => [agent.id, agent.overrides])));
     const explicit = resolveParadigmConfiguration(paradigmConfigurationSchema.parse({ ...saved, defaultAgentId: "custom" }));
     expect(explicit.defaultAgentId).toBe("custom");
@@ -80,11 +80,13 @@ describe("Builtin configuration ownership", () => {
     expect(resolveParadigmConfiguration(cleared).agents.find(agent => agent.id === "general")!.systemPrompt).toBe(configurationDefaults.agents.general!.systemPrompt);
     expect(saved.agents.find(agent => agent.id === "general")!.overrides.systemPrompt).toBe("Custom instructions");
   });
-  it("uses original defaults for custom entries independently of edited built-ins", () => {
-    let value = updateParadigmConfiguration(initial(), { type: "agent.save", id: "general", value: { id: "general", systemPrompt: "Changed", enabled: false } });
-    value = updateParadigmConfiguration(value, { type: "agent.save", id: null, value: { id: "custom", examples: [] } });
+  it("creates custom agents from factory general defaults rather than the edited or selected conversation agent", () => {
+    const general = resolveParadigmConfiguration(initial()).agents.find(agent => agent.id === "general")!;
+    let value = updateParadigmConfiguration(initial(), { type: "agent.default", id: "worker" });
+    value = updateParadigmConfiguration(value, { type: "agent.save", id: "general", value: { id: "general", systemPrompt: "Changed", enabled: false } });
+    value = updateParadigmConfiguration(value, { type: "agent.save", id: null, value: { id: "custom" } });
     expect(resolveParadigmConfiguration(value).agents.find(agent => agent.id === "custom"))
-      .toMatchObject({ systemPrompt: configurationDefaults.agents.worker!.systemPrompt, enabled: true, examples: [] });
+      .toEqual({ ...general, id: "custom", builtin: false });
   });
   it.each(["agent", "role"] as const)("edits code-owned %s entries without stored roster entries and rejects deletion or identity collisions", kind => {
     const id = kind === "agent" ? "general" : "default";
@@ -164,10 +166,10 @@ describe("Builtin configuration ownership", () => {
   });
   it("updates unoverridden fields without mutating already resolved configuration", () => {
     const oldDefaults = structuredClone(configurationDefaults), nextDefaults = structuredClone(configurationDefaults);
-    oldDefaults.agents.worker!.subagent.budget.maxRequests = 1200; nextDefaults.agents.worker!.subagent.budget.maxRequests = 3000;
-    nextDefaults.agents.worker!.subagent.budget.maxDurationSeconds = 50;
-    nextDefaults.agents.worker!.subagent.instructions = "New delegation instructions";
-    nextDefaults.agents.worker!.systemPrompt = "New default"; nextDefaults.roles.default!.thinking = "high";
+    oldDefaults.agents.general!.subagent.budget.maxRequests = 1200; nextDefaults.agents.general!.subagent.budget.maxRequests = 3000;
+    nextDefaults.agents.general!.subagent.budget.maxDurationSeconds = 50;
+    nextDefaults.agents.general!.subagent.instructions = "New delegation instructions";
+    nextDefaults.agents.general!.systemPrompt = "New default"; nextDefaults.roles.default!.thinking = "high";
     // Overriding one budget field keeps inheriting the other from current defaults.
     const entry = { id: "custom", builtin: false, overrides: { systemPrompt: "Pinned", subagent: { budget: { maxDurationSeconds: 70 } } } };
     const before = resolveAgentConfiguration(entry, oldDefaults);
@@ -195,7 +197,7 @@ describe("Builtin configuration ownership", () => {
   });
   it("replaces inherited resource policies as a pair and preserves empty allowlists", () => {
     const defaults = structuredClone(configurationDefaults);
-    defaults.agents.worker!.excludeResources = ["test/web"];
+    defaults.agents.general!.excludeResources = ["test/web"];
     const resolve = (overrides: Parameters<typeof resolveAgentConfiguration>[0]["overrides"]) =>
       resolveAgentConfiguration({ id: "custom", builtin: false, overrides }, defaults);
     expect(resolve({})).toMatchObject({ resources: null, excludeResources: ["test/web"] });
