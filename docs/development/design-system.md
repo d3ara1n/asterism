@@ -101,7 +101,9 @@ Use shadcn/Radix controls and shared combinations in `packages/ui/src/ui/`. Feat
 | Destructive | Irreversible confirmation |
 | Link | An action embedded in text |
 
-Icon-only actions use the shared accessible tooltip control. Destructive entry points and their confirmation remain distinct.
+Use the shared `IconButton` for icon-only actions. It supplies the accessible label, tooltip, and rounded-square shape. Island title bars follow the same rule in Settings and the workbench, including more, close, return, and auxiliary panel controls. Match the size of adjacent icon buttons within a title bar and use the shared size variants for density. Compose a menu or popover trigger as the child of `IconButton` with `asChild` so it uses the same button element instead of recreating the styling and tooltip.
+
+Destructive entry points and their confirmation remain distinct.
 
 Every size-adjustment handle supports double-clicking to restore the affected surface's default geometry. Reset clears the user size override and uses the current default, subject to the surface's minimum and maximum dimensions. Handle hints describe both dragging and double-click reset. An explicit reset action also remains available through a keyboard-accessible control or menu.
 

@@ -6,10 +6,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactEle
 
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
-import { Button } from "@asterism-app/ui/ui/button";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from "@asterism-app/ui/ui/dropdown-menu";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { cn } from "@asterism-app/ui/utils";
 import { useObjectCollapse } from "./object-collapse";
 import { fadeTransition } from "../../shared/weave/motion";
@@ -90,11 +88,10 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
           <div className="nodrag flex shrink-0 items-center gap-0.5">
             {actions}
             {panels.length > 0 && <DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger asChild><DropdownMenuTrigger asChild><Button ref={trigger} variant={active ? "selected" : "ghost"} size="icon-xs"
-                  aria-pressed={Boolean(active)} aria-label={i18n.text(objectsMessages.auxiliaryPanels)}><PanelsTopLeft /></Button></DropdownMenuTrigger></TooltipTrigger>
-                <TooltipContent>{i18n.text(objectsMessages.auxiliaryPanels)}</TooltipContent>
-              </Tooltip>
+              <IconButton ref={trigger} variant={active ? "selected" : "ghost"} size="icon-xs"
+                aria-pressed={Boolean(active)} label={i18n.text(objectsMessages.auxiliaryPanels)} asChild>
+                <DropdownMenuTrigger><PanelsTopLeft /></DropdownMenuTrigger>
+              </IconButton>
               <DropdownMenuContent align="end" onCloseAutoFocus={event => {
                 if (!menuSelected.current) return;
                 menuSelected.current = false;

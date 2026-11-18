@@ -1,7 +1,6 @@
 import { ActionMenu, ActionMenuTarget, ActionMenuTrigger, ActionMenuContent, ActionMenuGroup, ActionMenuItem, ActionMenuSeparator } from "@asterism-app/ui/ui/action-menu";
 
-import { Button } from "@asterism-app/ui/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { MoreHorizontal, PenLine, Trash2 } from "lucide-react";
 
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@asterism-app/ui/ui/alert-dialog";
@@ -35,12 +34,9 @@ export function ObjectActions({ object, appearance, onView, children }: {
   const [dialog, setDialog] = useState<"rename" | "remove" | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const openingRename = useRef(false);
-  const menuTrigger = <Tooltip>
-    <TooltipTrigger asChild><ActionMenuTrigger asChild>
-      <Button ref={trigger} variant="ghost" size="icon-xs" aria-label={i18n.formatMessage(objectsMessages.objectActions)}><MoreHorizontal /></Button>
-    </ActionMenuTrigger></TooltipTrigger>
-    <TooltipContent>{i18n.text(objectsMessages.objectActions)}</TooltipContent>
-  </Tooltip>;
+  const menuTrigger = <IconButton ref={trigger} size="icon-xs" label={i18n.text(objectsMessages.objectActions)} asChild>
+    <ActionMenuTrigger><MoreHorizontal /></ActionMenuTrigger>
+  </IconButton>;
   return <><ActionMenu>
     {children(menuTrigger, header => <ActionMenuTarget asChild blankOnly>{header}</ActionMenuTarget>)}
     <ActionMenuContent align="end" onCloseAutoFocus={event => {

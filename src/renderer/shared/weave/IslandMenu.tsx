@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from "react";
+import type { ComponentProps, ReactElement, ReactNode } from "react";
 import { ArrowLeft, ArrowRight, MoreHorizontal, RotateCcw, Scaling } from "lucide-react";
 
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -15,7 +15,8 @@ const sizePresets = [
 ] as const;
 
 /** Island chrome menu: window size and position belong to the containing ordinary island, independent of its content. Root islands keep their header without these controls. */
-export function IslandMenu({ children }: {
+export function IslandMenu({ triggerSize, children }: {
+  triggerSize?: ComponentProps<typeof IconButton>["size"];
   children: (trigger: ReactNode, renderHeader: (header: ReactElement) => ReactNode) => ReactNode;
 }) {
   const i18n = useI18n();
@@ -23,7 +24,7 @@ export function IslandMenu({ children }: {
   if (!arrangement) return children(null, header => header);
   const label = i18n.text(islandsMessages.actions);
   return <ActionMenu>
-    {children(<IconButton label={label} asChild>
+    {children(<IconButton label={label} size={triggerSize} asChild>
       <ActionMenuTrigger><MoreHorizontal /></ActionMenuTrigger>
     </IconButton>, header => <ActionMenuTarget asChild blankOnly>{header}</ActionMenuTarget>)}
     <ActionMenuContent align="end">
