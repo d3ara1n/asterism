@@ -17,6 +17,7 @@ import { useOutputFollow } from "./output-follow";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useConversationHistory } from "./use-conversation-history";
+import { ConversationHistoryWindow } from "./history-window";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { TimelineViewState } from "./view-state";
 
@@ -59,9 +60,11 @@ export function Conversation({ feedback, compressions, activity = null, executio
   const { ready } = state;
   const agentId = object.ref.id;
   const snapshot = session.snapshot();
-  const viewState = object.retained.get(viewStateKey, () => new TimelineViewState());
+  const { viewState, historyWindow } = object.retained.get(viewStateKey, () => ({
+    viewState: new TimelineViewState(), historyWindow: new ConversationHistoryWindow(agentId),
+  }));
   const running = executionState === "running";
-  const { read, items, loadEarlier } = useConversationHistory(snapshot, agentId, viewState.historyWindow, models.blocks, running, feedback, compressions);
+  const { read, items, loadEarlier } = useConversationHistory(snapshot, historyWindow, models.blocks, running, feedback, compressions);
   const { timeline: target, processOwners, toggle } = useConversationProcesses(items, viewState, running);
   const reducedMotion = useReducedMotion() === true;
   const presence = useTimelinePresence(target, processOwners, reducedMotion);
@@ -95,7 +98,7 @@ export function Conversation({ feedback, compressions, activity = null, executio
     await interaction.resume(); latest();
   };
 
-  return <ConversationSharing items={items} historyWindow={viewState.historyWindow} earlier={read.data?.earlier ?? false}>
+  return <ConversationSharing items={items} historyWindow={historyWindow} earlier={read.data?.earlier ?? false}>
     <AgentUIRegion position="top" />
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
       <ConversationNavigation ref={navigation} timeline={timeline} scroll={scroll} list={list} startMargin={startMargin} onSelect={jumpTo} />

@@ -7,10 +7,10 @@ import type { ConversationHistoryWindow } from "./history-window";
 import { displayedTimeline, liveTimeline, conversationTimeline, withLive } from "./timeline";
 
 /** Owns the reading window and the handoff from live output to saved records. */
-export function useConversationHistory(snapshot: RendererSessionSnapshot | null, agentId: string, window: ConversationHistoryWindow,
+export function useConversationHistory(snapshot: RendererSessionSnapshot | null, window: ConversationHistoryWindow,
   blocks: readonly ModelLiveBlock[], running: boolean, feedback: readonly InlineFeedback[], compressions: readonly CompressionActivity[]) {
   const read = useSessionRead(snapshot,
-    useCallback((snapshot, signal) => readConversation(snapshot, agentId, window, signal), [agentId, window]),
+    useCallback((snapshot, signal) => readConversation(snapshot, window, signal), [window]),
     { keepPrevious: true });
   const saved = useMemo(() => read.data ? conversationTimeline(read.data.projection, running, feedback, compressions) : null,
   [read.data, running, feedback, compressions]);

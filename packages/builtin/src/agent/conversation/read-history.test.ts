@@ -23,6 +23,36 @@ function fixture(nodes: ReturnType<typeof node>[]) {
 }
 
 describe("Conversation display reads", () => {
+  it("has no earlier page for a new Agent even when the session already spans multiple pages", async () => {
+    const path = Array.from({ length: 150 }, (_, i) => node(`other-${i}`, i ? `other-${i - 1}` : null, message("b", "Other Agent")));
+    const { remote, reads } = fixture(path);
+    const result = await readConversation(remote, new ConversationHistoryWindow("a"));
+    expect(result.earlier).toBe(false);
+    expect(withLive(conversationTimeline(result.projection, false), [])).toEqual([]);
+    expect(reads).toEqual([]);
+  });
+
+  it("loads a full page of this Agent's records despite interleaved Agent and diagnostic records", async () => {
+    const path: ReturnType<typeof node>[] = [];
+    for (let i = 0; i < 105; i++) {
+      path.push(node(`own-${i}`, path.at(-1)?.id ?? null, message("a", "Reader's input")),
+        node(`other-${i}`, `own-${i}`, message("b", "Other Agent")),
+        node(`diagnostic-${i}`, `other-${i}`, event("example/diagnostic", {}, { source: agentSource("a") })));
+    }
+    const { remote } = fixture(path);
+    const window = new ConversationHistoryWindow("a");
+    const messages = (result: Awaited<ReturnType<typeof readConversation>>) => conversationTimeline(result.projection, false).items
+      .filter(item => item.kind === "message").map(item => item.id);
+    const first = await readConversation(remote, window);
+    expect(messages(first)).toEqual(Array.from({ length: 100 }, (_, i) => `own-${i + 5}`));
+    expect(first.earlier).toBe(true);
+
+    window.expand(first.index);
+    const expanded = await readConversation(remote, window);
+    expect(messages(expanded)).toEqual(Array.from({ length: 105 }, (_, i) => `own-${i}`));
+    expect(expanded.earlier).toBe(false);
+  });
+
   // Generic operations and other Agents may carry large bodies; positional feedback still belongs after those records.
   it("reads only this Agent's conversation bodies while preserving unrelated feedback anchors and turn measurements", async () => {
     const tool = call("a", "work", 0, "c", { outcome: null });
@@ -34,7 +64,7 @@ describe("Conversation display reads", () => {
       node("other", "unrelated", text("b", "other", 0, "Another Agent's private response")),
       node("reply", "other", text("a", "final", 0, "Done", { completion })),
     ]);
-    const result = await readConversation(remote, "a", new ConversationHistoryWindow());
+    const result = await readConversation(remote, new ConversationHistoryWindow("a"));
     expect(new Set(reads)).toEqual(new Set(["input", "operation", "reply"]));
     const timeline = withLive(conversationTimeline(result.projection, false, [
       { id: "notice", afterNodeId: "unrelated", origin: "software", code: "info", level: "warning", message: "At this position" },
@@ -53,7 +83,7 @@ describe("Conversation display reads", () => {
       node("reply", "kept", text("a", "final", 0, "Retained answer", { completion })),
       node("summary", "reply", event(ContextSummary.id, { summary: "Compacted", keptFrom: "kept", model: "p/m", tokensBefore: 1000, completion }, { source: agentSource("a") })),
     ]);
-    const result = await readConversation(remote, "a", new ConversationHistoryWindow());
+    const result = await readConversation(remote, new ConversationHistoryWindow("a"));
     expect(reads).not.toContain("kept");
     const timeline = withLive(conversationTimeline(result.projection, false), []);
     expect(timeline.map(item => item.id)).toEqual(["compression-boundary:summary", "reply", "summary", "turn-metrics:input"]);
@@ -70,13 +100,13 @@ describe("Conversation display reads", () => {
       node("kept", "old", message("a", "Retained")),
       node("first-summary", "kept", summary("First handoff", "kept")),
     ];
-    const window = new ConversationHistoryWindow();
-    await readConversation(fixture(path).remote, "a", window);
+    const window = new ConversationHistoryWindow("a");
+    await readConversation(fixture(path).remote, window);
     path.push(node("newer", "first-summary", message("a", "Newer")),
       node("second-summary", "newer", summary("Second handoff", "newer")));
     const { remote } = fixture(path);
-    const existing = await readConversation(remote, "a", window);
-    const reopened = await readConversation(remote, "a", new ConversationHistoryWindow());
+    const existing = await readConversation(remote, window);
+    const reopened = await readConversation(remote, new ConversationHistoryWindow("a"));
     const items = (result: typeof existing) => withLive(conversationTimeline(result.projection, false), []);
     expect(items(existing)[0]).toMatchObject({ kind: "compression-summary", text: "First handoff" });
     expect(items(reopened)[0]).toMatchObject({ kind: "compression-summary", text: "Second handoff" });
@@ -93,7 +123,7 @@ describe("Conversation display reads", () => {
       node("reply", "input", text("a", "final", 0, "Answer", { continuation,
         completion: { ...completion, extensions: [{ contract: { id: "example/diagnostics" }, data: { request: diagnostics } }] } })),
     ]);
-    const result = await readConversation(remote, "a", new ConversationHistoryWindow());
+    const result = await readConversation(remote, new ConversationHistoryWindow("a"));
     const retained = JSON.stringify(result);
     expect(retained).not.toContain(continuation);
     expect(retained).not.toContain(diagnostics);

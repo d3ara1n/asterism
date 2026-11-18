@@ -29,7 +29,6 @@ import "./share.css";
 
 export interface ShareDialogProps {
   snapshot: RendererSessionSnapshot;
-  agentId: string;
   messages: ShareMessage[];
   anchor: string;
   historyWindow: ConversationHistoryWindow;
@@ -44,9 +43,10 @@ const widths = [720, 960, 1200] as const;
 const siteUrl = "https://asterism.dearain.dev";
 const segment = "h-6 min-w-0 rounded-sm px-2.5 text-xs tabular-nums text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs";
 
-export default function ShareDialog({ snapshot, agentId, messages: initial, anchor, historyWindow, earlier: initialEarlier, origin, onClose }: ShareDialogProps) {
+export default function ShareDialog({ snapshot, messages: initial, anchor, historyWindow, earlier: initialEarlier, origin, onClose }: ShareDialogProps) {
   const i18n = useI18n();
   const application = useRendererApplication();
+  const { agentId } = historyWindow;
   const lifetime = useLifetimeSignal();
   const [candidates, setCandidates] = useState(initial);
   const [selected, setSelected] = useState(() => initialShareSelection(initial, anchor));
@@ -94,7 +94,7 @@ export default function ShareDialog({ snapshot, agentId, messages: initial, anch
     setLoading(true);
     try {
       historyWindow.expand(snapshot.records.index({ scope: "timeline" }));
-      const read = await readConversation(snapshot, agentId, historyWindow, signal);
+      const read = await readConversation(snapshot, historyWindow, signal);
       signal.throwIfAborted();
       const timeline = conversationTimeline(read.projection, false);
       const loaded = shareMessages([...timeline.items, ...(timeline.tail ? [timeline.tail] : [])]);

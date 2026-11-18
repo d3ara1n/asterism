@@ -23,7 +23,7 @@ export function ConversationSharing({ items, historyWindow, earlier, children }:
     const { object, items, historyWindow, earlier } = current.current;
     const snapshot = object.session.snapshot();
     if (!snapshot) return;
-    setRequest({ snapshot, agentId: object.ref.id, messages: shareMessages(items), anchor,
+    setRequest({ snapshot, messages: shareMessages(items), anchor,
       historyWindow: historyWindow.fork(), earlier, origin, onClose: () => setRequest(null) });
   }, []);
   return <ConversationShareContext value={open}>
