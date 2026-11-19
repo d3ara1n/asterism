@@ -100,10 +100,10 @@ export function PluginsSettings({ manager }: { manager: PluginManager }) {
       <Select value={filter} onValueChange={setFilter}><SelectTrigger size="sm" aria-label={i18n.text(messages.filter)}><SelectValue /></SelectTrigger>
         <SelectContent><SelectGroup><SelectItem value="all">{i18n.text(messages.all)}</SelectItem>{Object.entries(labels).map(([value, label]) => <SelectItem key={value} value={value}>{i18n.text(label)}</SelectItem>)}</SelectGroup></SelectContent>
       </Select>
-      <Button size="sm" disabled={manager.busy} onClick={() => { void manager.add(); }}>{manager.busy ? <Spinner /> : <Plus />}{i18n.text(messages.addPackage)}</Button>
-    </div>
-    <div className="flex flex-wrap gap-3">
-      <Button variant="outline" size="sm" disabled={manager.busy || Boolean(npmPending)} onClick={() => setInstaller({})}>{i18n.text(messages.installNpm)}</Button>
+      <div className="flex shrink-0 items-center gap-3">
+        <Button variant="outline" size="sm" disabled={manager.busy || Boolean(npmPending)} onClick={() => setInstaller({})}>{i18n.text(messages.installNpm)}</Button>
+        <Button size="sm" disabled={manager.busy} onClick={() => { void manager.add(); }}>{manager.busy ? <Spinner /> : <Plus />}{i18n.text(messages.addPackage)}</Button>
+      </div>
       {manager.operation && <Button variant="ghost" size="sm" onClick={() => setInstaller({ ...(manager.operation?.targetSource ? { targetSource: manager.operation.targetSource } : {}) })}>
         {i18n.text(npmPending ? messages.installationProgress : messages.installationResult)}
       </Button>}
@@ -147,6 +147,7 @@ function PluginListItem({ plugin, status, failure, manager, onUpdate }: {
   const i18n = useI18n();
   const name = i18n.text(pluginName(plugin));
   const { index, metadata } = plugin;
+  const differentRunningVersion = plugin.runningVersion !== (plugin.npm?.version ?? metadata.version) ? plugin.runningVersion : null;
   const details = [metadata.author, plugin.npm ? null : metadata.version, plugin.id, plugin.npm?.name ?? plugin.source].filter(Boolean).join(" · ");
 
   return (
@@ -155,8 +156,8 @@ function PluginListItem({ plugin, status, failure, manager, onUpdate }: {
         <div className="flex items-start justify-between gap-4">
           <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
             <ItemTitle className="min-w-0 max-w-full wrap-anywhere">{name}</ItemTitle>
+            <Badge variant="outline">{i18n.text(plugin.npm ? messages.npmSource : plugin.bundled ? messages.bundledSource : messages.localSource)}</Badge>
             <StatusBadge tone={tones[status]}>{i18n.text(labels[status])}</StatusBadge>
-            {plugin.bundled && <Badge variant="secondary">{i18n.text(messages.builtIn)}</Badge>}
           </div>
           <ItemActions className="shrink-0">
             {index === null ? (
@@ -201,11 +202,10 @@ function PluginListItem({ plugin, status, failure, manager, onUpdate }: {
           <ItemDescription className="text-wrap wrap-anywhere">{i18n.text(metadata.description)}</ItemDescription>
         )}
         <p className="type-caption select-text wrap-anywhere">{details}</p>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{i18n.text(plugin.npm ? messages.npmSource : plugin.bundled ? messages.bundledSource : messages.localSource)}</Badge>
+        {(plugin.npm || differentRunningVersion) && <div className="flex flex-wrap items-center gap-2">
           {plugin.npm && <span className="type-caption">{i18n.formatMessage(messages.selectedVersion, { version: plugin.npm.version })}</span>}
-          {plugin.runningVersion && plugin.runningVersion !== (plugin.npm?.version ?? metadata.version) && <span className="type-caption">{i18n.formatMessage(messages.runningVersion, { version: plugin.runningVersion })}</span>}
-        </div>
+          {differentRunningVersion && <span className="type-caption">{i18n.formatMessage(messages.runningVersion, { version: differentRunningVersion })}</span>}
+        </div>}
         {index === null && <p className="type-caption">{i18n.text(messages.availableHint)}</p>}
         {status === "frontendFailed" && <p className="type-caption">{i18n.text(messages.frontendFailedHint)}</p>}
         {failure && (

@@ -37,7 +37,6 @@ export const pluginsMessages = pluginNamespace("asterism.host").messages("en", d
   search: { id: "plugins.search", defaultMessage: "Search plugins…" },
   filter: { id: "plugins.filter", defaultMessage: "Filter plugins" },
   all: { id: "plugins.all", defaultMessage: "All plugins" },
-  builtIn: { id: "plugins.builtIn", defaultMessage: "Built-in" },
   available: { id: "plugins.available", defaultMessage: "Not added" },
   addBack: { id: "plugins.addBack", defaultMessage: "Add back" },
   availableHint: { id: "plugins.availableHint", defaultMessage: "Included with Asterism. Add it back to use it after restarting." },

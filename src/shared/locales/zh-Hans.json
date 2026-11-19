@@ -834,7 +834,6 @@
   "plugins.search": "搜索插件…",
   "plugins.filter": "筛选插件",
   "plugins.all": "全部插件",
-  "plugins.builtIn": "内置",
   "plugins.available": "未添加",
   "plugins.addBack": "添加回来",
   "plugins.availableHint": "此插件随 Asterism 提供。添加回来后，重启即可使用。",
