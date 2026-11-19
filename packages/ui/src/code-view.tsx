@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { File, FileDiff, type FileDiffOptions, type FileOptions } from "@pierre/diffs/react";
 import { parsePatchFiles, preloadHighlighter, type BaseCodeOptions, type FileDiffMetadata, type SupportedLanguages } from "@pierre/diffs";
+import { codeViewThemeOptions } from "./code-theme";
 
 /** Shared Pierre presentation; the host stylesheet supplies `.pierre-code` fonts, sizes, and compact spacing. */
 export const codeViewOptions = {
-  theme: { light: "pierre-light", dark: "pierre-dark" },
-  themeType: "system", preferredHighlighter: "shiki-js",
+  ...codeViewThemeOptions, themeType: "system",
   disableFileHeader: true, overflow: "wrap",
 } satisfies BaseCodeOptions;
 
@@ -23,7 +23,7 @@ let preparing: Promise<void> | null = null;
 export function prepareCodeView(): Promise<void> {
   preparing ??= preloadHighlighter({
     themes: [codeViewOptions.theme.light, codeViewOptions.theme.dark],
-    langs: preloadedLanguages,
+    langs: preloadedLanguages, preferredHighlighter: codeViewOptions.preferredHighlighter,
   }).catch(error => { preparing = null; throw error; });
   return preparing;
 }

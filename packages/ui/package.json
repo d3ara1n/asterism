@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "exports": {
+    "./code-theme": "./src/code-theme.ts",
     "./code-view": "./src/code-view.tsx",
     "./command-filter": "./src/command-filter.ts",
     "./command-page": "./src/command-page.tsx",

@@ -4,12 +4,12 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
-import { HighlightStyle, LanguageDescription, syntaxHighlighting } from "@codemirror/language";
+import { LanguageDescription, syntaxHighlighting } from "@codemirror/language";
 import { languages } from "@codemirror/language-data";
 import { getSearchQuery, openSearchPanel, search, type SearchQuery } from "@codemirror/search";
-import { tags } from "@lezer/highlight";
 import { chinesePhrases } from "./phrases.ts";
 import { editorTheme } from "./theme.ts";
+import { loadEditorHighlightStyle } from "./highlight.ts";
 import { SearchPanel } from "./SearchPanel";
 import { gitGutter, setGitBaseline } from "./git-gutter";
 import { createHintPortals, type HintPortal } from "./hint-portals";
@@ -44,13 +44,14 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, lineW
 
   useEffect(() => {
     const language = new Compartment();
+    const highlighting = new Compartment();
     const hintPortals = createHintPortals(setHints);
     const view = new EditorView({
       parent: container.current!,
       state: EditorState.create({
         doc: initialText,
         extensions: [
-          hintPortals.extension, editorSetup(hintPortals.render), editorTheme, syntaxHighlighting(highlightStyle),
+          hintPortals.extension, editorSetup(hintPortals.render), editorTheme, highlighting.of([]),
           gitGutter(hintPortals.render),
           search({ top: true, createPanel: view => {
             const dom = document.createElement("div");
@@ -89,6 +90,9 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, lineW
     if (description) void description.load().then(support => {
       if (active) view.dispatch({ effects: language.reconfigure(support) });
     }).catch(error => { if (active) callbacks.current.onLanguageError(error); });
+    void loadEditorHighlightStyle().then(style => {
+      if (active) view.dispatch({ effects: highlighting.reconfigure(syntaxHighlighting(style)) });
+    }).catch(error => { if (active) callbacks.current.onLanguageError(error); });
     const frame = requestAnimationFrame(() => view.focus());
     return () => {
       active = false;
@@ -123,16 +127,3 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, lineW
     <HintPortals portals={hints} />
   </>;
 }
-
-const highlightStyle = HighlightStyle.define([
-  { tag: [tags.keyword, tags.operatorKeyword, tags.modifier], color: "var(--primary-text)" },
-  { tag: [tags.string, tags.regexp], color: "var(--success)" },
-  { tag: [tags.number, tags.bool, tags.null], color: "var(--warning)" },
-  { tag: [tags.typeName, tags.className, tags.tagName], color: "var(--primary-text)" },
-  { tag: [tags.comment, tags.meta], color: "var(--muted-foreground)" },
-  { tag: tags.heading, fontWeight: "bold", color: "var(--primary-text)" },
-  { tag: tags.emphasis, fontStyle: "italic" },
-  { tag: tags.strong, fontWeight: "bold" },
-  { tag: tags.link, textDecoration: "underline" },
-  { tag: tags.invalid, color: "var(--destructive)" },
-]);
