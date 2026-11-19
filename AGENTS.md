@@ -35,7 +35,8 @@ Reuse maintained libraries for general controls, animation, layout, drag, and vi
 - `button`, `badge`: `destructive` uses `text-destructive-foreground` without dark overrides, `link` uses `text-primary-text`; button adds the `selected` variant, badge adds `success` and `warning`.
 - `empty`, `field`, `item`: link hover uses `text-primary-text`.
 - `dialog`, `popover`: accept a `motionPreset="command"` opt-in for shared command-surface motion; dialog applies matching scrim timing.
-- `command`: `CommandDialog` opts into command-surface motion; `CommandList` animates content height by default and accepts `animateHeight={false}` when a parent owns sizing.
+- `dialog`, `alert-dialog`: content uses a shrinkable grid column, wraps long text, and scrolls at a viewport-relative maximum height by default. Callers that own inner scrolling can override the overflow.
+- `command`: `CommandDialog` puts its accessible title and description inside `DialogContent` and opts into command-surface motion; `CommandList` animates content height by default and accepts `animateHeight={false}` when a parent owns sizing.
 - `dialog`, `command`, `spinner`: built-in labels come from `useI18n()` and `commonMessages`; `DialogContent` accepts `closeLabel`, and `CommandDialog` title and description default to localized messages.
 - `tooltip`: Provider defaults to a 700 ms hover delay with no skip-delay window; explicit timing props remain supported.
 - `progress`: forwards `value` to the Radix root so the value attributes are exposed.

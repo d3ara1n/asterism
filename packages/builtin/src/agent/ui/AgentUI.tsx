@@ -125,7 +125,7 @@ function Modal({ open, onOpenChange, title, description, size = "default", hideC
   const previousFocus = useRef<HTMLElement | null>(null);
   useHideComposer(open && hideComposer);
   return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className={`nodrag nopan nokey max-h-[calc(100dvh-2rem)] overflow-y-auto ${size === "wide" ? "sm:max-w-4xl" : ""}`}
+    <DialogContent className={`nodrag nopan nokey ${size === "wide" ? "sm:max-w-4xl" : ""}`}
       showCloseButton={!!onOpenChange} aria-describedby={description ? descriptionId : undefined}
       onOpenAutoFocus={() => { previousFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; }}
       onCloseAutoFocus={event => {

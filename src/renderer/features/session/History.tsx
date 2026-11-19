@@ -87,7 +87,8 @@ export function SessionHistoryPanel({ controller, onClose }: { controller: Sessi
   }, [snapshot?.nodes, entries, branch, view]);
   const matches = useHistorySearch(remote, candidates, directory.data, registry, search);
   const visible = search ? candidates.filter(node => matches.ids.has(node.id)) : candidates;
-  const selectedRead = useHistoryEntry(remote, snapshot?.nodes.find(node => node.id === selectedId), directory.data, registry);
+  const selectedNode = snapshot?.nodes.find(node => node.id === selectedId);
+  const selectedRead = useHistoryEntry(remote, selectedNode, directory.data, registry);
   const showStart = branch.forkId === null && !search && view.kind === "all";
   const navigate = (target: HistoryBranch, requestedId?: string | null, reveal = false) => {
     const last = remembered.current.get(target.id);
@@ -138,7 +139,7 @@ export function SessionHistoryPanel({ controller, onClose }: { controller: Sessi
     onNavigate={target => navigate(target, nodeId, true)}
   />;
   return <Tabs value={branch.id} activationMode="manual" onValueChange={id => { const target = tree.branches.find(item => item.id === id); if (target) navigate(target); }} className="island-panel min-w-0 gap-0">
-    <Panel onClose={onClose} title={i18n.formatMessage(historyMessages.history)} compact contentRef={list} action={<ContinueAction controller={controller} nodeId={selectedId} directory={directory.data} label={selectedLabel} />} toolbar={<>
+    <Panel onClose={onClose} title={i18n.formatMessage(historyMessages.history)} compact contentRef={list} action={<ContinueAction controller={controller} nodeId={selectedId} createdAt={selectedNode?.createdAt} directory={directory.data} />} toolbar={<>
       <ScrollArea orientation="horizontal" className="h-10 shrink-0" viewportRef={tabs} viewportClassName="pb-1"><TabsList variant="line" aria-label={i18n.formatMessage(historyMessages.historyBranches)}>
         {tree.branches.map(item => <Tooltip key={item.id}><TabsTrigger asChild value={item.id}><TooltipTrigger>
           {branchLabel(item)}{item.id === executionBranch.id && <CircleDot className="size-3" aria-label={i18n.formatMessage(historyMessages.historyExecutionBranch)} />}
@@ -268,11 +269,11 @@ function HistoryViewPicker({ entries, value, onChange }: { entries: HistoryEntry
 }
 
 /** Progress subscriptions refresh only the continue action, preventing the entire history list from rerendering on stream deltas. */
-function ContinueAction({ controller, nodeId, directory, label }: { controller: SessionController; nodeId: string | null; directory: HistoryDirectory | null; label?: string }) {
+function ContinueAction({ controller, nodeId, createdAt, directory }: { controller: SessionController; nodeId: string | null; createdAt?: string; directory: HistoryDirectory | null }) {
   const i18n = useI18n();
   const { snapshot, state } = useSession(controller);
   const progress = useSessionActivity(controller);
-  const [target, setTarget] = useState<{ id: string | null } | null>(null);
+  const [target, setTarget] = useState<{ id: string | null; createdAt?: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const resources = directory?.resources;
   const remote = controller.recordSnapshot();
@@ -289,14 +290,19 @@ function ContinueAction({ controller, nodeId, directory, label }: { controller: 
   const unsettled = progress.timelineBusy || progress.busyObjectIds.length > 0;
   const wait = i18n.formatMessage(historyMessages.waitForResources, { names: progress.busyObjectIds.map(id => resources?.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource)).join(", ") });
   const disabled = saving || unsettled || state.navigating || state.status !== "ready" || (target !== null && leaving.status !== "ready") || warnings.status === "loading";
-  return <><TooltipHint content={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><span><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span></TooltipHint>
-    <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent>
-      <AlertDialogHeader><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
-      <p className="type-body break-words">{label ?? i18n.formatMessage(historyMessages.historyStart)}</p>
-      {leaving.error && <p className="type-caption text-destructive">{i18n.text(historyMessages.readFailed)} <Button variant="ghost" size="xs" onClick={leaving.retry}>{i18n.text(commonMessages.retry)}</Button></p>}
-      {leaving.status === "ready" && <DisposalWarningsNotice state={warnings} />}
-      {unsettled && <p className="type-caption">{wait}</p>}
-      <AlertDialogFooter><AlertDialogCancel disabled={saving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel><AlertDialogAction disabled={disabled} aria-busy={saving} onClick={event => {
+  return <><TooltipHint content={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><span><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId, createdAt })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span></TooltipHint>
+    <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent className="flex flex-col overflow-hidden">
+      <AlertDialogHeader className="shrink-0"><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
+      <ScrollArea className="flex flex-col" contentClassName="flex flex-col gap-2 p-1 pr-3"
+        viewportClassName="h-auto flex-auto focus-visible:outline-offset-[-2px]"
+        viewportProps={{ tabIndex: 0, role: "region", "aria-label": i18n.text(historyMessages.history) }}>
+        {target?.id === null && <p className="type-body">{i18n.text(historyMessages.historyStart)}</p>}
+        {target?.createdAt && <time dateTime={target.createdAt} className="type-body">{i18n.formatDate(Date.parse(target.createdAt), { dateStyle: "medium", timeStyle: "medium" })}</time>}
+        {leaving.error && <p className="type-caption text-destructive">{i18n.text(historyMessages.readFailed)} <Button variant="ghost" size="xs" onClick={leaving.retry}>{i18n.text(commonMessages.retry)}</Button></p>}
+        {leaving.status === "ready" && <DisposalWarningsNotice state={warnings} />}
+        {unsettled && <p className="type-caption">{wait}</p>}
+      </ScrollArea>
+      <AlertDialogFooter className="shrink-0"><AlertDialogCancel disabled={saving}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel><AlertDialogAction disabled={disabled} aria-busy={saving} onClick={event => {
         event.preventDefault(); if (!target) return; setSaving(true);
         void controller.branchFrom(target.id).then(result => { if (operationSucceeded(result)) setTarget(null); }).finally(() => setSaving(false));
       }}>{saving && <Spinner />}{i18n.text(warnings.status === "error" ? objectsMessages.disposalContinue : historyMessages.continueConfirm)}</AlertDialogAction></AlertDialogFooter>

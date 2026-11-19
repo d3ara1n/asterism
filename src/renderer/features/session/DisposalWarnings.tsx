@@ -20,7 +20,7 @@ export function DisposalWarningsNotice({ state }: { state: DisposalWarnings }) {
       {state.warnings.map((item) => (
         <p
           key={item.objectId}
-          className="type-body break-words text-destructive"
+          className="type-body wrap-anywhere text-destructive"
         >
           {item.title}: {i18n.text(item.warning)}
         </p>

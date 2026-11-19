@@ -176,7 +176,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
   const View = input?.entry.InputView;
   const element = <>
     {input && View && <Dialog open onOpenChange={next => { if (!next) closeInput(false); }}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{i18n.text(input.entry.label)}</DialogTitle>
           <DialogDescription className={input.entry.description ? undefined : "sr-only"}>{i18n.text(input.entry.description ?? input.entry.label)}</DialogDescription>

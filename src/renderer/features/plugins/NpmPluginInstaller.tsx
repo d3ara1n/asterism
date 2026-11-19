@@ -38,7 +38,7 @@ export function NpmPluginInstaller({ manager, target, onClose }: {
     void manager.run({ type: "plugin.npm.preview", spec, ...(target.targetSource ? { targetSource: target.targetSource } : {}) });
   };
   return <Dialog open onOpenChange={open => { if (!open) onClose(); }}>
-    <DialogContent className="max-w-xl">
+    <DialogContent className="sm:max-w-xl">
       <DialogHeader>
         <DialogTitle>{i18n.text(target.targetSource ? messages.updateNpm : messages.installNpm)}</DialogTitle>
         <DialogDescription>{i18n.text(messages.npmTrust)}</DialogDescription>
