@@ -175,7 +175,6 @@
   "peek.explain": "解释当前对话",
   "peek.question": "想了解当前对话的哪些内容？",
   "peek.ask": "提问…",
-  "peek.failed": "失败",
   "peek.cancelled": "已停止",
   "peek.partial": "未完成",
   "peek.preparing": "准备中…",
