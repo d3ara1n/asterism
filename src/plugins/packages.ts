@@ -168,15 +168,16 @@ export class PackageList {
     writeFileSync(temporary, JSON.stringify({ version: packageListVersion, packages }, null, 2), { flush: true });
     renameSync(temporary, this.file);
   }
-  /** Validate on addition: invalid packages fail without entries; new entries are enabled by default. */
-  add(entry: Omit<PackageEntry, "enabled">, npmRoot: string): PluginPackageManifest {
+  /** Validate on addition: invalid packages fail without entries. New entries are enabled and appended unless placement restores a previous selection. */
+  add(entry: Omit<PackageEntry, "enabled">, npmRoot: string, placement: { enabled?: boolean; index?: number } = {}): PluginPackageManifest {
     const manifest = validatePackageArtifact(this.root({ ...entry, enabled: true }, npmRoot));
     const packages = this.read();
     for (const existing of packages) {
       try { if (readManifest(this.root(existing, npmRoot)).id === manifest.id) throw new PluginPackageError("duplicate", `Plugin ${manifest.id} is already added.`); }
       catch (error) { if (error instanceof PluginPackageError && error.code === "duplicate") throw error; }
     }
-    this.write([...packages, { ...entry, enabled: true }]);
+    packages.splice(placement.index ?? packages.length, 0, { source: entry.source, enabled: placement.enabled ?? true });
+    this.write(packages);
     return manifest;
   }
   /** Replace a selected installation after acquisition; validate identity conflicts before publishing. */

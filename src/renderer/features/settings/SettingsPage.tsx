@@ -14,7 +14,7 @@ import { MessagingSettings } from "../configuration/MessagingSettings";
 import { WebProvidersSettings } from "../configuration/WebProvidersSettings";
 import { SkillSettings } from "../skills/SkillsSettings";
 import { skillsMessages } from "../../messages/skills";
-import { PluginsSettings, PluginSettingsContent, usePlugins, type PluginManager } from "../plugins/PluginsSettings";
+import { PluginsProvider, PluginsSettings, PluginSettingsContent, usePlugins, type PluginManager } from "../plugins/PluginsSettings";
 import { settingsPageKey, usePluginSettingsRegistry } from "../../modules/settings";
 import { pluginsMessages } from "../../messages/plugins";
 import { Item, ItemContent, ItemTitle, ItemDescription } from "@asterism-app/ui/ui/item";
@@ -74,7 +74,7 @@ function SettingsRoot({ openId, onOpen, onClosed, onCancel, manager, location }:
   const registry = usePluginSettingsRegistry();
   const entries: { id: string; title: UiText; summary: UiText; icon: SettingsIcon; source?: UiText; content: () => ReactNode }[] = [
     ...categories.map(category => ({ ...category, content: () => category.content(manager) })),
-    { id: "plugins", title: pluginsMessages.plugins, summary: pluginsMessages.pluginsSummary, icon: Puzzle, content: () => <PluginsSettings manager={manager} /> },
+    { id: "plugins", title: pluginsMessages.plugins, summary: pluginsMessages.pluginsSummary, icon: Puzzle, content: () => <PluginsSettings /> },
     ...Array.from(registry.pages, ([id, page]) => ({ id, title: page.title, summary: page.summary, icon: page.icon ?? Puzzle, source: page.pluginName,
       content: () => <PluginSettingsContent key={id} pluginId={page.pluginId} page={page} location={location} /> })),
   ];
@@ -178,5 +178,9 @@ export function SettingsPage({ active, target, onCancel, screenRef }: { active: 
     render: () => <SettingsRoot openId={openId} onOpen={id => { setLocation(undefined); setOpenId(id); }}
       onClosed={() => { setLocation(undefined); setOpenId(null); }} onCancel={onCancel} manager={manager} location={location} />,
   };
-  return <ConfigurationContext.Provider value={configuration}><Screen ref={screenRef} key={generation} label={i18n.formatMessage(settingsMessages.settings)} root={root} className="h-full" /></ConfigurationContext.Provider>;
+  // Plugin management islands render beside the root, so they read the manager and settings navigation from this provider.
+  const plugins = { manager, openPage: (key: string) => { setLocation(undefined); setOpenId(key); } };
+  return <ConfigurationContext.Provider value={configuration}><PluginsProvider value={plugins}>
+    <Screen ref={screenRef} key={generation} label={i18n.formatMessage(settingsMessages.settings)} root={root} className="h-full" />
+  </PluginsProvider></ConfigurationContext.Provider>;
 }

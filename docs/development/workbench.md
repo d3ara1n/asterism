@@ -14,7 +14,7 @@ Builtin's entry owns Agent/model controls and setup guidance for its configurati
 
 Settings home contains application pages and plugin-declared configuration-page entries with contributor attribution. Roles, for example, opens builtin's configuration page and identifies builtin as its source. Plugins can declare several pages or none.
 
-A normal Plugins card opens a plain management list with plugin information and enablement controls. There is no separate plugin list beneath the settings home and no plugin-card route to configuration pages. Plugin management remains available when a plugin has no configuration page or fails to load.
+The Plugins card opens plugin management: a searchable list grouped into installed packages and packages included with the application, with enablement switches and a restart action when the next startup differs. Each row opens a detail island with the plugin's running state, diagnostics, package information, next-start change, and links to the configuration pages it contributes. The list keeps a removed package visible until restart, because it is still running. Settings home has no separate plugin list beneath its page entries. Plugin management remains available when a plugin has no configuration page or fails to load.
 
 About owns version, update state, channel selection, and log access. The titlebar update indicator consumes the same state. General settings owns automatic-sleep and recycle-bin retention preferences and the recycle-bin entry. Sleeping sessions remain in the sidebar, dimmed with a moon icon; opening one renews user attention before its resources attach. Keep-awake is a per-session menu setting that prevents automatic sleep only.
 

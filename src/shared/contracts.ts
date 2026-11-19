@@ -22,7 +22,33 @@ export const npmOperationSchema = z.strictObject({
 export type NpmPreview = z.infer<typeof npmPreviewSchema>;
 export type NpmOperation = z.infer<typeof npmOperationSchema>;
 
-export const protocolVersion = 17;
+/** Where a package's files come from; path packages expose their user-owned directory. */
+export const pluginOriginSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("bundled") }),
+  z.strictObject({ kind: z.literal("path"), path: z.string() }),
+  z.strictObject({ kind: z.literal("npm"), name: z.string(), version: z.string() }),
+]);
+/**
+ * One plugin management entry. selection is the next-start loading list state (null when not selected);
+ * startup is this run's outcome for the same package, or for the same plugin ID under a replaced source such as an npm update.
+ * Unselected entries are bundled packages that can be added back, or removed packages still running until restart.
+ */
+export const pluginEntrySchema = z.strictObject({
+  /** Stable source identity used by management commands and npm update targets. */
+  source: z.string(),
+  id: z.string().nullable(),
+  origin: pluginOriginSchema,
+  metadata: pluginMetadataSchema,
+  metadataError: z.string().nullable(),
+  selection: z.strictObject({ enabled: z.boolean() }).nullable(),
+  startup: z.strictObject({ source: z.string(), status: z.enum(["loaded", "disabled", "invalid", "failed"]), version: z.string().nullable(),
+    diagnostic: pluginDiagnosticSchema.nullable() }).nullable(),
+  /** The next startup differs from this run for this entry. */
+  pending: z.boolean(),
+});
+export type PluginEntry = z.infer<typeof pluginEntrySchema>;
+
+export const protocolVersion = 18;
 export const systemResumeMessage = "system.resume";
 export const statusChannel = coreChannel("runtime-status");
 export const pickDirectoryChannel = coreChannel("pick-directory");
@@ -38,9 +64,10 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("workspace.prepare-close") }),
   // Plugin package management changes lists only and takes effect after restart; paths must be package roots containing Asterism manifests.
   z.strictObject({ type: z.literal("plugin.add"), path: z.string().min(1).max(4096) }),
-  z.strictObject({ type: z.literal("plugin.add-bundled"), source: z.string().min(1) }),
-  z.strictObject({ type: z.literal("plugin.enable"), index: z.number().int().nonnegative(), enabled: z.boolean() }),
-  z.strictObject({ type: z.literal("plugin.remove"), index: z.number().int().nonnegative() }),
+  // Restore a bundled package or a package removed since this startup, by source identity.
+  z.strictObject({ type: z.literal("plugin.restore"), source: z.string().min(1) }),
+  z.strictObject({ type: z.literal("plugin.enable"), source: z.string().min(1), enabled: z.boolean() }),
+  z.strictObject({ type: z.literal("plugin.remove"), source: z.string().min(1) }),
   z.strictObject({ type: z.literal("plugin.npm.preview"), spec: z.string().trim().min(1).max(512), targetSource: z.string().min(1).optional() }),
   z.strictObject({ type: z.literal("plugin.npm.install"), operationId: id }),
   z.strictObject({ type: z.literal("plugin.npm.approve"), operationId: id, packages: z.array(z.string().min(1)).min(1) }),
@@ -60,16 +87,8 @@ export const snapshotSchema = z.strictObject({
   templates: z.array(templateSummarySchema),
   /** Trash catalog containing sessions themselves only, used for settings counts and restoration. */
   archivedSessions: z.array(z.strictObject({ id, title: z.string(), created_at: z.string(), archived_at: z.string(), folder_id: folderIdSchema })),
-  /** Current list with startup outcomes and available bundled packages (null index); renderer paths are under asterism-plugin://. */
-  plugins: z.array(z.strictObject({ index: z.number().int().nonnegative().nullable(), bundled: z.boolean().default(false), id: z.string().nullable(), source: z.string(),
-    status: z.enum(["loaded", "disabled", "invalid", "failed", "pending", "available"]), enabled: z.boolean(), error: z.string().nullable(), renderer: z.string().nullable(),
-    diagnostic: pluginDiagnosticSchema.nullable().default(null),
-    stylesheet: z.string().nullable(), stylesheets: z.array(z.string()).optional(),
-    sourceKind: z.enum(["path", "bundled", "npm"]).optional(),
-    npm: z.strictObject({ name: z.string(), version: z.string(), installation: z.string().optional() }).optional(),
-    runningVersion: z.string().nullable().optional(),
-    metadata: pluginMetadataSchema.default({}),
-    dependencies: z.array(z.string()).default([]) })),
+  /** Selected packages in loading order, then removed packages still running, then bundled packages not selected. */
+  plugins: z.array(pluginEntrySchema),
   npmOperation: npmOperationSchema.nullable().optional(),
   /** Captured loaded composition for every renderer in this runtime, independent of next-start management edits. */
   rendererPlugins: z.array(z.strictObject({ id: z.string(), source: z.string(), metadata: pluginMetadataSchema,

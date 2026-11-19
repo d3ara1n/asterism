@@ -10,7 +10,7 @@ import { PackageList, PluginPackageError, readManifest, readPackageMetadata, pac
 import { readManagedPluginId } from "../plugins/npm-records.ts";
 import { NpmInstallations } from "../plugins/npm-installation.ts";
 import { applicationPackages, applicationManuals } from "../plugins/distribution.ts";
-import { commandSchema, snapshotSchema, type AppSnapshot, type AppError } from "../shared/contracts.ts";
+import { commandSchema, snapshotSchema, type AppSnapshot, type AppError, type PluginEntry } from "../shared/contracts.ts";
 import type { TranslationCatalog } from "../shared/i18n.ts";
 import type { ModelSettings } from "../shared/model.ts";
 import { pluginConfigurationCommandSchema, type PluginConfiguration } from "../shared/plugin-configuration.ts";
@@ -112,12 +112,9 @@ export class ApplicationService {
       else if (command.type === "plugin.npm.approve") this.npm.approve(command.operationId, command.packages);
       else if (command.type === "plugin.npm.cancel") this.npm.cancel(command.operationId);
       else if (command.type === "plugin.add") this.list.add({ source: { kind: "path", path: command.path } }, this.npmRoot);
-      else if (command.type === "plugin.add-bundled") {
-        const entry = this.list.distribution.packages.find(entry => packageSource(entry) === command.source);
-        if (!entry) throw new PluginPackageError("invalid_entry", "No such bundled package.");
-        this.list.add(entry, this.npmRoot);
-      } else if (command.type === "plugin.enable") this.list.setEnabled(command.index, command.enabled);
-      else if (command.type === "plugin.remove") this.list.remove(command.index);
+      else if (command.type === "plugin.restore") this.restore(command.source);
+      else if (command.type === "plugin.enable") this.list.setEnabled(this.selected(command.source), command.enabled);
+      else if (command.type === "plugin.remove") this.list.remove(this.selected(command.source));
       else if (command.type === "folder.create") this.folders.create(command.id, command.name, command.color);
       else if (command.type === "folder.update") this.folders.update(command.id, command.name, command.color);
       else if (command.type === "folder.delete") this.folders.delete(command.id);
@@ -136,36 +133,17 @@ export class ApplicationService {
     const sessions = this.sessions.tree.list().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, completed: session.completed, sleeping: session.sleeping, keepAwake: session.keepAwake, folder_id: membership.get(session.id) ?? null }));
     const archivedSessions = this.sessions.tree.archived().map(session => ({ id: session.id, title: session.title, created_at: session.createdAt, archived_at: session.archivedAt, folder_id: session.folderId }));
     const current = this.list.read();
+    const removed = this.startedEntries.filter(entry => !current.some(item => packageSource(item) === packageSource(entry)));
     const entries = [
-      ...current.map((entry, index) => ({ entry, index })),
-      ...this.list.distribution.packages.filter(entry => !current.some(item => packageSource(item) === packageSource(entry)))
-        .map(entry => ({ entry, index: null })),
+      ...current.map(entry => ({ entry, selected: true })),
+      ...removed.map(entry => ({ entry, selected: false })),
+      ...this.list.distribution.packages.filter(entry => ![...current, ...removed].some(item => packageSource(item) === packageSource(entry)))
+        .map(entry => ({ entry, selected: false })),
     ];
-    // Available distribution entries describe packages without adding them to the loading list.
-    const plugins: AppSnapshot["plugins"] = entries.map(({ entry, index }): AppSnapshot["plugins"][number] => {
-      const source = packageSource(entry);
-      const startup = this.sessions.packages.find(item => item.source === source);
-      const capturedEntry = this.startedEntries.find(item => packageSource(item) === source);
-      const pending = !startup || startup.enabled !== entry.enabled || JSON.stringify(capturedEntry) !== JSON.stringify(entry);
-      let metadata = startup?.metadata ?? {}, id = startup?.id ?? null, metadataError = startup?.metadataError ?? null;
-      const root = this.list.root(entry, this.npmRoot);
-      if (pending || index === null) {
-        try { metadata = readPackageMetadata(root); metadataError = null; }
-        catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
-      }
-      if (!id) {
-        try { id = (entry.source.kind === "npm" && entry.source.installation ? readManagedPluginId(this.npmRoot, entry.source.installation) : null) ?? readManifest(root).id; }
-        catch { /* Loading state retains package validation failure reasons. */ }
-      }
-      const running = this.sessions.packages.find(item => item.id === id && item.status === "loaded");
-      const sourceInfo = { sourceKind: entry.source.kind, ...(entry.source.kind === "npm" ? { npm: { name: entry.source.name, version: entry.source.version, installation: entry.source.installation } } : {}), runningVersion: running?.metadata.version ?? null };
-      if (index === null) return { ...sourceInfo, index, source, bundled: true, metadata, enabled: false, id, status: "available",
-        error: metadataError, diagnostic: null, renderer: null, stylesheet: null, stylesheets: [], dependencies: [] };
-      return { ...sourceInfo, index, source, bundled: entry.source.kind === "bundled", metadata, enabled: entry.enabled, id, status: pending ? "pending" as const : startup.status,
-        error: (pending ? null : startup.diagnostic?.message) ?? metadataError, diagnostic: pending ? null : startup.diagnostic ?? null, renderer: pending ? null : startup.renderer,
-        stylesheet: pending ? null : startup.stylesheet, stylesheets: pending ? [] : [...startup.stylesheets ?? []],
-        dependencies: [...startup?.rendererDependencies ?? []] };
-    }).filter((plugin, _, all) => plugin.index !== null || !plugin.id || !all.some(item => item.index !== null && item.id === plugin.id));
+    // Unselected entries describe packages without adding them to the loading list.
+    const plugins = entries.map(({ entry, selected }): PluginEntry => this.pluginEntry(entry, selected))
+      // A replaced source (npm update) or a path registration of a bundled identity supersedes the unselected record.
+      .filter((plugin, _, all) => plugin.selection || !plugin.id || !all.some(item => item.selection && item.id === plugin.id));
     return snapshotSchema.parse({ workspace, folders: this.folders.list(), sessions, templates: this.sessions.templates.list(), archivedSessions, plugins,
       npmOperation: this.npm.snapshot(), rendererImportMap: this.options.rendererImportMap ?? {},
       rendererPlugins: this.sessions.packages.flatMap(item => item.status === "loaded" && item.id ? [{
@@ -175,5 +153,50 @@ export class ApplicationService {
       catalogs: (this.options.catalogs ?? []).filter(catalog => this.sessions.packages.some(item => item.id === catalog.owner && item.status === "loaded")),
       restartRequired: JSON.stringify(current) !== this.started,
       ...(command.type === "workspace.prepare-close" ? { disposalWarnings: this.sessions.disposalWarnings().map(({ title, warning }) => ({ title, warning })) } : {}) });
+  }
+  /** Current loading-list position of a selected source. */
+  private selected(source: string): number {
+    const index = this.list.read().findIndex(entry => packageSource(entry) === source);
+    if (index < 0) throw new PluginPackageError("invalid_entry", "No such package entry.");
+    return index;
+  }
+  /** A package removed since startup returns with its captured enablement and loading position; otherwise a bundled package is added. */
+  private restore(source: string): void {
+    const current = this.list.read();
+    const captured = this.startedEntries.findIndex(entry => packageSource(entry) === source);
+    if (captured >= 0 && !current.some(entry => packageSource(entry) === source)) {
+      const entry = this.startedEntries[captured]!;
+      const before = new Set(this.startedEntries.slice(0, captured).map(packageSource));
+      this.list.add(entry, this.npmRoot, { enabled: entry.enabled, index: current.filter(item => before.has(packageSource(item))).length });
+      return;
+    }
+    const entry = this.list.distribution.packages.find(entry => packageSource(entry) === source);
+    if (!entry) throw new PluginPackageError("invalid_entry", "No such package to restore.");
+    this.list.add(entry, this.npmRoot);
+  }
+  /** Selection state comes from the current list; startup state comes from this run's outcome, matched by source and then by plugin ID. */
+  private pluginEntry(entry: PackageEntry, selected: boolean): PluginEntry {
+    const source = packageSource(entry);
+    const captured = this.startedEntries.find(item => packageSource(item) === source);
+    const changed = !captured || JSON.stringify(captured) !== JSON.stringify(entry);
+    const own = this.sessions.packages.find(item => item.source === source);
+    let metadata = own?.metadata ?? {}, id = own?.id ?? null, metadataError = own?.metadataError ?? null;
+    if (!own || changed) {
+      const root = this.list.root(entry, this.npmRoot);
+      try { metadata = readPackageMetadata(root); metadataError = null; }
+      catch (error) { metadataError = error instanceof Error ? error.message : String(error); }
+      if (!id) {
+        try { id = (entry.source.kind === "npm" && entry.source.installation ? readManagedPluginId(this.npmRoot, entry.source.installation) : null) ?? readManifest(root).id; }
+        catch { /* Startup diagnostics retain package validation failure reasons. */ }
+      }
+    }
+    const outcome = own ?? (id ? this.sessions.packages.find(item => item.id === id) : undefined);
+    const origin = entry.source.kind === "bundled" ? { kind: "bundled" as const }
+      : entry.source.kind === "path" ? { kind: "path" as const, path: entry.source.path }
+      : { kind: "npm" as const, name: entry.source.name, version: entry.source.version };
+    return { source, id, origin, metadata, metadataError,
+      selection: selected ? { enabled: entry.enabled } : null,
+      startup: outcome ? { source: outcome.source, status: outcome.status, version: outcome.metadata.version ?? null, diagnostic: outcome.diagnostic ?? null } : null,
+      pending: selected ? changed : captured !== undefined };
   }
 }

@@ -53,7 +53,7 @@ Automatic naming belongs to the paradigm that defines its triggers and material.
 
 Settings home contains host pages and plugin-declared configuration pages. Each plugin page identifies its contributor; Roles, for example, belongs to builtin. Plugins may contribute several pages or none.
 
-A Plugins card opens a plain management list with plugin information and enablement controls. Settings home has no separate plugin list beneath its page entries, and plugin management items do not act as configuration-page cards.
+A Plugins card opens plugin management. Each management entry separates this run's startup outcome from the next-start selection, so disabling or removing a running plugin shows both facts until restart. A plugin's detail island can open the configuration pages that plugin contributes; settings home has no separate plugin list beneath its page entries.
 
 ## Application networking
 
