@@ -37,7 +37,8 @@ export function initialWindowState(): { bounds: Rectangle; maximized: boolean; m
 /** Save after move/resize and on close; when maximized or fullscreen, retain normal bounds and record only the maximized flag. */
 export function trackWindowState(window: BrowserWindow): void {
   const save = () => {
-    if (window.isDestroyed() || window.isMinimized() || window.isFullScreen()) return;
+    // A window closed before it was first shown has not applied its saved maximized state yet.
+    if (window.isDestroyed() || !window.isVisible() || window.isMinimized() || window.isFullScreen()) return;
     const maximized = window.isMaximized();
     const bounds = maximized ? window.getNormalBounds() : window.getBounds();
     writeUiState("window", { ...bounds, maximized });

@@ -818,6 +818,7 @@
   "startup.plugins": "正在加载插件…",
   "startup.workspace": "正在打开工作区…",
   "startup.interface": "正在准备界面…",
+  "startup.starting": "正在启动星图…",
   "startup.failed": "星图未能完成启动",
   "startup.failedBody": "请重启应用后重试。日志中包含更多详情。",
   "startup.timedOut": "启动等待时间过长。请重启应用后重试。",

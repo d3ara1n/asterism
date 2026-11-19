@@ -19,6 +19,7 @@ export const startupMessages = pluginNamespace("asterism.host").messages("en", d
   plugins: { id: "startup.plugins", defaultMessage: "Loading plugins…" },
   workspace: { id: "startup.workspace", defaultMessage: "Opening your workspace…" },
   interface: { id: "startup.interface", defaultMessage: "Preparing the interface…" },
+  starting: { id: "startup.starting", defaultMessage: "Starting Asterism…" },
   failed: { id: "startup.failed", defaultMessage: "Asterism could not finish starting" },
   failedBody: { id: "startup.failedBody", defaultMessage: "Restart the application to try again. The logs contain more details." },
   timedOut: { id: "startup.timedOut", defaultMessage: "Startup took too long. Restart the application to try again." },

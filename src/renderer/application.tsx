@@ -27,7 +27,7 @@ import { PluginCommandsProvider, type RegisteredCommandGroup } from "./modules/c
 import { getI18n, useI18n } from "./shared/i18n";
 import { toast } from "./shared/toast";
 import { startupMessages } from "../shared/error-display";
-import type { UiText } from "@asterism-app/sdk/contracts";
+import { AfterCommit, type StartupSplash } from "./app/startup-splash";
 
 import { runtime } from "./runtime";
 import { contentInput, contentScopeId } from "./features/creation/content";
@@ -67,8 +67,11 @@ function StartupNotification() {
   }, [i18n]);
   return null;
 }
-/** Load the workbench and plugins after the lightweight startup page appears; the application controller stays subscribed from the initial read onward. */
-export async function startApplication(root: Root, progress: (message: UiText, detail?: string) => void, signal: AbortSignal): Promise<void> {
+/**
+ * Load the workbench and plugins under the startup splash; the application controller stays subscribed from the initial read onward.
+ * The splash hands over once the complete workbench tree has committed.
+ */
+export async function startApplication(root: Root, splash: StartupSplash, signal: AbortSignal): Promise<void> {
   signal.throwIfAborted();
   const events = new EventClient(runtime.events);
   const calls = new CallClient(runtime.calls, {
@@ -86,7 +89,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
   const initial = controller.getSnapshot();
   if (!initial.snapshot || initial.error) throw new Error(initial.error ? getI18n().text(initial.error) : "The workspace could not be read.");
   setLanguageCatalogs(initial.snapshot.catalogs ?? []);
-  progress(startupMessages.plugins);
+  splash.stage(startupMessages.plugins);
   const names = new Map(initial.snapshot.rendererPlugins.map(p => [p.id, pluginName(p)] as const));
   const plugins = initial.snapshot.rendererPlugins;
   const accepted = [workbenchRecordViews];
@@ -100,7 +103,7 @@ export async function startApplication(root: Root, progress: (message: UiText, d
     }
   })(); }, { once: true });
   const rendererPlugins = await loadPluginRenderers(plugins, { signal, importMap: initial.snapshot.rendererImportMap,
-    progress: id => progress(startupMessages.plugins, id), async accept(plugin, id) {
+    progress: id => splash.stage(startupMessages.plugins, id), async accept(plugin, id) {
       new ViewRegistry([...accepted, ...plugin.modules ?? []]);
       const prepared = await preparePlugin(plugin, events, signal, undefined, close => cleanup.push(close), calls);
       accepted.push(...plugin.modules ?? []);
@@ -143,6 +146,8 @@ export async function startApplication(root: Root, progress: (message: UiText, d
             </TooltipProvider>
           </MotionConfig>
         </ErrorBoundary>
+        {/* Outside the boundary so a crash fallback also completes the handoff. */}
+        <AfterCommit run={splash.handoff} />
       </HostI18nProvider>
     </StrictMode>,
   );

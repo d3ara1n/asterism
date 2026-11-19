@@ -35,7 +35,7 @@ import { appearanceChangedChannel } from "../shared/theme.ts";
 import { languageChangedChannel } from "../shared/language.ts";
 import { enableSettings } from "./settings-state.ts";
 import { acknowledgeNotice, listRecoveryPoints, pendingNotice, recoveryPointDirectory } from "../storage/preparation.ts";
-import { desktopUnsavedChangesChannel, unsavedChangesSchema } from "../shared/desktop.ts";
+import { desktopUnsavedChangesChannel, desktopWindowShowChannel, unsavedChangesSchema } from "../shared/desktop.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 let window: BrowserWindow | null = null;
@@ -150,6 +150,7 @@ function createWindow(): void {
     ...initialWindowAppearance(),
     ...initialTitleBar(titleBar),
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       preload: join(here, "../preload/index.cjs"),
       sandbox: true, contextIsolation: true, nodeIntegration: false,
@@ -164,7 +165,19 @@ function createWindow(): void {
     event.preventDefault();
     requestQuit();
   });
-  if (state.maximized) current.maximize();
+  // The renderer decides when to show the window: reopened windows at once, cold starts after the finished interface or a
+  // short delay, so quick cold starts never display a loading frame. Maximizing also shows a window, so it waits for the same moment.
+  let shown = false;
+  let showDeadline: NodeJS.Timeout | undefined;
+  const show = () => {
+    if (shown || current.isDestroyed()) return;
+    shown = true;
+    clearTimeout(showDeadline);
+    if (state.maximized) current.maximize();
+    current.show();
+  };
+  // A page whose startup script never runs still leaves a visible window after its first paint.
+  current.once("ready-to-show", () => { if (!shown) showDeadline = setTimeout(show, 1500); });
   trackWindowState(current);
   const refreshAppearance = followWindowAppearance(current, titleBar);
   current.webContents.setWindowOpenHandler(({ url }) => {
@@ -189,6 +202,8 @@ function createWindow(): void {
     }
   };
   ipcMain.on(desktopUnsavedChangesChannel, updateUnsaved);
+  const showRequested = (event: Electron.IpcMainEvent) => { if (trusted(event)) show(); };
+  ipcMain.on(desktopWindowShowChannel, showRequested);
   current.webContents.on("will-prevent-unload", event => {
     // Electron requires the decision before this event returns. Quitting has already confirmed drafts.
     if (quitting || dialog.showMessageBoxSync(current, unsavedPrompt()) === 1) event.preventDefault();
@@ -291,11 +306,14 @@ function createWindow(): void {
   current.webContents.on("render-process-gone", (_event, details) => {
     unsavedTitles = [];
     closeConnection();
-    if (!quitting && details.reason !== "clean-exit")
+    if (!quitting && details.reason !== "clean-exit") {
+      show();
       dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
+    }
   });
   current.webContents.on("preload-error", (_event, _path, error) => {
     console.error("Desktop bridge initialization failed.", error);
+    show();
     dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
   });
   current.webContents.on("did-navigate", () => {
@@ -341,6 +359,8 @@ function createWindow(): void {
     stopFileSaves();
     unsavedTitles = [];
     ipcMain.removeListener(desktopUnsavedChangesChannel, updateUnsaved);
+    ipcMain.removeListener(desktopWindowShowChannel, showRequested);
+    clearTimeout(showDeadline);
     desktopWindow.close();
     publishDesktopWindow = null;
     ipcMain.removeListener(rendererFailureChannel, reportFailure);
@@ -352,7 +372,7 @@ function createWindow(): void {
     stopAppearance(); stopPreferences(); stopLanguage(); stopUpdates(); stopNetwork();
   });
   const loading = current.loadURL(developmentURL ?? applicationRendererUrl);
-  loading.catch(error => { console.error("Renderer initialization failed.", error); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });
+  loading.catch(error => { console.error("Renderer initialization failed.", error); show(); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });
 }
 
 // Plugin output is served only through the roots captured by this startup's preparation.

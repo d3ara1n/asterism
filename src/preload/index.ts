@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { languageGetChannel, languageSetChannel, languageChangedChannel, languagePreferenceSchema, languageStateSchema } from "../shared/language.ts";
 import { desktopBridgeKey } from "../shared/core.ts";
-import { desktopWindowChangedChannel, desktopWindowGetChannel, desktopWindowStateSchema, desktopUnsavedChangesChannel, unsavedChangesSchema } from "../shared/desktop.ts";
+import { desktopWindowChangedChannel, desktopWindowGetChannel, desktopWindowShowChannel, desktopWindowStateSchema, desktopUnsavedChangesChannel, unsavedChangesSchema } from "../shared/desktop.ts";
 import { pickDirectoryChannel, openLocalFileChannel, showLocalFileChannel, showLocalFileSchema, openLogsChannel, localFilePathSchema, statusChannel, runtimeStatusSchema, type DesktopBridge } from "../shared/contracts.ts";
 import { connectionPortMessage, connectionRequestChannel } from "../shared/connection.ts";
 import { fileSaveChannel, fileSaveCommandSchema, fileSaveReplySchema } from "../shared/file-save.ts";
@@ -129,6 +129,7 @@ const bridge: DesktopBridge = {
   platform: process.platform === "darwin" ? "darwin" : process.platform === "win32" ? "win32" : "linux",
   window: {
     setUnsavedChanges: titles => ipcRenderer.send(desktopUnsavedChangesChannel, unsavedChangesSchema.parse(titles)),
+    show: () => ipcRenderer.send(desktopWindowShowChannel),
     async get() { return desktopWindowStateSchema.parse(await ipcRenderer.invoke(desktopWindowGetChannel)); },
     onChanged(listener) {
       const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => {

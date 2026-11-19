@@ -1,22 +1,24 @@
 import { createRoot } from "react-dom/client";
+import type { ReactNode } from "react";
 import { HostI18nProvider, startLanguage } from "./shared/i18n";
 import { startAppearance } from "./features/appearance/state";
 import { startDesktopWindow } from "./app/window-state";
 import { loadPreferences } from "./features/creation/preferences";
 import { StartupScreen, type StartupFailure } from "./app/StartupScreen";
+import { AfterCommit, startupSplash } from "./app/startup-splash";
 import { StartupError, awaitStartup, waitForRuntime } from "./app/boot";
 import { startupMessages } from "../shared/error-display";
-import type { UiText } from "@asterism-app/sdk/contracts";
 import { reportRendererFailure } from "./shared/failure";
 import "./styles.css";
 
 const root = createRoot(document.getElementById("root")!);
+const splash = startupSplash(document.getElementById("startup-splash")!);
 const lifetime = new AbortController();
 window.addEventListener("pagehide", () => lifetime.abort(), { once: true });
-const show = (stage: UiText, detail?: string, failure?: StartupFailure) => {
-  root.render(<HostI18nProvider><StartupScreen stage={stage} detail={detail} failure={failure} /></HostI18nProvider>);
-};
-show(startupMessages.dataCheck);
+splash.stage(startupMessages.dataCheck);
+// A window reopened after startup completed appears at once: a brief splash is preferable to a delayed window.
+// A failed read is reported by the startup wait below, which reads the same state.
+void window.host.startup.get().then(state => { if (state.status === "ready") splash.reveal(); }, () => {});
 
 async function boot(): Promise<void> {
   startAppearance();
@@ -32,9 +34,9 @@ async function boot(): Promise<void> {
       startDesktopWindow(window.host.window).then(keep),
     ]), desktopSignal),
     // The initial desktop bridge read has a deadline; backend phases remain subscribed, and the main process manages deadlines for actual work.
-    waitForRuntime(window.host.startup, lifetime.signal, state => show(startupMessages[state.stage], state.detail), desktopSignal),
+    waitForRuntime(window.host.startup, lifetime.signal, state => splash.stage(startupMessages[state.stage], state.detail), desktopSignal),
   ]);
-  show(startupMessages.interface);
+  splash.stage(startupMessages.interface);
   // Page loading and frontend plugin preparation share an overall wait deadline; individual plugins have shorter preparation deadlines.
   const deadline = new AbortController();
   const signal = AbortSignal.any([lifetime.signal, deadline.signal]);
@@ -42,10 +44,12 @@ async function boot(): Promise<void> {
   try {
     await awaitStartup(import("./application").then(module => {
       signal.throwIfAborted();
-      return module.startApplication(root, (message, detail) => show(message, detail), signal);
+      return module.startApplication(root, splash, signal);
     }), signal);
   } finally { clearTimeout(timer); }
 }
+
+const show = (content: ReactNode) => root.render(<HostI18nProvider>{content}<AfterCommit run={splash.handoff} /></HostI18nProvider>);
 
 void boot().catch(error => {
   if (lifetime.signal.aborted) return;
@@ -55,5 +59,5 @@ void boot().catch(error => {
   const failure: StartupFailure = error instanceof StartupError ? error.failure
     : { reason: error instanceof DOMException && error.name === "TimeoutError" ? "timeout" : "initialization",
       detail: error instanceof Error ? error.message : String(error) };
-  show(startupMessages.failed, undefined, failure);
+  show(<StartupScreen failure={failure} />);
 });

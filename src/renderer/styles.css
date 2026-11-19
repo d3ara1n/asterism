@@ -361,13 +361,28 @@
 /* Startup screens display independently before workbench loading, preserving native window dragging and controls. */
 .startup-screen { display: flex; height: 100%; padding: 3rem 1.5rem; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; color: var(--muted-foreground); font-family: var(--font-sans); font-size: 0.8125rem; -webkit-app-region: drag; }
 .startup-content { width: min(100%, 32rem); text-align: center; -webkit-app-region: no-drag; }
-.startup-indicator { width: 1.25rem; height: 1.25rem; border-radius: 9999px; border: 2px solid var(--border); border-top-color: var(--muted-foreground); animation: startup-spin 0.8s linear infinite; }
-.startup-stage { margin: 0; min-height: 1.25em; }
-/* Delay waiting content so fast startup never flashes loading; React uses an inline negative delay to continue static-placeholder timing. */
-.startup-reveal { display: flex; flex-direction: column; align-items: center; gap: 0.75rem; animation: startup-reveal var(--motion-fast) var(--ease-out) 300ms backwards; }
-@keyframes startup-reveal { from { opacity: 0; } }
-@keyframes startup-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .startup-indicator { animation-duration: 2.4s; } }
+/* The startup splash covers #root from the first frame. The mark's loop runs continuously regardless of stage, so startup speed never
+   changes what the user sees; stage labels sit below the mark outside the layout and fade in only for slow stages.
+   On handoff the splash and #root cross-fade; quick starts remove the splash before the window is shown. */
+.startup-splash { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; color: var(--foreground); font-family: var(--font-sans); font-size: 0.8125rem;
+  transition: opacity var(--motion-fast) var(--ease-out), scale var(--motion-fast) var(--ease-out); }
+:root[data-startup="waiting"] .startup-splash { -webkit-app-region: drag; }
+:root[data-startup="waiting"] #root { opacity: 0; }
+:root[data-startup="leaving"] #root { transition: opacity var(--motion-fast) var(--ease-out); }
+:root[data-startup="leaving"] .startup-splash { opacity: 0; scale: 0.96; pointer-events: none; }
+.startup-mark-frame { position: relative; display: flex; }
+.startup-mark path { opacity: 0.3; transform-box: fill-box; transform-origin: center; animation: startup-twinkle 1.5s var(--ease-out) infinite; }
+.startup-mark g:nth-child(2) path { animation-delay: 0.25s; }
+.startup-mark g:nth-child(3) path { animation-delay: 0.5s; }
+@keyframes startup-twinkle { 0%, 100% { opacity: 0.3; scale: 0.88; } 30% { opacity: 1; scale: 1; } }
+.startup-stage { position: absolute; top: 100%; left: 50%; width: min(32rem, calc(100vw - 3rem)); margin-top: 1.25rem; translate: -50% 0; text-align: center; color: var(--muted-foreground); }
+.startup-stage p { margin: 0; min-height: 1.25em; overflow-wrap: anywhere; opacity: 0; transition: opacity var(--motion-fast) var(--ease-out); }
+.startup-stage p[data-visible] { opacity: 1; }
+.startup-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .startup-mark path { animation: none; opacity: 0.6; }
+  :root[data-startup="leaving"] .startup-splash { scale: 1; }
+}
 /* xflow cursors derive entirely from state classes, independently of keys; workbench gestures are left-button box selection on empty space,
    middle/right-button panning, Space + left-button panning, and titlebar-only card dragging. Prefix selectors with .react-flow
    to reliably override xflow's own styles. */

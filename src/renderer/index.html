@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-startup="waiting">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -8,12 +8,21 @@
     <title>%APPLICATION_TITLE%</title>
   </head>
   <body>
-    <div id="root"><div class="startup-screen" role="status" aria-live="polite">
-      <div class="startup-content startup-reveal">
-        <div class="startup-indicator" aria-hidden="true"></div>
-        <p id="startup-stage" class="startup-stage"></p>
+    <div id="root"></div>
+    <div id="startup-splash" class="startup-splash">
+      <div class="startup-mark-frame">
+        <svg class="startup-mark" width="40" height="40" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <g transform="translate(12 6.8)"><path d="M-0.158 -3.579Q0.000 -4.000 0.158 -3.579 L0.625 -2.334Q0.910 -1.576 1.709 -1.709 L3.020 -1.926Q3.464 -2.000 3.178 -1.652 L2.334 -0.626Q1.820 0.000 2.334 0.626 L3.178 1.652Q3.464 2.000 3.020 1.926 L1.709 1.709Q0.910 1.576 0.625 2.334 L0.158 3.579Q0.000 4.000 -0.158 3.579 L-0.625 2.334Q-0.910 1.576 -1.709 1.709 L-3.020 1.926Q-3.464 2.000 -3.178 1.652 L-2.334 0.626Q-1.820 0.000 -2.334 -0.626 L-3.178 -1.652Q-3.464 -2.000 -3.020 -1.926 L-1.709 -1.709Q-0.910 -1.576 -0.625 -2.334Z"/></g>
+          <g transform="translate(17.3 16)"><path d="M-0.158 -3.579Q0.000 -4.000 0.158 -3.579 L0.625 -2.334Q0.910 -1.576 1.709 -1.709 L3.020 -1.926Q3.464 -2.000 3.178 -1.652 L2.334 -0.626Q1.820 0.000 2.334 0.626 L3.178 1.652Q3.464 2.000 3.020 1.926 L1.709 1.709Q0.910 1.576 0.625 2.334 L0.158 3.579Q0.000 4.000 -0.158 3.579 L-0.625 2.334Q-0.910 1.576 -1.709 1.709 L-3.020 1.926Q-3.464 2.000 -3.178 1.652 L-2.334 0.626Q-1.820 0.000 -2.334 -0.626 L-3.178 -1.652Q-3.464 -2.000 -3.020 -1.926 L-1.709 -1.709Q-0.910 -1.576 -0.625 -2.334Z"/></g>
+          <g transform="translate(6.7 16)"><path d="M-0.158 -3.579Q0.000 -4.000 0.158 -3.579 L0.625 -2.334Q0.910 -1.576 1.709 -1.709 L3.020 -1.926Q3.464 -2.000 3.178 -1.652 L2.334 -0.626Q1.820 0.000 2.334 0.626 L3.178 1.652Q3.464 2.000 3.020 1.926 L1.709 1.709Q0.910 1.576 0.625 2.334 L0.158 3.579Q0.000 4.000 -0.158 3.579 L-0.625 2.334Q-0.910 1.576 -1.709 1.709 L-3.020 1.926Q-3.464 2.000 -3.178 1.652 L-2.334 0.626Q-1.820 0.000 -2.334 -0.626 L-3.178 -1.652Q-3.464 -2.000 -3.020 -1.926 L-1.709 -1.709Q-0.910 -1.576 -0.625 -2.334Z"/></g>
+        </svg>
+        <div class="startup-stage" aria-live="polite">
+          <p class="startup-stage-text"></p>
+          <p class="startup-stage-detail type-caption"></p>
+        </div>
       </div>
-    </div></div>
+      <p class="startup-status" role="status"></p>
+    </div>
     <script type="module" src="/main.tsx"></script>
   </body>
 </html>

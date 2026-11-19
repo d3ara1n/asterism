@@ -7,6 +7,7 @@ export type DesktopPlatform = "darwin" | "win32" | "linux";
 export const desktopWindowGetChannel = coreChannel("window.get");
 export const desktopWindowChangedChannel = coreChannel("window.changed");
 export const desktopUnsavedChangesChannel = coreChannel("window.unsaved-changes");
+export const desktopWindowShowChannel = coreChannel("window.show");
 export const unsavedChangesSchema = z.array(z.string());
 export const desktopWindowStateSchema = z.strictObject({
   titleBar: z.enum(["macos", "overlay", "native"]),
@@ -17,6 +18,8 @@ export type DesktopWindowState = z.infer<typeof desktopWindowStateSchema>;
 export type TitleBarMode = DesktopWindowState["titleBar"];
 export interface DesktopWindowBridge {
   setUnsavedChanges(titles: string[]): void;
+  /** Windows are created hidden; the first request shows the window, later requests have no effect. */
+  show(): void;
   get(): Promise<DesktopWindowState>;
   onChanged(listener: (state: DesktopWindowState) => void): () => void;
 }
