@@ -408,7 +408,7 @@
 .markdown-content li { margin-block: 0.25rem; }
 .markdown-content li > :where(ul, ol, p) { margin-block: 0.25rem; }
 .markdown-content blockquote { border-inline-start: 3px solid var(--border); padding-inline-start: 1rem; color: var(--muted-foreground); }
-.markdown-content a { color: var(--primary-text); text-decoration: underline; text-underline-offset: 4px; }
+.markdown-content a:not([data-reference]) { color: var(--primary-text); text-decoration: underline; text-underline-offset: 4px; }
 .markdown-content :not(pre) > code { border-radius: var(--radius); background: var(--muted); padding: 0.125em 0.25em; font-family: var(--font-mono); font-size: 0.9em; }
 .markdown-content pre { white-space: pre; overflow-wrap: normal; }
 .markdown-content pre code { font: inherit; }

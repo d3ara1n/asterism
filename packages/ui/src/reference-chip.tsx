@@ -16,15 +16,20 @@ import { useResourceLocationActions } from "./resource-location-actions";
 import { ModelReferenceDetails } from "./model-reference-details";
 
 /**
- * Reference schemes have distinct icons and tones.
+ * Reference schemes have distinct icons and tones: chip faces tint their border and fill, link faces their underline.
  * The face derives only from the link itself so it stays fixed while the workbench changes; the hover card shows current state.
  */
-const kindStyles: Record<ReferenceKind, { icon: LucideIcon; tone: string }> = {
-  skill: { icon: BookOpen, tone: "border-folder-violet/30 bg-folder-violet/10 [&_[data-chip-icon]]:text-folder-violet" },
-  resource: { icon: Box, tone: "border-folder-blue/30 bg-folder-blue/10 [&_[data-chip-icon]]:text-folder-blue" },
-  model: { icon: Cpu, tone: "border-folder-teal/30 bg-folder-teal/10 [&_[data-chip-icon]]:text-folder-teal" },
+type KindStyle = { icon: LucideIcon; iconTone: string; chip: string; link: string };
+const kindStyles: Record<ReferenceKind, KindStyle> = {
+  skill: { icon: BookOpen, iconTone: "text-folder-violet", chip: "border-folder-violet/30 bg-folder-violet/10",
+    link: "decoration-folder-violet/40 hover:decoration-folder-violet" },
+  resource: { icon: Box, iconTone: "text-folder-blue", chip: "border-folder-blue/30 bg-folder-blue/10",
+    link: "decoration-folder-blue/40 hover:decoration-folder-blue" },
+  model: { icon: Cpu, iconTone: "text-folder-teal", chip: "border-folder-teal/30 bg-folder-teal/10",
+    link: "decoration-folder-teal/40 hover:decoration-folder-teal" },
 };
-const unknownStyle = { icon: Link2, tone: "border-border bg-muted [&_[data-chip-icon]]:text-muted-foreground" };
+const unknownStyle: KindStyle = { icon: Link2, iconTone: "text-muted-foreground", chip: "border-border bg-muted",
+  link: "decoration-muted-foreground/40 hover:decoration-muted-foreground" };
 
 /**
  * Face sizes: inline matches body text, title matches panel titles. Line boxes fill the content box (height minus the
@@ -57,7 +62,7 @@ function ReferenceLabel({ children }: { children: ReactNode }) {
   return render(children);
 }
 
-/** Shared chip presentation for references in the composer, rendered messages, and panel titles. */
+/** Chip presentation for references that stand apart from text: composer input and panel titles. */
 export function ReferenceChipFace({ href, children, selected = false, size = "inline", onRemove, hint, className, ...props }: ComponentProps<"span"> & {
   href: string; selected?: boolean; size?: ReferenceChipSize; hint?: string;
   /** Present in the composer; omitted where the chip is read-only. */
@@ -65,12 +70,12 @@ export function ReferenceChipFace({ href, children, selected = false, size = "in
 }) {
   const i18n = useI18n();
   const kind = referenceKind(href);
-  const { icon: Icon, tone } = kind ? kindStyles[kind] : unknownStyle;
+  const { icon: Icon, iconTone, chip } = kind ? kindStyles[kind] : unknownStyle;
   const metrics = sizes[size];
   return <span data-reference-chip="" data-kind={kind ?? undefined} {...props}
     className={cn("mx-0.5 inline-flex max-w-60 select-none items-center rounded-md border align-baseline font-medium text-foreground no-underline",
-      metrics.face, tone, selected && "ring-2 ring-ring", className)}>
-    <Icon data-chip-icon="" className={cn("shrink-0", metrics.icon)} aria-hidden />
+      metrics.face, chip, selected && "ring-2 ring-ring", className)}>
+    <Icon className={cn("shrink-0", metrics.icon, iconTone)} aria-hidden />
     <span className={cn("w-0 self-baseline", metrics.line)} aria-hidden>{"\u200b"}</span>
     <TooltipHint content={hint}><span className={cn("truncate", metrics.line)} translate="no"><ReferenceLabel>{children}</ReferenceLabel></span></TooltipHint>
     {onRemove && <TooltipHint content={i18n.text(commonMessages.removeReference)}><button type="button" tabIndex={-1}
@@ -81,6 +86,25 @@ export function ReferenceChipFace({ href, children, selected = false, size = "in
       onClick={onRemove}><X className="size-3" /></button></TooltipHint>}
   </span>;
 }
+
+/**
+ * Link presentation for references inside rendered prose. The label keeps the body color and wraps like ordinary text;
+ * the icon and a faint underline carry the kind, and the underline turns solid on hover. Decorations are not drawn under
+ * the atomic icon, and the word joiner after it forbids a line break between the icon and the label's first character.
+ */
+function ReferenceLinkFace({ href, children, selected = false, hint, className, ...props }: ComponentProps<"span"> & {
+  href: string; selected?: boolean; hint?: string;
+}) {
+  const kind = referenceKind(href);
+  const { icon: Icon, iconTone, link } = kind ? kindStyles[kind] : unknownStyle;
+  return <TooltipHint content={hint}><span data-reference-link="" data-kind={kind ?? undefined} {...props}
+    className={cn("rounded-sm text-foreground underline decoration-1 underline-offset-4 transition-colors", link, selected && "ring-2 ring-ring", className)}>
+    <Icon className={cn("mr-1 inline-block size-3.5 align-[-0.125em]", iconTone)} aria-hidden />{"\u2060"}
+    <span translate="no"><ReferenceLabel>{children}</ReferenceLabel></span>
+  </span></TooltipHint>;
+}
+
+export type ReferenceAppearance = "chip" | "link";
 
 /**
  * Skill names resolve through the Agent paradigm's catalog, which this package does not import.
@@ -94,12 +118,14 @@ const Skills = createContext<ReferenceSkills | null>(null);
 export const ReferenceSkillsProvider = Skills.Provider;
 
 /**
- * A reference chip with a hover card of the target's current state.
+ * A reference with a hover card of the target's current state.
  * Resource references need the session that the resource ID belongs to. openable activates the target on click;
  * input surfaces such as the composer omit it because the reference is still being composed.
+ * appearance "link" flows with surrounding prose; size and onRemove apply only to the chip appearance.
  */
-export function ReferenceChip({ href, sessionId, children, openable = false, selected, size, onRemove }: {
+export function ReferenceChip({ href, sessionId, children, openable = false, selected, size, onRemove, appearance = "chip" }: {
   href: string; sessionId?: string; children: ReactNode; openable?: boolean; selected?: boolean; size?: ReferenceChipSize; onRemove?(): void;
+  appearance?: ReferenceAppearance;
 }) {
   const skills = useContext(Skills);
   const navigation = useRendererResourceNavigation();
@@ -113,9 +139,12 @@ export function ReferenceChip({ href, sessionId, children, openable = false, sel
   const activate = !openable ? null
     : skill ? skills && ((origin: HTMLElement) => skills.open(skill.name, skill.path, origin))
     : resource && sessionId ? (origin: HTMLElement) => navigation.open({ sessionId, id: resource.resourceId }, resource.location, { origin }) : null;
-  const face = <ReferenceChipFace href={href} selected={selected} size={size} onRemove={onRemove} hint={card ? undefined : href}
-    tabIndex={model ? 0 : undefined} className={model ? "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : undefined}>{children}</ReferenceChipFace>;
-  const trigger = activate ? <a href={href} className="no-underline" aria-disabled={pending || undefined}
+  const faceProps = { href, selected, hint: card ? undefined : href, tabIndex: model ? 0 : undefined,
+    className: model ? "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : undefined };
+  const face = appearance === "link" ? <ReferenceLinkFace {...faceProps}>{children}</ReferenceLinkFace>
+    : <ReferenceChipFace {...faceProps} size={size} onRemove={onRemove}>{children}</ReferenceChipFace>;
+  // data-reference exempts the anchor from prose link styling, which would otherwise underline the face in the link color.
+  const trigger = activate ? <a href={href} data-reference="" className="no-underline" aria-disabled={pending || undefined}
     onAuxClick={event => event.preventDefault()} onClick={event => {
       event.preventDefault();
       if (pending) return;

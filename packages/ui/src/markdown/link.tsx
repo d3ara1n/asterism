@@ -20,8 +20,8 @@ export function MarkdownLink({ href, children, title, ...props }: AnchorProps) {
     target.focus({ preventScroll: true });
     target.scrollIntoView({ block: "nearest" });
   }}>{children}</a></TooltipHint>;
-  if (href && parseModelUrl(href)) return <ReferenceChip href={href}>{children}</ReferenceChip>;
-  if (href && parseSkillUrl(href)) return <ReferenceChip href={href} openable>{children}</ReferenceChip>;
+  if (href && parseModelUrl(href)) return <ReferenceChip appearance="link" href={href}>{children}</ReferenceChip>;
+  if (href && parseSkillUrl(href)) return <ReferenceChip appearance="link" href={href} openable>{children}</ReferenceChip>;
   if (href && parseResourceUrl(href)) return <ResourceReference href={href}>{children}</ResourceReference>;
   const url = href ? externalWebUrl(href) : null;
   return url ? <TooltipHint content={title}><a {...props} href={url} target="_blank" rel="noopener noreferrer">{children}</a></TooltipHint> : <span>{children}</span>;
@@ -30,5 +30,5 @@ export function MarkdownLink({ href, children, title, ...props }: AnchorProps) {
 /** Resource IDs are scoped to the session of the object rendering the message. */
 function ResourceReference({ href, children }: { href: string; children: AnchorProps["children"] }) {
   const object = useRendererObject();
-  return <ReferenceChip href={href} sessionId={object.ref.sessionId} openable>{children}</ReferenceChip>;
+  return <ReferenceChip appearance="link" href={href} sessionId={object.ref.sessionId} openable>{children}</ReferenceChip>;
 }
