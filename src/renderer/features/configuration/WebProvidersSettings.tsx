@@ -98,8 +98,8 @@ export function WebProvidersSettings() {
               mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{initial(label)}</span>}
               title={label} description={type && capabilities(type)}
               selected={island.has(webProviderIslandKey(state.id))} onOpen={origin => open(state.id, origin)}
+              trailing={issue && <StatusBadge tone={issue.tone}>{issue.label}</StatusBadge>}
               actions={<>
-                {issue && <StatusBadge tone={issue.tone}>{issue.label}</StatusBadge>}
                 <IconButton variant="ghost" size="icon-sm" disabled={busy || index === 0}
                   label={moveUpLabel} onClick={() => move(index, -1)}><ArrowUp /></IconButton>
                 <IconButton variant="ghost" size="icon-sm" disabled={busy || index === ordered.length - 1}

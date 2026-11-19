@@ -196,7 +196,7 @@ function HistoryRecordRow({ info, snapshot, directory, selected, current, select
   return <div data-selected={selected}>
     <ActionMenu>
       <ActionMenuTarget asChild disabled={!!read.error}>
-        <div><ListRow variant="navigation" selected={selected} className="h-auto px-2 py-1.5 font-normal" onOpen={() => select(info.id)}
+        <div><ListRow variant="navigation" selected={selected} className="h-auto font-normal [--list-row-x:--spacing(2)] [--list-row-y:--spacing(1.5)]" onOpen={() => select(info.id)}
           buttonProps={{ "aria-pressed": selected, "aria-current": undefined }}
           tooltip={`${label}\n${source}\n${i18n.formatDate(Date.parse(info.createdAt), { dateStyle: "medium", timeStyle: "short" })}`}
           media={<span className="text-muted-foreground" aria-hidden="true">{entry?.icon ?? (info.source?.resource ? descriptor.icon : <PanelsTopLeft />)}</span>}

@@ -91,7 +91,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
     const media = !marked ? icon : <span className="flex items-center gap-1.5">
       {folder ? <Tooltip>
         <TooltipTrigger asChild>
-          {/* The padded hover target keeps the tooltip reachable; a click falls through to the row and opens the session. */}
+          {/* Keep the folder tooltip accessible over a slightly larger area inside the session button. */}
           <span className="-m-1 flex p-1">
             <FolderDot color={folder.color} />
           </span>
@@ -166,7 +166,7 @@ function SidebarGroupHeader({ group, open, spaced, onToggle, onAction }: {
   const i18n = useI18n();
   const name = group.folder?.name ?? i18n.text(folderMessages.noFolder);
   const header = (actions: ReactNode) => <ListRow variant="navigation" onOpen={onToggle} buttonProps={{ "aria-expanded": open }}
-    className="h-8 px-2 pr-1 font-normal" title={<span className="flex items-center gap-2 pr-1">
+    className="h-8 font-normal [--list-row-x:--spacing(2)] [--list-row-action-inset:--spacing(1)]" title={<span className="flex items-center gap-2 pr-1">
       <ChevronRight aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground motion-safe:transition-transform", open && "rotate-90")} />
       {group.folder ? <FolderDot color={group.folder.color} className="mx-0.5" /> : <FolderIcon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />}
       <span className={cn("min-w-0 flex-1 truncate", group.folder ? "font-medium" : "text-muted-foreground")}>{name}</span>

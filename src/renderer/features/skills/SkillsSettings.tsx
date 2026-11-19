@@ -93,11 +93,9 @@ function SkillSettingsBody({ names }: { names: PluginNames }) {
           media={<BookOpen className="size-4 text-folder-violet" />} title={i18n.text(messages.allSkills)}
           description={catalog ? i18n.formatMessage(messages.count, { count: total })
             : !failed && <span className="inline-flex items-center gap-2"><Spinner />{i18n.text(messages.loading)}</span>}
-          actions={<>
-            {issues > 0 && <Badge variant="warning"><TriangleAlert />{i18n.formatMessage(messages.issueCount, { count: issues })}</Badge>}
-            <IconButton label={i18n.text(messages.refresh)} disabled={!catalog || refreshing} aria-busy={refreshing}
-              onClick={() => { void refresh(); }}>{refreshing ? <Spinner /> : <RefreshCw />}</IconButton>
-          </>} />
+          trailing={issues > 0 && <Badge variant="warning"><TriangleAlert />{i18n.formatMessage(messages.issueCount, { count: issues })}</Badge>}
+          actions={<IconButton label={i18n.text(messages.refresh)} disabled={!catalog || refreshing} aria-busy={refreshing}
+            onClick={() => { void refresh(); }}>{refreshing ? <Spinner /> : <RefreshCw />}</IconButton>} />
       </div>
     </ItemGroup>
     {catalog && catalog.length > 0 && <Section title={i18n.text(messages.sources)} hint={i18n.text(messages.composition)}>

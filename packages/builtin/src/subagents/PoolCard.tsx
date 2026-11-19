@@ -208,10 +208,10 @@ export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
           <p className="type-caption px-3 py-2" role="status" aria-atomic="true">{i18n.formatMessage(messages.active, { running, queued })}</p>
           {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VirtualList data={data.tasks.toReversed()}>{task =>
               <ListRow key={task.id} title={`${task.id} · ${task.role}`} tooltip={task.task} onOpen={() => select(task.id)}
-                className="gap-2 px-3 py-1.5 [&_[data-slot=item-title]]:text-xs [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-snug"
+                className="[--list-row-gap:--spacing(2)] [--list-row-x:--spacing(3)] [--list-row-y:--spacing(1.5)] [&_[data-slot=item-title]]:text-xs [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-snug"
                 contentClassName="gap-0.5"
                 description={<span className="block truncate">{task.task}</span>}
-                actions={<TaskStatus status={task.status} />} />}</VirtualList></ItemGroup>
+                trailing={<TaskStatus status={task.status} />} />}</VirtualList></ItemGroup>
             : <p className="type-caption p-3">{i18n.text(messages.empty)}</p>}
         </>}
       </SlidePage>

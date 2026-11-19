@@ -33,7 +33,7 @@ export function ObjectsPanel({ onClose }: { onClose: () => void }) {
     {objects.map(object => {
       const descriptor = registry.resource(object.kind);
       const isHidden = hidden.has(object.id);
-      return <ListRow key={object.id} variant="navigation" className="h-auto px-2 py-1.5"
+      return <ListRow key={object.id} variant="navigation" className="h-auto [--list-row-x:--spacing(2)] [--list-row-y:--spacing(1.5)]"
         title={<>
           <span className="block truncate leading-5">{object.title}</span>
           <span className="type-caption block truncate leading-4 font-normal">{i18n.text(descriptor.label)}{isHidden ? ` · ${i18n.formatMessage(objectsMessages.cardHidden)}` : ""}</span>

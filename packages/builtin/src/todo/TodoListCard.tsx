@@ -32,7 +32,7 @@ function QuickAction({ todo }: { todo: TodoSummary }) {
     : todo.status === "in_progress" ? [messages.complete, Check, { action: "complete", id: todo.id } as const]
       : [messages.reopen, Undo2, { action: "reopen", id: todo.id } as const];
   return <TooltipHint content={i18n.text(label)}><ListRowAction aria-label={i18n.text(label)} disabled={pending} aria-busy={pending}
-    className={pending ? "w-6 opacity-100" : undefined} onClick={() => { void run(input); }}>
+    onClick={() => { void run(input); }}>
     {pending ? <Spinner /> : <Icon />}
   </ListRowAction></TooltipHint>;
 }
@@ -42,7 +42,7 @@ function TaskRow({ todo, onOpen }: { todo: TodoSummary; onOpen(): void }) {
   const facts = [todo.assignee && actorName(i18n, todo.assignee), formatMoment(i18n, todo.updatedAt)].filter(Boolean).join(" · ");
   return <ListRow title={<span className="line-clamp-2 break-words">{todo.title}</span>} onOpen={onOpen} inactive={todo.status === "done"} tooltip={i18n.text(messages[todo.status])}
     media={<TodoStatusIcon status={todo.status} tooltip={false} />}
-    className="gap-2 px-3 py-1.5 [&_[data-slot=item-title]]:text-xs [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-snug"
+    className="[--list-row-gap:--spacing(2)] [--list-row-x:--spacing(3)] [--list-row-y:--spacing(1.5)] [&_[data-slot=item-title]]:text-xs [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-snug"
     contentClassName="gap-0.5" description={facts} actions={<QuickAction todo={todo} />} />;
 }
 

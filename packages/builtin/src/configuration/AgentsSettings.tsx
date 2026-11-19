@@ -122,12 +122,10 @@ function AgentRow({ agent, snapshot, selected, onOpen }: {
       {!agent.availableToAgents && <Badge variant="secondary">{i18n.formatMessage(agentsMessages.userSelectionOnly)}</Badge>}
     </>}
     description={agent.description}
-    actions={<>
-      {agent.modelRole !== null && !role
-        ? <StatusBadge tone="error">{i18n.formatMessage(agentsMessages.unavailableRole)}</StatusBadge>
-        : <Badge variant="secondary">{role ? role.id : i18n.formatMessage(agentsMessages.noRole)}</Badge>}
-      <Switch aria-label={i18n.formatMessage(agentsMessages.enableAgent, { agent_name: agent.id })} checked={agent.enabled} disabled={busy} onCheckedChange={setEnabled} />
-    </>} />;
+    trailing={agent.modelRole !== null && !role
+      ? <StatusBadge tone="error">{i18n.formatMessage(agentsMessages.unavailableRole)}</StatusBadge>
+      : <Badge variant="secondary">{role ? role.id : i18n.formatMessage(agentsMessages.noRole)}</Badge>}
+    actions={<Switch aria-label={i18n.formatMessage(agentsMessages.enableAgent, { agent_name: agent.id })} checked={agent.enabled} disabled={busy} onCheckedChange={setEnabled} />} />;
 }
 
 /* ---------- Shared editor components ---------- */

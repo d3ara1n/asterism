@@ -54,14 +54,12 @@ export function MessagingSettings() {
         <ListRow className="rounded-none" mediaVariant="icon" media={<MessageSquare />} title={connection.name}
           description={description} inactive={!connection.enabled}
           selected={island.has(messagingIslandKey(connection.id))} onOpen={origin => open(connection.id, origin)}
-          actions={<>
-            <StatusBadge tone={statusTone[status]}>{i18n.text(messages[status])}</StatusBadge>
-            {restartable.has(status) && <IconButton variant="ghost" size="icon-sm" disabled={action.busy}
-              label={i18n.text(messages.restart)}
-              onClick={() => void action.run({ type: "messaging.restart", id: connection.id })}>
-              <RotateCcw />
-            </IconButton>}
-          </>} />
+          trailing={<StatusBadge tone={statusTone[status]}>{i18n.text(messages[status])}</StatusBadge>}
+          actions={restartable.has(status) && <IconButton variant="ghost" size="icon-sm" disabled={action.busy}
+            label={i18n.text(messages.restart)}
+            onClick={() => void action.run({ type: "messaging.restart", id: connection.id })}>
+            <RotateCcw />
+          </IconButton>} />
       </div>;
     })}</ItemGroup>}
   </Section>;

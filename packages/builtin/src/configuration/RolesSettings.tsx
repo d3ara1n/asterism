@@ -100,7 +100,7 @@ function RoleRow({ role, snapshot, selected, onOpen }: {
     if (value === undefined) delete overrides[field]; else overrides[field] = value;
     void run({ type: "role.save", id: role.id, value: { ...overrides, id: role.id } });
   };
-  return <ListRow className="flex-wrap" contentClassName="min-w-40" selected={selected} inactive={!role.enabled} onOpen={onOpen}
+  return <ListRow buttonProps={{ className: "min-w-48" }} selected={selected} inactive={!role.enabled} onOpen={onOpen}
     title={role.id}
     description={role.description}
     actions={<>
