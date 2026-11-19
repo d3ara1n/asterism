@@ -55,6 +55,8 @@ An island shell's border, clipping, and focus highlight are independent of its b
 
 Feature code requests island operations through the shared interface. Layout calculations remain independent of business components.
 
+Panel islands (editors, details) are non-modal and have no bottom action bar. Operations that act on the island's whole subject sit in its title bar, between the title and the island menu and close controls: the primary action, such as Save, as a small button, and whole-subject actions such as delete, remove, or restore defaults as icon buttons, with destructive ones in the destructive tone and confirmed separately. Operations that affect only part of the content sit with their content section, in the section header's action slot. Plugin islands follow the same placement.
+
 ## Motion
 
 Use Motion for presence, layout changes, and shared elements. Public motion tokens own timing and curves. Respect reduced motion in both Motion and CSS.
