@@ -18,8 +18,8 @@ import type { Folder } from "../../shared/folders";
 import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
 import type { SessionResult } from "../../shared/session";
 import { SessionActions } from "./SessionActions";
-import { SessionStatus } from "./SessionStatus";
-import type { ResourceNoticeMark } from "./resource-status";
+import { CoffeeCup, SessionGlyph, SessionStatus, hasSessionIndicator } from "./SessionStatus";
+import { sessionIndicator, type ResourceNoticeMark } from "./resource-status";
 import type { ResourceActivity } from "@asterism-app/sdk/contracts";
 import { useFolders } from "../features/folders/context";
 import { groupByFolder, type FolderGroup } from "../features/folders/grouping";
@@ -86,9 +86,15 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
     const activities = resourceActivities.filter(activity => activity.resource.sessionId === session.id);
     const notices = resourceNotices.filter(notice => notice.resource.sessionId === session.id);
     const folder = marked && session.folder_id !== null ? folderById.get(session.folder_id) : undefined;
-    const icon = session.sleeping ? <Moon className="text-muted-foreground" /> : <MessageSquare className="text-muted-foreground" />;
+    const indicator = sessionIndicator(activities, notices);
+    // One mutually exclusive session state: sleep outranks keep-awake, which only takes effect once the session is awake.
+    // Completion is independent and fills whichever icon is shown.
+    const icon = <SessionGlyph icon={session.sleeping ? Moon : session.keepAwake ? CoffeeCup : MessageSquare} filled={session.completed} indicator={indicator} />;
+    // Resource details open from the icon; the row button cannot contain another button, so the icon then moves beside it with the same spacing.
+    const interactive = hasSessionIndicator(indicator);
+    const glyph = interactive ? <SessionStatus indicator={indicator} activities={activities} notices={notices}>{icon}</SessionStatus> : icon;
     // Sessions without a folder keep the dot slot so titles align.
-    const media = !marked ? icon : <span className="flex items-center gap-1.5">
+    const media = !marked ? glyph : <span className="flex items-center gap-1.5">
       {folder ? <Tooltip>
         <TooltipTrigger asChild>
           {/* Keep the folder tooltip accessible over a slightly larger area inside the session button. */}
@@ -98,7 +104,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
         </TooltipTrigger>
         <TooltipContent side="right">{folder.name}</TooltipContent>
       </Tooltip> : <span aria-hidden="true" className="size-2 shrink-0" />}
-      {icon}
+      {glyph}
     </span>;
     return <SessionActions key={session.id} sessionId={session.id} title={session.title} folderId={session.folder_id} disabled={disabled} sleeping={session.sleeping}
       keepAwake={session.keepAwake} onKeepAwakeChange={value => onKeepAwakeChange(session.id, value)}
@@ -109,12 +115,14 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
         selected={selectedSessionId === session.id} disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
         tooltip={session.title}
         buttonProps={{ "aria-current": selectedSessionId === session.id ? "page" : undefined }}
-        media={media}
-        title={<span className={cn("relative block truncate", session.completed && "line-through")}>
+        media={interactive ? undefined : media} leadingActions={interactive ? media : undefined}
+        title={<span className="relative block truncate">
           {session.title}{folder && <span className="sr-only">, {folder.name}</span>}
           {session.sleeping && <span className="sr-only">, {i18n.text(appMessages.sleeping)}</span>}
+          {!session.sleeping && session.keepAwake && <span className="sr-only">, {i18n.text(appMessages.keepAwake)}</span>}
+          {session.completed && <span className="sr-only">, {i18n.text(appMessages.completed)}</span>}
         </span>}
-        actions={<><SessionStatus activities={activities} notices={notices} />{trigger}</>} />}
+        actions={trigger} />}
     </SessionActions>;
   };
   return <aside id="app-sidebar" className="app-sidebar" aria-label={i18n.formatMessage(appMessages.appNavigation)}>
