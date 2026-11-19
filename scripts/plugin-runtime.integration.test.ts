@@ -109,6 +109,15 @@ test("compiled host executes the built-in distribution and its public consumer i
   await run(root, "builtin", [consumer, builtin]);
 }, 60_000);
 
+const contextFoldRoot = process.env.ASTERISM_TEST_CONTEXT_FOLD_ROOT;
+test.skipIf(!contextFoldRoot)("compiled Context Fold joins the built-in projector registry from a source-free package", async () => {
+  const root = temporary();
+  const shipped = join(root, "relocated", "context-fold");
+  mkdirSync(shipped, { recursive: true });
+  for (const path of ["package.json", "dist", "locales"]) cpSync(join(contextFoldRoot!, path), join(shipped, path), { recursive: true });
+  await run(root, "context-fold", [shipped, resolve(process.env.ASTERISM_TEST_BUILTIN_ROOT ?? "packages/builtin")]);
+}, 60_000);
+
 test("compiled pnpm launcher resolves from an unpacked distribution and runs scripts with Electron's Node shim", async () => {
   const root = temporary();
   // Stage the actual dependency files as electron-builder's asarUnpack does, without building an app.

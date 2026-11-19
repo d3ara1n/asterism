@@ -9,6 +9,7 @@ import type { createAgentFeedback } from "./feedback-state.ts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { createRequestAssembly } from "./preparation.ts";
 import { projectAgentContext, projectForAgent } from "./projection.ts";
+import type { WorkMessages } from "./work-projection.ts";
 import { compressContext, compressionDue, estimateContext, planCompression, type PreparedCompression } from "./compression.ts";
 import { deliverDrafts } from "./drafts.ts";
 import { turnStartRead } from "./input-message.ts";
@@ -21,6 +22,7 @@ interface AgentControllerDependencies {
   models: ModelServices;
   execution: ExecutionServices;
   prepareRequest: ReturnType<typeof createRequestAssembly>;
+  projectMessages?: WorkMessages;
   userAgent: string;
   usage?: Pick<ProviderUsage, "consume">;
   feedback: ReturnType<typeof createAgentFeedback>;
@@ -206,7 +208,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
               result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
                 agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },
                 userAgent: deps.userAgent, completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
-                target, system: files => { prepared = prepare(files); return prepared.system; }, messages: projectForAgent(snapshot, object.ref.id), signal: current,
+                target, system: files => { prepared = prepare(files); return prepared.system; }, messages: (deps.projectMessages ?? projectForAgent)(snapshot, object.ref.id), signal: current,
                 observer: { event(event) { progress.event(event); return observer.event(event); } },
               }));
             } catch (error) {

@@ -8,7 +8,7 @@ import { readRecords, type RecordRead } from "../shared/record-reading.ts";
 /** Projection depends only on pure contracts; background requests and the frontend context panel share the same rules, and the background entry point converts failures to plugin errors. */
 export class ContextProjectionError extends Error {}
 /** A response and all its tool results are indivisible; indices address AgentContext.path. */
-export interface ContextGroup { items: ModelItem[]; first: number; last: number }
+export interface ContextGroup { items: ModelItem[]; first: number; last: number; resultRecords?: ReadonlyMap<string, SessionRecord>; startRecord?: string | null }
 export interface AgentContext {
   path: readonly SessionRecord[];
   groups: ContextGroup[];
@@ -104,7 +104,10 @@ function projectContextRecords(path: readonly SessionRecord[], agentId: string, 
     for (const blocks of after.get(origin) ?? []) {
       const items = responseMessages(blocks.map(({ block }) => block), submitted);
       const indices = blocks.map(({ record }) => local.get(record.id)!);
-      if (items.length) groups.push({ items, first: Math.min(...indices), last: Math.max(...indices) });
+      if (items.length) groups.push({ items, first: Math.min(...indices), last: Math.max(...indices),
+        startRecord: origin, resultRecords: new Map(blocks.flatMap(({ block, record }) =>
+          block.kind === "toolcall" && block.outcome ? [[block.callId, record]] : [])),
+      });
     }
   };
   emit(null);

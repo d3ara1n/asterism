@@ -78,6 +78,12 @@ Request preparation changes the skills and instruction blocks presented to an Ag
 
 Keep preparation deterministic within the captured request environment. Changes to configuration or catalogs belong to later requests rather than altering the meaning of a request already being assembled.
 
+## Transform model context without rewriting history
+
+Agent context transforms compose in registration order after the built-in timeline projection. Each synchronous transform gets the preceding transform's standard context units. It can preserve, replace, add, or remove units; tool calls and results must stay paired within a unit. An invalid transform fails the request instead of silently restoring another projection. Keep transforms deterministic for a captured request, especially when reusing a provider's cached prefix.
+
+Provenance accompanies the model items but is not sent to the model. Preserve a part's original identity only when forwarding that part. Synthetic or replaced parts do not claim its provenance. Treat a recall ticket as an address, not authority: resolve it on the calling Agent's request path and return the original content as a new tool result. Projection changes neither the saved timeline nor user-facing history.
+
 ## Extend presentation without owning execution
 
 Use presentation extensions for the integration's controls and business state while preserving builtin's conversation and execution ownership. A view closing does not complete or cancel waiting backend work. Reopening should read the current state rather than depend on an earlier component instance.

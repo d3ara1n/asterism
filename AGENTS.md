@@ -27,6 +27,10 @@ Interface copy serves user understanding and action, not code comments or schema
 
 Reuse maintained libraries for general controls, animation, layout, drag, and virtualization. Confirm new dependencies separately with rationale and alternatives. For a missing shadcn control, check the registry and use `npx shadcn@latest add <name>`; official controls do not count as new dependencies.
 
+### npm package naming
+
+Use the `@asterism-app` scope for Asterism core and framework packages, and the `@asterism-plugins` scope for official optional plugins (for example, `@asterism-plugins/context-fold`). Third-party authors use their own scope and an `asterism-` package prefix (for example, `@alice/asterism-my-plugin`). The npm package name is separate from the runtime plugin ID.
+
 ### Vendored shadcn components
 
 `packages/ui/src/ui/` mixes shadcn registry files with project-owned controls. Run the shadcn CLI from the repository root: the `packages/ui` config cannot resolve its aliases, and the root config rewrites the `cn` import to an npm package named `cn` and adds it as a dependency. If workspace alias validation rejects `lib` or `hooks`, `add <name> --view` still exposes the registry source for applying it locally. After every `add` or `--overwrite` of a registry file, restore relative imports (`../utils`, `./button`), drop the `cn` dependency, and reapply the local changes below. Keep this list current whenever a registry file gains or loses a local change.

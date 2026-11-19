@@ -4,6 +4,8 @@ import { defineModule, PluginApiError, type PluginContext, type PluginModule, ty
 
 export { agentServices, registerAgentServices, type AgentServices } from "./agent-services.ts";
 export { defineAgentPreparer, captureAgentPreparers, type AgentPreparation, type AgentPromptBlock } from "./preparation.ts";
+export { defineAgentContextTransform, captureAgentContextTransforms,
+  type AgentContextUnit, type AgentContextItem, type AgentContextRequest } from "./context-transform.ts";
 
 export interface AgentCreationDescription {
   readonly id: string;

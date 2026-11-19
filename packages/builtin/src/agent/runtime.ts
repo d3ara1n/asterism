@@ -1,4 +1,5 @@
 import { agentCard } from "../shared/card-appearance.ts";
+import { createWorkProjection } from "./work-projection.ts";
 import { createRequestAssembly } from "./preparation.ts";
 import type { ApplicationIdentity } from "@asterism-app/sdk/runtime";
 import { AgentView, AgentSelection, AgentDrafts } from "./data.ts";
@@ -32,6 +33,7 @@ import { builtinConfiguration, resolveRoleTarget } from "../configuration/runtim
 /** The resource entry point only assembles domain modules and contributions; business modules do not depend on the full plugin context. */
 export function createAgentModule(application: ApplicationIdentity, usage: ProviderUsage, skills: SkillCatalog) {
   return defineModule(plugin => {
+    const projectMessages = createWorkProjection(plugin);
     const prepareRequest = createRequestAssembly(plugin, skills);
     const systemPrompt = (agent: Parameters<typeof prepareRequest>[0]) => prepareRequest(agent)().system;
     const selection = createSelection({ agents: () => builtinConfiguration(plugin).agents, roles: () => builtinConfiguration(plugin).roles });
@@ -39,9 +41,9 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
       utility: () => resolveRoleTarget(builtinConfiguration(plugin).roles, "utility") };
     const feedback = createAgentFeedback();
     plugin.lifetime.defer(feedback.clear);
-    const controller = createAgentController({ selection, tasks: plugin.tasks, models: plugin.models, execution: plugin.execution, prepareRequest, userAgent: application.userAgent,
+    const controller = createAgentController({ selection, tasks: plugin.tasks, models: plugin.models, execution: plugin.execution, prepareRequest, projectMessages, userAgent: application.userAgent,
       usage, feedback });
-    const admission = createAdmission({ selection, validate: plugin.models.validate, running: controller.running, systemPrompt });
+    const admission = createAdmission({ selection, validate: plugin.models.validate, running: controller.running, systemPrompt, projectMessages });
     const agentObject = (ref: ResourceRef) => {
       if (ref.kind !== Agent.kind) throw new PluginApiError("invalid_argument", "The target is not an Agent.");
       const object = plugin.object(ref.sessionId, Agent, ref.id);

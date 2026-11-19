@@ -4,6 +4,9 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { PackageList, buildPackages, importPackages, type ResolvedPackage } from "../../src/plugins/packages.ts";
+import type { PluginContext, TopLevelToolContext } from "@asterism-app/sdk/runtime";
+import { sessionSnapshot } from "../../src/plugins/records.ts";
+import { nodeView } from "../../src/session/view.ts";
 import * as sdkRuntime from "@asterism-app/sdk/runtime";
 import * as zod from "zod";
 import { savePluginBuild, readPluginBuild } from "../../src/plugins/artifacts.ts";
@@ -70,6 +73,44 @@ if (mode === "fixtures") {
   const api = await import(pathToFileURL(join(builtin.artifactRoot!, publicEntry)).href);
   assert.equal(evidence.agentCreations, api.agentCreations);
   assert.deepEqual(consumer.runtimeDependencies, ["asterism.builtin"]);
+} else if (mode === "context-fold") {
+  const items = await load();
+  const builtin = items.find(item => item.manifest?.id === "asterism.builtin")!;
+  const fold = items.find(item => item.manifest?.id === "asterism.context-fold")!;
+  const api = await import(pathToFileURL(join(builtin.artifactRoot!, builtin.artifact!.public.runtime["@asterism-app/builtin-api/runtime"]!)).href);
+  const contracts = await import(pathToFileURL(join(builtin.artifactRoot!, builtin.artifact!.public.runtime["@asterism-app/builtin-api/contracts"]!)).href);
+  const lifetime = new AbortController();
+  const context = { id: "asterism.context-fold", sessions: {}, lifetime: { signal: lifetime.signal } } as PluginContext;
+  const tool = fold.definition!.modules!.flatMap(module => module.setup(context).topLevelTools ?? [])[0]!;
+  const image = { kind: "file", mediaType: "image/png", file: { "$asterism.content": "550e8400-e29b-41d4-a716-446655440000" } } as const;
+  const outcome = { kind: "succeeded", data: null, model: [image] };
+  const original = { turn: 1, items: [
+    { item: { kind: "output", scope: "session", adapter: "test", parts: [{ kind: "toolcall", callId: "original", name: "see", arguments: {}, continuation: null }] } },
+    { item: { kind: "result", callId: "original", name: "see", outcome }, origin: { recordId: "shot", parts: [0] } },
+  ] };
+  const transformed = api.captureAgentContextTransforms(context)([original], { sessionId: "session", agentId: "agent", turn: 3 });
+  assert.match(transformed[0].items[1].item.outcome.model[0].text, /"ticket":"shot:0"/);
+  const ref = { sessionId: "session", id: "agent", kind: contracts.Agent.kind };
+  const at = (id: string, parentId: string | null) => ({ id, parentId, sessionId: ref.sessionId,
+    source: { plugin: "asterism.builtin", resource: ref }, createdAt: "2026-11-18T00:00:00Z", model: null, recipient: null });
+  const block = { responseId: "response", ordinal: 0, kind: "toolcall", argumentsText: null, continuation: null,
+    source: { model: "provider/model", adapter: "test", scope: "session" } };
+  const toolAt = (id: string, parent: string, pending: boolean, data: import("@asterism-app/sdk/contracts").Json) =>
+    ({ ...at(id, parent), pending, contract: contracts.ToolExecution.id, data });
+  const operation = (callId: string, name: string, requestParentId: string, args: import("@asterism-app/sdk/contracts").Json) =>
+    ({ ...block, complete: false, callId, name, requestParentId, arguments: args, outcome: null });
+  const start = { ...at("first", null), contract: "test.input", data: null };
+  const shot = toolAt("shot", "first", false, { input: operation("first-call", "see", "first", {}), output: outcome });
+  const sibling = toolAt("sibling", "first", false, { input: operation("side-call", "see", "first", {}), output: outcome });
+  const call = toolAt("recall", "shot", true, { input: operation("recall-call", tool.name, "shot", { ticket: "shot:0" }), output: null });
+  const snapshot = sessionSnapshot(nodeView(ref.sessionId, "Context Fold", [start, shot, sibling, call], call.id));
+  const callContext = { caller: { ref }, callId: "recall-call", session: { snapshot: () => snapshot } } as TopLevelToolContext;
+  const recalled = await tool.execute({ ticket: "shot:0" }, callContext);
+  assert.equal(recalled.kind, "succeeded");
+  assert.deepEqual(tool.toModel!(recalled.data!), [image]);
+  assert.equal((await tool.execute({ ticket: "sibling:0" }, callContext)).kind, "rejected");
+  lifetime.abort();
+  assert.equal(api.captureAgentContextTransforms(context), null);
 } else if (mode === "pnpm") {
   const launcher = pnpmLauncher();
   assert.equal(launcher, join(root, "app.asar.unpacked/node_modules/pnpm/bin/pnpm.cjs"));

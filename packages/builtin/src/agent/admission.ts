@@ -3,7 +3,7 @@ import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecu
 import { type SubmitAgentInputData, type AgentSelection as Selection, AgentInputMessage, AgentInputAccepted, type AgentConfiguration } from "@asterism-app/builtin-api/contracts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { SystemPrompt } from "@asterism-app/sdk/contracts";
-import { projectForAgent } from "./projection.ts";
+import type { WorkMessages } from "./work-projection.ts";
 import { duplicateSubmission, rememberSubmission } from "./submissions.ts";
 import { projectInputMessage } from "./input-message.ts";
 
@@ -16,7 +16,7 @@ function writeInput(input: SubmitAgentInputData, object: ObjectReader, writer: O
 }
 
 /** Resource actions accept inputs independently and share model preflight checks; submission identity and persistence form one atomic acceptance. */
-export function createAdmission(deps: { selection: AgentSelectionService; validate: ModelServices["validate"]; running(object: ObjectReader): boolean; systemPrompt: (agent: Pick<AgentConfiguration, "id" | "systemPrompt">) => SystemPrompt }) {
+export function createAdmission(deps: { selection: AgentSelectionService; validate: ModelServices["validate"]; running(object: ObjectReader): boolean; projectMessages: WorkMessages; systemPrompt: (agent: Pick<AgentConfiguration, "id" | "systemPrompt">) => SystemPrompt }) {
   const idle = (object: ObjectReader) => {
     if (deps.running(object)) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
   };
@@ -28,7 +28,7 @@ export function createAdmission(deps: { selection: AgentSelectionService; valida
     const current = object.get(AgentSelection);
     if (!current) return;
     const agent = deps.selection.agent(current.selection), snapshot = object.session.snapshot();
-    const messages = projectForAgent(snapshot, object.ref.id);
+    const messages = deps.projectMessages(snapshot, object.ref.id, !!input);
     if (input) messages.push(projectInputMessage(input));
     const target = deps.selection.target(current.selection);
     await deps.validate({ target, system: deps.systemPrompt(agent), messages, signal }, { content });
