@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
+import { hookupIpc } from "@sentry/electron/preload-namespaced";
 import { languageGetChannel, languageSetChannel, languageChangedChannel, languagePreferenceSchema, languageStateSchema } from "../shared/language.ts";
 import { desktopBridgeKey } from "../shared/core.ts";
 import { desktopWindowChangedChannel, desktopWindowGetChannel, desktopWindowShowChannel, desktopWindowStateSchema, desktopUnsavedChangesChannel, unsavedChangesSchema } from "../shared/desktop.ts";
@@ -12,6 +13,10 @@ import { recoveryActionSchema } from "../shared/recovery.ts";
 import { rendererFailureChannel } from "../shared/renderer-failure.ts";
 import { updatesGetChannel, updatesSetChannel, updatesCheckChannel, updatesInstallChannel, updatesChangedChannel, updateStateSchema } from "../shared/updates.ts";
 import { networkGetChannel, networkSetChannel, networkChangedChannel, networkPreferenceSchema, networkStateSchema } from "../shared/network.ts";
+import { crashReportsArgument, crashReportsGetChannel, crashReportsSetChannel, crashReportsStateSchema } from "../shared/crash-reports.ts";
+
+const crashReportsActive = process.argv.includes(crashReportsArgument);
+if (crashReportsActive) hookupIpc();
 
 let connectionRequested = false;
 // Hand ports directly to the page without cloning business messages again through contextBridge. The main process accepts trusted main-frame requests only.
@@ -19,6 +24,11 @@ ipcRenderer.on(connectionRequestChannel, event => {
   window.postMessage({ type: connectionPortMessage }, "*", event.ports.length ? [event.ports[0]!] : []);
 });
 const bridge: DesktopBridge = {
+  crashReports: {
+    active: crashReportsActive,
+    async get() { return crashReportsStateSchema.parse(await ipcRenderer.invoke(crashReportsGetChannel)); },
+    async set(enabled) { return crashReportsStateSchema.parse(await ipcRenderer.invoke(crashReportsSetChannel, enabled)); },
+  },
   network: {
     async get() { return networkStateSchema.parse(await ipcRenderer.invoke(networkGetChannel)); },
     async set(value) { return networkStateSchema.parse(await ipcRenderer.invoke(networkSetChannel, networkPreferenceSchema.parse(value))); },

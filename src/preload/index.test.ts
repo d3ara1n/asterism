@@ -10,6 +10,7 @@ vi.mock("electron", () => ({
   ipcRenderer: { on: electron.on, removeListener: electron.removeListener, send: electron.send },
   webUtils: {},
 }));
+vi.mock("@sentry/electron/preload-namespaced", () => ({ hookupIpc: vi.fn() }));
 let bridge: DesktopBridge;
 beforeAll(async () => {
   vi.stubGlobal("window", { postMessage: electron.postMessage });

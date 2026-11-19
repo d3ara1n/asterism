@@ -10,6 +10,7 @@ interface StartupOptions {
   directory: string;
   root: string;
   version: string;
+  utilityArguments?(): string[];
   publish(state: StartupState): void;
   showWindow(): void;
   settingsReady(): void;
@@ -45,7 +46,7 @@ export class StartupCoordinator {
         this.options.showWindow();
       },
       progress => this.stage(progress.stage, progress.detail),
-      () => { if (action.kind === "prepare") this.stage("dataFinalizing"); });
+      () => { if (action.kind === "prepare") this.stage("dataFinalizing"); }, this.options.utilityArguments?.());
     this.preparation = work;
     return work.finally(() => { this.preparation = null; });
   }

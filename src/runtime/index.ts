@@ -14,6 +14,9 @@ import { pluginStorageFailureSchema } from "../shared/recovery.ts";
 import { setGlobalDispatcher } from "undici";
 import { ProxyClient } from "./proxy-client.ts";
 import { createNetworkDispatcher } from "./network.ts";
+import { utilityCrashReports } from "./crash-reports.ts";
+
+const reportCrash = utilityCrashReports("runtime");
 
 // Task processes accept application data roots only from the main process, never renderer file paths.
 const port = process.parentPort;
@@ -95,6 +98,7 @@ try {
   proxy.close();
   await network.close();
   console.error("Task runtime initialization failed.", error);
+  if (!(error instanceof DatabaseVersionError)) await reportCrash(error);
   port.postMessage(error instanceof DatabaseVersionError
     ? { kind: "fatal", reason: "database_version", message: error.message, directory: error.directory }
     : { kind: "fatal", reason: "unknown", message: "The workspace could not be opened. Check the application logs." });

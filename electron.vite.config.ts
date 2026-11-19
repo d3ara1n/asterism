@@ -31,6 +31,7 @@ export default defineConfig({
         include: ["node-pty", "@xterm/headless", "@xterm/addon-serialize", "@vscode/ripgrep"],
       },
       outDir: resolve("dist/main"),
+      sourcemap: "hidden",
       rolldownOptions: {
         input: {
           index: resolve("src/main/index.ts"),
@@ -47,6 +48,7 @@ export default defineConfig({
     plugins: [runtimeModules()],
     build: {
       outDir: resolve("dist/preload"),
+      sourcemap: "hidden",
       externalizeDeps: false,
       rolldownOptions: {
         input: resolve("src/preload/index.ts"),
@@ -75,6 +77,6 @@ export default defineConfig({
       },
     ],
     server: { host: "127.0.0.1" },
-    build: { outDir: resolve("dist/renderer"), minify: true, rolldownOptions: { input: resolve("src/renderer/index.html") } },
+    build: { outDir: resolve("dist/renderer"), minify: true, sourcemap: "hidden", rolldownOptions: { input: resolve("src/renderer/index.html") } },
   },
 });

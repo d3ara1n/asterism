@@ -1,11 +1,13 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Copy } from "lucide-react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Switch } from "@asterism-app/ui/ui/switch";
 import { Separator } from "@asterism-app/ui/ui/separator";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import appIcon from "../../../../assets/icon/asterism.svg";
 import darkAppIcon from "../../../../assets/icon/asterism-dark.svg";
+import type { CrashReportsState } from "../../../shared/crash-reports";
 import { applicationId } from "../../../shared/application";
 import { appMessages } from "../../messages/app";
 import { settingsMessages } from "../../messages/settings";
@@ -35,11 +37,38 @@ export function AboutSettings() {
       <CopyIdentity />
     </Row>
     <Separator />
+    <CrashReportsRow />
+    <Separator />
     <Row label={i18n.text(settingsMessages.aboutLogs)}>
       <Button size="sm" variant="outline" onClick={() => void window.host.openLogs().then(error => { if (error) console.error(`Log folder could not be opened: ${error}`); })}>
         {i18n.text(settingsMessages.aboutOpenLogs)}</Button>
     </Row>
   </div>;
+}
+
+function CrashReportsRow() {
+  const i18n = useI18n();
+  const [state, setState] = useState<CrashReportsState>();
+  const [saving, setSaving] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    void window.host.crashReports.get().then(value => { if (mounted) setState(value); }, error => console.error("Crash reporting preference could not be loaded.", error));
+    return () => { mounted = false; };
+  }, []);
+  const setEnabled = async (enabled: boolean) => {
+    setSaving(true);
+    try { setState(await window.host.crashReports.set(enabled)); }
+    catch (error) {
+      console.error("Crash reporting preference could not be saved.", error);
+      toast.error(i18n.text(settingsMessages.crashReportsSaveFailed));
+    } finally { setSaving(false); }
+  };
+  const label = i18n.text(settingsMessages.crashReports);
+  return <Row label={label} hint={i18n.text(settingsMessages.crashReportsHint)}>
+    {state?.restartRequired && <span className="type-caption">{i18n.text(settingsMessages.crashReportsRestart)}</span>}
+    <Switch aria-label={label} checked={state?.enabled ?? false} disabled={!state || saving}
+      onCheckedChange={enabled => { void setEnabled(enabled); }} />
+  </Row>;
 }
 
 /** The single visual focus for update state: versions, action, status, and progress share one subdued surface, replacing content by state. */

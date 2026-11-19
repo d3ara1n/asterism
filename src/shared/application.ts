@@ -36,6 +36,7 @@ export const applicationStorage = {
   languageStore: "language",
   uiStateStore: "ui-state",
   updatesStore: "updates",
+  crashReportsStore: "crash-reports",
   networkStore: "network",
   chromiumDirectory: "chromium",
   logsDirectory: "logs",

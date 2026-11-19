@@ -26,6 +26,12 @@ Configure `MAC_SIGNING_P12` and `MAC_SIGNING_P12_PASSWORD` in Actions secrets. U
 
 Keep the private key outside the repository. Ordinary checks do not need signing secrets.
 
+## Configure crash reporting
+
+Error and crash reporting is opt-in. The main process assigns the Sentry environment: unpackaged development and preview runs use `development`, and packaged builds, including locally built installers, use `production`. Both use the same project and public DSN. Use the Environment filter in Sentry to view production issues without development events.
+
+Set `SENTRY_AUTH_TOKEN` in GitHub Actions to enable source map uploads to `gravitylab/asterism`. The release workflow injects matching debug IDs and uploads source maps before packaging; installers exclude the maps. Without the secret the workflow skips upload and still packages the app. The token belongs only in CI, never in a local build or in application code.
+
 ## Publish a prerelease
 
 Integrate checked changes into main using Conventional Commits. The Release workflow checks for eligible new main commits on its schedule; a maintainer can also trigger it manually.

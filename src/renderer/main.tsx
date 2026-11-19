@@ -9,8 +9,10 @@ import { AfterCommit, startupSplash } from "./app/startup-splash";
 import { StartupError, awaitStartup, waitForRuntime } from "./app/boot";
 import { startupMessages } from "../shared/error-display";
 import { reportRendererFailure } from "./shared/failure";
+import { startCrashReports } from "./shared/crash-reports";
 import "./styles.css";
 
+startCrashReports();
 const root = createRoot(document.getElementById("root")!);
 const splash = startupSplash(document.getElementById("startup-splash")!);
 const lifetime = new AbortController();

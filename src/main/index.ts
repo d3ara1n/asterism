@@ -12,6 +12,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { pickDirectoryChannel, openLocalFileChannel, showLocalFileChannel, showLocalFileSchema, openLogsChannel, localFilePathSchema, statusChannel } from "../shared/contracts.ts";
 import { connectionRequestChannel } from "../shared/connection.ts";
+import { CrashReports } from "./crash-reports.ts";
 import { RuntimeHost } from "./runtime-host.ts";
 import { applicationBrand, applicationDataDirectory, applicationId, applicationStorage, applicationRendererUrl } from "../shared/application.ts";
 import { followWindowAppearance, initialWindowAppearance } from "./window-appearance.ts";
@@ -53,6 +54,7 @@ let recoveryPending = false;
 let connectSettings: (() => void) | null = null;
 /** Trusted renderer page URL without the hash, used for permission decisions. */
 let trustedURL: string | null = null;
+const crashReports = new CrashReports();
 const runtime = new RuntimeHost(status => {
   if (window && !window.isDestroyed()) window.webContents.send(statusChannel, status);
   if (status === "ready") startup.publish({ status: "ready" });
@@ -154,7 +156,7 @@ function createWindow(): void {
     webPreferences: {
       preload: join(here, "../preload/index.cjs"),
       sandbox: true, contextIsolation: true, nodeIntegration: false,
-      webviewTag: false,
+      webviewTag: false, additionalArguments: crashReports.arguments(),
     },
   });
   const current = window;
@@ -286,6 +288,7 @@ function createWindow(): void {
   const desktopWindow = serveDesktopWindow(current, titleBar, trusted, () => quitting || quitRequest !== null);
   publishDesktopWindow = desktopWindow.publish;
   const stopPreferences = servePreferences(trusted);
+  const stopCrashReports = crashReports.serve(trusted);
   const stopLanguage = serveLanguage(current, trusted);
   let stopUpdates = () => {};
   let stopNetwork = () => {};
@@ -312,6 +315,7 @@ function createWindow(): void {
     }
   });
   current.webContents.on("preload-error", (_event, _path, error) => {
+    crashReports.capture(error, "preload");
     console.error("Desktop bridge initialization failed.", error);
     show();
     dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
@@ -369,7 +373,7 @@ function createWindow(): void {
     connectSettings = null;
     closeConnection();
     window = null; ipcMain.removeHandler(pickDirectoryChannel); ipcMain.removeHandler(openLocalFileChannel); ipcMain.removeHandler(showLocalFileChannel); ipcMain.removeHandler(openLogsChannel);
-    stopAppearance(); stopPreferences(); stopLanguage(); stopUpdates(); stopNetwork();
+    stopAppearance(); stopPreferences(); stopLanguage(); stopUpdates(); stopNetwork(); stopCrashReports();
   });
   const loading = current.loadURL(developmentURL ?? applicationRendererUrl);
   loading.catch(error => { console.error("Renderer initialization failed.", error); show(); dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale)); });
@@ -409,6 +413,7 @@ mkdirSync(dataRoot, { recursive: true });
 app.setPath("userData", dataRoot);
 const startup = new StartupCoordinator({
   directory: here, root: dataRoot, version: app.getVersion(),
+  utilityArguments: () => crashReports.arguments(),
   publish: state => {
     if (window && !window.isDestroyed()) window.webContents.send(startupChangedChannel, state);
   },
@@ -421,7 +426,7 @@ const startup = new StartupCoordinator({
   },
   startRuntime: async (failures, pluginBuild) => {
     await network?.apply();
-    await runtime.start(join(here, "runtime.js"), dataRoot, failures, pluginBuild);
+    await runtime.start(join(here, "runtime.js"), dataRoot, failures, pluginBuild, crashReports.arguments());
     void updates?.check();
   },
 });
@@ -429,6 +434,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   initializeApplicationLog(dataRoot, app.getVersion());
+  crashReports.start();
   let logClosing = false;
   let logClosed = false;
   // Final quit follows resource cleanup and window closure; cancelled exits leave logging active.
@@ -437,7 +443,7 @@ if (!app.requestSingleInstanceLock()) {
     event.preventDefault();
     if (logClosing) return;
     logClosing = true;
-    void closeApplicationLog().then(() => {
+    void Promise.allSettled([closeApplicationLog(), crashReports.flush()]).then(() => {
       logClosed = true;
       // Let Electron finish cancelling this will-quit event before requesting the final quit.
       setImmediate(() => app.quit());
@@ -471,6 +477,7 @@ if (!app.requestSingleInstanceLock()) {
     });
     await startup.run();
   }).catch(error => {
+    crashReports.capture(error, "startup");
     console.error("Electron initialization failed.", error);
     dialog.showErrorBox(applicationBrand.en, startupText(startupMessages.windowLoadFailed, () => readLanguage().locale));
     app.quit();

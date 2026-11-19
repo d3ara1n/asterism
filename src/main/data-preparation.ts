@@ -13,9 +13,9 @@ export class PreparationTerminationError extends Error {}
 export function prepareDataProcess(entry: string, root: string, version: string, action: PreparationAction, signal: AbortSignal,
   onHost: (status: "migrating" | "ready") => void = () => {},
   onProgress: (progress: PreparationProgress) => void = () => {},
-  onFinalizing: () => void = () => {}): Promise<PreparationResult> {
+  onFinalizing: () => void = () => {}, extraArguments: string[] = []): Promise<PreparationResult> {
   signal.throwIfAborted();
-  const args = [root, version, action.kind, ...action.kind === "restore" ? [action.point] : []];
+  const args = [root, version, action.kind, ...(action.kind === "restore" ? [action.point] : []), ...extraArguments];
   console.info(`Data preparation starting. action=${action.kind}`);
   return new Promise((resolve, reject) => {
     const child = utilityProcess.fork(entry, args, { serviceName: `${applicationBrand.en} data preparation`, stdio: "pipe" });

@@ -140,12 +140,29 @@ jobs:
           identity="$(security find-identity -v -p codesigning "$signing/build.keychain-db" | sed -n 's/.*"\(.*\)".*/\1/p' | head -1)"
           test -n "$identity"
           echo "CSC_NAME=$identity" >> "$GITHUB_ENV"
+      - name: Build application
+        run: npm run build
+      - name: Upload Sentry source maps
+        shell: bash
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: gravitylab
+          SENTRY_PROJECT: asterism
+          SENTRY_URL: https://us.sentry.io
+        run: |
+          set -euo pipefail
+          if [[ -z "$SENTRY_AUTH_TOKEN" ]]; then
+            echo "::notice::Sentry source maps not uploaded: SENTRY_AUTH_TOKEN is not configured."
+            exit 0
+          fi
+          npx --yes @sentry/cli@3.8.2 sourcemaps inject dist
+          npx --yes @sentry/cli@3.8.2 sourcemaps upload dist
       - name: Build distributables
         shell: bash
         env:
           RELEASE_PLATFORM: ${{ matrix.platform }}
           RELEASE_ARCH: ${{ matrix.arch }}
-        run: npm run make -- "--$RELEASE_PLATFORM" "--$RELEASE_ARCH"
+        run: npx --no-install electron-builder --config electron-builder.config.ts --publish never "--$RELEASE_PLATFORM" "--$RELEASE_ARCH"
       - name: Verify macOS signature
         if: runner.os == 'macOS'
         run: codesign --verify --deep --strict out/mac-arm64/Asterism.app

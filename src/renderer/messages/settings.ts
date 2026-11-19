@@ -48,6 +48,22 @@ export const settingsMessages = pluginNamespace("asterism.host").messages("en", 
     id: "settings.about.logs.open",
     defaultMessage: "Open folder",
   },
+  crashReports: {
+    id: "settings.about.crashReports.label",
+    defaultMessage: "Send error and crash reports",
+  },
+  crashReportsHint: {
+    id: "settings.about.crashReports.hint",
+    defaultMessage: "Send error stacks and crash dumps to Sentry. Dumps can contain data from application memory.",
+  },
+  crashReportsRestart: {
+    id: "settings.about.crashReports.restart",
+    defaultMessage: "Restart required",
+  },
+  crashReportsSaveFailed: {
+    id: "settings.about.crashReports.saveFailed",
+    defaultMessage: "Could not save the error reporting preference",
+  },
   aboutCopyIdentity: {
     id: "settings.about.identity.copy",
     defaultMessage: "Copy application ID",

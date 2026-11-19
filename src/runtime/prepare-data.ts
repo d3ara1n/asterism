@@ -2,6 +2,9 @@ import { prepareApplicationData, restoreApplicationData, startFreshApplicationDa
 import { clearPause } from "../storage/preparation.ts";
 import type { PreparationMessage } from "../shared/recovery.ts";
 import { LegacyCredentials } from "./legacy-credentials.ts";
+import { utilityCrashReports } from "./crash-reports.ts";
+
+const reportCrash = utilityCrashReports("preparation");
 
 /** Send final results after commit and cleanup; the main process terminates this process on receipt. Arguments: data root, app version, operation, and restore target. */
 const port = process.parentPort;
@@ -26,6 +29,7 @@ try {
   }
 } catch (error) {
   console.error("Data preparation failed.", error);
+  await reportCrash(error);
   terminal = { kind: "error", error: error instanceof Error ? error.message : String(error) };
 }
 // The main process may terminate this process on receipt; pass final diagnostics to the pipe first.
