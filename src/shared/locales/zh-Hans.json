@@ -686,7 +686,7 @@
   "model.delete.unusedDescription": "将移除「{current_name}」，没有模型角色使用它。",
   "model.name": "显示名称",
   "model.serverId.label": "服务端模型 ID",
-  "model.serverId.hint": "须与提供商 API 的模型名一致；可含 /，不含空白；默认由名称生成。",
+  "model.serverId.hint": "发送请求时传给提供商 API 的精确模型标识符，例如 gpt-5 或 anthropic/claude-sonnet-4。",
   "model.capabilities": "能力",
   "model.reasoning": "支持思考",
   "model.availableThinkingLevels": "可用思考等级",

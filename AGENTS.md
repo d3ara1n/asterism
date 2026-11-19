@@ -23,7 +23,7 @@ Keep fixed application identity, data layout, and internal channel identities ce
 
 Current example resources validate foundations and do not define the final product catalog. Workbench cards and auxiliary surfaces reuse the shared object and island presentation. Overall visual changes require user confirmation.
 
-Interface copy states only what visuals cannot. Encode state with bars, rings, icons, tones, and labeled values rather than explanatory sentences. Omit text that restates the domain's inherent semantics, describes implementation, or reassures the user; mark exceptional states with a short label. Explanations for developers belong in code comments.
+Interface copy serves user understanding and action, not code comments or schema documentation. State only what visuals cannot: encode state with bars, rings, icons, tones, and labeled values rather than explanatory sentences, and mark exceptional states with a short label. Field hints explain what a value represents, where it comes from, and what it affects; omit character rules, validation regexes, and UI conveniences such as prefilling from another field unless a constraint is non-obvious from the domain concept, letting inline validation report invalid input. Omit text that restates inherent domain semantics, describes implementation, or reassures the user; explanations for developers belong in code comments.
 
 Reuse maintained libraries for general controls, animation, layout, drag, and virtualization. Confirm new dependencies separately with rationale and alternatives. For a missing shadcn control, check the registry and use `npx shadcn@latest add <name>`; official controls do not count as new dependencies.
 

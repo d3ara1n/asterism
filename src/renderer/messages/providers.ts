@@ -262,7 +262,7 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   serverModelIdHint: {
     id: "model.serverId.hint",
-    defaultMessage: "Must match the model name used by the provider''s API; may contain ''/'', no spaces. Generated from the name.",
+    defaultMessage: "The exact model identifier sent in API requests to this provider, such as gpt-5 or anthropic/claude-sonnet-4.",
   },
   capabilities: {
     id: "model.capabilities",
