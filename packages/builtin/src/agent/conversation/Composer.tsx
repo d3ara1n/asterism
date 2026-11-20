@@ -34,7 +34,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
     <ComposerEditor ref={inputRef} value={state.text} disabled={busy} onChange={draft.setText}
       onSubmit={() => form.current?.requestSubmit()}
       label={i18n.formatMessage(conversationMessages.messagePlaceholder)}
-      placeholder={running ? i18n.formatMessage(conversationMessages.draftPlaceholder) : i18n.formatMessage(conversationMessages.continuePlaceholder)} />
+      placeholder={i18n.formatMessage(conversationMessages.inputPlaceholder)} />
     <InputGroupAddon align="block-end" data-disabled={busy} className="min-w-0 gap-1 data-[disabled=true]:cursor-default">
       <AttachFiles draft={draft} disabled={busy || !ready} />
       <DraftFiles draft={draft} disabled={busy} />

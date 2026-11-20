@@ -60,13 +60,9 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
     id: "conversation.input.messagePlaceholder",
     defaultMessage: "Message the agent",
   },
-  draftPlaceholder: {
-    id: "conversation.input.draftPlaceholder",
-    defaultMessage: "Draft your next message…",
-  },
-  continuePlaceholder: {
-    id: "conversation.input.continuePlaceholder",
-    defaultMessage: "Continue the conversation…",
+  inputPlaceholder: {
+    id: "conversation.input.placeholder",
+    defaultMessage: "Use @ to add references, or press Ctrl+K for commands.",
   },
   stop: {
     id: "conversation.stop",
