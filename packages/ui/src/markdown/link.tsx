@@ -24,7 +24,9 @@ export function MarkdownLink({ href, children, title, ...props }: AnchorProps) {
   if (href && parseSkillUrl(href)) return <ReferenceChip appearance="link" href={href} openable>{children}</ReferenceChip>;
   if (href && parseResourceUrl(href)) return <ResourceReference href={href}>{children}</ResourceReference>;
   const url = href ? externalWebUrl(href) : null;
-  return url ? <TooltipHint content={title}><a {...props} href={url} target="_blank" rel="noopener noreferrer">{children}</a></TooltipHint> : <span>{children}</span>;
+  if (!url) return <span>{children}</span>;
+  const hint = <>{title && title !== url && <>{title}{"\n"}</>}<bdi dir="ltr" translate="no">{url}</bdi></>;
+  return <TooltipHint content={hint}><a {...props} href={url} target="_blank" rel="noopener noreferrer">{children}</a></TooltipHint>;
 }
 
 /** Resource IDs are scoped to the session of the object rendering the message. */
