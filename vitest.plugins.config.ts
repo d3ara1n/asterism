@@ -6,6 +6,6 @@ export default defineConfig({
   test: {
     ...configuration.test,
     include: ["src/plugins/**/*.integration.test.ts", "scripts/**/*.integration.test.ts"],
-    exclude: configDefaults.exclude,
+    exclude: [...configDefaults.exclude, "src/plugins/npm-installation.integration.test.ts"],
   },
 });

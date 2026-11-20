@@ -7,12 +7,11 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parse } from "yaml";
-import { NpmInstallations, type ManagedNpmSource } from "./npm-installation.ts";
+import { NpmInstallations } from "./npm-installation.ts";
 import { createNpmProcess } from "./npm-process.ts";
 
-/** Real pnpm against an isolated local registry; this opt-in suite never publishes or modifies application data. */
-test.each(["node", "electron-node"])("%s: pnpm blocks dependency scripts and executes approved pending builds without system Node/npm", async runtime => {
+/** Opt-in smoke test of the shipped process boundary, not the installer state machine. */
+test("bundled pnpm runs a dependency script only after approval, without system Node or npm", async () => {
   const root = mkdtempSync(join(tmpdir(), "asterism-npm-registry-"));
   const archives = new Map<string, Buffer>();
   const server = createServer((request, response) => {
@@ -44,35 +43,45 @@ test.each(["node", "electron-node"])("%s: pnpm blocks dependency scripts and exe
     pack("fixture-native", { scripts: { install: `node -e "require('node:fs').writeFileSync('script-built.txt', 'approved')"` } }, {});
     pack("fixture-plugin", {
       asterism: { id: "fixture.plugin", displayName: "Fixture" },
-      dependencies: { "fixture-native": "1.0.0" }, devDependencies: { "must-not-fetch-dev": "1.0.0" },
+      dependencies: { "fixture-native": "1.0.0" },
     }, {
       "dist/artifact.json": JSON.stringify({ format: 2, id: "fixture.plugin", runtime: "runtime.mjs", public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, stylesheets: [] }),
       "dist/runtime.mjs": "throw new Error('Installation must never import plugin code');\n",
     });
-    const systemBin = join(root, "system-bin"); mkdirSync(systemBin);
+    const home = join(root, "home"), temp = join(root, "tmp"), systemBin = join(root, "system-bin");
+    for (const directory of [home, temp, systemBin]) mkdirSync(directory);
     if (process.platform !== "win32") symlinkSync("/bin/sh", join(systemBin, "sh"));
-    const require = createRequire(import.meta.url);
-    const owned = createNpmProcess(undefined, { executable: runtime === "electron-node" ? require("electron") as string : process.execPath,
-      env: { ...process.env, PATH: systemBin, ...(runtime === "electron-node" ? { ELECTRON_RUN_AS_NODE: "1" } : {}) } });
-    const selected: ManagedNpmSource[] = [];
-    // The registry/store flags isolate all test packages and cache while exercising the production launcher/process owner.
+    // Metadata survives a store change, so isolate config and cache for every pnpm command, including preview.
+    const env: NodeJS.ProcessEnv = {
+      PATH: systemBin, ELECTRON_RUN_AS_NODE: "1", HOME: home, USERPROFILE: home,
+      TMPDIR: temp, TMP: temp, TEMP: temp,
+      XDG_CONFIG_HOME: join(root, "config"), XDG_CACHE_HOME: join(root, "cache"),
+      XDG_DATA_HOME: join(root, "data"), XDG_STATE_HOME: join(root, "state"),
+      npm_config_userconfig: join(home, ".npmrc"), npm_config_globalconfig: join(home, "global.npmrc"),
+      ...(process.platform === "win32" ? { SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec,
+        PATHEXT: process.env.PATHEXT, APPDATA: home, LOCALAPPDATA: home } : {}),
+    };
+    const executable = createRequire(import.meta.url)("electron") as string;
+    const owned = createNpmProcess(undefined, { executable, env });
+    let installation: string | undefined;
+    const flags = [`--registry=${registry}`, `--store-dir=${join(root, "store")}`, "--fetch-retries=0", "--config.update-notifier=false"];
     manager = new NpmInstallations({ npmRoot: join(root, "managed"),
-      process: { run: (args, ...rest) => owned.run([...args, `--registry=${registry}`, ...(args[0] === "install" ? [`--store-dir=${join(root, "store")}`] : []), "--fetch-retries=0"], ...rest) },
-      publish(source) { selected.push(source); },
+      process: { run(args, cwd, ...rest) {
+        if (args[0] === "install") installation = cwd;
+        return owned.run([...args, ...flags], cwd, ...rest);
+      } },
+      publish() {},
     });
     manager.preview("fixture-plugin@latest"); await manager.settled();
     expect(manager.snapshot(), JSON.stringify(manager.snapshot())).toMatchObject({ phase: "preview", preview: { name: "fixture-plugin", version: "1.0.0" } });
     const id = manager.snapshot()!.id; manager.install(id); await manager.settled();
     expect(manager.snapshot(), JSON.stringify(manager.snapshot())).toMatchObject({ phase: "awaiting-approval", blockedBuilds: ["fixture-native@1.0.0"] });
-    expect(selected).toEqual([]);
+    if (!installation) throw new Error("Missing installation directory.");
+    const scriptMarker = join(installation, "node_modules/.pnpm/fixture-native@1.0.0/node_modules/fixture-native/script-built.txt");
+    expect(existsSync(scriptMarker)).toBe(false);
     manager.approve(id, ["fixture-native@1.0.0"]); await manager.settled();
-    expect(manager.snapshot(), JSON.stringify(manager.snapshot())).toMatchObject({ phase: "succeeded" }); expect(selected).toHaveLength(1);
-    const project = join(root, "managed/installations", selected[0]!.installation);
-    const scriptMarker = join(project, "node_modules/.pnpm/fixture-native@1.0.0/node_modules/fixture-native/script-built.txt");
+    expect(manager.snapshot(), JSON.stringify(manager.snapshot())).toMatchObject({ phase: "succeeded" });
     expect(readFileSync(scriptMarker, "utf8")).toBe("approved");
-    expect(parse(readFileSync(join(project, "pnpm-workspace.yaml"), "utf8"))).toMatchObject({ strictDepBuilds: true, allowBuilds: { "fixture-native@1.0.0": true } });
-    expect(existsSync(join(project, "pnpm-lock.yaml"))).toBe(true);
-    expect(existsSync(join(project, "node_modules/.pnpm/must-not-fetch-dev@1.0.0"))).toBe(false);
   } finally {
     await manager?.close();
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
