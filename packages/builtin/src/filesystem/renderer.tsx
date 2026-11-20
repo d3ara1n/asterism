@@ -79,7 +79,7 @@ function DirectoryTreeActions({ data }: { data: { path: string } }) {
 
 function DirectoryTreeBody() {
   const { store, state } = useDirectoryTree();
-  return <FileTreeBody store={store} state={state} />;
+  return <FileTreeBody store={store} state={state} rowMenu />;
 }
 
 export default {

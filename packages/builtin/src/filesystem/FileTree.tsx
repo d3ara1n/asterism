@@ -9,6 +9,7 @@ import { Empty, EmptyHeader, EmptyMedia, EmptyDescription } from "@asterism-app/
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { cn } from "@asterism-app/ui/utils";
 import { filesystemMessages } from "../messages/filesystem";
+import { FileTreeMenu } from "./FileTreeMenu";
 import type { TreeState, TreeStore } from "./tree-store";
 
 const DirectoryDiff = lazy(() => import("./DirectoryDiff"));
@@ -57,9 +58,10 @@ const treeStyle = {
 const viewItem = "h-6 min-w-0 gap-1 rounded-sm px-2 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs";
 
 /** Card body: edge-aligned filter bar + file tree; explanatory text fills empty-directory, no-match, and root-failure states. */
-export function FileTreeBody({ store, state }: {
+export function FileTreeBody({ store, state, rowMenu = false }: {
   store: TreeStore;
   state: TreeState;
+  rowMenu?: boolean;
 }) {
   const i18n = useI18n();
   const navigation = useRendererResourceNavigation();
@@ -68,15 +70,18 @@ export function FileTreeBody({ store, state }: {
   const changes = state.mode === "changes" ? store.changeTree : undefined;
   const changing = changes !== undefined;
   const model = changes?.model ?? store.model;
+  const openDiff = (path: string, origin?: HTMLElement) => {
+    void island.open({ key: `diff:${object.ref.sessionId}:${object.ref.id}:${path}`, label: path, size: "content", origin,
+      render: () => <Suspense fallback={<IslandPanel title={path}><Spinner /></IslandPanel>}>
+        <DirectoryDiff resource={object.ref} path={path} store={store} />
+      </Suspense> });
+  };
   const openFile = (path: string, origin: HTMLElement) => {
     if (model.getItem(path)?.isDirectory() !== false) return;
     if (changing) {
       const entry = changes?.entry(path);
       if (!entry || entry.path.endsWith("/")) return;
-      void island.open({ key: `diff:${object.ref.sessionId}:${object.ref.id}:${entry.path}`, label: entry.path, size: "content", origin,
-        render: () => <Suspense fallback={<IslandPanel title={entry.path}><Spinner /></IslandPanel>}>
-          <DirectoryDiff resource={object.ref} path={entry.path} store={store} />
-        </Suspense> });
+      openDiff(entry.path, origin);
     } else void navigation.open(object.ref, path, { origin });
   };
   // A Changes view with nothing to list replaces the tree with a centered state.
@@ -110,13 +115,21 @@ export function FileTreeBody({ store, state }: {
     {state.failure && (changing || !state.error) && <p className="type-caption shrink-0 px-2 pt-1 text-destructive">{i18n.text(state.failure)}</p>}
     <div className="relative min-h-0 flex-1 pt-1">
       <div className={cn("h-full", (notice || blank) && "invisible")}><FileTree key={state.mode} model={model} style={treeStyle}
+        renderContextMenu={rowMenu ? (item, context) => {
+          const entry = changes?.entry(item.path);
+          // Git directory summaries are leaves in the Changes tree, but not files on disk.
+          const directory = item.kind === "directory" || entry?.path.endsWith("/") === true;
+          return <FileTreeMenu key={item.path} item={item} context={context} directory={directory} deleted={entry?.status === "deleted"}
+            openDiff={!directory && entry ? origin => openDiff(entry.path, origin) : undefined} />;
+        } : undefined}
         onClick={event => {
           if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
           const row = event.nativeEvent.composedPath().find((node): node is HTMLElement => node instanceof HTMLElement && !!node.dataset.itemPath);
           if (row) openFile(row.dataset.itemPath!, row);
         }}
         onKeyDownCapture={event => {
-          if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+          // React also bubbles keys from the portaled row menu through this tree.
+          if (event.key !== "Enter" || event.nativeEvent.isComposing || !event.nativeEvent.composedPath().includes(event.currentTarget)) return;
           const item = model.getFocusedItem();
           if (!item || item.isDirectory()) return;
           event.preventDefault(); event.stopPropagation();

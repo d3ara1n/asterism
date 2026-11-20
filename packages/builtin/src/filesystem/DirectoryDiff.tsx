@@ -5,10 +5,12 @@ import { ResourcePresenceChanged, type ResourceRef, type UiText } from "@asteris
 import type { z } from "zod";
 import { CodeDiff, CodeText, parseFileDiff } from "@asterism-app/ui/code-view";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { commonMessages } from "@asterism-app/ui/messages/common";
+import { ResourceSourceChip } from "@asterism-app/ui/reference-chip";
 import { ResourceLocationActions } from "@asterism-app/ui/resource-location-actions";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, WrapText } from "lucide-react";
 import { failureDisplay } from "@asterism-app/ui/error-display";
 import { ReadDirectoryDiff } from "./editor-contract";
 import { filesystemMessages as messages } from "../messages/filesystem";
@@ -35,6 +37,7 @@ export default function DirectoryDiff({ resource, path, store }: { resource: Res
   const [error, setError] = useState<UiText | null>(null);
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
+  const [lineWrapping, setLineWrapping] = useState(true);
   useEffect(() => {
     if (!present) return;
     let controller: AbortController;
@@ -56,15 +59,19 @@ export default function DirectoryDiff({ resource, path, store }: { resource: Res
     return () => { unsubscribe(); controller.abort(); };
   }, [present, calls, resource, path, store, attempt]);
   const parsed = useMemo(() => data?.kind === "patch" ? parseFileDiff(data.patch) : null, [data]);
-  return <IslandPanel title={path} description={i18n.text(messages.diffBase)} action={<>
+  const overflow = lineWrapping ? "wrap" : "scroll";
+  return <IslandPanel title={path} source={<ResourceSourceChip resource={resource} />} description={i18n.text(messages.diffBase)} action={<>
+    <IconButton label={i18n.text(commonMessages.wordWrap)} aria-pressed={lineWrapping} disabled={data?.kind !== "patch"}
+      variant={lineWrapping ? "selected" : "ghost"} onClick={() => setLineWrapping(value => !value)}><WrapText /></IconButton>
     <IconButton label={i18n.text(messages.directoryRefresh)} disabled={loading} onClick={() => setAttempt(value => value + 1)}>
       {loading ? <Spinner /> : <RefreshCw />}
     </IconButton>
     <ResourceLocationActions resource={resource} location={path} />
   </>}>
     {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
-    {data?.kind === "patch" ? parsed?.hunks.length === 0
-      ? <CodeText contents={data.patch} language="diff" /> : <CodeDiff diff={parsed ?? data.patch} />
+    {data?.kind === "patch" ? parsed?.hunks.length
+      ? <CodeDiff diff={parsed} overflow={overflow} lineDiffType="word-alt" />
+      : <CodeText contents={data.patch} language="diff" overflow={overflow} />
       : data ? <p className="type-caption text-muted-foreground">{i18n.text(data.kind === "binary" ? messages.diffBinary : messages.diffEmpty)}</p>
       : loading ? <Spinner /> : null}
   </IslandPanel>;

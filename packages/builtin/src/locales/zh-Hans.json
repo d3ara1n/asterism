@@ -885,6 +885,7 @@
   "filesystem.changes.empty": "无变更",
   "filesystem.changes.notRepository": "非 Git 仓库",
   "filesystem.watch.failed": "目录监听不可用",
+  "filesystem.diff.open": "查看差异",
   "filesystem.diff.failed": "无法读取差异。",
   "filesystem.diff.empty": "相对 HEAD 无内容变更",
   "filesystem.diff.binary": "二进制文件已变更",

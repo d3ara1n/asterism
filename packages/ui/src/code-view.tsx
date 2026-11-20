@@ -11,7 +11,7 @@ export const codeViewOptions = {
 
 /** Common grammars registered at startup; the library asynchronously adds highlighting for other languages on first use. */
 const preloadedLanguages: SupportedLanguages[] = [
-  "text", "typescript", "tsx", "javascript", "jsx", "json", "markdown", "css", "html",
+  "text", "diff", "typescript", "tsx", "javascript", "jsx", "json", "markdown", "css", "html",
   "python", "shellscript", "yaml", "toml", "rust", "go", "java", "c", "cpp", "sql", "xml",
 ];
 
@@ -107,8 +107,11 @@ export function parseFileDiff(patch: string): FileDiffMetadata | null {
 }
 
 /** Unified diff of one file. A patch string that does not parse as a single file diff renders as plain diff text. */
-export function CodeDiff({ diff }: { diff: FileDiffMetadata | string }) {
+export function CodeDiff({ diff, overflow = diffViewOptions.overflow, lineDiffType = diffViewOptions.lineDiffType }: {
+  diff: FileDiffMetadata | string;
+} & Pick<FileDiffOptions<undefined, undefined>, "overflow" | "lineDiffType">) {
   const fileDiff = useMemo(() => typeof diff === "string" ? parseFileDiff(diff) : diff, [diff]);
-  if (!fileDiff) return <CodeText contents={typeof diff === "string" ? diff : ""} language="diff" overflow="wrap" />;
-  return <FileDiff fileDiff={fileDiff} options={diffViewOptions} className="pierre-code type-code" disableWorkerPool />;
+  const options = useMemo(() => ({ ...diffViewOptions, overflow, lineDiffType }), [overflow, lineDiffType]);
+  if (!fileDiff) return <CodeText contents={typeof diff === "string" ? diff : ""} language="diff" overflow={overflow} />;
+  return <FileDiff fileDiff={fileDiff} options={options} className="pierre-code type-code" disableWorkerPool />;
 }
