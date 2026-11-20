@@ -67,7 +67,7 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
       void content?.close(); content = value.content;
       change({ text: value.text, files: value.files.map(attach), batch: state.batch + 1, error: null });
     },
-    async add(files: readonly File[]) {
+    async add(files: readonly File[], reportError: (error: UiText) => void = error => change({ error })) {
       if (state.locked || state.uploading || !files.length) return;
       const pending = files.map(file => ({
         file, entry: { id: nextFileId++, name: file.name, mediaType: fileMediaType(file), size: file.size },
@@ -90,7 +90,7 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
             uploads: state.uploads.filter(item => item.id !== entry.id),
           });
         }
-      } catch { if (!current.cancelled) change({ error: mediaMessages.failed }); }
+      } catch { if (!current.cancelled) reportError(mediaMessages.failed); }
       finally { if (upload === current) { upload = undefined; change({ uploading: false, uploads: [] }); } }
     },
     cancelUpload,

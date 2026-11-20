@@ -3,7 +3,7 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useRef, useSyncExternalStore, type ClipboardEvent, type DragEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion, type MotionProps } from "motion/react";
 import { useI18n, type ContentReader } from "@asterism-app/sdk/renderer";
-import { type ModelFilePart, previewsAsImage } from "@asterism-app/sdk/contracts";
+import { type ModelFilePart, type UiText, previewsAsImage } from "@asterism-app/sdk/contracts";
 import { inputFileName, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { File as FileIcon, Image as ImageIcon, Paperclip, X } from "lucide-react";
 import { Attachment, AttachmentGroup, AttachmentContent, AttachmentTitle, AttachmentActions, AttachmentAction, AttachmentTrigger } from "@asterism-app/ui/ui/attachment";
@@ -123,26 +123,30 @@ export function DraftFileError({ draft, className }: { draft: MessageDraft; clas
   const i18n = useI18n();
   return state.error && <p role="alert" className={cn("type-caption text-destructive", className)}>{i18n.text(state.error)}</p>;
 }
-export function AttachFiles({ draft, disabled }: { draft: MessageDraft; disabled: boolean }) {
+type FileErrorHandler = (error: UiText) => void;
+
+export function AttachFiles({ draft, disabled, onError }: {
+  draft: MessageDraft; disabled: boolean; onError?: FileErrorHandler;
+}) {
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const input = useRef<HTMLInputElement>(null);
   const i18n = useI18n();
   return <div className="flex shrink-0 items-center gap-1">
     <input ref={input} type="file" multiple className="hidden" disabled={disabled || state.uploading}
-      onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void draft.add(files); }} />
+      onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void draft.add(files, onError); }} />
     <IconButton type="button" variant="ghost" size="icon-sm" disabled={disabled || state.uploading} onClick={() => input.current?.click()}
       label={i18n.text(mediaMessages.attach)}><Paperclip /></IconButton>
   </div>;
 }
 /** Files are accepted by the conversation entry point, preventing propagation to workbench creation routing; plain-text paste retains input behavior. */
-export function fileInputEvents(draft: MessageDraft, disabled: boolean) {
+export function fileInputEvents(draft: MessageDraft, disabled: boolean, onError?: FileErrorHandler) {
   const blocked = () => disabled || draft.getSnapshot().uploading;
   return {
     onPaste(event: ClipboardEvent) {
       const files = Array.from(event.clipboardData.files);
       if (!files.length) return;
       event.preventDefault(); event.stopPropagation();
-      if (!blocked()) void draft.add(files);
+      if (!blocked()) void draft.add(files, onError);
     },
     onDragOver(event: DragEvent) {
       if (!event.dataTransfer.types.includes("Files")) return;
@@ -151,7 +155,7 @@ export function fileInputEvents(draft: MessageDraft, disabled: boolean) {
     onDrop(event: DragEvent) {
       if (!event.dataTransfer.types.includes("Files")) return;
       event.preventDefault(); event.stopPropagation();
-      if (!blocked()) void draft.add(Array.from(event.dataTransfer.files));
+      if (!blocked()) void draft.add(Array.from(event.dataTransfer.files), onError);
     },
   };
 }

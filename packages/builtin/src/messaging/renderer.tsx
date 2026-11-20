@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
@@ -53,16 +54,18 @@ function useOperations() {
   const active = useRef(new Set<string>());
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
-  async function run(key: string, work: () => Promise<RendererReceipt | void>): Promise<boolean> {
+  async function run(key: string, work: () => Promise<RendererReceipt | void>,
+    reportError: (message: string) => void = setError): Promise<boolean> {
     if (active.current.has(key)) return false;
     active.current.add(key); setPending(new Set(active.current)); setError(null);
     try {
       const receipt = await work();
       const failure = receipt ? receiptError(i18n, receipt) : null;
-      setError(failure);
+      if (failure === null) setError(null);
+      else reportError(failure);
       return failure === null;
     } catch (error) {
-      setError(error instanceof Error ? error.message : i18n.text(messages.failed));
+      reportError(error instanceof Error ? error.message : i18n.text(messages.failed));
       return false;
     } finally { active.current.delete(key); setPending(new Set(active.current)); }
   }
@@ -250,7 +253,7 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
       const receipt = await object.invoke(SendChat, { text, ...(replyTo ? { replyTo: replyTo.id } : {}) });
       if (receipt.ok) { setText(""); setReplyTo(null); setFollow(value => value + 1); }
       return receipt;
-    });
+    }, message => toast.error(message));
   };
   const reply = (message: MessagingMessage) => { setReplyTo(message); composer.current?.focus(); };
   return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
@@ -295,7 +298,6 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
           {sending ? <Spinner aria-hidden="true" /> : <Send />}
         </IconButton>
       </div>
-      <ErrorLine error={operations.error} />
     </form>
   </div>;
 }

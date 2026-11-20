@@ -1,10 +1,11 @@
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useI18n, useRendererApplication } from "@asterism-app/sdk/renderer";
+import type { UiText } from "@asterism-app/sdk/contracts";
 import { Square, ArrowUp, Archive, Paperclip, FileType } from "lucide-react";
 import { useRef, useState, useSyncExternalStore, type DragEvent, type RefObject } from "react";
 import { composerTextLimit, type MessageDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
-import { AttachFiles, DraftFiles, DraftFileError, fileInputEvents } from "./Files";
+import { AttachFiles, DraftFiles, fileInputEvents } from "./Files";
 import { ComposerEditor, type ComposerEditorHandle } from "./composer-editor";
 import { droppedPathText, isFileDrag } from "./file-drop";
 import { toast } from "sonner";
@@ -47,6 +48,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
   const cancelDisabled = !ready || controlPending;
   const busy = state.locked;
   const dropsEnabled = ready && !busy;
+  const onFileError = (error: UiText) => toast.error(i18n.text(error));
   // Capture file drags before the editor or workbench can interpret them. Text and references pass through.
   const onFileDrag = (event: DragEvent) => {
     if (!isFileDrag(event.dataTransfer.types)) return;
@@ -63,7 +65,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
     setFileDrag(null);
     if (!ready || draft.getSnapshot().locked) return;
     const target = dropTarget(event.target);
-    if (target === "attach") void draft.add(Array.from(event.dataTransfer.files));
+    if (target === "attach") void draft.add(Array.from(event.dataTransfer.files), onFileError);
     if (target === "paths") {
       const text = droppedPathText(Array.from(event.dataTransfer.files), pathForFile);
       if (text === null) toast.error(i18n.text(conversationMessages.pathsUnavailable));
@@ -72,7 +74,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
       }
     }
   };
-  return <form ref={form} onPaste={fileInputEvents(draft, !dropsEnabled).onPaste}
+  return <form ref={form} onPaste={fileInputEvents(draft, !dropsEnabled, onFileError).onPaste}
     onSubmit={event => { event.preventDefault(); void onSend(); }}>
   <InputGroup onDragEnterCapture={onFileDrag} onDragOverCapture={onFileDrag} onDropCapture={onDrop}
     onDragLeave={event => {
@@ -83,7 +85,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
       label={i18n.formatMessage(conversationMessages.messagePlaceholder)}
       placeholder={i18n.formatMessage(conversationMessages.inputPlaceholder)} />
     <InputGroupAddon align="block-end" data-disabled={busy} className="min-w-0 gap-1 data-[disabled=true]:cursor-default">
-      <AttachFiles draft={draft} disabled={busy || !ready} />
+      <AttachFiles draft={draft} disabled={busy || !ready} onError={onFileError} />
       <DraftFiles draft={draft} disabled={busy} />
       <Button type="button" size="sm" variant="ghost" disabled={busy || !ready || state.uploading || (!state.text.trim() && !state.files.length)}
         onClick={() => { void onSave(); }}><Archive />{i18n.text(conversationMessages.saveDraft)}</Button>
@@ -106,6 +108,5 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
       })}
     </div>}
   </InputGroup>
-  <DraftFileError draft={draft} className="mt-1" />
 </form>;
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createMessageDraft, copyDraft } from "./draft.ts";
 import type { RendererContentInput } from "@asterism-app/sdk/renderer";
 import type { ContentRef } from "@asterism-app/sdk/contracts";
@@ -80,6 +80,19 @@ describe("Message file drafts", () => {
     expect(draft.getSnapshot()).toMatchObject({ uploading: false, error: null });
     await draft.add([new File(["image"], "shot.png", { type: "image/png" })]);
     expect(draft.getSnapshot().files).toHaveLength(1);
+    await draft.close();
+  });
+  it("Reports a failed addition once without leaving an inline error or discarding staged files", async () => {
+    const draft = createMessageDraft(() => ({ ...reader, close: async () => {}, async stage(file) {
+      if ((file as File).name === "failed.png") throw new Error("Upload failed");
+      return ref;
+    } }));
+    draft.setText("Keep this text");
+    const onError = vi.fn();
+    await draft.add([new File(["ok"], "ok.png", { type: "image/png" }), new File(["bad"], "failed.png", { type: "image/png" })], onError);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(draft.getSnapshot()).toMatchObject({ uploading: false, uploads: [], error: null });
+    expect(draft.parts()).toEqual([{ kind: "text", text: "Keep this text" }, { kind: "file", file: ref, mediaType: "image/png", filename: "ok.png" }]);
     await draft.close();
   });
   // A card must not remount when its upload completes, and a file withdrawn before staging must never reach the hold.
