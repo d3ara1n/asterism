@@ -244,6 +244,28 @@ it("persists template renames for future conversations while preserving existing
     .rejects.toMatchObject({ code: "not_found" });
 });
 
+// The use time orders the Home catalog; only a completed start of that template may set it.
+it("records the latest start time per template and keeps it across restarts", async () => {
+  const first = open();
+  const sourceId = first.app.sessions.tree.create("Source");
+  const item = await first.plugin.session(sourceId).create(Create, { title: "Item", seed: "seed" });
+  const used = await save(first.app, sourceId, [item]), unused = await save(first.app, sourceId, [item]);
+  const lastUsed = (app: ApplicationService, id: string) =>
+    app.execute({ type: "workspace.read" }).templates.find(template => template.id === id)!.lastUsedAt;
+  expect(lastUsed(first.app, used)).toBeNull();
+  vi.useFakeTimers({ toFake: ["Date"] });
+  try {
+    vi.setSystemTime(Date.parse("2026-11-01T00:00:00.000Z"));
+    await start(first.app, used);
+    vi.setSystemTime(Date.parse("2026-11-02T00:00:00.000Z"));
+    await start(first.app, used);
+  } finally { vi.useRealTimers(); }
+  await close(first.app);
+  const second = open(first.root);
+  expect(lastUsed(second.app, used)).toBe("2026-11-02T00:00:00.000Z");
+  expect(lastUsed(second.app, unused)).toBeNull();
+});
+
 // Replacement writes a new snapshot under the same catalog identity, not a merge or an update to earlier instances.
 it("replaces a template snapshot while preserving its metadata, same-name neighbors, and existing sessions", async () => {
   const first = open();
@@ -255,9 +277,9 @@ it("replaces a template snapshot while preserving its metadata, same-name neighb
   const folderId = randomUUID();
   first.app.execute({ type: "folder.create", id: folderId, name: "Projects", color: "blue" });
   first.app.execute({ type: "template.move", templateId, folderId });
+  const existingId = await start(first.app, templateId);
   const before = first.app.execute({ type: "workspace.read" }).templates;
   const original = before.find(template => template.id === templateId)!;
-  const existingId = await start(first.app, templateId);
 
   const replacementId = first.app.sessions.tree.create("Different source");
   const replacement = first.plugin.session(replacementId);

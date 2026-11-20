@@ -12,9 +12,11 @@ import type { ContentStore } from "./content-store.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { createResourceId } from "../resources/id.ts";
 
+/** Time a session was last started from the template; null until the first start. */
+export const templateLastUsedColumnSql = "last_used_at TEXT";
 export const templateSchemaSql = `
   CREATE TABLE templates (
-    id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at TEXT NOT NULL, data_json TEXT NOT NULL, ${folderColumnSql}
+    id TEXT PRIMARY KEY, title TEXT NOT NULL, created_at TEXT NOT NULL, data_json TEXT NOT NULL, ${folderColumnSql}, ${templateLastUsedColumnSql}
   ) STRICT;
 `;
 
@@ -27,12 +29,12 @@ export class TemplateStore {
     this.data = new SessionDataStore(db);
   }
   list(): TemplateSummary[] {
-    const rows = this.db.prepare(`SELECT id, title, created_at AS createdAt, folder_id AS folderId,
+    const rows = this.db.prepare(`SELECT id, title, created_at AS createdAt, folder_id AS folderId, last_used_at AS lastUsedAt,
       (SELECT json_group_array(json_object('id', json_extract(value, '$.id'),
         'kind', json_extract(value, '$.kind'), 'title', json_extract(value, '$.title')))
         FROM json_each(templates.data_json, '$.objects')) AS objects
       FROM templates ORDER BY created_at DESC, rowid DESC`).all() as
-      { id: string; title: string; createdAt: string; folderId: string | null; objects: string }[];
+      { id: string; title: string; createdAt: string; folderId: string | null; lastUsedAt: string | null; objects: string }[];
     return rows.map(row => {
       const objects = JSON.parse(row.objects) as { id: string; kind: string; title: string | null }[];
       return { ...row, objects: objects.map(({ id, kind, title }) => ({
@@ -122,6 +124,8 @@ export class TemplateStore {
       type: "link.set", sessionId, linked: true,
       receiverId: identities.get(link.receiverId)!, resourceId: identities.get(link.resourceId)!,
     });
+    // Written inside the creation transaction, so a failed start leaves the previous use time.
+    this.db.prepare("UPDATE templates SET last_used_at = ? WHERE id = ?").run(new Date().toISOString(), templateId);
   }
   rename(id: string, title: string): void {
     const result = this.db.prepare("UPDATE templates SET title = ? WHERE id = ?").run(title, id);

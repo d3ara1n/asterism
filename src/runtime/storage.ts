@@ -5,12 +5,12 @@ import { DatabaseSync } from "node:sqlite";
 import { sessionSchemaSql, pendingRecordsIndexSql, folderSchemaSql, folderColumnSql, completedColumnSql, keepAwakeColumnSql, sleepingColumnSql, lastOpenedColumnSql } from "../session/schema.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
-import { templateSchemaSql } from "./templates.ts";
+import { templateLastUsedColumnSql, templateSchemaSql } from "./templates.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 import { mcpSchemaSql } from "../mcp/storage.ts";
 import { tutorialTemplate } from "./tutorial-template.ts";
 
-export const workspaceDatabaseVersion = 34;
+export const workspaceDatabaseVersion = 35;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
@@ -85,6 +85,8 @@ const islandsTableSql = `
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
     version: workspaceDatabaseVersion, migrations: {
+      // Earlier starts were not recorded; existing templates begin without a use time.
+      34: db => { db.exec(`ALTER TABLE templates ADD COLUMN ${templateLastUsedColumnSql};`); },
       // Existing sessions get a fresh inactivity baseline instead of inheriting their historical creation time.
       33: db => {
         db.exec(`ALTER TABLE sessions ADD COLUMN ${sleepingColumnSql};

@@ -7,6 +7,8 @@ const id = z.string().min(1).max(160);
 export const templateObjectSummarySchema = z.strictObject({ id, kind: id, title: z.string().optional() });
 export const templateSummarySchema = z.strictObject({
   id: z.string().uuid(), title: z.string(), createdAt: z.string(), folderId: folderIdSchema,
+  /** Last time a session was started from the template; null when never started since use tracking began. */
+  lastUsedAt: z.string().nullable(),
   objects: z.array(templateObjectSummarySchema),
 });
 export type TemplateObjectSummary = z.infer<typeof templateObjectSummarySchema>;

@@ -32,6 +32,8 @@ Templates are useful for recurring combinations of participants, resources, and 
 
 Replacing an existing template updates the starting arrangement for future sessions, not sessions already created from it. The replacement is a complete snapshot rather than a merge: objects omitted from the new selection are no longer part of that template. Its name and folder stay the same, and changes in a source session do not update it automatically.
 
+Home can list templates by recent use. A template's use time is recorded each time a session starts from it. Templates that have not been started since this record was introduced have no use time and appear after used ones.
+
 A template starts a new session rather than copying an ongoing conversation or suspending and resuming its processes. Each resource determines which setup data it can reuse. References to external locations still point into the external world, so review them before treating a new session as an independent copy.
 
 ## Read activity and reminders separately

@@ -20,8 +20,13 @@ function setup() {
   const db = openDatabase(root); databases.push(db);
   return { root, db, tree: new SessionTree(db) };
 }
-/** Remove lifecycle columns when constructing fixtures for formats preceding version 34. */
+/** Remove the template use column when constructing fixtures for formats preceding version 35. */
+function revertTemplateUse(db: DatabaseSync) {
+  db.exec("ALTER TABLE templates DROP COLUMN last_used_at;");
+}
+/** Remove lifecycle columns when constructing fixtures for formats preceding version 34; also reverts later formats. */
 function revertSleeping(db: DatabaseSync) {
+  revertTemplateUse(db);
   db.exec(`ALTER TABLE sessions DROP COLUMN sleeping_at;
     ALTER TABLE sessions DROP COLUMN last_opened_at;
     ALTER TABLE sessions DROP COLUMN keep_awake;`);
@@ -45,6 +50,20 @@ function revertIslands(db: DatabaseSync) {
 }
 const count = (db: DatabaseSync, table: string, sessionId: string) =>
   Number((db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE session_id = ?`).get(sessionId) as { n: number }).n);
+
+// Use times cannot be reconstructed from history, so migrated templates must stay unused instead of inheriting a time.
+it("migrates format 34 templates without a use time and keeps their catalog fields", () => {
+  const { root, db } = setup();
+  const before = db.prepare("SELECT id, title, created_at, data_json, folder_id FROM templates").all();
+  expect(before).toHaveLength(1);
+  revertTemplateUse(db);
+  db.exec("PRAGMA user_version = 34;");
+  db.close(); databases.splice(databases.indexOf(db), 1);
+  workspaceStorage(root).inspect()!.apply();
+  const reopened = openDatabase(root); databases.push(reopened);
+  expect(reopened.prepare("SELECT id, title, created_at, data_json, folder_id FROM templates").all()).toEqual(before);
+  expect(reopened.prepare("SELECT id, last_used_at AS lastUsedAt FROM templates").all()).toEqual([{ id: (before[0] as { id: string }).id, lastUsedAt: null }]);
+});
 
 it("migrates format 33 with a fresh inactivity baseline and preserves saved history and catalog metadata", () => {
   const { root, db, tree } = setup();

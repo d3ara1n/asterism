@@ -1,6 +1,6 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useMemo, useRef, useState } from "react";
-import { Info, LayoutTemplate, MoreHorizontal, PenLine, Trash2 } from "lucide-react";
+import { ArrowUpDown, Folder as FolderIcon, Info, LayoutTemplate, MoreHorizontal, PenLine, Trash2 } from "lucide-react";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import type { TemplateSummary, TemplateObjectSummary } from "../../../shared/templates";
 import { templateMessages } from "../../../shared/template-messages";
@@ -11,6 +11,8 @@ import { useModuleViews } from "../../modules/views";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Item } from "@asterism-app/ui/ui/item";
+import { SearchInput } from "@asterism-app/ui/ui/search-input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { StatusText } from "@asterism-app/ui/ui/status";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
@@ -23,21 +25,65 @@ import { existingFolder, useFolders } from "../folders/context";
 import { FolderDialog } from "../folders/FolderDialog";
 import { MoveToFolderMenu } from "../folders/menus";
 import { FolderDot, folderTint } from "../folders/marks";
+import { sortFolders } from "../folders/grouping";
+import { templateSorts, viewTemplates, type TemplateFolderFilter, type TemplateSort } from "./catalog";
+import { readTemplateFolder, readTemplateSort, writeTemplateFolder, writeTemplateSort } from "./catalog-state";
 import { cn } from "@asterism-app/ui/utils";
 
 const KIND_PREVIEW_LIMIT = 6;
+
+// Radix Select values cannot be null; folder identities are UUIDs, so these never collide.
+const allFolders = "all", noFolder = "none";
+const sortLabels: Record<TemplateSort, UiText> = {
+  created: templateMessages.sortCreated, recent: templateMessages.sortRecent,
+  "name-asc": templateMessages.sortNameAsc, "name-desc": templateMessages.sortNameDesc,
+};
 
 export function TemplateCards({ templates, ready, onStart, onChanged }: {
   templates: readonly TemplateSummary[]; ready: boolean;
   onStart: (id: string) => Promise<UiText | null>; onChanged: () => void;
 }) {
   const i18n = useI18n();
+  const { folders } = useFolders();
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<TemplateSort>(readTemplateSort);
+  const [storedFolder, setFolder] = useState<TemplateFolderFilter>(readTemplateFolder);
+  // A deleted folder, or one remembered after every folder is gone, reads as all templates.
+  const folder = storedFolder === "all" || storedFolder === null ? (folders.length ? storedFolder : "all")
+    : existingFolder(folders, storedFolder)?.id ?? "all";
+  const visible = viewTemplates(templates, { query, folder, sort }, i18n.locale);
+  const selectFolder = (value: string) => {
+    const next = value === allFolders ? "all" : value === noFolder ? null : value;
+    setFolder(next); writeTemplateFolder(next);
+  };
   return <section aria-labelledby="templates-title" className="mt-10">
-    <h2 id="templates-title" className="type-section mb-4">{i18n.text(templateMessages.templates)}</h2>
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
-      {templates.map(template => <TemplateCard key={template.id} template={template} ready={ready} onStart={onStart} onChanged={onChanged} />)}
+    <div className="mb-4 flex flex-wrap items-center gap-2">
+      <h2 id="templates-title" className="type-section mr-auto">{i18n.text(templateMessages.templates)}</h2>
+      {templates.length > 0 && <>
+        <div className="w-48"><SearchInput value={query} onChange={setQuery} label={i18n.text(templateMessages.searchTemplates)} /></div>
+        {folders.length > 0 && <Select value={folder === "all" ? allFolders : folder ?? noFolder} onValueChange={selectFolder}>
+          <SelectTrigger className="w-40" aria-label={i18n.text(templateMessages.folderFilter)}><SelectValue /></SelectTrigger>
+          <SelectContent position="popper" align="end"><SelectGroup>
+            <SelectItem value={allFolders}><FolderIcon />{i18n.text(commonMessages.all)}</SelectItem>
+            <SelectItem value={noFolder}><FolderIcon />{i18n.text(folderMessages.noFolder)}</SelectItem>
+            {sortFolders(folders, i18n.locale).map(item => <SelectItem key={item.id} value={item.id}>
+              <FolderDot color={item.color} className="mx-1" />{item.name}
+            </SelectItem>)}
+          </SelectGroup></SelectContent>
+        </Select>}
+        <Select value={sort} onValueChange={value => { const next = value as TemplateSort; setSort(next); writeTemplateSort(next); }}>
+          <SelectTrigger className="w-40" aria-label={i18n.text(templateMessages.sort)}><ArrowUpDown /><SelectValue /></SelectTrigger>
+          <SelectContent position="popper" align="end"><SelectGroup>
+            {templateSorts.map(item => <SelectItem key={item} value={item}>{i18n.text(sortLabels[item])}</SelectItem>)}
+          </SelectGroup></SelectContent>
+        </Select>
+      </>}
     </div>
-    {!templates.length && <p className="type-caption">{i18n.text(templateMessages.empty)}</p>}
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
+      {visible.map(template => <TemplateCard key={template.id} template={template} ready={ready} onStart={onStart} onChanged={onChanged} />)}
+    </div>
+    {!templates.length ? <p className="type-caption">{i18n.text(templateMessages.empty)}</p>
+      : !visible.length && <p role="status" className="type-caption">{i18n.text(commonMessages.noMatches)}</p>}
   </section>;
 }
 
@@ -122,6 +168,7 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
                 <p className="mt-3 flex items-center gap-1.5">{i18n.text(folderMessages.folder)}:
                   {folder ? <><FolderDot color={folder.color} />{folder.name}</> : i18n.text(folderMessages.noFolder)}</p>
                 <p className="mt-3 opacity-70">{i18n.formatMessage(templateMessages.created, { time: Date.parse(template.createdAt) })}</p>
+                {template.lastUsedAt && <p className="opacity-70">{i18n.formatMessage(templateMessages.lastUsed, { time: Date.parse(template.lastUsedAt) })}</p>}
               </TooltipContent>
             </Tooltip>
           </div>
