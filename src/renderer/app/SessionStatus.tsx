@@ -1,7 +1,7 @@
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@asterism-app/ui/ui/hover-card";
 import { ProgressRing } from "@asterism-app/ui/ui/progress-ring";
 import { cn } from "@asterism-app/ui/utils";
-import { Bell, Flame, Hand, Octagon, createLucideIcon, type LucideIcon } from "lucide-react";
+import { CircleCheck, Flame, Hand, OctagonAlert, createLucideIcon, type LucideIcon } from "lucide-react";
 import type { ResourceActivity, ResourceNotice } from "@asterism-app/sdk/contracts";
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { resourceStatusMessages as messages } from "../messages/resource-status";
@@ -9,23 +9,24 @@ import { useI18n } from "../shared/i18n";
 import type { ResourceNoticeMark, SessionIndicator, SessionResourceState } from "./resource-status";
 
 const noticeOrder = ["error", "attention", "success"] as const;
-// Notices are single silhouettes without a plate: shape and tone carry the meaning.
-// The hand stays an outline because filling merges its fingers at badge size.
-const noticeShapes: Record<ResourceNotice["kind"], { icon: LucideIcon; tone: string; filled: boolean }> = {
-  error: { icon: Octagon, tone: "text-destructive", filled: true },
-  attention: { icon: Hand, tone: "text-warning", filled: false },
-  success: { icon: Bell, tone: "text-success", filled: true },
+// Notices are outlined symbols without a plate: shape and tone carry the meaning.
+const noticeShapes: Record<ResourceNotice["kind"], { icon: LucideIcon; tone: string }> = {
+  error: { icon: OctagonAlert, tone: "text-destructive" },
+  attention: { icon: Hand, tone: "text-warning" },
+  success: { icon: CircleCheck, tone: "text-success" },
 };
 // Each mask clears a ring around one badge so it stays legible on any row background (hover, selection).
-// Positions follow the 16px icon: the state badge is size-3 at -top-1 -right-1, the instance mark size-2.5 at -bottom-1 -right-1.
+// Tailwind sizes scale with the root font size (appearance density), so the cut uses the same rem units as the badges:
+// the state badge is size-3 (0.375rem radius) at -top-1 -right-1, centered 0.125rem inside the top-right corner;
+// the instance mark is size-2.5 (0.3125rem radius) at -bottom-1 -right-1, centered 0.0625rem inside the bottom-right corner.
 const masks = {
-  state: "radial-gradient(circle at 14px 2px, #0000 7.5px, #000 8px)",
-  instances: "radial-gradient(circle at 15px 15px, #0000 6.5px, #000 7px)",
+  state: "radial-gradient(circle at calc(100% - 0.125rem) 0.125rem, #0000 0.5rem, #000 calc(0.5rem + 0.5px))",
+  instances: "radial-gradient(circle at calc(100% - 0.0625rem) calc(100% - 0.0625rem), #0000 0.4375rem, #000 calc(0.4375rem + 0.5px))",
 };
 
 function NoticeMark({ kind, className }: { kind: ResourceNotice["kind"]; className: string }) {
-  const { icon: Icon, tone, filled } = noticeShapes[kind];
-  return <Icon aria-hidden="true" fill={filled ? "currentColor" : "none"} className={cn(tone, className)} />;
+  const { icon: Icon, tone } = noticeShapes[kind];
+  return <Icon aria-hidden="true" className={cn(tone, className)} />;
 }
 
 function StateBadge({ state }: { state: SessionResourceState }) {
@@ -34,7 +35,7 @@ function StateBadge({ state }: { state: SessionResourceState }) {
 }
 
 function InstanceMark({ className }: { className: string }) {
-  return <Flame aria-hidden="true" fill="currentColor" className={cn("text-warning", className)} />;
+  return <Flame aria-hidden="true" className={cn("text-warning", className)} />;
 }
 
 /**
