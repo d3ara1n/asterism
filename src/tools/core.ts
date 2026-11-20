@@ -106,6 +106,7 @@ export const ResourceCall = defineTool({
     "resource_id selects the resource, args supplies the operation's shared parameters, and target selects content, scope, or a resource-specific view. Available tools and target schemas can differ by resource; resource_inspect describes them for the selected resource.",
     "Domain qualifiers in tool names describe the operation's scope, such as terminal_input for terminal interaction.",
     "Omitting target is equivalent to null; this is valid only when the implementation accepts null.",
+    "If the outer resource_call arguments repeatedly fail schema validation, resource_script offers a different call format for non-interactive resource tools, even for a single call. The script handle binds the resource ID and tool name; target and args still follow the schemas from resource_inspect.",
     jsonArgumentHint,
   ],
   argsSchema: z.strictObject({
