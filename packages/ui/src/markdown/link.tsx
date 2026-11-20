@@ -1,5 +1,5 @@
-import { useContext, type ComponentProps } from "react";
-import { MarkdownDocumentContext } from "./presentation";
+import { useContext, useState, type ComponentProps } from "react";
+import { MarkdownDocumentContext, MarkdownStreamingContext } from "./presentation";
 import { parseModelUrl, parseResourceUrl, parseSkillUrl } from "@asterism-app/sdk/contracts";
 import { useRendererObject } from "@asterism-app/sdk/renderer";
 import { externalWebUrl } from "../links";
@@ -10,6 +10,7 @@ type AnchorProps = ComponentProps<"a">;
 
 export function MarkdownLink({ href, children, title, ...props }: AnchorProps) {
   const documentMode = useContext(MarkdownDocumentContext);
+  const streaming = useContext(MarkdownStreamingContext);
   if (documentMode && href && (parseModelUrl(href) || parseSkillUrl(href) || parseResourceUrl(href))) return <span>{children}</span>;
   if (href?.startsWith("#")) return <TooltipHint content={title}><a {...props} href={href} onAuxClick={event => event.preventDefault()} onClick={event => {
     event.preventDefault();
@@ -26,7 +27,17 @@ export function MarkdownLink({ href, children, title, ...props }: AnchorProps) {
   const url = href ? externalWebUrl(href) : null;
   if (!url) return <span>{children}</span>;
   const hint = <>{title && title !== url && <>{title}{"\n"}</>}<bdi dir="ltr" translate="no">{url}</bdi></>;
-  return <TooltipHint content={hint}><a {...props} href={url} target="_blank" rel="noopener noreferrer">{children}</a></TooltipHint>;
+  // Don't request an unfinished destination or make document export depend on a decorative image.
+  const favicon = documentMode || streaming ? null : new URL("/favicon.ico", url).href;
+  return <TooltipHint content={hint}><a {...props} href={url} target="_blank" rel="noopener noreferrer">
+    {favicon ? <LinkFavicon key={favicon} src={favicon} /> : null}{children}
+  </a></TooltipHint>;
+}
+
+function LinkFavicon({ src }: { src: string }) {
+  const [failed, setFailed] = useState(false);
+  return failed ? null : <img src={src} alt="" width={14} height={14} loading="lazy" decoding="async" referrerPolicy="no-referrer"
+    className="me-1 inline-block size-3.5 align-[-0.125em]" onError={() => setFailed(true)} />;
 }
 
 /** Resource IDs are scoped to the session of the object rendering the message. */

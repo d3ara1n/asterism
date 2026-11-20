@@ -1,6 +1,6 @@
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { Copy, WrapText } from "lucide-react";
-import { createContext, useContext, useState } from "react";
+import { useContext, useState } from "react";
 import { toast } from "sonner";
 
 import { IconButton } from "../ui/icon-button";
@@ -8,9 +8,7 @@ import { CodeText } from "../code-view";
 import { commonMessages } from "../messages/common";
 import { markdownMessages } from "../messages/markdown";
 import { MermaidDiagram } from "./mermaid";
-import { MarkdownDocumentContext } from "./presentation";
-
-export const MarkdownStreamingContext = createContext(false);
+import { MarkdownDocumentContext, MarkdownStreamingContext } from "./presentation";
 
 /** The fenced code body and language come directly from the Markdown AST; highlighting is handled by the shared Pierre view. */
 export function MarkdownCode({ code, language }: { code: string; language: string }) {

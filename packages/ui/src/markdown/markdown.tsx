@@ -6,11 +6,11 @@ import { memo, useContext, useEffect, useId, useMemo, useState } from "react";
 import { TooltipHint } from "../tooltip-hint";
 import { externalWebUrl } from "../links";
 import { markdownMessages } from "../messages/markdown";
-import { MarkdownCode, MarkdownStreamingContext } from "./code";
+import { MarkdownCode } from "./code";
 import { MarkdownLink } from "./link";
 import { markdownOptions } from "./options";
 import { rehypeScopedAnchors } from "./anchors";
-import { MarkdownDocumentContext } from "./presentation";
+import { MarkdownDocumentContext, MarkdownStreamingContext } from "./presentation";
 
 const components: NonNullable<StreamdownProps["components"]> = {
   a: ({ node: _node, ...props }) => <MarkdownLink {...props} />,
