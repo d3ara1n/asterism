@@ -152,6 +152,60 @@ describe("AI SDK adaptation contract", () => {
     });
   });
 
+  it("continues from a historical Responses attachment rejected before transport without losing the new message or supported files", async () => {
+    const current = structuredClone(transportInput);
+    current.settings.provider.protocol = "openai-responses";
+    current.messages = [
+      { kind: "input", parts: [{ kind: "file", filename: "old.mp4", mediaType: "video/mp4", data: Uint8Array.of(80) }] },
+      { kind: "input", parts: [{ kind: "text", text: "Continue the conversation" },
+        { kind: "file", filename: "report.pdf", mediaType: "application/pdf", data: Uint8Array.of(42) }] },
+    ];
+    const original = structuredClone(current);
+    const transport = vi.fn<typeof fetch>(async () => {
+      const response = { id: "response-1", model: "test", created_at: 0 };
+      const frames = [
+        { type: "response.created", response: { ...response, status: "in_progress" } },
+        { type: "response.completed", response: { ...response, status: "completed", usage: { input_tokens: 3, output_tokens: 2, total_tokens: 5 } } },
+      ];
+      return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
+    });
+    const learned = new Map<string, Set<string>>();
+    const run = async (request: ModelInput) => {
+      const diagnostic = vi.fn();
+      const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport, learned);
+      const events: ModelEvent[] = [];
+      for await (const event of adapter.prepare(request).stream(new AbortController().signal, diagnostic)) events.push(event);
+      expect(events.at(-1)).toMatchObject({ type: "finish", reason: "stop" });
+      expect(diagnostic).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ type: "diagnostic", level: "warning",
+        code: "attachments_omitted", omittedFiles: ['"old.mp4" (video/mp4)'] }));
+    };
+    await run(current);
+    expect(transport).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(String(transport.mock.calls[0]![1]!.body));
+    expect(sent.input).toMatchObject([
+      { role: "user", content: [{ type: "input_text", text: expect.stringContaining('"old.mp4" (video/mp4) was not sent') }] },
+      { role: "user", content: [{ type: "input_text", text: "Continue the conversation" },
+        { type: "input_file", filename: "report.pdf", file_data: "data:application/pdf;base64,Kg==" }] },
+    ]);
+    expect(current).toEqual(original);
+    await run(current);
+    expect(transport).toHaveBeenCalledTimes(2);
+    expect([...learned.values()].map(types => [...types])).toEqual([["video/mp4"]]);
+  });
+
+  it("does not reinterpret HTTP attachment rejection as a recoverable local Responses encoding error", async () => {
+    const current = structuredClone(transportInput);
+    current.settings.provider.protocol = "openai-responses";
+    current.messages = [{ kind: "input", parts: [{ kind: "file", filename: "report.pdf", mediaType: "application/pdf", data: Uint8Array.of(42) }] }];
+    const transport = vi.fn<typeof fetch>(async () => Response.json({ error: { message: "'file part media type application/pdf' functionality not supported." } }, { status: 400 }));
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
+    const diagnostic = vi.fn();
+    await expect(consume(adapter.prepare(current).stream(new AbortController().signal, diagnostic)))
+      .rejects.toMatchObject({ origin: "model", code: "provider_error", details: { statusCode: 400 } });
+    expect(transport).toHaveBeenCalledTimes(1);
+    expect(diagnostic).not.toHaveBeenCalled();
+  });
+
   // Request projection contract: toggles do not alter history; off does not delete reasoning; filtering must not send empty assistants or lose tool calls.
   it("only the current request reasoning toggle controls historical reasoning and reenabling sends it back completely", () => {
     const current = structuredClone(input);

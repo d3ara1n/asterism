@@ -6,6 +6,7 @@ export const agentFeedbackSchema = z.strictObject({
   origin: z.enum(["model", "software"]), code: z.string(), message: z.string(),
   level: z.enum(["warning", "error"]), details: errorDetailsSchema.optional(),
   responseId: z.string().optional(),
+  omittedFiles: z.array(z.string()).optional(),
 });
 export type AgentFeedback = z.infer<typeof agentFeedbackSchema>;
 export const inlineFeedbackSchema = agentFeedbackSchema.extend({

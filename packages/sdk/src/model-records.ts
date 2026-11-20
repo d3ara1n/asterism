@@ -62,5 +62,5 @@ export const modelRunRecordSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("block"), block: modelBlockSchema }),
   z.strictObject({ type: z.literal("tool.begin"), block: modelBlockSchema }),
   z.strictObject({ type: z.literal("tool.complete"), block: modelBlockSchema }),
-  z.strictObject({ type: z.literal("diagnostic"), origin: z.enum(["model", "software"]), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]), details: errorDetailsSchema.optional(), responseId: id.optional() }),
+  z.strictObject({ type: z.literal("diagnostic"), origin: z.enum(["model", "software"]), code: z.string(), message: z.string(), level: z.enum(["error", "warning"]), details: errorDetailsSchema.optional(), responseId: id.optional(), omittedFiles: z.array(z.string()).optional() }),
 ]);

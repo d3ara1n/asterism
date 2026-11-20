@@ -119,7 +119,12 @@ export async function startApplication(root: Root, splash: StartupSplash, signal
     } });
   const moduleViews = new ViewRegistry(accepted);
   const applicationServices = { platform: window.host.platform, preferences: pluginPreferences, files: rendererFiles,
-    pickDirectory: (initialPath?: string) => window.host.pickDirectory(initialPath), async openLocalFile(path: string) {
+    pickDirectory: (initialPath?: string) => window.host.pickDirectory(initialPath),
+    pathForFile(file: File) {
+      try { return window.host.pathForFile(file) || null; }
+      catch { return null; }
+    },
+    async openLocalFile(path: string) {
     const error = await window.host.openLocalFile(path);
     if (error) throw new Error(error);
   }, async showLocalFile(path: string, directory: boolean) {

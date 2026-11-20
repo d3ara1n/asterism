@@ -12,6 +12,12 @@ Being available as an Agent resource includes investigation of saved conversatio
 
 Input acceptance, execution ending, and acceptance of the deliverable are separate events. A supervisor relationship requires an agreement about reports, evidence, and follow-through; the link alone does not schedule work or make a final response a verified result.
 
+### Attachments and local paths carry different information
+
+Drop a local file as an attachment to include its contents in a model request, or insert its path to name the file in the draft without attaching it. A local path is ordinary message text; it does not give the Agent access to the file. If the Agent needs to open the file itself, it needs an appropriate linked resource or tool.
+
+Moving a conversation to a different model can change which earlier attachments it can use. When the request adapter can identify an attachment it cannot encode, the Agent can continue with a text notice in its place. The original file remains in history. The notice means the model did not receive that file's contents, even if it answered the rest of the message. Other request failures can still stop execution.
+
 ### Running work is broader than a model response
 
 An Agent remains active through its task, including waiting for tools or answers, retry delays, and automatic context compaction. A pause in streaming is not by itself evidence that execution has ended. Stopping requests cancellation; the activity remains until the task and its cleanup have settled. Cancellation does not imply that the Agent needs your attention or that completed external effects were undone.

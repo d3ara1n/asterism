@@ -9,8 +9,9 @@ import { projectHistory, validateProjection } from "./projection.ts";
 import { modelProtocol, type ModelProtocol } from "./protocols/index.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
-import { describeError, errorMessage, type ModelResponse } from "@asterism-app/sdk/contracts";
+import { describeError, errorMessage, type ModelResponse, type ModelRunEvent } from "@asterism-app/sdk/contracts";
 import { ZodError } from "zod";
+import { withResponsesFileRecovery } from "./protocols/responses-file-recovery.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
 function responseParsingFailure(error: unknown): boolean {
@@ -80,7 +81,8 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
 export class AiSdkAdapter implements ModelAdapter {
   constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
     private readonly languageModelFactory?: (input: ModelInput, key: string) => Exclude<LanguageModel, string>,
-    private readonly transport: typeof fetch = fetch) {}
+    private readonly transport: typeof fetch = fetch,
+    private readonly rejectedResponsesFiles = new Map<string, Set<string>>()) {}
   format(settings: ModelSettings): string {
     return modelProtocol(settings.provider.protocol).continuationFormat;
   }
@@ -99,19 +101,21 @@ export class AiSdkAdapter implements ModelAdapter {
     const options = requestOptions(input.settings.provider, input.settings.model, {
       purpose: "execution", thinking: input.settings.thinking, system, maxOutputTokens: input.maxOutputTokens,
     });
-    return { stream: signal => this.stream(input, messages, options, signal) };
+    return { stream: (signal, diagnostic) => this.stream(input, messages, options, signal, diagnostic) };
   }
-  private async *stream(input: ModelInput, messages: ModelMessage[], options: ReturnType<typeof requestOptions>, signal: AbortSignal): AsyncIterable<ModelEvent> {
+  private async *stream(input: ModelInput, messages: ModelMessage[], options: ReturnType<typeof requestOptions>, signal: AbortSignal,
+    diagnostic?: (event: Extract<ModelRunEvent, { type: "diagnostic" }>) => void): AsyncIterable<ModelEvent> {
     const { provider, model } = input.settings;
     const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const controller = new AbortController();
     const streamSignal = AbortSignal.any([signal, controller.signal]);
-    let responseMetadata: ModelResponse | null = null;
+    let responseMetadata: ModelResponse | null = null, transportStarted = false;
     // The SDK may consume the first SSE error before doStream returns; retain the received prefix and release it on first-block delivery.
     let capturePrefix = true, responsePrefix = "";
     const decoder = new TextDecoder();
     const transport: typeof fetch = async (url, init) => {
+      transportStarted = true;
       let response: Response;
       try { response = await this.transport(url, init); }
       catch (error) { throw providerFailure(error, true); }
@@ -139,7 +143,23 @@ export class AiSdkAdapter implements ModelAdapter {
       }
       return response;
     };
-    const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, transport, input);
+    let omitted: readonly string[] = [];
+    const emitAttachmentWarning = () => {
+      if (!omitted.length || signal.aborted) return;
+      const omittedFiles = omitted;
+      omitted = [];
+      diagnostic?.({ type: "diagnostic", origin: "software", level: "warning", code: "attachments_omitted",
+        message: `Attachments not sent by the current request adapter: ${omittedFiles.join(", ")}.`, omittedFiles });
+    };
+    let languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, transport, input);
+    if (diagnostic && languageModel.specificationVersion === "v4" && !this.languageModelFactory && provider.protocol === "openai-responses") {
+      const target = JSON.stringify([provider.id, provider.baseUrl, model.modelId]);
+      const rejected = this.rejectedResponsesFiles.get(target) ?? new Set<string>();
+      languageModel = withResponsesFileRecovery(languageModel, rejected, () => transportStarted, files => {
+        omitted = files;
+        this.rejectedResponsesFiles.set(target, rejected);
+      });
+    }
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
     signal.throwIfAborted();
     const timing = new RequestTimer();
@@ -149,10 +169,12 @@ export class AiSdkAdapter implements ModelAdapter {
     signal.addEventListener("abort", cancelled, { once: true });
     try {
       for await (const event of this.decode(measured, messages, tools, options, protocol, streamSignal, () => responseMetadata !== null)) {
+        emitAttachmentWarning();
         capturePrefix = false; responsePrefix = "";
         yield event.type === "finish" ? { ...event, response: responseMetadata } : event;
       }
     } catch (error) {
+      emitAttachmentWarning();
       // Model termination may precede connection close or user cancellation; acquired metering must still be delivered.
       if (measured.completion) yield { ...measured.completion, response: responseMetadata };
       const failure = providerFailure(error, responseMetadata !== null && responseParsingFailure(error));

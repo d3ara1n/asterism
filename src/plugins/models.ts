@@ -49,6 +49,7 @@ export function resolveTarget(snapshot: Pick<ConfigurationSnapshot, "modelProvid
 export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): HostModels {
   // Capture current connection settings before requests; catalog reads remain synchronous.
   const current = () => configuration.modelCatalog();
+  const rejectedResponsesFiles = new Map<string, Set<string>>();
   const resolve = async (target: ModelTarget, execute = true, signal?: AbortSignal): Promise<ResolvedTarget> => {
     await configuration.execute({ type: "read" });
     const config = current();
@@ -59,7 +60,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
     const settings: ModelSettings = { provider: connection, model, thinking: result.thinking };
     const credential = adapterFactory || !execute ? null : await configuration.executionCredential(connection.id, signal);
     const adapter = adapterFactory?.(settings)
-      ?? new AiSdkAdapter(async () => credential);
+      ?? new AiSdkAdapter(async () => credential, undefined, undefined, rejectedResponsesFiles);
     return { settings, adapter };
   };
   const catalog = {

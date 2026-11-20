@@ -114,7 +114,8 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "turn-metrics": return <TurnFooter inputId={node.inputId} metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} replyCreatedAt={node.replyCreatedAt} />;
     case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
       {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>
-        <p className="whitespace-pre-wrap break-words">{node.message}</p>
+        <p className="whitespace-pre-wrap break-words">{node.omittedFiles
+          ? i18n.formatMessage(conversationMessages.attachmentsOmitted, { files: node.omittedFiles.join(", ") }) : node.message}</p>
         {node.details && <ExecutionErrorDetails code={node.code} details={node.details} />}
       </AlertDescription></Alert>;
     default: return null;

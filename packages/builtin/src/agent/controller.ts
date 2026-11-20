@@ -162,6 +162,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
         return { inputId: input?.id ?? null, position: snapshot.position };
       };
       startTask(object, "conversation", async signal => {
+        const attachmentWarnings = new Set<string>();
         return runAgentLoop({
           retry: {
             maxRetries: agentRequestRetries,
@@ -172,6 +173,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
           nextTurn(reason) {
             const ended = boundary();
             if (!deliverDrafts(object, "turn")) return false;
+            attachmentWarnings.clear();
             object.events.publish(AgentTurnEnded, { ...ended, reason, settled: false });
             return true;
           },
@@ -186,9 +188,14 @@ export function createAgentController(deps: AgentControllerDependencies) {
               event(event) {
                 if (event.type === "progress") return;
                 if (event.type === "diagnostic") {
+                  if (event.omittedFiles) {
+                    if (attachmentWarnings.has(event.message)) return;
+                    attachmentWarnings.add(event.message);
+                  }
                   deps.feedback.report(object, { origin: event.origin, code: event.code, message: event.message, level: event.level,
                     ...(event.details ? { details: event.details } : {}),
-                    ...(event.responseId ? { responseId: event.responseId } : {}) }, event.level === "error" || event.code === "cancelled");
+                    ...(event.responseId ? { responseId: event.responseId } : {}),
+                    ...(event.omittedFiles ? { omittedFiles: [...event.omittedFiles] } : {}) }, event.level === "error" || event.code === "cancelled");
                   return;
                 }
                 object.commit(writer => {

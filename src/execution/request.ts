@@ -89,7 +89,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
       return pendingProgress;
     };
     try {
-      for await (const event of prepared.stream(signal)) {
+      for await (const event of prepared.stream(signal, emit)) {
         if (event.type === "finish") responseMetadata = event.response ?? null;
         // The adapter handles aborts and delivers previously acquired terminal state; check cancellation again before the tool batch starts.
         buffer.accept(event);

@@ -1,6 +1,6 @@
 import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from "react";
 import { AnimatePresence } from "motion/react";
-import { Extension, type Editor, type Range } from "@tiptap/core";
+import { Extension, type Editor, type JSONContent, type Range } from "@tiptap/core";
 import { useEditor, EditorContent } from "@tiptap/react";
 import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
@@ -17,6 +17,7 @@ import { composerTextLimit } from "./draft";
 
 export interface ComposerEditorHandle {
   focus(): void;
+  appendText(text: string): "tooLong" | void;
 }
 
 const suggestionKey = new PluginKey("referenceSuggestion");
@@ -77,7 +78,7 @@ function submitOnEnter(bridge: { current: EditorBridge }) {
   });
 }
 
-/** Dropped reference text is inserted at the drop point and parsed like typed text; file drops keep the attachment path. */
+/** Dropped reference text is inserted at the drop point and parsed into chips. */
 const referenceDrop = Extension.create({
   name: "referenceDrop",
   addProseMirrorPlugins() {
@@ -160,7 +161,19 @@ export function ComposerEditor({ ref, value, placeholder, label, disabled, onCha
 
   useImperativeHandle(ref, () => ({
     focus: () => { editor.commands.focus(null, { scrollIntoView: false }); },
-  }), [editor]);
+    appendText(text) {
+      if (disabled || !editor.isEditable || !text) return;
+      const current = serializeDoc(editor.getJSON());
+      const suffix = current && !current.endsWith("\n") ? `\n${text}` : text;
+      if (current.length + suffix.length > composerTextLimit) return "tooLong";
+      // Use literal nodes so path punctuation cannot become markup or a reference chip.
+      const content = suffix.split("\n").flatMap<JSONContent>((line, index) => [
+        ...index ? [{ type: "hardBreak" }] : [],
+        ...line ? [{ type: "text", text: line }] : [],
+      ]);
+      editor.chain().insertContentAt(editor.state.doc.content.size - 1, content).focus("end").run();
+    },
+  }), [editor, disabled]);
 
   useEffect(() => {
     if (serializeDoc(editor.getJSON()) === value) return;

@@ -1,8 +1,11 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const conversationMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
+  attachmentsOmitted: { id: "conversation.attachments.omitted", defaultMessage: "Attachments not sent by the current model interface: {files}" },
   earlierMessages: { id: "conversation.history.loadEarlier", defaultMessage: "Load earlier messages" },
   historyReadFailed: { id: "conversation.history.readFailed", defaultMessage: "Conversation history could not be loaded." },
+  insertPaths: { id: "conversation.input.insertPaths", defaultMessage: "Insert paths" },
+  pathsUnavailable: { id: "conversation.input.pathsUnavailable", defaultMessage: "Could not insert paths. One or more dropped files have no available local path." },
   inputTooLong: { id: "conversation.input.tooLong", defaultMessage: "Text exceeds the {limit, number}-character limit." },
   copyInput: { id: "conversation.input.copy", defaultMessage: "Copy text" },
   inputCopied: { id: "conversation.input.copied", defaultMessage: "Copied" },

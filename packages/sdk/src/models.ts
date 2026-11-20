@@ -84,7 +84,7 @@ export type ModelRunEvent =
   | { type: "tool.begin"; block: Extract<ModelBlock, { kind: "toolcall" }> }
   | { type: "tool.complete"; block: Extract<ModelBlock, { kind: "toolcall" }> }
   | { type: "progress"; blocks: readonly ModelLiveBlock[] }
-  | { type: "diagnostic"; origin: "model" | "software"; code: string; message: string; level: "error" | "warning"; details?: ErrorDetails; responseId?: string };
+  | { type: "diagnostic"; origin: "model" | "software"; code: string; message: string; level: "error" | "warning"; details?: ErrorDetails; responseId?: string; omittedFiles?: readonly string[] };
 /** Deliver execution events synchronously; consumers save finalized records, exceptions stop execution, and no further events are delivered after returning. */
 export interface ModelRunObserver { event(event: ModelRunEvent): undefined }
 /** Used only for HTTP request identity; does not enter model messages, history, or resource authorization. */

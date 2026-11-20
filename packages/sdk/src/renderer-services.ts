@@ -86,6 +86,8 @@ export interface RendererApplicationServices {
   readonly platform: "darwin" | "win32" | "linux";
   preferences(pluginId: string): import("./renderer-creation.ts").RendererPreferences;
   pickDirectory(initialPath?: string): Promise<string | null>;
+  /** Resolve a native File from a drop or picker without reading its contents. Null when a local path is unavailable. */
+  pathForFile(file: File): string | null;
   openLocalFile(path: string): Promise<void>;
   /** Select a local file in the system file manager; directory targets open in that manager. */
   showLocalFile(path: string, directory: boolean): Promise<void>;
