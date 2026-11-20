@@ -1,0 +1,171 @@
+---
+import Icon from "./Icon.astro";
+import { content, type Locale } from "../i18n/content";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = content[locale].resources;
+---
+
+<section id="resources" class="resources wrap">
+  <div class="head">
+    <h2>{t.title}</h2>
+    <p>{t.body}</p>
+  </div>
+
+  <ul class="grid" role="list">
+    {
+      t.items.map((item, index) => (
+        <li class="tile" style={`--i:${index}`}>
+          <div class="tile-head">
+            <Icon name={item.icon} />
+            <span class="tile-kind">{item.kind}</span>
+            <span class="tile-title">{item.title}</span>
+          </div>
+          <p class="tile-body">{item.meta}</p>
+        </li>
+      ))
+    }
+    <li class="tile tile-plugin" style={`--i:${t.items.length}`}>
+      <div class="tile-head">
+        <Icon name="puzzle" />
+        <span class="tile-kind">{t.plugin.kind}</span>
+        <span class="tile-title">{t.plugin.title}</span>
+      </div>
+      <p class="tile-body">{t.plugin.meta}</p>
+    </li>
+  </ul>
+</section>
+
+<style>
+  .resources {
+    padding-block: clamp(5rem, 10vw, 8rem);
+    background: linear-gradient(var(--line), var(--line)) top center / calc(100% - var(--gutter) * 2) 1px no-repeat;
+  }
+
+  .head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(1.25rem, 6vw, 6rem);
+    align-items: end;
+  }
+
+  h2 {
+    font-size: clamp(2rem, 3.8vw, 3.25rem);
+    line-height: 1.05;
+    font-weight: 340;
+    font-stretch: 110%;
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+  }
+
+  :global(html:lang(zh)) h2 {
+    letter-spacing: 0;
+    line-height: 1.24;
+  }
+
+  .head p {
+    max-width: 26em;
+    color: var(--ink-2);
+    text-wrap: pretty;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: clamp(2.5rem, 5vw, 3.75rem) 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Same shell-and-surface shape as the workbench cards in the demo. */
+  .tile {
+    display: flex;
+    flex-direction: column;
+    padding: 0 4px 4px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--surface) 70%, var(--bg));
+    transition: border-color 0.25s, translate 0.35s var(--ease), box-shadow 0.35s var(--ease);
+  }
+
+  .tile:hover {
+    border-color: var(--ink-3);
+    translate: 0 -2px;
+    box-shadow: var(--shadow);
+  }
+
+  .tile-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    min-width: 0;
+    padding: 0.6rem 0.6rem 0.55rem;
+    font-size: 0.875rem;
+  }
+
+  .tile-head :global(.icon) {
+    flex: none;
+    align-self: center;
+    width: 15px;
+    height: 15px;
+    color: var(--ink-2);
+  }
+
+  .tile-kind {
+    flex: none;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+
+  .tile-title {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+
+  .tile-body {
+    flex: 1;
+    margin: 0;
+    padding: 0.85rem 0.8rem 0.95rem;
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.05), 0 0 2px rgb(0 0 0 / 0.03);
+    font-size: 0.875rem;
+    color: var(--ink-2);
+  }
+
+  .tile-plugin {
+    border-style: dashed;
+    border-color: var(--ink-3);
+    background: transparent;
+  }
+
+  .tile-plugin .tile-body {
+    background: transparent;
+    box-shadow: none;
+  }
+
+  @media (max-width: 60rem) {
+    .head {
+      grid-template-columns: 1fr;
+    }
+
+    .grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 42rem) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+</style>

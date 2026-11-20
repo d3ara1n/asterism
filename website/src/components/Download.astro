@@ -1,5 +1,5 @@
 ---
-import Glyph from "./Glyph.astro";
+import Icon from "./Icon.astro";
 import Mark from "./Mark.astro";
 import { content, releasesUrl, type Locale } from "../i18n/content";
 
@@ -50,8 +50,8 @@ const quarantineCmd = "xattr -dr com.apple.quarantine /Applications/Asterism.app
             data-label-copy={t.copy}
             data-label-copied={t.copied}
           >
-            <span class="icon-copy"><Glyph name="copy" /></span>
-            <span class="icon-check" hidden><Glyph name="check" /></span>
+            <span class="icon-copy"><Icon name="copy" size={14} /></span>
+            <span class="icon-check" hidden><Icon name="check" size={14} /></span>
             <span data-copy-text>{t.copy}</span>
           </button>
         </div>

@@ -1,0 +1,2184 @@
+---
+// One large, self-playing mock of the Asterism window. The layout follows the app (titlebar parts, docked sidebar,
+// canvas island, object cards, docked panels); content is illustrative and does not track interface details.
+import Icon from "./Icon.astro";
+import MockCard from "./MockCard.astro";
+import { content, type Locale } from "../i18n/content";
+import { matches, stateAt } from "./demo-timeline";
+
+interface Props {
+  locale: Locale;
+}
+
+const { locale } = Astro.props;
+const t = content[locale].demo;
+const u = t.ui;
+const k = u.kinds;
+
+// Server render the first frame of the script so the window is complete before the client takes over.
+const initial = stateAt(0);
+const on = (expr: string) => matches(expr, initial);
+const mods = (rules: string) =>
+  Object.fromEntries(
+    rules.split(";").map(rule => {
+      const at = rule.indexOf(":");
+      return [rule.slice(0, at).trim(), on(rule.slice(at + 1))];
+    }),
+  );
+
+const menuResources = [
+  { icon: "folder", label: k.directory, id: "dir" },
+  { icon: "file-text", label: k.note, id: "note" },
+  { icon: "square-terminal", label: k.terminal, id: "term" },
+  { icon: "globe", label: k.web },
+  { icon: "server", label: k.mcp },
+  { icon: "boxes", label: k.pool },
+  { icon: "list-todo", label: k.todo },
+  { icon: "book-open", label: k.manual },
+] as const;
+
+const accessRows = [
+  { icon: "folder", title: "~/asterism", kind: k.directory, state: "link-dir", cursor: "sw-dir" },
+  { icon: "file-text", title: u.noteTitle, kind: k.note, state: "link-note", cursor: "sw-note" },
+  { icon: "square-terminal", title: "zsh", kind: k.terminal, state: "never", cursor: undefined },
+] as const;
+
+const readSel = "read:tool1 !tool1-done, rtool !rtool-done";
+---
+
+<section class="demo" data-demo aria-label={t.label}>
+  <div class="wrap demo-head">
+    <ol class="chapters" role="list">
+      {
+        t.chapters.map((chapter, index) => (
+          <li>
+            <button type="button" class:list={["chapter", { "is-active": index === 0 }]} data-chapter={index} aria-current={index === 0 ? "step" : undefined}>
+              <span class="chapter-bar"><span /></span>
+              <span class="chapter-num">0{index + 1}</span>
+              <span class="chapter-title">{chapter.title}</span>
+              <span class="chapter-body">{chapter.body}</span>
+            </button>
+          </li>
+        ))
+      }
+    </ol>
+    <button type="button" class="play" data-play data-label-pause={u.pause} data-label-play={u.play} aria-label={u.pause}>
+      <span class="play-pause"><Icon name="pause" size={14} /></span>
+      <span class="play-play"><Icon name="play" size={14} /></span>
+    </button>
+  </div>
+
+  <div class="stage-wrap wrap">
+    <div class="stage" data-stage role="img" aria-label={t.label}>
+      <div class:list={["m-window", mods("fade:fade")]} data-window data-class="fade:fade" aria-hidden="true">
+        <span class="m-lights"><i /><i /><i /></span>
+
+        <!-- Titlebar: navigation part and actions part -->
+        <header class="m-titlebar">
+          <div class="m-part m-nav">
+            <span class="m-ib"><Icon name="panel-left" /></span>
+            <span class="m-btn m-app"><span class="m-asterism">⁂</span><b>Asterism</b><Icon name="chevron-down" class="m-dim" /></span>
+            <span class="m-sep" />
+            <span class="m-session-title">{u.sessionTitle}</span>
+          </div>
+          <div class="m-part m-actions">
+            <span class="m-add">
+              <span class:list={["m-btn", mods("pressed:menu")]} data-class="pressed:menu" data-cursor="add"><Icon name="plus" />{u.add}<Icon name="chevron-down" class="m-dim" /></span>
+              <div class:list={["m-menu fade", { "is-on": on("menu") }]} data-show="menu">
+                <p class="m-menu-label">{u.menuAgents}</p>
+                <span class:list={["m-menu-item", mods("hover:hover-agent")]} data-class="hover:hover-agent" data-cursor="menu-agent"><Icon name="bot" />{k.agent}…</span>
+                <span class="m-menu-sep" />
+                <p class="m-menu-label">{u.menuResources}</p>
+                {
+                  menuResources.map(item => (
+                    <span
+                      class:list={["m-menu-item", "id" in item && mods(`hover:hover-${item.id}`)]}
+                      data-class={"id" in item ? `hover:hover-${item.id}` : undefined}
+                      data-cursor={"id" in item ? `menu-${item.id}` : undefined}
+                    >
+                      <Icon name={item.icon} />
+                      {item.label}…
+                    </span>
+                  ))
+                }
+              </div>
+            </span>
+            <span class="m-btn"><Icon name="layout-dashboard" />{u.layout}<Icon name="chevron-down" class="m-dim" /></span>
+            <span class:list={["m-btn", mods("pressed:access")]} data-class="pressed:access" data-cursor="access"><Icon name="key-round" />{u.access}</span>
+            <span class="m-btn"><Icon name="list-tree" />{u.objects}</span>
+            <span class:list={["m-btn", mods("pressed:hist")]} data-class="pressed:hist" data-cursor="history"><Icon name="history" />{u.history}</span>
+          </div>
+        </header>
+
+        <div class="m-main">
+          <!-- Docked navigation -->
+          <aside class="m-dock m-sidebar">
+            <div class="m-side-head">
+              <span class="m-side-brand"><span class="m-asterism">⁂</span>Asterism</span>
+              <span class="m-ib"><Icon name="panel-left-close" /></span>
+            </div>
+            <span class="m-btn m-wide"><Icon name="house" />{u.home}</span>
+            <div class="m-side-section">
+              <span class="m-label">{u.conversations}</span>
+              <span class="m-ib"><Icon name="folder-plus" /></span>
+            </div>
+            <div class="m-toggle"><span class="is-on">{u.folders}</span><span>{u.recent}</span></div>
+            <div class="m-group">
+              <Icon name="chevron-right" class="m-dim m-rot" />
+              <i class="m-folder-dot" />
+              <b>{u.folderName}</b>
+              <span class="m-count">{u.sessions.length}</span>
+            </div>
+            <div class="m-nested">
+              {
+                u.sessions.map((title, index) => (
+                  <span class:list={["m-row", { "is-selected": index === 0 }]}>
+                    <Icon name="message-square" />
+                    <span class="m-row-title">{title}</span>
+                    {index === 0 && <i class:list={["m-live fade", { "is-on": on("working, rworking") }]} data-show="working, rworking" />}
+                  </span>
+                ))
+              }
+            </div>
+            <div class="m-group">
+              <Icon name="chevron-right" class="m-dim m-rot" />
+              <Icon name="folder" class="m-dim" />
+              <span class="m-dim m-grow">{u.noFolder}</span>
+              <span class="m-count">{u.looseSessions.length}</span>
+            </div>
+            <div class="m-nested">
+              {
+                u.looseSessions.map(title => (
+                  <span class="m-row">
+                    <Icon name="message-square" />
+                    <span class="m-row-title">{title}</span>
+                  </span>
+                ))
+              }
+            </div>
+          </aside>
+
+          <!-- Central canvas island -->
+          <div class="m-canvas">
+            <div class="m-world">
+              <MockCard icon="folder" kind={k.directory} title="~/asterism" class:list={["m-dir fade", { "is-on": on("dir") }]} data-show="dir">
+                <div class="m-tree">
+                  <span><Icon name="chevron-right" class="m-dim" /><Icon name="folder" />docs</span>
+                  <span><Icon name="chevron-right" class="m-dim" /><Icon name="folder" />packages</span>
+                  <span><Icon name="chevron-down" class="m-dim" /><Icon name="folder-open" />src</span>
+                  <span class="m-tree-in"><Icon name="chevron-right" class="m-dim" /><Icon name="folder" />main</span>
+                  <span class="m-tree-in"><Icon name="chevron-right" class="m-dim" /><Icon name="folder" />renderer</span>
+                  <span class:list={["m-tree-file", mods(readSel)]} data-class={readSel}><Icon name="file" />CHANGELOG.md<em>M</em></span>
+                  <span class="m-tree-file"><Icon name="file" />package.json</span>
+                </div>
+              </MockCard>
+
+              <MockCard icon="file-text" kind={k.note} title={u.noteTitle} class:list={["m-note fade", { "is-on": on("note") }]} data-show="note">
+                <div class:list={["m-doc", mods("read:tool2 !tool2-done")]} data-class="read:tool2 !tool2-done">
+                  <b>{u.noteHeading}</b>
+                  <ul>{u.noteLines.map(line => <li>{line}</li>)}</ul>
+                </div>
+              </MockCard>
+
+              <MockCard icon="square-terminal" kind={k.terminal} title="zsh" class:list={["m-term fade", { "is-on": on("term") }]} data-show="term">
+                <div class="m-shell" data-cursor="term">
+                  <div><span class="m-ps">~/asterism $</span> <span data-type="command" data-text="npm run build" /><i class:list={["m-caret fade", { "is-on": on("term-focus !term-out") }]} data-show="term-focus !term-out" /></div>
+                  <div class:list={["flow", { "is-on": on("term-out") }]} data-show="term-out">
+                    <div class="m-shell-dim">vite v7.4 building for production…</div>
+                    <div><span class="m-shell-ok">✓</span> 2148 modules transformed.</div>
+                    <div class="m-shell-dim">out/renderer ready in 6.21s</div>
+                    <div><span class="m-ps">~/asterism $</span> <i class="m-caret is-on" /></div>
+                  </div>
+                </div>
+              </MockCard>
+
+              <MockCard icon="bot" kind={k.agent} title={u.writer} class="m-writer">
+                <div class="m-agent">
+                  <div class="m-timeline">
+                    <p class:list={["m-empty fade", { "is-on": on("!prompt") }]} data-show="!prompt">{u.emptyConversation}</p>
+                    <div class:list={["m-msg-user flow", { "is-on": on("prompt") }]} data-show="prompt">{u.prompt}</div>
+                    <div class:list={["m-tool flow", { "is-on": on("tool1") }, mods("pending:tool1 !tool1-done")]} data-show="tool1" data-class="pending:tool1 !tool1-done">
+                      <span class="m-tool-icon"><Icon name="loader-circle" class="m-spin" /><Icon name="file-text" class="m-done" /></span>
+                      <b>{u.readText}</b><span class="m-badge">CHANGELOG.md</span><span class="m-tool-sum">~/asterism</span>
+                    </div>
+                    <div class:list={["m-tool flow", { "is-on": on("tool2") }, mods("pending:tool2 !tool2-done")]} data-show="tool2" data-class="pending:tool2 !tool2-done">
+                      <span class="m-tool-icon"><Icon name="loader-circle" class="m-spin" /><Icon name="file-text" class="m-done" /></span>
+                      <b>{u.readText}</b><span class="m-badge">{u.noteTitle}</span>
+                    </div>
+                    <p class:list={["m-reply flow", { "is-on": on("reply") }]} data-show="reply" data-type="reply" data-text={u.reply} />
+                    <div class:list={["m-tool flow", { "is-on": on("wsend") }, mods("pending:wsend !wsend-done")]} data-show="wsend" data-class="pending:wsend !wsend-done">
+                      <span class="m-tool-icon"><Icon name="loader-circle" class="m-spin" /><Icon name="send" class="m-done" /></span>
+                      <b>{u.send}</b><span class="m-badge">{u.reviewer}</span>
+                      <span class:list={["m-tool-meta fade", { "is-on": on("wsend-done") }]} data-show="wsend-done">{u.accepted}</span>
+                    </div>
+                    <div class:list={["m-msg-agent flow", { "is-on": on("win") }]} data-show="win">
+                      <span class="m-sender"><Icon name="bot" />{u.reviewer}</span>
+                      <p>{u.review}</p>
+                    </div>
+                    <div class:list={["m-msg-user flow", { "is-on": on("b2prompt") }]} data-show="b2prompt">{u.followUp}</div>
+                    <p class:list={["m-reply flow", { "is-on": on("b2reply") }]} data-show="b2reply" data-type="revised" data-text={u.revised} />
+                    <p class:list={["m-status flow", { "is-on": on("working") }]} data-show="working"><Icon name="loader-circle" class="m-spinning" />{u.workingHint}</p>
+                  </div>
+                  <footer class="m-composer-wrap">
+                    <div class="m-toolbar">
+                      <span class="m-btn m-xs"><Icon name="bot" />{u.role}<Icon name="chevron-down" class="m-dim" /></span>
+                      <span class="m-ring" />
+                    </div>
+                    <div class="m-composer" data-cursor="composer">
+                      <p class="m-input">
+                        <span class:list={["m-placeholder", { "is-hidden": on("c1, c2") }]} data-class="is-hidden:c1, c2">{u.placeholder}</span>
+                        <span data-type="compose1" data-text={u.prompt} class:list={["fade", { "is-on": on("c1") }]} data-show="c1" />
+                        <span data-type="compose2" data-text={u.followUp} class:list={["fade", { "is-on": on("c2") }]} data-show="c2" />
+                      </p>
+                      <div class="m-composer-bar">
+                        <span class="m-ib"><Icon name="paperclip" /></span>
+                        <span class="m-grow" />
+                        <span class="m-btn m-xs"><Icon name="archive" />{u.saveDraft}</span>
+                        <span class:list={["m-send", mods("ready:c1, c2")]} data-class="ready:c1, c2" data-cursor="send"><Icon name="arrow-up" /></span>
+                      </div>
+                    </div>
+                  </footer>
+                </div>
+                <i class="m-port m-port-writer" data-cursor="writer-port" />
+              </MockCard>
+
+              <MockCard icon="bot" kind={k.agent} title={u.reviewer} class:list={["m-reviewer fade", { "is-on": on("rev") }]} data-show="rev">
+                <div class="m-agent">
+                  <div class="m-timeline">
+                    <p class:list={["m-empty fade", { "is-on": on("!rin") }]} data-show="!rin">{u.emptyConversation}</p>
+                    <div class:list={["m-msg-agent flow", { "is-on": on("rin") }]} data-show="rin">
+                      <span class="m-sender"><Icon name="bot" />{u.writer}</span>
+                      <p>{u.incoming}</p>
+                    </div>
+                    <div class:list={["m-tool flow", { "is-on": on("rtool") }, mods("pending:rtool !rtool-done")]} data-show="rtool" data-class="pending:rtool !rtool-done">
+                      <span class="m-tool-icon"><Icon name="loader-circle" class="m-spin" /><Icon name="file-text" class="m-done" /></span>
+                      <b>{u.readText}</b><span class="m-badge">CHANGELOG.md</span>
+                    </div>
+                    <p class:list={["m-reply flow", { "is-on": on("rreply") }]} data-show="rreply" data-type="review" data-text={u.review} />
+                    <div class:list={["m-tool flow", { "is-on": on("rsend") }, mods("pending:rsend !rsend-done")]} data-show="rsend" data-class="pending:rsend !rsend-done">
+                      <span class="m-tool-icon"><Icon name="loader-circle" class="m-spin" /><Icon name="send" class="m-done" /></span>
+                      <b>{u.send}</b><span class="m-badge">{u.writer}</span>
+                      <span class:list={["m-tool-meta fade", { "is-on": on("rsend-done") }]} data-show="rsend-done">{u.accepted}</span>
+                    </div>
+                  </div>
+                  <footer class="m-composer-wrap">
+                    <div class="m-toolbar">
+                      <span class="m-btn m-xs"><Icon name="bot" />{u.role}<Icon name="chevron-down" class="m-dim" /></span>
+                      <span class="m-ring" />
+                    </div>
+                    <div class="m-composer">
+                      <p class="m-input"><span class="m-placeholder">{u.placeholder}</span></p>
+                      <div class="m-composer-bar">
+                        <span class="m-ib"><Icon name="paperclip" /></span>
+                        <span class="m-grow" />
+                        <span class="m-send"><Icon name="arrow-up" /></span>
+                      </div>
+                    </div>
+                  </footer>
+                </div>
+                <i class="m-port m-port-rev" data-cursor="rev-port" />
+              </MockCard>
+
+              <!-- Links: source endpoint dot, line, and a solid head at the receiving end -->
+              <svg class="m-links" viewBox="0 0 1038 750">
+                <defs>
+                  <marker id="m-head" viewBox="-10 -6 11 12" refX="0" refY="0" markerWidth="11" markerHeight="12" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+                    <path d="M0 0 L-9 -4.95 Q-6.48 0 -9 4.95 Z" />
+                  </marker>
+                </defs>
+                <g class:list={["m-link", { "is-on": on("link-dir") }]} data-show="link-dir">
+                  <path d="M268 116 C296 116 290 170 304 170" pathLength="1" marker-end="url(#m-head)" />
+                  <circle cx="268" cy="116" r="3.5" /><circle class="m-tip" cx="312" cy="170" r="3.5" />
+                </g>
+                <g class:list={["m-link", { "is-on": on("link-note") }]} data-show="link-note">
+                  <path d="M268 344 C296 344 290 214 304 214" pathLength="1" marker-end="url(#m-head)" />
+                  <circle cx="268" cy="344" r="3.5" /><circle class="m-tip" cx="312" cy="214" r="3.5" />
+                </g>
+                <g class:list={["m-link", { "is-on": on("link-rev") }]} data-show="link-rev">
+                  <path d="M700 300 L732 300" pathLength="1" marker-start="url(#m-head)" marker-end="url(#m-head)" />
+                  <circle class="m-tip" cx="688" cy="300" r="3.5" /><circle class="m-tip" cx="744" cy="300" r="3.5" />
+                </g>
+                <g class:list={["m-link", "m-link-late", { "is-on": on("link-dir-rev") }]} data-show="link-dir-rev">
+                  <path d="M180 24 C180 8 196 8 230 8 L820 8 C872 8 880 30 880 98" pathLength="1" marker-end="url(#m-head)" />
+                  <circle cx="180" cy="24" r="3.5" /><circle class="m-tip" cx="880" cy="106" r="3.5" />
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Docked auxiliary panel -->
+          <div class:list={["m-panel-slot", mods("open:access, hist")]} data-class="open:access, hist">
+            <aside class="m-dock m-panel">
+              <div class:list={["m-panel-view fade", { "is-on": on("access") }]} data-show="access">
+                <header class="m-panel-head"><b>{u.accessTitle}</b><span class="m-ib"><Icon name="x" /></span></header>
+                <div class="m-panel-body">
+                  <div class="m-toggle"><span class="is-on">{u.byReceiver}</span><span>{u.byResource}</span></div>
+                  <span class="m-label m-gap">{u.recipient}</span>
+                  <span class="m-combo"><Icon name="bot" />{u.writer}<span class="m-grow" /><Icon name="chevron-down" class="m-dim" /></span>
+                  <b class="m-h3">{u.canAccess}</b>
+                  {
+                    accessRows.map(row => (
+                      <div class="m-access-row">
+                        <Icon name={row.icon} class="m-dim" />
+                        <div class="m-access-text">
+                          <b>{row.title}</b>
+                          <span class="m-caption">{row.kind}</span>
+                          <span class:list={["m-state", mods(`linked:${row.state}`)]} data-class={`linked:${row.state}`}>
+                            <span class="m-state-on"><Icon name="check" />{u.linked}</span>
+                            <span class="m-state-off"><Icon name="link-2" />{u.notLinked}</span>
+                          </span>
+                        </div>
+                        <span class:list={["m-switch", mods(`checked:${row.state}`)]} data-class={`checked:${row.state}`} data-cursor={row.cursor}><i /></span>
+                      </div>
+                    ))
+                  }
+                  <p class="m-caption m-boundary">{u.accessBoundary}</p>
+                </div>
+              </div>
+
+              <div class:list={["m-panel-view fade", { "is-on": on("hist") }]} data-show="hist">
+                <header class="m-panel-head m-tabs">
+                  <span class:list={["m-tab", mods("active:!branch")]} data-class="active:!branch">{u.main}</span>
+                  <span class:list={["m-tab flow-inline", { "is-on": on("branch") }, mods("active:branch")]} data-show="branch" data-class="active:branch">{u.branch}<Icon name="circle-dot" /></span>
+                  <span class="m-grow" />
+                  <span class="m-ib"><Icon name="x" /></span>
+                </header>
+                <div class="m-panel-body">
+                  <div class="m-hist-tools">
+                    <span class="m-combo"><Icon name="history" />{u.allRecords}<span class="m-grow" /><Icon name="chevron-down" class="m-dim" /></span>
+                    <span class="m-ib m-ib-outline"><Icon name="search" /></span>
+                  </div>
+                  <div class="m-hist">
+                    <span class="m-hrow m-hrow-start"><Icon name="history" class="m-dim" /><span>{u.sessionStart}</span></span>
+                    <span class="m-hrow"><Icon name="message-square" class="m-dim" /><span><b>{u.prompt}</b><i>{u.you}</i></span></span>
+                    <span class="m-hrow"><Icon name="file-text" class="m-dim" /><span><b>{u.readText} · CHANGELOG.md</b><i>{u.writer}</i></span></span>
+                    <span class="m-hrow"><Icon name="file-text" class="m-dim" /><span><b>{u.readText} · {u.noteTitle}</b><i>{u.writer}</i></span></span>
+                    <span class:list={["m-hrow", mods("selected:hsel")]} data-class="selected:hsel" data-cursor="hrow">
+                      <Icon name="bot" class="m-dim" /><span><b>{u.reply}</b><i>{u.writer}</i></span>
+                    </span>
+                    <span class:list={["m-hcont flow", { "is-on": on("hsel") }]} data-show="hsel"><span class="m-btn m-xs m-outline" data-cursor="hcont"><Icon name="git-branch" />{u.continueHere}</span></span>
+                    <span class:list={["m-hbranch flow", { "is-on": on("branch") }]} data-show="branch"><Icon name="git-branch" />{u.branchesHere}</span>
+                    <span class:list={["m-hrow flow", { "is-on": on("!branch") }]} data-show="!branch"><Icon name="layers" class="m-dim" /><span><b>{u.reviewer}</b><i>{u.sessionSource}</i></span></span>
+                    <span class:list={["m-hrow flow", { "is-on": on("!branch") }]} data-show="!branch"><Icon name="send" class="m-dim" /><span><b>{u.send} · {u.reviewer}</b><i>{u.writer}</i></span></span>
+                    <span class:list={["m-hrow flow", { "is-on": on("!branch") }]} data-show="!branch"><Icon name="bot" class="m-dim" /><span><b>{u.review}</b><i>{u.reviewer}</i></span></span>
+                    <span class:list={["m-hrow m-hrow-new flow", { "is-on": on("b2prompt") }]} data-show="b2prompt"><Icon name="message-square" class="m-dim" /><span><b>{u.followUp}</b><i>{u.you}</i></span></span>
+                    <span class:list={["m-hrow m-hrow-new flow", { "is-on": on("b2reply") }]} data-show="b2reply"><Icon name="bot" class="m-dim" /><span><b>{u.revised}</b><i>{u.writer}</i></span><Icon name="circle-dot" class="m-cur" /></span>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <span class="m-rest" data-cursor="rest" />
+        <span class="m-cursor" data-pointer>
+          <i class="m-cursor-ring" />
+          <svg width="20" height="20" viewBox="0 0 20 20"><path d="M3.5 2.2v14.3l3.6-3.4 2.4 5.3 2.3-1-2.3-5.2h5z" /></svg>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { chapterAt, chapterStarts, cursorCues, loopLength, matches, stateAt, typing } from "./demo-timeline";
+
+  const root = document.querySelector<HTMLElement>("[data-demo]");
+  const stage = root?.querySelector<HTMLElement>("[data-stage]");
+  const win = root?.querySelector<HTMLElement>("[data-window]");
+  const pointer = root?.querySelector<HTMLElement>("[data-pointer]");
+  const playButton = root?.querySelector<HTMLButtonElement>("[data-play]");
+
+  if (root && stage && win && pointer && playButton) {
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    const shows = [...win.querySelectorAll<HTMLElement | SVGElement>("[data-show]")].map(el => ({ el, expr: el.dataset.show! }));
+    const classed = [...win.querySelectorAll<HTMLElement>("[data-class]")].map(el => ({
+      el,
+      rules: el.dataset.class!.split(";").map(rule => {
+        const at = rule.indexOf(":");
+        return [rule.slice(0, at).trim(), rule.slice(at + 1)] as const;
+      }),
+    }));
+    const typed = [...win.querySelectorAll<HTMLElement>("[data-type]")].map(el => ({
+      el,
+      span: typing[el.dataset.type!],
+      chars: Array.from(el.dataset.text ?? ""),
+      shown: -1,
+    }));
+    const chapters = [...root.querySelectorAll<HTMLButtonElement>("[data-chapter]")];
+
+    // Narrow stages crop the window to a 760px view and pan it to each chapter's working area.
+    const viewWidth = 760;
+    const cameraX = [214, 520, 520, 520];
+    let scale = 1;
+    let narrow = false;
+    let time = 0;
+    let lastKey = "";
+    let lastChapter = -1;
+    const aim = () => {
+      const x = narrow ? cameraX[chapterAt(time)] : 0;
+      win.style.translate = `${-x * scale}px 0`;
+    };
+    const fit = () => {
+      narrow = stage.clientWidth < 720;
+      stage.toggleAttribute("data-narrow", narrow);
+      scale = stage.clientWidth / (narrow ? viewWidth : 1280);
+      win.style.setProperty("--s", String(scale));
+      aim();
+    };
+    new ResizeObserver(fit).observe(stage);
+    fit();
+
+    const render = () => {
+      const state = stateAt(time);
+      const key = [...state].sort().join(" ");
+      if (key !== lastKey) {
+        lastKey = key;
+        shows.forEach(({ el, expr }) => el.classList.toggle("is-on", matches(expr, state)));
+        classed.forEach(({ el, rules }) => rules.forEach(([name, expr]) => el.classList.toggle(name, matches(expr, state))));
+      }
+      typed.forEach(item => {
+        const [start, duration] = item.span;
+        const progress = Math.min(Math.max((time - start) / duration, 0), 1);
+        const count = Math.round(progress * item.chars.length);
+        if (count !== item.shown) {
+          item.shown = count;
+          item.el.textContent = item.chars.slice(0, count).join("");
+        }
+        item.el.classList.toggle("typing", progress > 0 && progress < 1);
+      });
+      const chapter = chapterAt(time);
+      if (chapter !== lastChapter) {
+        lastChapter = chapter;
+        aim();
+        chapters.forEach((button, index) => {
+          button.classList.toggle("is-active", index === chapter);
+          button.classList.toggle("is-past", index < chapter);
+          if (index === chapter) button.setAttribute("aria-current", "step");
+          else button.removeAttribute("aria-current");
+        });
+      }
+      const end = chapterStarts[chapter + 1] ?? loopLength;
+      chapters[chapter].style.setProperty("--p", String((time - chapterStarts[chapter]) / (end - chapterStarts[chapter])));
+    };
+
+    // Pointer: ease toward the current cue's target, measured every frame so moving panels and cards stay tracked.
+    const cursor = { x: 1080, y: 640 };
+    const cueAt = (t: number) => {
+      let cue = cursorCues[0];
+      for (const item of cursorCues) if (item[0] <= t) cue = item;
+      return cue;
+    };
+    const targetPoint = (name: string) => {
+      const el = win.querySelector<HTMLElement>(`[data-cursor="${name}"]`);
+      if (!el) return null;
+      const box = el.getBoundingClientRect();
+      const frame = win.getBoundingClientRect();
+      return { x: (box.left + box.width / 2 - frame.left) / scale, y: (box.top + box.height / 2 - frame.top) / scale };
+    };
+    const click = () => {
+      pointer.classList.remove("is-click");
+      void pointer.offsetWidth;
+      pointer.classList.add("is-click");
+    };
+    const moveCursor = (dt: number, previous: number) => {
+      const cue = cueAt(time);
+      const target = targetPoint(cue[1]);
+      if (target) {
+        const k = dt < 0 ? 1 : 1 - Math.exp(-dt / 110);
+        cursor.x += (target.x - cursor.x) * k;
+        cursor.y += (target.y - cursor.y) * k;
+        pointer.style.translate = `${cursor.x}px ${cursor.y}px`;
+      }
+      if (dt > 0) for (const [at, , pressed] of cursorCues) if (pressed && at > previous && at <= time) click();
+    };
+
+    let playing = false;
+    let userPaused = reduced.matches;
+    let visible = false;
+    let frame = 0;
+    let last = 0;
+    const tick = (now: number) => {
+      const dt = Math.min(now - last, 64);
+      last = now;
+      const previous = time;
+      time += dt;
+      if (time >= loopLength) {
+        time = 0;
+        lastKey = "";
+      }
+      render();
+      moveCursor(time < previous ? -1 : dt, previous);
+      frame = requestAnimationFrame(tick);
+    };
+    const sync = () => {
+      const shouldPlay = visible && !userPaused;
+      root.classList.toggle("is-paused", userPaused);
+      playButton.setAttribute("aria-label", userPaused ? playButton.dataset.labelPlay! : playButton.dataset.labelPause!);
+      if (shouldPlay === playing) return;
+      playing = shouldPlay;
+      if (playing) {
+        last = performance.now();
+        frame = requestAnimationFrame(tick);
+      } else cancelAnimationFrame(frame);
+    };
+
+    // Paused playback shows the settled end of a chapter.
+    const settle = (index: number) => {
+      time = (chapterStarts[index + 1] ?? loopLength - 800) - 400;
+      render();
+      moveCursor(-1, time);
+    };
+
+    chapters.forEach((button, index) => {
+      button.addEventListener("click", () => {
+        if (userPaused) settle(index);
+        else {
+          time = chapterStarts[index];
+          lastKey = "";
+          render();
+        }
+      });
+    });
+    playButton.addEventListener("click", () => {
+      userPaused = !userPaused;
+      if (!userPaused && reduced.matches) time = chapterStarts[chapterAt(time)];
+      sync();
+    });
+
+    new IntersectionObserver(
+      entries => {
+        visible = entries.some(entry => entry.isIntersecting);
+        sync();
+      },
+      { threshold: 0.2 },
+    ).observe(stage);
+
+    if (userPaused) settle(2);
+    else render();
+    sync();
+  }
+</script>
+
+<style>
+  .demo {
+    position: relative;
+    padding-bottom: clamp(5rem, 10vw, 8rem);
+  }
+
+  /* Chapter controls */
+  .demo-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: clamp(1.25rem, 2.6vw, 2rem);
+  }
+
+  .chapters {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: clamp(0.75rem, 2vw, 1.75rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chapter {
+    display: grid;
+    width: 100%;
+    gap: 0.2rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    color: var(--ink-3);
+    cursor: pointer;
+    transition: color 0.3s;
+  }
+
+  .chapter:hover,
+  .chapter.is-active {
+    color: var(--ink);
+  }
+
+  .chapter-bar {
+    position: relative;
+    height: 2px;
+    margin-bottom: 0.85rem;
+    overflow: hidden;
+    border-radius: 2px;
+    background: var(--line);
+  }
+
+  .chapter-bar span {
+    position: absolute;
+    inset: 0;
+    background: var(--ink);
+    transform-origin: 0 50%;
+    transform: scaleX(0);
+  }
+
+  .chapter.is-past .chapter-bar span {
+    transform: scaleX(1);
+    opacity: 0.35;
+  }
+
+  .chapter.is-active .chapter-bar span {
+    transform: scaleX(var(--p, 0));
+  }
+
+  :global(.demo.is-paused) .chapter.is-active .chapter-bar span {
+    transform: scaleX(1);
+  }
+
+  .chapter-num {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--ink-3);
+  }
+
+  .chapter-title {
+    font-size: 1.0625rem;
+    font-weight: 520;
+    font-stretch: 106%;
+    letter-spacing: -0.01em;
+  }
+
+  .chapter-body {
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--ink-2);
+    opacity: 0.55;
+    transition: opacity 0.3s;
+    text-wrap: pretty;
+  }
+
+  .chapter.is-active .chapter-body {
+    opacity: 1;
+  }
+
+  .play {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 2rem;
+    height: 2rem;
+    margin-top: 0.85rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: color 0.2s, border-color 0.2s;
+  }
+
+  .play:hover {
+    color: var(--ink);
+    border-color: var(--ink-3);
+  }
+
+  .play-play,
+  :global(.demo.is-paused) .play-pause {
+    display: none;
+  }
+
+  :global(.demo.is-paused) .play-play {
+    display: flex;
+  }
+
+  .play-pause {
+    display: flex;
+  }
+
+  /* Stage: fixed 1280×800 window scaled to the available width */
+  .stage-wrap {
+    position: relative;
+  }
+
+  .stage-wrap::before {
+    content: "";
+    position: absolute;
+    inset: -8% -4% -14%;
+    pointer-events: none;
+    background: radial-gradient(60% 55% at 50% 45%, color-mix(in srgb, var(--surface) 90%, transparent), transparent 75%);
+  }
+
+  .stage {
+    position: relative;
+    aspect-ratio: 1280 / 800;
+  }
+
+  .stage[data-narrow] {
+    aspect-ratio: 760 / 800;
+    overflow: hidden;
+    border-radius: 10px;
+    box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.2), 0 24px 50px -24px rgb(16 19 22 / 0.4);
+  }
+
+  .stage[data-narrow] .m-window {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .m-window {
+    /* Application tokens, light */
+    --material: #e6e6e8;
+    --card: #ffffff;
+    --shell: #f9f9f9;
+    --fg: #202020;
+    --muted: #f0f0f0;
+    --muted-fg: #646464;
+    --border: #e0e0e0;
+    --input: #d9d9d9;
+    --selected: #e0e0e0;
+    --accent: #ebebeb;
+    --canvas: #f0f0f0;
+    --grid: #d4d4d4;
+    --primary: #202020;
+    --primary-fg: #ffffff;
+    --ext: #f4f0fe;
+    --ext-fg: #2f265f;
+    --success: #218358;
+    --warning: #ab6400;
+    --read: #fff3d6;
+    --m-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: grid;
+    grid-template-rows: 32px minmax(0, 1fr);
+    gap: 6px;
+    width: 1280px;
+    height: 800px;
+    padding-top: 6px;
+    overflow: hidden;
+    border-radius: 12px;
+    background: var(--material);
+    color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", "PingFang SC", "Microsoft YaHei UI", "Noto Sans CJK SC", sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+    letter-spacing: 0;
+    transform-origin: 0 0;
+    scale: var(--s, 0.9375);
+    transition: translate 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+    box-shadow:
+      0 0 0 0.5px rgb(0 0 0 / 0.22),
+      0 1px 0 rgb(255 255 255 / 0.6) inset,
+      0 40px 90px -30px rgb(16 19 22 / 0.42),
+      0 14px 30px -18px rgb(16 19 22 / 0.3);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .m-window {
+      --material: #262628;
+      --card: #191919;
+      --shell: #222222;
+      --fg: #eeeeee;
+      --muted: #222222;
+      --muted-fg: #b4b4b4;
+      --border: #3a3a3a;
+      --input: #484848;
+      --selected: #313131;
+      --accent: #2a2a2a;
+      --canvas: #111111;
+      --grid: #333333;
+      --primary: #eeeeee;
+      --primary-fg: #111111;
+      --ext: #291f43;
+      --ext-fg: #e2ddfe;
+      --success: #3dd68c;
+      --warning: #ffca16;
+      --read: #3a2e10;
+      box-shadow:
+        0 0 0 0.5px rgb(255 255 255 / 0.16),
+        0 1px 0 rgb(255 255 255 / 0.08) inset,
+        0 40px 90px -30px rgb(0 0 0 / 0.8),
+        0 14px 30px -18px rgb(0 0 0 / 0.6);
+    }
+  }
+
+  .m-window > *,
+  .m-main > * {
+    transition: opacity 0.6s var(--m-ease);
+  }
+
+  .m-window.fade > .m-main,
+  .m-window.fade > .m-titlebar {
+    opacity: 0.25;
+  }
+
+  .m-window :global(.icon) {
+    flex: none;
+    width: 14px;
+    height: 14px;
+  }
+
+  .m-window :global(.m-dim) {
+    color: var(--muted-fg);
+  }
+
+  b {
+    font-weight: 600;
+  }
+
+  /* Shared state helpers: `fade` overlays and `flow` list items */
+  .fade {
+    transition: opacity 0.35s var(--m-ease), scale 0.45s var(--m-ease), translate 0.45s var(--m-ease);
+  }
+
+  .fade:not(.is-on) {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .flow:not(.is-on) {
+    display: none !important;
+  }
+
+  .flow.is-on {
+    animation: m-rise 0.45s var(--m-ease) both;
+  }
+
+  .flow-inline:not(.is-on) {
+    display: none;
+  }
+
+  @keyframes m-rise {
+    from {
+      opacity: 0;
+      translate: 0 6px;
+    }
+  }
+
+  /* Window chrome */
+  .m-lights {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    z-index: 3;
+    display: flex;
+    gap: 8px;
+  }
+
+  .m-lights i {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ff5f57;
+    box-shadow: 0 0 0 0.5px rgb(0 0 0 / 0.18) inset;
+  }
+
+  .m-lights i:nth-child(2) {
+    background: #febc2e;
+  }
+
+  .m-lights i:nth-child(3) {
+    background: #28c840;
+  }
+
+  .m-titlebar {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+    margin-inline: 6px;
+    min-width: 0;
+  }
+
+  .m-part {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    padding-inline: 4px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+  }
+
+  .m-nav {
+    padding-left: 80px;
+  }
+
+  .m-actions {
+    position: relative;
+    z-index: 4;
+  }
+
+  .m-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding-inline: 8px;
+    border-radius: 6px;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+
+  .m-btn.pressed {
+    background: var(--selected);
+  }
+
+  .m-xs {
+    height: 22px;
+    padding-inline: 6px;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .m-xs :global(.icon) {
+    width: 12px;
+    height: 12px;
+  }
+
+  .m-outline {
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+
+  .m-ib {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--fg);
+  }
+
+  .m-ib :global(.icon) {
+    width: 13px;
+    height: 13px;
+  }
+
+  .m-ib-outline {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+  }
+
+  .m-app {
+    gap: 4px;
+  }
+
+  .m-asterism {
+    font-size: 20px;
+    line-height: 1;
+    font-weight: 400;
+    margin-top: -2px;
+  }
+
+  .m-sep {
+    width: 1px;
+    height: 16px;
+    margin-inline: 2px;
+    background: var(--border);
+  }
+
+  .m-session-title {
+    padding-inline: 6px;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* Add menu */
+  .m-add {
+    position: relative;
+  }
+
+  .m-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: -2px;
+    width: 200px;
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    box-shadow: 0 10px 28px -10px rgb(0 0 0 / 0.22), 0 2px 6px rgb(0 0 0 / 0.06);
+    transform-origin: 90% 0;
+  }
+
+  .m-menu:not(.is-on) {
+    scale: 0.96;
+    translate: 0 -4px;
+  }
+
+  .m-menu-label {
+    margin: 0;
+    padding: 6px 8px 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted-fg);
+  }
+
+  .m-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 30px;
+    padding-inline: 8px;
+    border-radius: 5px;
+    transition: background-color 0.15s;
+  }
+
+  .m-menu-item :global(.icon) {
+    width: 15px;
+    height: 15px;
+    color: var(--muted-fg);
+  }
+
+  .m-menu-item.hover {
+    background: var(--accent);
+  }
+
+  .m-menu-sep {
+    display: block;
+    height: 1px;
+    margin: 4px -4px;
+    background: var(--border);
+  }
+
+  /* Main page */
+  .m-main {
+    position: relative;
+    display: flex;
+    min-height: 0;
+    padding-bottom: 6px;
+  }
+
+  .m-dock {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    overflow: hidden;
+  }
+
+  .m-sidebar {
+    flex: none;
+    width: 224px;
+    margin-left: 6px;
+    padding: 12px;
+  }
+
+  .m-side-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 8px 20px;
+  }
+
+  .m-side-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+  }
+
+  .m-wide {
+    width: 100%;
+    height: 32px;
+    justify-content: flex-start;
+  }
+
+  .m-side-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 24px 0 4px;
+    padding-left: 8px;
+  }
+
+  .m-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted-fg);
+  }
+
+  .m-toggle {
+    display: flex;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .m-toggle span {
+    flex: 1;
+    height: 26px;
+    display: grid;
+    place-items: center;
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+
+  .m-toggle span + span {
+    border-left: 1px solid var(--border);
+  }
+
+  .m-toggle .is-on {
+    background: var(--accent);
+  }
+
+  .m-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding-inline: 8px;
+    margin-top: 4px;
+  }
+
+  .m-group b {
+    flex: 1;
+    font-weight: 500;
+  }
+
+  .m-window :global(.m-rot) {
+    width: 13px;
+    height: 13px;
+    rotate: 90deg;
+  }
+
+  .m-folder-dot {
+    width: 8px;
+    height: 8px;
+    margin-inline: 2px;
+    border-radius: 50%;
+    background: #0090ff;
+  }
+
+  .m-count {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--muted-fg);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .m-nested {
+    display: grid;
+    margin-left: 15px;
+    padding-left: 6px;
+    border-left: 1px solid var(--border);
+  }
+
+  .m-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding-inline: 8px;
+    border-radius: 6px;
+  }
+
+  .m-row :global(.icon) {
+    color: var(--muted-fg);
+  }
+
+  .m-row.is-selected {
+    background: var(--selected);
+  }
+
+  .m-row-title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .m-live {
+    position: absolute;
+    top: 9px;
+    left: 18px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--warning);
+    box-shadow: 0 0 0 2px var(--selected);
+  }
+
+  /* Canvas island */
+  .m-canvas {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    margin-inline: 6px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background-color: var(--canvas);
+    background-image: radial-gradient(circle, var(--grid) 1px, transparent 1.2px);
+    background-size: 20px 20px;
+    background-position: 10px 10px;
+  }
+
+  .m-world {
+    position: absolute;
+    inset: 0;
+    width: 1038px;
+    height: 750px;
+  }
+
+  .m-links {
+    position: absolute;
+    inset: 0;
+    width: 1038px;
+    height: 750px;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .m-link path {
+    fill: none;
+    stroke: var(--primary);
+    stroke-opacity: 0.6;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    transition: stroke-dashoffset 0.6s var(--m-ease);
+  }
+
+  .m-links marker path {
+    fill: var(--primary);
+    fill-opacity: 0.6;
+  }
+
+  .m-link circle {
+    fill: var(--primary);
+    stroke: var(--card);
+    stroke-width: 2;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .m-link.is-on path {
+    stroke-dashoffset: 0;
+  }
+
+  .m-link.is-on circle {
+    opacity: 1;
+  }
+
+  .m-link:not(.is-on) path {
+    marker-start: none;
+    marker-end: none;
+  }
+
+  .m-link-late.is-on path {
+    transition-duration: 0.9s;
+    transition-delay: 0.25s;
+  }
+
+  /* Object cards */
+  .m-world :global(.m-card) {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--shell);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  }
+
+  .m-world :global(.m-card.fade:not(.is-on)) {
+    scale: 0.94;
+  }
+
+  .m-world :global(.m-card-head) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    padding: 8px 8px 8px 12px;
+  }
+
+  .m-world :global(.m-card-icon) {
+    display: flex;
+    color: var(--muted-fg);
+  }
+
+  .m-world :global(.m-card-icon .icon) {
+    width: 15px;
+    height: 15px;
+  }
+
+  .m-world :global(.m-card-names) {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .m-world :global(.m-card-kind) {
+    flex: none;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted-fg);
+  }
+
+  .m-world :global(.m-card-title) {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-weight: 600;
+  }
+
+  .m-world :global(.m-card-controls) {
+    display: flex;
+    gap: 2px;
+    color: var(--muted-fg);
+  }
+
+  .m-world :global(.m-card-controls .icon) {
+    width: 12px;
+    height: 12px;
+  }
+
+  .m-world :global(.m-open) {
+    rotate: 90deg;
+  }
+
+  .m-world :global(.m-card-body) {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    margin: 0 4px 4px;
+    overflow: hidden;
+    border-radius: 8px;
+    background: var(--card);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 0 2px rgb(0 0 0 / 0.04);
+  }
+
+  .m-world :global(.m-dir) {
+    left: 28px;
+    top: 24px;
+    width: 240px;
+    height: 218px;
+  }
+
+  .m-world :global(.m-note) {
+    left: 28px;
+    top: 262px;
+    width: 240px;
+    height: 166px;
+  }
+
+  .m-world :global(.m-term) {
+    left: 28px;
+    top: 448px;
+    width: 240px;
+    height: 262px;
+  }
+
+  .m-world :global(.m-writer) {
+    left: 312px;
+    top: 24px;
+    width: 376px;
+    height: 686px;
+  }
+
+  .m-world :global(.m-reviewer) {
+    left: 744px;
+    top: 106px;
+    width: 270px;
+    height: 500px;
+  }
+
+  .m-world :global(.m-reviewer.fade:not(.is-on)) {
+    translate: 16px 0;
+  }
+
+  .m-port {
+    position: absolute;
+    top: 276px;
+    width: 1px;
+    height: 1px;
+  }
+
+  .m-port-writer {
+    right: 0;
+  }
+
+  .m-port-rev {
+    top: 194px;
+    left: 0;
+  }
+
+  /* Directory */
+  .m-tree {
+    display: grid;
+    gap: 1px;
+    padding: 8px 6px;
+    font-size: 12.5px;
+  }
+
+  .m-tree span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding-inline: 4px;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+  }
+
+  .m-tree :global(.icon) {
+    width: 13px;
+    height: 13px;
+  }
+
+  .m-tree :global(.icon:not(.m-dim)) {
+    color: var(--muted-fg);
+  }
+
+  .m-tree-in {
+    padding-left: 22px !important;
+  }
+
+  .m-tree-file {
+    padding-left: 22px !important;
+  }
+
+  .m-tree em {
+    margin-left: auto;
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--warning);
+  }
+
+  .m-tree .read,
+  .m-doc.read {
+    background: var(--read);
+  }
+
+  /* Note */
+  .m-doc {
+    flex: 1;
+    padding: 12px 14px;
+    font-size: 12.5px;
+    transition: background-color 0.3s;
+  }
+
+  .m-doc b {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+
+  .m-doc ul {
+    display: grid;
+    gap: 3px;
+    margin: 0;
+    padding-left: 18px;
+    color: var(--fg);
+  }
+
+  /* Terminal */
+  .m-shell {
+    flex: 1;
+    padding: 10px 12px;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+  }
+
+  .m-ps {
+    color: #6fb3d2;
+  }
+
+  .m-shell-dim {
+    color: #8b8b8b;
+  }
+
+  .m-shell-ok {
+    color: #4ec98f;
+  }
+
+  .m-caret {
+    display: inline-block;
+    width: 7px;
+    height: 13px;
+    margin-left: 1px;
+    vertical-align: -2px;
+    background: #d4d4d4;
+    animation: m-blink 1s steps(1) infinite;
+  }
+
+  .m-caret.fade:not(.is-on) {
+    display: none;
+  }
+
+  @keyframes m-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  /* Agent conversation */
+  .m-agent {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .m-timeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+    padding: 12px 14px;
+    overflow: hidden;
+  }
+
+  .m-empty {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted-fg);
+  }
+
+  .m-msg-user {
+    align-self: flex-end;
+    max-width: 88%;
+    padding: 7px 11px;
+    border-radius: 6px;
+    background: var(--muted);
+  }
+
+  .m-msg-agent {
+    display: grid;
+    gap: 4px;
+    max-width: 92%;
+  }
+
+  .m-msg-agent p {
+    margin: 0;
+    padding: 7px 11px;
+    border-radius: 6px;
+    background: var(--ext);
+    color: var(--ext-fg);
+  }
+
+  .m-sender {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    color: var(--muted-fg);
+  }
+
+  .m-sender :global(.icon) {
+    width: 12px;
+    height: 12px;
+  }
+
+  .m-reply {
+    margin: 0;
+    padding-block: 2px;
+    text-wrap: pretty;
+  }
+
+  .typing::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 1px;
+    vertical-align: -2px;
+    background: currentColor;
+  }
+
+  .m-tool {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12.5px;
+    transition: border-color 0.3s;
+  }
+
+  .m-tool.pending {
+    border-style: dashed;
+  }
+
+  .m-tool b {
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .m-tool-icon {
+    display: grid;
+    color: var(--muted-fg);
+  }
+
+  .m-tool-icon > :global(*) {
+    grid-area: 1 / 1;
+    width: 13px !important;
+    height: 13px !important;
+  }
+
+  .m-tool :global(.m-spin) {
+    display: none;
+    animation: m-rotate 0.9s linear infinite;
+  }
+
+  .m-tool.pending :global(.m-spin) {
+    display: block;
+  }
+
+  .m-tool.pending :global(.m-done) {
+    display: none;
+  }
+
+  .m-window :global(.m-spinning) {
+    animation: m-rotate 0.9s linear infinite;
+  }
+
+  @keyframes m-rotate {
+    to {
+      rotate: 360deg;
+    }
+  }
+
+  .m-badge {
+    padding: 0 6px;
+    border-radius: 4px;
+    background: var(--muted);
+    color: var(--muted-fg);
+    font-size: 11.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .m-tool-sum {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--muted-fg);
+  }
+
+  .m-tool-meta {
+    margin-left: auto;
+    font-size: 11.5px;
+    color: var(--muted-fg);
+  }
+
+  .m-status {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    padding-top: 6px;
+    font-size: 12px;
+    color: var(--muted-fg);
+  }
+
+  .m-status :global(.icon) {
+    width: 12px;
+    height: 12px;
+  }
+
+  .m-composer-wrap {
+    flex: none;
+    padding: 4px 10px 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  .m-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .m-ring {
+    width: 14px;
+    height: 14px;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: conic-gradient(var(--muted-fg) 0 22%, var(--border) 0);
+    mask: radial-gradient(circle, transparent 4px, #000 4.5px);
+  }
+
+  .m-composer {
+    border: 1px solid var(--input);
+    border-radius: 8px;
+    background: var(--card);
+  }
+
+  .m-input {
+    display: grid;
+    min-height: 40px;
+    margin: 0;
+    padding: 9px 11px 4px;
+  }
+
+  .m-input > * {
+    grid-area: 1 / 1;
+  }
+
+  .m-placeholder {
+    color: var(--muted-fg);
+    opacity: 0.85;
+    transition: opacity 0.2s;
+  }
+
+  .m-placeholder.is-hidden {
+    opacity: 0;
+  }
+
+  .m-composer-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 6px 6px;
+  }
+
+  .m-grow {
+    flex: 1;
+  }
+
+  .m-send {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: var(--primary);
+    color: var(--primary-fg);
+    opacity: 0.5;
+    transition: opacity 0.2s;
+  }
+
+  .m-send.ready {
+    opacity: 1;
+  }
+
+  /* Docked panel */
+  .m-panel-slot {
+    position: relative;
+    flex: none;
+    width: 0;
+    overflow: hidden;
+    transition: width 0.42s var(--m-ease);
+  }
+
+  .m-panel-slot.open {
+    width: 326px;
+  }
+
+  .m-panel {
+    position: absolute;
+    top: 0;
+    right: 6px;
+    bottom: 0;
+    width: 320px;
+  }
+
+  .m-panel-view {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .m-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex: none;
+    height: 45px;
+    padding: 0 10px 0 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .m-panel-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 18px 20px;
+  }
+
+  .m-gap {
+    margin: 16px 0 4px;
+  }
+
+  .m-combo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding-inline: 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-weight: 500;
+  }
+
+  .m-h3 {
+    margin: 20px 0 6px;
+  }
+
+  .m-access-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding-block: 11px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .m-access-row:last-of-type {
+    border-bottom: 0;
+  }
+
+  .m-access-row > :global(.icon) {
+    margin-top: 3px;
+    width: 15px;
+    height: 15px;
+  }
+
+  .m-access-text {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .m-caption {
+    margin: 0;
+    font-size: 12px;
+    color: var(--muted-fg);
+  }
+
+  .m-state {
+    display: grid;
+    margin-top: 4px;
+    font-size: 12px;
+  }
+
+  .m-state > span {
+    grid-area: 1 / 1;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: opacity 0.25s;
+  }
+
+  .m-state :global(.icon) {
+    width: 12px;
+    height: 12px;
+  }
+
+  .m-state-on {
+    color: var(--success);
+    opacity: 0;
+  }
+
+  .m-state-off {
+    color: var(--muted-fg);
+  }
+
+  .m-state.linked .m-state-on {
+    opacity: 1;
+  }
+
+  .m-state.linked .m-state-off {
+    opacity: 0;
+  }
+
+  .m-switch {
+    position: relative;
+    flex: none;
+    width: 32px;
+    height: 18px;
+    margin-top: 2px;
+    border-radius: 999px;
+    background: var(--input);
+    transition: background-color 0.25s;
+  }
+
+  .m-switch i {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.18);
+    transition: translate 0.25s var(--m-ease);
+  }
+
+  .m-switch.checked {
+    background: var(--primary);
+  }
+
+  .m-switch.checked i {
+    translate: 14px 0;
+    background: var(--primary-fg);
+  }
+
+  .m-boundary {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    line-height: 1.6;
+  }
+
+  /* History */
+  .m-tabs {
+    justify-content: flex-start;
+    gap: 4px;
+    padding-left: 12px;
+  }
+
+  .m-tab {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 100%;
+    padding-inline: 8px;
+    font-weight: 500;
+    color: var(--muted-fg);
+    transition: color 0.2s;
+  }
+
+  .m-tab :global(.icon) {
+    width: 11px;
+    height: 11px;
+  }
+
+  .m-tab::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 -1px;
+    height: 2px;
+    background: var(--fg);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .m-tab.active {
+    color: var(--fg);
+  }
+
+  .m-tab.active::after {
+    opacity: 1;
+  }
+
+  .m-tab.flow-inline.is-on {
+    animation: m-rise 0.4s var(--m-ease) both;
+  }
+
+  .m-hist-tools {
+    display: flex;
+    gap: 6px;
+  }
+
+  .m-hist-tools .m-combo {
+    flex: 1;
+    height: 30px;
+  }
+
+  .m-hist {
+    display: grid;
+    gap: 2px;
+    margin: 12px -8px 0;
+  }
+
+  .m-hrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 6px 8px;
+    border-radius: 6px;
+    transition: background-color 0.2s;
+  }
+
+  .m-hrow > span {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .m-hrow b {
+    font-weight: 400;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    line-height: 20px;
+  }
+
+  .m-hrow i {
+    font-style: normal;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--muted-fg);
+  }
+
+  .m-hrow-start {
+    height: 34px;
+  }
+
+  .m-hrow.selected {
+    background: var(--selected);
+  }
+
+  .m-window :global(.m-cur) {
+    width: 11px;
+    height: 11px;
+  }
+
+  .m-hcont {
+    display: flex;
+    padding: 2px 8px 6px 34px;
+  }
+
+  .m-hbranch {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px 4px 34px;
+    font-size: 12px;
+    color: var(--muted-fg);
+  }
+
+  .m-hbranch :global(.icon) {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Pointer */
+  .m-rest {
+    position: absolute;
+    top: 640px;
+    left: 1100px;
+    width: 1px;
+    height: 1px;
+  }
+
+  .m-cursor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    translate: 1080px 640px;
+    pointer-events: none;
+  }
+
+  .m-cursor svg {
+    position: absolute;
+    top: -3px;
+    left: -4px;
+    overflow: visible;
+    filter: drop-shadow(0 1px 1.5px rgb(0 0 0 / 0.3));
+  }
+
+  .m-cursor path {
+    fill: #111111;
+    stroke: #ffffff;
+    stroke-width: 1.3;
+    stroke-linejoin: round;
+  }
+
+  .m-cursor-ring {
+    position: absolute;
+    top: -14px;
+    left: -14px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgb(120 120 128 / 0.35);
+    opacity: 0;
+  }
+
+  .m-cursor.is-click .m-cursor-ring {
+    animation: m-click 0.5s var(--m-ease);
+  }
+
+  @keyframes m-click {
+    from {
+      opacity: 1;
+      scale: 0.4;
+    }
+    to {
+      opacity: 0;
+      scale: 1.3;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .m-cursor {
+      display: none;
+    }
+  }
+
+  /* Narrow: four compact tabs; the active chapter's line sits below them. */
+  @media (max-width: 52rem) {
+    .chapters {
+      position: relative;
+      gap: 0.6rem;
+      padding-bottom: 2.6rem;
+    }
+
+    .chapter-num {
+      display: none;
+    }
+
+    .chapter-bar {
+      margin-bottom: 0.6rem;
+    }
+
+    .chapter-title {
+      font-size: 0.8125rem;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .chapter-body {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      min-height: 2.6rem;
+      display: none;
+      align-items: flex-end;
+    }
+
+    .chapter.is-active .chapter-body {
+      display: flex;
+    }
+
+    .play {
+      margin-top: -0.4rem;
+    }
+  }
+</style>

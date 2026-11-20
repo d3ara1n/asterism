@@ -1,6 +1,5 @@
 ---
-import Glyph from "./Glyph.astro";
-import { content, repoUrl, type HeroNodeId, type Locale } from "../i18n/content";
+import { content, repoUrl, type Locale } from "../i18n/content";
 
 interface Props {
   locale: Locale;
@@ -8,653 +7,66 @@ interface Props {
 
 const { locale } = Astro.props;
 const t = content[locale].hero;
-
-type Kind = "agent" | "note" | "folder" | "terminal";
-interface Node {
-  id: HeroNodeId;
-  kind: Kind;
-  wide: [number, number];
-  narrow: [number, number];
-}
-
-const nodes: Node[] = [
-  { id: "notes", kind: "note", wide: [0, 28], narrow: [0, 8] },
-  { id: "folder", kind: "folder", wide: [34, 194], narrow: [188, 76] },
-  { id: "terminal", kind: "terminal", wide: [8, 360], narrow: [0, 314] },
-  { id: "writer", kind: "agent", wide: [336, 166], narrow: [76, 190] },
-  { id: "reviewer", kind: "agent", wide: [460, 358], narrow: [152, 410] },
-];
-
-// Directed links: resources are made available to the writer; the writer reports to the reviewer.
-const links: [HeroNodeId, HeroNodeId][] = [
-  ["notes", "writer"],
-  ["folder", "writer"],
-  ["terminal", "writer"],
-  ["writer", "reviewer"],
-];
-
-// SSR fallback geometry so the board is complete even before client scripts run.
-const initialPaths: Record<string, string> = {
-  "notes:writer": "M212 64C274 64 274 186 333 186",
-  "folder:writer": "M246 230C290 230 290 202 333 202",
-  "terminal:writer": "M220 396C278 396 278 218 333 218",
-  "writer:reviewer": "M452 242C452 300 576 300 576 355",
-};
-const initialStarts: Record<string, [number, number]> = {
-  "notes:writer": [212, 64],
-  "folder:writer": [246, 230],
-  "terminal:writer": [220, 396],
-  "writer:reviewer": [452, 242],
-};
 ---
 
 <section class="hero wrap">
-  <div class="hero-copy">
-    <h1>{t.lede}</h1>
-    <p class="sublede">{t.sublede}</p>
-    <div class="actions">
-      <a class="button button-solid" href="#download">{t.download}</a>
-      <a class="button button-ghost" href={repoUrl}>{t.source}</a>
-    </div>
-  </div>
-
-  <div
-    class="canvas"
-    data-canvas
-    data-unlinked-meta={t.unlinkedMeta}
-    data-unrouted-meta={t.unroutedMeta}
-  >
-    <div class="board" data-board role="group" aria-label={t.canvasLabel}>
-      <svg class="wires" data-wires viewBox="0 0 704 456">
-        <defs>
-          <marker id="hero-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M1.5 1.5 8.5 5 1.5 8.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-          </marker>
-          <marker id="hero-arrow-muted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-            <path d="M1.5 1.5 8.5 5 1.5 8.5" fill="none" stroke="var(--line)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
-          </marker>
-        </defs>
-        {
-          links.map(([from, to], index) => {
-            const key = `${from}:${to}`;
-            const [sx, sy] = initialStarts[key];
-            const label = t.toggleLinkLabel.replace("{from}", t.nodes[from].title).replace("{to}", t.nodes[to].title);
-            return (
-              <g
-                class="wire-group"
-                data-wire
-                data-from={from}
-                data-to={to}
-                style={`--w:${index}`}
-                role="button"
-                tabindex="0"
-                aria-pressed="true"
-                aria-label={label}
-              >
-                <path class="wire-hit" d={initialPaths[key]} />
-                <path class="wire-line" d={initialPaths[key]} marker-end="url(#hero-arrow)" pathLength="1" />
-                <circle class="wire-port" cx={sx} cy={sy} r="3" />
-              </g>
-            );
-          })
-        }
-      </svg>
-
-      {
-        nodes.map((node, index) => (
-          <div
-            class:list={["card", `card-${node.kind}`]}
-            data-node={node.id}
-            data-wide={node.wide.join(",")}
-            data-narrow={node.narrow.join(",")}
-            data-default-meta={t.nodes[node.id].meta}
-            style={`translate:${node.wide[0]}px ${node.wide[1]}px;--i:${index}`}
-          >
-            <div class="card-head">
-              <Glyph name={node.kind} />
-              <span class="card-title">{t.nodes[node.id].title}</span>
-              <span class="card-grip" aria-hidden="true" />
-            </div>
-            <div class="card-meta">
-              {node.id === "writer" && <span class="pulse" data-pulse />}
-              {node.kind === "terminal" ? (
-                <code>$ {t.nodes[node.id].meta}</code>
-              ) : (
-                <span data-meta-text>{t.nodes[node.id].meta}</span>
-              )}
-            </div>
-          </div>
-        ))
-      }
-    </div>
+  <h1>{t.lede}</h1>
+  <p class="sublede">{t.sublede}</p>
+  <div class="actions">
+    <a class="button button-solid" href="#download">{t.download}</a>
+    <a class="button button-ghost" href={repoUrl}>{t.source}</a>
   </div>
 </section>
-
-<script>
-  const canvas = document.querySelector<HTMLElement>("[data-canvas]");
-  const board = canvas?.querySelector<HTMLElement>("[data-board]");
-  const wiresSvg = board?.querySelector<SVGSVGElement>("[data-wires]");
-  if (canvas && board && wiresSvg) {
-    const sizes = { wide: [704, 456], narrow: [380, 496] } as const;
-    type Layout = keyof typeof sizes;
-    const cards = new Map<string, HTMLElement>();
-    const positions = new Map<string, [number, number]>();
-    const wireGroups = [...wiresSvg.querySelectorAll<SVGGElement>("[data-wire]")];
-    const activeLinks = new Set<string>(wireGroups.map(group => `${group.dataset.from}:${group.dataset.to}`));
-
-    let layout: Layout = "wide";
-    let scale = 1;
-
-    board.querySelectorAll<HTMLElement>("[data-node]").forEach(card => {
-      cards.set(card.dataset.node!, card);
-    });
-
-    const loadLayoutPositions = (next: Layout) => {
-      layout = next;
-      canvas.dataset.layout = layout;
-      const [w, h] = sizes[layout];
-      board.style.width = `${w}px`;
-      board.style.height = `${h}px`;
-      wiresSvg.setAttribute("viewBox", `0 0 ${w} ${h}`);
-      cards.forEach((card, id) => {
-        const [x, y] = card.dataset[layout]!.split(",").map(Number);
-        positions.set(id, [x, y]);
-      });
-    };
-
-    interface Box {
-      x: number;
-      y: number;
-      w: number;
-      h: number;
-    }
-    type Side = "left" | "right" | "top" | "bottom";
-
-    const box = (id: string): Box => {
-      const card = cards.get(id)!;
-      const [x, y] = positions.get(id)!;
-      return { x, y, w: card.offsetWidth, h: card.offsetHeight };
-    };
-
-    const sides = (a: Box, b: Box): [Side, Side] => {
-      if (b.x - (a.x + a.w) >= 22) return ["right", "left"];
-      if (a.x - (b.x + b.w) >= 22) return ["left", "right"];
-      return b.y > a.y ? ["bottom", "top"] : ["top", "bottom"];
-    };
-
-    const syncSemantics = () => {
-      const incoming = new Map<string, number>();
-      const outgoing = new Map<string, number>();
-
-      wireGroups.forEach(group => {
-        const from = group.dataset.from!;
-        const to = group.dataset.to!;
-        const key = `${from}:${to}`;
-        const on = activeLinks.has(key);
-        group.classList.toggle("is-detached", !on);
-        group.setAttribute("aria-pressed", String(on));
-        const line = group.querySelector<SVGPathElement>(".wire-line")!;
-        line.setAttribute("marker-end", on ? "url(#hero-arrow)" : "url(#hero-arrow-muted)");
-        if (on) {
-          outgoing.set(from, (outgoing.get(from) ?? 0) + 1);
-          incoming.set(to, (incoming.get(to) ?? 0) + 1);
-        }
-      });
-
-      cards.forEach((card, id) => {
-        const isAgent = card.classList.contains("card-agent");
-        const connected = isAgent ? (incoming.get(id) ?? 0) > 0 || (outgoing.get(id) ?? 0) > 0 : (outgoing.get(id) ?? 0) > 0;
-        card.classList.toggle("is-unlinked", !connected);
-
-        if (id === "writer") {
-          const hasInputs = (incoming.get("writer") ?? 0) > 0;
-          const metaText = card.querySelector<HTMLElement>("[data-meta-text]");
-          const pulse = card.querySelector<HTMLElement>("[data-pulse]");
-          if (metaText) metaText.textContent = hasInputs ? card.dataset.defaultMeta! : canvas.dataset.unlinkedMeta!;
-          if (pulse) pulse.classList.toggle("is-idle", !hasInputs);
-        } else if (id === "reviewer") {
-          const hasRoute = (incoming.get("reviewer") ?? 0) > 0;
-          const metaText = card.querySelector<HTMLElement>("[data-meta-text]");
-          if (metaText) metaText.textContent = hasRoute ? card.dataset.defaultMeta! : canvas.dataset.unroutedMeta!;
-        }
-      });
-
-    };
-
-    const draw = () => {
-      const ends: { id: string; side: Side; other: Box; set: (x: number, y: number) => void }[] = [];
-      const wires = wireGroups.map(group => {
-        const from = box(group.dataset.from!);
-        const to = box(group.dataset.to!);
-        const [fromSide, toSide] = sides(from, to);
-        const wire = { group, fromSide, toSide, a: [0, 0], b: [0, 0] };
-        ends.push({ id: group.dataset.from!, side: fromSide, other: to, set: (x, y) => (wire.a = [x, y]) });
-        ends.push({ id: group.dataset.to!, side: toSide, other: from, set: (x, y) => (wire.b = [x, y]) });
-        return wire;
-      });
-
-      const groups = new Map<string, typeof ends>();
-      ends.forEach(end => {
-        const key = `${end.id}:${end.side}`;
-        const list = groups.get(key) ?? [];
-        list.push(end);
-        groups.set(key, list);
-      });
-
-      groups.forEach(group => {
-        const { id, side } = group[0];
-        const card = box(id);
-        const vertical = side === "left" || side === "right";
-        group.sort((p, q) => (vertical ? p.other.y + p.other.h / 2 - (q.other.y + q.other.h / 2) : p.other.x - q.other.x));
-        group.forEach((end, index) => {
-          const t = (index + 1) / (group.length + 1);
-          if (vertical) end.set(side === "left" ? card.x : card.x + card.w, card.y + card.h * (0.2 + 0.6 * t));
-          else end.set(card.x + card.w * (0.2 + 0.6 * t), side === "top" ? card.y : card.y + card.h);
-        });
-      });
-
-      const normal = { left: [-1, 0], right: [1, 0], top: [0, -1], bottom: [0, 1] } as const;
-      wires.forEach(({ group, fromSide, toSide, a, b }) => {
-        const [anx, any] = normal[fromSide];
-        const [bnx, bny] = normal[toSide];
-        const gap = 3;
-        const bx = b[0] + bnx * gap;
-        const by = b[1] + bny * gap;
-        const bend = Math.max(28, Math.hypot(bx - a[0], by - a[1]) * 0.44);
-        const d = `M${a[0]} ${a[1]}C${a[0] + anx * bend} ${a[1] + any * bend} ${bx + bnx * bend} ${by + bny * bend} ${bx} ${by}`;
-        group.querySelectorAll("path").forEach(p => p.setAttribute("d", d));
-        const port = group.querySelector<SVGCircleElement>(".wire-port");
-        if (port) {
-          port.setAttribute("cx", String(a[0]));
-          port.setAttribute("cy", String(a[1]));
-        }
-      });
-    };
-
-    const place = () => {
-      cards.forEach((card, id) => {
-        const [x, y] = positions.get(id)!;
-        card.style.translate = `${x}px ${y}px`;
-      });
-      draw();
-    };
-
-    const fit = () => {
-      const next: Layout = matchMedia("(max-width: 62rem)").matches ? "narrow" : "wide";
-      if (next !== layout) {
-        loadLayoutPositions(next);
-        place();
-      }
-      const [w, h] = sizes[layout];
-      const availableWidth = canvas.clientWidth - 8;
-      scale = Math.min(1, availableWidth / w);
-      const scaledW = w * scale;
-      const scaledH = h * scale;
-      const offsetX = layout === "wide" ? Math.max(0, canvas.clientWidth - scaledW) : (canvas.clientWidth - scaledW) / 2;
-      canvas.style.height = `${Math.ceil(scaledH + 24)}px`;
-      board.style.translate = `${offsetX}px 12px`;
-      board.style.scale = String(scale);
-    };
-
-    wireGroups.forEach(group => {
-      const toggle = () => {
-        const key = `${group.dataset.from}:${group.dataset.to}`;
-        if (activeLinks.has(key)) activeLinks.delete(key);
-        else activeLinks.add(key);
-        syncSemantics();
-      };
-      group.addEventListener("click", toggle);
-      group.addEventListener("keydown", event => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          toggle();
-        }
-      });
-    });
-
-    cards.forEach((card, id) => {
-      card.addEventListener("pointerdown", event => {
-        if (event.button !== 0) return;
-        event.preventDefault();
-        card.setPointerCapture(event.pointerId);
-        card.classList.add("is-dragging");
-        const [w, h] = sizes[layout];
-        const [startX, startY] = positions.get(id)!;
-        const move = (moveEvent: PointerEvent) => {
-          const dx = (moveEvent.clientX - event.clientX) / scale;
-          const dy = (moveEvent.clientY - event.clientY) / scale;
-          const x = Math.min(Math.max(startX + dx, 0), w - card.offsetWidth);
-          const y = Math.min(Math.max(startY + dy, 0), h - card.offsetHeight);
-          positions.set(id, [x, y]);
-          place();
-        };
-        const end = () => {
-          card.classList.remove("is-dragging");
-          card.removeEventListener("pointermove", move);
-          card.removeEventListener("pointerup", end);
-          card.removeEventListener("pointercancel", end);
-        };
-        card.addEventListener("pointermove", move);
-        card.addEventListener("pointerup", end);
-        card.addEventListener("pointercancel", end);
-      });
-    });
-
-    loadLayoutPositions(matchMedia("(max-width: 62rem)").matches ? "narrow" : "wide");
-    place();
-    syncSemantics();
-    fit();
-    addEventListener("resize", fit);
-    document.fonts?.ready.then(() => {
-      place();
-      fit();
-    });
-    canvas.classList.add("is-ready");
-  }
-</script>
 
 <style>
   .hero {
     display: grid;
-    grid-template-columns: minmax(21rem, 0.88fr) minmax(0, 1.12fr);
-    align-items: center;
-    gap: clamp(2rem, 4vw, 3.5rem);
-    min-height: min(47rem, calc(100svh - 4.5rem));
-    padding-block: clamp(1.75rem, 4.5vh, 3.5rem) clamp(2.75rem, 5.5vh, 4.5rem);
-  }
-
-  .hero-copy {
-    position: relative;
-    z-index: 1;
+    justify-items: center;
+    text-align: center;
+    padding-block: clamp(3.5rem, 9vh, 6.5rem) clamp(2.75rem, 6vh, 4rem);
   }
 
   h1 {
-    max-width: 12ch;
-    font-size: clamp(2.6rem, 5vw, 4.75rem);
-    line-height: 1.03;
+    max-width: 15ch;
+    font-size: clamp(2.6rem, 5.6vw, 5rem);
+    line-height: 1.02;
     font-weight: 330;
     font-stretch: 112%;
     letter-spacing: -0.035em;
     text-wrap: balance;
+    animation: rise 0.9s var(--ease) both;
   }
 
   :global(html:lang(zh)) h1 {
-    max-width: 9.5em;
-    font-size: clamp(2.35rem, 4.4vw, 4.1rem);
+    max-width: 12em;
+    font-size: clamp(2.35rem, 4.8vw, 4.25rem);
     font-weight: 320;
     letter-spacing: -0.01em;
     line-height: 1.18;
   }
 
   .sublede {
-    max-width: 30em;
+    max-width: 34em;
     margin-top: 1.35rem;
-    font-size: clamp(1rem, 1.15vw, 1.0625rem);
+    font-size: clamp(1rem, 1.2vw, 1.125rem);
     color: var(--ink-2);
-    text-wrap: pretty;
+    text-wrap: balance;
+    animation: rise 0.9s 0.08s var(--ease) both;
   }
 
   .actions {
     display: flex;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 0.75rem;
-    margin-top: 2.25rem;
+    margin-top: 2.1rem;
+    animation: rise 0.9s 0.16s var(--ease) both;
   }
 
-  .canvas {
-    position: relative;
-    min-width: 0;
-    height: 480px;
-  }
-
-  .canvas::before {
-    content: "";
-    position: absolute;
-    inset: -1rem -1.5rem;
-    pointer-events: none;
-    background-image: radial-gradient(circle, var(--grid) 1px, transparent 1.25px);
-    background-size: 22px 22px;
-    background-position: center;
-    mask-image: radial-gradient(ellipse 82% 80% at 54% 50%, #000 45%, transparent 100%);
-  }
-
-  .board {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 704px;
-    height: 456px;
-    transform-origin: 0 0;
-  }
-
-  .wires {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-    color: var(--ink-3);
-  }
-
-  .wire-group {
-    cursor: pointer;
-    outline: none !important;
-  }
-
-  .wire-hit {
-    fill: none;
-    stroke: transparent;
-    stroke-width: 20;
-  }
-
-  .wire-line {
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 1.35;
-    transition: stroke 0.22s, stroke-width 0.22s, stroke-dasharray 0.22s;
-  }
-
-  .wire-port {
-    fill: var(--surface);
-    stroke: currentColor;
-    stroke-width: 1.35;
-    transition: stroke 0.22s, fill 0.22s, r 0.22s;
-  }
-
-  .wire-group:hover .wire-line,
-  .wire-group:focus-visible .wire-line {
-    stroke: var(--ink);
-    stroke-width: 1.85;
-  }
-
-  .wire-group:hover .wire-port,
-  .wire-group:focus-visible .wire-port {
-    stroke: var(--ink);
-    fill: var(--ink);
-  }
-
-  .wire-group.is-detached .wire-line {
-    stroke: var(--line);
-    stroke-dasharray: 0.022 0.022;
-  }
-
-  .wire-group.is-detached .wire-port {
-    stroke: var(--line);
-    fill: var(--bg);
-  }
-
-  .wire-group.is-detached:hover .wire-line,
-  .wire-group.is-detached:focus-visible .wire-line {
-    stroke: var(--ink-2);
-  }
-
-  .canvas.is-ready .wire-group:not(.is-detached) .wire-line {
-    animation: wire-in 0.8s var(--ease) backwards;
-    animation-delay: calc(0.28s + var(--w) * 0.08s);
-  }
-
-  .card {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 212px;
-    padding: 12px 14px 13px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 0.875rem;
-    box-shadow: var(--shadow);
-    cursor: grab;
-    touch-action: none;
-    user-select: none;
-    transition: box-shadow 0.22s, border-color 0.22s, opacity 0.22s;
-  }
-
-  /* Animate opacity only, backwards fill, so individual CSS `translate` stays completely untouched for dragging. */
-  .canvas.is-ready .card {
-    animation: card-fade 0.55s var(--ease) backwards;
-    animation-delay: calc(0.04s + var(--i) * 0.06s);
-  }
-
-  .card:hover {
-    border-color: var(--ink-3);
-  }
-
-  .card.is-unlinked {
-    border-style: dashed;
-    box-shadow: none;
-    opacity: 0.66;
-  }
-
-  .card.is-dragging {
-    cursor: grabbing;
-    z-index: 4;
-    opacity: 1;
-    border-style: solid;
-    border-color: var(--ink-2);
-    box-shadow: 0 1px 0 rgb(0 0 0 / 0.05), 0 24px 48px -20px rgb(0 0 0 / 0.36);
-  }
-
-  .card-agent {
-    width: 232px;
-    border-radius: 20px;
-    border-color: color-mix(in srgb, var(--ink) 28%, var(--line));
-  }
-
-  .card-head {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9375rem;
-    font-weight: 540;
-    font-stretch: 104%;
-  }
-
-  .card-head :global(.glyph) {
-    color: var(--ink-2);
-    flex: none;
-  }
-
-  .card-title {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* Quiet tactile grip dots on hover to invite dragging without instructional text. */
-  .card-grip {
-    width: 6px;
-    height: 10px;
-    flex: none;
-    opacity: 0.28;
-    background-image: radial-gradient(circle, currentColor 1px, transparent 1.1px);
-    background-size: 3px 3.5px;
-    transition: opacity 0.2s;
-  }
-
-  .card:hover .card-grip,
-  .card.is-dragging .card-grip {
-    opacity: 0.65;
-  }
-
-  .card-meta {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    margin-top: 0.3rem;
-    padding-left: 1.5rem;
-    font-size: 0.8125rem;
-    color: var(--ink-3);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .card-meta code {
-    font-family: var(--mono);
-    font-size: 0.75rem;
-    color: var(--ink-2);
-  }
-
-  .pulse {
-    width: 6px;
-    height: 6px;
-    flex: none;
-    border-radius: 50%;
-    background: var(--ink);
-    transition: opacity 0.25s, background-color 0.25s;
-    animation: pulse 2.4s ease-in-out infinite;
-  }
-
-  .pulse.is-idle {
-    background: var(--ink-3);
-    animation: none;
-    opacity: 0.45;
-  }
-
-  @keyframes card-fade {
+  @keyframes rise {
     from {
       opacity: 0;
-    }
-  }
-
-  @keyframes wire-in {
-    from {
-      opacity: 0;
-    }
-  }
-
-  @keyframes pulse {
-    50% {
-      opacity: 0.25;
-    }
-  }
-
-  .canvas[data-layout="narrow"] .card {
-    width: 184px;
-  }
-
-  .canvas[data-layout="narrow"] .card-agent {
-    width: 202px;
-  }
-
-  @media (max-width: 62rem) {
-    .hero {
-      grid-template-columns: 1fr;
-      min-height: 0;
-      padding-top: 2rem;
-    }
-
-    .canvas::before {
-      inset: 0 -1rem;
-      mask-image: radial-gradient(ellipse 92% 84% at 50% 50%, #000 55%, transparent 100%);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .pulse {
-      animation: none;
+      translate: 0 10px;
     }
   }
 </style>

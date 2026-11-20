@@ -1,0 +1,29 @@
+---
+// Simplified workbench object card: shell, title row, and inset content surface, following the app's ObjectSurface layout.
+import type { HTMLAttributes } from "astro/types";
+import Icon from "./Icon.astro";
+import type { IconName } from "./icons";
+
+interface Props extends HTMLAttributes<"div"> {
+  icon: IconName;
+  kind: string;
+  title: string;
+}
+
+const { icon, kind, title, class: className, ...rest } = Astro.props;
+---
+
+<div class:list={["m-card", className]} {...rest}>
+  <header class="m-card-head">
+    <span class="m-card-icon"><Icon name={icon} /></span>
+    <span class="m-card-names">
+      <span class="m-card-kind">{kind}</span>
+      <span class="m-card-title">{title}</span>
+    </span>
+    <span class="m-card-controls">
+      <span class="m-ib"><Icon name="panel-right-open" /></span>
+      <span class="m-ib"><Icon name="chevron-right" class="m-open" /></span>
+    </span>
+  </header>
+  <div class="m-card-body"><slot /></div>
+</div>
