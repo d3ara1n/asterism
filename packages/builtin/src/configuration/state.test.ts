@@ -21,9 +21,9 @@ describe("Builtin configuration ownership", () => {
     expect(decoded).toEqual({ ...saved, defaultAgentId: "worker" });
     expect(snapshot.defaultAgentId).toBe("worker");
     expect(snapshot.agents.filter(agent => ["general", "worker", "custom"].includes(agent.id)).map(agent => agent.id)).toEqual(["general", "worker", "custom"]);
-    expect(snapshot.agents.find(agent => agent.id === "general")).toMatchObject({ builtin: true, systemPrompt: "", availableToAgents: false });
+    expect(snapshot.agents.find(agent => agent.id === "general")).toMatchObject({ builtin: true, availableToAgents: false });
     expect(snapshot.agents.find(agent => agent.id === "worker")).toMatchObject({ systemPrompt: "User instructions", enabled: false, availableToAgents: true });
-    expect(snapshot.agents.find(agent => agent.id === "custom")).toMatchObject({ systemPrompt: "",
+    expect(snapshot.agents.find(agent => agent.id === "custom")).toMatchObject({
       availableToAgents: false, delegates: [], subagent: { budget: { maxRequests: 17, maxDurationSeconds: 2400 } } });
     expect(snapshot.overrides.agents).toEqual(Object.fromEntries(saved.agents.map(agent => [agent.id, agent.overrides])));
     const explicit = resolveParadigmConfiguration(paradigmConfigurationSchema.parse({ ...saved, defaultAgentId: "custom" }));

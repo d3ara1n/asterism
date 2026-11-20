@@ -15,7 +15,7 @@ export const defaultAgents: AgentConfiguration[] = [
     "enabled": true,
     "availableToAgents": false,
     "description": "Default agent for conversations.",
-    "systemPrompt": "",
+    "systemPrompt": "Reuse linked resources when they meet the task's needs. If a useful resource is missing, check the creation catalog and create it yourself when available.",
     "modelRole": "default",
     "examples": [],
     "subagent": {
