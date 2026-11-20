@@ -79,6 +79,7 @@
   "shell.preset": "从预设添加",
   "shell.invalid": "请检查 ID、可执行文件和环境变量。",
   "shell.empty": "无输出",
+  "shell.noOutputYet": "暂无输出",
   "shell.input": "输入",
   "shell.output": "输出",
   "shell.exit": "退出码：{code}",

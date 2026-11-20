@@ -33,6 +33,7 @@ export const shellMessages = pluginNamespace("asterism.host").messages("en", def
   preset: { id: "shell.preset", defaultMessage: "Add from preset" },
   invalid: { id: "shell.invalid", defaultMessage: "Check the ID, executable and environment entries." },
   empty: { id: "shell.empty", defaultMessage: "No output" },
+  noOutputYet: { id: "shell.noOutputYet", defaultMessage: "No output yet" },
   input: { id: "shell.input", defaultMessage: "Input" },
   output: { id: "shell.output", defaultMessage: "Output" },
   exit: { id: "shell.exit", defaultMessage: "Exit code: {code}" },

@@ -8,6 +8,14 @@ A resource card presents an object; an operation view explains one attempt to do
 
 Use host presentation for containment and navigation. Keep the plugin's domain content within it instead of rebuilding the surrounding application. Localize the view's styling so one plugin does not redefine another's interface.
 
+## Carry a tool view from input to result
+
+A tool title should identify the work before it produces output. Give long questions, commands, and other unbounded inputs a short, single-line excerpt. Use the SDK renderer’s `HeaderExcerpt` in a shrinkable title slot so the input yields space to a distinct status label, and make the complete input available in the expanded view rather than embedding it in the title.
+
+During argument generation, an input preview can follow the tail of the whole draft. Once the tool begins, its arguments are stable: put the context and controls that users still need outside any live-output viewport. A tool that only needs to show status or ask for input does not need a streaming region.
+
+If a tool emits a growing report or log, use the SDK renderer’s `StreamingScrollArea` to bound that section’s height so updates cannot push its context away. Follow new content at the end, but let readers move away without losing their place. When the operation settles, keep the input and report in the same places and update the status or add outcome details in place. The renderer owns these choices; a streaming declaration tells the host when a body is available for automatic disclosure, not how to lay it out or scroll it.
+
 ## Give expanded views a meaningful identity
 
 An island is an expanded plugin surface with its own view lifetime. Choose its identity according to what users consider the same open work. A shared settings editor may need one instance; editors for different resources or sessions need distinct identities.

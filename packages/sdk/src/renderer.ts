@@ -16,6 +16,7 @@ export * from "./renderer-calls.ts";
 export * from "./renderer-creation.ts";
 export type * from "./renderer-commands.ts";
 export * from "./renderer-tools.ts";
+export * from "./renderer-ui.ts";
 export * from "./renderer-records.ts";
 export * from "./renderer-card.ts";
 export * from "./renderer-island.ts";

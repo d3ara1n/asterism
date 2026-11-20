@@ -1,12 +1,14 @@
 import { StrictMode, useEffect } from "react";
 import { rendererFiles } from "./files";
-import { RendererEventsProvider, RendererCallsProvider, RendererApplicationProvider } from "@asterism-app/sdk/renderer";
+import { RendererEventsProvider, RendererCallsProvider, RendererApplicationProvider, RendererUiProvider } from "@asterism-app/sdk/renderer";
 import { EventClient } from "../shared/event-client";
 import { CallClient } from "../shared/call-client";
 import { HostI18nProvider, setLanguageCatalogs } from "./shared/i18n";
 import { ErrorBoundary } from "./app/ErrorBoundary";
 import { MotionConfig } from "motion/react";
 import { TooltipProvider } from "@asterism-app/ui/ui/tooltip";
+import { HeaderExcerpt } from "@asterism-app/ui/header-excerpt";
+import { StreamingScrollArea } from "@asterism-app/ui/streaming-scroll-area";
 import { Button } from "@asterism-app/ui/ui/button";
 import { ModuleViewsProvider } from "./modules/views";
 import { HostConfigsProvider } from "./modules/configs";
@@ -31,6 +33,8 @@ import { AfterCommit, type StartupSplash } from "./app/startup-splash";
 
 import { runtime } from "./runtime";
 import { contentInput, contentScopeId } from "./features/creation/content";
+
+const rendererUi = { HeaderExcerpt, StreamingScrollArea };
 
 /** Present migration completion and plugin storage failures after the home page mounts. */
 function StartupNotification() {
@@ -129,20 +133,22 @@ export async function startApplication(root: Root, splash: StartupSplash, signal
         <ErrorBoundary>
           <MotionConfig reducedMotion="user">
             <TooltipProvider>
-              <RendererEventsProvider value={events}>
-                <RendererCallsProvider value={calls}>
-                  <HostConfigsProvider>
-                    <ModuleViewsProvider registry={moduleViews}>
-                      <RendererApplicationProvider value={applicationServices}>
-                        <PluginSettingsProvider value={{ pages, sessionEntries, renderers: rendererPlugins.outcomes }}>
-                          <PluginCommandsProvider groups={commandGroups}><App controller={controller} /></PluginCommandsProvider>
-                          <StartupNotification />
-                        </PluginSettingsProvider>
-                      </RendererApplicationProvider>
-                    </ModuleViewsProvider>
-                  </HostConfigsProvider>
-                </RendererCallsProvider>
-              </RendererEventsProvider>
+              <RendererUiProvider value={rendererUi}>
+                <RendererEventsProvider value={events}>
+                  <RendererCallsProvider value={calls}>
+                    <HostConfigsProvider>
+                      <ModuleViewsProvider registry={moduleViews}>
+                        <RendererApplicationProvider value={applicationServices}>
+                          <PluginSettingsProvider value={{ pages, sessionEntries, renderers: rendererPlugins.outcomes }}>
+                            <PluginCommandsProvider groups={commandGroups}><App controller={controller} /></PluginCommandsProvider>
+                            <StartupNotification />
+                          </PluginSettingsProvider>
+                        </RendererApplicationProvider>
+                      </ModuleViewsProvider>
+                    </HostConfigsProvider>
+                  </RendererCallsProvider>
+                </RendererEventsProvider>
+              </RendererUiProvider>
             </TooltipProvider>
           </MotionConfig>
         </ErrorBoundary>

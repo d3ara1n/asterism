@@ -2,7 +2,7 @@
 import { createElement } from "react";
 import { z } from "zod";
 import { defineData, type Json } from "@asterism-app/sdk/contracts";
-import { toolRenderer, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { HeaderExcerpt, StreamingScrollArea, toolRenderer, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 
 const Result = defineData("example.writer/write", z.object({ written: z.number() }));
 const targetSchema = z.object({ path: z.string() });
@@ -34,14 +34,30 @@ export const writerView = toolRenderer({ ...Result, targetSchema, tool: { argsSc
   execution: view, result: view,
 });
 
-/** Plugins render progressive output themselves; the shell manages automatic expansion and collapse based on declarations and user settings. */
+/** Input context is stable while the report grows; execution and results render it in the same place. */
 const Report = defineData("example.writer/report", z.object({ text: z.string() }));
-function ReportBody({ phase, result }: ToolRenderProps<z.infer<typeof Report.schema>>) {
-  const text = result?.data?.text ?? "";
-  return createElement("pre", null, phase === "executing" ? text.slice(-2_000) : text);
+const reportArgs = z.object({ question: z.string() });
+type ReportProps = ToolRenderProps<z.infer<typeof Report.schema>, Json, z.infer<typeof reportArgs>>;
+function ReportHeader({ args }: ReportProps) {
+  const question = args !== null && typeof args === "object" && !Array.isArray(args) && typeof args.question === "string" ? args.question : "";
+  // The excerpt belongs in a shrinkable title slot, not in a tooltip containing the complete question.
+  return createElement(HeaderExcerpt, { text: question });
 }
-export const reportView = toolRenderer(Report, {
+function ReportBody(props: ReportProps) {
+  if (props.phase === "input") return null;
+  const text = props.result?.data?.text;
+  const status = props.phase === "settled" ? "No report" : "No report yet";
+  return createElement("div", null,
+    createElement("p", null, props.args.question),
+    createElement(StreamingScrollArea, {
+      label: "Report", initialScrollPosition: props.phase === "settled" ? "start" : "end",
+      children: createElement("pre", { style: { whiteSpace: "pre-wrap", overflowWrap: "anywhere" } }, text || status),
+    }),
+  );
+}
+export const reportView = toolRenderer({ ...Report, tool: { argsSchema: reportArgs } }, {
   label: "Report",
-  execution: { bodyRenderer: ReportBody, streaming: ({ result }) => !!result?.data?.text },
-  result: { bodyRenderer: ReportBody },
+  input: { headerRenderer: ReportHeader },
+  execution: { headerRenderer: ReportHeader, bodyRenderer: ReportBody, streaming: ({ result }) => !!result?.data?.text },
+  result: { headerRenderer: ReportHeader, bodyRenderer: ReportBody },
 });
