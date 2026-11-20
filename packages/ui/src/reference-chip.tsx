@@ -1,4 +1,5 @@
 import { TooltipHint } from "./tooltip-hint";
+import { InlineLinkLabel } from "./inline-link-label";
 import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useRef, useState, type ComponentProps, type ComponentType, type ReactNode } from "react";
 import { ModelCatalog, formatModelExpression, parseModelUrl, parseResourceUrl, parseSkillUrl, resourceUrl, type ModelExpression, type ResourceRef, type UiText } from "@asterism-app/sdk/contracts";
 import { useI18n, useRendererCatalogs, useRendererResourceNavigation, useRendererResources, type RendererResourceIdentity } from "@asterism-app/sdk/renderer";
@@ -89,8 +90,7 @@ export function ReferenceChipFace({ href, children, selected = false, size = "in
 
 /**
  * Link presentation for references inside rendered prose. The label keeps the body color and wraps like ordinary text;
- * the icon and a faint underline carry the kind, and the underline turns solid on hover. Decorations are not drawn under
- * the atomic icon, and the word joiner after it forbids a line break between the icon and the label's first character.
+ * the icon and a faint underline carry the kind, and the underline turns solid on hover.
  */
 function ReferenceLinkFace({ href, children, selected = false, hint, className, ...props }: ComponentProps<"span"> & {
   href: string; selected?: boolean; hint?: string;
@@ -99,8 +99,9 @@ function ReferenceLinkFace({ href, children, selected = false, hint, className, 
   const { icon: Icon, iconTone, link } = kind ? kindStyles[kind] : unknownStyle;
   return <TooltipHint content={hint}><span data-reference-link="" data-kind={kind ?? undefined} {...props}
     className={cn("rounded-sm text-foreground underline decoration-1 underline-offset-4 transition-colors", link, selected && "ring-2 ring-ring", className)}>
-    <Icon className={cn("mr-1 inline-block size-3.5 align-[-0.125em]", iconTone)} aria-hidden />{"\u2060"}
-    <span translate="no"><ReferenceLabel>{children}</ReferenceLabel></span>
+    <InlineLinkLabel icon={<Icon className={cn("size-full", iconTone)} />}>
+      <span translate="no"><ReferenceLabel>{children}</ReferenceLabel></span>
+    </InlineLinkLabel>
   </span></TooltipHint>;
 }
 
