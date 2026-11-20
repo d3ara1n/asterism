@@ -14,8 +14,7 @@ import { useI18n } from "../../shared/i18n";
 import { operationSucceeded } from "../../shared/toast";
 import { useIsland, useIslandStrip } from "../../shared/weave/Screen";
 import { useAppearance, useScheme } from "../appearance/state";
-import type { DragKind } from "../creation/routing";
-import { dropCandidates } from "../creation/routing";
+import { dropCandidates, type DragKind, type DropStatus } from "../creation/routing";
 import { dragKinds, snapshotDrop } from "../creation/snapshot";
 import type { WorkbenchOperation } from "../session/controller";
 import { useWorkbenchCanvas, type WorkbenchCanvas } from "./canvas";
@@ -40,7 +39,13 @@ export interface WorkbenchHandle {
   canvas: WorkbenchCanvas;
 }
 
-type DropHandlers = { canDrop(kinds: readonly DragKind[]): boolean; onDropItems(items: readonly DropItem[], origin: Point): void };
+type DropHandlers = {
+  dropStatus(kinds: readonly DragKind[]): DropStatus;
+  onDropItems(items: readonly DropItem[], origin: Point, offeredTypes?: readonly string[]): void;
+};
+
+const isEditable = (target: EventTarget | null) => target instanceof Element
+  && (target.closest("input, textarea") !== null || (target instanceof HTMLElement && target.isContentEditable));
 type Props = WorkbenchEnvironment & DropHandlers & {
   ref?: Ref<WorkbenchHandle>; onHome(): void; overview?: boolean; active: boolean;
   /** Application-owned environment outlet: object and panel islands obtain the same environment outside the workbench subtree through it. */ store: WorkbenchStore;
@@ -49,7 +54,7 @@ type Run = (command: WorkbenchOperation) => Promise<boolean>;
 type WorkbenchEdge = Edge<ConnectionEdge["data"]>;
 
 /** Workbench root island: projects peer objects and relationships; agent conversation is only the agent object's card content. */
-export function Workbench({ ref, controller, session, ready, run, onHome, store, canDrop, onDropItems, overview, active }: Props) {
+export function Workbench({ ref, controller, session, ready, run, onHome, store, dropStatus, onDropItems, overview, active }: Props) {
   const i18n = useI18n();
   const canvasRef = useRef<WorkbenchCanvas>(null);
   const canvas = useMemo<WorkbenchCanvas>(() => ({
@@ -85,7 +90,7 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
 
   return <RendererNavigationProvider value={{ home: onHome }}><RendererCatalogProvider ready={ready}><WorkbenchContext.Provider value={context}>
     <div className="relative h-full">
-      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready} canDrop={canDrop} onDropItems={onDropItems} overview={overview} active={active} /></ReactFlowProvider>
+      <ReactFlowProvider><Canvas ref={canvasRef} session={session} run={run} writable={ready} dropStatus={dropStatus} onDropItems={onDropItems} overview={overview} active={active} /></ReactFlowProvider>
       {session.objects.length === 0 && <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
         <p className="type-caption">{i18n.formatMessage(workbenchMessages.emptyHint)}</p>
       </div>}
@@ -93,7 +98,7 @@ export function Workbench({ ref, controller, session, ready, run, onHome, store,
   </WorkbenchContext.Provider></RendererCatalogProvider></RendererNavigationProvider>;
 }
 
-function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, active }: DropHandlers & {
+function Canvas({ ref, session, run, writable, dropStatus, onDropItems, overview, active }: DropHandlers & {
   ref?: Ref<WorkbenchCanvas>; session: WorkbenchSnapshot; run: Run; writable: boolean; overview?: boolean; active: boolean;
 }) {
   const i18n = useI18n();
@@ -193,13 +198,21 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
       void run({ type: "link.set", sessionId: latest.current.id, receiverId: link.receiverId, resourceId: link.resourceId, linked: false });
     }
   }, [run]);
-  // Dropped content: capture a synchronous snapshot on drop, then hand it to the host creation coordinator for arbitration.
+  const canvasDropStatus = (event: React.DragEvent) =>
+    !writable || event.defaultPrevented || isEditable(event.target) || !event.dataTransfer.types.length
+      ? "disabled" : dropStatus(dragKinds(event.dataTransfer));
+  const onDragOver = (event: React.DragEvent) => {
+    const status = canvasDropStatus(event);
+    // Even unsupported kinds need a drop event; only potential matches get the add overlay.
+    if (status !== "disabled") event.preventDefault();
+    setDropping(status === "supported");
+  };
   const onDrop = (event: React.DragEvent) => {
     setDropping(false);
-    if (!writable || !canDrop(dragKinds(event.dataTransfer))) return;
+    if (canvasDropStatus(event) === "disabled") return;
     event.preventDefault();
     const items = snapshotDrop(event.dataTransfer);
-    if (items.length) onDropItems(items, flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }));
+    onDropItems(items, flow.screenToFlowPosition({ x: event.clientX, y: event.clientY }), [...event.dataTransfer.types]);
   };
   const onNodesChange = useCallback((changes: NodeChange<ObjectNodeType>[]) => {
     setNodes(current => applyNodeChanges(changes, current));
@@ -215,10 +228,10 @@ function Canvas({ ref, session, run, writable, canDrop, onDropItems, overview, a
       }
     }
   }, [run, toNodes, onView]);
-  return <div ref={viewportElement} className="relative h-full outline-none" onDragOver={event => { if (writable && canDrop(dragKinds(event.dataTransfer))) { event.preventDefault(); setDropping(true); } }}
+  return <div ref={viewportElement} className="relative h-full outline-none" onDragOver={onDragOver}
     tabIndex={-1}
     onPaste={event => {
-      if (!writable || event.defaultPrevented || (event.target instanceof Element && event.target.closest("input, textarea, [contenteditable=true]"))) return;
+      if (!writable || event.defaultPrevented || isEditable(event.target)) return;
       const items = snapshotDrop(event.clipboardData).filter(item => item.kind === "file" && !item.path && dropCandidates(registry.creations, item).length > 0);
       if (!items.length) return;
       event.preventDefault();

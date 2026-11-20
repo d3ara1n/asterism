@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CreationEntry, DropAccepts, DropItem } from "@asterism-app/sdk/renderer";
-import { acceptsItem, dropCandidates, rememberedEntry, routeKey } from "./routing";
+import { acceptsItem, dropCandidates, planDrop, rememberedEntry, routeKey } from "./routing";
 
 const file = (name: string, mime = "", directory = false): DropItem => ({ kind: "file", file: new File([], name), path: `/tmp/${name}`, name, mime, directory });
 const entry = (id: string, accepts: DropAccepts): CreationEntry =>
@@ -27,6 +27,17 @@ describe("Declarative drag-and-drop matching", () => {
     expect(acceptsItem({ files: { mime: ["image/*"] } }, file("a.pdf", "application/pdf"))).toBe(false);
     const entries = [entry("image", { files: { mime: ["image/*"] } }), entry("pdf", { files: { extensions: [".pdf"] } })];
     expect(dropCandidates(entries, file("a.png", "image/png")).map(item => item.id)).toEqual(["image"]);
+  });
+  it("keeps supported items in order and separates unsupported files from the same drop", () => {
+    const directories = entry("directory", { files: { directories: true } });
+    const images = entry("image", { files: { mime: ["image/*"] } });
+    const pdf = file("report.pdf", "application/pdf");
+    const project = file("project", "", true);
+    const image = file("diagram.png", "image/png");
+    expect(planDrop([directories, images], [pdf, project, image])).toEqual({
+      routable: [{ item: project, candidates: [directories] }, { item: image, candidates: [images] }],
+      unsupported: [pdf],
+    });
   });
   it("filters URLs by scheme and rejects invalid URLs", () => {
     const accepts = { urls: { schemes: ["https"] } };

@@ -16,11 +16,12 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { Checkbox } from "@asterism-app/ui/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@asterism-app/ui/ui/dialog";
 import { Label } from "@asterism-app/ui/ui/label";
-import { useStateToast } from "../../shared/toast";
+import { toast, useStateToast } from "../../shared/toast";
 import type { SessionController } from "../session/controller";
 import type { WorkbenchCanvas } from "../workbench/canvas";
 import { pluginPreferences, readPreference, writePreference } from "./preferences";
-import { canDropKind, dropCandidates, rememberedEntry, routeKey, type DragKind } from "./routing";
+import { canDropKind, planDrop, rememberedEntry, routeKey, type DragKind, type DropStatus } from "./routing";
+import { describeDropTypes } from "./drop-feedback";
 import { contentInput, contentScopeId } from "./content";
 
 type InputState = { entry: CreationEntry; source: CreationSource; initialInput?: Json; content: RendererContentInput; position: Point | null; done: (ok: boolean) => void };
@@ -32,8 +33,8 @@ export interface CreationCoordinator {
   readonly menu: readonly CreationEntry[];
   readonly pending: boolean;
   open(entry: CreationEntry): void;
-  canDrop(kinds: readonly DragKind[]): boolean;
-  drop(items: readonly DropItem[], origin: Point): void;
+  dropStatus(kinds: readonly DragKind[]): DropStatus;
+  drop(items: readonly DropItem[], origin: Point, offeredTypes?: readonly string[]): void;
   readonly element: ReactNode;
 }
 
@@ -142,14 +143,19 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
     return new Promise<CreationEntry | null>(done => setChoice({ item, candidates, key, done }));
   }, []);
 
-  const drop = useCallback((items: readonly DropItem[], origin: Point) => {
+  const drop = useCallback((items: readonly DropItem[], origin: Point, offeredTypes: readonly string[] = []) => {
     if (!latest.current.writable || latest.current.pending) return;
+    const { routable, unsupported } = planDrop(registry.creations, items);
+    if (unsupported.length || (!items.length && offeredTypes.length)) {
+      toast.info(i18n.formatMessage(routable.length ? creationMessages.dropPartiallyUnsupported : creationMessages.dropUnsupported), {
+        description: describeDropTypes(i18n, unsupported, offeredTypes),
+        classNames: { description: "wrap-anywhere" },
+      });
+    }
     void (async () => {
       // Route multiple dropped items individually, staggering placement; each starts after the preceding one completes.
       let index = 0;
-      for (const item of items) {
-        const candidates = dropCandidates(registry.creations, item);
-        if (!candidates.length) continue;
+      for (const { item, candidates } of routable) {
         const entry = await choose(item, candidates);
         if (!entry) continue;
         const position = { x: origin.x + index * 32, y: origin.y + index * 32 };
@@ -157,11 +163,14 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
         await start(entry, { kind: "drop", item }, position);
       }
     })();
-  }, [registry, choose, start]);
+  }, [registry, i18n, choose, start]);
 
   const menu = useMemo(() => registry.creations.filter(entry => entry.triggers.menu), [registry]);
   const open = useCallback((entry: CreationEntry) => { if (latest.current.writable && !latest.current.pending) void start(entry, { kind: "menu" }, null); }, [start]);
-  const canDrop = useCallback((kinds: readonly DragKind[]) => !latest.current.pending && kinds.some(kind => canDropKind(registry.creations, kind)), [registry]);
+  const dropStatus = useCallback((kinds: readonly DragKind[]): DropStatus => {
+    if (!latest.current.writable || latest.current.pending) return "disabled";
+    return kinds.some(kind => canDropKind(registry.creations, kind)) ? "supported" : "unsupported";
+  }, [registry]);
 
   const closeInput = (ok: boolean) => {
     if (busy) cancelRunning();
@@ -201,7 +210,7 @@ export function useCreationCoordinator({ controller, canvas, writable, ready }: 
       setChoice(null); choice.done(entry);
     }} />}
   </>;
-  return { menu, pending, open, canDrop, drop, element };
+  return { menu, pending, open, dropStatus, drop, element };
 }
 
 /** When multiple entries accept the same dropped item, the user chooses and can remember the choice for that content type. */

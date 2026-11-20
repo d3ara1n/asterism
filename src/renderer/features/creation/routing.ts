@@ -9,6 +9,7 @@ export const routeKeyVersion = 1;
 
 /** Only coarse categories are readable during hover; the complete snapshot is available after drop. */
 export type DragKind = "file" | "url" | "text";
+export type DropStatus = "disabled" | "supported" | "unsupported";
 
 export function extensionOf(name: string): string | null {
   const dot = name.lastIndexOf(".");
@@ -53,6 +54,18 @@ export function acceptsItem(accepts: DropAccepts, item: DropItem): boolean {
 export function dropCandidates(entries: readonly CreationEntry[], item: DropItem): CreationEntry[] {
   return entries.filter(entry => entry.triggers.drop && acceptsItem(entry.triggers.drop.accepts, item));
 }
+/** Classify the entire payload before starting interactive routing so skipped items can be reported together. */
+export function planDrop(entries: readonly CreationEntry[], items: readonly DropItem[]) {
+  const routable: { item: DropItem; candidates: CreationEntry[] }[] = [];
+  const unsupported: DropItem[] = [];
+  for (const item of items) {
+    const candidates = dropCandidates(entries, item);
+    if (candidates.length) routable.push({ item, candidates });
+    else unsupported.push(item);
+  }
+  return { routable, unsupported };
+}
+
 export function canDropKind(entries: readonly CreationEntry[], kind: DragKind): boolean {
   return entries.some(entry => entry.triggers.drop && acceptsKind(entry.triggers.drop.accepts, kind));
 }

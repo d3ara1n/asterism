@@ -266,7 +266,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       active={!inSettings && view.kind === "conversation" && view.sessionId === session.id}
       overview={view.kind === "conversation" && view.overview}
       ready={writable} run={run} store={workbenchStore}
-      onHome={goHome} canDrop={creation.canDrop} onDropItems={creation.drop} /></motion.div> : null}
+      onHome={goHome} dropStatus={creation.dropStatus} onDropItems={creation.drop} /></motion.div> : null}
   </WorkbenchSurface>;
   const sidebar = <Sidebar snapshot={snapshot} status={exiting ? "stopping" : state.status} busy={state.busy}
     resourceActivities={state.resourceActivities} resourceNotices={state.resourceNotices}
