@@ -971,10 +971,5 @@
   "conversation.share.selectAll": "全选",
   "conversation.share.clearSelection": "清除",
   "conversation.share.size": "{width} × {height} px",
-  "conversation.share.markdown": "Markdown",
-  "purpose.conversation": "主对话",
-  "purpose.subagent": "子代理",
-  "purpose.compression": "上下文压缩",
-  "purpose.naming": "自动命名",
-  "purpose.peek": "快速查看"
+  "conversation.share.markdown": "Markdown"
 }

@@ -194,7 +194,6 @@ export interface ModuleContribution {
   tools?: readonly ToolContribution[];
   observers?: readonly SessionObserver[];
   preparers?: readonly CommandPreparer[];
-  modelPurposes?: readonly import("./runtime-telemetry.ts").ModelPurposeDeclaration[];
 }
 /** Named module entry point: plugins provide contributions, and the host handles assembly and invocation. */
 export interface PluginModule { setup(plugin: PluginContext): ModuleContribution }

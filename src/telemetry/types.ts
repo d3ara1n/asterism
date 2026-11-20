@@ -1,5 +1,5 @@
 import type { ModelCost, UiText, Usage } from "@asterism-app/sdk/contracts";
-import type { ExternalUsageOutcome, ModelPurposeDeclaration } from "@asterism-app/sdk/runtime";
+import type { ExternalUsageOutcome } from "@asterism-app/sdk/runtime";
 import type { SessionStatus } from "../shared/telemetry.ts";
 
 /** One tool call settled inside an execution request. */
@@ -64,14 +64,8 @@ export interface WorkspaceLookup {
 
 /** Recording side of the usage ledger, shared with plugin contexts and model services. */
 export interface UsageRecorder {
-  registerPurposes(pluginId: string, declarations: readonly ModelPurposeDeclaration[]): void;
   recordModelUsage(record: ModelUsageRecord): void;
   recordExternalUsage(record: ExternalUsageRecord): void;
 }
 /** Hosts composed without a ledger, such as isolated tests, record nothing. */
-export const noUsageRecorder: UsageRecorder = { registerPurposes() {}, recordModelUsage() {}, recordExternalUsage() {} };
-
-/** Plugin-declared purpose labels, registered as plugins load. */
-export interface PurposeLabels {
-  label(pluginId: string, purposeId: string): UiText | null;
-}
+export const noUsageRecorder: UsageRecorder = { recordModelUsage() {}, recordExternalUsage() {} };

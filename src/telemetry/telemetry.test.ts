@@ -71,6 +71,36 @@ describe("Usage time buckets", () => {
 });
 
 describe("Usage ledger queries", () => {
+  it("keeps raw purposes scoped to their plugins and ignores legacy labels", () => {
+    const directory = root();
+    const service = new TelemetryService(directory, workspace().lookup);
+    try {
+      const legacy = record({ purposeId: "naming" });
+      service.recordModelUsage(legacy);
+      service.recordModelUsage(record({ pluginId: "other", purposeId: "naming" }));
+      service.recordModelUsage(record({ purposeId: "Naming" }));
+      service.recordModelUsage(record({}));
+      const db = openTelemetryDatabase(directory);
+      try {
+        db.prepare("UPDATE model_usage_events SET purpose_label_snapshot = ? WHERE id = ?").run("Session naming", legacy.id);
+      } finally { db.close(); }
+
+      const group = { dimension: "purpose", key: '["plugin","naming"]', pluginId: "plugin", purposeId: "naming" };
+      const { purposes } = query(service, { kind: "facets" });
+      expect(purposes).toHaveLength(4);
+      expect(purposes).toContainEqual(group);
+      const filter = { ...everything, pluginId: "plugin", purposeId: "naming" };
+      const { rows } = query(service, { kind: "events", offset: 0, limit: 10, only: "all" }, filter);
+      expect(rows.map(row => [row.id, row.purpose])).toEqual([[legacy.id, group]]);
+
+      const exported = service.execute({ type: "export", filter, format: "json" });
+      if (exported.kind !== "export") throw new Error("Unexpected reply.");
+      expect(exported.rows).toBe(1);
+      expect(JSON.parse(exported.content)).toEqual([expect.objectContaining({ id: legacy.id, purposeId: "naming" })]);
+      expect(exported.content).not.toContain("Session naming");
+    } finally { service.close(); }
+  });
+
   it("groups by the current folder of live sessions and the recorded folder of deleted ones", () => {
     const { folders, sessions, lookup } = workspace();
     folders.set("work", { id: "work", name: "Work", color: "blue" });

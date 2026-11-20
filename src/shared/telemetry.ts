@@ -16,7 +16,7 @@ const time = z.number().int().nonnegative();
 /**
  * from/to bound event start times as [from, to); null leaves that side open. utcOffsetMinutes is positive east of UTC (+480 for UTC+8)
  * and places hour, day, weekday, and month boundaries. Optional dimensions narrow the ledger; null selects the absent value
- * (no folder, no declared purpose, the provider's default thinking level).
+ * (no folder, no purpose, the provider's default thinking level).
  */
 export const telemetryFilterSchema = z.strictObject({
   from: time.nullable(),
@@ -108,7 +108,7 @@ export type TelemetryGroup =
   | { dimension: "provider"; key: string; providerId: string; providerName: string }
   | { dimension: "folder"; key: string; folderId: string | null; name: string | null; color: string | null; deleted: boolean }
   | { dimension: "session"; key: string; sessionId: string; title: string | null; status: SessionStatus; folderId: string | null; folderName: string | null; folderColor: string | null }
-  | { dimension: "purpose"; key: string; pluginId: string; purposeId: string | null; label: UiText | null; recorded: string | null }
+  | { dimension: "purpose"; key: string; pluginId: string; purposeId: string | null }
   | { dimension: "plugin"; key: string; pluginId: string; name: UiText | null }
   | { dimension: "thinking"; key: string; level: string | null }
   | { dimension: "error"; key: string; origin: string | null; code: string | null }

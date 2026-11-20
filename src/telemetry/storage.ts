@@ -20,6 +20,7 @@ const schemaSql = `
     first_output_ms INTEGER,
     plugin_id TEXT NOT NULL,
     purpose_id TEXT,
+    -- Legacy v1 column. Purpose IDs are the only purpose data read and written now.
     purpose_label_snapshot TEXT,
     session_id TEXT,
     session_title_snapshot TEXT,

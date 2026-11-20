@@ -1,11 +1,3 @@
-import type { UiText } from "./i18n.ts";
-
-/** Plugin-declared model call purpose; requests pass its id as `purpose`, and usage statistics group and label them by it. */
-export interface ModelPurposeDeclaration {
-  readonly id: string;
-  readonly label: UiText;
-}
-
 export type ExternalUsageOutcome = "succeeded" | "failed" | "cancelled";
 
 /**

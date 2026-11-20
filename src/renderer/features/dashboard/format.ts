@@ -62,7 +62,7 @@ export function groupLabel(i18n: I18n, group: TelemetryGroup): string {
     case "provider": return group.providerName;
     case "folder": return group.folderId === null ? i18n.text(msg.noFolder) : group.name ?? group.folderId.slice(0, 8);
     case "session": return group.title ?? i18n.text(msg.untitled);
-    case "purpose": return group.purposeId === null ? i18n.text(msg.noPurpose) : group.label ? i18n.text(group.label) : group.recorded ?? group.purposeId;
+    case "purpose": return group.purposeId ?? i18n.text(msg.noPurpose);
     case "plugin": return group.name ? i18n.text(group.name) : group.pluginId;
     case "thinking": return group.level === null ? i18n.text(msg.defaultThinking)
       : group.level in thinkingLabels ? i18n.text(thinkingLabels[group.level as keyof typeof thinkingLabels]) : group.level;

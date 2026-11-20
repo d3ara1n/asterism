@@ -5,7 +5,7 @@ import {
   type TelemetryGroup, type TelemetryQuery, type TelemetryQueryResult, type ToolRow, type UsageMetrics,
 } from "../shared/telemetry.ts";
 import { bucketKeys, bucketStart, localDateKey, type Granularity } from "../shared/telemetry-time.ts";
-import type { PurposeLabels, WorkspaceLookup } from "./types.ts";
+import type { WorkspaceLookup } from "./types.ts";
 
 export class TelemetryError extends Error {
   constructor(readonly code: "invalid_request" | "unavailable", message: string) { super(message); }
@@ -118,13 +118,15 @@ const dimensionSpecs: Record<TelemetryDimension, DimensionSpec> = {
 const dimensionSelect = (spec: DimensionSpec) => spec.columns.map((column, index) => `${column} AS d${index}`).join(", ");
 const dimensionValues = (spec: DimensionSpec, row: Row) => spec.columns.map((_, index) => text(row[`d${index}`]));
 const groupKey = (values: readonly (string | null)[]) => JSON.stringify(values);
+const purposeGroup = (pluginId: string, purposeId: string | null): Extract<TelemetryGroup, { dimension: "purpose" }> =>
+  ({ dimension: "purpose", key: groupKey([pluginId, purposeId]), pluginId, purposeId });
 const otherGroup: TelemetryGroup = { dimension: "other", key: "other" };
 const metricOrder = "m_cost DESC, m_total DESC, m_requests DESC";
 
 /** Resolves dimension values to live names, falling back to the latest recorded snapshot. Snapshot maps load once per command. */
 class Groups {
   private readonly cache = new Map<string, Map<string, Row>>();
-  constructor(private readonly db: DatabaseSync, private readonly lookup: WorkspaceLookup, private readonly purposes: PurposeLabels) {}
+  constructor(private readonly db: DatabaseSync, private readonly lookup: WorkspaceLookup) {}
   private snapshots(name: string, sql: string, key: (row: Row) => string): Map<string, Row> {
     let map = this.cache.get(name);
     if (!map) {
@@ -155,13 +157,6 @@ class Groups {
     return { dimension: "session", key: groupKey([sessionId]), sessionId, title: live?.title ?? text(recorded?.title), status: live?.status ?? "deleted",
       folderId: folder.folderId, folderName: folder.name, folderColor: folder.color };
   }
-  purpose(pluginId: string, purposeId: string | null): Extract<TelemetryGroup, { dimension: "purpose" }> {
-    const recorded = purposeId === null ? null : text(this.snapshots("purpose", `SELECT plugin_id, purpose_id, purpose_label_snapshot AS label, MAX(started_at)
-      FROM model_usage_events WHERE purpose_id IS NOT NULL GROUP BY plugin_id, purpose_id`, row => groupKey([text(row.plugin_id), text(row.purpose_id)]))
-      .get(groupKey([pluginId, purposeId]))?.label);
-    return { dimension: "purpose", key: groupKey([pluginId, purposeId]), pluginId, purposeId,
-      label: purposeId === null ? null : this.purposes.label(pluginId, purposeId), recorded };
-  }
   resolve(dimension: TelemetryDimension, values: readonly (string | null)[]): TelemetryGroup {
     const key = groupKey(values);
     const [first = null, second = null] = values;
@@ -170,7 +165,7 @@ class Groups {
       case "provider": return { dimension, key, providerId: first!, providerName: this.providerName(first!) };
       case "folder": return this.folder(first);
       case "session": return this.session(first!);
-      case "purpose": return this.purpose(first!, second);
+      case "purpose": return purposeGroup(first!, second);
       case "plugin": return { dimension, key, pluginId: first!, name: this.lookup.pluginNames().get(first!) ?? null };
       case "thinking": return { dimension, key, level: first };
       case "error": return { dimension, key, origin: first, code: second };
@@ -181,8 +176,8 @@ class Groups {
 /** One read over the ledger; rewrites the live session mirror so effective folders reflect the current workspace. */
 export class TelemetryReader {
   private readonly groups: Groups;
-  constructor(private readonly db: DatabaseSync, private readonly lookup: WorkspaceLookup, purposes: PurposeLabels, private readonly now = Date.now()) {
-    this.groups = new Groups(db, lookup, purposes);
+  constructor(private readonly db: DatabaseSync, private readonly lookup: WorkspaceLookup, private readonly now = Date.now()) {
+    this.groups = new Groups(db, lookup);
     db.exec("BEGIN; DELETE FROM temp.live_sessions;");
     try {
       const insert = db.prepare("INSERT INTO temp.live_sessions (id, folder_id) VALUES (?, ?)");
@@ -331,7 +326,7 @@ export class TelemetryReader {
     const sessionId = text(row.session_id);
     return {
       id: String(row.id), startedAt: num(row.started_at), durationMs: nullableNum(row.duration_ms), firstOutputMs: nullableNum(row.first_output_ms),
-      purpose: this.groups.purpose(String(row.plugin_id), text(row.purpose_id)),
+      purpose: purposeGroup(String(row.plugin_id), text(row.purpose_id)),
       session: sessionId === null ? null : this.groups.session(sessionId),
       providerId: String(row.provider_id), providerName: this.lookup.providerNames().get(String(row.provider_id)) ?? String(row.provider_name_snapshot),
       modelId: String(row.model_id), thinking: text(row.thinking),
@@ -396,7 +391,7 @@ export class TelemetryReader {
       const folder = this.groups.folder(text(row.folder_id));
       return {
         id: event.id, startedAt: new Date(event.startedAt).toISOString(), durationMs: event.durationMs, firstOutputMs: event.firstOutputMs,
-        pluginId: event.purpose.pluginId, purposeId: event.purpose.purposeId, purpose: event.purpose.recorded,
+        pluginId: event.purpose.pluginId, purposeId: event.purpose.purposeId,
         sessionId: event.session?.sessionId ?? null, sessionTitle: event.session?.title ?? null, folderId: folder.folderId, folderName: folder.name,
         providerId: event.providerId, providerName: event.providerName, modelId: event.modelId, thinking: event.thinking,
         inputTokens: event.inputTokens, outputTokens: event.outputTokens, reasoningTokens: event.reasoningTokens,

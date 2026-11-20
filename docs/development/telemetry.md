@@ -1,6 +1,6 @@
 # Usage statistics
 
-The host keeps a usage ledger of model requests, the tool calls those requests make, and plugin-reported metered usage. The ledger is paradigm-neutral: every plugin's model calls pass through host model services, so recording needs no plugin cooperation beyond optional labels.
+The host keeps a usage ledger of model requests, the tool calls those requests make, and plugin-reported metered usage. The ledger is paradigm-neutral: host model services record usage for every plugin without requiring plugins to register any purposes.
 
 ## Storage and lifetime
 
@@ -14,9 +14,9 @@ Model services record each request when it settles, including failures and cance
 
 Cost is estimated at recording time from the configured model prices, with per-category amounts and long-context tier selection, so later price edits do not rewrite history. Requests with unknown or partial pricing keep a status that the interface reports instead of counting unknown parts as zero.
 
-Plugins label model calls by declaring purposes in their contribution and passing a purpose identifier with each request; the host groups by plugin and purpose without interpreting them. Plugins report non-model metered usage, such as web search fees, through the telemetry service. Plugins that call external services directly remain outside the ledger.
+Plugins can pass a purpose identifier with a model request. The host groups by plugin and purpose, displays the identifier verbatim like a tool name, and exports it as `purposeId`. The interface localizes its own labels, including the label for a missing purpose. Plugins report non-model metered usage, such as web search fees, through the telemetry service. Plugins that call external services directly remain outside the ledger.
 
-Each record snapshots the session title and folder, the provider name, and the purpose label at recording time. Reads prefer live workspace names and folder membership, so renaming or moving a session regroups its history; snapshots take over after deletion.
+Each model record snapshots the session title, folder, and provider name at recording time. Reads prefer live workspace names and folder membership, so renaming or moving a session regroups its history; snapshots take over after deletion.
 
 ## Reading
 
