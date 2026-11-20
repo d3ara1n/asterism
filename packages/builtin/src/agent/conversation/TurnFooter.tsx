@@ -20,7 +20,7 @@ export function TurnFooter({ inputId, metrics, incomplete, replyMarkdown, replyC
     <div className="min-w-0"><TurnMetrics metrics={metrics} incomplete={incomplete} /></div>
     {replyMarkdown !== null && <div className="flex items-center gap-2">
       {replyCreatedAt !== null && <MessageTimestamp createdAt={replyCreatedAt} />}
-      <div className="flex items-center gap-0.5 opacity-60 transition-opacity group-hover/turn:opacity-100 focus-within:opacity-100">
+      <div className="flex items-center gap-0.5 opacity-60 transition-opacity group-hover/turn:opacity-100 has-[:focus-visible]:opacity-100">
         <CopyReply markdown={replyMarkdown} />
         {share && <IconButton size="icon-xs" label={i18n.text(shareMessages.share)} onClick={event => share(`turn-metrics:${inputId}`, event.currentTarget)}><Share2 /></IconButton>}
       </div>

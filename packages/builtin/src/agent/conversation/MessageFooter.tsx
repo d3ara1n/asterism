@@ -40,7 +40,7 @@ export function MessageFooter({ node, text, children }: {
   const details = () => ({ id: node.id, createdAt: node.createdAt, sender: node.sender, parts: node.parts, startsTurn: node.startsTurn });
   const footer = <div className="flex items-center gap-2">
     <MessageTimestamp createdAt={node.createdAt} />
-    <div className="nodrag nopan nokey flex items-center gap-0.5 opacity-60 transition-opacity group-hover/message:opacity-100 focus-within:opacity-100">
+    <div className="nodrag nopan nokey flex items-center gap-0.5 opacity-60 transition-opacity group-hover/message:opacity-100 has-[:focus-visible]:opacity-100 has-[[aria-expanded=true]]:opacity-100">
       {text && <IconButton size="icon-xs" label={i18n.text(messages.copyInput)} disabled={copying} onClick={() => { void copy(text); }}><Copy /></IconButton>}
       {share && <IconButton size="icon-xs" label={i18n.text(shareMessages.share)} onClick={event => share(node.id, event.currentTarget)}><Share2 /></IconButton>}
       <ActionMenuTrigger asChild><Button ref={more} variant="ghost" size="icon-xs"

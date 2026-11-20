@@ -422,7 +422,7 @@ function ChatRow({ message, first, fresh, usable, quoted, nameOf, onReply, onJum
             </BubbleContent>
           </Bubble>}
           <div className={cn("absolute bottom-0 flex items-center gap-0.5 whitespace-nowrap opacity-0 transition-opacity duration-150",
-            "group-hover/row:opacity-100 group-focus-within/row:opacity-100", self ? "right-full mr-1 flex-row-reverse" : "left-full ml-1")}>
+            "group-hover/row:opacity-100 group-has-[:focus-visible]/row:opacity-100", self ? "right-full mr-1 flex-row-reverse" : "left-full ml-1")}>
             <TooltipHint content={i18n.formatDate(sentAt, { dateStyle: "full", timeStyle: "medium" })}><time dateTime={message.sentAt}
               className="type-caption px-0.5 tabular-nums">{i18n.formatDate(sentAt, { hour: "2-digit", minute: "2-digit" })}</time></TooltipHint>
             {usable && <IconButton size="icon-xs" label={i18n.text(messages.reply)} onClick={() => onReply(message)}><CornerUpLeft /></IconButton>}

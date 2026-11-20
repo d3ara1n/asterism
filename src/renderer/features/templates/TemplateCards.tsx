@@ -125,7 +125,7 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
               </TooltipContent>
             </Tooltip>
           </div>
-          <div className="absolute right-2 top-2 opacity-0 focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+          <div className="absolute right-2 top-2 opacity-0 has-[:focus-visible]:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
             <ActionMenuTrigger asChild>
               <Button ref={trigger} variant="ghost" size="icon-xs" disabled={!ready || busy} aria-label={i18n.text(templateMessages.actions)}>
                 <MoreHorizontal />
