@@ -1,5 +1,5 @@
 import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
-import { ArrowDown, MessageSquare } from "lucide-react";
+import { ArrowDown, ChevronsUp, MessageSquare, RotateCw } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyDescription } from "@asterism-app/ui/ui/empty";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -7,6 +7,8 @@ import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
 import { ConversationSharing } from "./ConversationSharing";
 import { ConversationNavigation, type ConversationNavigationHandle } from "./ConversationNavigation";
+import { ConversationSeam } from "./ConversationSeam";
+import { IconSwap } from "./IconSwap";
 
 import { MessageComposer } from "./Composer";
 import type { ComposerEditorHandle } from "./composer-editor";
@@ -107,12 +109,18 @@ export function Conversation({ feedback, compressions, activity = null, executio
         viewportClassName="scroll-pt-4 select-text overscroll-contain [overflow-anchor:none]"
         viewportProps={{ onScroll: event => { onScroll(event); navigation.current?.update(); } }}>
         <div ref={header}>
-          {read.data?.earlier && <div className="px-4 pt-3"><Button variant="ghost" size="sm" disabled={read.status === "loading"}
+          {read.data?.earlier && <div className="px-4 pt-2"><ConversationSeam disabled={read.status === "loading"}
             onClick={() => { preserveReadingPosition(); loadEarlier(); }}>
-            {i18n.text(conversationMessages.earlierMessages)}</Button></div>}
+            <IconSwap swapKey={read.status}>{read.status === "loading"
+              ? <StatusIcon tone="progress" className="size-3.5 text-current" /> : <ChevronsUp className="size-3.5" />}</IconSwap>
+            <span className="truncate">{i18n.text(read.status === "loading" ? commonMessages.loading : conversationMessages.earlierMessages)}</span>
+          </ConversationSeam></div>}
           {read.status === "loading" && !read.data && <p className="type-caption p-4" role="status">{i18n.text(commonMessages.loading)}</p>}
-          {read.status === "error" && <div className="p-4"><p className="type-caption">{i18n.text(conversationMessages.historyReadFailed)}</p>
-            <Button variant="ghost" size="sm" onClick={read.retry}>{i18n.text(commonMessages.retry)}</Button></div>}
+          {read.status === "error" && <div className="px-4 pt-2"><ConversationSeam onClick={read.retry}>
+            <StatusIcon tone="warning" className="size-3.5" />
+            <span className="truncate">{i18n.text(conversationMessages.historyReadFailed)}</span>
+            <span className="inline-flex shrink-0 items-center gap-1 text-foreground"><RotateCw aria-hidden="true" className="size-3" />{i18n.text(commonMessages.retry)}</span>
+          </ConversationSeam></div>}
         </div>
         <VirtualConversationTimeline ref={list} items={timeline} viewState={viewState} scrollRef={scroll} startMargin={startMargin}
           target={target} presence={presence} reducedMotion={reducedMotion}
