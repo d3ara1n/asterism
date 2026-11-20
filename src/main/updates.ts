@@ -114,9 +114,9 @@ export class ApplicationUpdates {
     // macOS native signature validation finishes asynchronously afterward; failures can display the startup recovery entry.
     this.updater.once("error", onFailure);
     try {
-      // Non-silent: the Windows installer shows update progress; its mode and directory pages are skipped for updates.
-      this.updater.quitAndInstall(false, true); }
-    catch (error) {
+      // Keep the Windows installer visible; its NSIS include handles progress-only updates.
+      this.updater.quitAndInstall(false, true);
+    } catch (error) {
       this.updater.removeListener("error", onFailure);
       const failure = error instanceof Error ? error : new Error(String(error));
       this.failed(failure);

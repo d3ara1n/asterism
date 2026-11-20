@@ -1,29 +1,30 @@
 import type { Configuration } from "electron-builder";
 import { applicationBrand, applicationId, applicationRepository } from "./src/shared/application.ts";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { verifyPackagedPlugins } from "./scripts/verify-package.ts";
 import { pluginDistributionFiles } from "./scripts/plugin-distribution.ts";
 import { testFileGlob } from "./src/shared/runtime-modules.ts";
+import { runtimeImportsFile } from "./scripts/bundle-runtime-imports.ts";
+import { builtinDirectory, releaseLayout } from "./scripts/release-layout.ts";
 
+const layout = releaseLayout();
 const config: Configuration = {
   appId: applicationId,
   productName: applicationBrand.en,
   directories: { output: "out", buildResources: "assets/icon" },
   files: [
-    "dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md", "!node_modules/@asterism-app/builtin/dist{,/**}", "!node_modules/@asterism-app/{sdk,builtin-api}/examples/**/dist{,/**}", `!${testFileGlob}`, "!**/*.map",
-    // Explicit directory mappings preserve example declarations that the default application filter excludes.
-    ...["docs/manual", ...["sdk", "ui", "builtin-api"].map(name => `packages/${name}`)]
-      .map(path => ({ from: path, to: path, filter: ["**/*", "!**/node_modules{,/**}", "!**/dist{,/**}", `!${testFileGlob}`, "!**/*.map"] })),
-    { from: "packages/builtin", to: "packages/builtin", filter: pluginDistributionFiles("packages/builtin") },
-    { from: "packages/plugin-build", to: "packages/plugin-build", filter: ["package.json", "docs/**"] },
-    // Public libraries resolve through node_modules, whose default dependency filter omits examples.
-    ...["sdk", "builtin-api"].flatMap(name => ["docs", "examples"].map(directory => ({
-      from: `packages/${name}/${directory}`, to: `node_modules/@asterism-app/${name}/${directory}`, filter: ["**/*", "!**/dist{,/**}", `!${testFileGlob}`, "!**/*.map"],
-    }))),
+    "dist/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md", `!**/${runtimeImportsFile}`, `!${testFileGlob}`, "!**/*.map",
+    ...layout.exclusions,
+    { from: builtinDirectory, to: builtinDirectory, filter: pluginDistributionFiles(builtinDirectory) },
+    ...layout.manualFiles.map(file => ({ ...file, filter: ["**/*", "!**/node_modules{,/**}", "!**/dist{,/**}", `!${testFileGlob}`, "!**/*.map"] })),
   ],
-  asarUnpack: ["docs/manual/**", "packages/**", "node_modules/**"],
+  asarUnpack: layout.unpack,
   afterPack(context) {
-    verifyPackagedPlugins(join(context.packager.getResourcesDir(context.appOutDir), "app.asar.unpacked"));
+    const resources = context.packager.getResourcesDir(context.appOutDir);
+    verifyPackagedPlugins(join(resources, "app.asar"), layout.roots);
+    for (const path of layout.physicalInputs)
+      if (!existsSync(join(resources, "app.asar.unpacked", path))) throw new Error(`Missing unpacked runtime input: ${path}`);
   },
   extraResources: [{ from: "assets/icon/asterism-full.png", to: "asterism-full.png" }],
   artifactName: "Asterism-${os}-${arch}.${ext}",
@@ -41,7 +42,7 @@ const config: Configuration = {
   },
   dmg: { sign: false },
   win: { target: ["nsis"], icon: "assets/icon/asterism.ico", verifyUpdateCodeSignature: false },
-  nsis: { oneClick: false, allowToChangeInstallationDirectory: true, perMachine: false, differentialPackage: false },
+  nsis: { oneClick: false, allowToChangeInstallationDirectory: true, perMachine: false, differentialPackage: false, include: "scripts/windows/installer.nsh" },
   linux: { target: ["AppImage"], icon: "assets/icon/asterism.png", category: "Utility" },
 };
 

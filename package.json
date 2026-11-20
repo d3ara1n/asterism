@@ -24,7 +24,7 @@
     "i18n:check": "node scripts/i18n.ts check",
     "icon": "node scripts/app-icon.ts",
     "build:plugin-tool": "npm run build --workspace @asterism-app/plugin-build",
-    "build:plugins": "npm run build:plugin-tool && asterism-plugin-build --root packages/builtin",
+    "build:plugins": "npm run build:plugin-tool && node scripts/build-builtin.ts",
     "pretypecheck": "npm run build:plugin-tool",
     "pretest": "npm run build:plugin-tool",
     "pretest:plugins": "npm run build:plugins",

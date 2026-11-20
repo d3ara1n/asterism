@@ -22,18 +22,18 @@ function put(root: string, path: string, contents: string) {
   mkdirSync(dirname(file), { recursive: true });
   writeFileSync(file, contents);
 }
-async function host(root: string) {
-  const outdir = join(root, "app.asar.unpacked/dist/main");
+async function host(root: string, distribution = "app.asar.unpacked") {
+  const outdir = join(root, distribution, "dist/main");
   // Bundle the current host/SDK, not mocks or a TS import trampoline. Keep application output depth.
   // Host modules are separate entries sharing chunks with the harness, as in the application build.
   const modules = await buildHost(outdir, { "plugin-runtime-host": resolve("scripts/testing/plugin-runtime-host.ts") });
   writeFileSync(join(outdir, "host-modules.json"), JSON.stringify(modules));
   return join(outdir, "plugin-runtime-host.mjs");
 }
-async function run(root: string, mode: string, directories: string[] = [], environment: NodeJS.ProcessEnv = {}) {
+async function run(root: string, mode: string, directories: string[] = [], environment: NodeJS.ProcessEnv = {}, entry?: string) {
   const home = join(root, "home");
   mkdirSync(home, { recursive: true });
-  const { stdout } = await promisify(execFile)(electron, ["--no-experimental-strip-types", await host(root), mode, root, ...directories], {
+  const { stdout } = await promisify(execFile)(electron, ["--no-experimental-strip-types", entry ?? await host(root), mode, root, ...directories], {
     cwd: root, maxBuffer: 4 * 1024 * 1024,
     env: { ...process.env, NODE_OPTIONS: "", NODE_PATH: "", ELECTRON_RUN_AS_NODE: "1",
       HOME: home, USERPROFILE: home, XDG_CONFIG_HOME: join(home, "config"), XDG_CACHE_HOME: join(home, "cache"),
@@ -118,11 +118,19 @@ test.skipIf(!contextFoldRoot)("compiled Context Fold joins the built-in projecto
   await run(root, "context-fold", [shipped, resolve(process.env.ASTERISM_TEST_BUILTIN_ROOT ?? "packages/builtin")]);
 }, 60_000);
 
-test("compiled pnpm launcher resolves from an unpacked distribution and runs scripts with Electron's Node shim", async () => {
+test("starts pnpm from a real ASAR while leaving regular dependencies in the archive", async () => {
   const root = temporary();
-  // Stage the actual dependency files as electron-builder's asarUnpack does, without building an app.
-  // This proves physical unpacked resolution/execution, not archive traversal or the final builder filter.
-  cpSync(dirname(require.resolve("pnpm")), join(root, "app.asar.unpacked/node_modules/pnpm"), { recursive: true });
+  const staging = join(root, "staging");
+  await host(root, "staging");
+  const asar = createRequire(require.resolve("app-builder-lib/package.json"))("@electron/asar") as typeof import("@electron/asar");
+  cpSync(dirname(require.resolve("pnpm")), join(staging, "node_modules/pnpm"), { recursive: true });
+  put(staging, "node_modules/fixture-archived/package.json", JSON.stringify({ name: "fixture-archived", exports: "./index.mjs" }));
+  put(staging, "node_modules/fixture-archived/index.mjs", "export default 'packed';");
+  put(staging, "dist/main/probe.mjs", `import assert from 'node:assert/strict';
+    import dependency from 'fixture-archived';
+    assert.equal(dependency, 'packed');
+    await import('./plugin-runtime-host.mjs');`);
+  await asar.createPackageWithOptions(staging, join(root, "app.asar"), { unpackDir: "node_modules/pnpm" });
   put(root, "project/package.json", JSON.stringify({ name: "isolated-script-probe", private: true }));
-  await run(root, "pnpm", [], { PATH: "" });
+  await run(root, "pnpm", [], { PATH: "" }, join(root, "app.asar/dist/main/probe.mjs"));
 }, 60_000);

@@ -21,6 +21,8 @@ export interface BuildPluginResult {
   /** The package's dist directory, replaced as a whole by each successful build. */
   outputDirectory: string;
   artifact: PluginArtifact;
+  /** Private package requests left external in the compiled backend. */
+  runtimeImports: string[];
 }
 const portable = (path: string) => path.replaceAll("\\", "/");
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
@@ -71,6 +73,7 @@ export async function buildPlugin({ root: requestedRoot }: BuildPluginOptions): 
   };
   const temporary = join(root, `.asterism-build-${randomUUID()}`);
   const artifact: PluginArtifact = { format: 2, id, public: { runtime: {}, renderer: {} }, imports: { runtime: [], renderer: [] }, stylesheets: [] };
+  const runtimeImports = new Set<string>();
   try {
     await mkdir(temporary, { recursive: true });
     const runtimePublic = await resolvePublic(root, "runtime", config.public?.runtime ?? []);
@@ -101,6 +104,7 @@ export async function buildPlugin({ root: requestedRoot }: BuildPluginOptions): 
         if (matchesPackage(request, peers)) shared.add(request);
         else if (!matchesPackage(request, installed))
           throw new Error(`Backend import ${request} is not declared in dependencies or peerDependencies`);
+        else if (packageName(request) !== pkg.name) runtimeImports.add(request);
       }
       artifact.imports.runtime = [...shared].sort();
       for (const [path, output] of Object.entries(result.metafile.outputs)) {
@@ -193,7 +197,7 @@ export async function buildPlugin({ root: requestedRoot }: BuildPluginOptions): 
     await rename(outputDirectory, previous).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; });
     await rename(temporary, outputDirectory);
     await rm(previous, { recursive: true, force: true });
-    return { root, outputDirectory, artifact };
+    return { root, outputDirectory, artifact, runtimeImports: [...runtimeImports].sort() };
   } finally {
     await rm(temporary, { recursive: true, force: true });
   }

@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 
-/** Rewrite archive segments to the physical unpacked tree used for plugin output and native dependencies. */
+/** Rewrite archive segments to the physical unpacked tree for an OS consumer. */
 export function unpackedArchivePath(entry: string): string | null {
   const segments = entry.split(/[\\/]/u);
   let archive = -1;
@@ -11,6 +11,5 @@ export function unpackedArchivePath(entry: string): string | null {
 }
 /** Keep this depth: bundled main/runtime entries live in out/<realm>, two levels below the application root. */
 export function applicationDirectory(path: string): string {
-  const directory = fileURLToPath(new URL(`../../${path}/`, import.meta.url));
-  return unpackedArchivePath(directory) ?? directory;
+  return fileURLToPath(new URL(`../../${path}/`, import.meta.url));
 }

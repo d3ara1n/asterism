@@ -68,9 +68,17 @@ The resulting stable version must exceed existing stable releases. For one targe
 
 Promotion does not require a new main commit and does not include later main changes. A failed build creates no release. If publication cleanup cannot reach GitHub or the runner is terminated before cleanup, inspect any remaining draft before retrying; manual remote cleanup requires explicit authorization.
 
+## Assemble the desktop payload
+
+The desktop Node bundles and the built-in plugin report external package imports as build output. The release includes those roots and their installed npm dependency closure, rather than the entire development workspace. Browser bundles contribute assets, not copies of their npm source packages. Runtime consumers that launch an OS tool or publish manuals own those inputs separately.
+
+The bundled plugin resolves imports through `app.asar`, like the desktop host. Only native packages detected by electron-builder and inputs that an OS process uses as real paths, such as command launchers and searchable manuals, are unpacked. Keep public examples as authored content. Do not introduce per-library pruning rules to reduce the size of a release.
+
 ## Accept installed updates
 
 Before sharing builds with users, verify consecutive installed versions on the actual distribution platforms: first install, model setup, a saved task, download, restart replacement, and retained data.
+
+On Windows, accept both a current-user and an all-users in-app update, including an existing custom installation path. The updater should keep the registered scope and path, show installation progress, and relaunch without a completion prompt. All-users updates may request UAC. Opening the Setup EXE directly still uses the assisted wizard.
 
 Check native helpers inside the installed artifact. macOS releases use a fixed self-signed identity. The native updater validates the new application against the installed application's designated requirement, which binds the application identifier and signing certificate hash. Users do not need to import the signing certificate. CI keychain trust supports signing on the build machine.
 

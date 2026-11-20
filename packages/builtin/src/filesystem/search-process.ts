@@ -10,7 +10,7 @@ import type { directoryFindTargetSchema, directoryGrepTargetSchema } from "./sea
 type FindOptions = FindArgs & Partial<z.infer<typeof directoryFindTargetSchema>>;
 type GrepOptions = GrepArgs & Partial<z.infer<typeof directoryGrepTargetSchema>>;
 
-/** After Forge unpacking, OS processes use the physical executable path; development paths remain unchanged. */
+/** After ASAR unpacking, OS processes use the physical executable path; development paths remain unchanged. */
 export function executablePath(path: string): string {
   return path.replace(/([\\/])([^\\/]+\.asar)(?=[\\/])/g, "$1$2.unpacked");
 }

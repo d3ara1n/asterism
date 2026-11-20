@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { z } from "zod";
 import type { PluginDefinition, PluginStorageDeclaration, ManualSource } from "@asterism-app/sdk/runtime";
-import { applicationDirectory } from "./package-modules.ts";
+import { applicationDirectory, unpackedArchivePath } from "./package-modules.ts";
 import { captureArtifact, artifactPath } from "./artifact-resolver.ts";
 import { registerArtifactModules, rendererImportMap, artifactRoots } from "./native-modules.ts";
 import { artifactSchema, type PluginArtifact } from "@asterism-app/plugin-build/artifact";
@@ -136,7 +136,7 @@ function manualDirectories(root: string, declared: readonly string[]): ManualSou
 }
 
 /** Public packages provided by the artifact contribute their own manuals; the plugin's own package is already covered. */
-function packageManuals(root: string, manifest: PluginPackageManifest, artifact: PluginArtifact): ManualSource[] {
+function packageManuals(root: string, manifest: PluginPackageManifest, artifact: PluginArtifact, bundled: boolean): ManualSource[] {
   const sources = manualDirectories(root, manifest.manual ?? []);
   const require = createRequire(join(root, "package.json"));
   const own = z.object({ name: z.string().optional() }).parse(JSON.parse(readFileSync(join(root, "package.json"), "utf8"))).name;
@@ -151,7 +151,10 @@ function packageManuals(root: string, manifest: PluginPackageManifest, artifact:
       ...source, path: `public/${name}/${source.path}`,
     })));
   }
-  return sources.map(source => ({ ...source, path: `plugins/${manifest.id}/${source.path}` }));
+  return sources.map(source => ({
+    ...source, path: `plugins/${manifest.id}/${source.path}`,
+    directory: (bundled ? unpackedArchivePath(source.directory) : null) ?? source.directory,
+  }));
 }
 
 /** Package list persistence: `<data>/plugins.json`; changes take effect after restart. The distribution supplies defaults and bundled roots. */
@@ -287,7 +290,7 @@ export async function buildPackages(list: PackageList, npmRoot: string, reserved
       item.storageEntry = artifact.storage && artifactPath(item.artifactRoot!, artifact.storage);
       item.renderer = artifact.renderer && `${item.artifactKey}/${artifact.renderer}`;
       item.stylesheets = artifact.stylesheets.map(path => `${item.artifactKey}/${path}`);
-      item.manualSources = packageManuals(root, item.manifest, artifact);
+      item.manualSources = packageManuals(root, item.manifest, artifact, entry.source.kind === "bundled");
       if (item.manifest.i18n) item.catalogs = loadCatalogs(root, id, item.manifest.i18n.catalogs);
     } catch (error) {
       item.status = item.manifest ? "failed" : "invalid";

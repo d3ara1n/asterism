@@ -1,6 +1,7 @@
 import { findPackageJSON } from "node:module";
 import { dirname, join, delimiter } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { npmLauncher } from "./npm-launcher.ts";
 import { unpackedArchivePath } from "./package-modules.ts";
 import { startShellProcess } from "../shell/process.ts";
 
@@ -11,9 +12,9 @@ export interface NpmProcess {
 
 /** Package resolution works in development and in the packaged application's unpacked dependencies. */
 export function pnpmLauncher(): string {
-  const manifest = findPackageJSON("pnpm", import.meta.url);
+  const manifest = findPackageJSON(npmLauncher.package, import.meta.url);
   if (!manifest) throw new Error("The bundled pnpm package is missing.");
-  const file = join(dirname(manifest), "bin/pnpm.cjs");
+  const file = join(dirname(manifest), npmLauncher.entry);
   return unpackedArchivePath(file) ?? file;
 }
 

@@ -10,7 +10,7 @@ const id = "virtual:asterism/runtime-host-modules", resolvedId = `\0${id}`;
  * real files, so import, require, and namespace identity follow ordinary module semantics. Served graphs (tests) use
  * the resolved source files directly.
  */
-export function runtimeHostModules(): Plugin {
+export function runtimeHostModules(externalImports?: Set<string>): Plugin {
   const references = new Set<string>();
   let building = false;
   return {
@@ -25,7 +25,10 @@ export function runtimeHostModules(): Plugin {
         if (!resolved) throw new Error(`Host module ${specifier} cannot be resolved.`);
         const key = JSON.stringify(specifier);
         if (!building) return `${key}: ${JSON.stringify(pathToFileURL(resolved.id).href)}`;
-        if (resolved.external) return `${key}: import.meta.resolve(${key})`;
+        if (resolved.external) {
+          externalImports?.add(specifier);
+          return `${key}: import.meta.resolve(${key})`;
+        }
         const reference = this.emitFile({ type: "chunk", id: resolved.id, preserveSignature: "strict",
           name: `host/${specifier.replace(/[^a-z0-9]+/giu, "-").replace(/^-|-$/gu, "")}` });
         references.add(reference);
