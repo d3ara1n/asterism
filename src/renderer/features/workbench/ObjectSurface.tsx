@@ -110,8 +110,7 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
         </header>)}
         {collapse.mounted && <motion.div data-object-content="" inert={!collapse.interactive}
           style={{ opacity: collapse.opacity, y: collapse.y }}
-          // Distinguish content surface and shell by background color alone, without a border; soft, faint shadows around the edges transition colors without a hard dividing line.
-          className="nodrag nopan relative mx-1 mb-1 flex min-h-0 min-w-0 flex-1 overflow-hidden rounded-lg bg-card shadow-[0_1px_3px_0_rgb(0_0_0/0.06),0_0_2px_0_rgb(0_0_0/0.04)]">
+          className="nodrag nopan surface-inset relative mx-1 mb-1 flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", active && "invisible @min-[52rem]/card:visible")}>{children}</div>
           {/* popLayout takes a leaving panel out of flow at once, so wide cards reclaim the column while it fades and switches crossfade in place. */}
           <AnimatePresence initial={false} mode="popLayout">

@@ -57,8 +57,10 @@ import { sessionController } from "../features/session/registry";
 import { FolderServicesProvider, type FolderServices } from "../features/folders/context";
 
 import { islandTransition } from "../shared/weave/motion";
+import { DashboardModel } from "../features/dashboard/model";
 
 const DashboardPage = lazy(() => import("../features/dashboard/DashboardPage").then(module => ({ default: module.DashboardPage })));
+const DashboardActions = lazy(() => import("../features/dashboard/DashboardActions").then(module => ({ default: module.DashboardActions })));
 
 /** Space switches the whole main page, including its docked sidebars, together; only the central Screen coordinates Islands. */
 type MainView = { kind: "home" } | { kind: "dashboard" } | { kind: "conversation"; sessionId: string; overview?: boolean };
@@ -100,6 +102,8 @@ export function App({ controller }: { controller: ApplicationController }) {
     setCollapsedGroups(next);
     writeCollapsedGroups(next);
   }, [collapsedGroups]);
+  // Usage view state lives for the whole run, so its titlebar actions, page, and detail islands share it across navigation.
+  const [dashboard] = useState(() => new DashboardModel());
   // Environment outlet for the current workbench: object islands and the auxiliary panel obtain the session environment through it.
   const [workbenchStore] = useState(() => new WorkbenchStore());
   const [panel, setPanel] = useState<{ kind: PanelKind; origin: HTMLElement | null } | null>(null);
@@ -264,7 +268,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Button variant="ghost" size="sm" aria-pressed={panel?.kind === "access"} onClick={event => togglePanel("access", event.currentTarget)} aria-label={i18n.formatMessage(accessMessages.accessLabel)}><KeyRound /><span className="toolbar-label">{i18n.formatMessage(accessMessages.access)}</span></Button>
     <Button variant="ghost" size="sm" aria-pressed={panel?.kind === "objects"} onClick={event => togglePanel("objects", event.currentTarget)} aria-label={i18n.formatMessage(objectsMessages.objects)}><ListTree /><span className="toolbar-label">{i18n.formatMessage(objectsMessages.objects)}</span></Button>
     <Button variant="ghost" size="sm" aria-pressed={panel?.kind === "history"} onClick={event => togglePanel("history", event.currentTarget)} aria-label={i18n.formatMessage(historyMessages.history)}><History /><span className="toolbar-label">{i18n.formatMessage(historyMessages.history)}</span></Button>
-  </> : undefined;
+  </> : view.kind === "dashboard" ? <Suspense fallback={null}><DashboardActions model={dashboard} /></Suspense> : undefined;
 
   // The feedback layer and session canvas are sibling nodes, each reset by session; their key spaces must not overlap.
   const conversation = <WorkbenchSurface overlay={<WorkbenchFeedback key={`feedback:${active?.sessionId ?? ""}`} phase={phase} hasContent={!!session}
@@ -307,7 +311,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   </Dock> : null;
   const main: IslandSpec = {
     key: "main-view", label: mainTitle, width: { min: 440, grow: 1 }, surface: view.kind === "conversation" ? "transparent" : false,
-    // Home and workbench enter and exit simultaneously in both directions; exiting content leaves the layout flow so it does not occupy space alongside entering content.
+    // Views enter and exit simultaneously in both directions; exiting content leaves the layout flow so it does not occupy space alongside entering content.
     // The clip contains the scaled enter and exit frames, so they never give the island body a scroll range; each view scrolls itself.
     render: () => <div className="relative h-full overflow-hidden"><AnimatePresence mode="popLayout" initial={false}>
       {view.kind === "home"
@@ -320,10 +324,10 @@ export function App({ controller }: { controller: ApplicationController }) {
             templates={snapshot?.templates ?? []} onTemplateStart={startTemplate} onTemplatesChanged={() => { void controller.refresh({ quiet: true }); }}
             ready={ready} onCreated={sessionCreated} folder={homeFolder} /></motion.div>
         : view.kind === "dashboard"
-          ? <motion.div key="dashboard" className="h-full" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }} transition={islandTransition}>
+          ? <motion.div key="dashboard" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
             <Suspense fallback={null}>
-              <DashboardPage active={!inSettings} onOpenSession={openSession} />
+              <DashboardPage model={dashboard} active={!inSettings} onOpenSession={openSession} />
             </Suspense></motion.div>
           : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>

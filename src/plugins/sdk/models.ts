@@ -16,14 +16,14 @@ export function bindModels(owner: string, host: PluginHostServices, runs: RunGro
       checkAvailable();
       return runs.iterate(signal => host.models.stream({ ...request, signal }, {
         content: messages => host.content?.captureReader(inputReferences(messages), options?.content, owner),
-        telemetry: { pluginId: owner, entryKind: "stream", purposeId: request.purpose ?? null },
+        telemetry: { pluginId: owner, purposeId: request.purpose ?? null },
       }), request.signal);
     },
     run(request, options) {
       checkAvailable();
       return runs.start(signal => host.models.run({ ...request, signal,
         content: messages => host.content?.captureReader(inputReferences(messages), options?.content, owner),
-        telemetry: { pluginId: owner, entryKind: "run", purposeId: request.purpose ?? null },
+        telemetry: { pluginId: owner, purposeId: request.purpose ?? null },
       }), { signal: request.signal, affectsHistory: false }).done;
     },
     list() { checkAvailable(); return host.models.list(); },

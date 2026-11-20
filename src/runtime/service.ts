@@ -25,7 +25,7 @@ import { ContentTransferService } from "./content-transfer.ts";
 import type { ManualSource } from "@asterism-app/sdk/runtime";
 import type { PluginCandidate } from "../shared/plugin-startup.ts";
 import { TelemetryService } from "../telemetry/service.ts";
-import type { LiveFolderInfo, LiveSessionInfo, WorkspaceLookup } from "../telemetry/types.ts";
+import type { WorkspaceLookup } from "../telemetry/types.ts";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string, readonly display?: UiText) { super(message); }
@@ -68,35 +68,17 @@ export class ApplicationService {
       });
       // Archive cleanup releases references first; session services then explicitly reclaim content.
       collectExpiredSessions(this.db, Date.now(), this.configuration.sessionLifecycle().retentionDays);
+      // Telemetry reads the workspace catalog directly so usage history keeps current names for every session, archived ones included.
       const lookup: WorkspaceLookup = {
-        folders: () => new Map(this.folders.list().map(f => [f.id, { id: f.id, name: f.name, color: f.color } satisfies LiveFolderInfo])),
-        sessions: () => {
-          const map = new Map<string, LiveSessionInfo>();
-          const membership = this.folders.sessionFolders();
-          for (const s of this.sessions.tree.list()) {
-            map.set(s.id, { id: s.id, title: s.title, folderId: membership.get(s.id) ?? null, status: s.sleeping ? "sleeping" : "active", completed: s.completed });
-          }
-          for (const s of this.sessions.tree.archived()) {
-            map.set(s.id, { id: s.id, title: s.title, folderId: s.folderId, status: "archived", completed: false });
-          }
-          return map;
-        },
-        session: id => {
-          const row = this.db.prepare("SELECT id, title, folder_id, sleeping_at, archived_at, completed FROM sessions WHERE id = ?").get(id) as { id: string; title: string; folder_id: string | null; sleeping_at: string | null; archived_at: string | null; completed: number } | undefined;
-          if (!row) return null;
-          const status = row.archived_at !== null ? "archived" : row.sleeping_at !== null ? "sleeping" : "active";
-          return { id: row.id, title: row.title, folderId: row.folder_id, status, completed: row.completed === 1 };
-        },
-        folder: id => {
-          const row = this.db.prepare("SELECT id, name, color FROM folders WHERE id = ?").get(id) as LiveFolderInfo | undefined;
-          return row ?? null;
-        },
+        folders: () => new Map(this.folders.list().map(folder => [folder.id, { id: folder.id, name: folder.name, color: folder.color }])),
+        sessions: () => new Map(this.sessions.tree.usageCatalog().map(session => [session.id, session])),
+        session: id => this.sessions.tree.usageCatalog(id)[0] ?? null,
         pluginNames: () => new Map((this.sessions?.packages ?? []).flatMap(item => item.id ? [[item.id, item.metadata.name ?? null] as const] : [])),
-        providerNames: () => new Map(this.configuration.modelCatalog().modelProviders.map(p => [p.id, p.name])),
+        providerNames: () => new Map(this.configuration.modelCatalog().modelProviders.map(provider => [provider.id, provider.name])),
       };
-      telemetry = this.telemetry = new TelemetryService(root, { lookup, onChanged: options.onTelemetryChanged });
+      telemetry = this.telemetry = new TelemetryService(root, lookup, options.onTelemetryChanged);
       this.sessions = new SessionService(this.db, root, this.configuration, {
-        onChanged: options.onSessionChanged, adapterFactory: options.adapterFactory, plugins: options.plugins, telemetry: this.telemetry,
+        onChanged: options.onSessionChanged, adapterFactory: options.adapterFactory, plugins: options.plugins, usageLedger: this.telemetry,
         configurationChanged: options.onPluginConfigurationChanged, preparedStorage: options.preparedStorage,
         pluginDependencies: options.pluginDependencies, packages: options.packages, packageRoots: options.packageRoots, skillDirectories: options.skillDirectories,
         manualSources: packages => [...applicationManuals, ...(options.manualSources ?? []).filter(source => packages.some(item => item.id === source.pluginId && item.status === "loaded"))],

@@ -227,7 +227,7 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         }
         tools.push(...(contribution.tools ?? []).map(tool => adaptTool(tool, sdk, services)));
         observers.push(...contribution.observers ?? []); preparers.push(...contribution.preparers ?? []);
-        if (contribution.modelPurposes?.length) services.shared.telemetry?.registerModelPurposes(id, contribution.modelPurposes);
+        if (contribution.modelPurposes?.length) services.shared.usageLedger.registerPurposes(id, contribution.modelPurposes);
       };
       const setup = plugin.setup;
       const root = setup ? synchronous(() => setup.call(plugin, sdk.context)) : undefined;

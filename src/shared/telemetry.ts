@@ -2,388 +2,214 @@ import { z } from "zod";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import type { AppError } from "./contracts.ts";
 
-/** Filter shared by every telemetry query; utcOffsetMinutes is positive east of UTC (e.g. +480 for UTC+8). */
+/**
+ * Usage statistics protocol: composable reads over the host usage ledger. Each read applies one filter and returns identities,
+ * recorded snapshots, and raw sums; presentation, ratios, and localized labels belong to the renderer.
+ */
+export const telemetryDimensions = ["model", "provider", "folder", "session", "purpose", "plugin", "thinking", "error"] as const;
+export type TelemetryDimension = typeof telemetryDimensions[number];
+export const telemetryGranularities = ["hour", "day", "week", "month"] as const;
+
+const id = z.string().min(1).max(512);
+const time = z.number().int().nonnegative();
+
+/**
+ * from/to bound event start times as [from, to); null leaves that side open. utcOffsetMinutes is positive east of UTC (+480 for UTC+8)
+ * and places hour, day, weekday, and month boundaries. Optional dimensions narrow the ledger; null selects the absent value
+ * (no folder, no declared purpose, the provider's default thinking level).
+ */
 export const telemetryFilterSchema = z.strictObject({
-  from: z.number().int().nonnegative().nullable(),
-  to: z.number().int().nonnegative().nullable(),
+  from: time.nullable(),
+  to: time.nullable(),
   utcOffsetMinutes: z.number().int().min(-840).max(840),
-  /** undefined = no filter; null = ungrouped sessions without a folder; string = specific folder ID. */
-  folderId: z.string().min(1).nullable().optional(),
-  providerId: z.string().min(1).optional(),
-  modelId: z.string().min(1).optional(),
-  pluginId: z.string().min(1).optional(),
-  /** undefined = no filter; null = calls without a declared purpose; string = specific purpose ID. */
-  purposeId: z.string().min(1).nullable().optional(),
-  sessionId: z.string().min(1).optional(),
-});
+  folderId: id.nullable().optional(),
+  providerId: id.optional(),
+  modelId: id.optional(),
+  pluginId: id.optional(),
+  purposeId: id.nullable().optional(),
+  sessionId: id.optional(),
+  thinking: id.nullable().optional(),
+}).refine(filter => filter.modelId === undefined || filter.providerId !== undefined, { message: "A model filter requires its provider." });
 export type TelemetryFilter = z.infer<typeof telemetryFilterSchema>;
 
-export const telemetryDrilldownTargetSchema = z.discriminatedUnion("kind", [
-  z.strictObject({ kind: z.literal("day"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u) }),
-  z.strictObject({ kind: z.literal("folder"), folderId: z.string().min(1).nullable() }),
-  z.strictObject({ kind: z.literal("model"), providerId: z.string().min(1), modelId: z.string().min(1) }),
-  z.strictObject({ kind: z.literal("session"), sessionId: z.string().min(1) }),
-  z.strictObject({ kind: z.literal("purpose"), pluginId: z.string().min(1), purposeId: z.string().min(1).nullable() }),
-  z.strictObject({ kind: z.literal("plugin"), pluginId: z.string().min(1) }),
+export const telemetryQuerySchema = z.discriminatedUnion("kind", [
+  /** Filter choices and the recorded time span, independent of the filter. */
+  z.strictObject({ kind: z.literal("facets") }),
+  /** Totals for the filter; compare repeats them for another time range under the same dimensions. */
+  z.strictObject({ kind: z.literal("summary"), compare: z.strictObject({ from: time, to: time }).nullable() }),
+  /** Time buckets; groupBy splits each bucket into the top `limit` groups plus one remainder group. */
+  z.strictObject({ kind: z.literal("series"), granularity: z.enum(telemetryGranularities), groupBy: z.enum(telemetryDimensions).nullable(), limit: z.number().int().min(1).max(12) }),
+  /** Totals per dimension value, ordered by cost, tokens, then requests; latency adds time-to-first-output percentiles. */
+  z.strictObject({ kind: z.literal("breakdown"), dimension: z.enum(telemetryDimensions), limit: z.number().int().min(1).max(1000), latency: z.boolean() }),
+  /** Local weekday × hour totals. */
+  z.strictObject({ kind: z.literal("matrix") }),
+  /** Request counts between the shared edges of a timing field. */
+  z.strictObject({ kind: z.literal("distribution"), field: z.enum(["duration", "ttft"]) }),
+  /** Individual model requests, newest first. */
+  z.strictObject({ kind: z.literal("events"), offset: z.number().int().min(0), limit: z.number().int().min(1).max(200), only: z.enum(["all", "failed", "tiered"]) }),
+  /** Tool calls made by model requests in the filter, grouped by tool name or target resource kind. */
+  z.strictObject({ kind: z.literal("tools"), groupBy: z.enum(["tool", "resource"]) }),
+  /** Plugin-reported non-model usage; model, provider, purpose, and thinking filters exclude all of it. */
+  z.strictObject({ kind: z.literal("external") }),
 ]);
-export type TelemetryDrilldownTarget = z.infer<typeof telemetryDrilldownTargetSchema>;
+export type TelemetryQuery = z.infer<typeof telemetryQuerySchema>;
 
 export const telemetryCommandSchema = z.discriminatedUnion("type", [
-  z.strictObject({ type: z.literal("overview"), filter: telemetryFilterSchema }),
-  z.strictObject({ type: z.literal("projects"), filter: telemetryFilterSchema }),
-  z.strictObject({ type: z.literal("models"), filter: telemetryFilterSchema }),
-  z.strictObject({ type: z.literal("activity"), filter: telemetryFilterSchema }),
-  z.strictObject({ type: z.literal("tools"), filter: telemetryFilterSchema }),
-  z.strictObject({
-    type: z.literal("drilldown"),
-    filter: telemetryFilterSchema,
-    target: telemetryDrilldownTargetSchema,
-    eventLimit: z.number().int().min(1).max(500).optional(),
-    eventOffset: z.number().int().min(0).optional(),
-    eventFilter: z.enum(["all", "failed", "tiered"]).optional(),
-  }),
+  z.strictObject({ type: z.literal("query"), filter: telemetryFilterSchema, query: telemetryQuerySchema }),
   z.strictObject({ type: z.literal("export"), filter: telemetryFilterSchema, format: z.enum(["csv", "json"]) }),
-  z.strictObject({ type: z.literal("clear"), beforeTimestamp: z.number().int().nonnegative().nullable().optional() }),
+  /** Permanently delete records that started before `before`; null deletes everything. */
+  z.strictObject({ type: z.literal("clear"), before: time.nullable() }),
 ]);
 export type TelemetryCommand = z.infer<typeof telemetryCommandSchema>;
 
-export interface CurrencyAmount {
-  currency: string;
-  amount: number;
-}
+/** Upper edges in milliseconds; counts have one more entry for values at or above the last edge. */
+export const distributionEdges = { duration: [2_000, 5_000, 15_000, 30_000, 60_000], ttft: [500, 1_000, 2_000, 5_000, 10_000] } as const;
 
-export interface TelemetrySummaryMetrics {
+export interface CostParts { input: number | null; cacheRead: number | null; cacheWrite: number | null; output: number | null; reasoning: number | null }
+
+/** Raw sums over model requests. Output tokens include reasoning tokens; input tokens include cache reads and writes. */
+export interface UsageMetrics {
   requests: number;
   completed: number;
   failed: number;
   cancelled: number;
   inputTokens: number;
   outputTokens: number;
-  totalTokens: number;
   reasoningTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
-  uncachedInputTokens: number;
-  cacheHitRate: number | null;
+  totalTokens: number;
+  /** Estimated from the configured model prices at request time. */
   costUsd: number;
+  /** Requests whose price was unknown or only partly known; costUsd excludes their unknown parts. */
   costIncomplete: number;
-  externalCostUsd: number;
-  externalOtherCurrencies: CurrencyAmount[];
+  cost: CostParts;
+  /** Net prompt-cache saving: read discounts minus write surcharges. */
   cacheSavedUsd: number;
-  p50TtftMs: number | null;
-  p95TtftMs: number | null;
-  avgTokensPerSec: number | null;
-  totalDurationMs: number;
+  /** Requests priced by a long-context tier. */
   tieredRequests: number;
-  activeDays: number;
+  durationMs: number;
+  /** Generation time and output tokens of requests with output, after the first output arrived. */
+  generationMs: number;
+  generatedTokens: number;
+  lastAt: number | null;
 }
 
-export interface TelemetryTrendBucket {
-  bucket: string;
-  startAt: number;
-  costUsd: number;
-  totalTokens: number;
-  inputTokens: number;
-  uncachedInputTokens: number;
-  outputTokens: number;
-  textOutputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  reasoningTokens: number;
-  requests: number;
-  byModel: Record<string, { costUsd: number; totalTokens: number; requests: number }>;
-  byFolder: Record<string, { costUsd: number; totalTokens: number; requests: number }>;
-}
+export interface CurrencyAmount { currency: string; amount: number }
+export interface Percentiles { p50: number | null; p95: number | null }
+export type SessionStatus = "active" | "sleeping" | "archived" | "deleted";
 
-export interface TokenBreakdown {
-  uncachedInput: { tokens: number; costUsd: number | null };
-  cacheRead: { tokens: number; costUsd: number | null };
-  cacheWrite: { tokens: number; costUsd: number | null };
-  textOutput: { tokens: number; costUsd: number | null };
-  reasoning: { tokens: number; costUsd: number | null };
-}
+/**
+ * A dimension value. Live workspace names win; recorded snapshots remain for deleted sessions, folders, providers, and plugins.
+ * `other` collects groups beyond a series limit.
+ */
+export type TelemetryGroup =
+  | { dimension: "model"; key: string; providerId: string; modelId: string; providerName: string }
+  | { dimension: "provider"; key: string; providerId: string; providerName: string }
+  | { dimension: "folder"; key: string; folderId: string | null; name: string | null; color: string | null; deleted: boolean }
+  | { dimension: "session"; key: string; sessionId: string; title: string | null; status: SessionStatus; folderId: string | null; folderName: string | null; folderColor: string | null }
+  | { dimension: "purpose"; key: string; pluginId: string; purposeId: string | null; label: UiText | null; recorded: string | null }
+  | { dimension: "plugin"; key: string; pluginId: string; name: UiText | null }
+  | { dimension: "thinking"; key: string; level: string | null }
+  | { dimension: "error"; key: string; origin: string | null; code: string | null }
+  | { dimension: "other"; key: string };
 
-export interface PurposeStat {
-  pluginId: string;
-  purposeId: string | null;
-  label: UiText | null;
-  fallbackLabel: string;
-  requests: number;
-  totalTokens: number;
-  costUsd: number;
-}
-
-export interface FolderStat {
-  folderId: string | null;
-  name: string | null;
-  color: string | null;
-  deleted: boolean;
-  sessions: number;
-  activeSessions: number;
-  completedSessions: number;
-  sleepingSessions: number;
-  archivedSessions: number;
-  requests: number;
-  totalTokens: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheHitRate: number | null;
-  costUsd: number;
-  costIncomplete: number;
-  topModel: string | null;
-  lastActiveAt: number | null;
-}
-
-export interface SessionStat {
-  sessionId: string;
-  title: string;
-  deleted: boolean;
-  status: "active" | "sleeping" | "archived" | "deleted";
-  completed: boolean;
-  folderId: string | null;
-  folderName: string | null;
-  folderColor: string | null;
-  requests: number;
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  totalTokens: number;
-  maxInputTokens: number;
-  cacheHitRate: number | null;
-  costUsd: number;
-  costIncomplete: number;
-  tieredRequests: number;
-  lastActiveAt: number;
-  primaryModel: string | null;
-}
-
-export interface ModelStat {
-  providerId: string;
-  providerName: string;
-  modelId: string;
-  requests: number;
-  completed: number;
-  failed: number;
-  cancelled: number;
-  inputTokens: number;
-  outputTokens: number;
-  reasoningTokens: number;
-  cacheReadTokens: number;
-  totalTokens: number;
-  cacheHitRate: number | null;
-  costUsd: number;
-  costIncomplete: number;
-  effectiveUsdPerMillion: number | null;
-  p50TtftMs: number | null;
-  p95TtftMs: number | null;
-  avgTokensPerSec: number | null;
-  successRate: number | null;
-}
-
-export interface TelemetryFilterOptions {
-  folders: { id: string; name: string; color: string | null; deleted: boolean }[];
-  providers: { id: string; name: string }[];
-  models: { providerId: string; modelId: string; providerName: string }[];
-  plugins: { id: string; name: UiText | null }[];
-}
-
-export interface TelemetryOverviewReply {
-  kind: "overview";
-  hasAnyData: boolean;
+export interface TelemetryFacets {
+  kind: "facets";
   firstEventAt: number | null;
-  summary: TelemetrySummaryMetrics;
-  previousSummary: TelemetrySummaryMetrics | null;
-  burnRate7dUsdPerDay: number;
-  burnRate7dByProvider: Record<string, number>;
-  monthToDateCostUsd: number;
-  granularity: "hour" | "day" | "week" | "month";
-  trend: TelemetryTrendBucket[];
-  trendModels: { key: string; label: string; providerId: string | null; modelId: string | null }[];
-  trendFolders: { key: string; label: string | null; color: string | null; folderId: string | null }[];
-  tokenBreakdown: TokenBreakdown;
-  purposes: PurposeStat[];
-  topFolders: FolderStat[];
-  topModels: ModelStat[];
-  topSessions: SessionStat[];
-  filterOptions: TelemetryFilterOptions;
+  lastEventAt: number | null;
+  folders: Extract<TelemetryGroup, { dimension: "folder" }>[];
+  providers: Extract<TelemetryGroup, { dimension: "provider" }>[];
+  models: Extract<TelemetryGroup, { dimension: "model" }>[];
+  plugins: Extract<TelemetryGroup, { dimension: "plugin" }>[];
+  purposes: Extract<TelemetryGroup, { dimension: "purpose" }>[];
+  thinking: Extract<TelemetryGroup, { dimension: "thinking" }>[];
 }
-
-export interface TelemetryProjectsReply {
-  kind: "projects";
-  folders: FolderStat[];
-  sessions: SessionStat[];
-  scatter: {
-    sessionId: string;
-    title: string;
-    folderId: string | null;
-    folderName: string | null;
-    folderColor: string | null;
-    requests: number;
-    costUsd: number;
-    totalTokens: number;
-    maxInputTokens: number;
-  }[];
-  tieredSummary: { requests: number; totalTokens: number; costUsd: number; affectedSessions: number };
+export interface ExternalTotals { usd: number; other: CurrencyAmount[]; count: number }
+export interface TelemetrySummary {
+  kind: "summary";
+  metrics: UsageMetrics;
+  sessions: number;
+  activeDays: number;
+  ttft: Percentiles;
+  external: ExternalTotals;
+  previous: { metrics: UsageMetrics; external: ExternalTotals } | null;
 }
-
-export interface TelemetryModelsReply {
-  kind: "models";
-  models: ModelStat[];
-  shareTrend: { bucket: string; startAt: number; shares: Record<string, number>; totals: Record<string, number> }[];
-  shareModels: { key: string; label: string }[];
-  thinkingLevels: {
-    level: string;
-    requests: number;
-    totalTokens: number;
-    reasoningTokens: number;
-    avgReasoningTokens: number | null;
-    costUsd: number;
-  }[];
+export interface SeriesPoint {
+  key: string;
+  start: number;
+  metrics: UsageMetrics;
+  /** Cost, tokens, and requests per group key. */
+  groups: Record<string, { costUsd: number; totalTokens: number; requests: number }>;
 }
-
-export interface TelemetryActivityReply {
-  kind: "activity";
-  calendar: { date: string; costUsd: number; totalTokens: number; requests: number }[];
-  streaks: {
-    activeDays: number;
-    longestStreak: number;
-    currentStreak: number;
-    avgDailyTokens: number;
-    avgDailyCostUsd: number;
-    peakDay: { date: string; costUsd: number; totalTokens: number; requests: number } | null;
-  };
-  matrix: { weekday: number; hour: number; requests: number; totalTokens: number; costUsd: number }[];
-  latencyBuckets: { bucket: string; minMs: number; maxMs: number | null; count: number }[];
-  totalGenerationMs: number;
+export interface TelemetrySeries {
+  kind: "series";
+  granularity: typeof telemetryGranularities[number];
+  groups: TelemetryGroup[];
+  points: SeriesPoint[];
 }
-
-export interface TelemetryToolsReply {
-  kind: "tools";
-  plugins: {
-    pluginId: string;
-    name: UiText | null;
-    requests: number;
-    totalTokens: number;
-    costUsd: number;
-    purposes: PurposeStat[];
-  }[];
-  tools: {
-    toolName: string;
-    implementationId: string | null;
-    targetResourceKind: string | null;
-    calls: number;
-    succeeded: number;
-    failed: number;
-    rejected: number;
-    cancelled: number;
-    successRate: number | null;
-    p50DurationMs: number | null;
-    p95DurationMs: number | null;
-    totalDurationMs: number;
-  }[];
-  resourceKinds: {
-    kind: string;
-    calls: number;
-    succeeded: number;
-    failed: number;
-    totalDurationMs: number;
-  }[];
-  externalUsage: {
-    pluginId: string;
-    category: string;
-    provider: string | null;
-    count: number;
-    totalQuantity: number | null;
-    unit: string | null;
-    currency: string | null;
-    totalAmount: number | null;
-  }[];
-}
-
-export interface TelemetryEventRow {
+export interface BreakdownRow { group: TelemetryGroup; metrics: UsageMetrics; sessions: number; ttft: Percentiles | null }
+export interface TelemetryBreakdown { kind: "breakdown"; dimension: TelemetryDimension; rows: BreakdownRow[]; total: number }
+export interface TelemetryMatrix { kind: "matrix"; cells: { weekday: number; hour: number; requests: number; totalTokens: number; costUsd: number }[] }
+export interface TelemetryDistribution { kind: "distribution"; field: "duration" | "ttft"; edges: readonly number[]; counts: number[] }
+export interface TelemetryEvent {
   id: string;
   startedAt: number;
   durationMs: number | null;
   firstOutputMs: number | null;
-  pluginId: string;
-  entryKind: string;
-  purposeId: string | null;
-  purposeLabel: UiText | null;
-  purposeFallback: string;
-  sessionId: string | null;
-  sessionTitle: string | null;
-  folderId: string | null;
-  folderName: string | null;
-  folderColor: string | null;
+  purpose: Extract<TelemetryGroup, { dimension: "purpose" }>;
+  session: Extract<TelemetryGroup, { dimension: "session" }> | null;
   providerId: string;
   providerName: string;
   modelId: string;
   thinking: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
-  totalTokens: number | null;
   reasoningTokens: number | null;
   cacheReadTokens: number | null;
   cacheWriteTokens: number | null;
   costUsd: number | null;
   costStatus: string;
   tierFromInputTokens: number | null;
-  outcome: string;
-  finishReason: string | null;
+  outcome: "completed" | "failed" | "cancelled";
+  errorOrigin: string | null;
   errorCode: string | null;
-  toolCallCount: number;
+  toolCalls: number;
 }
-
-export interface DrilldownBreakdownItem {
-  key: string;
-  label: string;
-  color?: string | null;
-  requests: number;
-  totalTokens: number;
-  costUsd: number;
+export interface TelemetryEvents { kind: "events"; total: number; rows: TelemetryEvent[] }
+export interface ToolRow {
+  toolName: string | null;
+  resourceKind: string | null;
+  calls: number;
+  succeeded: number;
+  failed: number;
+  rejected: number;
+  cancelled: number;
+  durationMs: number;
+  duration: Percentiles;
 }
-
-export interface TelemetryDrilldownReply {
-  kind: "drilldown";
-  target: TelemetryDrilldownTarget;
-  title: string;
-  subtitle: string | null;
-  color: string | null;
-  sessionStatus: "active" | "sleeping" | "archived" | "deleted" | null;
-  summary: TelemetrySummaryMetrics;
-  hourlyLatency: { hour: number; p50TtftMs: number | null; requests: number }[] | null;
-  errorBreakdown: { code: string; origin: string | null; count: number }[];
-  primaryBreakdown: { kind: "models" | "folders" | "sessions" | "purposes" | "days"; items: DrilldownBreakdownItem[] };
-  secondaryBreakdown: { kind: "models" | "folders" | "sessions" | "purposes" | "days"; items: DrilldownBreakdownItem[] };
-  events: TelemetryEventRow[];
-  totalEvents: number;
+export interface TelemetryTools { kind: "tools"; groupBy: "tool" | "resource"; rows: ToolRow[] }
+export interface ExternalRow {
+  pluginId: string;
+  pluginName: UiText | null;
+  category: string;
+  provider: string | null;
+  count: number;
+  failed: number;
+  quantity: number | null;
+  unit: string | null;
+  currency: string | null;
+  amount: number | null;
 }
+export interface TelemetryExternal { kind: "external"; rows: ExternalRow[] }
 
-export interface TelemetryExportReply {
-  kind: "export";
-  format: "csv" | "json";
-  filename: string;
-  content: string;
-  rowCount: number;
-}
+export type TelemetryQueryResult = TelemetryFacets | TelemetrySummary | TelemetrySeries | TelemetryBreakdown | TelemetryMatrix
+  | TelemetryDistribution | TelemetryEvents | TelemetryTools | TelemetryExternal;
+export type QueryResultOf<Q extends TelemetryQuery> = Extract<TelemetryQueryResult, { kind: Q["kind"] }>;
 
-export interface TelemetryClearReply {
-  kind: "clear";
-  deletedModelEvents: number;
-  deletedToolEvents: number;
-  deletedExternalEvents: number;
-}
-
-export type TelemetryReply =
-  | TelemetryOverviewReply
-  | TelemetryProjectsReply
-  | TelemetryModelsReply
-  | TelemetryActivityReply
-  | TelemetryToolsReply
-  | TelemetryDrilldownReply
-  | TelemetryExportReply
-  | TelemetryClearReply;
+export interface TelemetryExportReply { kind: "export"; format: "csv" | "json"; filename: string; content: string; rows: number }
+export interface TelemetryClearReply { kind: "clear"; deleted: number }
+export type TelemetryReply = { kind: "query"; result: TelemetryQueryResult } | TelemetryExportReply | TelemetryClearReply;
 
 export type TelemetryResult =
   | { ok: true; reply: TelemetryReply }
@@ -391,5 +217,6 @@ export type TelemetryResult =
 
 export interface TelemetryBridge {
   execute(command: TelemetryCommand): Promise<TelemetryResult>;
+  /** Fires after new records or deletions, throttled by the runtime. */
   onChanged(listener: () => void): () => void;
 }

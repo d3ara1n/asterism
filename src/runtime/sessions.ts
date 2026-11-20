@@ -33,6 +33,7 @@ import { EventBus } from "../plugins/events.ts";
 import { TemplateStore } from "./templates.ts";
 import { ResourceHolds } from "./resource-holds.ts";
 import type { PluginCandidate, PluginOutcome } from "../shared/plugin-startup.ts";
+import { noUsageRecorder, type UsageRecorder } from "../telemetry/types.ts";
 
 /** One concrete renderer connection owns its admitted watches. */
 export interface SessionWatchOwner { readonly active: boolean }
@@ -49,7 +50,8 @@ export interface SessionServiceOptions {
   packageRoots?: ReadonlyMap<string, string>;
   /** User skill directories; tests leave this empty to stay isolated from the real user profile. */
   skillDirectories?: readonly string[];
-  telemetry?: import("../telemetry/service.ts").TelemetryService;
+  /** Usage ledger for model requests and plugin-reported usage; omitted hosts record nothing. */
+  usageLedger?: UsageRecorder;
 }
 
 
@@ -96,7 +98,7 @@ export class SessionService {
     for (const id of planSessionSleep(this.tree.active().filter(session => !session.keepAwake), configuration.sessionLifecycle().sleepDays, Date.now()).due) this.tree.sleep(id);
     this.events.declarePublic(SessionTitleChanged);
     this.events.declarePublic(SystemResumed);
-    this.shared = createSharedServices({ db, dataRoot, configuration, events: this.events, telemetry: options.telemetry,
+    this.shared = createSharedServices({ db, dataRoot, configuration, events: this.events, usageLedger: options.usageLedger ?? noUsageRecorder,
       manualSources: () => options.manualSources?.(this.packages) ?? [], packageRoots: options.packageRoots ?? new Map(), skillDirectories: options.skillDirectories ?? [] });
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     this.content.collectStartup();
@@ -154,7 +156,8 @@ export class SessionService {
       context: linked => this.resources.context(linked),
     };
     const refOf = (objectId: string): ResourceRef | null => this.tree.resourceRef(objectId);
-    const models = createModelServices(configuration, options.adapterFactory, options.telemetry ? input => options.telemetry!.recordModelUsage(input) : undefined);
+    const ledger = options.usageLedger ?? noUsageRecorder;
+    const models = createModelServices(configuration, options.adapterFactory, record => ledger.recordModelUsage(record));
     const modules = loadPlugins(options.plugins ?? [], { holds: this.holds, events: this.events, extensionsDirectory: join(dataRoot, applicationStorage.pluginDataDirectory), data: new SessionDataStore(db), content: this.content, refOf,
       configurationChanged: options.configurationChanged, preparedStorage: options.preparedStorage,
       pluginDependencies: options.pluginDependencies, packages: options.packages, sessions: host, models, shared: this.shared });

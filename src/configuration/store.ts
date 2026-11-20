@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
-import { canEditModelProviderField, modelReference, modelSchema, modelProviderSchema, sessionEntrySelectionSchema,
+import { canEditModelProviderField, modelReference, modelSchema, modelProviderSchema, sessionEntrySelectionSchema, usageBudgetSchema,
   defaultSessionLifecycle, sessionLifecycleSchema, type SessionLifecycle, type ModelProvider, type ProviderModel } from "../shared/configuration.ts";
 import { mcpSettingsSchema, defaultMcpSettings, shellSettingsSchema, defaultShellSettings, modelCostSchema, webProviderStateSchema, type WebProviderState, messagingConnectionSchema, type MessagingConnection } from "@asterism-app/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
@@ -13,7 +13,7 @@ import { jsonStorage } from "../storage/migrations.ts";
 import { migrateConfiguration13 } from "./credential-migration.ts";
 
 /** Global configuration format; increment on changes and append an n → n+1 migration to `configurationStorage`. */
-export const configurationVersion = 16;
+export const configurationVersion = 17;
 const storedProviderSchema = modelProviderSchema.strip();
 const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
 /** Models use `<providerId>/<modelId>` identities; other entries use id. */
@@ -30,6 +30,7 @@ const documentSchema = z.strictObject({
   sessionEntry: sessionEntrySelectionSchema.nullable(),
   sessionLifecycle: sessionLifecycleSchema,
   showUsage: z.boolean(),
+  usageBudget: usageBudgetSchema,
 }).superRefine((document, context) => {
   for (const key of ["modelProviders", "webProviders", "messagingConnections", "models"] as const) {
     const ids = new Set<string>();
@@ -55,7 +56,7 @@ type ConfigurationSave =
 function initialConfiguration(): ConfigurationDocument {
   return { version: configurationVersion, mcp: structuredClone(defaultMcpSettings), mcpAuthorizations: {},
     shell: structuredClone(defaultShellSettings), messagingConnections: [], modelProviders: [], webProviders: [], models: [],
-    sessionEntry: null, sessionLifecycle: structuredClone(defaultSessionLifecycle), showUsage: true };
+    sessionEntry: null, sessionLifecycle: structuredClone(defaultSessionLifecycle), showUsage: true, usageBudget: null };
 }
 /**
  * v12 web providers held one API key reference; v13 stores provider settings and secret references by setting key,
@@ -72,7 +73,8 @@ export function configurationStorage(root: string, decrypt?: (ciphertext: string
   return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile), version: configurationVersion,
     migrations: { 12: migrateConfiguration12, 13: value => migrateConfiguration13(root, value, decrypt),
       14: value => ({ ...(value as object), sessionLifecycle: structuredClone(defaultSessionLifecycle) }),
-      15: value => ({ ...(value as object), showUsage: true }) } });
+      15: value => ({ ...(value as object), showUsage: true }),
+      16: value => ({ ...(value as object), usageBudget: null }) } });
 }
 
 /** Locate by old identity and replace; reject new identities that conflict with other entries. */
@@ -116,6 +118,8 @@ export class ConfigurationStore {
   setSessionLifecycle(value: SessionLifecycle) { this.commit({ ...this.document, sessionLifecycle: value }); }
   showUsage(): boolean { return this.document.showUsage; }
   setShowUsage(value: boolean) { this.commit({ ...this.document, showUsage: value }); }
+  usageBudget(): number | null { return this.document.usageBudget; }
+  setUsageBudget(value: number | null) { this.commit({ ...this.document, usageBudget: value }); }
   sessionEntry() { return structuredClone(this.document.sessionEntry); }
   selectSessionEntry(value: z.infer<typeof sessionEntrySelectionSchema>) { this.commit({ ...this.document, sessionEntry: value }); }
   list<K extends ConfigurationKind>(kind: K): Entry[K][] {

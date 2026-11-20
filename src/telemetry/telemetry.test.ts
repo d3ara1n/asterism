@@ -1,193 +1,167 @@
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { modelCostSchema } from "@asterism-app/sdk/contracts";
-import { openTelemetryDatabase, telemetryDatabasePath } from "./storage.ts";
+import { modelCostSchema, type Usage } from "@asterism-app/sdk/contracts";
+import { bucketKey, bucketKeys, dateKeyStart } from "../shared/telemetry-time.ts";
+import type { QueryResultOf, TelemetryFilter, TelemetryQuery } from "../shared/telemetry.ts";
+import { bucketSql } from "./queries.ts";
 import { TelemetryService } from "./service.ts";
-import { bucketForTimestamp, localDateKey, percentile } from "./queries.ts";
-import type { LiveFolderInfo, LiveSessionInfo, WorkspaceLookup } from "./types.ts";
+import { openTelemetryDatabase } from "./storage.ts";
+import type { LiveFolder, LiveSession, ModelUsageRecord, WorkspaceLookup } from "./types.ts";
 
 const roots: string[] = [];
-function tempRoot(): string {
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+function root(): string {
   const dir = mkdtempSync(join(tmpdir(), "asterism-telemetry-"));
   roots.push(dir);
   return dir;
 }
 
-afterEach(() => {
-  while (roots.length) {
-    try { rmSync(roots.pop()!, { recursive: true, force: true }); } catch { /* ignore */ }
-  }
-});
-
 const price = (amount: number) => ({ amount, unit: "token" as const, per: 1_000_000 });
-const claudeCost = modelCostSchema.parse({
-  currency: "USD",
-  rates: { text: { input: price(3), cacheRead: price(0.3), cacheWrite: price(3.75), output: price(15) } },
-  tiers: [{ fromInputTokens: 200_000, rates: { text: { input: price(6), cacheRead: price(0.6), cacheWrite: price(7.5), output: price(22.5) } } }],
-});
+const cost = modelCostSchema.parse({ currency: "USD", rates: { text: { input: price(3), cacheRead: price(0.3), cacheWrite: price(3.75), output: price(15) } }, tiers: [] });
+const usage = (input: number, output: number, extra: Partial<Usage> = {}): Usage =>
+  ({ input, output, total: input + output, reasoning: null, cacheRead: 0, cacheWrite: 0, ...extra });
 
-describe("Telemetry storage and quarantine", () => {
-  it("initializes cleanly and quarantines corrupt database files without throwing", () => {
-    const root = tempRoot();
-    const file = telemetryDatabasePath(root);
-    mkdirSync(join(root, "telemetry"), { recursive: true });
-    writeFileSync(file, "not a sqlite file");
+function workspace() {
+  const folders = new Map<string, LiveFolder>();
+  const sessions = new Map<string, LiveSession>();
+  const lookup: WorkspaceLookup = {
+    folders: () => folders, sessions: () => sessions, session: id => sessions.get(id) ?? null,
+    providerNames: () => new Map([["p", "Provider"]]), pluginNames: () => new Map(),
+  };
+  return { folders, sessions, lookup };
+}
+let sequence = 0;
+function record(overrides: Partial<ModelUsageRecord>): ModelUsageRecord {
+  return {
+    id: `r${++sequence}`, startedAt: 0, durationMs: 1_000, firstOutputMs: 200, pluginId: "plugin", purposeId: null, sessionId: null,
+    providerId: "p", providerName: "Provider", modelId: "m", thinking: null, usage: usage(100, 10), cost, hasFiles: false,
+    outcome: "completed", errorOrigin: null, errorCode: null, tools: [], ...overrides,
+  };
+}
+const everything: TelemetryFilter = { from: null, to: null, utcOffsetMinutes: 0 };
+function query<Q extends TelemetryQuery>(service: TelemetryService, query: Q, filter: TelemetryFilter = everything): QueryResultOf<Q> {
+  const reply = service.execute({ type: "query", filter, query }, Date.UTC(2026, 2, 20));
+  if (reply.kind !== "query" || reply.result.kind !== query.kind) throw new Error("Unexpected reply.");
+  return reply.result as QueryResultOf<Q>;
+}
 
-    const db = openTelemetryDatabase(root);
+describe("Usage time buckets", () => {
+  it("assigns every timestamp to the same bucket in SQLite and in the renderer", () => {
+    const db = openTelemetryDatabase(root());
     try {
-      const row = db.prepare("SELECT COUNT(*) AS count FROM model_usage_events").get() as { count: number };
-      expect(row.count).toBe(0);
-    } finally {
-      db.close();
-    }
+      // Hours either side of local midnight, Sundays and Mondays, month ends, and offsets on both sides of UTC.
+      const times = [Date.UTC(2026, 0, 4, 23, 30), Date.UTC(2026, 0, 5, 0, 30), Date.UTC(2026, 1, 28, 16, 5), Date.UTC(2026, 2, 1, 15, 59), Date.UTC(2025, 11, 31, 23, 59)];
+      for (const offset of [-300, 0, 330, 480, 840]) for (const granularity of ["hour", "day", "week", "month"] as const) for (const at of times) {
+        const sql = (db.prepare(`SELECT ${bucketSql("?", granularity, offset)} AS key`).get(at) as { key: string }).key;
+        expect(sql, `${granularity} ${offset} ${new Date(at).toISOString()}`).toBe(bucketKey(at, granularity, offset));
+      }
+    } finally { db.close(); }
+  });
+
+  it("enumerates contiguous buckets over a range that starts mid-bucket", () => {
+    const offset = 480;
+    const from = dateKeyStart("2026-03-09", offset) + 3 * 3_600_000;
+    expect(bucketKeys(from, dateKeyStart("2026-03-12", offset), "day", offset)).toEqual(["2026-03-09", "2026-03-10", "2026-03-11"]);
+    // 2026-03-09 is a Monday; the range reaches into the following week.
+    expect(bucketKeys(from, dateKeyStart("2026-03-17", offset), "week", offset)).toEqual(["2026-03-09", "2026-03-16"]);
+    expect(bucketKeys(from, dateKeyStart("2026-05-02", offset), "month", offset)).toEqual(["2026-03", "2026-04", "2026-05"]);
   });
 });
 
-describe("Telemetry timezone bucketing and percentiles", () => {
-  it("buckets timestamps using the user's local UTC offset rather than UTC midnight", () => {
-    // 2026-03-10T17:30:00Z is 2026-03-11 01:30 in UTC+8 (+480) and 2026-03-10 12:30 in UTC-5 (-300).
-    const ts = Date.UTC(2026, 2, 10, 17, 30, 0);
-    expect(localDateKey(ts, 480)).toBe("2026-03-11");
-    expect(localDateKey(ts, -300)).toBe("2026-03-10");
-    expect(bucketForTimestamp(ts, "hour", 480).bucket).toBe("2026-03-11 01:00");
-    expect(bucketForTimestamp(ts, "day", 480).bucket).toBe("2026-03-11");
-    expect(percentile([100, 500, 200, 400, 300], 50)).toBe(300);
-    expect(percentile([100, 500, 200, 400, 300], 95)).toBe(500);
-    expect(percentile([], 50)).toBeNull();
-  });
-});
-
-describe("TelemetryService recording, cross-DB live enrichment, and aggregations", () => {
-  it("aggregates overview, projects, models, activity, tools, drilldown, export, and clear accurately", () => {
-    const root = tempRoot();
-    const liveFolders = new Map<string, LiveFolderInfo>([
-      ["f-work", { id: "f-work", name: "Work", color: "blue" }],
-      ["f-oss", { id: "f-oss", name: "Open Source", color: "green" }],
-    ]);
-    const liveSessions = new Map<string, LiveSessionInfo>([
-      ["s-1", { id: "s-1", title: "Refactor runtime", folderId: "f-work", status: "active", completed: false }],
-      ["s-2", { id: "s-2", title: "Deleted later", folderId: "f-oss", status: "active", completed: false }],
-    ]);
-    const lookup: WorkspaceLookup = {
-      folders: () => liveFolders,
-      sessions: () => liveSessions,
-      session: id => liveSessions.get(id) ?? null,
-      folder: id => liveFolders.get(id) ?? null,
-      pluginNames: () => new Map([["asterism.builtin", "Built-in"]]),
-      providerNames: () => new Map([["p-anth", "Anthropic"]]),
-    };
-
-    const service = new TelemetryService(root, { lookup, notifyThrottleMs: 0 });
+describe("Usage ledger queries", () => {
+  it("groups by the current folder of live sessions and the recorded folder of deleted ones", () => {
+    const { folders, sessions, lookup } = workspace();
+    folders.set("work", { id: "work", name: "Work", color: "blue" });
+    folders.set("oss", { id: "oss", name: "Open source", color: "green" });
+    sessions.set("moved", { id: "moved", title: "Moved", folderId: "work", status: "active" });
+    sessions.set("gone", { id: "gone", title: "Gone", folderId: "oss", status: "active" });
+    const service = new TelemetryService(root(), lookup);
     try {
-      service.registerModelPurposes("asterism.builtin", [
-        { id: "conversation", label: "Conversation" },
-        { id: "subagent", label: "Subagent" },
-      ]);
+      service.recordModelUsage(record({ sessionId: "moved" }));
+      service.recordModelUsage(record({ sessionId: "gone" }));
+      // After recording: one session moves out of its folder, the other session and its folder are deleted.
+      sessions.set("moved", { id: "moved", title: "Moved", folderId: null, status: "sleeping" });
+      sessions.delete("gone");
+      folders.delete("oss");
 
-      const t1 = Date.UTC(2026, 2, 10, 10, 0, 0);
-      const t2 = Date.UTC(2026, 2, 11, 14, 0, 0);
+      const byFolder = query(service, { kind: "breakdown", dimension: "folder", limit: 10, latency: false });
+      expect(byFolder.rows.map(row => row.group)).toEqual(expect.arrayContaining([
+        expect.objectContaining({ folderId: null, name: null, deleted: false }),
+        expect.objectContaining({ folderId: "oss", name: "Open source", color: "green", deleted: true }),
+      ]));
+      expect(query(service, { kind: "summary", compare: null }, { ...everything, folderId: "work" }).metrics.requests).toBe(0);
+      const bySession = query(service, { kind: "breakdown", dimension: "session", limit: 10, latency: false }, { ...everything, folderId: "oss" });
+      expect(bySession.rows.map(row => row.group)).toEqual([expect.objectContaining({ sessionId: "gone", title: "Gone", status: "deleted", folderName: "Open source" })]);
+    } finally { service.close(); }
+  });
 
-      service.recordModelUsage({
-        startedAt: t1, endedAt: t1 + 4000, durationMs: 4000, firstOutputMs: 800, firstTextMs: 900, firstReasoningMs: null, outputChunks: 20,
-        pluginId: "asterism.builtin", entryKind: "execution", resourceId: "a-1", resourceKind: "asterism.builtin/agent",
-        sessionId: "s-1", purposeId: "conversation",
-        providerId: "p-anth", providerName: "Anthropic", modelId: "claude-sonnet", protocol: "anthropic", thinking: "medium",
-        usage: { input: 100_000, output: 10_000, total: 110_000, reasoning: 2_000, cacheRead: 80_000, cacheWrite: 10_000 },
-        cost: claudeCost, hasFiles: false, toolCallCount: 2, outcome: "completed", finishReason: "tool-calls", errorOrigin: null, errorCode: null,
-        tools: [
-          { startedAt: t1 + 2000, durationMs: 120, sessionId: "s-1", pluginId: "asterism.builtin", toolName: "read", implementationId: "asterism.builtin/directory.read", targetResourceKind: "asterism.builtin/directory", outcomeKind: "succeeded", errorCode: null },
-          { startedAt: t1 + 2200, durationMs: 350, sessionId: "s-1", pluginId: "asterism.builtin", toolName: "exec", implementationId: "asterism.builtin/directory.exec", targetResourceKind: "asterism.builtin/directory", outcomeKind: "failed", errorCode: "command_failed" },
-        ],
-      });
+  it("computes nearest-rank time-to-first-output percentiles per group", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      for (const firstOutputMs of [100, 500, 200, 400, 300]) service.recordModelUsage(record({ modelId: "a", firstOutputMs }));
+      service.recordModelUsage(record({ modelId: "b", firstOutputMs: null }));
+      const rows = query(service, { kind: "breakdown", dimension: "model", limit: 10, latency: true }).rows;
+      expect(rows.find(row => row.group.key === JSON.stringify(["p", "a"]))?.ttft).toEqual({ p50: 300, p95: 500 });
+      expect(rows.find(row => row.group.key === JSON.stringify(["p", "b"]))?.ttft).toEqual({ p50: null, p95: null });
+    } finally { service.close(); }
+  });
 
-      // Trigger long-context tier (>= 200K input) on s-2
-      service.recordModelUsage({
-        startedAt: t2, endedAt: t2 + 6000, durationMs: 6000, firstOutputMs: 1200, firstTextMs: 1200, firstReasoningMs: null, outputChunks: 40,
-        pluginId: "asterism.builtin", entryKind: "execution", resourceId: "p-1", resourceKind: "asterism.builtin/subagent-pool",
-        sessionId: "s-2", purposeId: "subagent",
-        providerId: "p-anth", providerName: "Anthropic", modelId: "claude-sonnet", protocol: "anthropic", thinking: "high",
-        usage: { input: 250_000, output: 20_000, total: 270_000, reasoning: 5_000, cacheRead: 100_000, cacheWrite: 0 },
-        cost: claudeCost, hasFiles: false, toolCallCount: 0, outcome: "failed", finishReason: null, errorOrigin: "model", errorCode: "rate_limit",
-      });
+  it("sums priced parts, generation speed inputs, and cache savings without counting unknown prices as zero", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      service.recordModelUsage(record({ usage: usage(1_000_000, 100_000, { cacheRead: 800_000 }), durationMs: 3_000, firstOutputMs: 1_000 }));
+      service.recordModelUsage(record({ cost: null, usage: usage(10, 0), durationMs: 500, firstOutputMs: null }));
+      const { metrics } = query(service, { kind: "summary", compare: null });
+      // Uncached input 0.2M × $3, cache reads 0.8M × $0.3, output 0.1M × $15.
+      expect(metrics.cost.input).toBeCloseTo(0.6);
+      expect(metrics.cost.cacheRead).toBeCloseTo(0.24);
+      expect(metrics.cost.output).toBeCloseTo(1.5);
+      // Part sums cover priced requests only; the unpriced request adds nothing to them.
+      expect(metrics.cost.cacheWrite).toBe(0);
+      expect(metrics.costUsd).toBeCloseTo(2.34);
+      expect(metrics.costIncomplete).toBe(1);
+      expect(metrics.cacheSavedUsd).toBeCloseTo(0.8 * 2.7);
+      // Only the request with output contributes generation time after its first output.
+      expect([metrics.generatedTokens, metrics.generationMs]).toEqual([100_000, 2_000]);
+    } finally { service.close(); }
+  });
 
-      service.recordExternalUsage({
-        recordedAt: t1 + 5000, pluginId: "asterism.builtin", sessionId: "s-1",
-        category: "web.search", providerLabel: "exa", quantity: 1, unit: "request", currency: "USD", amount: 0.005, outcome: "succeeded", durationMs: 600,
-      });
+  it("fills empty buckets and folds groups beyond the limit into one remainder", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      const day = (date: string, hour: number) => dateKeyStart(date, 0) + hour * 3_600_000;
+      service.recordModelUsage(record({ modelId: "big", startedAt: day("2026-03-01", 9), usage: usage(1_000_000, 0) }));
+      service.recordModelUsage(record({ modelId: "small", startedAt: day("2026-03-03", 9) }));
+      service.recordModelUsage(record({ modelId: "tiny", startedAt: day("2026-03-03", 10), usage: usage(1, 0) }));
+      const series = query(service, { kind: "series", granularity: "day", groupBy: "model", limit: 1 },
+        { from: dateKeyStart("2026-03-01", 0), to: dateKeyStart("2026-03-04", 0), utcOffsetMinutes: 0 });
+      expect(series.points.map(point => [point.key, point.metrics.requests])).toEqual([["2026-03-01", 1], ["2026-03-02", 0], ["2026-03-03", 2]]);
+      expect(series.groups.map(group => group.key)).toEqual([JSON.stringify(["p", "big"]), "other"]);
+      expect(series.points[2]!.groups.other).toMatchObject({ requests: 2 });
+    } finally { service.close(); }
+  });
 
-      // Simulate renaming folder f-work and deleting session s-2 from workspace.db:
-      // s-1 should pick up renamed folder live; s-2 should retain snapshot folder and show deleted status.
-      liveFolders.set("f-work", { id: "f-work", name: "Core Engineering", color: "violet" });
-      liveSessions.delete("s-2");
+  it("excludes plugin-reported usage when a model dimension narrows the filter", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      service.recordExternalUsage({ recordedAt: 0, pluginId: "plugin", sessionId: null, category: "web.search", providerLabel: null,
+        quantity: 1, unit: "request", currency: "usd", amount: 0.01, outcome: "succeeded", durationMs: null });
+      expect(query(service, { kind: "summary", compare: null }).external).toEqual({ usd: 0.01, other: [], count: 1 });
+      expect(query(service, { kind: "summary", compare: null }, { ...everything, providerId: "p" }).external.count).toBe(0);
+    } finally { service.close(); }
+  });
 
-      const filter = { from: null, to: null, utcOffsetMinutes: 0 };
-
-      const overview = service.execute({ type: "overview", filter });
-      expect(overview.kind).toBe("overview");
-      if (overview.kind !== "overview") return;
-      expect(overview.hasAnyData).toBe(true);
-      expect(overview.summary.requests).toBe(2);
-      expect(overview.summary.completed).toBe(1);
-      expect(overview.summary.failed).toBe(1);
-      expect(overview.summary.tieredRequests).toBe(1);
-      expect(overview.summary.externalCostUsd).toBeCloseTo(0.005, 6);
-      expect(overview.summary.cacheSavedUsd).toBeGreaterThan(0);
-      expect(overview.topFolders.find(f => f.folderId === "f-work")?.name).toBe("Core Engineering");
-      expect(overview.topSessions.find(s => s.sessionId === "s-2")).toMatchObject({ deleted: true, title: "Deleted later", folderId: "f-oss" });
-
-      const projects = service.execute({ type: "projects", filter });
-      expect(projects.kind).toBe("projects");
-      if (projects.kind === "projects") {
-        expect(projects.tieredSummary.requests).toBe(1);
-        expect(projects.tieredSummary.affectedSessions).toBe(1);
-      }
-
-      const models = service.execute({ type: "models", filter });
-      expect(models.kind).toBe("models");
-      if (models.kind === "models") {
-        expect(models.models).toHaveLength(1);
-        expect(models.thinkingLevels.map(t => t.level)).toEqual(["medium", "high"]);
-      }
-
-      const tools = service.execute({ type: "tools", filter });
-      expect(tools.kind).toBe("tools");
-      if (tools.kind === "tools") {
-        expect(tools.tools).toHaveLength(2);
-        expect(tools.resourceKinds[0]).toMatchObject({ kind: "asterism.builtin/directory", calls: 2, succeeded: 1, failed: 1 });
-        expect(tools.externalUsage[0]).toMatchObject({ category: "web.search", provider: "exa", totalAmount: 0.005 });
-      }
-
-      const drill = service.execute({
-        type: "drilldown",
-        filter,
-        target: { kind: "model", providerId: "p-anth", modelId: "claude-sonnet" },
-        eventFilter: "failed",
-      });
-      expect(drill.kind).toBe("drilldown");
-      if (drill.kind === "drilldown") {
-        expect(drill.errorBreakdown).toEqual([{ code: "rate_limit", origin: "model", count: 1 }]);
-        expect(drill.events).toHaveLength(1);
-        expect(drill.events[0]?.errorCode).toBe("rate_limit");
-      }
-
-      const csv = service.execute({ type: "export", filter, format: "csv" });
-      expect(csv.kind).toBe("export");
-      if (csv.kind === "export") {
-        expect(csv.rowCount).toBe(2);
-        expect(csv.content.split("\n").length).toBe(3);
-      }
-
-      const cleared = service.execute({ type: "clear", beforeTimestamp: t2 });
-      expect(cleared.kind).toBe("clear");
-      if (cleared.kind === "clear") {
-        expect(cleared.deletedModelEvents).toBe(1);
-        expect(cleared.deletedToolEvents).toBe(2);
-        expect(cleared.deletedExternalEvents).toBe(1);
-      }
-    } finally {
-      service.close();
-    }
+  it("clears records before a time together with the tool calls of cleared requests", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      const tool = { durationMs: 5, toolName: "read", implementationId: null, resourceKind: "directory", outcome: "succeeded", errorCode: null };
+      service.recordModelUsage(record({ startedAt: 1_000, tools: [{ ...tool, startedAt: 1_100 }] }));
+      service.recordModelUsage(record({ startedAt: 5_000, tools: [{ ...tool, startedAt: 900 }] }));
+      expect(service.execute({ type: "clear", before: 2_000 })).toEqual({ kind: "clear", deleted: 1 });
+      // The remaining request keeps its tool call even though the call's own timestamp precedes the bound.
+      expect(query(service, { kind: "tools", groupBy: "tool" }).rows.map(row => row.calls)).toEqual([1]);
+    } finally { service.close(); }
   });
 });

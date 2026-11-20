@@ -94,12 +94,15 @@ export const sessionLifecycleSchema = z.strictObject({
 });
 export type SessionLifecycle = z.infer<typeof sessionLifecycleSchema>;
 export const defaultSessionLifecycle: SessionLifecycle = { retentionDays: 30, sleepDays: 30 };
+/** Monthly spending target in USD for usage statistics; null shows no target. */
+export const usageBudgetSchema = z.number().positive().max(1_000_000_000).nullable();
 export const configurationSnapshotSchema = z.strictObject({
   mcp: mcpSettingsSchema,
   shell: shellSettingsSchema,
   sessionEntry: sessionEntrySelectionSchema.nullable(),
   sessionLifecycle: sessionLifecycleSchema,
   showUsage: z.boolean(),
+  usageBudget: usageBudgetSchema,
   messagingConnections: z.array(messagingConfigurationSchema),
   messagingProviderTypes: z.array(messagingProviderTypeSchema),
   webProviders: z.array(webProviderSchema),
@@ -121,6 +124,7 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("sessionEntry.set"), value: sessionEntrySelectionSchema }),
   z.strictObject({ type: z.literal("sessionLifecycle.set"), value: sessionLifecycleSchema }),
   z.strictObject({ type: z.literal("showUsage.set"), value: z.boolean() }),
+  z.strictObject({ type: z.literal("usageBudget.set"), value: usageBudgetSchema }),
   // Save targets the current ID; a different ID in value means rename.
   z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderSchema }),
   z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),

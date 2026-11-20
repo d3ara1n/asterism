@@ -43,7 +43,7 @@ The Linux native-titlebar switch is resolved when creating the window and requir
 
 Window owns titlebar and managed space. Screens move within that space; islands are columns within a screen. Descendants do not independently compensate for the titlebar.
 
-Settings sits to the left of the main page. The main page lays out the navigation sidebar, a central Island viewport, and an optional auxiliary panel as neighboring regions. Sidebars stay docked within the page while visible and reserve width from the central viewport; users hide or close them explicitly. Home or the workbench is the central root Island. Navigation switches whole pages, including their sidebars, rather than intercepting system gestures.
+Settings sits to the left of the main page. The main page lays out the navigation sidebar, a central Island viewport, and an optional auxiliary panel as neighboring regions. Sidebars stay docked within the page while visible and reserve width from the central viewport; users hide or close them explicitly. The page chosen in the sidebar is the central root Island; it cannot close, and its details open as ordinary islands to the right. The workbench is one canvas-backed island with the shared border, rounding, and focus highlight. Pages made of several cards, such as Home and usage statistics, place their cards directly on the window material. A page's controls for its content source, such as the workbench's object actions or the usage view, range, and filters, sit in the window titlebar's action area. Navigation switches whole pages, including their sidebars, rather than intercepting system gestures.
 
 Islands declare minimum width, growth weight, and optional maximum. When they fit, distribute space and center them. When they overflow, use minimum widths and reveal the focused island within the Island viewport without moving the docked sidebars. Segment navigation makes completely displaced islands reachable.
 
@@ -121,7 +121,7 @@ Use the shared display, page, section, body, caption, label, and code roles. Int
 
 The host publishes typography through root CSS tokens. Plugin DOM content inherits those styles; renderers that require explicit font options consume the resolved tokens and apply changes to existing views. Interactive terminals and terminal images use the same font settings. Font changes recalculate terminal geometry without restarting the shell.
 
-Use Lucide icons. Chart category colors and folder colors are independent of status and accent colors. Pair each graphic with visible labels and values; colors alone do not encode meaning, so a folder color always appears with its folder name, either visibly or, for compact membership marks in a list, through a tooltip and the row's accessible name.
+Use Lucide icons. Charts use the shared chart container for tooltips, axes, and theme colors. Chart category colors and folder colors are independent of status and accent colors. Pair each graphic with visible labels and values; colors alone do not encode meaning, so a folder color always appears with its folder name, either visibly or, for compact membership marks in a list, through a tooltip and the row's accessible name.
 
 Switches express immediate booleans, checkboxes express form or multi-selection, radios express explained single choices, tabs change content, and searchable choices use the shared command/popover combination.
 

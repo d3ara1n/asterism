@@ -33,7 +33,7 @@ Use the `@asterism-app` scope for Asterism core and framework packages, and the 
 
 ### Vendored shadcn components
 
-`packages/ui/src/ui/` mixes shadcn registry files with project-owned controls. Run the shadcn CLI from the repository root: the `packages/ui` config cannot resolve its aliases, and the root config rewrites the `cn` import to an npm package named `cn` and adds it as a dependency. If workspace alias validation rejects `lib` or `hooks`, `add <name> --view` still exposes the registry source for applying it locally. After every `add` or `--overwrite` of a registry file, restore relative imports (`../utils`, `./button`), drop the `cn` dependency, and reapply the local changes below. Keep this list current whenever a registry file gains or loses a local change.
+`packages/ui/src/ui/` mixes shadcn registry files with project-owned controls. Run the shadcn CLI from the repository root: the `packages/ui` config cannot resolve its aliases, and the root config rewrites the `cn` import to an npm package named `cn` and adds it as a dependency. If workspace alias validation rejects `lib` or `hooks`, `add <name> --view` still exposes the registry source for applying it locally. After every `add` or `--overwrite` of a registry file, restore relative imports (`../utils`, `./button`), drop the `cn` dependency, and reapply the local changes below. Registry files only the host uses, such as `sonner` and `chart`, live in `src/renderer/shared/ui/` instead, so plugins do not receive them through the shared UI modules; they import `cn` from `@asterism-app/ui/utils`. Keep this list current whenever a registry file gains or loses a local change.
 
 - `input-group`: `InputGroupAddon` click focuses `[data-slot=input-group-control]` instead of the first `input`, so textareas receive focus and hidden file inputs are skipped.
 - `button`, `badge`: `destructive` uses `text-destructive-foreground` without dark overrides, `link` uses `text-primary-text`; button adds the `selected` variant, badge adds `success` and `warning`.
@@ -45,6 +45,7 @@ Use the `@asterism-app` scope for Asterism core and framework packages, and the 
 - `tooltip`: Provider defaults to a 700 ms hover delay with no skip-delay window; explicit timing props remain supported.
 - `hover-card`, `tooltip`: fade and scale in place to keep the trigger under the pointer as the surface opens.
 - `progress`: forwards `value` to the Radix root so the value attributes are exposed.
+- `chart` (host): the dark theme selector is `[data-mode=dark]`; the tooltip uses the popover surface with sans tabular figures.
 - `scroll-area`: exposes viewport refs/props and content styling; supports both axes; uses an explicit Radix content element with caller-controlled display, a transparent track, and a semantic overlay thumb; normalizes Radix pointer coordinates for scaled canvases.
 - `message-scroller`: the jump button's screen-reader label comes from `commonMessages`; a nested Radix root preserves the primitive root's ref registration, while Viewport and Content compose through `asChild` so the same viewport owns scrolling and an overlay scrollbar; the viewport drops `scroll-fade-b` and native scrollbar styling.
 

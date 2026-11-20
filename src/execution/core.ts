@@ -12,6 +12,7 @@ import type { ContentLease } from "../runtime/content-store.ts";
 import type { BoundTopLevelTool } from "../plugins/top-level-tools.ts";
 import { ToolScheduler } from "./scheduler.ts";
 import { executeResourceScript, scriptToModel } from "./script.ts";
+import type { ToolUsageRecord } from "../telemetry/types.ts";
 
 export type PendingCall = ModelToolCall;
 export type ToolObserver = ModelToolObserver;
@@ -58,16 +59,11 @@ export function coreDeclarations(tools: readonly BoundTopLevelTool[] = []): Tool
   return [...actions, ...tools.filter(entry => entry.available)].map(({ tool }) => declareTool(tool));
 }
 
-export interface SettledToolTelemetry {
-  call: PendingCall;
-  info: ToolInvocationInfo;
-  outcome: ToolOutcome;
-  startedAt: number;
-  finishedAt: number;
-}
+/** Receives each settled call, including calls made by scripts; resource_call reports the resource tool it invoked. */
+export type ToolSettled = (record: ToolUsageRecord) => void;
 /** Bind resource dispatch without making the model runner depend on a session or resource identity. */
 export function bindModelTools(capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = [], handover?: ContentLease, notice?: () => void,
-  onToolSettled?: (entry: SettledToolTelemetry) => void): ModelTools {
+  onToolSettled?: ToolSettled): ModelTools {
   return {
     declarations: coreDeclarations(tools),
     preview: (name, args) => previewCoreCall(name, args, capabilities, tools),
@@ -98,7 +94,7 @@ class ToolDispatcher {
   private readonly callableNames: string[];
   constructor(private readonly capabilities: AgentCapabilities, private readonly tools: readonly BoundTopLevelTool[],
     private readonly handover?: ContentLease, private readonly notice?: () => void,
-    private readonly onToolSettled?: (entry: SettledToolTelemetry) => void) {
+    private readonly onToolSettled?: ToolSettled) {
     this.callableNames = [...actions, ...tools.filter(entry => entry.available)]
       .filter(entry => !entry.tool.requiresInteraction)
       .map(entry => entry.tool.name).filter(name => name !== ResourceScript.name && name !== ResourceCall.name);
@@ -141,7 +137,11 @@ class ToolDispatcher {
     const complete = (completion: CallResult, latest: Json = null) => {
       const finishedAt = Date.now();
       const outcome = finishToolResult(completion, { ...info, finishedAt }, latest, "execute" in result ? result.toModel : undefined);
-      this.onToolSettled?.({ call, info, outcome, startedAt: info.startedAt ?? finishedAt, finishedAt });
+      const args = call.arguments;
+      const resourceTool = call.name === ResourceCall.name && args && typeof args === "object" && !Array.isArray(args) && typeof args.tool === "string" ? args.tool : null;
+      this.onToolSettled?.({ startedAt: info.startedAt ?? finishedAt, durationMs: info.startedAt === undefined ? null : finishedAt - info.startedAt,
+        toolName: resourceTool ?? call.name, implementationId: info.implementation?.id ?? null, resourceKind: info.resource?.kind ?? null,
+        outcome: outcome.kind, errorCode: "error" in outcome ? outcome.error.code : null });
       return outcome;
     };
     if (signal.aborted) return complete({ kind: "cancelled", message: "The operation was not started." });
@@ -177,7 +177,7 @@ class ToolDispatcher {
 export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities,
   signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
   observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = [], notice?: () => void,
-  onToolSettled?: (entry: SettledToolTelemetry) => void): Promise<void> {
+  onToolSettled?: ToolSettled): Promise<void> {
   const dispatcher = new ToolDispatcher(capabilities, tools, handover, notice, onToolSettled);
   const prepared = calls.map(call => dispatcher.prepare(call, observer));
   const outcomes = await Promise.allSettled(prepared.map(async entry => settle(entry.call, await dispatcher.run(entry, signal, observer))));

@@ -1,51 +1,41 @@
 import type { ModelCost, UiText, Usage } from "@asterism-app/sdk/contracts";
-import type { ExternalUsageOutcome } from "@asterism-app/sdk/runtime";
+import type { ExternalUsageOutcome, ModelPurposeDeclaration } from "@asterism-app/sdk/runtime";
+import type { SessionStatus } from "../shared/telemetry.ts";
 
-export interface ToolUsageRecordInput {
-  id?: string;
+/** One tool call settled inside an execution request. */
+export interface ToolUsageRecord {
   startedAt: number;
   durationMs: number | null;
-  sessionId: string | null;
-  pluginId: string;
   toolName: string;
   implementationId: string | null;
-  targetResourceKind: string | null;
-  outcomeKind: string;
+  resourceKind: string | null;
+  outcome: string;
   errorCode: string | null;
 }
 
-export interface ModelUsageRecordInput {
-  id?: string;
+/** One settled model request, with the configured price used to estimate its cost. */
+export interface ModelUsageRecord {
+  id: string;
   startedAt: number;
-  endedAt: number;
   durationMs: number | null;
   firstOutputMs: number | null;
-  firstTextMs: number | null;
-  firstReasoningMs: number | null;
-  outputChunks: number | null;
   pluginId: string;
-  entryKind: "execution" | "run" | "stream";
-  resourceId: string | null;
-  resourceKind: string | null;
-  sessionId: string | null;
   purposeId: string | null;
+  sessionId: string | null;
   providerId: string;
   providerName: string;
   modelId: string;
-  protocol: string | null;
   thinking: string | null;
   usage: Usage | null;
   cost: ModelCost | null;
   hasFiles: boolean;
-  toolCallCount: number;
   outcome: "completed" | "failed" | "cancelled";
-  finishReason: string | null;
   errorOrigin: string | null;
   errorCode: string | null;
-  tools?: readonly ToolUsageRecordInput[];
+  tools: readonly ToolUsageRecord[];
 }
 
-export interface ExternalUsageRecordInput {
+export interface ExternalUsageRecord {
   recordedAt: number;
   pluginId: string;
   sessionId: string | null;
@@ -59,25 +49,29 @@ export interface ExternalUsageRecordInput {
   durationMs: number | null;
 }
 
-export interface LiveFolderInfo {
-  id: string;
-  name: string;
-  color: string;
-}
+export interface LiveFolder { id: string; name: string; color: string }
+export interface LiveSession { id: string; title: string; folderId: string | null; status: Exclude<SessionStatus, "deleted"> }
 
-export interface LiveSessionInfo {
-  id: string;
-  title: string;
-  folderId: string | null;
-  status: "active" | "sleeping" | "archived";
-  completed: boolean;
-}
-
+/** Current workspace names and membership; read at recording time for snapshots and at query time for grouping. */
 export interface WorkspaceLookup {
-  folders(): ReadonlyMap<string, LiveFolderInfo>;
-  sessions(): ReadonlyMap<string, LiveSessionInfo>;
-  session(id: string): LiveSessionInfo | null;
-  folder(id: string): LiveFolderInfo | null;
-  pluginNames(): ReadonlyMap<string, UiText | null>;
+  folders(): ReadonlyMap<string, LiveFolder>;
+  /** Every session still in the workspace, including archived ones. */
+  sessions(): ReadonlyMap<string, LiveSession>;
+  session(id: string): LiveSession | null;
   providerNames(): ReadonlyMap<string, string>;
+  pluginNames(): ReadonlyMap<string, UiText | null>;
+}
+
+/** Recording side of the usage ledger, shared with plugin contexts and model services. */
+export interface UsageRecorder {
+  registerPurposes(pluginId: string, declarations: readonly ModelPurposeDeclaration[]): void;
+  recordModelUsage(record: ModelUsageRecord): void;
+  recordExternalUsage(record: ExternalUsageRecord): void;
+}
+/** Hosts composed without a ledger, such as isolated tests, record nothing. */
+export const noUsageRecorder: UsageRecorder = { registerPurposes() {}, recordModelUsage() {}, recordExternalUsage() {} };
+
+/** Plugin-declared purpose labels, registered as plugins load. */
+export interface PurposeLabels {
+  label(pluginId: string, purposeId: string): UiText | null;
 }

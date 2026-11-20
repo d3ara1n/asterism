@@ -9,7 +9,7 @@ import type { SdkObjects } from "./objects.ts";
 import { bindModelTools } from "../../execution/core.ts";
 import type { ContentLease } from "../../runtime/content-store.ts";
 import type { PluginEventScope } from "../event-scope.ts";
-import type { ToolUsageRecordInput } from "../../telemetry/types.ts";
+import type { ToolUsageRecord } from "../../telemetry/types.ts";
 
 interface ExecutionBinding {
   owner: string;
@@ -90,29 +90,13 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
           const capabilities = host.sessions.capabilities(linked, policy, caller, interactive, resourcePolicy);
           const boundTools = topLevelTools(caller, policy, linkedRefs, interactive, kind => capabilities.resourceToolRestriction(kind));
           const preparedSystem = host.sessions.context(linked).then(files => typeof system === "function" ? system(files) : system);
-          const settledTools: ToolUsageRecordInput[] = [];
+          const settledTools: ToolUsageRecord[] = [];
           return await host.models.run({ target, system: preparedSystem,
-            messages, userAgent, sessionId: ref.sessionId, requestParentId, purpose,
-            telemetry: { pluginId: owner, entryKind: "execution", resourceId: ref.id, resourceKind: ref.kind, purposeId: purpose ?? null, tools: settledTools },
+            messages, userAgent, sessionId: ref.sessionId, requestParentId,
+            telemetry: { pluginId: owner, purposeId: purpose ?? null, tools: settledTools },
             signal, tools: bindModelTools(capabilities, boundTools, handover, () => {
               events.publish(ResourceNoticeRaised, { title: source.title, kind: "attention" }, { plugin: owner, resource: ref });
-            }, entry => {
-              const rawArgs = entry.call.arguments;
-              const toolName = entry.call.name === "resource_call" && rawArgs && typeof rawArgs === "object" && !Array.isArray(rawArgs) && typeof rawArgs.tool === "string"
-                ? rawArgs.tool : entry.call.name;
-              const outcome = entry.outcome;
-              settledTools.push({
-                startedAt: entry.startedAt,
-                durationMs: Math.max(0, entry.finishedAt - entry.startedAt),
-                sessionId: ref.sessionId,
-                pluginId: owner,
-                toolName,
-                implementationId: entry.info.implementation?.id ?? null,
-                targetResourceKind: entry.info.resource?.kind ?? null,
-                outcomeKind: outcome.kind,
-                errorCode: "error" in outcome ? outcome.error.code : null,
-              });
-            }),
+            }, settled => settledTools.push(settled)),
             completionExtensions: request.completionExtensions,
             content: values => options?.content
               ? host.content?.captureReader(inputReferences(values), options.content, owner)

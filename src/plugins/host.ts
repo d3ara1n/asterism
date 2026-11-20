@@ -11,6 +11,7 @@ import type { AgentCatalogService } from "./agent-catalog.ts";
 import type { WebProviderRegistry } from "../configuration/web-providers.ts";
 import type { MessagingRegistry } from "../configuration/messaging.ts";
 import type { ModelProviderExtensions } from "../configuration/provider-extensions.ts";
+import type { UsageRecorder } from "../telemetry/types.ts";
 
 /** Application-wide services composed once by the host and shared by every plugin context. */
 export interface SharedServices {
@@ -25,7 +26,7 @@ export interface SharedServices {
   webProviders: WebProviderRegistry;
   messaging: MessagingRegistry;
   extensions: ModelProviderExtensions;
-  telemetry?: import("../telemetry/service.ts").TelemetryService;
+  usageLedger: UsageRecorder;
   manualSources(): readonly ManualSource[];
   packageRoots: ReadonlyMap<string, string>;
   /** Host-owned calls served through the plugin call transport. */

@@ -30,6 +30,14 @@ Use reusable choices for work you repeat. Make a task-specific choice when the m
 
 Response usage and estimated cost concern model requests; account balance and quota concern the provider account or plan. Use each to answer its own question rather than treating one as confirmation of the other.
 
+## Read usage statistics as estimates over a permanent record
+
+Usage statistics collect every model request across sessions and plugins, so you can see where cost and tokens went by folder, session, model, purpose, and time. They record counts, timings, and outcomes, never conversation content. The record is kept until you delete it; archiving or deleting sessions and folders does not remove their usage, and restoring a recovery point does not rewind it.
+
+Costs are estimates computed from the prices configured for each model when the request finished. Changing a price later does not rewrite earlier estimates, and requests whose price was unknown or only partly known are counted as such rather than as free. A provider's bill can still differ: relays, discounts, and charges the protocol does not report fall outside the estimate. Use provider balances for what the account actually holds, and usage statistics to understand which work consumed it.
+
+Folders and session names follow your current organization. Moving a session to another folder moves its history with it; names recorded at the time remain visible after a session or folder is deleted. A monthly budget sets the pace shown for the current calendar month; it does not limit requests.
+
 ## Put lasting responsibility in Agent instructions
 
 An Agent configuration can leave its role instructions empty. The factory conversation default does so: it adds no role prompt or identity to the model context. Shared environment instructions, selected skills, and linked resource context still apply. Add role instructions when you want expertise, standards, and responsibilities that should survive individual tasks. Put the current goal, permitted scope, acceptance criteria, and reserved decisions in the task. This avoids turning a reusable role into a collection of stale project instructions.

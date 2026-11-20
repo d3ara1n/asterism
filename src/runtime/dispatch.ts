@@ -72,9 +72,9 @@ export async function serveContent(service: ApplicationService, command: unknown
 export function serveTelemetry(service: ApplicationService, command: unknown): TelemetryResult {
   try { return { ok: true, reply: service.telemetry.execute(command) }; }
   catch (error) {
-    const known = error instanceof TelemetryError;
-    if (!known) console.error("Telemetry command failed.", error);
-    return { ok: false, error: { code: known ? error.code : "internal", message: known ? error.message : "Telemetry query could not be completed." } };
+    if (error instanceof TelemetryError) return { ok: false, error: { code: error.code, message: error.message } };
+    console.error("Usage statistics command failed.", error);
+    return { ok: false, error: { code: "unavailable", message: "Usage statistics could not be read." } };
   }
 }
 

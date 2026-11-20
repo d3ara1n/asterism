@@ -14,6 +14,7 @@ import { ResourceActivities } from "./resource-activities.ts";
 import { ShellHost } from "../shell/host.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { ReadSkillDocument, ReadSkills, RefreshSkills, SkillsChanged } from "../shared/skills.ts";
+import type { UsageRecorder } from "../telemetry/types.ts";
 
 export interface SharedServiceOptions {
   db: DatabaseSync;
@@ -24,7 +25,7 @@ export interface SharedServiceOptions {
   packageRoots: ReadonlyMap<string, string>;
   /** User skill directories scanned alongside plugin contributions. */
   skillDirectories: readonly string[];
-  telemetry?: import("../telemetry/service.ts").TelemetryService;
+  usageLedger: UsageRecorder;
 }
 
 /** The single composition point for host services shared by all plugins; closing ends their connections, processes and caches. */
@@ -43,7 +44,7 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
   return {
     activities, mcp, shell, deadlines, usage, agentCatalog, modelProviders: models, usageProviders: usages,
     webProviders: configuration.web, messaging: configuration.messaging, extensions: configuration.extensions,
-    telemetry: options.telemetry,
+    usageLedger: options.usageLedger,
     manualSources: options.manualSources, packageRoots: options.packageRoots,
     calls: [
       ...mcp.calls, ...shell.calls,

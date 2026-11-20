@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import type { PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
 import { configurationStorage } from "../configuration/store.ts";
 import { workspaceStorage } from "../runtime/storage.ts";
+import { telemetryStorage } from "../telemetry/storage.ts";
 import { buildPackages, importPackages, packageListStorage, type BuiltPackage } from "../plugins/packages.ts";
 import { collectManagedInstallations } from "../plugins/npm-installation.ts";
 import { savePluginBuild } from "../plugins/artifacts.ts";
@@ -15,6 +16,7 @@ import type { PreparationProgress, PreparationResult } from "../shared/recovery.
 
 /**
  * Application data covered by recovery points; caches (`ui-state.json`, plugin builds, Chromium, logs) are neither migrated nor backed up.
+ * The usage ledger is migrated with host storage but stays outside recovery points, so restoring workspace state never rewinds usage history.
  * Register new host persistent files here and declare formats in `hostStorages`.
  */
 export const applicationDataPaths: readonly DataPath[] = [
@@ -36,7 +38,7 @@ function preferenceStorage(root: string, name: string): StorageDefinition {
   return jsonStorage({ id: name, file: join(root, `${name}.json`), version: preferenceVersion, migrations: {} });
 }
 export function hostStorages(root: string, decrypt?: (ciphertext: string) => Promise<string>): StorageDefinition[] {
-  return [packageListStorage(root), configurationStorage(root, decrypt), workspaceStorage(root),
+  return [packageListStorage(root), configurationStorage(root, decrypt), workspaceStorage(root), telemetryStorage(root),
     ...[applicationStorage.appearanceStore, applicationStorage.languageStore, applicationStorage.updatesStore, applicationStorage.networkStore].map(name => preferenceStorage(root, name))];
 }
 

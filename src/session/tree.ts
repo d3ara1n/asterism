@@ -115,6 +115,15 @@ export class SessionTree {
     if (!this.db.prepare("UPDATE sessions SET completed = ? WHERE id = ? AND archived_at IS NULL").run(Number(completed), sessionId).changes)
       throw new SessionError("not_found", "Session not found.");
   }
+  /** Every stored session, archived included, or one session by ID; usage statistics resolve names and folders through it. */
+  usageCatalog(id?: string): { id: string; title: string; folderId: string | null; status: "active" | "sleeping" | "archived" }[] {
+    const rows = (id === undefined
+      ? this.db.prepare("SELECT id, title, folder_id, sleeping_at, archived_at FROM sessions").all()
+      : this.db.prepare("SELECT id, title, folder_id, sleeping_at, archived_at FROM sessions WHERE id = ?").all(id)) as
+      { id: string; title: string; folder_id: string | null; sleeping_at: string | null; archived_at: string | null }[];
+    return rows.map(row => ({ id: row.id, title: row.title, folderId: row.folder_id,
+      status: row.archived_at !== null ? "archived" : row.sleeping_at !== null ? "sleeping" : "active" }));
+  }
   /** Trash catalog: lists sessions themselves without reading their contents. */
   archived(): { id: string; title: string; createdAt: string; archivedAt: string; folderId: string | null }[] {
     return (this.db.prepare("SELECT id, title, created_at, archived_at, folder_id FROM sessions WHERE archived_at IS NOT NULL ORDER BY archived_at DESC, rowid DESC").all() as

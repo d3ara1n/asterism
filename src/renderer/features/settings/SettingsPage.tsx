@@ -7,6 +7,7 @@ import { NetworkSettings } from "./NetworkSettings";
 import { HomeEntrySettings } from "./HomeEntrySettings";
 import { SessionsSettings } from "./SessionsSettings";
 import { SidebarSettings } from "./SidebarSettings";
+import { UsageSettings } from "./UsageSettings";
 import { AboutSettings } from "./AboutSettings";
 import { AppearanceSettings } from "../appearance/AppearanceSettings";
 import { ModelProvidersSettings } from "../configuration/ModelProvidersSettings";
@@ -45,7 +46,7 @@ type SettingsIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean 
 interface SettingsCategory { id: SettingsCategoryId; title: UiText; summary: UiText; icon: SettingsIcon; content: (manager: PluginManager) => ReactNode }
 
 const categories: SettingsCategory[] = [
-  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: SlidersHorizontal, content: () => <><LanguageSettings /><NetworkSettings /><HomeEntrySettings /><SidebarSettings /><SessionsSettings /></> },
+  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: SlidersHorizontal, content: () => <><LanguageSettings /><NetworkSettings /><HomeEntrySettings /><SidebarSettings /><SessionsSettings /><UsageSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /><MessagingSettings /></> },
   { id: "skills", title: skillsMessages.title, summary: skillsMessages.summary, icon: BookOpen, content: manager => <SkillSettings plugins={manager.list} /> },

@@ -197,6 +197,8 @@
 
 @utility surface { @apply rounded-lg border bg-card text-card-foreground; }
 @utility surface-floating { @apply rounded-lg border bg-popover text-popover-foreground shadow-md; }
+/* Content inset within a card shell: separated from the shell by background and a faint edge shadow, without a border. */
+@utility surface-inset { @apply rounded-lg bg-card shadow-[0_1px_3px_0_rgb(0_0_0/0.06),0_0_2px_0_rgb(0_0_0/0.04)]; }
 @layer base {
   * { box-sizing: border-box; }
   html, body, #root { height: 100%; background: transparent; }
@@ -312,6 +314,8 @@
   .app-sidebar { @apply flex h-full min-h-0 flex-col p-3; }
   .home-page { @apply flex h-full overflow-y-auto px-6 py-10; padding-inline: calc(1.5rem + var(--space-inset)); }
   .home-content { @apply m-auto w-full max-w-5xl shrink-0; }
+  /* Usage statistics: panel cards fill the root island edge to edge; weave spacing alone separates them from docks and neighboring islands. */
+  .dashboard-page { @apply h-full overflow-y-auto; }
 
   /* Settings: category cards sit on the material; details overlay the overview absolutely and fade/scale from the card origin. */
   /* Island weave: left-to-right islands center in columns when they fit, otherwise overflow and follow focus. */

@@ -50,7 +50,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     telemetry: {
       recordExternalUsage(record) {
         checkAvailable();
-        shared.telemetry?.recordExternalUsage({
+        shared.usageLedger.recordExternalUsage({
           recordedAt: record.recordedAt ?? Date.now(),
           pluginId: internal.id,
           sessionId: record.sessionId ?? null,
