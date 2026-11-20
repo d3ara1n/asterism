@@ -98,7 +98,7 @@ async function summarizeContext(
   try {
     // Off omits reasoning parameters so models without a disabled mode use the upstream default; other levels encode like work requests.
     for await (const event of models.stream({ target: target.thinking === "off" ? { provider: target.provider, model: target.model } : target,
-      userAgent, sessionId: object.ref.sessionId,
+      userAgent, sessionId: object.ref.sessionId, purpose: "compression",
       system: { blocks: [{ id: "context-summary", text: summarySystemPrompt }] },
       messages: [{ kind: "input", parts: [{ kind: "text", text: summaryPrompt(plan) }] }],
       signal,

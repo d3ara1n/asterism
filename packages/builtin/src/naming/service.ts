@@ -13,7 +13,7 @@ async function generateTitle(models: Pick<ModelServices, "stream">, target: Mode
   const textParts = new Set<string>();
   for await (const event of models.stream({
     target, signal,
-    userAgent, sessionId,
+    userAgent, sessionId, purpose: "naming",
     system: { blocks: [{ id: builtin.name("session-naming"), text: namingInstruction }] },
     messages: [{ kind: "input", parts: [{ kind: "text", text: prompt }] }],
   })) {

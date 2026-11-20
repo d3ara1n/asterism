@@ -8,6 +8,7 @@ import type { ContentBridge, ContentCommand, ContentResult } from "./content.ts"
 import type { EventControl, EventFrame } from "./plugin-events.ts";
 export type { ChannelEnd, ChannelValue };
 import type { CallControl, CallFrame } from "./plugin-calls.ts";
+import type { TelemetryBridge, TelemetryCommand, TelemetryResult } from "./telemetry.ts";
 
 /**
  * Direct renderer/task-process connections: the main process checks sources only when handing off MessagePorts and never forwards subsequent business messages.
@@ -23,9 +24,10 @@ export interface ConnectionServices {
   configuration: { command: ConfigurationCommand; result: ConfigurationResult };
   "plugin-configuration": { command: PluginConfigurationCommand; result: PluginConfigurationResult };
   content: { command: ContentCommand; result: ContentResult };
+  telemetry: { command: TelemetryCommand; result: TelemetryResult };
 }
 export type ConnectionService = keyof ConnectionServices;
-export const connectionServices: readonly ConnectionService[] = ["workspace", "session", "configuration", "plugin-configuration", "content"];
+export const connectionServices: readonly ConnectionService[] = ["workspace", "session", "configuration", "plugin-configuration", "content", "telemetry"];
 
 export type ChannelControl =
   | { type: "open"; id: number; contract: string; object: { sessionId: string; id: string; kind: string } }
@@ -47,6 +49,7 @@ export type RuntimeFrame =
   | { kind: "session"; event: SessionChanged }
   | { kind: "configuration.changed" }
   | { kind: "plugin-configuration.changed"; id: string }
+  | { kind: "telemetry.changed" }
   | { kind: "events"; frame: EventFrame }
   | { kind: "calls"; frame: CallFrame }
   | { kind: "channels"; frame: ChannelFrame };
@@ -69,6 +72,7 @@ export interface RuntimeBridge {
   configuration: ConfigurationBridge;
   pluginConfiguration: PluginConfigurationBridge;
   content: ContentBridge;
+  telemetry: TelemetryBridge;
   events: EventBridge;
   calls: CallBridge;
   channels: ChannelBridge;

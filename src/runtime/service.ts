@@ -24,6 +24,8 @@ import { collectExpiredSessions, openDatabase } from "./storage.ts";
 import { ContentTransferService } from "./content-transfer.ts";
 import type { ManualSource } from "@asterism-app/sdk/runtime";
 import type { PluginCandidate } from "../shared/plugin-startup.ts";
+import { TelemetryService } from "../telemetry/service.ts";
+import type { LiveFolderInfo, LiveSessionInfo, WorkspaceLookup } from "../telemetry/types.ts";
 
 export class ApplicationError extends Error {
   constructor(readonly code: AppError["code"], message: string, readonly display?: UiText) { super(message); }
@@ -35,13 +37,14 @@ export class ApplicationService {
   readonly configuration: ConfigurationService;
   readonly sessions: SessionService;
   readonly content: ContentTransferService;
+  readonly telemetry: TelemetryService;
   private readonly db: DatabaseSync;
   private readonly folders: FolderStore;
   private readonly list: PackageList;
   private readonly started: string;
   private readonly startedEntries: readonly PackageEntry[];
   private readonly npm: NpmInstallations;
-  constructor(root: string, private readonly options: { rendererImportMap?: Record<string, string>; packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage; distribution?: Distribution } = {}) {
+  constructor(root: string, private readonly options: { rendererImportMap?: Record<string, string>; packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; onTelemetryChanged?: () => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage; distribution?: Distribution } = {}) {
     this.db = openDatabase(root);
     this.folders = new FolderStore(this.db);
     this.list = applicationPackages(root, options.distribution);
@@ -57,6 +60,7 @@ export class ApplicationService {
         this.list.replace(index, { ...entries[index]!, source }, this.npmRoot);
       }
     } });
+    let telemetry: TelemetryService | undefined;
     try {
       this.configuration = new ConfigurationService(root, () => {
         this.sessions?.refreshSleep();
@@ -64,14 +68,41 @@ export class ApplicationService {
       });
       // Archive cleanup releases references first; session services then explicitly reclaim content.
       collectExpiredSessions(this.db, Date.now(), this.configuration.sessionLifecycle().retentionDays);
+      const lookup: WorkspaceLookup = {
+        folders: () => new Map(this.folders.list().map(f => [f.id, { id: f.id, name: f.name, color: f.color } satisfies LiveFolderInfo])),
+        sessions: () => {
+          const map = new Map<string, LiveSessionInfo>();
+          const membership = this.folders.sessionFolders();
+          for (const s of this.sessions.tree.list()) {
+            map.set(s.id, { id: s.id, title: s.title, folderId: membership.get(s.id) ?? null, status: s.sleeping ? "sleeping" : "active", completed: s.completed });
+          }
+          for (const s of this.sessions.tree.archived()) {
+            map.set(s.id, { id: s.id, title: s.title, folderId: s.folderId, status: "archived", completed: false });
+          }
+          return map;
+        },
+        session: id => {
+          const row = this.db.prepare("SELECT id, title, folder_id, sleeping_at, archived_at, completed FROM sessions WHERE id = ?").get(id) as { id: string; title: string; folder_id: string | null; sleeping_at: string | null; archived_at: string | null; completed: number } | undefined;
+          if (!row) return null;
+          const status = row.archived_at !== null ? "archived" : row.sleeping_at !== null ? "sleeping" : "active";
+          return { id: row.id, title: row.title, folderId: row.folder_id, status, completed: row.completed === 1 };
+        },
+        folder: id => {
+          const row = this.db.prepare("SELECT id, name, color FROM folders WHERE id = ?").get(id) as LiveFolderInfo | undefined;
+          return row ?? null;
+        },
+        pluginNames: () => new Map((this.sessions?.packages ?? []).flatMap(item => item.id ? [[item.id, item.metadata.name ?? null] as const] : [])),
+        providerNames: () => new Map(this.configuration.modelCatalog().modelProviders.map(p => [p.id, p.name])),
+      };
+      telemetry = this.telemetry = new TelemetryService(root, { lookup, onChanged: options.onTelemetryChanged });
       this.sessions = new SessionService(this.db, root, this.configuration, {
-        onChanged: options.onSessionChanged, adapterFactory: options.adapterFactory, plugins: options.plugins,
+        onChanged: options.onSessionChanged, adapterFactory: options.adapterFactory, plugins: options.plugins, telemetry: this.telemetry,
         configurationChanged: options.onPluginConfigurationChanged, preparedStorage: options.preparedStorage,
         pluginDependencies: options.pluginDependencies, packages: options.packages, packageRoots: options.packageRoots, skillDirectories: options.skillDirectories,
         manualSources: packages => [...applicationManuals, ...(options.manualSources ?? []).filter(source => packages.some(item => item.id === source.pluginId && item.status === "loaded"))],
       });
       this.content = new ContentTransferService(this.sessions);
-    } catch (error) { this.db.close(); throw error; }
+    } catch (error) { telemetry?.close(); this.db.close(); throw error; }
   }
   async close(): Promise<void> {
     const results = await Promise.allSettled([
@@ -80,6 +111,7 @@ export class ApplicationService {
     const errors = results.flatMap(result => result.status === "rejected" ? [result.reason] : []);
     // Keep storage available until session work and renderer transfers have reached terminal outcomes.
     try { this.db.close(); } catch (error) { errors.push(error); }
+    try { this.telemetry.close(); } catch (error) { errors.push(error); }
     if (errors.length === 1) throw errors[0];
     if (errors.length) throw new AggregateError(errors, "Application cleanup failed.");
   }

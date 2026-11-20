@@ -71,6 +71,7 @@ export interface PluginContext {
   readonly webProviders: WebProviderServices;
   readonly web: WebServices;
   readonly messaging: MessagingServices;
+  readonly telemetry: import("./runtime-telemetry.ts").TelemetryServices;
   session(id: string): SessionExecutor;
   /** Obtain an object handle using a named resource contract; the host validates plugin ownership of the contract, object existence, and matching type, and stamps records accordingly. */
   object<S extends Json>(sessionId: string, contract: ResourceContract<S>, id: string): ObjectExecutor;
@@ -193,6 +194,7 @@ export interface ModuleContribution {
   tools?: readonly ToolContribution[];
   observers?: readonly SessionObserver[];
   preparers?: readonly CommandPreparer[];
+  modelPurposes?: readonly import("./runtime-telemetry.ts").ModelPurposeDeclaration[];
 }
 /** Named module entry point: plugins provide contributions, and the host handles assembly and invocation. */
 export interface PluginModule { setup(plugin: PluginContext): ModuleContribution }

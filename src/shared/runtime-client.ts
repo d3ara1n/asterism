@@ -20,6 +20,7 @@ export class RuntimeClient implements RuntimeBridge {
   private readonly sessionListeners = new Set<(event: SessionChanged) => void>();
   private readonly configurationListeners = new Set<() => void>();
   private readonly pluginConfigurationListeners = new Set<(id: string) => void>();
+  private readonly telemetryListeners = new Set<() => void>();
   private readonly eventListeners = new Set<(frame: EventFrame) => void>();
   private readonly callListeners = new Set<(frame: CallFrame) => void>();
   private readonly channelListeners = new Set<(frame: ChannelFrame) => void>();
@@ -75,6 +76,7 @@ export class RuntimeClient implements RuntimeBridge {
       case "session": for (const listener of this.sessionListeners) listener(frame.event); return;
       case "configuration.changed": for (const listener of this.configurationListeners) listener(); return;
       case "plugin-configuration.changed": for (const listener of this.pluginConfigurationListeners) listener(frame.id); return;
+      case "telemetry.changed": for (const listener of this.telemetryListeners) listener(); return;
       case "events": for (const listener of this.eventListeners) listener(frame.frame); return;
       case "calls": for (const listener of this.callListeners) listener(frame.frame); return;
       case "channels": for (const listener of this.channelListeners) listener(frame.frame); return;
@@ -99,6 +101,10 @@ export class RuntimeClient implements RuntimeBridge {
     onChanged: listener => RuntimeClient.listen(this.pluginConfigurationListeners, listener),
   };
   readonly content: RuntimeBridge["content"] = { execute: command => this.request("content", command) };
+  readonly telemetry: RuntimeBridge["telemetry"] = {
+    execute: command => this.request("telemetry", command),
+    onChanged: listener => RuntimeClient.listen(this.telemetryListeners, listener),
+  };
   readonly events: RuntimeBridge["events"] = {
     send: control => this.post({ kind: "events", control }),
     onFrame: listener => RuntimeClient.listen(this.eventListeners, listener),

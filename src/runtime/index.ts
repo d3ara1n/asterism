@@ -57,7 +57,8 @@ try {
       declarations: new Map(packages.flatMap(item => item.manifest && item.storage ? [[item.manifest.id, item.storage] as const] : [])) },
     onConfigurationChanged: () => broadcast({ kind: "configuration.changed" }),
     onSessionChanged: event => broadcast({ kind: "session", event }),
-    onPluginConfigurationChanged: id => broadcast({ kind: "plugin-configuration.changed", id }) });
+    onPluginConfigurationChanged: id => broadcast({ kind: "plugin-configuration.changed", id }),
+    onTelemetryChanged: () => broadcast({ kind: "telemetry.changed" }) });
   const disconnect = (id: string) => { const connection = connections.get(id); connections.delete(id); connection?.close(); };
   port.on("message", ({ data, ports }) => {
     if (data?.kind === "shutdown") {

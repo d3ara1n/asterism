@@ -58,12 +58,20 @@ export function coreDeclarations(tools: readonly BoundTopLevelTool[] = []): Tool
   return [...actions, ...tools.filter(entry => entry.available)].map(({ tool }) => declareTool(tool));
 }
 
+export interface SettledToolTelemetry {
+  call: PendingCall;
+  info: ToolInvocationInfo;
+  outcome: ToolOutcome;
+  startedAt: number;
+  finishedAt: number;
+}
 /** Bind resource dispatch without making the model runner depend on a session or resource identity. */
-export function bindModelTools(capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = [], handover?: ContentLease, notice?: () => void): ModelTools {
+export function bindModelTools(capabilities: AgentCapabilities, tools: readonly BoundTopLevelTool[] = [], handover?: ContentLease, notice?: () => void,
+  onToolSettled?: (entry: SettledToolTelemetry) => void): ModelTools {
   return {
     declarations: coreDeclarations(tools),
     preview: (name, args) => previewCoreCall(name, args, capabilities, tools),
-    execute: (calls, signal, settle, observer) => executeCoreBatch(calls, capabilities, signal, settle, observer, handover, tools, notice),
+    execute: (calls, signal, settle, observer) => executeCoreBatch(calls, capabilities, signal, settle, observer, handover, tools, notice, onToolSettled),
   };
 }
 
@@ -89,7 +97,8 @@ class ToolDispatcher {
   private readonly scheduler = new ToolScheduler();
   private readonly callableNames: string[];
   constructor(private readonly capabilities: AgentCapabilities, private readonly tools: readonly BoundTopLevelTool[],
-    private readonly handover?: ContentLease, private readonly notice?: () => void) {
+    private readonly handover?: ContentLease, private readonly notice?: () => void,
+    private readonly onToolSettled?: (entry: SettledToolTelemetry) => void) {
     this.callableNames = [...actions, ...tools.filter(entry => entry.available)]
       .filter(entry => !entry.tool.requiresInteraction)
       .map(entry => entry.tool.name).filter(name => name !== ResourceScript.name && name !== ResourceCall.name);
@@ -129,8 +138,12 @@ class ToolDispatcher {
   }
 
   private async invoke({ call, result, info }: PreparedCall, signal: AbortSignal, observer: ToolObserver): Promise<ToolOutcome> {
-    const complete = (completion: CallResult, latest: Json = null) => finishToolResult(completion,
-      { ...info, finishedAt: Date.now() }, latest, "execute" in result ? result.toModel : undefined);
+    const complete = (completion: CallResult, latest: Json = null) => {
+      const finishedAt = Date.now();
+      const outcome = finishToolResult(completion, { ...info, finishedAt }, latest, "execute" in result ? result.toModel : undefined);
+      this.onToolSettled?.({ call, info, outcome, startedAt: info.startedAt ?? finishedAt, finishedAt });
+      return outcome;
+    };
     if (signal.aborted) return complete({ kind: "cancelled", message: "The operation was not started." });
     if (!("execute" in result)) return complete(result);
     info = { ...info, startedAt: Date.now() };
@@ -163,8 +176,9 @@ class ToolDispatcher {
 /** Captured request capabilities and one scheduler cover the entire batch, including scripts' child operations. */
 export async function executeCoreBatch(calls: readonly PendingCall[], capabilities: AgentCapabilities,
   signal: AbortSignal, settle: (call: PendingCall, outcome: ToolOutcome) => void,
-  observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = [], notice?: () => void): Promise<void> {
-  const dispatcher = new ToolDispatcher(capabilities, tools, handover, notice);
+  observer: ToolObserver = {}, handover?: ContentLease, tools: readonly BoundTopLevelTool[] = [], notice?: () => void,
+  onToolSettled?: (entry: SettledToolTelemetry) => void): Promise<void> {
+  const dispatcher = new ToolDispatcher(capabilities, tools, handover, notice, onToolSettled);
   const prepared = calls.map(call => dispatcher.prepare(call, observer));
   const outcomes = await Promise.allSettled(prepared.map(async entry => settle(entry.call, await dispatcher.run(entry, signal, observer))));
   const failed = outcomes.find(outcome => outcome.status === "rejected");

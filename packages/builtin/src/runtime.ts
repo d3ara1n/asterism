@@ -36,6 +36,7 @@ import { createSubagentPoolModule } from "./subagents/runtime.ts";
 import { CreateSubagentPool, createPoolSchema } from "./subagents/contract.ts";
 import schedules from "./schedules/runtime.ts";
 import { CreateAlarm, CreateTimer } from "./schedules/contract.ts";
+import { purposeMessages } from "./messages/purposes.ts";
 
 /** Composes only plugin business logic; the application owns loading, host services, and external plugin dependencies. */
 export default definePlugin({ namespace: builtin,
@@ -45,6 +46,13 @@ export default definePlugin({ namespace: builtin,
       const skills = new SkillCatalog(plugin.agentCatalog);
       const usage = plugin.providerUsage;
       return {
+        modelPurposes: [
+          { id: "conversation", label: purposeMessages.conversation },
+          { id: "subagent", label: purposeMessages.subagent },
+          { id: "compression", label: purposeMessages.compression },
+          { id: "naming", label: purposeMessages.naming },
+          { id: "peek", label: purposeMessages.peek },
+        ],
         calls: [
           implementCall(UpdateParadigmConfiguration, async input => {
             settings.update(current => ({ ...current, paradigm: updateParadigmConfiguration(current.paradigm, input) }));

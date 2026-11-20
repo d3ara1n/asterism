@@ -47,6 +47,24 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     messaging: bindMessaging(shared.messaging, sessionRuns, internal.lifetime, scope),
     modelProviders: bindModelProviders(shared.modelProviders, sessionRuns, scope),
     ...bindUsage(shared.usageProviders, shared.usage, sessionRuns, scope),
+    telemetry: {
+      recordExternalUsage(record) {
+        checkAvailable();
+        shared.telemetry?.recordExternalUsage({
+          recordedAt: record.recordedAt ?? Date.now(),
+          pluginId: internal.id,
+          sessionId: record.sessionId ?? null,
+          category: record.category,
+          providerLabel: record.provider ?? null,
+          quantity: record.quantity ?? null,
+          unit: record.unit ?? null,
+          currency: record.currency ?? null,
+          amount: record.amount ?? null,
+          outcome: record.outcome ?? "succeeded",
+          durationMs: record.durationMs ?? null,
+        });
+      },
+    },
     agentCatalog: bindAgentCatalog(shared.agentCatalog, sessionRuns, checkAvailable),
     models,
     execution: execution.execution,

@@ -94,7 +94,7 @@ ${peekOutline(records)}
       data.round = round; update(round === 1 ? "investigating" : data.phase, "");
       const response = await collectPeekResponse(deps.models.stream({
         target, system: requestSystem, messages, tools: retrievalTools, signal, maxOutputTokens: outputLimit,
-        sessionId: object.ref.sessionId, userAgent: deps.userAgent,
+        sessionId: object.ref.sessionId, userAgent: deps.userAgent, purpose: "peek",
       }), signal, {
         progress: update,
         finish(event) {

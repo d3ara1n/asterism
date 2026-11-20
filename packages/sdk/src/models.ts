@@ -92,6 +92,8 @@ export interface ModelRequestIdentity {
   userAgent?: string;
   /** Stable within a session; may be omitted for a one-off call without a session. */
   sessionId?: string;
+  /** Optional plugin-defined purpose identifier for host telemetry grouping; independent of model messages and authorization. */
+  purpose?: string;
 }
 /** Transient metadata from the actual HTTP response; contains no request credentials or body and is not automatically written to history. */
 export interface ModelResponse {

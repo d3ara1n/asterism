@@ -8,7 +8,7 @@ import { coreChannel } from "./core.ts";
  * Task viewports and card positions belong to task view events, not here; user-visible editable preferences belong to settings instead.
  */
 /** Preference keys allow only host-defined prefixes; renderers cannot write other UI state. */
-export const preferenceKeySchema = z.string().min(1).max(512).regex(/^(?:creation-route|sidebar|home|plugin)\/[\x21-\x7e]+$/u);
+export const preferenceKeySchema = z.string().min(1).max(512).regex(/^(?:creation-route|sidebar|home|dashboard|plugin)\/[\x21-\x7e]+$/u);
 export const preferencesGetChannel = coreChannel("preferences:get");
 export const preferencesSetChannel = coreChannel("preferences:set");
 export const preferenceWriteSchema = z.strictObject({ key: preferenceKeySchema, value: jsonSchema.nullable() });

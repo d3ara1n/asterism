@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { modelCostSchema } from "./model-cost.ts";
-import { estimateModelCost, totalEstimatedCost, type CostQuantity } from "./model-cost-estimate.ts";
+import { estimateCacheSavings, estimateModelCost, estimateUsageCost, totalEstimatedCost, type CostQuantity } from "./model-cost-estimate.ts";
 
 const price = (amount: number) => ({ amount, unit: "token", per: 1_000_000 });
 const quantities = (input: number, output: number): CostQuantity[] => [
@@ -51,5 +51,21 @@ describe("Reference cost calculation", () => {
     const tiered = { ...cost, tiers: [{ fromInputTokens: 100, rates: cost.rates }] };
     expect(estimateModelCost(tiered, null, quantities(10, 3)).lines.every(line => line.issue === "tier")).toBe(true);
     expect(totalEstimatedCost([result, estimateModelCost(null, 5, quantities(5, 1))])).toEqual({ amount: 0, incomplete: 2 });
+  });
+
+  it("estimates cache net savings (read discount minus write surcharge) and returns null for multimodal or unpriced requests", () => {
+    const cost = modelCostSchema.parse({
+      currency: "USD",
+      rates: { text: { input: price(3), cacheRead: price(0.3), cacheWrite: price(3.75), output: price(15) } },
+      tiers: [],
+    });
+    const usage = { input: 1_000_000, output: 100_000, total: 1_100_000, reasoning: null, cacheRead: 800_000, cacheWrite: 100_000 };
+    // Read saves 0.8M * ($3 - $0.3) = $2.16; write costs extra 0.1M * ($3.75 - $3) = $0.075 -> net $2.085.
+    expect(estimateCacheSavings(usage, cost, false)).toBeCloseTo(2.085, 6);
+    expect(estimateCacheSavings(usage, cost, true)).toBeNull();
+    const est = estimateUsageCost(usage, cost, false);
+    expect(est.status).toBe("complete");
+    // 0.1M uncached ($0.3) + 0.8M cacheRead ($0.24) + 0.1M cacheWrite ($0.375) + 0.1M output ($1.5) = $2.415.
+    expect(est.amount).toBeCloseTo(2.415, 6);
   });
 });

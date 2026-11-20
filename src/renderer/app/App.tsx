@@ -2,7 +2,7 @@ import { runtime } from "../runtime";
 import { motion, AnimatePresence } from "motion/react";
 import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuShortcut } from "@asterism-app/ui/ui/dropdown-menu";
 import { Button } from "@asterism-app/ui/ui/button";
-import { PanelLeft, ArrowLeft, ChevronDown, House, Settings, Plus, KeyRound, ListTree, History, Command } from "lucide-react";
+import { PanelLeft, ArrowLeft, ChevronDown, House, BarChart3, Settings, Plus, KeyRound, ListTree, History, Command } from "lucide-react";
 
 
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
@@ -40,13 +40,14 @@ import { operationSucceeded, toast, useStateToast } from "../shared/toast";
 import { errorDisplay } from "../../shared/error-display.ts";
 import { accessMessages } from "../messages/access";
 import { appMessages } from "../messages/app";
+import { dashboardMessages } from "../messages/dashboard";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { historyMessages } from "../messages/history";
 import { objectsMessages } from "../messages/objects";
 import { settingsMessages } from "../messages/settings";
 import { useI18n } from "../shared/i18n";
 import type { WorkbenchOperation } from "../features/session/controller";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type { ApplicationController } from "./controller";
 import { useDesktopWindow } from "./window-state";
@@ -57,8 +58,10 @@ import { FolderServicesProvider, type FolderServices } from "../features/folders
 
 import { islandTransition } from "../shared/weave/motion";
 
+const DashboardPage = lazy(() => import("../features/dashboard/DashboardPage").then(module => ({ default: module.DashboardPage })));
+
 /** Space switches the whole main page, including its docked sidebars, together; only the central Screen coordinates Islands. */
-type MainView = { kind: "home" } | { kind: "conversation"; sessionId: string; overview?: boolean };
+type MainView = { kind: "home" } | { kind: "dashboard" } | { kind: "conversation"; sessionId: string; overview?: boolean };
 type PageId = "settings" | "main";
 /** Workbench sidebars opened from the titlebar: one at a time, docked beside the central Screen. */
 type PanelKind = "objects" | "history" | "access";
@@ -119,6 +122,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const commandSession = useMemo(() => !inSettings ? active?.recordSnapshot() ?? null : null, [inSettings, active, sessionState]);
   const completed = view.kind === "conversation" && !!snapshot?.sessions.find(item => item.id === view.sessionId)?.completed;
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
+    : view.kind === "dashboard" ? i18n.formatMessage(dashboardMessages.title)
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? i18n.formatMessage(commonMessages.conversation);
 
   const focusMain = () => requestAnimationFrame(() => document.getElementById("screen-main")?.focus({ preventScroll: true }));
@@ -166,6 +170,9 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   const goHome = () => {
     void navigate({ kind: "home" });
+  };
+  const goDashboard = () => {
+    void navigate({ kind: "dashboard" });
   };
   const openSession = (sessionId: string) => {
     void navigate({ kind: "conversation", sessionId });
@@ -230,6 +237,7 @@ export function App({ controller }: { controller: ApplicationController }) {
         <span aria-hidden="true" className="shrink-0 text-xl leading-none font-normal text-foreground">⁂</span><span className="text-sm font-semibold text-foreground">{i18n.formatMessage(appMessages.appName)}</span><ChevronDown className="text-muted-foreground" />
       </Button></DropdownMenuTrigger><DropdownMenuContent align="start">
         <DropdownMenuItem onSelect={goHome}><House />{i18n.formatMessage(commonMessages.home)}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={goDashboard}><BarChart3 />{i18n.formatMessage(dashboardMessages.title)}</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => { commandFocus.current = menuTrigger.current; setCommandsOpen(true); }}>
           <Command />{i18n.text(commandsMessages.title)}<DropdownMenuShortcut>{applicationCommandsShortcut}</DropdownMenuShortcut>
@@ -284,9 +292,10 @@ export function App({ controller }: { controller: ApplicationController }) {
     }}
     onTemplateSaved={() => { void controller.refresh({ quiet: true }); }}
     homeActive={view.kind === "home"}
+    dashboardActive={view.kind === "dashboard"}
     view={sidebarView} onViewChange={changeSidebarView}
     collapsed={collapsedGroups} onToggleGroup={toggleGroup}
-    onHome={goHome} onSession={openSession} onHide={hideSidebar}
+    onHome={goHome} onDashboard={goDashboard} onSession={openSession} onHide={hideSidebar}
     onRetry={() => { void controller.refresh(); }} />;
   // Docked beside Screen, but still inside the main page and bound to the current session.
   const auxiliaryPanel = panel && view.kind === "conversation" && active ? <Dock key="auxiliary" contentKey={panel.kind}
@@ -310,9 +319,15 @@ export function App({ controller }: { controller: ApplicationController }) {
           }}
             templates={snapshot?.templates ?? []} onTemplateStart={startTemplate} onTemplatesChanged={() => { void controller.refresh({ quiet: true }); }}
             ready={ready} onCreated={sessionCreated} folder={homeFolder} /></motion.div>
-        : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
-          {conversation}</motion.div>}
+        : view.kind === "dashboard"
+          ? <motion.div key="dashboard" className="h-full" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }} transition={islandTransition}>
+            <Suspense fallback={null}>
+              <DashboardPage active={!inSettings} onOpenSession={openSession} />
+            </Suspense></motion.div>
+          : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
+            {conversation}</motion.div>}
     </AnimatePresence></div>,
   };
   // The workbench persistently displays session read failures; the same entry handles backend unavailability while the workbench is visible.
@@ -353,6 +368,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       toastOptions={{ closeButtonAriaLabel: i18n.formatMessage(commonMessages.close) }} />
     {creation.element}
     <ApplicationCommands open={commandsOpen} onOpenChange={setCommandsOpen} session={commandSession} ready={commandSession !== null && writable} returnFocus={commandFocus}
-      sessions={{ sessions: snapshot?.sessions ?? [], selectedId: view.kind === "conversation" ? view.sessionId : null, ready, open: openSession }} />
+      sessions={{ sessions: snapshot?.sessions ?? [], selectedId: view.kind === "conversation" ? view.sessionId : null, ready, open: openSession }}
+      onOpenDashboard={goDashboard} />
   </RendererSettingsNavigationProvider></FolderServicesProvider></UpdatesProvider></RendererCatalogProvider>;
 }

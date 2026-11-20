@@ -25,6 +25,7 @@ export interface SharedServices {
   webProviders: WebProviderRegistry;
   messaging: MessagingRegistry;
   extensions: ModelProviderExtensions;
+  telemetry?: import("../telemetry/service.ts").TelemetryService;
   manualSources(): readonly ManualSource[];
   packageRoots: ReadonlyMap<string, string>;
   /** Host-owned calls served through the plugin call transport. */

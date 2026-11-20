@@ -56,3 +56,4 @@ export type * from "./runtime-application.ts";
 export * from "./runtime-shell.ts";
 export * from "./runtime-terminal.ts";
 export type * from "./runtime-mcp.ts";
+export type * from "./runtime-telemetry.ts";

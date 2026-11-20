@@ -24,6 +24,7 @@ export interface SharedServiceOptions {
   packageRoots: ReadonlyMap<string, string>;
   /** User skill directories scanned alongside plugin contributions. */
   skillDirectories: readonly string[];
+  telemetry?: import("../telemetry/service.ts").TelemetryService;
 }
 
 /** The single composition point for host services shared by all plugins; closing ends their connections, processes and caches. */
@@ -42,6 +43,7 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
   return {
     activities, mcp, shell, deadlines, usage, agentCatalog, modelProviders: models, usageProviders: usages,
     webProviders: configuration.web, messaging: configuration.messaging, extensions: configuration.extensions,
+    telemetry: options.telemetry,
     manualSources: options.manualSources, packageRoots: options.packageRoots,
     calls: [
       ...mcp.calls, ...shell.calls,

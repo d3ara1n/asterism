@@ -6,10 +6,11 @@ import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { ActionMenu, ActionMenuContent, ActionMenuItem, ActionMenuSeparator, ActionMenuTrigger, ActionMenuTarget } from "@asterism-app/ui/ui/action-menu";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
-import { ChevronRight, Moon, Folder as FolderIcon, FolderPlus, House, MessageSquare, MoreHorizontal, PanelLeftClose, Pencil, Trash2 } from "lucide-react";
+import { BarChart3, ChevronRight, Moon, Folder as FolderIcon, FolderPlus, House, MessageSquare, MoreHorizontal, PanelLeftClose, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@asterism-app/ui/utils";
 
 import { appMessages } from "../messages/app";
+import { dashboardMessages } from "../messages/dashboard";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { useI18n } from "../shared/i18n";
 import { folderMessages } from "../../shared/folder-messages";
@@ -40,7 +41,7 @@ type FolderAction = { kind: "edit" | "delete"; folder: Folder; trigger: HTMLButt
 const viewLabels = { folders: appMessages.sidebarViewFolders, recent: appMessages.sidebarViewRecent } as const;
 
 /** Application navigation consumes only session summaries; after selecting a session, the application layer explicitly loads the workbench. */
-export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNotices, selectedSessionId, renameDisabledSessionId, homeActive, view, onViewChange, collapsed, onToggleGroup, onHome, onSession, onRename, onArchive, onCompletedChange, onKeepAwakeChange, onTemplateSaved, onHide, onRetry }: {
+export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNotices, selectedSessionId, renameDisabledSessionId, homeActive, dashboardActive, view, onViewChange, collapsed, onToggleGroup, onHome, onDashboard, onSession, onRename, onArchive, onCompletedChange, onKeepAwakeChange, onTemplateSaved, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
   resourceActivities: readonly ResourceActivity[];
   resourceNotices: readonly ResourceNoticeMark[];
@@ -52,7 +53,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
   view: SidebarView; onViewChange: (view: SidebarView) => void;
   /** Collapsed group keys: folder identities or `noFolderGroup`. */
   collapsed: ReadonlySet<string>; onToggleGroup: (key: string) => void;
-  homeActive: boolean; onHome: () => void; onSession: (id: string) => void;
+  homeActive: boolean; dashboardActive: boolean; onHome: () => void; onDashboard: () => void; onSession: (id: string) => void;
   onHide: () => void; onRetry: () => void;
 }) {
   const i18n = useI18n();
@@ -132,6 +133,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
     </header>
     <nav className="flex flex-col gap-1" aria-label={i18n.formatMessage(appMessages.mainViews)}>
       <Button variant={homeActive ? "selected" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{i18n.formatMessage(commonMessages.home)}</Button>
+      <Button variant={dashboardActive ? "selected" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={dashboardActive ? "page" : undefined} disabled={dashboardActive} onClick={onDashboard}><BarChart3 />{i18n.formatMessage(dashboardMessages.title)}</Button>
     </nav>
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
       <div className="mb-1 flex items-center justify-between gap-2 pl-2">

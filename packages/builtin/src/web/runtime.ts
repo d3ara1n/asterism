@@ -35,10 +35,25 @@ export default defineModule(plugin => {
     const started = performance.now();
     update(sessionId, startRequest);
     const outcome = await result(work, signal);
-    update(sessionId, stats => finishRequest(stats, {
-      kind, subject, outcome: outcome.kind === "succeeded" ? "succeeded" : outcome.kind === "cancelled" ? "cancelled" : "failed",
-      at: Date.now(), durationMs: performance.now() - started, cost: outcome.kind === "succeeded" ? costOf(outcome.data.usage) : [],
-    }));
+    const durationMs = performance.now() - started;
+    const at = Date.now();
+    const status = outcome.kind === "succeeded" ? "succeeded" : outcome.kind === "cancelled" ? "cancelled" : "failed";
+    const costs = outcome.kind === "succeeded" ? costOf(outcome.data.usage) : [];
+    update(sessionId, stats => finishRequest(stats, { kind, subject, outcome: status, at, durationMs, cost: costs }));
+    const provider = outcome.kind === "succeeded" ? outcome.data.provider : undefined;
+    if (costs.length) {
+      for (const item of costs) {
+        plugin.telemetry.recordExternalUsage({
+          category: `web.${kind}`, provider, sessionId, quantity: 1, unit: "request",
+          currency: item.currency, amount: item.amount, outcome: status, durationMs, recordedAt: at,
+        });
+      }
+    } else {
+      plugin.telemetry.recordExternalUsage({
+        category: `web.${kind}`, provider, sessionId, quantity: 1, unit: "request",
+        outcome: status, durationMs, recordedAt: at,
+      });
+    }
     return outcome;
   }
   return {

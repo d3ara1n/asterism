@@ -115,6 +115,7 @@ Application identity and data layout are centralized. Development and installed 
 | Credentials and credential-command expressions | Saved with their owning entry: host configuration or plugin storage |
 | Session tree, current data, templates, view state, content roots | Runtime SQLite database |
 | Immutable bytes | Runtime content store |
+| Usage telemetry ledger | Independent telemetry SQLite database (outside recovery points) |
 | Plugin-private data | Plugin directory and optional host-managed facilities |
 | Recovery points | Data preparation service |
 | Chromium data | Electron session storage |

@@ -10,6 +10,7 @@ import type { ModelServices } from "@asterism-app/sdk/runtime";
 import { inputReferences, resolveInput, type ModelContent } from "../model/input.ts";
 import type { ModelItem } from "@asterism-app/sdk/contracts";
 import { errorMessages } from "../shared/error-display.ts";
+import type { ModelUsageRecordInput, ToolUsageRecordInput } from "../telemetry/types.ts";
 
 /** Model targets identify concrete provider/model pairs; paradigms resolve their own configuration. */
 export type { ModelTarget, StreamRequest } from "@asterism-app/sdk/contracts";
@@ -20,11 +21,30 @@ export class ModelTargetFailure extends PluginApiError {
 
 interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
 /** Host transport inputs; tools and conversation correlation are supplied by the consumer. */
+export interface ModelCallTelemetryContext {
+  pluginId: string;
+  entryKind: "execution" | "run" | "stream";
+  resourceId?: string | null;
+  resourceKind?: string | null;
+  purposeId?: string | null;
+  tools?: readonly ToolUsageRecordInput[];
+}
+function hasFileParts(messages: readonly ModelItem[]): boolean {
+  return messages.some(item => {
+    if (item.kind === "input" || item.kind === "context") return item.parts.some(part => part.kind === "file");
+    if (item.kind === "result") return item.outcome.model.some(part => part.kind === "file");
+    return false;
+  });
+}
 export interface RunRequest extends Omit<ModelRunRequest, "system"> {
   system: SystemPrompt | Promise<SystemPrompt>;
   content?: HostInputOptions["content"];
+  telemetry?: ModelCallTelemetryContext;
 }
-interface HostInputOptions { content?: (messages: readonly ModelItem[]) => ModelContent | undefined }
+interface HostInputOptions {
+  content?: (messages: readonly ModelItem[]) => ModelContent | undefined;
+  telemetry?: ModelCallTelemetryContext;
+}
 export interface HostModels {
   stream(request: StreamRequest, options?: HostInputOptions): AsyncIterable<ModelEvent>;
   run(request: RunRequest): Promise<ModelRunResult>;
@@ -46,7 +66,8 @@ export function resolveTarget(snapshot: Pick<ConfigurationSnapshot, "modelProvid
   return { ok: true, model, thinking };
 }
 
-export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter): HostModels {
+export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter,
+  recordTelemetry?: (input: ModelUsageRecordInput) => void): HostModels {
   // Capture current connection settings before requests; catalog reads remain synchronous.
   const current = () => configuration.modelCatalog();
   const rejectedResponsesFiles = new Map<string, Set<string>>();
@@ -104,32 +125,85 @@ export function createModelServices(configuration: ConfigurationService, adapter
     },
     async *stream(request, options) {
       request.signal.throwIfAborted();
-      const { target, system, messages, tools, maxOutputTokens, userAgent, sessionId } = structuredClone({
+      const { target, system, messages, tools, maxOutputTokens, userAgent, sessionId, purpose } = structuredClone({
         target: request.target, system: request.system, messages: request.messages, tools: request.tools, maxOutputTokens: request.maxOutputTokens,
-        userAgent: request.userAgent, sessionId: request.sessionId,
+        userAgent: request.userAgent, sessionId: request.sessionId, purpose: request.purpose,
       });
+      const wallStart = Date.now();
+      const filesPresent = hasFileParts(messages);
       const content = capture(messages, options?.content);
+      let resolvedSettings: ModelSettings | null = null;
+      let finishEvent: Extract<ModelEvent, { type: "finish" }> | null = null;
+      let failedError: unknown = null;
+      let completed = false;
       try {
         const { settings, adapter } = await resolve(target, true, request.signal);
+        resolvedSettings = settings;
         const resolvedMessages = await resolveInput(messages, content, request.signal);
         const source = { model: modelExpression(settings), adapter: adapter.format(settings), scope: modelScope(settings) };
         for await (const event of adapter.prepare({ settings, system, messages: resolvedMessages, maxOutputTokens, userAgent, sessionId,
           tools: settings.model.capabilities.tools ? tools ?? [] : [] }).stream(request.signal)) {
           request.signal.throwIfAborted();
+          if (event.type === "finish") finishEvent = event;
           yield event.type === "finish" ? { ...event, source } : event;
         }
-      } finally { await content?.close(); }
+        completed = true;
+      } catch (error) {
+        failedError = error;
+        throw error;
+      } finally {
+        await content?.close();
+        if (recordTelemetry && resolvedSettings && options?.telemetry) {
+          const wallEnd = Date.now();
+          const failure = failedError instanceof ModelFailure ? failedError : null;
+          const timing = finishEvent?.timing ?? failure?.timing ?? null;
+          const usage = finishEvent?.usage ?? failure?.usage ?? null;
+          const outcome = completed && !failedError ? "completed"
+            : request.signal.aborted || (!failedError && !completed) ? "cancelled" : "failed";
+          recordTelemetry({
+            startedAt: timing ? Date.parse(timing.startedAt) || wallStart : wallStart,
+            endedAt: timing ? Date.parse(timing.endedAt) || wallEnd : wallEnd,
+            durationMs: timing?.durationMs ?? (wallEnd - wallStart),
+            firstOutputMs: timing?.firstOutputMs ?? null,
+            firstTextMs: timing?.firstTextMs ?? null,
+            firstReasoningMs: timing?.firstReasoningMs ?? null,
+            outputChunks: timing?.outputChunks ?? null,
+            pluginId: options.telemetry.pluginId,
+            entryKind: options.telemetry.entryKind,
+            resourceId: options.telemetry.resourceId ?? null,
+            resourceKind: options.telemetry.resourceKind ?? null,
+            sessionId: sessionId ?? null,
+            purposeId: options.telemetry.purposeId ?? purpose ?? null,
+            providerId: resolvedSettings.provider.id,
+            providerName: resolvedSettings.provider.name,
+            modelId: resolvedSettings.model.modelId,
+            protocol: resolvedSettings.provider.protocol,
+            thinking: resolvedSettings.thinking,
+            usage,
+            cost: resolvedSettings.model.cost,
+            hasFiles: filesPresent,
+            toolCallCount: 0,
+            outcome,
+            finishReason: finishEvent?.reason ?? null,
+            errorOrigin: failure?.origin ?? (outcome === "failed" ? "software" : null),
+            errorCode: failure?.code ?? (outcome === "failed" ? "stream_failed" : null),
+          });
+        }
+      }
     },
     run(request) {
       const system = request.system instanceof Promise ? request.system : structuredClone(request.system);
-      const { messages, target, userAgent, sessionId } = structuredClone({
-        messages: request.messages, target: request.target, userAgent: request.userAgent, sessionId: request.sessionId,
+      const { messages, target, userAgent, sessionId, purpose } = structuredClone({
+        messages: request.messages, target: request.target, userAgent: request.userAgent, sessionId: request.sessionId, purpose: request.purpose,
       });
+      const wallStart = Date.now();
+      const filesPresent = hasFileParts(messages);
+      let resolvedSettings: ModelSettings | null = null;
       let content: ModelContent | undefined;
       let captured: Promise<void>;
       try { request.signal.throwIfAborted(); content = capture(messages, request.content); captured = Promise.resolve(); }
       catch (error) { captured = Promise.reject(error); }
-      const preparation = [resolve(target, true, request.signal), Promise.resolve(system), captured] as const;
+      const preparation = [resolve(target, true, request.signal).then(resolved => { resolvedSettings = resolved.settings; return resolved; }), Promise.resolve(system), captured] as const;
       const environment = Promise.all(preparation).then(async ([resolved, preparedSystem]) => ({
         ...resolved, userAgent, sessionId, tools: request.tools,
         messages: await resolveInput(messages, content, request.signal),
@@ -138,7 +212,45 @@ export function createModelServices(configuration: ConfigurationService, adapter
         if (error instanceof ModelTargetFailure) throw new ModelFailure(error.reason, error.message);
         throw error;
       });
-      return runModelRequest(request, environment).finally(async () => {
+      return runModelRequest(request, environment).then(result => {
+        if (recordTelemetry && resolvedSettings && request.telemetry) {
+          const wallEnd = Date.now();
+          const timing = result.completion?.timing ?? result.timing ?? null;
+          const termination = result.completion?.termination;
+          const outcome = result.reason === "completed" ? "completed" : result.reason === "cancelled" ? "cancelled" : "failed";
+          recordTelemetry({
+            id: result.responseId ?? undefined,
+            startedAt: timing ? Date.parse(timing.startedAt) || wallStart : wallStart,
+            endedAt: timing ? Date.parse(timing.endedAt) || wallEnd : wallEnd,
+            durationMs: timing?.durationMs ?? (wallEnd - wallStart),
+            firstOutputMs: timing?.firstOutputMs ?? null,
+            firstTextMs: timing?.firstTextMs ?? null,
+            firstReasoningMs: timing?.firstReasoningMs ?? null,
+            outputChunks: timing?.outputChunks ?? null,
+            pluginId: request.telemetry.pluginId,
+            entryKind: request.telemetry.entryKind,
+            resourceId: request.telemetry.resourceId ?? null,
+            resourceKind: request.telemetry.resourceKind ?? null,
+            sessionId: sessionId ?? null,
+            purposeId: request.telemetry.purposeId ?? purpose ?? null,
+            providerId: resolvedSettings.provider.id,
+            providerName: resolvedSettings.provider.name,
+            modelId: resolvedSettings.model.modelId,
+            protocol: resolvedSettings.provider.protocol,
+            thinking: resolvedSettings.thinking,
+            usage: result.completion?.usage ?? null,
+            cost: resolvedSettings.model.cost,
+            hasFiles: filesPresent,
+            toolCallCount: request.telemetry.tools?.length ?? result.tools.length,
+            outcome,
+            finishReason: result.completion?.finishReason ?? null,
+            errorOrigin: termination?.reason === "failed" ? termination.origin : (result.reason === "failed" ? "software" : null),
+            errorCode: result.reason === "failed" ? result.code : (termination?.reason === "failed" ? termination.code : null),
+            tools: request.telemetry.tools,
+          });
+        }
+        return result;
+      }).finally(async () => {
         await Promise.allSettled(preparation);
         await content?.close();
       });

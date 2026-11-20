@@ -21,6 +21,8 @@ export const applicationStorage = {
   shellIntegrationDirectory: "shell-integration",
   databaseDirectory: "db",
   databaseFile: "workspace.sqlite",
+  telemetryDirectory: "telemetry",
+  telemetryDatabaseFile: "telemetry.sqlite",
   contentDirectory: "content",
   sealedContentDirectory: "sealed", // Within contentDirectory.
   temporaryContentDirectory: "temporary", // Within contentDirectory.

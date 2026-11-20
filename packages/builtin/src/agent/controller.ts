@@ -214,7 +214,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
               let prepared: ReturnType<typeof prepare>;
               result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
                 agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },
-                userAgent: deps.userAgent, completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
+                userAgent: deps.userAgent, purpose: "conversation", completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
                 target, system: files => { prepared = prepare(files); return prepared.system; }, messages: (deps.projectMessages ?? projectForAgent)(snapshot, object.ref.id), signal: current,
                 observer: { event(event) { progress.event(event); return observer.event(event); } },
               }));

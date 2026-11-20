@@ -9,6 +9,8 @@ import type { ConfigurationResult } from "../shared/configuration.ts";
 import type { ContentResult } from "../shared/content.ts";
 import type { PluginConfigurationResult } from "../shared/plugin-configuration.ts";
 import type { SessionResult } from "../shared/session.ts";
+import type { TelemetryResult } from "../shared/telemetry.ts";
+import { TelemetryError } from "../telemetry/service.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import type { SessionWatchOwner } from "./sessions.ts";
 import { ApplicationError, type ApplicationService } from "./service.ts";
@@ -67,6 +69,15 @@ export async function serveContent(service: ApplicationService, command: unknown
   }
 }
 
+export function serveTelemetry(service: ApplicationService, command: unknown): TelemetryResult {
+  try { return { ok: true, reply: service.telemetry.execute(command) }; }
+  catch (error) {
+    const known = error instanceof TelemetryError;
+    if (!known) console.error("Telemetry command failed.", error);
+    return { ok: false, error: { code: known ? error.code : "internal", message: known ? error.message : "Telemetry query could not be completed." } };
+  }
+}
+
 /** Dispatch direct requests by service name; unknown services are invalid requests. */
 export async function serve(service: ApplicationService, name: ConnectionService, command: unknown, watchOwner?: SessionWatchOwner): Promise<ConnectionServices[ConnectionService]["result"]> {
   switch (name) {
@@ -75,6 +86,7 @@ export async function serve(service: ApplicationService, name: ConnectionService
     case "configuration": return serveConfiguration(service, command);
     case "plugin-configuration": return servePluginConfiguration(service, command);
     case "content": return serveContent(service, command);
+    case "telemetry": return serveTelemetry(service, command);
     default: return { ok: false, error: { code: "invalid_request", message: "Unknown runtime service." } };
   }
 }

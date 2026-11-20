@@ -174,7 +174,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
           const response = await deps.execution.run({
             access: deps.access, interactive: false, target, signal: current, requestParentId: parent,
             agent: currentAgent.id, resources: { allow: currentAgent.resources ?? undefined, exclude: currentAgent.excludeResources ?? undefined },
-            userAgent: deps.userAgent, messages, observer: { event },
+            userAgent: deps.userAgent, purpose: "subagent", messages, observer: { event },
             tools: { exclude: ["resource_create", "creation_list", "creation_inspect"] },
             system: files => {
               const system = prepare(files).system;
