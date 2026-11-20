@@ -53,8 +53,8 @@ export function OverviewView({ state, page, openGroup, openDay, openKey }: ViewP
     <div className="grid gap-3 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
       <Panel title={i18n.text(msg.trend)} state={series} skeleton={<ChartSkeleton className="h-64" />} empty={empty}
         actions={<>
-          <ToggleGroup type="single" size="sm" variant="outline" value={split} aria-label={i18n.text(msg.splitBy)} onValueChange={value => { if (value) setSplit(value as Split); }}>
-            {(Object.keys(splitLabels) as Split[]).map(key => <ToggleGroupItem key={key} value={key} className="h-7 px-2 text-xs">{i18n.text(splitLabels[key])}</ToggleGroupItem>)}
+          <ToggleGroup type="single" variant="outline" value={split} aria-label={i18n.text(msg.splitBy)} onValueChange={value => { if (value) setSplit(value as Split); }}>
+            {(Object.keys(splitLabels) as Split[]).map(key => <ToggleGroupItem key={key} value={key}>{i18n.text(splitLabels[key])}</ToggleGroupItem>)}
           </ToggleGroup>
           <MeasureToggle value={measure} onChange={setMeasure} />
         </>}>
@@ -77,8 +77,8 @@ export function OverviewView({ state, page, openGroup, openDay, openKey }: ViewP
 
 export function MeasureToggle({ value, onChange }: { value: Measure; onChange: (value: Measure) => void }) {
   const i18n = useI18n();
-  return <ToggleGroup type="single" size="sm" variant="outline" value={value} aria-label={i18n.text(msg.measure)} onValueChange={next => { if (next) onChange(next as Measure); }}>
-    {measures.map(key => <ToggleGroupItem key={key} value={key} className="h-7 px-2 text-xs">{i18n.text(measureLabels[key])}</ToggleGroupItem>)}
+  return <ToggleGroup type="single" variant="outline" value={value} aria-label={i18n.text(msg.measure)} onValueChange={next => { if (next) onChange(next as Measure); }}>
+    {measures.map(key => <ToggleGroupItem key={key} value={key}>{i18n.text(measureLabels[key])}</ToggleGroupItem>)}
   </ToggleGroup>;
 }
 

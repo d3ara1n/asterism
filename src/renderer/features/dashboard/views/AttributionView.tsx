@@ -37,9 +37,9 @@ export function AttributionView({ model, state, page, openGroup, openKey }: View
   const columns = useMemo(() => attributionColumns(i18n, dimension, total), [i18n, dimension, total]);
   return <div className="flex flex-col gap-3">
     <div className="flex flex-wrap items-center gap-2">
-      <ToggleGroup type="single" size="sm" variant="outline" value={dimension} aria-label={i18n.text(msg.dimension)}
+      <ToggleGroup type="single" variant="outline" value={dimension} aria-label={i18n.text(msg.dimension)}
         onValueChange={value => { if (value) model.setAttribution(value as TelemetryDimension); }}>
-        {attributionDimensions.map(key => <ToggleGroupItem key={key} value={key} className="h-7 px-2.5 text-xs">{i18n.text(dimensionLabels[key])}</ToggleGroupItem>)}
+        {attributionDimensions.map(key => <ToggleGroupItem key={key} value={key}>{i18n.text(dimensionLabels[key])}</ToggleGroupItem>)}
       </ToggleGroup>
     </div>
     <Panel title={i18n.text(dimensionLabels[dimension])} state={series} skeleton={<ChartSkeleton className="h-64" />}

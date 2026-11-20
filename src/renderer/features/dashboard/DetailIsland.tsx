@@ -112,11 +112,11 @@ function EventLog({ filter, revision }: { filter: TelemetryFilter; revision: num
   const events = useTelemetry(filter, { kind: "events", offset: 0, limit, only }, revision);
   const data = events.data;
   return <Panel title={data ? `${i18n.text(msg.detailRequests)} · ${i18n.formatNumber(data.total)}` : i18n.text(msg.detailRequests)} state={events}
-    actions={<ToggleGroup type="single" size="sm" variant="outline" value={only} aria-label={i18n.text(msg.detailRequests)}
+    actions={<ToggleGroup type="single" variant="outline" value={only} aria-label={i18n.text(msg.detailRequests)}
       onValueChange={value => { if (value) { setOnly(value as typeof only); setLimit(pageSize); } }}>
-      <ToggleGroupItem value="all" className="h-7 px-2 text-xs">{i18n.text(msg.eventsAll)}</ToggleGroupItem>
-      <ToggleGroupItem value="failed" className="h-7 px-2 text-xs">{i18n.text(msg.eventsFailed)}</ToggleGroupItem>
-      <ToggleGroupItem value="tiered" className="h-7 px-2 text-xs">{i18n.text(msg.eventsTiered)}</ToggleGroupItem>
+      <ToggleGroupItem value="all">{i18n.text(msg.eventsAll)}</ToggleGroupItem>
+      <ToggleGroupItem value="failed">{i18n.text(msg.eventsFailed)}</ToggleGroupItem>
+      <ToggleGroupItem value="tiered">{i18n.text(msg.eventsTiered)}</ToggleGroupItem>
     </ToggleGroup>}
     empty={data?.rows.length === 0 && <PanelState label={i18n.text(msg.eventsEmpty)} />}>
     {data && <>
