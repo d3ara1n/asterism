@@ -107,6 +107,17 @@ function Canvas({ ref, session, run, writable, dropStatus, onDropItems, overview
   const { controller } = useWorkbench();
   const viewportElement = useRef<HTMLDivElement>(null);
   const [dropping, setDropping] = useState(false);
+  useEffect(() => {
+    if (!dropping) return;
+    const clear = () => setDropping(false);
+    const events = new AbortController();
+    // A drop on another surface may be consumed before it bubbles back to the workbench.
+    const options = { capture: true, signal: events.signal };
+    window.addEventListener("drop", clear, options);
+    window.addEventListener("dragend", clear, options);
+    window.addEventListener("blur", clear, { signal: events.signal });
+    return () => events.abort();
+  }, [dropping]);
   const scheme = useScheme();
   const { edgeStyle } = useAppearance();
   // Callbacks read the latest session through refs while retaining stable identities, avoiding rebuilding every node on each snapshot update.
@@ -238,7 +249,10 @@ function Canvas({ ref, session, run, writable, dropStatus, onDropItems, overview
       const bounds = event.currentTarget.getBoundingClientRect();
       onDropItems(items, flow.screenToFlowPosition({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 }));
     }}
-    onDragLeave={event => { if (event.currentTarget === event.target) setDropping(false); }} onDrop={onDrop}>
+    onDragLeaveCapture={event => {
+      // The drag leaves the hit-tested child, not necessarily the canvas itself. Keep the hint only when moving within the canvas.
+      if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) setDropping(false);
+    }} onDrop={onDrop}>
   {dropping && <div className="pointer-events-none absolute inset-2 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/5">
     <p className="type-body">{i18n.formatMessage(workbenchMessages.dropHint)}</p></div>}
   <SmartEdgeProvider nodes={routingNodes} options={routingOptions}><ReactFlow<ObjectNodeType, WorkbenchEdge>
