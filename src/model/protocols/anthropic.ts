@@ -5,6 +5,15 @@ import { mappedEffort, setEffort, withRequestEncoding, type Body } from "../requ
 import { namespaced, pickNative, type ModelProtocol, type ProviderOptions } from "./contract.ts";
 import { withAnthropicThinking } from "./anthropic-thinking.ts";
 import { anthropicUsage } from "./anthropic-usage.ts";
+import { inlineBase64, projectInlineFiles } from "./inline-file-projection.ts";
+
+const projectFiles = (prompt: Parameters<typeof projectInlineFiles>[0]) => {
+  const document: Parameters<typeof projectInlineFiles>[1] = part => {
+    if (part.mediaType.startsWith("image/") || part.mediaType === "application/pdf") return;
+    return { type: "document", source: { type: "base64", media_type: part.mediaType, data: inlineBase64(part.data.data) }, title: part.filename };
+  };
+  return projectInlineFiles(prompt, (part, index) => part.mediaType === "text/plain" ? undefined : document(part, index), document);
+};
 
 type ActiveLevel = Exclude<ThinkingLevel, "off">;
 const nativeKeys = ["signature", "redactedData"] as const;
@@ -55,7 +64,7 @@ export const anthropicMessages: ModelProtocol = {
       transport => withAnthropicThinking(fetch => createAnthropic({ ...connection, fetch }).messages(target.model.modelId), transport),
       connection.fetch,
       (body, level, maxOutputTokens) => encodeRequest(body, level, maxOutputTokens, mappings, manual),
-      { forwardReasoning: false },
+      { forwardReasoning: false, projectPrompt: projectFiles },
     );
   },
   callOptions: (_target, request) => ({

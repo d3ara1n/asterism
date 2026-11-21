@@ -456,7 +456,7 @@
   "conversation.status.working": "执行中",
   "conversation.status.ready": "就绪",
   "conversation.status.elapsed": "已用时 {duration}",
-  "conversation.attachments.omitted": "当前模型接口未发送这些附件：{files}",
+  "conversation.attachments.omitted": "已省略的附件：{files}",
   "conversation.status.workingHint": "助手正在执行…",
   "agent.retryWaiting": "{seconds} 秒后重试 · {attempt}/{max}",
   "agent.retrying": "正在重试 · {attempt}/{max}",

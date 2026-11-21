@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateText } from "ai";
 import { thinkingLevels } from "@asterism-app/sdk/contracts";
-import { AiSdkAdapter, sdkMessages } from "./ai-sdk.ts";
+import { AiSdkAdapter } from "./ai-sdk.ts";
 import { createProviderModel } from "./provider.ts";
 import { modelProtocol } from "./protocols/index.ts";
 import { modelScope, type Json } from "../shared/model.ts";
@@ -460,37 +460,93 @@ describe("Explicit compatibility and target projection", () => {
     expect((await request(current)).input).toEqual(body.input);
   });
 
-  // Moving files can change only their representation position, never place them after subsequent historical messages.
-  it("Chat attachments immediately follow the tool result batch before the next historical message", () => {
+  function chatToolFiles(): ModelInput {
     const current = input("openai-chat");
-    current.settings.model.compatibility = [{ id: "toolFilesAsUserMessage" }];
-    current.messages = [
-      { kind: "result", callId: "call", name: "lookup", error: false,
-        parts: [{ kind: "file", data: new Uint8Array([1]), mediaType: "image/png", filename: "result.png" }] },
-      { kind: "result", callId: "second", name: "lookup", error: false, parts: [{ kind: "text", text: "Another result" }] },
+    // No generation override: the tool attachment must trigger wire encoding on its own.
+    current.settings.thinking = null;
+    current.settings.model.generation.maxOutputTokens = null;
+    current.messages.push(
+      { kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings),
+        parts: ["call", "second"].map(callId => ({ kind: "toolcall", callId, name: "lookup", arguments: {}, continuation: null })) },
+      { kind: "result", callId: "call", name: "lookup", error: false, parts: [
+        { kind: "text", text: "First result" },
+        { kind: "file", data: new Uint8Array([1, 2, 3]), mediaType: "image/png", filename: "result.png" },
+        { kind: "file", data: new Uint8Array([4, 5, 6]), mediaType: "text/csv", filename: "result.csv" },
+        { kind: "text", text: "End of first result" },
+      ] },
+      { kind: "result", callId: "second", name: "lookup", error: false, parts: [{ kind: "text", text: "Second result" }] },
       { kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings),
         parts: [{ kind: "text", text: "Following answer", continuation: null }] },
-    ];
-    const messages = sdkMessages(current);
-    expect(messages.map(message => message.role)).toEqual(["tool", "user", "assistant"]);
-    expect(messages[0]?.content).toHaveLength(2);
-    expect(messages[1]).toMatchObject({ content: [{ type: "text" }, { type: "file", filename: "result.png" }] });
-    expect(messages[2]).toMatchObject({ content: [{ type: "text", text: "Following answer" }] });
+    );
+    return current;
+  }
+
+  it("Chat sends tool attachments as structured wire parts without a compatibility pack", async () => {
+    const { messages } = await request(chatToolFiles());
+    expect((messages as unknown[]).slice(-3)).toEqual([
+      { role: "tool", tool_call_id: "call", content: [
+        { type: "text", text: "First result" },
+        { type: "image_url", image_url: { url: "data:image/png;base64,AQID" } },
+        { type: "file", file: { filename: "result.csv", file_data: "data:text/csv;base64,BAUG" } },
+        { type: "text", text: "End of first result" },
+      ] },
+      { role: "tool", tool_call_id: "second", content: "Second result" },
+      { role: "assistant", content: "Following answer" },
+    ]);
   });
 
-  // References before submission and bytes in actual requests share one protocol gate; files cannot be moved silently.
-  it("Chat rejects tool files without a tool-file tag in validate and prepare", () => {
+  it.each(["provider", "model"] as const)("Chat moves tool attachments after the result batch with an explicit %s pack", async layer => {
+    const current = chatToolFiles();
+    current.settings[layer].compatibility = [{ id: "toolFilesAsUserMessage" }];
+    const { messages } = await request(current);
+    expect((messages as unknown[]).slice(-4)).toEqual([
+      { role: "tool", tool_call_id: "call", content: "First result\nEnd of first result\n[2 file(s) attached in the following user message: result.png, result.csv]" },
+      { role: "tool", tool_call_id: "second", content: "Second result" },
+      { role: "user", content: [
+        { type: "text", text: "Files attached from the preceding tool results:" },
+        { type: "image_url", image_url: { url: "data:image/png;base64,AQID" } },
+        { type: "file", file: { filename: "result.csv", file_data: "data:text/csv;base64,BAUG" } },
+      ] },
+      { role: "assistant", content: "Following answer" },
+    ]);
+  });
+
+  it("Chat sends a standalone generic user file rather than an SDK placeholder or an error", async () => {
     const current = input("openai-chat");
-    const adapter = new AiSdkAdapter(async () => { throw new Error("Must fail before reading credentials"); });
-    const saved = { ...current, messages: [{ kind: "result" as const, callId: "call", name: "lookup", outcome: {
-      kind: "succeeded" as const, data: null, model: [{ kind: "file" as const, file: { "$asterism.content": "c4b22b60-ae71-4e92-9823-2223b48a8327" }, mediaType: "image/png" }],
-    } }] };
-    expect(() => adapter.validate(saved)).toThrow("Tool files in a user message");
-    current.messages = [{ kind: "result", callId: "call", name: "lookup", error: false,
-      parts: [{ kind: "file", data: new Uint8Array([1]), mediaType: "image/png" }] }];
-    expect(() => adapter.prepare(current)).toThrow("Tool files in a user message");
-    current.settings.provider.compatibility = [{ id: "toolFilesAsUserMessage" }];
-    expect(() => adapter.validate({ ...saved, settings: current.settings })).not.toThrow();
-    expect(() => adapter.prepare(current)).not.toThrow();
+    current.messages.push({ kind: "input", parts: [{ kind: "file", filename: "report.csv", mediaType: "text/csv", data: Uint8Array.of(42) }] });
+    const { messages } = await request(current);
+    expect((messages as unknown[]).at(-1)).toEqual({ role: "user", content: [
+      { type: "file", file: { filename: "report.csv", file_data: "data:text/csv;base64,Kg==" } },
+    ] });
+  });
+
+  it("Messages encodes generic user and tool files without dropping them from the combined user block", async () => {
+    const current = chatToolFiles();
+    current.settings.provider.protocol = "anthropic";
+    current.messages.splice(-1, 0, { kind: "input", parts: [
+      { kind: "file", filename: "report.csv", mediaType: "text/csv", data: Uint8Array.of(42) },
+      { kind: "text", text: "Use both files" },
+    ] });
+    const { messages } = await request(current);
+    expect((messages as unknown[]).at(-2)).toMatchObject({ role: "user", content: [
+      { type: "tool_result", tool_use_id: "call", content: [
+        { type: "text", text: "First result" },
+        { type: "image", source: { type: "base64", media_type: "image/png", data: "AQID" } },
+        { type: "document", source: { type: "base64", media_type: "text/csv", data: "BAUG" }, title: "result.csv" },
+        { type: "text", text: "End of first result" },
+      ] },
+      { type: "tool_result", tool_use_id: "second", content: "Second result" },
+      { type: "document", source: { type: "base64", media_type: "text/csv", data: "Kg==" }, title: "report.csv" },
+      { type: "text", text: "Use both files" },
+    ] });
+  });
+
+  it("Chat surfaces the endpoint's rejection of tool attachment parts", async () => {
+    const adapter = new AiSdkAdapter(async () => null, undefined, async () => Response.json({
+      error: { message: "Only text is accepted in tool messages" },
+    }, { status: 400 }));
+    const stream = adapter.prepare(chatToolFiles()).stream(new AbortController().signal);
+    await expect((async () => { for await (const _event of stream) { /* Consume the provider error. */ } })())
+      .rejects.toMatchObject({ origin: "model", code: "provider_error", message: "Only text is accepted in tool messages", details: { httpStatus: 400 } });
   });
 });

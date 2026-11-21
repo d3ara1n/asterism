@@ -10,7 +10,6 @@ import { PluginApiError } from "@asterism-app/sdk/runtime";
 import type { ModelServices } from "@asterism-app/sdk/runtime";
 import { inputReferences, resolveInput, type ModelContent } from "../model/input.ts";
 import type { ModelItem, RequestTiming, Usage } from "@asterism-app/sdk/contracts";
-import { errorMessages } from "../shared/error-display.ts";
 import type { ModelUsageRecord, ToolUsageRecord } from "../telemetry/types.ts";
 
 /** Model targets identify concrete provider/model pairs; paradigms resolve their own configuration. */
@@ -82,7 +81,6 @@ export function createModelServices(configuration: ConfigurationService, adapter
   recordUsage: RecordModelUsage = () => {}): HostModels {
   // Capture current connection settings before requests; catalog reads remain synchronous.
   const current = () => configuration.modelCatalog();
-  const rejectedResponsesFiles = new Map<string, Set<string>>();
   const resolve = async (target: ModelTarget, execute = true, signal?: AbortSignal): Promise<ResolvedTarget> => {
     await configuration.execute({ type: "read" });
     const config = current();
@@ -93,7 +91,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
     const settings: ModelSettings = { provider: connection, model, thinking: result.thinking };
     const credential = adapterFactory || !execute ? null : await configuration.executionCredential(connection.id, signal);
     const adapter = adapterFactory?.(settings)
-      ?? new AiSdkAdapter(async () => credential, undefined, undefined, rejectedResponsesFiles);
+      ?? new AiSdkAdapter(async () => credential);
     return { settings, adapter };
   };
   const catalog = {
@@ -131,8 +129,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
         if (error instanceof PluginApiError) throw error;
         if (request.signal.aborted) throw error;
         throw new PluginApiError("invalid_argument", error instanceof ModelFailure ? error.message : "The model request could not be prepared.",
-          error instanceof ModelFailure ? error.code : undefined,
-          error instanceof ModelFailure && error.code === "tool_files_unsupported" ? errorMessages.tool_files_unsupported : undefined);
+          error instanceof ModelFailure ? error.code : undefined);
       } finally { await content?.close(); }
     },
     async *stream(request, options) {

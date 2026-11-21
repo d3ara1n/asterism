@@ -5,13 +5,13 @@ import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 import { requestOptions } from "./request-options.ts";
-import { projectHistory, validateProjection } from "./projection.ts";
+import { projectHistory } from "./projection.ts";
 import { modelProtocol, type ModelProtocol } from "./protocols/index.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
 import { describeError, errorMessage, type ModelResponse, type ModelRunEvent } from "@asterism-app/sdk/contracts";
 import { ZodError } from "zod";
-import { withResponsesFileRecovery } from "./protocols/responses-file-recovery.ts";
+import { responsesFileRetry } from "./protocols/responses-file-recovery.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
 function responseParsingFailure(error: unknown): boolean {
@@ -35,7 +35,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   const protocol = modelProtocol(input.settings.provider.protocol);
   const filesInUserMessage = protocol.toolResultFiles(input.settings) === "user-message";
   const attachments: Extract<ResolvedInputPart, { kind: "file" }>[] = [];
-  /** Protocol validation has admitted these files; files from the same batch merge into the subsequent user message. */
+  /** Files from the same batch merge into the subsequent user message when the protocol selects that representation. */
   const flushAttachments = () => {
     if (!attachments.length) return;
     messages.push({ role: "user", content: [{ type: "text", text: "Files attached from the preceding tool results:" },
@@ -60,7 +60,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
     if (item.kind === "result") {
       const files = item.parts.filter(part => part.kind === "file");
       const text = item.parts.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
-      // Serialize text once; protocols that cannot carry files in results receive them in the subsequent user message.
+      // Serialize text once; the user-message representation keeps a reference in the tool result.
       let output: ToolResultPart["output"];
       if (!files.length || filesInUserMessage) {
         const notice = files.length ? `[${files.length} file(s) attached in the following user message: ${files.map(file => file.filename ?? file.mediaType).join(", ")}]` : "";
@@ -81,8 +81,7 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
 export class AiSdkAdapter implements ModelAdapter {
   constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
     private readonly languageModelFactory?: (input: ModelInput, key: string) => Exclude<LanguageModel, string>,
-    private readonly transport: typeof fetch = fetch,
-    private readonly rejectedResponsesFiles = new Map<string, Set<string>>()) {}
+    private readonly transport: typeof fetch = fetch) {}
   format(settings: ModelSettings): string {
     return modelProtocol(settings.provider.protocol).continuationFormat;
   }
@@ -90,7 +89,6 @@ export class AiSdkAdapter implements ModelAdapter {
     validateProviderTransport(input.settings.provider);
     validateRequestIdentity(input.settings, input);
     requestOptions(input.settings.provider, input.settings.model, { purpose: "execution", thinking: input.settings.thinking, maxOutputTokens: input.maxOutputTokens });
-    validateProjection(input);
   }
   prepare(input: ModelInput): PreparedModel {
     // Capture top-level request identity so waiting for credentials cannot observe values later replaced by the caller.
@@ -110,15 +108,26 @@ export class AiSdkAdapter implements ModelAdapter {
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const controller = new AbortController();
     const streamSignal = AbortSignal.any([signal, controller.signal]);
-    let responseMetadata: ModelResponse | null = null, transportStarted = false;
+    let responseMetadata: ModelResponse | null = null;
+    let omittedFile: string | undefined;
     // The SDK may consume the first SSE error before doStream returns; retain the received prefix and release it on first-block delivery.
     let capturePrefix = true, responsePrefix = "";
     const decoder = new TextDecoder();
     const transport: typeof fetch = async (url, init) => {
-      transportStarted = true;
       let response: Response;
-      try { response = await this.transport(url, init); }
-      catch (error) { throw providerFailure(error, true); }
+      try {
+        response = await this.transport(url, init);
+        if (diagnostic && provider.protocol === "openai-responses" && !this.languageModelFactory) {
+          const retry = await responsesFileRetry(response, init?.body, streamSignal);
+          if (retry) {
+            const headers = new Headers(init?.headers);
+            headers.delete("content-length");
+            void response.body?.cancel().catch(() => {});
+            omittedFile = retry.label;
+            response = await this.transport(url, { ...init, headers, body: retry.body });
+          }
+        }
+      } catch (error) { throw providerFailure(error, true); }
       responseMetadata = {
         connection: { id: provider.id }, endpoint: provider.baseUrl, model: model.modelId,
         status: response.status, receivedAt: Date.now(), headers: Object.fromEntries(response.headers),
@@ -143,23 +152,13 @@ export class AiSdkAdapter implements ModelAdapter {
       }
       return response;
     };
-    let omitted: readonly string[] = [];
     const emitAttachmentWarning = () => {
-      if (!omitted.length || signal.aborted) return;
-      const omittedFiles = omitted;
-      omitted = [];
-      diagnostic?.({ type: "diagnostic", origin: "software", level: "warning", code: "attachments_omitted",
-        message: `Attachments not sent by the current request adapter: ${omittedFiles.join(", ")}.`, omittedFiles });
+      if (!omittedFile || signal.aborted) return;
+      diagnostic?.({ type: "diagnostic", origin: "model", level: "warning", code: "attachments_omitted",
+        message: `Retried without an attachment rejected by the provider: ${omittedFile}.`, omittedFiles: [omittedFile] });
+      omittedFile = undefined;
     };
-    let languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, transport, input);
-    if (diagnostic && languageModel.specificationVersion === "v4" && !this.languageModelFactory && provider.protocol === "openai-responses") {
-      const target = JSON.stringify([provider.id, provider.baseUrl, model.modelId]);
-      const rejected = this.rejectedResponsesFiles.get(target) ?? new Set<string>();
-      languageModel = withResponsesFileRecovery(languageModel, rejected, () => transportStarted, files => {
-        omitted = files;
-        this.rejectedResponsesFiles.set(target, rejected);
-      });
-    }
+    const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, transport, input);
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
     signal.throwIfAborted();
     const timing = new RequestTimer();

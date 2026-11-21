@@ -5,6 +5,8 @@ import type { ThinkingMappings } from "./compatibility.ts";
 
 export type LanguageModelV4 = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["model"];
 type CallOptions = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["params"];
+export type RequestPrompt = CallOptions["prompt"];
+type PromptProjection = { prompt: RequestPrompt; encode: (body: Body) => void };
 export type Body = Record<string, unknown>;
 /** Protocols own serialized field names and explicit reasoning mappings; null leaves reasoning at its default. */
 export type RequestEncoder = (body: Body, level: ThinkingLevel | null, maxOutputTokens: number | undefined) => void;
@@ -33,15 +35,17 @@ export function mappedEffort(level: ThinkingLevel, mappings: ThinkingMappings, r
 
 /**
  * Preserves explicit sampling values and applies protocol mappings after SDK serialization.
+ * Protocols may project prompt parts that the SDK would otherwise erase or flatten.
  * Protocols that fully encode reasoning can omit it from SDK options to avoid model-name mode substitutions.
  * Each call independently captures options and transport without shared mutable state linking concurrent requests.
  */
 export function withRequestEncoding(createModel: (transport: typeof fetch) => LanguageModelV4, transport: typeof fetch, encode: RequestEncoder,
-  { forwardReasoning = true }: { forwardReasoning?: boolean } = {}) {
+  { forwardReasoning = true, projectPrompt }: { forwardReasoning?: boolean; projectPrompt?: (prompt: RequestPrompt) => PromptProjection | null } = {}) {
   const project = (params: CallOptions) => {
     const level = params.reasoning === undefined || params.reasoning === "provider-default" ? null
       : params.reasoning === "none" ? "off" : params.reasoning;
-    if (level === null && params.temperature === undefined && params.topP === undefined && params.maxOutputTokens === undefined) return null;
+    const projection = projectPrompt?.(params.prompt);
+    if (!projection && level === null && params.temperature === undefined && params.topP === undefined && params.maxOutputTokens === undefined) return null;
     const wireFetch: typeof fetch = (url, init) => {
       if (typeof init?.body !== "string")
         throw new ModelFailure("protocol_encoding", "The request encoder requires a serialized request body.");
@@ -50,19 +54,21 @@ export function withRequestEncoding(createModel: (transport: typeof fetch) => La
       if (params.temperature !== undefined) body.temperature = params.temperature;
       if (params.topP !== undefined) body.top_p = params.topP;
       encode(body, level, params.maxOutputTokens);
+      projection?.encode(body);
       return transport(url, { ...init, body: JSON.stringify(body) });
     };
-    return createModel(wireFetch);
+    return { model: createModel(wireFetch), params: { ...params, prompt: projection?.prompt ?? params.prompt,
+      reasoning: forwardReasoning ? params.reasoning : undefined } };
   };
   return wrapLanguageModel({ model: createModel(transport), middleware: {
     specificationVersion: "v4",
     wrapStream: ({ params, doStream }) => {
       const target = project(params);
-      return target ? target.doStream(forwardReasoning ? params : { ...params, reasoning: undefined }) : doStream();
+      return target ? target.model.doStream(target.params) : doStream();
     },
     wrapGenerate: ({ params, doGenerate }) => {
       const target = project(params);
-      return target ? target.doGenerate(forwardReasoning ? params : { ...params, reasoning: undefined }) : doGenerate();
+      return target ? target.model.doGenerate(target.params) : doGenerate();
     },
   } });
 }

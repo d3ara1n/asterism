@@ -1,7 +1,7 @@
 import type { ModelProtocolId } from "@asterism-app/sdk/contracts";
 import type { wrapLanguageModel } from "ai";
 import type { ProtocolTarget } from "../compatibility.ts";
-import type { ModelEvent, ModelValidationInput } from "../contract.ts";
+import type { ModelEvent } from "../contract.ts";
 import { jsonSchema, type Json, type Usage } from "../../shared/model.ts";
 import type { LanguageModelV4 } from "../request-encoding.ts";
 
@@ -38,7 +38,6 @@ export interface ModelProtocol {
   toolResultFiles(target: ProtocolTarget): "content" | "user-message";
   createModel(target: ProtocolTarget, connection: ModelConnection): LanguageModelV4;
   callOptions(target: ProtocolTarget, request: ProtocolRequest): { system?: string; providerOptions: ProviderOptions };
-  validate?(input: ModelValidationInput): void;
   /** Extract allowlisted native values from SDK provider metadata into this protocol's flat continuation record. */
   capture(metadata: unknown): Record<string, Json>;
   /** Re-read stored continuation through the same allowlist. */

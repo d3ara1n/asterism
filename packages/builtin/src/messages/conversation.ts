@@ -1,7 +1,7 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const conversationMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
-  attachmentsOmitted: { id: "conversation.attachments.omitted", defaultMessage: "Attachments not sent by the current model interface: {files}" },
+  attachmentsOmitted: { id: "conversation.attachments.omitted", defaultMessage: "Attachments omitted: {files}" },
   earlierMessages: { id: "conversation.history.loadEarlier", defaultMessage: "Load earlier messages" },
   historyReadFailed: { id: "conversation.history.readFailed", defaultMessage: "Conversation history could not be loaded." },
   insertPaths: { id: "conversation.input.insertPaths", defaultMessage: "Insert paths" },

@@ -1,42 +1,34 @@
-import { UnsupportedFunctionalityError, wrapLanguageModel } from "ai";
-import type { LanguageModelV4 } from "../request-encoding.ts";
+import type { Body } from "../request-encoding.ts";
 
-type Prompt = Parameters<LanguageModelV4["doStream"]>[0]["prompt"];
-
-/** Only inline user files enter the SDK branch that throws this exact error. Tool output files and provider references use different encoders. */
-function mask(prompt: Prompt, mediaTypes: ReadonlySet<string>) {
-  const omitted: string[] = [];
-  const messages: Prompt = prompt.map(message => message.role !== "user" ? message : {
-    ...message, content: message.content.map(part => {
-      if (part.type !== "file" || part.data.type !== "data" || typeof part.data.data === "string" || !mediaTypes.has(part.mediaType)) return part;
-      const label = part.filename ? `${JSON.stringify(part.filename)} (${part.mediaType})` : part.mediaType;
-      omitted.push(label);
-      return { type: "text", text: `[Attachment ${label} was not sent: the current request adapter does not support this file type. The file contents were not provided.]` };
-    }),
-  });
-  return { messages, omitted };
+function object(value: unknown): Body | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Body : undefined;
 }
 
-/** Re-encode a rejected prompt once, only before transport. Keep the SDK's checks and learn only from its actual rejection. */
-export function withResponsesFileRecovery(model: LanguageModelV4, rejected: Set<string>, transportStarted: () => boolean,
-  report: (omitted: readonly string[]) => void): LanguageModelV4 {
-  return wrapLanguageModel({ model, middleware: {
-    specificationVersion: "v4",
-    async wrapStream({ params, doStream }) {
-      const first = mask(params.prompt, rejected);
-      if (first.omitted.length) report(first.omitted);
-      try {
-        return await (first.omitted.length ? model.doStream({ ...params, prompt: first.messages }) : doStream());
-      } catch (error) {
-        if (transportStarted() || params.abortSignal?.aborted || !UnsupportedFunctionalityError.isInstance(error)) throw error;
-        const mediaType = /^file part media type ([^\s/]+\/[^\s/]+)$/.exec(error.functionality)?.[1];
-        if (!mediaType) throw error;
-        const retry = mask(first.messages, new Set([mediaType]));
-        if (!retry.omitted.length) throw error;
-        rejected.add(mediaType);
-        report([...first.omitted, ...retry.omitted]);
-        return model.doStream({ ...params, prompt: retry.messages });
-      }
-    },
-  } });
+/** Retry only a pre-stream HTTP rejection that identifies an attachment in the actual wire request. */
+export async function responsesFileRetry(response: Response, body: BodyInit | null | undefined, signal: AbortSignal) {
+  if (![400, 415, 422].includes(response.status) || typeof body !== "string" || signal.aborted ||
+    response.headers.get("content-type")?.includes("text/event-stream")) return;
+  let rejection: unknown;
+  try { rejection = await response.clone().json(); }
+  catch { return; }
+  if (signal.aborted) return;
+  const param = object(object(rejection)?.error)?.param;
+  if (typeof param !== "string") return;
+  const path = /^input\[(\d+)\]\.content\[(\d+)\](?:\.(?:type|file_data|file_id|file_url|filename|image_url))?$/.exec(param);
+  if (!path) return;
+
+  const request = object(JSON.parse(body));
+  if (!Array.isArray(request?.input)) return;
+  const message = object(request.input[Number(path[1])]);
+  if (message?.role !== "user" || !Array.isArray(message.content)) return;
+  const index = Number(path[2]);
+  const part = object(message.content[index]);
+  if (part?.type !== "input_file" && part?.type !== "input_image") return;
+
+  const data = part.type === "input_file" ? part.file_data : part.image_url;
+  const media = typeof data === "string" ? /^data:([^;,]+)[;,]/.exec(data)?.[1] : undefined;
+  const label = typeof part.filename === "string" ? [JSON.stringify(part.filename), media && `(${media})`].filter(Boolean).join(" ")
+    : media ?? (part.type === "input_image" ? "image" : "file");
+  message.content[index] = { type: "input_text", text: `[Attachment ${label} was rejected by the provider. Its contents were not provided in this retry.]` };
+  return { body: JSON.stringify(request), label };
 }

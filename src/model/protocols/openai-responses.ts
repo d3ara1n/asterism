@@ -86,7 +86,7 @@ export const openaiResponses: ModelProtocol = {
       ...(fields.systemMessage ? { system: request.system } : {}),
       providerOptions: { openai: {
         // Explicit false matters too: otherwise the SDK automatically requests encrypted reasoning by model name.
-        store: false, forceReasoning: reasoning,
+        store: false, forceReasoning: reasoning, passThroughUnsupportedFiles: true,
         ...(reasoning && fields.encryptedContent ? { include: ["reasoning.encrypted_content"] } : {}),
         ...(reasoning && fields.reasoningSummary ? { reasoningSummary: "auto" } : {}),
         ...(fields.systemMessage ? { systemMessageMode: "system" }
