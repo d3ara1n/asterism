@@ -3,7 +3,7 @@
   "private": true,
   "license": "MIT",
   "version": "0.1.0",
-  "description": "A local-first AI workbench for agents, resources, and work in progress",
+  "description": "A desktop workbench for agents, resources, and work in progress",
   "author": "Chien Zhang",
   "main": "dist/main/index.js",
   "type": "module",

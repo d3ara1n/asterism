@@ -1,6 +1,6 @@
 # Product purpose and boundaries
 
-Asterism is a local-first personal agent workbench. People organize a piece of work, supply material, observe execution, and continue from its results or history.
+Asterism is a personal desktop agent workbench. People organize a piece of work, supply material, observe execution, and continue from its results or history.
 
 The product name is Asterism, with `asterism` used in code. The name describes a recognizable arrangement of stars: objects and relationships become meaningful through how a person organizes them.
 

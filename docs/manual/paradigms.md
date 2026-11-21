@@ -1,6 +1,6 @@
 # Agent paradigms
 
-Asterism is a local-first, resource-centered workbench. Resources, links, tools, history, and views form a shared foundation for different ways of working with Agents. Resource-centered design belongs to the whole workbench, not to one particular Agent paradigm.
+Asterism is a desktop, resource-centered workbench. Resources, links, tools, history, and views form a shared foundation for different ways of working with Agents. Resource-centered design belongs to the whole workbench, not to one particular Agent paradigm.
 
 ## Paradigms, plugins, and workflows
 
