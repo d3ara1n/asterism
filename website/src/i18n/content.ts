@@ -171,9 +171,9 @@ const basePlatforms = {
 export const content: Record<Locale, Content> = {
   en: {
     htmlLang: "en",
-    title: "Asterism — a local-first workbench for agents",
+    title: "Asterism — a desktop workbench for agents",
     description:
-      "Organize agents, files, terminals, and services on one local workbench. Explicit links decide access, and work history stays inspectable as a tree.",
+      "Organize agents, files, terminals, and services on one desktop workbench. Explicit links decide access, and work history stays inspectable as a tree.",
     skipToContent: "Skip to content",
     nav: {
       source: "GitHub",
@@ -181,7 +181,7 @@ export const content: Record<Locale, Content> = {
       switchName: "中文",
     },
     hero: {
-      lede: "A local-first workbench for working with agents.",
+      lede: "A desktop workbench for working with agents.",
       sublede:
         "Agents, files, terminals, and services share one canvas. Links decide what each agent can reach, and history keeps every turn.",
       download: "Download",
@@ -299,8 +299,8 @@ export const content: Record<Locale, Content> = {
     },
     principles: [
       {
-        term: "Local-first",
-        detail: "Sessions, SQLite history, and settings live on your machine. Nothing leaves except requests to providers you configure.",
+        term: "Local storage",
+        detail: "Sessions, SQLite history, and settings live on your machine with no Asterism account. Model requests go to your providers, and Sentry crash reporting is opt-in.",
       },
       {
         term: "Your models",
@@ -335,9 +335,9 @@ export const content: Record<Locale, Content> = {
   },
   zh: {
     htmlLang: "zh-CN",
-    title: "Asterism — 本地优先的智能体工作台",
+    title: "Asterism — 智能体桌面工作台",
     description:
-      "在同一张本地工作台上组织智能体、文件、终端与外部服务。显式链接决定访问边界，会话历史以树状结构完整留存。",
+      "在同一张桌面工作台上组织智能体、文件、终端与外部服务。显式链接决定访问边界，会话历史以树状结构完整留存。",
     skipToContent: "跳至正文",
     nav: {
       source: "GitHub",
@@ -345,7 +345,7 @@ export const content: Record<Locale, Content> = {
       switchName: "EN",
     },
     hero: {
-      lede: "本地优先的智能体工作台。",
+      lede: "面向智能体的桌面工作台。",
       sublede: "智能体、文件、终端与外部服务同在一张画布上。链接决定各自能触及什么，历史保留每一轮推进。",
       download: "下载应用",
       source: "查看源码",
@@ -462,8 +462,8 @@ export const content: Record<Locale, Content> = {
     },
     principles: [
       {
-        term: "本地优先",
-        detail: "会话、SQLite 历史记录与配置均保存在本机，仅向你自行配置的服务商发起请求。",
+        term: "数据留在本地",
+        detail: "会话、SQLite 历史记录与配置均保存在本机，无需 Asterism 账号。模型请求直连你配置的服务商，Sentry 崩溃报告默认关闭、按需开启。",
       },
       {
         term: "自选模型",
