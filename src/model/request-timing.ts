@@ -14,6 +14,8 @@ export class RequestTimer {
   private outputChunks = 0;
   private result: RequestTiming | undefined;
 
+  get hasOutput(): boolean { return this.firstOutputMs !== null; }
+
   output(kind: "text" | "thinking" | "toolcall", delta: string): void {
     if (!delta.length || this.result) return;
     const elapsed = performance.now() - this.started;

@@ -97,6 +97,59 @@ describe("AI SDK adaptation contract", () => {
     expect(failure.details.statusCode).toBe(statusCode);
   });
 
+  it.each([
+    { code: "UND_ERR_SOCKET", retryable: true },
+    { code: "ECONNRESET", retryable: true },
+    { code: "UNKNOWN_IO_ERROR", retryable: false },
+  ])("classifies an HTTP 200 stream read failure after keepalives: $code", async ({ code, retryable }) => {
+    const current = structuredClone(transportInput);
+    current.settings.provider.protocol = "openai-chat";
+    const raw = ": PING\n\n: PING\n\n";
+    const cause = Object.assign(new Error("other side closed"), { code });
+    const interrupted = new TypeError("terminated", { cause });
+    const transport = vi.fn<typeof fetch>(async () => {
+      let sent = false;
+      const body = new ReadableStream<Uint8Array>({ pull(controller) {
+        if (sent) controller.error(interrupted);
+        else { sent = true; controller.enqueue(new TextEncoder().encode(raw)); }
+      } });
+      return new Response(body, { headers: { "content-type": "text/event-stream" } });
+    });
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
+    await expect(consume(adapter.prepare(current).stream(new AbortController().signal)))
+      .rejects.toMatchObject({ origin: "model", code: "provider_error", retryable, details: {
+        httpStatus: 200, rawResponse: raw,
+        causes: [expect.objectContaining({ message: "terminated", causes: [expect.objectContaining({ code })] })],
+      } });
+    expect(transport).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry a connection reset after delivering partial model output", async () => {
+    const current = structuredClone(transportInput);
+    current.settings.provider.protocol = "openai-chat";
+    const interrupted = Object.assign(new Error("connection reset"), { code: "ECONNRESET" });
+    let disconnect!: () => void;
+    const chunk = { id: "response-1", object: "chat.completion.chunk", created: 1, model: "test",
+      choices: [{ index: 0, delta: { role: "assistant", content: "Partial text" }, finish_reason: null }] };
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        disconnect = () => controller.error(interrupted);
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunk)}\n\n`));
+      },
+    });
+    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () =>
+      new Response(body, { headers: { "content-type": "text/event-stream" } }));
+    const stream = adapter.prepare(current).stream(new AbortController().signal);
+    const run = async () => {
+      for await (const event of stream) {
+        if (event.type === "part.delta" && event.delta === "Partial text") disconnect();
+      }
+    };
+    await expect(run()).rejects.toMatchObject({ origin: "model", retryable: false, details: {
+      httpStatus: 200, causes: [expect.objectContaining({ code: "ECONNRESET" })],
+    } });
+  });
+
   // SDK streams must deliver the caller's limit to the provider without expanding the configured output limit.
   it.each([{ requested: 400, expected: 400 }, { requested: 2000, expected: 1000 }])(
     "uses the smaller of the single-completion limit $requested and model configuration", async ({ requested, expected }) => {

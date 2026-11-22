@@ -1,4 +1,4 @@
-import { jsonSchema as sdkJsonSchema, streamText, tool, APICallError, StreamProviderError, JSONParseError, TypeValidationError, InvalidResponseDataError,
+import { jsonSchema as sdkJsonSchema, streamText, tool,
   type ModelMessage, type ToolResultPart, type ToolSet, type LanguageModel } from "ai";
 import { jsonSchema, unauthenticatedApiKey, type Json, type ModelSettings } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
@@ -9,33 +9,10 @@ import { projectHistory } from "./projection.ts";
 import { modelProtocol, type ModelProtocol } from "./protocols/index.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
-import { describeError, errorMessage, type ModelResponse } from "@asterism-app/sdk/contracts";
-import { ZodError } from "zod";
+import { describeError, type ModelResponse } from "@asterism-app/sdk/contracts";
+import { providerFailure } from "./provider-failure.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
-function responseParsingFailure(error: unknown): boolean {
-  return error instanceof SyntaxError || error instanceof ZodError
-    || JSONParseError.isInstance(error) || TypeValidationError.isInstance(error) || InvalidResponseDataError.isInstance(error);
-}
-const retryableStatuses = new Set([408, 429, 500, 502, 503, 504, 529]);
-
-/** Provenance explains who failed; only a transient response status justifies automatic retry. */
-function providerFailure(error: unknown, upstream = false, httpStatus?: number): ModelFailure {
-  if (error instanceof ModelFailure) return error;
-  const details = describeError(error);
-  const parsing = responseParsingFailure(error);
-  const providerError = APICallError.isInstance(error) || StreamProviderError.isInstance(error);
-  const httpRejected = httpStatus !== undefined && httpStatus >= 400;
-  const remote = upstream || providerError || httpRejected;
-  // An HTTP rejection takes precedence. After a successful HTTP response, use the SDK's stream error status.
-  const status = httpRejected ? httpStatus : providerError ? error.statusCode : undefined;
-  const retryable = status !== undefined && retryableStatuses.has(status);
-  // SDK parsing/validation messages embed received values and issue trees; retain them only in details.
-  const message = parsing ? "Model response parsing failed."
-    : errorMessage(error, remote ? "Provider request failed." : "Model processing failed.");
-  return new ModelFailure(parsing ? "response_parsing" : remote ? "provider_error" : "processing_error",
-    message, details, remote ? "model" : "software", retryable);
-}
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
   const protocol = modelProtocol(input.settings.provider.protocol);
@@ -114,6 +91,7 @@ export class AiSdkAdapter implements ModelAdapter {
     const controller = new AbortController();
     const streamSignal = AbortSignal.any([signal, controller.signal]);
     let responseMetadata: ModelResponse | null = null;
+    let readFailure: { error: unknown } | undefined;
     // The SDK may consume the first SSE error before doStream returns; retain the received prefix and release it on first-block delivery.
     let capturePrefix = true, responsePrefix = "";
     const decoder = new TextDecoder();
@@ -121,7 +99,7 @@ export class AiSdkAdapter implements ModelAdapter {
       let response: Response;
       try {
         response = await this.transport(url, init);
-      } catch (error) { throw providerFailure(error, true); }
+      } catch (error) { throw providerFailure(error, { upstream: true }); }
       responseMetadata = {
         connection: { id: provider.id }, endpoint: provider.baseUrl, model: model.modelId,
         status: response.status, receivedAt: Date.now(), headers: Object.fromEntries(response.headers),
@@ -130,16 +108,18 @@ export class AiSdkAdapter implements ModelAdapter {
         const reader = response.body.getReader();
         return new Response(new ReadableStream<Uint8Array>({
           async pull(output) {
-            try {
-              const { done, value } = await reader.read();
-              if (done) {
-                if (capturePrefix) responsePrefix += decoder.decode();
-                output.close();
-              } else {
-                if (capturePrefix) responsePrefix += decoder.decode(value, { stream: true });
-                output.enqueue(value);
-              }
-            } catch (error) { output.error(providerFailure(error, true)); }
+            const { done, value } = await reader.read().catch((error: unknown) => {
+              // Preserve the original cause so the classifier can recognize it through any SDK wrapper.
+              readFailure = { error };
+              throw error;
+            });
+            if (done) {
+              if (capturePrefix) responsePrefix += decoder.decode();
+              output.close();
+            } else {
+              if (capturePrefix) responsePrefix += decoder.decode(value, { stream: true });
+              output.enqueue(value);
+            }
           },
           cancel: reason => reader.cancel(reason),
         }), { status: response.status, statusText: response.statusText, headers: response.headers });
@@ -152,10 +132,16 @@ export class AiSdkAdapter implements ModelAdapter {
     const timing = new RequestTimer();
     const protocol = modelProtocol(provider.protocol);
     const measured = measureModel(languageModel, protocol, timing);
+    let outputStarted = false;
+    const classifyFailure = (error: unknown, upstream = false) => providerFailure(error, {
+      upstream, httpStatus: responseMetadata?.status, readFailure,
+      allowReadRetry: !streamSignal.aborted && !outputStarted && !timing.hasOutput && !measured.completion,
+    });
     const cancelled = () => { timing.end("cancelled"); };
     signal.addEventListener("abort", cancelled, { once: true });
     try {
-      for await (const event of this.decode(measured, messages, tools, options, protocol, streamSignal, () => responseMetadata?.status)) {
+      for await (const event of this.decode(measured, messages, tools, options, protocol, streamSignal, classifyFailure)) {
+        if (event.type !== "finish") outputStarted = true;
         capturePrefix = false; responsePrefix = "";
         yield event.type === "finish" ? { ...event, response: responseMetadata } : event;
       }
@@ -164,7 +150,7 @@ export class AiSdkAdapter implements ModelAdapter {
       if (measured.completion) yield { ...measured.completion, response: responseMetadata };
       // An asynchronous transport callback assigns the response; narrow to the actual value obtained after the callback.
       const received = responseMetadata as ModelResponse | null;
-      const failure = providerFailure(error, received !== null && responseParsingFailure(error), received?.status);
+      const failure = classifyFailure(error);
       failure.details ??= describeError(error);
       if (responsePrefix) failure.details.rawResponse = responsePrefix;
       if (received) {
@@ -186,7 +172,7 @@ export class AiSdkAdapter implements ModelAdapter {
   }
   private async *decode(measured: ReturnType<typeof measureModel>, messages: ModelMessage[], tools: ToolSet,
     options: ReturnType<typeof requestOptions>, protocol: ModelProtocol,
-    signal: AbortSignal, receivedStatus: () => number | undefined): AsyncIterable<ModelEvent> {
+    signal: AbortSignal, classifyFailure: (error: unknown, upstream: boolean) => ModelFailure): AsyncIterable<ModelEvent> {
     const result = streamText({ model: measured.model, messages, tools,
       ...options, abortSignal: signal,
       include: { rawChunks: true },
@@ -256,8 +242,7 @@ export class AiSdkAdapter implements ModelAdapter {
         case "error":
           // Server and transport errors retain raw diagnostics separately from the failure summary.
           {
-            const status = receivedStatus();
-            const failure = providerFailure(event.error, rawFailure !== undefined || (status !== undefined && responseParsingFailure(event.error)), status);
+            const failure = classifyFailure(event.error, rawFailure !== undefined);
             failure.details ??= describeError(event.error);
             if (rawFailure !== undefined) failure.details.rawEvent = rawFailure;
             throw failure;
