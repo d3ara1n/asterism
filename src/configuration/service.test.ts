@@ -46,13 +46,13 @@ describe("Real configuration and consumption boundaries", () => {
     await configurationStorage(root).inspect()!.apply();
     const migrated = new ConfigurationService(root);
     cleanups.push(() => migrated.close());
-    expect(migrated.sessionLifecycle()).toEqual({ retentionDays: 30, sleepDays: 30 });
-    const saved = await migrated.execute({ type: "sessionLifecycle.set", value: { retentionDays: null, sleepDays: 7 } });
-    expect(saved.snapshot.sessionLifecycle).toEqual({ retentionDays: null, sleepDays: 7 });
+    expect(migrated.sessionLifecycle()).toEqual({ retentionDays: 30, sleepDays: 7 });
+    const saved = await migrated.execute({ type: "sessionLifecycle.set", value: { retentionDays: null, sleepDays: 30 } });
+    expect(saved.snapshot.sessionLifecycle).toEqual({ retentionDays: null, sleepDays: 30 });
     migrated.close();
     const reopened = new ConfigurationService(root);
     cleanups.push(() => reopened.close());
-    expect(reopened.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 7 });
+    expect(reopened.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 30 });
     expect(reopened.current().sessionEntry).toEqual({ pluginId: "test.plugin", entryId: "home" });
     expect(reopened.current().modelProviders[0]?.apiKey).toBe("example-saved-key");
     expect(reopened.mcpAuthorization("example")).toEqual({ port: 62986 });

@@ -93,7 +93,7 @@ export const sessionLifecycleSchema = z.strictObject({
   sleepDays: sessionLifecycleDaysSchema,
 });
 export type SessionLifecycle = z.infer<typeof sessionLifecycleSchema>;
-export const defaultSessionLifecycle: SessionLifecycle = { retentionDays: 30, sleepDays: 30 };
+export const defaultSessionLifecycle: SessionLifecycle = { retentionDays: 30, sleepDays: 7 };
 /** Monthly spending target in USD for usage statistics; null shows no target. */
 export const usageBudgetSchema = z.number().positive().max(1_000_000_000).nullable();
 export const configurationSnapshotSchema = z.strictObject({
