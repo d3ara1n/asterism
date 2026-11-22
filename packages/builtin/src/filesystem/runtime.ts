@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { defineModule, implementResource, implementTool, implementCall, implementChannel, PluginApiError, type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { TextError, readToModel, editText, textChange, writeToModel, editToModel } from "../shared/text.ts";
-import { Directory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryStatus, DirectoryWatch } from "./contract.ts";
+import { Directory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryWatch } from "./contract.ts";
 import { saveFileContent } from "./save.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
 import { readImageFile } from "./image-io.ts";
@@ -20,7 +20,6 @@ import { searchReferencePaths } from "./reference-search.ts";
 import { SearchDirectoryReferences } from "./search-contract.ts";
 import { searchTools } from "./search.ts";
 import { listFiles, readMetadata, readFileContent, readChildren } from "./read.ts";
-import { readDirectoryStatus } from "./git-status.ts";
 import { watchDirectory } from "./watch.ts";
 import { fileFailure } from "./file-io.ts";
 import { editorCalls } from "./editor-runtime.ts";
@@ -173,17 +172,10 @@ export function createFilesystemModule(shell: ShellServices) {
         { kind: "file", file: data.image, mediaType: data.mediaType, filename: basename(data.path) }],
     }),
   ],
-  channels: [implementChannel(DirectoryWatch, async channel => {
-    const fail = (error: unknown) => {
-      if (channel.signal.aborted) return;
-      plugin.log.warn(`Directory watch failed: ${String(error)}`);
-      channel.send({ type: "error" });
-      channel.close();
-    };
-    try {
-      await watchDirectory(rootOf(channel.object), channel.signal, event => channel.send(event), fail,
-        error => plugin.log.warn(`Directory watcher cleanup failed: ${String(error)}`));
-    } catch (error) { fail(error); }
+  channels: [implementChannel(DirectoryWatch, channel => {
+    const refresh = watchDirectory(rootOf(channel.object), channel.signal, event => channel.send(event),
+      error => plugin.log.warn(`Directory refresh failed: ${String(error)}`));
+    channel.onMessage(message => { if (message.type === "refresh") refresh(); });
   })],
   calls: [
     ...editorCalls,
@@ -194,6 +186,5 @@ export function createFilesystemModule(shell: ShellServices) {
       try { return await readChildren(rootOf(object), path, signal); }
       catch (error) { signal.throwIfAborted(); return fileFailure(error); }
     }),
-    implementCall(DirectoryStatus, async (_input, { object, signal }) => readDirectoryStatus(rootOf(object), signal)),
   ],
 })); }

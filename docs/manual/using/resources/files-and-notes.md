@@ -32,7 +32,7 @@ These actions act on the current saved filesystem content. They neither export t
 
 ### Git views answer a particular comparison
 
-The Changes view compares current files with HEAD. It is useful for reviewing the net result, not for distinguishing everything staged from everything unstaged. Opposing edits can cancel in the displayed diff while Git status still lists a change. Reviewing the diff does not stage, revert, or commit anything.
+The Changes view compares current files with HEAD. It is useful for reviewing the net result, not for distinguishing everything staged from everything unstaged. Opposing edits can cancel in the displayed diff while Git status still lists a change. Reviewing the diff does not stage, revert, or commit anything. File listings do not wait for Git, so the browser remains usable if Git is missing or its status cannot be read.
 
 ## Note: keep shared session material
 

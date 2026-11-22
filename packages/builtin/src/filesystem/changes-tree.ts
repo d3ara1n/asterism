@@ -1,4 +1,4 @@
-import { FileTree, type FileTreeDirectoryHandle } from "@pierre/trees";
+import { FileTree } from "@pierre/trees";
 import { buildChanges, type ChangeEntry } from "./changes-model.ts";
 import { diffPaths } from "./tree-model.ts";
 
@@ -11,7 +11,6 @@ export class ChangesTree {
   });
   private entries = new Map<string, ChangeEntry>();
   private paths: string[] = [];
-  private expanded = new Set<string>();
 
   entry(path: string) { return this.entries.get(path); }
 
@@ -19,12 +18,6 @@ export class ChangesTree {
     const tree = buildChanges(files);
     this.entries = tree.entries;
     this.model.batch(diffPaths(this.paths, tree.paths));
-    if (this.paths.length === 0) {
-      for (const path of this.expanded) {
-        const item = this.model.getItem(path);
-        if (item?.isDirectory()) (item as FileTreeDirectoryHandle).expand();
-      }
-    }
     this.paths = tree.paths;
     this.model.setGitStatus([...tree.entries].map(([path, entry]) => ({ path, status: entry.status })));
   }
@@ -34,18 +27,6 @@ export class ChangesTree {
     const value = query.trim();
     this.model.setSearch(value || null);
     return this.entries.size > 0 && value !== "" && this.model.getSearchMatchingPaths().length === 0;
-  }
-
-  /** Keep only expansion intent while the view is absent. */
-  clear() {
-    this.expanded = new Set(this.paths.filter(path => {
-      const item = this.model.getItem(path);
-      return item?.isDirectory() && (item as FileTreeDirectoryHandle).isExpanded();
-    }));
-    this.entries.clear();
-    this.paths = [];
-    this.model.resetPaths([]);
-    this.model.setGitStatus([]);
   }
 
   dispose() { this.model.cleanUp(); }

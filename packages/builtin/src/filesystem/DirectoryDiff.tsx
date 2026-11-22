@@ -41,7 +41,7 @@ export default function DirectoryDiff({ resource, path, store }: { resource: Res
   useEffect(() => {
     if (!present) return;
     let controller: AbortController;
-    // Store refreshes reread in the background; an unchanged result keeps the current object and its parsed diff.
+    // Git refreshes reread in the background; an unchanged result keeps the current object and its parsed diff.
     const read = (background: boolean) => {
       controller?.abort(); controller = new AbortController();
       const { signal } = controller;
@@ -55,7 +55,7 @@ export default function DirectoryDiff({ resource, path, store }: { resource: Res
       });
     };
     read(false);
-    const unsubscribe = store.onRefresh(() => read(true));
+    const unsubscribe = store.onGitRefresh(() => read(true));
     return () => { unsubscribe(); controller.abort(); };
   }, [present, calls, resource, path, store, attempt]);
   const parsed = useMemo(() => data?.kind === "patch" ? parseFileDiff(data.patch) : null, [data]);

@@ -104,20 +104,16 @@ export const treeChildrenOutput = z.strictObject({
 export const DirectoryChildren = defineCall(builtin.name("directory.children"), {
   scope: "object", input: treeChildrenInput, output: treeChildrenOutput,
 });
-export const gitStatusValue = z.enum(["added", "deleted", "modified", "renamed", "untracked"]);
-/** Git state within the resource root; null outside a repository. Paths are root-relative, untracked directories end in '/'. */
-export const DirectoryStatus = defineCall(builtin.name("directory.status"), {
-  scope: "object", input: z.strictObject({}),
-  output: z.strictObject({
-    files: z.array(z.strictObject({ path: z.string(), status: gitStatusValue })),
-    added: z.number().int().nonnegative(),
-    removed: z.number().int().nonnegative(),
-  }).nullable(),
-});
+export type GitChange = { path: string; status: "added" | "deleted" | "modified" | "renamed" | "untracked" };
+/** Paths are relative to the resource root; untracked directory summaries end in '/'. */
+export type GitSummary = { files: GitChange[]; added: number; removed: number };
 
-/** View-owned filesystem and Git invalidation; the next read supplies current state. */
+/** A view owns file invalidations and a Git snapshot independently of directory listing reads. */
 export type DirectoryWatchEvent =
-  | { type: "ready" }
-  | { type: "changed" }
-  | { type: "error" };
-export const DirectoryWatch = defineChannel<null, DirectoryWatchEvent>(builtin.name("directory.watch"));
+  | { type: "filesChanged"; parents: string[] }
+  | { type: "watchError" }
+  | { type: "watchReady" }
+  | { type: "gitReading" }
+  | { type: "gitStatus"; summary: GitSummary | null }
+  | { type: "gitError" };
+export const DirectoryWatch = defineChannel<{ type: "refresh" }, DirectoryWatchEvent>(builtin.name("directory.watch"));

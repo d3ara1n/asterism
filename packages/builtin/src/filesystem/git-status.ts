@@ -1,33 +1,45 @@
-import type { z } from "zod";
-import type { DirectoryStatus, gitStatusValue } from "./contract.ts";
-import { git, GitExit } from "./git.ts";
+import type { GitChange, GitSummary } from "./contract.ts";
+import type { GitWorktree } from "./git-repository.ts";
+import { git } from "./git.ts";
 
-type Status = z.infer<typeof gitStatusValue>;
-type Summary = NonNullable<z.infer<typeof DirectoryStatus.output>>;
-
-function classify(x: string, y: string): Status | null {
-  if (x === "?" && y === "?") return "untracked";
-  if (x === "!") return null;
+function classify(x: string, y: string): GitChange["status"] {
   if (x === "D" || y === "D") return "deleted";
   if (x === "R" || y === "R") return "renamed";
   if (x === "A" || x === "C" || y === "A" || y === "C") return "added";
   return "modified";
 }
 
-/** Parse `git status --porcelain=v1 -z`; paths are repository-relative and re-rooted at `prefix` (ending in '/' or empty). */
-export function parseStatus(output: string, prefix: string): Array<{ path: string; status: Status }> {
+/** Read the HEAD OID from the same porcelain snapshot as the files. Paths are repository-relative. */
+export function parseStatus(output: string, prefix: string): { head: string | null; files: GitChange[] } {
   const records = output.split("\0");
-  const files: Array<{ path: string; status: Status }> = [];
+  const files: GitChange[] = [];
+  let head: string | null | undefined;
   for (let i = 0; i < records.length; i++) {
     const record = records[i]!;
-    if (record.length < 4) continue;
-    const x = record[0]!, y = record[1]!, path = record.slice(3);
-    // Rename and copy records carry the original path in the following NUL-separated field.
-    if ("RC".includes(x) || "RC".includes(y)) i++;
-    const status = classify(x, y);
-    if (status && path.startsWith(prefix) && path.length > prefix.length) files.push({ path: path.slice(prefix.length), status });
+    if (record.startsWith("# branch.oid ")) {
+      const oid = record.slice("# branch.oid ".length);
+      if (oid === "(initial)") head = null;
+      else if (/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(oid)) head = oid;
+      continue;
+    }
+    const type = record[0];
+    let path: string, status: GitChange["status"];
+    if (type === "?") {
+      path = record.slice(2);
+      status = "untracked";
+    } else if (type === "1" || type === "2" || type === "u") {
+      // Consume only the fixed header; a path can contain spaces, tabs, and newlines.
+      const fields = record.split(" ", type === "1" ? 8 : type === "2" ? 9 : 10);
+      if (type === "2") i++; // The source of a rename/copy is the next NUL record.
+      const xy = fields[1];
+      if (xy?.length !== 2) continue;
+      status = classify(xy[0]!, xy[1]!);
+      path = record.slice(fields.join(" ").length + 1);
+    } else continue;
+    if (path.startsWith(prefix) && path.length > prefix.length) files.push({ path: path.slice(prefix.length), status });
   }
-  return files;
+  if (head === undefined) throw new Error("Git status did not report HEAD.");
+  return { head, files };
 }
 
 /** Sum `git diff --numstat -z --no-renames`; binary files report '-' and contribute no lines. */
@@ -42,33 +54,13 @@ export function sumNumstat(output: string): { added: number; removed: number } {
   return { added, removed };
 }
 
-/**
- * Parse `rev-parse --is-inside-work-tree --show-prefix --verify --quiet HEAD`. An unborn branch omits the HEAD line;
- * null means the directory is not inside a work tree (for example, inside the Git directory).
- */
-export function parseProbe(output: string): { prefix: string; head: string | null } | null {
-  const [inside, prefix = "", head = ""] = output.split(/\r?\n/u);
-  return inside === "true" ? { prefix, head: head.trim() || null } : null;
-}
-
-/** Staged and unstaged changes against HEAD within `root`; null when `root` is outside a work tree or git is unavailable. */
-export async function readDirectoryStatus(root: string, signal: AbortSignal): Promise<Summary | null> {
-  const probe = await git(root, ["rev-parse", "--is-inside-work-tree", "--show-prefix", "--verify", "--quiet", "HEAD"], signal).catch(error => {
-    signal.throwIfAborted();
-    if (!(error instanceof GitExit)) throw error;
-    // Exit 1 is the missing HEAD after the earlier fields were printed; 128 and ENOENT mean no work tree.
-    if (error.exitCode === 1) return error.stdout;
-    if (error.exitCode === 128 || error.exitCode === "ENOENT") return "";
-    throw error;
-  });
-  const location = parseProbe(probe);
-  if (!location) return null;
-  const { prefix, head } = location;
+/** Staged and unstaged changes against HEAD within the resource, without requiring another repository probe. */
+export async function readDirectoryStatus(root: string, repository: GitWorktree, signal: AbortSignal, run = git): Promise<GitSummary> {
+  const status = await run(root, ["status", "--porcelain=v2", "--branch", "--no-ahead-behind", "-z", "--untracked-files=normal", "--", "."], signal);
+  const { files, head } = parseStatus(status, repository.prefix);
+  if (files.every(file => file.status === "untracked")) return { files, added: 0, removed: 0 };
   // An unborn branch compares against the empty tree of the repository's object format.
-  const base = head ?? (await git(root, ["hash-object", "-t", "tree", "--stdin"], signal)).trim();
-  const [status, numstat] = await Promise.all([
-    git(root, ["status", "--porcelain=v1", "-z", "--untracked-files=normal", "--", "."], signal),
-    git(root, ["diff", base, "--numstat", "-z", "--no-renames", "--", "."], signal),
-  ]);
-  return { files: parseStatus(status, prefix), ...sumNumstat(numstat) };
+  const base = head ?? (await run(root, ["hash-object", "-t", "tree", "--stdin"], signal)).trim();
+  const numstat = await run(root, ["diff", base, "--numstat", "-z", "--no-renames", "--", "."], signal);
+  return { files, ...sumNumstat(numstat) };
 }

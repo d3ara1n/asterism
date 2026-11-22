@@ -17,7 +17,7 @@ const DirectoryDiff = lazy(() => import("./DirectoryDiff"));
 /** Header actions: working-tree line changes against HEAD, when any, and a refresh of loaded directories. */
 export function FileTreeActions({ store, state }: { store: TreeStore; state: TreeState }) {
   const i18n = useI18n();
-  const busy = state.loading || state.refreshing;
+  const busy = state.loading || state.refreshing || state.gitRefreshing;
   return <>
     {state.changes && <span className="type-caption flex items-center gap-1 tabular-nums">
       <span className="sr-only">{i18n.formatMessage(filesystemMessages.directoryChanges, state.changes)}</span>
@@ -85,12 +85,12 @@ export function FileTreeBody({ store, state, rowMenu = false }: {
     } else void navigation.open(object.ref, path, { origin });
   };
   // A Changes view with nothing to list replaces the tree with a centered state.
-  const blank: { icon: ReactNode; label: string } | null = !changing || state.loading ? null
+  const blank: { icon: ReactNode; label: string } | null = !changing ? null
     : state.git === null ? { icon: <GitCompare />, label: i18n.text(filesystemMessages.notRepository) }
     : state.git?.files.length === 0 ? { icon: <CircleCheck />, label: i18n.text(filesystemMessages.noChanges) }
     : null;
   const notice = changing
-    ? !blank && !state.loading && state.changeNoMatches ? i18n.text(filesystemMessages.directoryNoMatches) : null
+    ? !blank && state.changeNoMatches ? i18n.text(filesystemMessages.directoryNoMatches) : null
     : state.error ? i18n.text(state.error)
       : state.empty ? i18n.text(filesystemMessages.toolDirectoryEmpty)
       : state.noMatches ? i18n.text(filesystemMessages.directoryNoMatches) : null;
@@ -112,7 +112,8 @@ export function FileTreeBody({ store, state, rowMenu = false }: {
       </ToggleGroup>}
     </div>
     {state.watchFailure && <p role="status" className="type-caption shrink-0 px-2 pt-1 text-destructive">{i18n.text(state.watchFailure)}</p>}
-    {state.failure && (changing || !state.error) && <p className="type-caption shrink-0 px-2 pt-1 text-destructive">{i18n.text(state.failure)}</p>}
+    {state.gitFailure && <p role="status" className="type-caption shrink-0 px-2 pt-1 text-destructive">{i18n.text(state.gitFailure)}</p>}
+    {!changing && !state.error && state.failure && <p className="type-caption shrink-0 px-2 pt-1 text-destructive">{i18n.text(state.failure)}</p>}
     <div className="relative min-h-0 flex-1 pt-1">
       <div className={cn("h-full", (notice || blank) && "invisible")}><FileTree key={state.mode} model={model} style={treeStyle}
         renderContextMenu={rowMenu ? (item, context) => {

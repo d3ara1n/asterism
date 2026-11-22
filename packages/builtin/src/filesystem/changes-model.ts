@@ -1,7 +1,6 @@
-import type { z } from "zod";
-import type { DirectoryStatus } from "./contract.ts";
+import type { GitChange } from "./contract.ts";
 
-export type ChangeEntry = NonNullable<z.infer<typeof DirectoryStatus.output>>["files"][number];
+export type ChangeEntry = GitChange;
 
 /** Compare siblings directory-first, keeping each subtree contiguous and its parent first. */
 function comparePaths(left: string, right: string): number {
