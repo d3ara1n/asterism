@@ -92,7 +92,7 @@ export function SaveTemplate({ sessionId, title, folderId, templates, disabled, 
       </DialogHeader>
       <form onSubmit={event => { event.preventDefault(); void save(); }}>
         <FieldGroup className="gap-4">
-          {templates.length > 0 && <ToggleGroup type="single" variant="outline" className="w-full" value={replacing ? "replace" : "create"}
+          {templates.length > 0 && <ToggleGroup type="single" variant="segmented" className="w-full" value={replacing ? "replace" : "create"}
             disabled={saving} aria-label={i18n.text(templateMessages.saveMode)} onValueChange={value => {
               if (value === "create" || value === "replace") setMode(value);
             }}>

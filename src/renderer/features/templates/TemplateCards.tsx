@@ -140,14 +140,15 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
     <ActionMenu modal={false}>
       <ActionMenuTarget asChild disabled={!ready || busy}>
         <div className="group relative">
-          <TooltipHint content={template.title}><Item variant="outline" asChild className="w-full overflow-hidden bg-card p-0 text-left hover:bg-accent/50 disabled:opacity-50">
+          <TooltipHint content={template.title}><Item variant="outline" asChild className="w-full overflow-hidden rounded-lg bg-card-shell p-1 text-left transition-colors hover:bg-accent/60 disabled:opacity-50">
             <button type="button" data-action-menu-primary disabled={!ready || busy} aria-busy={starting} onClick={() => void run(() => onStart(template.id))}>
               {/* The folder color marks where new sessions land; the folder name stays in the information tooltip. */}
-              <span className={cn("relative flex h-20 w-full overflow-hidden text-muted-foreground", folder ? folderTint(folder.color) : "bg-muted")} aria-hidden="true">
+              {/* The preview is the card's sheet, nested concentrically inside the shell like object card content. */}
+              <span className={cn("relative flex h-20 w-full overflow-hidden rounded-(--radius-inset) text-muted-foreground shadow-(--shadow-sheet)", folder ? folderTint(folder.color) : "bg-card")} aria-hidden="true">
                 <TemplatePreview objects={template.objects} />
                 {starting && <span className="absolute inset-0 flex items-center justify-center bg-muted/80"><Spinner className="size-8" /></span>}
               </span>
-              <span className="block w-full min-w-0 px-3 pb-3">
+              <span className="block w-full min-w-0 px-2 pt-2 pb-1.5">
                 <span className="block truncate font-medium">{template.title}</span>
                 <span className="type-caption mt-1 block truncate pr-8">
                   {i18n.formatMessage(templateMessages.objectCount, { count: template.objects.length })}

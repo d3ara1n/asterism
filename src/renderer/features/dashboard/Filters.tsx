@@ -93,7 +93,7 @@ export function FilterChips({ model, facets, filters, labels }: {
   return <div className="flex min-w-0 flex-wrap items-center gap-1.5">
     {keys.map(key => {
       const text = i18n.formatMessage(msg.filterChip, { dimension: i18n.text(chipLabels[key]), value: value(key) });
-      return <span key={key} className="inline-flex h-7 max-w-64 items-center gap-1 rounded-md border bg-card pr-0.5 pl-2 text-xs">
+      return <span key={key} className="inline-flex h-7 max-w-64 items-center gap-1 rounded-md bg-secondary pr-0.5 pl-2 text-xs text-secondary-foreground">
         <span className="min-w-0 truncate">{text}</span>
         <button type="button" aria-label={i18n.formatMessage(msg.removeFilter, { name: text })} onClick={() => {
           model.removeFilter(key);

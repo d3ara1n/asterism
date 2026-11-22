@@ -59,7 +59,7 @@ export function TodoListInput({ initialInput, busy, resolve, cancel }: CreationI
       <FieldTitle id={`${id}-label`}>{i18n.text(messages.sharedList)}</FieldTitle>
       {lists === null ? <div className="flex justify-center py-4"><Spinner className="text-muted-foreground" /></div>
         : <RadioGroup value={choice ?? ""} onValueChange={setChoice} aria-labelledby={`${id}-label`}
-          className="max-h-[50dvh] gap-1 overflow-y-auto rounded-md border p-1"
+          className="surface-group max-h-[50dvh] gap-1 overflow-y-auto p-1"
           // Radix radios swallow Enter; in this form Enter submits the current choice.
           onKeyDown={event => { if (event.key === "Enter" && ready) { event.preventDefault(); form.current?.requestSubmit(); } }}>
           {lists.map(list => <Label key={list.id} htmlFor={option(list.id)}

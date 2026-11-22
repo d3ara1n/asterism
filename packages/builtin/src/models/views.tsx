@@ -45,8 +45,8 @@ function ListBody({ result }: ListProps) {
   const groups = groupByProvider(data.slice(0, TOOL_BODY_LINE_LIMIT));
   return <div className="@container/models space-y-2">
     <ToolScrollArea className="max-h-80"><div className="grid grid-cols-1 items-start gap-2 @min-[36rem]/models:grid-cols-2">
-      {groups.map(group => <section key={group.provider} className="min-w-0 rounded-md border">
-        <header className="flex items-center justify-between gap-2 border-b bg-muted/40 px-3 py-1.5">
+      {groups.map(group => <section key={group.provider} className="min-w-0 overflow-hidden rounded-md bg-card">
+        <header className="flex items-center justify-between gap-2 bg-muted/50 px-3 py-1.5">
           <TooltipHint content={group.provider}><h4 className="min-w-0 truncate type-label text-foreground">{names.provider(group.provider)}</h4></TooltipHint>
           <Badge variant="secondary" className="py-0 font-normal tabular-nums">{group.models.length}</Badge>
         </header>
@@ -92,7 +92,7 @@ function Capability({ icon, label, supported }: { icon: ReactNode; label: string
   const i18n = useI18n();
   const state = i18n.text(supported ? configurationMessages.supported : configurationMessages.unsupported);
   return <TooltipHint content={state}><span className={cn("inline-flex items-center gap-1.5 rounded-md border px-2 py-1 type-caption [&_svg]:size-3.5 [&_svg]:shrink-0",
-    supported ? "text-foreground" : "border-dashed text-muted-foreground/70")}>
+    supported ? "border-transparent bg-secondary text-foreground" : "border-dashed text-muted-foreground/70")}>
     {icon}<span>{label}</span>
     {supported ? <Check aria-hidden="true" className="text-success" /> : <Minus aria-hidden="true" />}
     <span className="sr-only">{state}</span>
@@ -131,7 +131,7 @@ function Prices({ cost }: { cost: ModelInfo["cost"] }) {
   return <section className="space-y-2">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h4 className="type-label">{i18n.text(messages.prices)}</h4>
-      {tables.length > 1 && <ToggleGroup type="single" variant="outline" size="sm" value={String(selected)}
+      {tables.length > 1 && <ToggleGroup type="single" variant="segmented" size="sm" value={String(selected)}
         onValueChange={value => value && setSelected(Number(value))} aria-label={i18n.text(messages.priceTier)}>
         {tables.map((entry, index) => <ToggleGroupItem key={index} value={String(index)} className="h-6 px-2 type-caption">
           {entry.fromInputTokens === null ? i18n.text(diagnosticMessages.basePrice)

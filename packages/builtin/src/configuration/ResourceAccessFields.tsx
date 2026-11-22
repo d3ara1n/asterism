@@ -29,7 +29,7 @@ export function ResourceAccessFields({ value, onChange, modified, onRestore }: {
         <FieldLabel id={`${id}-mode`}>{i18n.formatMessage(agentsMessages.resourceAccessMode)}</FieldLabel>
         {modified && <ModifiedNote onRestore={onRestore} />}
       </div>
-      <ToggleGroup type="single" variant="outline" size="sm" value={mode} aria-labelledby={`${id}-mode`}
+      <ToggleGroup type="single" variant="segmented" size="sm" value={mode} aria-labelledby={`${id}-mode`}
         onValueChange={next => {
           if (next) onChange({ resources: next === "allow" ? selected : null, excludeResources: next === "exclude" ? selected : null });
         }}>

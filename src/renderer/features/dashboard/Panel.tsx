@@ -11,10 +11,11 @@ import type { QueryState } from "./use-telemetry";
 
 /**
  * A dashboard panel: a card shell with a header row and an inset content surface, matching workbench object cards.
+ * On the window material the shell keeps its edge; embedded in an island sheet it is a borderless tone group.
  * The panel owns its own loading, failure, and empty states, so one slow or failed read never blanks the page.
  */
-export function Panel({ title, icon, actions, className, bodyClassName, state, empty, skeleton, children }: {
-  title: ReactNode; icon?: ReactNode; actions?: ReactNode; className?: string; bodyClassName?: string;
+export function Panel({ title, icon, actions, embedded = false, className, bodyClassName, state, empty, skeleton, children }: {
+  title: ReactNode; icon?: ReactNode; actions?: ReactNode; embedded?: boolean; className?: string; bodyClassName?: string;
   /** Reads the panel content depends on; the first read shows a skeleton, later reads keep the current content. */
   state?: QueryState<unknown> | readonly QueryState<unknown>[];
   /** Content shown instead of children when there is nothing to present. */
@@ -31,7 +32,7 @@ export function Panel({ title, icon, actions, className, bodyClassName, state, e
     : empty ? empty
     : children;
   const phase = failed ? "failed" : loading ? "loading" : empty ? "empty" : "ready";
-  return <Card className={cn("min-w-0 gap-0 overflow-hidden bg-card-shell py-0 shadow-none", className)}>
+  return <Card className={cn("min-w-0 gap-0 overflow-hidden bg-card-shell py-0 shadow-none", embedded && "border-0", className)}>
     <header className="flex min-h-11 shrink-0 items-center gap-2 px-3 py-2">
       {icon && <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">{icon}</span>}
       <h2 className="type-section min-w-0 flex-1 truncate">{title}</h2>

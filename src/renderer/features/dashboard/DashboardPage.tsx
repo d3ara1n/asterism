@@ -8,7 +8,7 @@ import { commonMessages } from "@asterism-app/ui/messages/common";
 import type { TelemetryGroup } from "../../../shared/telemetry";
 import { runtime } from "../../runtime";
 import { useI18n } from "../../shared/i18n";
-import { fadeTransition } from "../../shared/weave/motion";
+import { exitTransition, fadeTransition } from "../../shared/weave/motion";
 import { useIsland, useIslandStrip } from "../../shared/weave/Screen";
 import { dashboardMessages as msg } from "../../messages/dashboard";
 import { DetailIsland, detailKey, detailPrefix, detailWidth, type DetailSubject } from "./DetailIsland";
@@ -72,7 +72,7 @@ export function DashboardPage({ model, active, onOpenSession }: { model: Dashboa
         : !facets.data ? <div className="flex min-h-80 items-center justify-center"><Spinner /></div>
         : empty ? status("empty", msg.emptyTitle, msg.emptyBody)
         : <AnimatePresence mode="popLayout" initial={false}>
-          <motion.div key={state.view} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={fadeTransition}>
+          <motion.div key={state.view} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6, transition: exitTransition }} transition={fadeTransition}>
             <View model={model} state={state} page={page} openGroup={openGroup} openDay={openDay} openKey={openKey} />
           </motion.div>
         </AnimatePresence>}

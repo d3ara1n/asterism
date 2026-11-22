@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Activity, BarChart3, Cpu, Download, Gauge, MoreHorizontal, PieChart, Wrench, Trash2 } from "lucide-react";
 import type { UiMessage } from "@asterism-app/sdk/contracts";
 import { useRendererApplication, useRendererSettings } from "@asterism-app/sdk/renderer";
@@ -12,6 +12,7 @@ import { runtime } from "../../runtime";
 import { useI18n } from "../../shared/i18n";
 import { toast } from "../../shared/toast";
 import { dashboardMessages as msg } from "../../messages/dashboard";
+import { indicatorItem, SelectionIndicator } from "../../shared/selection-indicator";
 import { ClearDialog } from "./ClearDialog";
 import { FilterPicker } from "./Filters";
 import { dashboardViews, useDashboard, usePageFilter, type DashboardModel, type DashboardView } from "./model";
@@ -37,6 +38,7 @@ export function DashboardActions({ model }: { model: DashboardModel }) {
   const application = useRendererApplication();
   const settings = useRendererSettings();
   const [clearing, setClearing] = useState(false);
+  const indicator = useId();
   const empty = state.facets?.firstEventAt === null;
   const exportAs = async (format: "csv" | "json") => {
     try {
@@ -52,8 +54,11 @@ export function DashboardActions({ model }: { model: DashboardModel }) {
       {dashboardViews.map(view => {
         const { label, icon: Icon } = viewTabs[view];
         const selected = state.view === view;
-        return <Button key={view} variant={selected ? "selected" : "ghost"} size="sm" aria-pressed={selected} aria-label={i18n.text(label)}
-          onClick={() => model.setView(view)}><Icon /><span className="toolbar-label">{i18n.text(label)}</span></Button>;
+        return <span key={view} className="relative">
+          {selected && <SelectionIndicator layoutId={indicator} />}
+          <Button variant="ghost" size="sm" className={indicatorItem(selected)} aria-pressed={selected} aria-label={i18n.text(label)}
+            onClick={() => model.setView(view)}><Icon /><span className="toolbar-label">{i18n.text(label)}</span></Button>
+        </span>;
       })}
     </div>
     <span aria-hidden="true" className="mx-1 h-4 w-px shrink-0 bg-border" />

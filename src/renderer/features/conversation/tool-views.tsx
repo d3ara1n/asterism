@@ -120,7 +120,7 @@ function StateItems({ items, path }: { items: readonly StateValue[]; path: strin
       {i18n.formatMessage(toolsMessages.toolStateItems, { count: items.length })}
     </CollapsibleTrigger>
     <CollapsibleContent>
-      <ul className="space-y-1.5 pt-1.5">{items.map((item, index) => <li key={index} className="rounded-md border px-2 py-1.5">
+      <ul className="space-y-1.5 pt-1.5">{items.map((item, index) => <li key={index} className="rounded-md bg-card px-2 py-1.5">
         {item.kind === "group" ? <StateFields fields={item.fields} path={`${path}/${index}`} /> : <StateValueView value={item} path={`${path}/${index}`} />}
       </li>)}</ul>
     </CollapsibleContent>

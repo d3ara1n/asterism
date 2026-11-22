@@ -161,7 +161,7 @@ export function PluginsSettings() {
         <div className="min-w-0 flex-1"><SearchInput value={query} onChange={setQuery} label={i18n.text(messages.search)} /></div>
         <AddPluginMenu onError={setError} onNpm={origin => { void islands.installer({}, origin); }} />
       </div>
-      <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.text(messages.filter)} value={filter}
+      <ToggleGroup type="single" variant="segmented" size="sm" aria-label={i18n.text(messages.filter)} value={filter}
         onValueChange={value => { if (value) setFilter(value as PluginFilter); }}>
         {filters.map(item => <ToggleGroupItem key={item.value} value={item.value} className="gap-1.5 px-2.5">
           {item.value === "issues" && item.count ? <StatusIcon tone="error" className="size-3.5" /> : null}
@@ -457,7 +457,7 @@ function NpmInstallerPanel({ target }: { target: InstallTarget }) {
 
       {current && preview && <div className="surface-group flex flex-col gap-3 p-4">
         <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground"><Package className="size-4" aria-hidden="true" /></span>
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Package className="size-4" aria-hidden="true" /></span>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
             <p className="font-mono text-sm font-medium select-text wrap-anywhere" translate="no">{preview.name}<span className="text-muted-foreground">@{preview.version}</span></p>
             {preview.description && <p className="type-caption text-pretty">{preview.description}</p>}
@@ -503,7 +503,7 @@ function NpmInstallerPanel({ target }: { target: InstallTarget }) {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <ScrollArea className="mt-2 h-48 rounded-md border bg-muted/40"><pre className="type-caption select-text whitespace-pre-wrap wrap-anywhere p-3 font-mono">{current.output}</pre></ScrollArea>
+          <ScrollArea className="mt-2 h-48 rounded-md bg-muted/50"><pre className="type-caption select-text whitespace-pre-wrap wrap-anywhere p-3 font-mono">{current.output}</pre></ScrollArea>
         </CollapsibleContent>
       </Collapsible>}
     </div>

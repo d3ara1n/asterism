@@ -37,7 +37,7 @@ function Header({ result }: Props) {
 }
 
 function Panel({ icon, title, aside, children }: { icon: ReactNode; title: string; aside?: ReactNode; children: ReactNode }) {
-  return <section className="flex min-w-0 flex-col gap-3 rounded-md border p-3">
+  return <section className="flex min-w-0 flex-col gap-3 rounded-md bg-card p-3">
     <header className="flex items-center gap-1.5 type-label [&>svg]:size-3.5 [&>svg]:shrink-0">
       {icon}<h4 className="min-w-0 flex-1 truncate">{title}</h4>{aside}
     </header>

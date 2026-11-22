@@ -25,7 +25,7 @@ export function ObjectsPanel({ onClose }: { onClose: () => void }) {
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
   return <Panel onClose={onClose} title={i18n.formatMessage(objectsMessages.objects)} compact toolbar={<>
     <SearchInput value={query} onChange={setQuery} label={i18n.formatMessage(objectsMessages.searchObjects)} />
-    <ToggleGroup type="single" size="sm" aria-label={i18n.formatMessage(objectsMessages.objects)} value={hiddenOnly ? "hidden" : "all"} onValueChange={next => { if (next) setHiddenOnly(next === "hidden"); }}>
+    <ToggleGroup type="single" variant="segmented" size="sm" aria-label={i18n.formatMessage(objectsMessages.objects)} value={hiddenOnly ? "hidden" : "all"} onValueChange={next => { if (next) setHiddenOnly(next === "hidden"); }}>
       <ToggleGroupItem value="all">{i18n.formatMessage(commonMessages.all)}</ToggleGroupItem>
       <ToggleGroupItem value="hidden">{i18n.formatMessage(objectsMessages.hiddenObjects)}</ToggleGroupItem>
     </ToggleGroup>

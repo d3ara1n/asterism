@@ -24,7 +24,7 @@ function cost(i18n: I18n, items: Stats["cost"]) {
 
 /** Metric block: main value above and secondary explanation below; tabular numerals support side-by-side comparison. */
 function Metric({ label, value, note }: { label: string; value: ReactNode; note?: ReactNode }) {
-  return <div className="flex min-w-0 flex-col gap-0.5 rounded-md border px-2.5 py-2">
+  return <div className="surface-group flex min-w-0 flex-col gap-0.5 px-2.5 py-2">
     <dt className="type-label truncate">{label}</dt>
     <dd className="type-body truncate font-medium tabular-nums">{value}</dd>
     {note && <dd className="type-caption truncate tabular-nums">{note}</dd>}

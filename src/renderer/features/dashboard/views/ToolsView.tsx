@@ -55,7 +55,7 @@ export function ToolsView({ state, page, openGroup, openKey }: ViewProps) {
   return <div className="flex flex-col gap-3">
     <Panel title={i18n.text(msg.toolCalls)} state={tools}
       actions={<>
-        <ToggleGroup type="single" variant="outline" value={groupBy} aria-label={i18n.text(msg.dimension)}
+        <ToggleGroup type="single" variant="segmented" value={groupBy} aria-label={i18n.text(msg.dimension)}
           onValueChange={value => { if (value) setGroupBy(value as typeof groupBy); }}>
           <ToggleGroupItem value="tool">{i18n.text(msg.groupTool)}</ToggleGroupItem>
           <ToggleGroupItem value="resource">{i18n.text(msg.groupResource)}</ToggleGroupItem>

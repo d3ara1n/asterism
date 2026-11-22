@@ -58,7 +58,7 @@ export function PluginIcon({ entry, size = "md", className }: { entry: PluginEnt
   if (entry.metadata.icon && !broken) return <img src={entry.metadata.icon} alt="" draggable={false} onError={() => setBroken(true)}
     className={cn(frame, "shrink-0 object-contain", className)} />;
   const initial = Array.from(i18n.text(pluginName(entry)).trim())[0]?.toLocaleUpperCase() ?? "?";
-  return <span aria-hidden="true" className={cn(frame, "flex shrink-0 select-none items-center justify-center border bg-muted font-semibold text-muted-foreground", className)}>
+  return <span aria-hidden="true" className={cn(frame, "flex shrink-0 select-none items-center justify-center bg-muted font-semibold text-muted-foreground", className)}>
     {initial}
   </span>;
 }

@@ -25,7 +25,7 @@ export function DelegationFields({ value, agents, onChange, modified, onRestore 
         <FieldLabel id={id}>{i18n.formatMessage(agentsMessages.delegateTargets)}</FieldLabel>
         {modified && <ModifiedNote onRestore={onRestore} />}
       </div>
-      <ToggleGroup type="single" variant="outline" size="sm" value={value === null ? "all" : "allow"} aria-labelledby={id}
+      <ToggleGroup type="single" variant="segmented" size="sm" value={value === null ? "all" : "allow"} aria-labelledby={id}
         onValueChange={mode => { if (mode) onChange(mode === "all" ? null : selected); }}>
         <ToggleGroupItem value="all">{i18n.formatMessage(agentsMessages.resourcesAll)}</ToggleGroupItem>
         <ToggleGroupItem value="allow">{i18n.formatMessage(agentsMessages.resourcesAllow)}</ToggleGroupItem>

@@ -56,8 +56,10 @@ export function ConversationEntry({ ready, open, folder }: SessionEntryProps) {
   };
   return <>
     <form {...fileInputEvents(draft, busy || !ready)} onSubmit={event => { event.preventDefault(); void submit(); }}
-      aria-label={i18n.text(commonMessages.newConversation)} className="rounded-xl border bg-muted">
-      <InputGroup className="rounded-xl border-0 border-b bg-card shadow-none">
+      aria-label={i18n.text(commonMessages.newConversation)}
+      className="rounded-xl border bg-card-shell p-1 shadow-(--shadow-lift) transition-[border-color] duration-200 has-[textarea:focus]:border-ring">
+      {/* The editor sheet nests one inset and the tray border inside the tray corner, like the conversation composer. */}
+      <InputGroup className="rounded-[calc(var(--radius)-1px)] border-0 bg-card shadow-(--shadow-sheet) has-[[data-slot=input-group-control]:focus-visible]:ring-0 dark:bg-card">
         <label htmlFor="builtin-first-message" className="sr-only">{i18n.text(homeMessages.firstMessage)}</label>
         <InputGroupTextarea id="builtin-first-message" className="min-h-32 px-4 py-4" rows={4} maxLength={100_000}
           placeholder={i18n.text(homeMessages.homePlaceholder)} value={input.text} disabled={busy}
@@ -68,10 +70,10 @@ export function ConversationEntry({ ready, open, folder }: SessionEntryProps) {
           }} />
         <InputGroupAddon align="block-end" className="min-w-0 gap-1">
           <AttachFiles draft={draft} disabled={busy || !ready} /><DraftFiles draft={draft} disabled={busy} />
-          <IconButton variant="default" className="rounded-full" label={i18n.text(commonMessages.sendMessage)} type="submit" disabled={!canSend}><ArrowUp /></IconButton>
+          <IconButton variant="default" className="rounded-full transition-[opacity,transform] active:scale-90" label={i18n.text(commonMessages.sendMessage)} type="submit" disabled={!canSend}><ArrowUp /></IconButton>
         </InputGroupAddon>
       </InputGroup>
-      <div className="flex min-w-0 flex-wrap items-center gap-0.5 px-1.5 py-1">
+      <div className="flex min-w-0 flex-wrap items-center gap-0.5 px-0.5 pt-1">
         <folder.Picker disabled={busy} />
         <Choice icon={<Bot />} label={i18n.text(commonMessages.agent)} value={agent?.id ?? (agentId ? `${agentId} · ${i18n.text(agentsMessages.unavailableAgent)}` : i18n.text(commonMessages.agent))}
           disabled={!snapshot || busy} selected={agentId ?? ""} onSelect={setAgentId}

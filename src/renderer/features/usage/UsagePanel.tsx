@@ -46,7 +46,7 @@ export function UsagePanel({ modelProviders }: { modelProviders: readonly ModelP
   const label = i18n.text(appMessages.usagePanel);
   return <div className="relative -mx-1.5 mt-2 h-9 shrink-0">
     <div className={cn("absolute inset-x-0 bottom-0 z-20 flex flex-col rounded-lg border transition-[background-color,border-color,box-shadow] duration-200",
-      open ? "border-border bg-popover text-popover-foreground shadow-lg" : "border-transparent")}>
+      open ? "border-border bg-popover text-popover-foreground shadow-(--shadow-lift)" : "border-transparent")}>
       <AnimatePresence initial={false}>
         {open && <motion.div key="meters" className="overflow-hidden"
           initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={islandTransition}>
@@ -56,7 +56,7 @@ export function UsagePanel({ modelProviders }: { modelProviders: readonly ModelP
         </motion.div>}
       </AnimatePresence>
       {/* Split handle: the toggle takes the remaining width and the refresh segment the full height, joined by a divider. */}
-      <div className={cn("flex h-[34px] items-stretch", open && "border-t")}>
+      <div className="flex h-[34px] items-stretch">
         <button type="button" aria-expanded={open} aria-controls={open ? "usage-meters" : undefined} onClick={() => setOpen(!open)}
           className={cn(handleSegment, "min-w-0 flex-1 gap-2 pl-2 text-left")}>
           <ChevronUp aria-hidden="true" className={cn("size-3.5 shrink-0 text-muted-foreground motion-safe:transition-transform", open && "rotate-180")} />

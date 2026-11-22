@@ -55,7 +55,7 @@ const treeStyle = {
 } as CSSProperties;
 
 /** Compact segment inside the filter bar; the selected segment is raised against the muted track. */
-const viewItem = "h-6 min-w-0 gap-1 rounded-sm px-2 text-xs text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs";
+const viewItem = "h-6 min-w-0 gap-1 px-2 text-xs";
 
 /** Card body: edge-aligned filter bar + file tree; explanatory text fills empty-directory, no-match, and root-failure states. */
 export function FileTreeBody({ store, state, rowMenu = false }: {
@@ -102,8 +102,8 @@ export function FileTreeBody({ store, state, rowMenu = false }: {
         <SearchInput variant="inline" value={state.query} onChange={value => store.setFilter(value)}
           label={i18n.formatMessage(filesystemMessages.directorySearch)} />
       </div>
-      {store.changeTree && <ToggleGroup type="single" spacing={0.5} value={state.mode} aria-label={i18n.text(filesystemMessages.viewLabel)}
-        className="mr-2 shrink-0 rounded-md bg-muted p-0.5"
+      {store.changeTree && <ToggleGroup type="single" variant="segmented" value={state.mode} aria-label={i18n.text(filesystemMessages.viewLabel)}
+        className="mr-2 shrink-0"
         onValueChange={value => { if (value === "files" || value === "changes") store.setMode(value); }}>
         <ToggleGroupItem value="files" className={viewItem}>{i18n.text(filesystemMessages.filesView)}</ToggleGroupItem>
         <ToggleGroupItem value="changes" className={viewItem}>{i18n.text(filesystemMessages.changesView)}

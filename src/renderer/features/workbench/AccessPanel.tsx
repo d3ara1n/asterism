@@ -46,7 +46,7 @@ export function AccessPanel({ onClose }: { onClose: () => void }) {
   const targets = (byReceiver ? objects : receivers).filter(object => object.id !== selected?.id
     && `${object.title} ${i18n.text(registry.resource(object.kind).label)}`.toLocaleLowerCase(i18n.locale).includes(search));
   return <Panel onClose={onClose} title={i18n.formatMessage(accessMessages.accessLabel)} toolbar={<>
-    <ToggleGroup type="single" size="sm" aria-label={i18n.formatMessage(accessMessages.accessLabel)} value={mode} onValueChange={next => { if (next) { setMode(next as typeof mode); setQuery(""); } }}>
+    <ToggleGroup type="single" variant="segmented" size="sm" aria-label={i18n.formatMessage(accessMessages.accessLabel)} value={mode} onValueChange={next => { if (next) { setMode(next as typeof mode); setQuery(""); } }}>
       <ToggleGroupItem value="receiver">{i18n.formatMessage(accessMessages.byReceiver)}</ToggleGroupItem>
       <ToggleGroupItem value="resource">{i18n.formatMessage(accessMessages.byResource)}</ToggleGroupItem>
     </ToggleGroup>

@@ -58,7 +58,7 @@ function FetchBody({ result }: ToolRenderProps) {
         <TooltipHint content={document.url}><a href={document.url} target="_blank" rel="noopener noreferrer"
           className="type-label break-words text-primary-text hover:underline">{document.title || document.url}</a></TooltipHint>
         <p className="type-caption truncate text-muted-foreground">{sourceLine(document)}</p>
-        {part && <ToolScrollArea className="m-0 rounded-md border" contentClassName="px-3 py-2 pr-4">
+        {part && <ToolScrollArea className="m-0 rounded-md bg-card" contentClassName="px-3 py-2 pr-4">
           {part.format === "markdown" ? <Markdown>{part.text}</Markdown> : <p className="type-body whitespace-pre-wrap break-words">{part.text}</p>}
         </ToolScrollArea>}
         {part?.truncated && <p className="type-caption text-muted-foreground">{i18n.text(messages.truncated)}</p>}

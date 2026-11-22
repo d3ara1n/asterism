@@ -1,7 +1,7 @@
 # Shell-and-sheet surface language and interaction motion
 
 Filed: 2026-11-22
-Status: Stage 1 accepted. Stage 1b (design language and lineless groups and blocks) implemented; visual acceptance pending. The user approved the direction and its staged rollout. Each stage needs the user's visual acceptance in light and dark modes before the next starts.
+Status: Complete. Stages 1 and 1b accepted by the user; the user then delegated the remaining visual decisions and will review the finished result as a whole. Archive after that review. The user approved the direction and its staged rollout. Each stage needs the user's visual acceptance in light and dark modes before the next starts.
 
 ## Direction
 
@@ -24,7 +24,7 @@ Motion explains cause and continuity. Every item uses the public motion tokens a
 | --- | --- | --- |
 | Sliding selection indicator (Motion `layoutId`) | Selection moves rather than reappears | Settings navigation, sidebar sessions, segmented controls |
 | Directional page change | Order and depth of navigation | Settings categories by navigation order; entering and leaving a single-column page |
-| Shared element | The opened thing is the clicked thing | Chosen in stage 2; single-column settings uses directional page motion because its header and sheet clip separately |
+| Shared element | The opened thing is the clicked thing | Remains available; no current interaction needed one without crossing separately clipped regions, so none was added |
 | Row presence with height folding | Items join or leave a list | Lists in settings and panels, reusing the drafts box parameters |
 | Value transitions | A value changed | Switches, progress, and counts, only on actual change |
 
@@ -37,6 +37,14 @@ Effects that do not map to one of these meanings are out of scope. A static trea
 1. **Settings and panel islands.** Add the motion vocabulary to settings navigation and page changes. Move the shared panel island to the shell and sheet variant and promote the tray shadow to a shared utility. Update the design system's surface and motion sections and the surface comment in `styles.css`. Accept with settings and a provider detail open side by side, in wide and single-column layouts.
 2. **Home, usage statistics, and sidebar.** Apply the surface rules to their cards and the sliding selection indicator to sidebar and segmented controls.
 3. **Menus, popovers, and dialogs.** Decide separately whether these change. They already share the command surface motion definition, have the widest reach, and are portalled outside islands.
+
+## Outcome of stages 2 and 3
+
+- Home: the session entry became a composer-style tray with a raised editor sheet; template cards became shells with a nested preview sheet.
+- Sidebar: main views and sessions share one travelling selection indicator; the folder view switch and every other single-choice toggle group use the segmented variant.
+- Usage statistics: the view switch uses the selection indicator; view changes exit on the short timing; headline values rise into place when they change; detail-island panels drop their border inside the sheet; filter chips are tone chips; the expanded sidebar usage panel uses the shared lift and no internal rule.
+- Tool bodies: sub-panels and lists inside process blocks rise to the card tone instead of outlines.
+- Stage 3 decision: menus, popovers, and dialogs keep their outer edge and shadow, because they float over arbitrary content; internal rules inside dialogs were removed where tone and spacing already separate regions.
 
 ## Validation
 

@@ -63,7 +63,7 @@ function ListPage({ list, latest, filter, onFilter, onOpen }: {
     confirmation={deleting && <DeleteListConfirm list={list} onClose={() => setDeleting(false)} />}>
     {trigger => <div className="flex min-h-0 flex-1 flex-col">
       <header className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
-        <ToggleGroup type="single" size="sm" value={filter} aria-label={i18n.text(messages.status)} className="min-w-0 flex-1"
+        <ToggleGroup type="single" variant="segmented" size="sm" value={filter} aria-label={i18n.text(messages.status)} className="min-w-0 flex-1"
           onValueChange={value => { if (value) onFilter(value as TodoFilterKey); }}>
           {(["open", "done", "all"] as const).map(key => <ToggleGroupItem key={key} value={key} className="h-7 gap-1.5 px-2 text-xs">
             {i18n.text(messages[key])}<span className="tabular-nums text-muted-foreground">{counts[key]}</span>

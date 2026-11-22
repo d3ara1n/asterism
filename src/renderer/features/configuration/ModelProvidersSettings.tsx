@@ -164,7 +164,7 @@ function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null)
         {items.map(preset => {
           const description = presetDescription(preset, modelProviderPresets, false);
           return <div key={preset.id} className="flex flex-col gap-1">
-            <Item asChild variant="outline" className={cn(tile, "bg-card")}><button type="button" onClick={() => onPick(preset)}>
+            <Item asChild className={cn(tile, "bg-card-shell")}><button type="button" onClick={() => onPick(preset)}>
               <span className="type-section max-w-full truncate">{preset.name}</span>
               {description && <span className="type-caption">{description}</span>}
             </button></Item>
@@ -174,7 +174,7 @@ function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null)
       </div>
     </section>)}
     {q && !groups.length && <p className="type-caption">{i18n.formatMessage(providersMessages.noMatchingProvider)}</p>}
-    <Item asChild variant="outline" className={cn(tile, "border-dashed")}><button type="button" onClick={() => onPick(null)}>
+    <Item asChild variant="outline" className={cn(tile, "border-dashed border-input")}><button type="button" onClick={() => onPick(null)}>
       <span className="type-section">{i18n.formatMessage(providersMessages.customConnection)}</span>
       <span className="type-caption">{i18n.formatMessage(providersMessages.customConnectionHint)}</span>
     </button></Item>

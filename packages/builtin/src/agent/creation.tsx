@@ -43,7 +43,7 @@ export function AgentInput({ busy, resolve, cancel }: CreationInputProps<{ selec
     <Field aria-labelledby="agent-configuration-label">
       <FieldTitle id="agent-configuration-label">{i18n.formatMessage(commonMessages.agent)}</FieldTitle>
       {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
-      <div className="flex min-w-0 flex-wrap items-center gap-0.5 rounded-md border bg-muted px-1.5 py-1">
+      <div className="surface-group flex min-w-0 flex-wrap items-center gap-0.5 px-1.5 py-1">
         <Choice icon={<Bot />} label={i18n.formatMessage(commonMessages.agent)} value={agent?.id ?? i18n.formatMessage(creationMessages.chooseAgent)} disabled={!configuration || busy}
           selected={agent?.id ?? ""} onSelect={setAgentId} options={agents.map(item => ({ value: item.id, label: item.id }))} />
         <ModelChoices configuration={configuration} agent={agentId} model={modelId} thinking={thinking} disabled={busy}

@@ -94,7 +94,7 @@ function ChannelRow() {
   const { state, saving, installing, set } = useUpdates();
   const prerelease = state?.includePrerelease ?? false;
   return <Row label={i18n.text(messages.channel)}>
-    <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.text(messages.channel)}
+    <ToggleGroup type="single" variant="segmented" size="sm" aria-label={i18n.text(messages.channel)}
       value={state ? (prerelease ? "prerelease" : "stable") : ""} disabled={!state || saving || installing}
       onValueChange={value => { if (value) void set(value === "prerelease"); }}>
       <ToggleGroupItem value="stable">{i18n.text(messages.channelStable)}</ToggleGroupItem>

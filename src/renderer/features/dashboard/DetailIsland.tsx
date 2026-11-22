@@ -71,7 +71,7 @@ export function DetailIsland({ model, subject, onOpenSession }: { model: Dashboa
     {session && session.status !== "deleted" && <IconButton size="icon-sm" label={i18n.text(msg.openSession)} onClick={() => onOpenSession(session.sessionId)}><ArrowUpRight /></IconButton>}
   </>}>
     <div className="flex flex-col gap-4">
-      <Panel title={i18n.text(msg.detail)} state={summary}>
+      <Panel embedded title={i18n.text(msg.detail)} state={summary}>
         {metrics && <div className="grid grid-cols-3 divide-x">
           <Stat label={i18n.text(msg.cost)} value={formatUsd(i18n, metrics.costUsd)} />
           <Stat label={i18n.text(msg.tokens)} value={formatTokens(metrics.totalTokens)} />
@@ -83,16 +83,16 @@ export function DetailIsland({ model, subject, onOpenSession }: { model: Dashboa
           <Stat className="border-t" label={i18n.text(msg.speed)} value={outputSpeed(metrics) === null ? "—" : i18n.formatMessage(msg.perSecond, { value: Math.round(outputSpeed(metrics)!) })} />
         </div>}
       </Panel>
-      <Panel title={i18n.text(msg.trend)} state={series} empty={metrics?.requests === 0 && <PanelState label={i18n.text(msg.noData)} />}>
+      <Panel embedded title={i18n.text(msg.trend)} state={series} empty={metrics?.requests === 0 && <PanelState label={i18n.text(msg.noData)} />}>
         {series.data && <TrendChart series={series.data} measure="costUsd" className="h-44" />}
       </Panel>
-      {primary && <Panel title={i18n.text(dimensionLabels[primary])} state={first} empty={first.data?.rows.length === 0 && <PanelState label={i18n.text(msg.noData)} />}>
+      {primary && <Panel embedded title={i18n.text(dimensionLabels[primary])} state={first} empty={first.data?.rows.length === 0 && <PanelState label={i18n.text(msg.noData)} />}>
         {first.data && <RankedList rows={first.data.rows} measure="costUsd" onOpen={(row, origin) => open(row.group, origin)} />}
       </Panel>}
-      {secondary && <Panel title={i18n.text(dimensionLabels[secondary])} state={second} empty={second.data?.rows.length === 0 && <PanelState label={i18n.text(msg.noData)} />}>
+      {secondary && <Panel embedded title={i18n.text(dimensionLabels[secondary])} state={second} empty={second.data?.rows.length === 0 && <PanelState label={i18n.text(msg.noData)} />}>
         {second.data && <RankedList rows={second.data.rows} measure="costUsd" onOpen={(row, origin) => open(row.group, origin)} />}
       </Panel>}
-      {errors.data && errors.data.rows.length > 0 && <Panel title={i18n.text(msg.errors)} state={errors}>
+      {errors.data && errors.data.rows.length > 0 && <Panel embedded title={i18n.text(msg.errors)} state={errors}>
         <ul className="flex flex-col divide-y">{errors.data.rows.map(row => <li key={row.group.key} className="flex items-center gap-3 px-4 py-2 text-sm">
           <span className="min-w-0 flex-1 truncate font-mono text-xs">{groupLabel(i18n, row.group)}</span>
           {groupDetail(row.group) && <span className="type-caption">{groupDetail(row.group)}</span>}
@@ -111,8 +111,8 @@ function EventLog({ filter, revision }: { filter: TelemetryFilter; revision: num
   const [limit, setLimit] = useState(pageSize);
   const events = useTelemetry(filter, { kind: "events", offset: 0, limit, only }, revision);
   const data = events.data;
-  return <Panel title={data ? `${i18n.text(msg.detailRequests)} · ${i18n.formatNumber(data.total)}` : i18n.text(msg.detailRequests)} state={events}
-    actions={<ToggleGroup type="single" variant="outline" value={only} aria-label={i18n.text(msg.detailRequests)}
+  return <Panel embedded title={data ? `${i18n.text(msg.detailRequests)} · ${i18n.formatNumber(data.total)}` : i18n.text(msg.detailRequests)} state={events}
+    actions={<ToggleGroup type="single" variant="segmented" value={only} aria-label={i18n.text(msg.detailRequests)}
       onValueChange={value => { if (value) { setOnly(value as typeof only); setLimit(pageSize); } }}>
       <ToggleGroupItem value="all">{i18n.text(msg.eventsAll)}</ToggleGroupItem>
       <ToggleGroupItem value="failed">{i18n.text(msg.eventsFailed)}</ToggleGroupItem>

@@ -1,9 +1,11 @@
 import { ArrowDownRight, ArrowUpRight, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@asterism-app/ui/utils";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import type { BreakdownRow, TelemetryGroup } from "../../../shared/telemetry";
 import { useI18n } from "../../shared/i18n";
+import { exitTransition, fadeTransition } from "../../shared/weave/motion";
 import { dashboardMessages as msg } from "../../messages/dashboard";
 import { FolderDot } from "../folders/marks";
 import { formatMeasure, formatPercent, groupColor, groupDetail, groupLabel } from "./format";
@@ -29,12 +31,25 @@ export function Stat({ label, value, change, detail, badge, footer, className }:
   return <div className={cn("flex min-w-0 flex-col gap-1.5 p-4", className)}>
     <div className="flex min-w-0 items-center justify-between gap-2"><span className="type-label truncate">{label}</span>{badge}</div>
     <div className="flex min-w-0 items-baseline gap-2">
-      <span className="truncate text-2xl font-semibold tracking-tight tabular-nums">{value}</span>
+      <StatValue value={value} />
       {change !== undefined && <Change value={change} />}
     </div>
     {detail && <div className="type-caption min-w-0 truncate tabular-nums">{detail}</div>}
     {footer}
   </div>;
+}
+
+/** A headline value that changed rises into place; the same value across rerenders stays still. */
+function StatValue({ value }: { value: ReactNode }) {
+  const key = typeof value === "string" || typeof value === "number" ? String(value) : "node";
+  return <span className="relative flex min-w-0 overflow-hidden">
+    <AnimatePresence initial={false} mode="popLayout">
+      <motion.span key={key} className="truncate text-2xl font-semibold tracking-tight tabular-nums"
+        initial={{ opacity: 0, y: "40%" }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: "-40%", transition: exitTransition }} transition={fadeTransition}>
+        {value}
+      </motion.span>
+    </AnimatePresence>
+  </span>;
 }
 
 /** A group's identity: folder color mark, label, deletion state, and secondary detail. */

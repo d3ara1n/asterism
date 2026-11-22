@@ -45,6 +45,7 @@ Use the `@asterism-app` scope for Asterism core and framework packages, and the 
 - `tooltip`: Provider defaults to a 700 ms hover delay with no skip-delay window; explicit timing props remain supported.
 - `hover-card`, `tooltip`: fade and scale in place to keep the trigger under the pointer as the surface opens.
 - `progress`: forwards `value` to the Radix root so the value attributes are exposed.
+- `toggle-group`: adds the `segmented` variant, a recessed track whose single indicator travels to the selected item; items then use the default toggle styling without their own selected fill.
 - `chart` (host): the dark theme selector is `[data-mode=dark]`; the tooltip uses the popover surface with sans tabular figures.
 - `scroll-area`: exposes viewport refs/props and content styling; supports both axes; uses an explicit Radix content element with caller-controlled display, a transparent track, and a semantic overlay thumb; normalizes Radix pointer coordinates for scaled canvases.
 - `message-scroller`: the jump button's screen-reader label comes from `commonMessages`; a nested Radix root preserves the primitive root's ref registration, while Viewport and Content compose through `asChild` so the same viewport owns scrolling and an overlay scrollbar; the viewport drops `scroll-fade-b` and native scrollbar styling.

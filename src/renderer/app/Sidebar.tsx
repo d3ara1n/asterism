@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef, useState, type ReactElement, type ReactNode } from "react";
+import { lazy, Suspense, useId, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { ListRow, ListRowAction } from "@asterism-app/ui/ui/list-row";
@@ -19,6 +19,7 @@ import type { Folder } from "../../shared/folders";
 import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
 import type { SessionResult } from "../../shared/session";
 import { SessionActions } from "./SessionActions";
+import { indicatorItem, SelectionIndicator } from "../shared/selection-indicator";
 import { CoffeeCup, SessionGlyph, SessionStatus, hasSessionIndicator } from "./SessionStatus";
 import { sessionIndicator, type ResourceNoticeMark } from "./resource-status";
 import type { ResourceActivity } from "@asterism-app/sdk/contracts";
@@ -71,6 +72,8 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
     else listHeading.current?.focus({ preventScroll: true });
   };
   const disabled = busy || status !== "ready";
+  // Home, usage statistics, and the open session share one selection that travels between them.
+  const selection = useId();
   // Without folders both arrangements are the same flat list, so the switch is omitted.
   const grouped = folders.length > 0 && view === "folders";
   const groups = snapshot && grouped ? groupByFolder(folders, snapshot.sessions, session => session.folder_id, i18n.locale) : [];
@@ -112,8 +115,10 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
       completed={session.completed} onCompletedChange={completed => onCompletedChange(session.id, completed)}
       renameDisabled={renameDisabledSessionId === session.id}
       onRename={title => onRename(session.id, title)} onArchive={() => onArchive(session.id)} onTemplateSaved={onTemplateSaved} templates={snapshot?.templates ?? []}>
-      {trigger => <ListRow variant="navigation"
-        selected={selectedSessionId === session.id} disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
+      {trigger => <div className="relative">
+        {selectedSessionId === session.id && <SelectionIndicator layoutId={selection} />}
+        <ListRow variant="navigation" className={indicatorItem(selectedSessionId === session.id)}
+        disabled={disabled} inactive={session.sleeping} onOpen={() => onSession(session.id)}
         tooltip={session.title}
         buttonProps={{ "aria-current": selectedSessionId === session.id ? "page" : undefined }}
         media={interactive ? undefined : media} leadingActions={interactive ? media : undefined}
@@ -123,7 +128,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
           {!session.sleeping && session.keepAwake && <span className="sr-only">, {i18n.text(appMessages.keepAwake)}</span>}
           {session.completed && <span className="sr-only">, {i18n.text(appMessages.completed)}</span>}
         </span>}
-        actions={trigger} />}
+        actions={trigger} /></div>}
     </SessionActions>;
   };
   return <aside id="app-sidebar" className="app-sidebar" aria-label={i18n.formatMessage(appMessages.appNavigation)}>
@@ -132,15 +137,15 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
       <IconButton size="icon-xs" label={i18n.formatMessage(appMessages.hideSidebar)} onClick={onHide}><PanelLeftClose /></IconButton>
     </header>
     <nav className="flex flex-col gap-1" aria-label={i18n.formatMessage(appMessages.mainViews)}>
-      <Button variant={homeActive ? "selected" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{i18n.formatMessage(commonMessages.home)}</Button>
-      <Button variant={dashboardActive ? "selected" : "ghost"} className="w-full justify-start disabled:opacity-100" aria-current={dashboardActive ? "page" : undefined} disabled={dashboardActive} onClick={onDashboard}><BarChart3 />{i18n.formatMessage(dashboardMessages.title)}</Button>
+      <span className="relative">{homeActive && <SelectionIndicator layoutId={selection} />}<Button variant="ghost" className={cn("w-full justify-start disabled:opacity-100", indicatorItem(homeActive))} aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{i18n.formatMessage(commonMessages.home)}</Button></span>
+      <span className="relative">{dashboardActive && <SelectionIndicator layoutId={selection} />}<Button variant="ghost" className={cn("w-full justify-start disabled:opacity-100", indicatorItem(dashboardActive))} aria-current={dashboardActive ? "page" : undefined} disabled={dashboardActive} onClick={onDashboard}><BarChart3 />{i18n.formatMessage(dashboardMessages.title)}</Button></span>
     </nav>
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
       <div className="mb-1 flex items-center justify-between gap-2 pl-2">
         <h2 ref={listHeading} tabIndex={-1} id="conversation-list-title" className="type-label">{i18n.formatMessage(commonMessages.conversations)}</h2>
         <IconButton ref={createTrigger} size="icon-xs" label={i18n.text(folderMessages.create)} disabled={!ready} onClick={() => setCreating(true)}><FolderPlus /></IconButton>
       </div>
-      {folders.length > 0 && <ToggleGroup type="single" variant="outline" size="sm" className="mb-2 w-full" aria-label={i18n.text(appMessages.sidebarView)}
+      {folders.length > 0 && <ToggleGroup type="single" variant="segmented" size="sm" className="mb-2 w-full" aria-label={i18n.text(appMessages.sidebarView)}
         value={view} onValueChange={value => { if (value) onViewChange(value as SidebarView); }}>
         {sidebarViews.map(item => <ToggleGroupItem key={item} value={item} className="h-7 flex-1">{i18n.text(viewLabels[item])}</ToggleGroupItem>)}
       </ToggleGroup>}

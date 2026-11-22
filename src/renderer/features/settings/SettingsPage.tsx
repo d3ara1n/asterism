@@ -25,7 +25,8 @@ import { ArrowLeft, Info, SlidersHorizontal, Palette, PlugZap, Puzzle, BookOpen,
 import { ConfigurationReadStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";
 import { Screen, useIsland, useIslandCancel, type IslandSpec, type ScreenHandle } from "../../shared/weave/Screen";
-import { exitTransition, fadeTransition, indicatorTransition } from "../../shared/weave/motion";
+import { exitTransition, fadeTransition } from "../../shared/weave/motion";
+import { indicatorItem, SelectionIndicator } from "../../shared/selection-indicator";
 import { settingsMessages } from "../../messages/settings";
 import { useI18n } from "../../shared/i18n";
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode, type Ref, type RefObject } from "react";
@@ -160,10 +161,8 @@ function SettingsRoot({ openId, onOpen, onClosed, onCancel, manager, location }:
         {group.entries.map(entry => {
           const selected = entry.id === shown?.id;
           return <div key={entry.id} className="relative">
-            {selected && <motion.span layoutId={`${layout}-indicator`} aria-hidden="true" className="absolute inset-0 rounded-md bg-selected"
-              transition={indicatorTransition} />}
-            <ListRow variant="navigation" media={icon(entry)}
-              className={cn("relative bg-transparent transition-colors", selected && "text-selected-foreground hover:bg-transparent dark:hover:bg-transparent")}
+            {selected && <SelectionIndicator layoutId={`${layout}-indicator`} />}
+            <ListRow variant="navigation" media={icon(entry)} className={cn("bg-transparent transition-colors", indicatorItem(selected))}
               title={<span className="block truncate">{i18n.text(entry.title)}</span>} onOpen={() => void select(entry.id)}
               buttonProps={{ ref: rowRef(entry.id), "aria-current": selected ? "page" : undefined }} />
           </div>;

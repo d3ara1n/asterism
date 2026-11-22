@@ -41,7 +41,7 @@ type Action = "copyImage" | "saveImage" | "copyMarkdown" | "saveMarkdown";
 const widths = [720, 960, 1200] as const;
 /** Printed in the image, where it cannot be clicked, so the visible text carries the address. */
 const siteUrl = "https://asterism.dearain.dev";
-const segment = "h-6 min-w-0 rounded-sm px-2.5 text-xs tabular-nums text-muted-foreground hover:bg-transparent hover:text-foreground data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs";
+const segment = "h-6 min-w-0 px-2.5 text-xs tabular-nums";
 
 export default function ShareDialog({ snapshot, messages: initial, anchor, historyWindow, earlier: initialEarlier, origin, onClose }: ShareDialogProps) {
   const i18n = useI18n();
@@ -141,10 +141,10 @@ export default function ShareDialog({ snapshot, messages: initial, anchor, histo
       }}
       onCloseAutoFocus={event => { event.preventDefault(); if (origin.isConnected) origin.focus(); }}
       className="nodrag nopan nokey flex h-[min(840px,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1240px,calc(100vw-2rem))]">
-      <DialogHeader className="shrink-0 border-b px-5 py-3.5 pr-12"><DialogTitle className="type-section">{i18n.text(messages.share)}</DialogTitle></DialogHeader>
+      <DialogHeader className="shrink-0 px-5 py-3.5 pr-12"><DialogTitle className="type-section">{i18n.text(messages.share)}</DialogTitle></DialogHeader>
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(240px,320px)_minmax(0,1fr)] max-sm:grid-cols-[180px_minmax(0,1fr)]">
-        <section aria-label={i18n.text(messages.messages)} className="flex min-h-0 min-w-0 flex-col border-r">
-          <div className="flex h-11 shrink-0 items-center gap-1 border-b px-3">
+        <section aria-label={i18n.text(messages.messages)} className="flex min-h-0 min-w-0 flex-col">
+          <div className="flex h-11 shrink-0 items-center gap-1 px-3">
             <span className="type-label min-w-0 flex-1 truncate tabular-nums" aria-live="polite">
               {i18n.formatMessage(messages.selected, { count: chosen.length, total: candidates.length })}</span>
             <Button variant="ghost" size="xs" disabled={!idle || chosen.length === candidates.length}
@@ -155,7 +155,7 @@ export default function ShareDialog({ snapshot, messages: initial, anchor, histo
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
             {earlier && <Button variant="ghost" size="sm" className="mb-2 w-full text-muted-foreground" disabled={loading || !idle}
               onClick={() => { void loadEarlier(); }}>{loading && <Spinner data-icon="inline-start" />}{i18n.text(conversationMessages.earlierMessages)}</Button>}
-            {groups.map((group, index) => <div key={group[0]!.id} role="group" className={cn("flex flex-col gap-0.5", index > 0 && "mt-2 border-t pt-2")}>
+            {groups.map((group, index) => <div key={group[0]!.id} role="group" className={cn("flex flex-col gap-0.5", index > 0 && "mt-3")}>
               {group.map(message => <SelectionRow key={message.id} ref={message.id === anchor ? anchorRow : undefined}
                 message={message} name={label(message)} checked={selected.has(message.id)} disabled={!idle}
                 onToggle={range => toggle(message.id, range)} />)}
@@ -163,9 +163,9 @@ export default function ShareDialog({ snapshot, messages: initial, anchor, histo
           </div>
         </section>
         <section aria-label={i18n.text(messages.preview)} className="flex min-h-0 min-w-0 flex-col bg-muted/50">
-          <div className="flex h-11 shrink-0 items-center justify-between gap-3 border-b bg-background px-3">
-            <ToggleGroup type="single" spacing={0.5} value={String(width)} aria-label={i18n.text(messages.width)} disabled={!idle}
-              className="rounded-md bg-muted p-0.5" onValueChange={value => { if (value) setWidth(Number(value)); }}>
+          <div className="flex h-11 shrink-0 items-center justify-between gap-3 px-3">
+            <ToggleGroup type="single" variant="segmented" value={String(width)} aria-label={i18n.text(messages.width)} disabled={!idle}
+              onValueChange={value => { if (value) setWidth(Number(value)); }}>
               {widths.map(value => <ToggleGroupItem key={value} value={String(value)} className={segment}>{value}</ToggleGroupItem>)}
             </ToggleGroup>
             {chosen.length > 0 && (scale === null
@@ -188,7 +188,7 @@ export default function ShareDialog({ snapshot, messages: initial, anchor, histo
           </div>
         </section>
       </div>
-      <DialogFooter className="shrink-0 items-center border-t px-5 py-3 sm:justify-between">
+      <DialogFooter className="shrink-0 items-center px-5 py-3 sm:justify-between">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" disabled={!chosen.length || !idle}>

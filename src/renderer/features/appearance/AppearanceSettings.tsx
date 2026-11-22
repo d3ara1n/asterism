@@ -115,7 +115,7 @@ export function AppearanceSettings() {
     <Section title={i18n.formatMessage(appearanceMessages.color)} action={<Button size="sm" variant="outline" onClick={() => setPicking(true)}><Palette />{i18n.formatMessage(appearanceMessages.choosePalette)}</Button>}>
       <ItemGroup className="surface-group">
         <Row label={i18n.formatMessage(appearanceMessages.mode)} hint={i18n.formatMessage(appearanceMessages.modeHint)}>
-          <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.modeLabel)} value={appearance.mode}
+          <ToggleGroup type="single" variant="segmented" size="sm" aria-label={i18n.formatMessage(appearanceMessages.modeLabel)} value={appearance.mode}
             onValueChange={mode => mode && void save({ mode: mode as Appearance["mode"] })}>
             <ToggleGroupItem value="system" className="px-2.5"><Monitor />{i18n.formatMessage(appearanceMessages.system)}</ToggleGroupItem>
             <ToggleGroupItem value="light" className="px-2.5"><Sun />{i18n.formatMessage(appearanceMessages.light)}</ToggleGroupItem>
@@ -151,7 +151,7 @@ export function AppearanceSettings() {
     <Section title={i18n.formatMessage(appearanceMessages.shape)}>
       <ItemGroup className="surface-group">
         <Row label={i18n.formatMessage(appearanceMessages.cornerRadius)}>
-          <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.cornerRadiusLabel)} value={appearance.radius}
+          <ToggleGroup type="single" variant="segmented" size="sm" aria-label={i18n.formatMessage(appearanceMessages.cornerRadiusLabel)} value={appearance.radius}
             onValueChange={radius => radius && void save({ radius: radius as Appearance["radius"] })}>
             {([["none", i18n.formatMessage(appearanceMessages.square)], ["sm", i18n.formatMessage(appearanceMessages.small)], ["md", i18n.formatMessage(appearanceMessages.medium)], ["lg", i18n.formatMessage(appearanceMessages.large)]] as const).map(([v, text]) =>
               <Tooltip key={v}><ToggleGroupItem asChild value={v} aria-label={text} className="px-2.5"><TooltipTrigger>
@@ -161,7 +161,7 @@ export function AppearanceSettings() {
         </Row>
         <ItemSeparator />
         <Row label={i18n.formatMessage(appearanceMessages.density)} hint={i18n.formatMessage(appearanceMessages.densityHint)}>
-          <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.densityLabel)} value={appearance.density}
+          <ToggleGroup type="single" variant="segmented" size="sm" aria-label={i18n.formatMessage(appearanceMessages.densityLabel)} value={appearance.density}
             onValueChange={density => density && void save({ density: density as Appearance["density"] })}>
             <ToggleGroupItem value="compact" className="px-2.5">{i18n.formatMessage(appearanceMessages.compact)}</ToggleGroupItem>
             <ToggleGroupItem value="standard" className="px-2.5">{i18n.formatMessage(appearanceMessages.standard)}</ToggleGroupItem>

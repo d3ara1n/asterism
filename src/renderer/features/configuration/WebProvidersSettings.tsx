@@ -151,7 +151,7 @@ function WebProviderCreation() {
           const exists = added.has(type.id);
           const help = type.settings.find((setting): setting is SecretSetting => setting.kind === "secret" && !!setting.helpUrl);
           return <div key={type.id} className="flex flex-col gap-1">
-            <Item asChild variant="outline" className={cn(tile, "bg-card", exists ? "opacity-60" : "hover:bg-accent")}>
+            <Item asChild className={cn(tile, "bg-card-shell", exists ? "opacity-60" : "hover:bg-accent")}>
               <button type="button" disabled={exists} onClick={() => setPicked(type.id)}>
                 <span className="flex w-full min-w-0 items-center justify-between gap-2">
                   <span className="type-section truncate">{i18n.text(type.label)}</span>

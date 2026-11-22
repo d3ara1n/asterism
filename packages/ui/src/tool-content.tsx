@@ -29,7 +29,7 @@ export function ToolDetailsSwitcher({ items, stateKey = null }: {
   const panelId = useId();
   const selected = items.find(item => item.value === value);
   return <div className="space-y-2">
-    <ToggleGroup type="single" size="sm" value={selected?.value ?? ""} onValueChange={setValue}
+    <ToggleGroup type="single" variant="segmented" size="sm" value={selected?.value ?? ""} onValueChange={setValue}
       aria-label={items.map(item => item.label).join(", ")}>
       {items.map(item => <ToggleGroupItem key={item.value} value={item.value} id={`${panelId}-${item.value}`}
         aria-controls={panelId} aria-expanded={selected === item}>{item.label}

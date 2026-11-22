@@ -55,7 +55,7 @@ function AgentListBody({ result }: AgentListProps) {
   return <div className="@container/agents space-y-3">
     <ToolScrollArea className="max-h-80"><ItemGroup className="grid grid-cols-1 items-stretch gap-3 @min-[36rem]/agents:grid-cols-2">
       {entries.slice(0, TOOL_BODY_LINE_LIMIT).map(entry => <Item key={entry.id} role="listitem"
-        variant="outline" size="sm" className="min-w-0 flex-col items-stretch gap-3">
+        size="sm" className="min-w-0 flex-col items-stretch gap-3 bg-card">
         <div className="flex min-w-0 items-center gap-3">
           <ItemMedia variant="icon" className="text-muted-foreground"><Bot aria-hidden="true" /></ItemMedia>
           <ItemContent className="min-w-0">
@@ -96,7 +96,7 @@ function ListHeader({ result }: ListProps) {
 function CreationCard({ entry }: { entry: z.infer<typeof CreationListResult.schema>[number] }) {
   const i18n = useI18n();
   const resource = useRendererResources().get(entry.resourceKind);
-  return <Item role="listitem" variant="outline" size="sm" className="min-w-0 flex-nowrap items-start gap-3 px-3 py-2.5">
+  return <Item role="listitem" size="sm" className="min-w-0 flex-nowrap items-start gap-3 bg-card px-3 py-2.5">
     <ItemMedia variant="icon" className="text-muted-foreground">{resource.icon}</ItemMedia>
     <ItemContent className="min-w-0 gap-0.5">
       <ItemTitle className="w-full break-words">{i18n.text(resource.label)}</ItemTitle>
