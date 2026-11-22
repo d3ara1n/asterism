@@ -16,7 +16,7 @@ import { conversationMessages } from "../../messages/conversation";
 import { useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk/renderer";
 
 import { useOutputFollow } from "./output-follow";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 import { useConversationHistory } from "./use-conversation-history";
 import { ConversationHistoryWindow } from "./history-window";
@@ -31,16 +31,19 @@ import type { AgentActivity, CompressionActivity, InlineFeedback } from "../feed
 import { useConversationProcesses } from "./use-conversation-processes";
 import { useTimelinePresence } from "./timeline-presence";
 import { conversationTransition, immediateTransition } from "./motion";
-import { formatElapsedTime } from "./elapsed-time";
+import { ExecutionIndicator } from "./ExecutionIndicator";
 
-/** Execution status in the card title bar; history belongs to the session and is accessed from the window title bar. */
+/**
+ * Execution status in the card title bar; history belongs to the session and is accessed from the window title bar.
+ * The badge stays still: the composer edge carries the live activity, and this badge only names the state at a glance.
+ */
 export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const snapshot = object.session.snapshot();
   const agentRunning = data.executionState === "running";
   if (!snapshot) return null;
-  return <StatusBadge tone={agentRunning ? "progress" : "neutral"} role="status">
+  return <StatusBadge tone={agentRunning ? "progress" : "neutral"} still role="status">
     {agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}
   </StatusBadge>;
 }
@@ -100,6 +103,9 @@ export function Conversation({ feedback, compressions, activity = null, executio
     await interaction.resume(); latest();
   };
 
+  const indicator = <ExecutionIndicator running={running} activity={activity}
+    compressing={compressions.some(item => item.status === "running")} startedAt={executionStartedAt} />;
+
   return <ConversationSharing items={items} historyWindow={historyWindow} earlier={read.data?.earlier ?? false}>
     <AgentUIRegion position="top" />
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -126,10 +132,8 @@ export function Conversation({ feedback, compressions, activity = null, executio
           target={target} presence={presence} reducedMotion={reducedMotion}
           onResize={() => { onResize(); navigation.current?.update(); }} onScrollEnd={onScrollEnd} onProcessMount={onProcessMount}
           onToggleProcess={id => { preserveItem(id); toggle(id); }} />
-        <div className="px-4 pb-4">
-          {running && <ExecutionStatus activity={activity} compressing={compressions.some(item => item.status === "running")}
-            startedAt={executionStartedAt} />}
-        </div>
+        {/* Leaves room for the execution tab standing on the composer edge. */}
+        <div className="pb-6" />
       </ScrollArea>
       {read.status === "ready" && !timeline.length && !running && <Empty className="pointer-events-none absolute inset-0 p-6">
         <EmptyHeader>
@@ -152,36 +156,18 @@ export function Conversation({ feedback, compressions, activity = null, executio
       </div>
     </div>
     <AgentUIRegion position="bottom" />
-    {!composerHidden && <footer className="shrink-0 px-2 pt-1 pb-2">
-      <ComposerTray running={running}>
-        <AgentDraftsPanel onTake={() => composer.current?.focus()} />
-        <MessageComposer draft={interaction.draft} inputRef={composer}
-          ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
-          onSave={() => interaction.save()} onCancel={interaction.cancel} onContinue={resume} />
-        <AgentToolbar className="px-0.5 pt-1" />
-      </ComposerTray>
-    </footer>}
+    {composerHidden
+      // An overlay that hides the composer keeps the execution indicator on the edge where the tray would stand.
+      ? <div className="relative mx-2 mb-2 h-px shrink-0">{indicator}</div>
+      : <footer className="shrink-0 px-2 pt-1 pb-2">
+        <ComposerTray>
+          {indicator}
+          <AgentDraftsPanel onTake={() => composer.current?.focus()} />
+          <MessageComposer draft={interaction.draft} inputRef={composer}
+            ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
+            onSave={() => interaction.save()} onCancel={interaction.cancel} onContinue={resume} />
+          <AgentToolbar className="px-0.5 pt-1" />
+        </ComposerTray>
+      </footer>}
   </ConversationSharing>;
-}
-
-/** Elapsed time spans requests, compaction, and retry waits; clock updates stay within this status row. */
-function ExecutionStatus({ activity, compressing, startedAt }: { activity: AgentActivity | null; compressing: boolean; startedAt: number | null }) {
-  const i18n = useI18n();
-  const [now, setNow] = useState(Date.now);
-  const resumeAt = activity?.resumeAt ?? null;
-  useEffect(() => {
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), resumeAt === null ? 1000 : 250);
-    return () => clearInterval(timer);
-  }, [resumeAt, startedAt]);
-  const duration = formatElapsedTime(startedAt, now);
-  const label = compressing ? i18n.text(conversationMessages.compressing) : !activity ? i18n.formatMessage(conversationMessages.workingHint)
-    : resumeAt !== null
-      ? i18n.formatMessage(conversationMessages.retryWaiting, { attempt: activity.attempt, max: activity.max, seconds: Math.max(0, Math.ceil((resumeAt - now) / 1000)) })
-      : i18n.formatMessage(conversationMessages.retrying, { attempt: activity.attempt, max: activity.max });
-  return <p className="type-caption flex items-center gap-2 pt-4">
-    <span role="status" className="flex items-center gap-2"><StatusIcon tone="progress" className="size-3" />{label}</span>
-    {duration && <span role="timer" aria-live="off" aria-label={i18n.formatMessage(conversationMessages.elapsed, { duration })}
-      className="shrink-0 tabular-nums">{duration}</span>}
-  </p>;
 }

@@ -1,0 +1,16 @@
+/*
+ * Execution activity traces on the composer: a light travelling along the tray's top edge and an arc orbiting the stop button.
+ * They are CSS animations so a remount under a presence boundary that skips entry animations, such as switching sessions
+ * or views while the agent runs, still starts them. The global reduced-motion rule stops them: the edge light rests at
+ * the centre of its track, and the orbit leaves only its still ring.
+ */
+.execution-trace {
+  position: absolute; inset-inline: 1.25rem; top: -1px; height: 1px; pointer-events: none;
+  background-image: linear-gradient(90deg, transparent, var(--primary) 50%, transparent);
+  background-size: 50% 100%; background-repeat: no-repeat; background-position: 50% 0;
+  animation: execution-trace 1.8s ease-in-out infinite;
+}
+@keyframes execution-trace { from { background-position: -100% 0; } to { background-position: 200% 0; } }
+.working-orbit { animation: working-orbit 1.1s linear infinite; }
+@keyframes working-orbit { to { rotate: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .working-orbit-arc { display: none; } }

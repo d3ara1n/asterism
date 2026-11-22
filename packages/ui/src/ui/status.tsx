@@ -28,9 +28,9 @@ export function StatusIcon({ tone, icon, still = false, className }: { tone: Sta
   return <Icon aria-hidden="true" className={cn(colors[tone], className)} />;
 }
 
-/** Status markers in lists and titles; icons inherit the foreground color of the corresponding solid surface. */
-export function StatusBadge({ tone, children, className, ...props }: Omit<ComponentProps<typeof Badge>, "variant" | "asChild"> & { tone: StatusTone }) {
-  return <Badge {...props} variant={badgeTones[tone]} className={cn("font-normal", className)}><StatusIcon tone={tone} className="text-current" />{children}</Badge>;
+/** Status markers in lists and titles; icons inherit the foreground color of the corresponding solid surface. still has the same meaning as on StatusIcon. */
+export function StatusBadge({ tone, still, children, className, ...props }: Omit<ComponentProps<typeof Badge>, "variant" | "asChild"> & { tone: StatusTone; still?: boolean }) {
+  return <Badge {...props} variant={badgeTones[tone]} className={cn("font-normal", className)}><StatusIcon tone={tone} still={still} className="text-current" />{children}</Badge>;
 }
 
 /** Inline status descriptions; error text also uses the error color. */

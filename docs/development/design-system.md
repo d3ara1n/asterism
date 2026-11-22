@@ -139,6 +139,8 @@ User, Agent, and resource event messages share body rendering, and source presen
 
 The Agent composer and the Home entry are trays: a shell lifted over the content, holding a raised editor sheet, with configuration on the tray's lower edge. The tray border takes the ring tone while the editor is focused. Send and stop share one round slot so the action row keeps its width across execution states.
 
+While an Agent runs, a light travels along the composer tray's top edge, an arc orbits the stop control, and a tab standing on the tray edge shows the elapsed time followed by the execution phase (working, retrying, waiting to retry, or compacting). The conversation itself carries no separate status row, and the card's title badge stays still. When an overlay hides the composer, the edge light and tab remain where the tray would stand. Continuous activity traces run as CSS animations, so a view remounted mid-run under a presence boundary that skips entry animations still shows them moving.
+
 ### Feedback and status
 
 Status uses the shared status components with text and icons. Feedback stays with the operation it belongs to: field errors with fields, command progress at its entry, and Agent execution errors and warnings inline in the owning conversation. Independent interface command failures use toasts. One failure is never shown both inline and as a toast, and a background reread never becomes a global saving indicator.
