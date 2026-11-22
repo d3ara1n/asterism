@@ -1,7 +1,7 @@
 import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
 import { ArrowDown, ChevronsUp, MessageSquare, RotateCw } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyDescription } from "@asterism-app/ui/ui/empty";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useMotionValue, useReducedMotion } from "motion/react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
@@ -31,11 +31,11 @@ import type { AgentActivity, CompressionActivity, InlineFeedback } from "../feed
 import { useConversationProcesses } from "./use-conversation-processes";
 import { useTimelinePresence } from "./timeline-presence";
 import { conversationTransition, immediateTransition } from "./motion";
-import { ExecutionIndicator } from "./ExecutionIndicator";
+import { ExecutionEdge, ExecutionStatus } from "./ExecutionStatus";
 
 /**
  * Execution status in the card title bar; history belongs to the session and is accessed from the window title bar.
- * The badge stays still: the composer edge carries the live activity, and this badge only names the state at a glance.
+ * The badge stays still: the conversation end and the composer edge carry the live activity, and this badge only names the state at a glance.
  */
 export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
   const i18n = useI18n();
@@ -91,6 +91,9 @@ export function Conversation({ feedback, compressions, activity = null, executio
   const navigation = useRef<ConversationNavigationHandle>(null);
   const composer = useRef<ComposerEditorHandle>(null);
   const composerHidden = useComposerHidden();
+  // The share of the execution status row inside the viewport; the composer edge light takes over as it scrolls out.
+  // It starts visible so a run starting at the end shows no edge light before the row is first measured.
+  const statusVisible = useMotionValue(1);
 
   if (!snapshot) return null;
   const send = async () => {
@@ -103,8 +106,7 @@ export function Conversation({ feedback, compressions, activity = null, executio
     await interaction.resume(); latest();
   };
 
-  const indicator = <ExecutionIndicator running={running} activity={activity}
-    compressing={compressions.some(item => item.status === "running")} startedAt={executionStartedAt} />;
+  const edge = <ExecutionEdge running={running} visible={statusVisible} />;
 
   return <ConversationSharing items={items} historyWindow={historyWindow} earlier={read.data?.earlier ?? false}>
     <AgentUIRegion position="top" />
@@ -132,8 +134,10 @@ export function Conversation({ feedback, compressions, activity = null, executio
           target={target} presence={presence} reducedMotion={reducedMotion}
           onResize={() => { onResize(); navigation.current?.update(); }} onScrollEnd={onScrollEnd} onProcessMount={onProcessMount}
           onToggleProcess={id => { preserveItem(id); toggle(id); }} />
-        {/* Leaves room for the execution tab standing on the composer edge. */}
-        <div className="pb-6" />
+        <div className="px-4 pb-4">
+          {running && <ExecutionStatus activity={activity} compressing={compressions.some(item => item.status === "running")}
+            startedAt={executionStartedAt} viewport={scroll} visible={statusVisible} />}
+        </div>
       </ScrollArea>
       {read.status === "ready" && !timeline.length && !running && <Empty className="pointer-events-none absolute inset-0 p-6">
         <EmptyHeader>
@@ -157,11 +161,11 @@ export function Conversation({ feedback, compressions, activity = null, executio
     </div>
     <AgentUIRegion position="bottom" />
     {composerHidden
-      // An overlay that hides the composer keeps the execution indicator on the edge where the tray would stand.
-      ? <div className="relative mx-2 mb-2 h-px shrink-0">{indicator}</div>
+      // An overlay that hides the composer keeps the edge light where the tray would stand.
+      ? <div className="relative mx-2 mb-2 h-px shrink-0">{edge}</div>
       : <footer className="shrink-0 px-2 pt-1 pb-2">
         <ComposerTray>
-          {indicator}
+          {edge}
           <AgentDraftsPanel onTake={() => composer.current?.focus()} />
           <MessageComposer draft={interaction.draft} inputRef={composer}
             ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}

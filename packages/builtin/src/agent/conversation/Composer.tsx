@@ -9,7 +9,6 @@ import type { AgentExecutionState } from "../state";
 import { AttachFiles, DraftFiles, fileInputEvents } from "./Files";
 import { ComposerEditor, type ComposerEditorHandle } from "./composer-editor";
 import { droppedPathText, isFileDrag } from "./file-drop";
-import "./execution.css";
 import { toast } from "sonner";
 import { cn } from "@asterism-app/ui/utils";
 
@@ -33,13 +32,13 @@ function dropTarget(target: EventTarget): FileDropTarget | null {
 
 /**
  * The input tray: a shell holding the drafts box, the editor sheet and the toolbar lip, so everything that shapes the next
- * message reads as one object. The conversation places its execution indicator on the tray's top edge.
- * The tray does not clip: the reference menu opens above the editor and the execution tab stands above the edge.
+ * message reads as one object. The conversation places its execution edge light on the tray's top edge.
+ * The tray does not clip: the reference menu opens above the editor.
  * The tray matches the card content corner rather than exceeding it; the wide footer gap keeps the two edges apart,
  * and the editor sheet nests concentrically inside the tray's padding and border.
  */
 export function ComposerTray({ children }: { children: ReactNode }) {
-  return <div className={cn("group/tray relative flex min-w-0 flex-col rounded-lg border bg-card-shell p-1 shadow-(--shadow-lift) transition-[border-color] duration-200",
+  return <div className={cn("relative flex min-w-0 flex-col rounded-lg border bg-card-shell p-1 shadow-(--shadow-lift) transition-[border-color] duration-200",
     "has-[[data-slot=input-group-control]:focus]:border-ring")}>
     {children}
   </div>;
@@ -62,18 +61,6 @@ function PrimaryActionSlot({ swapKey, children }: { swapKey: string; children: R
 function LeavingInert({ children }: { children: ReactNode }) {
   const present = useIsPresent();
   return <div className="contents" inert={!present}>{children}</div>;
-}
-
-/**
- * An arc orbiting the stop button marks ongoing work. The rotation is a CSS animation: the slot's presence skips entry
- * animations, which would leave a Motion-driven orbit still when the composer remounts during a run.
- */
-function WorkingOrbit() {
-  return <svg aria-hidden viewBox="0 0 40 40" className="working-orbit pointer-events-none absolute -inset-1 size-10 text-primary">
-    <circle cx="20" cy="20" r="18.25" fill="none" stroke="currentColor" strokeOpacity={0.15} strokeWidth="1.5" />
-    <circle className="working-orbit-arc" cx="20" cy="20" r="18.25" fill="none" stroke="currentColor" strokeWidth="1.5"
-      strokeLinecap="round" strokeDasharray="30 85" />
-  </svg>;
 }
 
 export function MessageComposer({ draft, inputRef, ready, executionState, writable, onSend, onSave, onCancel, onContinue }: {
@@ -151,13 +138,10 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
         </motion.div>}
       </AnimatePresence>
       <PrimaryActionSlot swapKey={running ? "stop" : "send"}>
-        {running ? <>
-          <IconButton type="button" variant="secondary" size="icon-sm" className="rounded-full" disabled={cancelDisabled}
-            label={i18n.formatMessage(conversationMessages.stop)} onClick={() => { void control(onCancel); }}>
-            <Square className="size-3 fill-current" />
-          </IconButton>
-          <WorkingOrbit />
-        </> : <IconButton type="submit" variant="default" size="icon-sm" className="rounded-full transition-[opacity,transform] active:scale-90"
+        {running ? <IconButton type="button" variant="secondary" size="icon-sm" className="rounded-full" disabled={cancelDisabled}
+          label={i18n.formatMessage(conversationMessages.stop)} onClick={() => { void control(onCancel); }}>
+          <Square className="size-3 fill-current" />
+        </IconButton> : <IconButton type="submit" variant="default" size="icon-sm" className="rounded-full transition-[opacity,transform] active:scale-90"
           disabled={!writable || state.uploading || empty} label={i18n.formatMessage(commonMessages.sendMessage)}><ArrowUp /></IconButton>}
       </PrimaryActionSlot>
     </InputGroupAddon>

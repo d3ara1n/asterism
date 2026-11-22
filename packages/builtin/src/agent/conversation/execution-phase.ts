@@ -1,6 +1,6 @@
 import type { AgentActivity } from "../feedback";
 
-/** The execution phase named on the composer's top edge. Compaction takes precedence because a retry cannot run during it. */
+/** The execution phase shown at the end of the conversation. Compaction takes precedence because a retry cannot run during it. */
 export type ExecutionPhase =
   | { kind: "working" }
   | { kind: "compressing" }

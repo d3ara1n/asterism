@@ -99,6 +99,8 @@ Motion uses the shared Motion library for presence, layout, and shared elements,
 
 Command and searchable-choice surfaces share one motion definition across application and Agent palettes, command popovers, and reference suggestions: a short fade with restrained scale and translation, entering from the trigger-facing edge. One container owns sizing in these surfaces, and nested pages preserve the focus and state ownership of their control instead of remounting it.
 
+Hover cards and tooltips take the same motion. They open a few pixels from their trigger, so their travel stays inside that gap and the surface never passes under the pointer that opened it.
+
 Motion does not fight measurement. Virtual lists own item positioning and scroll compensation; disclosure animates content without a second layout system. Streaming Markdown uses the renderer's own pacing. History remounts render statically, and transitions do not replay merely because an item scrolled into view. Home and the workbench keep the same backing container while content loads, and the first Home display plays no entrance.
 
 ## Patterns
@@ -139,7 +141,7 @@ User, Agent, and resource event messages share body rendering, and source presen
 
 The Agent composer and the Home entry are trays: a shell lifted over the content, holding a raised editor sheet, with configuration on the tray's lower edge. The tray border takes the ring tone while the editor is focused. Send and stop share one round slot so the action row keeps its width across execution states.
 
-While an Agent runs, a light travels along the composer tray's top edge, an arc orbits the stop control, and a tab standing on the tray edge shows the elapsed time followed by the execution phase (working, retrying, waiting to retry, or compacting). The conversation itself carries no separate status row, and the card's title badge stays still. When an overlay hides the composer, the edge light and tab remain where the tray would stand. Continuous activity traces run as CSS animations, so a view remounted mid-run under a presence boundary that skips entry animations still shows them moving.
+While an Agent runs, one moving element shows it at a time. At the end of the conversation, a small dotted orb names the execution phase through its motion beside the phase text and elapsed time, with a distinct motion for working, compacting, retrying, and waiting to retry; retries take the warning tone, and successive phases cross-fade in place. As that row scrolls out of view, it folds into the composer: it fades while a light grows along the tray's top edge from the left, and scrolling back unfolds it again. The stop control and the card's title badge stay still. When an overlay hides the composer, the edge light remains where the tray would stand. Continuous activity traces run as CSS animations, so a view remounted mid-run under a presence boundary that skips entry animations still shows them moving.
 
 ### Feedback and status
 
