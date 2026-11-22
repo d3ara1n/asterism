@@ -7,6 +7,9 @@ export const applicationSlug = "asterism";
 /** Packaged renderer document served through the application-owned artifact protocol. */
 export const applicationRendererUrl = "asterism-plugin://app/index.html";
 export const applicationRepository = { owner: "d3ara1n", name: "asterism" } as const;
+/** Public developer identity: Dearain is the display name across development surfaces; d3ara1n is its unique account handle. */
+export const applicationDeveloper = { name: "Dearain", handle: "d3ara1n", website: "https://dearain.dev" } as const;
+export const applicationLicense = packageMetadata.license;
 export const applicationVersion = packageMetadata.version;
 /** Built-in model calls declare the actual app identity; third-party callers may supply their own UA. */
 export const applicationUserAgent = `${applicationBrand.en}/${applicationVersion}`;

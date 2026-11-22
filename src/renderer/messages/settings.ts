@@ -65,6 +65,26 @@ export const settingsMessages = pluginNamespace("asterism.host").messages("en", 
     id: "settings.about.crashReports.saveFailed",
     defaultMessage: "Could not save the error reporting preference",
   },
+  aboutDeveloper: {
+    id: "settings.about.developer.title",
+    defaultMessage: "Developer",
+  },
+  aboutDeveloperGitHub: {
+    id: "settings.about.developer.github",
+    defaultMessage: "Open GitHub profile",
+  },
+  aboutDeveloperWebsite: {
+    id: "settings.about.developer.website",
+    defaultMessage: "Open website",
+  },
+  aboutSource: {
+    id: "settings.about.source.label",
+    defaultMessage: "Source code",
+  },
+  aboutSourceOpen: {
+    id: "settings.about.source.open",
+    defaultMessage: "Open repository",
+  },
   aboutCopyIdentity: {
     id: "settings.about.identity.copy",
     defaultMessage: "Copy application ID",
