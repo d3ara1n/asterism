@@ -22,7 +22,7 @@ export interface PanelProps {
   children: ReactNode;
 }
 
-/** Shared panel presentation; its owner supplies closing and any container-specific tools. */
+/** Shared panel presentation: header and toolbar on the shell, content on an inset sheet. Its owner supplies closing and any container-specific tools. */
 export function Panel({ title, description, source, action, toolbar, tools, renderHeader, compact, contentRef, layout = "padded", onClose, children }: PanelProps) {
   const i18n = useI18n();
   const wrapHeader = renderHeader ?? ((header: ReactElement) => header);
@@ -39,12 +39,14 @@ export function Panel({ title, description, source, action, toolbar, tools, rend
       {tools}
       <IconButton label={i18n.formatMessage(commonMessages.close)} onClick={onClose}><X /></IconButton>
     </header>)}
-    {toolbar && <div className="flex shrink-0 flex-col gap-2 border-b px-3 py-3">{toolbar}</div>}
-    {layout === "fill"
-      ? <div ref={contentRef} data-layout="fill" className="island-panel-content">{children}</div>
-      : <ScrollArea className="min-h-0 flex-1 basis-0" viewportRef={contentRef}
-          contentClassName={cn("island-panel-content", compact && "px-2 py-2")}>
-          {children}
-        </ScrollArea>}
+    {toolbar && <div className="island-panel-toolbar">{toolbar}</div>}
+    <div className="island-panel-sheet">
+      {layout === "fill"
+        ? <div ref={contentRef} data-layout="fill" className="island-panel-content">{children}</div>
+        : <ScrollArea className="min-h-0 flex-1 basis-0" viewportRef={contentRef}
+            contentClassName={cn("island-panel-content", compact && "px-2 py-2")}>
+            {children}
+          </ScrollArea>}
+    </div>
   </div>;
 }

@@ -25,6 +25,8 @@ Pair colored surfaces with their corresponding foreground token. Contrast requir
 
 `surface` is the ordinary bordered card surface; `surface-floating` adds the shared shadow for floating content. Menus and dialogs use their public control surfaces.
 
+Islands, docks, and object cards use a shell and sheet. The shell carries the title bar, navigation, and toolbars on the `card-shell` tone; reading and editing content sits on one inset sheet in the card tone, raised by the shared sheet shadow rather than a border. The shared panel provides this layering, so plugin islands opened through it inherit it. A sheet nests concentrically one 4px inset and the shell border inside its shell, which the shared inset radius token expresses. Content floating inside a shell, such as the Agent composer tray, uses the shared lift shadow; when it sits farther from its container edge than its own radius, it matches the container radius rather than shrinking toward a square corner. Feature code does not define its own shadows or nested radii.
+
 Theme values, palette ordering, radii, density, and font settings have shared definitions. Components do not duplicate those values.
 
 ## Native windows
@@ -60,6 +62,8 @@ Panel islands (editors, details) are non-modal and have no bottom action bar. Op
 ## Motion
 
 Use Motion for presence, layout changes, and shared elements. Public motion tokens own timing and curves. Respect reduced motion in both Motion and CSS.
+
+Interaction motion explains cause and continuity through a small vocabulary. A selection indicator travels between items instead of reappearing. Page changes move along the direction of navigation: siblings in a navigation list move along its order, and entering a deeper page comes from the side and returns the way it came. Arriving content takes the shared fade timing while leaving content clears on the shorter exit timing, so the arriving page reads as the subject. Rows join and leave lists by folding their height, and values animate only when they actually change. Effects that do not express one of these meanings are omitted, and a static treatment that does not stand on its own is not compensated with more motion.
 
 Command and searchable-choice surfaces share one motion definition across application palettes, Agent palettes, command popovers, and the composer's reference suggestions. Presence uses a short fade with restrained scale and translation: 180 ms to open and 120 ms to close. Anchored surfaces enter from the trigger-facing edge, including when collision placement changes their side; unanchored palettes enter from above. Scrims fade with the same timing. Ordinary dialogs and menus retain their own motion.
 

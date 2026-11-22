@@ -39,8 +39,7 @@ function dropTarget(target: EventTarget): FileDropTarget | null {
  */
 export function ComposerTray({ running, children }: { running: boolean; children: ReactNode }) {
   const reducedMotion = useReducedMotion() === true;
-  return <div className={cn("relative flex min-w-0 flex-col rounded-lg border bg-card-shell p-1",
-    "shadow-[0_1px_2px_0_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(0_0_0/0.16)] transition-[border-color] duration-200",
+  return <div className={cn("relative flex min-w-0 flex-col rounded-lg border bg-card-shell p-1 shadow-(--shadow-lift) transition-[border-color] duration-200",
     "has-[[data-slot=input-group-control]:focus]:border-ring")}>
     <AnimatePresence>
       {running && <motion.span key="working" aria-hidden className="pointer-events-none absolute inset-x-5 -top-px h-px"
@@ -136,8 +135,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
   return <form ref={form} onPaste={fileInputEvents(draft, !dropsEnabled, onFileError).onPaste}
     onSubmit={event => { event.preventDefault(); void onSend(); }}>
   {/* The editor sheet rests inside the tray, raised by the same faint edge shadow as card content. */}
-  <InputGroup className={cn("rounded-[max(0px,calc(var(--radius)-5px))] border-0 bg-card dark:bg-card",
-    "shadow-[0_1px_3px_0_rgb(0_0_0/0.06),0_0_2px_0_rgb(0_0_0/0.04)]",
+  <InputGroup className={cn("rounded-(--radius-inset) border-0 bg-card shadow-(--shadow-sheet) dark:bg-card",
     "has-[[data-slot=input-group-control]:focus-visible]:ring-0")}
     onDragEnterCapture={onFileDrag} onDragOverCapture={onFileDrag} onDropCapture={onDrop}
     onDragLeave={event => {

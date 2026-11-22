@@ -1,7 +1,7 @@
 # Shell-and-sheet surface language and interaction motion
 
 Filed: 2026-11-22
-Status: Planned. The user approved the direction and its staged rollout. Each stage needs the user's visual acceptance in light and dark modes before the next starts.
+Status: Stage 1 implemented; visual acceptance pending. The user approved the direction and its staged rollout. Each stage needs the user's visual acceptance in light and dark modes before the next starts.
 
 ## Direction
 
@@ -24,7 +24,7 @@ Motion explains cause and continuity. Every item uses the public motion tokens a
 | --- | --- | --- |
 | Sliding selection indicator (Motion `layoutId`) | Selection moves rather than reappears | Settings navigation, sidebar sessions, segmented controls |
 | Directional page change | Order and depth of navigation | Settings categories by navigation order; entering and leaving a single-column page |
-| Shared element | The opened thing is the clicked thing | Single-column settings: row expands into the page header and returns to it |
+| Shared element | The opened thing is the clicked thing | Chosen in stage 2; single-column settings uses directional page motion because its header and sheet clip separately |
 | Row presence with height folding | Items join or leave a list | Lists in settings and panels, reusing the drafts box parameters |
 | Value transitions | A value changed | Switches, progress, and counts, only on actual change |
 

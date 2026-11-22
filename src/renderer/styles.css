@@ -62,6 +62,10 @@
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   /* Screen transitions: exponential ease-out, fast initially with a slow settling tail and no overshoot. */
   --ease-page: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Shell-and-sheet layering: a sheet nests one 4px inset plus the shell border inside its shell; floating trays lift off their shell. */
+  --radius-inset: max(0px, calc(var(--radius) - 5px));
+  --shadow-sheet: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 0 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-lift: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 8px 24px -12px rgb(0 0 0 / 0.16);
 }
 /* Dark first-frame fallback (graphite + gray); overridden by themeTokens at runtime. */
 @media (prefers-color-scheme: dark) {
@@ -151,8 +155,9 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
-/* The only two surfaces: content matches Card (solid + 1px border), overlays match Popover (solid + border + shadow).
-   Use these utilities where Card components cannot be used, such as window parts, island bases, and animated elements. */
+/* Surfaces: content shells match Card (solid + 1px border), overlays match Popover (solid + border + shadow), and reading or editing
+   content inside a shell sits on an inset sheet. Use these utilities where Card components cannot be used, such as window parts,
+   island bases, and animated elements. */
 /* Command surfaces share tokens projected by commandMotionStyle; ordinary dialogs and menus keep their own motion. */
 @utility command-surface-motion {
   --command-enter-x: 0px;
@@ -198,7 +203,7 @@
 @utility surface { @apply rounded-lg border bg-card text-card-foreground; }
 @utility surface-floating { @apply rounded-lg border bg-popover text-popover-foreground shadow-md; }
 /* Content inset within a card shell: separated from the shell by background and a faint edge shadow, without a border. */
-@utility surface-inset { @apply rounded-lg bg-card shadow-[0_1px_3px_0_rgb(0_0_0/0.06),0_0_2px_0_rgb(0_0_0/0.04)]; }
+@utility surface-inset { @apply rounded-lg bg-card; box-shadow: var(--shadow-sheet); }
 @layer base {
   * { box-sizing: border-box; }
   html, body, #root { height: 100%; background: transparent; }
@@ -333,10 +338,17 @@
   .island-body { @apply relative h-full overflow-x-hidden overflow-y-auto; }
   /* Surfaced islands inset content by one border width and clip to inner radii, keeping borders and focus highlights visible without corner leakage. */
   .island[data-surface] > .island-body { position: absolute; inset: 1px; height: auto; border-radius: calc(var(--radius) - 1px); }
-  /* Panels in docks and Islands share a fixed titlebar and independently scrolling content. */
+  /* Panels in docks and Islands: the titlebar and toolbar sit on the shell, content scrolls on one inset sheet.
+     The header's 24px start inset lines its title up with sheet content (4px sheet inset + 20px content padding). */
   .island-body:has(> .island-panel) { overflow: hidden; }
-  .island-panel { @apply flex h-full min-h-0 flex-col; }
-  .island-panel-header { @apply flex shrink-0 items-center gap-2 border-b py-2.5 pr-2.5 pl-5; }
+  .island-panel { @apply flex h-full min-h-0 flex-col bg-card-shell; }
+  .island-panel-header { @apply flex shrink-0 items-center gap-2 py-2 pr-2 pl-6; }
+  .island-panel-toolbar { @apply flex shrink-0 flex-col gap-2 px-3 pb-2; }
+  .island-panel-sheet {
+    @apply relative mx-1 mb-1 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card;
+    border-radius: var(--radius-inset);
+    box-shadow: var(--shadow-sheet);
+  }
   .island-panel-content { @apply min-h-0 flex-1 px-5 py-5; }
   .island-panel-content[data-layout="fill"] { @apply flex flex-col overflow-hidden p-0; }
   .island[data-peek] { cursor: pointer; }
