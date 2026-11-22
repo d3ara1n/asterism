@@ -1,20 +1,20 @@
 # Design system
 
-Asterism presents many plugins' work inside one workbench. The design system keeps that work reading as one application: the same layering, the same meaning for lines and motion, and the same controls for the same kinds of choice. This document records the language, its foundations, the patterns that apply it, and where each part is implemented. Exact values live in the theme, stylesheet, and shared controls; this document explains what they mean and how to choose among them.
+Asterism presents many plugins' work inside one workbench. The design system keeps that work reading as one application: the same layering, the same treatment of lines and motion, and the same controls for the same kinds of choice. This document records the recommended practice behind that consistency: the design direction, its foundations, the patterns that apply it, and where each part is implemented. Exact values live in the theme, stylesheet, and shared controls. Recommendations guide judgment rather than replacing it; when a case is unclear, compare the candidates in both schemes and keep the one that reads more calmly.
 
 ## Design language
 
-The native window material is the base. Opaque content surfaces sit above it, and everything inside them follows four principles.
+The native window material is the base, and opaque content surfaces sit above it. The direction is close to tonal elevation, as in Material Design's surface containers, with an inset grouped structure similar to Apple's grouped lists and sidebar-and-content windows.
 
-**Tone and depth form regions.** A shell holds titles, navigation, and toolbars. Reading and editing content sits on a raised sheet inside the shell. Within a sheet, groups of rows and process blocks recede back to the shell tone. Floating elements lift above everything with a shared shadow. Each layer has its own tone, shadow, and radius, so a region is recognizable without an outline around it.
+**Tone and depth lead.** A shell holds titles, navigation, and toolbars; reading and editing content sits on a raised sheet inside it; groups recede within the sheet; floating elements lift above everything. Most regions are recognizable from tone and depth alone, and items sharing a background read as one group.
 
-**Lines carry meaning.** A line tells the reader something: where focus is, what is selected, where a drop lands, or the state of a piece of work. Hairlines separate consecutive rows inside a group, and an outer shell keeps its border as the edge against the window material. A border never separates two regions that tone already separates. Because lines are rare, the ones that remain are noticed.
+**Lines add what tone cannot.** A line earns its place when it defines an edge that tone and shadow leave soft, shows state such as focus, selection, progress, or failure, or guides the eye along structure such as rows. Lines that only repeat a boundary tone already draws add noise.
 
-**Motion explains cause and continuity.** Movement shows where something came from, where it went, or that a value changed. A small vocabulary covers these meanings; motion that expresses none of them is omitted, and motion never decorates a static state.
+**Motion explains cause and continuity.** Movement shows where something came from, where it went, or that a value changed. Motion that expresses none of these is omitted.
 
-**Restraint over effects.** Shading stays restrained. A treatment that does not stand on its own is not compensated with more effects, gradients, or animation.
+**Restraint over effects.** A treatment that does not stand on its own is not compensated with more effects, gradients, or animation.
 
-When a new surface is designed, decide in this order: which layer the content belongs to, whether any line is needed and what it means, and only then whether a change deserves motion. Most questions resolve at the first step.
+A new surface usually resolves by deciding which layer its content belongs to; lines and motion follow from what that layer leaves unclear.
 
 ## Foundations
 
@@ -45,14 +45,16 @@ Colored surfaces pair with their foreground token, and contrast holds in both sc
 | --- | --- | --- |
 | Window material | Native vibrancy, Acrylic, or a solid fallback | Page backgrounds, gaps between surfaces |
 | Shell | `card-shell` with a border against the material | Titles, navigation, toolbars, the composer and entry trays |
-| Sheet | `card`, raised by the sheet shadow, no border | Reading and editing content inside a shell |
-| Group | Shell tone recessed on a sheet, no border | Grouped rows, fields, empty states, process blocks |
-| Tint | A tint of the current text color, no border | Regions inside content whose container tone varies: inline code, code block frames, tables, small chips |
+| Sheet | `card`, raised by the sheet shadow | Reading and editing content inside a shell |
+| Group | Shell tone recessed on a sheet | Grouped rows, fields, empty states, process blocks |
+| Tint | A tint of the current text color | Frames and chips inside rendered content, whose surrounding tone varies |
 | Floating | Popover tone with the floating or lift shadow | Menus, popovers, tooltips, hover cards, dialogs, toasts, trays that float over content |
 
-Islands, docks, and object cards are shells. The shared panel and the object surface supply their sheet, so plugin islands opened through the shared panel inherit the layering. Cards placed directly on the window material, such as template cards and usage panels, keep the shell border and hold a sheet inside. Embedded inside another sheet, the same panel drops its border and reads as a group. Panels and fields inside a group rise back to the sheet tone rather than adding outlines. Floating surfaces keep their outer edge and shadow because they cover arbitrary content; inside them, header, body, and footer separate by spacing and tone rather than rules.
+Islands, docks, and object cards are shells, and the shared panel and object surface supply their sheet, so plugin islands opened through the shared panel inherit the layering. Cards placed directly on the window material keep the shell border and hold a sheet inside; the same panel embedded inside another sheet reads as a group instead. Floating surfaces keep their outer edge and shadow because they cover arbitrary content.
 
 The stylesheet expresses these layers as `surface` (a bordered shell or card), `surface-floating`, `surface-inset` (a sheet), `surface-group`, `surface-block` (a process block), and `surface-tint`, together with tokens for the sheet shadow, the lift shadow, and the nested inset radius.
+
+Both schemes express the same material. Light tones show depth through shadow; dark tones absorb shadow, so the dark scheme simulates a highlight instead: raised sheets and lifted surfaces add a faint light edge, and their shadows deepen.
 
 ### Shape
 
@@ -72,16 +74,21 @@ macOS uses native controls and under-window vibrancy. Supported Windows versions
 
 ## Lines
 
-| Line | Meaning |
-| --- | --- |
-| Ring or border in the ring tone | Keyboard focus, or the focused island, dock, or tray |
-| `selected` fill | Persistent selection; a fill rather than an outline |
-| Moving dashed outline | Content still forming: a tool call receiving input or waiting to run |
-| Still dashed outline | Content that ended incomplete or did not enter later model context |
-| Red line on a faint red tone | The request that produced the content failed |
-| Dashed target with an accent tint | Where a drop will land |
-| Hairline between rows | Structure inside one group |
-| Shell border | The edge between a shell and the window material |
+Lines in use fall into three roles. The tables record current uses rather than a closed list.
+
+| Role | Line | Use |
+| --- | --- | --- |
+| Edge | Shell border | The edge between a shell and the window material |
+| Edge | Floating edge | Menus, popovers, and dialogs over arbitrary content |
+| Edge | Light sheet edge in the dark scheme | Raised sheets where a shadow does not read |
+| State | Ring or border in the ring tone | Keyboard focus, or the focused island, dock, or tray |
+| State | Moving dashed outline | Content still forming: a tool call receiving input or waiting to run |
+| State | Still dashed outline | Content that ended incomplete or did not enter later model context |
+| State | Red line on a faint red tone | The request that produced the content failed |
+| State | Dashed target with an accent tint | Where a drop will land |
+| Structure | Hairline between rows | Rows inside one group, list, or table |
+
+Persistent selection uses the `selected` fill rather than an outline.
 
 Process blocks draw their state line along their rounded outline. Reduced motion keeps the moving dash still. A one-time warning ripple marks a newly raised notice and then disappears.
 
@@ -130,11 +137,11 @@ Settings rows and fields sit in groups on the page sheet, with hairlines between
 
 ### Process blocks and tool views
 
-Thinking, tool calls, and summaries are process blocks: groups in the reading flow whose outline appears only for state. A tool header is one line: the operation name, then optional subject, summary, and trailing metadata. The subject is a low-emphasis badge naming the operation's focus, the summary is muted text that yields space first, and metadata stays visible. Resource creation and creation-entry inspection use the resource type as the subject, with an instance title in the summary when one exists; operations on an existing resource use its recorded name and kind icon, with paths, queries, or other details in the summary. Separate slots replace punctuation that would only join an object and its details, and the block itself presents exceptional outcomes. Unbounded inputs such as questions and commands appear as a single-line excerpt, with the full text in the body. Input, execution, and result reuse one block, so the reader's place survives each phase; content still being composed shows a bounded tail preview, and stable inputs and controls stay outside any live-output region.
+Thinking, tool calls, and summaries are process blocks: groups in the reading flow whose outline shows their state. A tool header is one line: the operation name, then optional subject, summary, and trailing metadata. The subject is a low-emphasis badge naming the operation's focus, the summary is muted text that yields space first, and metadata stays visible. Resource creation and creation-entry inspection use the resource type as the subject, with an instance title in the summary when one exists; operations on an existing resource use its recorded name and kind icon, with paths, queries, or other details in the summary. Separate slots replace punctuation that would only join an object and its details, and the block itself presents exceptional outcomes. Unbounded inputs such as questions and commands appear as a single-line excerpt, with the full text in the body. Input, execution, and result reuse one block, so the reader's place survives each phase; content still being composed shows a bounded tail preview, and stable inputs and controls stay outside any live-output region.
 
 Code, diffs, Markdown, math, diagrams, and reference chips render through the shared controls, so every plugin's output reads the same.
 
-Rendered content can land on a sheet, a message tone, a process block, or a floating surface, so regions inside it take a tint rather than a fixed tone. Inline code and tables use the tint; a table separates rows with hairlines and its header row with one more tint step. A code block is a small shell and sheet: the language and actions sit on the tint, and the code sits on a nested sheet. Code and diff views use the sheet tone in both schemes instead of the syntax theme's own background, so a code region matches the editor and the sheets around it.
+Rendered content can land on a sheet, a message tone, a process block, or a floating surface, so its frames take the tint rather than a fixed tone. Code blocks and tables share one structure: a tinted frame carries the label row (the language and actions, or the table header), and the body sits on a nested sheet. Table rows separate with hairlines. Inline code takes a slightly stronger tint. Code and diff views use the sheet tone in both schemes instead of the syntax theme's own background, so a code region matches the editor and the sheets around it.
 
 ### Messages
 
@@ -189,5 +196,7 @@ The Asterism identity is a triangular constellation of three rounded six-point s
 The theme owns color values, palettes, radius, density, and fonts. The host stylesheet owns the layer utilities, shadow and radius tokens, process-block state lines, and motion tokens. `packages/ui/` owns shared control semantics and appearance, and plugins receive those controls from the host so every plugin shares one copy. The window, its native material, and titlebar behavior belong to the main process and window components; island layout belongs to the weave.
 
 Feature code composes these parts instead of creating parallel button, select, border, shadow, or motion styles. Put recurring Asterism-specific appearance in shared theme tokens or styles, and recurring behavior in shared controls composed from upstream primitives. As registry components are revisited, move local design out of them into those shared layers so the upstream source can remain unchanged. Where composition cannot preserve the intended behavior through supported interfaces, let a project-owned control own that behavior explicitly.
+
+When a case reads better outside these recommendations, the improvement updates the shared layer and this document together, so the new practice applies everywhere rather than remaining a local exception. Tables of current uses grow through such revisions.
 
 Visual changes are accepted manually on the actual platform in both schemes. Typechecks and builds support that acceptance; they do not establish appearance.

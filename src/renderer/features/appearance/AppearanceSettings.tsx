@@ -212,20 +212,20 @@ export function AppearanceSettings() {
   </div>;
 }
 
-/** Live preview: a canvas, object card, and primary button consume current tokens directly, reflecting corner radius, density, and light/dark mode. */
 /**
- * Live preview: a miniature workbench scene. A link grants the agent access to the note resource, and the agent card shows a ready-to-run state;
- * each element represents a token category: canvas texture, cards, borders, secondary text, primary color, and connections.
+ * Live preview: a miniature workbench scene built from the same layers as real object cards, a bordered shell holding its title
+ * and a raised sheet holding content, so tone, depth, radius, density, and scheme changes read as they will in the workbench.
+ * A link grants the agent access to the note resource, and the agent card shows a ready-to-run state.
  */
 function LivePreview({ appearance }: { appearance: Appearance }) {
   const i18n = useI18n();
   return <div aria-hidden="true" className="relative mt-2 overflow-hidden rounded-lg bg-canvas">
     <Texture kind={appearance.canvas} gap={20} />
     <div className="relative flex items-center px-8 py-7">
-      <div className="w-48 shrink-0 -translate-y-4 rounded-lg border bg-card p-3 shadow-sm">
-        <p className="type-label flex items-center gap-1.5 text-muted-foreground"><FileText className="size-3.5" />{i18n.formatMessage(appearanceMessages.previewNote)}</p>
-        <p className="type-section mt-1 truncate">{i18n.formatMessage(appearanceMessages.previewChecklist)}</p>
-        <div className="mt-2 space-y-1.5">
+      <div className="w-48 shrink-0 -translate-y-4 overflow-hidden rounded-xl border bg-card-shell">
+        <p className="flex items-center gap-2 px-3 py-2"><FileText className="size-3.5 shrink-0 text-muted-foreground" />
+          <span className="type-section min-w-0 truncate">{i18n.formatMessage(appearanceMessages.previewChecklist)}</span></p>
+        <div className="surface-inset mx-1 mb-1 space-y-1.5 p-3">
           <span className="block h-1.5 w-full rounded-full bg-muted" />
           <span className="block h-1.5 w-4/5 rounded-full bg-muted" />
           <span className="block h-1.5 w-3/5 rounded-full bg-muted" />
@@ -236,17 +236,19 @@ function LivePreview({ appearance }: { appearance: Appearance }) {
         <ConnectionPreview kind={appearance.edgeStyle} />
         <span className="absolute left-1/2 -translate-x-1/2 -translate-y-8 rounded-sm bg-canvas px-1 text-[10px] text-muted-foreground">{i18n.formatMessage(appearanceMessages.previewRead)}</span>
       </div>
-      <div className="w-52 shrink-0 translate-y-4 rounded-lg border bg-card shadow-sm">
-        <div className="flex items-center gap-1.5 p-3 pb-2">
-          <Bot className="size-3.5 text-muted-foreground" />
+      <div className="w-52 shrink-0 translate-y-4 overflow-hidden rounded-xl border bg-card-shell">
+        <div className="flex items-center gap-2 px-3 py-2">
+          <Bot className="size-3.5 shrink-0 text-muted-foreground" />
           <p className="type-section min-w-0 flex-1 truncate">{i18n.formatMessage(appearanceMessages.previewReviewer)}</p>
-          <span className="rounded-full bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground">{i18n.formatMessage(appearanceMessages.previewReady)}</span>
+          <span className="surface-tint rounded-full px-1.5 py-0.5 text-[10px]">{i18n.formatMessage(appearanceMessages.previewReady)}</span>
         </div>
-        <p className="type-caption px-3">{i18n.formatMessage(appearanceMessages.previewResourceCount)}</p>
-        <p className="mx-3 mt-1.5 truncate rounded-sm bg-muted px-1.5 py-0.5 text-[11px]"><span className="type-code text-muted-foreground">read("checklist.md")</span></p>
-        <div className="mt-2 flex justify-end gap-1.5 border-t p-2">
-          <span className="rounded-md border bg-card px-2.5 py-1 text-xs">{i18n.formatMessage(appearanceMessages.previewEdit)}</span>
-          <span className="rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground">{i18n.formatMessage(appearanceMessages.previewRun)}</span>
+        <div className="surface-inset mx-1 mb-1 p-2.5">
+          <p className="type-caption">{i18n.formatMessage(appearanceMessages.previewResourceCount)}</p>
+          <p className="surface-tint mt-1.5 truncate rounded-sm px-1.5 py-0.5 text-[11px]"><span className="type-code text-muted-foreground">read("checklist.md")</span></p>
+          <div className="mt-3 flex justify-end gap-1.5">
+            <span className="rounded-md border bg-background px-2.5 py-1 text-xs">{i18n.formatMessage(appearanceMessages.previewEdit)}</span>
+            <span className="rounded-md bg-primary px-2.5 py-1 text-xs text-primary-foreground">{i18n.formatMessage(appearanceMessages.previewRun)}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -270,12 +272,14 @@ function PaletteDialog({ open, onOpenChange, appearance }: { open: boolean; onOp
           const name = i18n.text(paletteMessages[palette.id]!);
           return <Item key={palette.id} asChild variant="outline" className="flex-col items-stretch gap-0 overflow-hidden bg-card p-0 text-left hover:border-ring/60"><button type="button"
             disabled={busy} onClick={() => { void save({ accent: palette.accent, gray: palette.gray }).then(saved => { if (saved) onOpenChange(false); }); }}>
-            {/* Miniature UI: background, cards, primary color bars, and secondary text bars. */}
+            {/* Miniature UI: a shell on the canvas holding a sheet with text and primary bars, beside a selection fill. */}
             <span aria-hidden="true" className="flex h-16 gap-1.5 p-2" style={{ background: t.canvas }}>
-              <span className="flex flex-1 flex-col gap-1 rounded-sm border p-1.5" style={{ background: t.card, borderColor: t.border }}>
-                <span className="h-1.5 w-3/4 rounded-full" style={{ background: t.foreground }} />
-                <span className="h-1 w-1/2 rounded-full" style={{ background: t["muted-foreground"] }} />
-                <span className="mt-auto h-2 w-8 rounded-sm" style={{ background: t.primary }} />
+              <span className="flex flex-1 rounded-md border p-0.5" style={{ background: t["card-shell"], borderColor: t.border }}>
+                <span className="flex flex-1 flex-col gap-1 rounded-sm p-1.5 shadow-(--shadow-sheet)" style={{ background: t.card }}>
+                  <span className="h-1.5 w-3/4 rounded-full" style={{ background: t.foreground }} />
+                  <span className="h-1 w-1/2 rounded-full" style={{ background: t["muted-foreground"] }} />
+                  <span className="mt-auto h-2 w-8 rounded-sm" style={{ background: t.primary }} />
+                </span>
               </span>
               <span className="w-3 rounded-sm" style={{ background: t.selected }} />
             </span>

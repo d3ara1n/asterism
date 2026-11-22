@@ -291,10 +291,6 @@ export const appearanceMessages = pluginNamespace("asterism.host").messages("en"
     id: "appearance.canvas.texture.none",
     defaultMessage: "None",
   },
-  previewNote: {
-    id: "appearance.preview.note",
-    defaultMessage: "Note",
-  },
   previewChecklist: {
     id: "appearance.preview.checklist",
     defaultMessage: "Launch checklist",

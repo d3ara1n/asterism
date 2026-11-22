@@ -30,6 +30,8 @@
   --destructive: #ce2c31;
   --canvas: #f0f0f0;
   --radius: 8px;
+  --radius-sm: 4px;
+  --shadow-sheet: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 0 2px 0 rgb(0 0 0 / 0.04);
   --code-font-size: 13px;
   box-sizing: border-box;
   padding: 32px 32px 24px;
