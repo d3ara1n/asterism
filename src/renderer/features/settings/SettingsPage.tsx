@@ -2,11 +2,9 @@ import { ShellSettingsPage } from "../shell/Settings";
 import { shellMessages } from "@asterism-app/ui/messages/shell";
 import { McpSettings } from "../mcp/Settings";
 import { mcpMessages } from "@asterism-app/ui/messages/mcp";
-import { LanguageSettings } from "./LanguageSettings";
+import { InterfaceSettings } from "./InterfaceSettings";
 import { NetworkSettings } from "./NetworkSettings";
-import { HomeEntrySettings } from "./HomeEntrySettings";
 import { SessionsSettings } from "./SessionsSettings";
-import { SidebarSettings } from "./SidebarSettings";
 import { UsageSettings } from "./UsageSettings";
 import { AboutSettings } from "./AboutSettings";
 import { AppearanceSettings } from "../appearance/AppearanceSettings";
@@ -18,126 +16,158 @@ import { skillsMessages } from "../../messages/skills";
 import { PluginsProvider, PluginsSettings, PluginSettingsContent, usePlugins, type PluginManager } from "../plugins/PluginsSettings";
 import { settingsPageKey, usePluginSettingsRegistry } from "../../modules/settings";
 import { pluginsMessages } from "../../messages/plugins";
-import { Item, ItemContent, ItemTitle, ItemDescription } from "@asterism-app/ui/ui/item";
-import { AnimatePresence, motion } from "motion/react";
-
-import { Card } from "@asterism-app/ui/ui/card";
-
-import { Button } from "@asterism-app/ui/ui/button";
+import { motion } from "motion/react";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
+import { ListRow } from "@asterism-app/ui/ui/list-row";
+import { cn } from "@asterism-app/ui/utils";
 import { ArrowLeft, Info, SlidersHorizontal, Palette, PlugZap, Puzzle, BookOpen, Terminal, Network } from "lucide-react";
 import { ConfigurationReadStatus } from "../configuration/forms";
 import { ConfigurationContext, useConfiguration } from "../configuration/state";
 import { Screen, useIsland, useIslandCancel, type IslandSpec, type ScreenHandle } from "../../shared/weave/Screen";
+import { fadeTransition } from "../../shared/weave/motion";
 import { settingsMessages } from "../../messages/settings";
 import { useI18n } from "../../shared/i18n";
-import { useEffect, useRef, useState, type ComponentType, type ReactNode, type Ref } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode, type Ref } from "react";
 import type { UiText } from "@asterism-app/sdk/contracts";
-
-/** The official Card carries the detail animation; component source remains unchanged. */
-const MotionCard = motion.create(Card);
-import { fadeTransition, islandTransition } from "../../shared/weave/motion";
 
 /** Settings category registry: add a category by appending one entry. Include only categories with a clear purpose. */
 export type SettingsCategoryId = "general" | "appearance" | "providers" | "plugins" | "skills" | "shell" | "mcp" | "about";
 export const isSettingsCategory = (id: string): id is SettingsCategoryId => ["general", "appearance", "providers", "plugins", "skills", "shell", "mcp", "about"].includes(id);
-/** Host and plugin cards share one icon contract; the card decides size and color. */
+/** Host and plugin entries share one icon contract; the navigation decides size and color. */
 type SettingsIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
 /** Host categories render with the plugin manager available, for pages that present plugin-contributed material. */
 interface SettingsCategory { id: SettingsCategoryId; title: UiText; summary: UiText; icon: SettingsIcon; content: (manager: PluginManager) => ReactNode }
+interface SettingsEntry { id: string; title: UiText; summary: UiText; icon: SettingsIcon; source?: { pluginId: string; name: UiText }; content: () => ReactNode }
 
 const categories: SettingsCategory[] = [
-  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: SlidersHorizontal, content: () => <><LanguageSettings /><NetworkSettings /><HomeEntrySettings /><SidebarSettings /><SessionsSettings /><UsageSettings /></> },
+  { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: SlidersHorizontal, content: () => <><InterfaceSettings /><NetworkSettings /><SessionsSettings /><UsageSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
   { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /><MessagingSettings /></> },
   { id: "skills", title: skillsMessages.title, summary: skillsMessages.summary, icon: BookOpen, content: manager => <SkillSettings plugins={manager.list} /> },
   { id: "shell", title: shellMessages.title, summary: shellMessages.summary, icon: Terminal, content: () => <ShellSettingsPage /> },
   { id: "mcp", title: mcpMessages.settings, summary: mcpMessages.summary, icon: Network, content: () => <McpSettings /> },
+  { id: "plugins", title: pluginsMessages.plugins, summary: pluginsMessages.pluginsSummary, icon: Puzzle, content: () => <PluginsSettings /> },
   { id: "about", title: settingsMessages.aboutTitle, summary: settingsMessages.aboutSummary, icon: Info, content: () => <AboutSettings /> },
 ];
 /** Categories editing the shared host configuration; their bodies render once its snapshot is available. */
 const configurationPages = new Set<string>(["providers", "shell", "mcp"]);
+/** Root island width at which navigation and the open page sit side by side; narrower roots show one at a time. */
+const splitWidth = 560;
+
+/** Host categories form the first group; plugin pages follow, grouped by contributing plugin under its name. */
+function groupEntries(entries: readonly SettingsEntry[]) {
+  const groups: { key: string; title?: UiText; entries: SettingsEntry[] }[] = [];
+  for (const entry of entries) {
+    const key = entry.source?.pluginId ?? "";
+    let group = groups.find(item => item.key === key);
+    if (!group) groups.push(group = { key, title: entry.source?.name, entries: [] });
+    group.entries.push(entry);
+  }
+  return groups;
+}
 
 /**
- * Settings screen: the root island initially shows category cards tiled over the material; opening a category fades out the overview and scales and fades in category content from the clicked card's transform origin,
- * reversing toward the same origin when closing. Animate only opacity/transform, without layout interpolation. Category content can open islands at the right end (such as provider details).
+ * Settings root island: category navigation on the card shell beside the open page on an inset sheet.
+ * A wide root always shows a page, opening the first category when none is chosen; a narrow root shows the navigation as a list
+ * and an opened page in its place with a way back. Category content can open islands at the right end (such as provider details).
  */
 export type SettingsTarget = ({ category: SettingsCategoryId } | { pluginId: string; pageId: string; location?: string }) & { sequence: number };
 function SettingsRoot({ openId, onOpen, onClosed, onCancel, manager, location }: { openId: string | null; onOpen: (id: string) => void; onClosed: () => void; onCancel: () => void; manager: PluginManager; location?: string }) {
   const i18n = useI18n();
   const island = useIsland();
-  const stage = useRef<HTMLDivElement>(null);
+  const shell = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
-  const cards = useRef(new Map<string, HTMLButtonElement>());
-  const lastCard = useRef<string | null>(null);
-  const overviewScroll = useRef(0);
-  // Transform origin shared by details and overview (relative to the stage): use the center of the last clicked card; when opened directly from outside, reuse the previous origin or top center.
-  const [origin, setOrigin] = useState("50% 0px");
+  const rows = useRef(new Map<string, HTMLButtonElement>());
+  const lastOpen = useRef<string | null>(null);
+  const [wide, setWide] = useState(true);
   const registry = usePluginSettingsRegistry();
-  const entries: { id: string; title: UiText; summary: UiText; icon: SettingsIcon; source?: UiText; content: () => ReactNode }[] = [
+  const entries: SettingsEntry[] = [
     ...categories.map(category => ({ ...category, content: () => category.content(manager) })),
-    { id: "plugins", title: pluginsMessages.plugins, summary: pluginsMessages.pluginsSummary, icon: Puzzle, content: () => <PluginsSettings /> },
-    ...Array.from(registry.pages, ([id, page]) => ({ id, title: page.title, summary: page.summary, icon: page.icon ?? Puzzle, source: page.pluginName,
+    ...Array.from(registry.pages, ([id, page]) => ({ id, title: page.title, summary: page.summary, icon: page.icon ?? Puzzle,
+      source: { pluginId: page.pluginId, name: page.pluginName },
       content: () => <PluginSettingsContent key={id} pluginId={page.pluginId} page={page} location={location} /> })),
   ];
+  const groups = groupEntries(entries);
   const open = entries.find(entry => entry.id === openId);
+  const shown = open ?? (wide ? entries[0] : undefined);
 
-  useEffect(() => { if (openId) heading.current?.focus({ preventScroll: true }); }, [openId]);
-  const openCard = (id: string) => {
-    const card = cards.current.get(id)?.getBoundingClientRect(), base = stage.current?.getBoundingClientRect();
-    if (card && base) setOrigin(`${card.left + card.width / 2 - base.left}px ${card.top + card.height / 2 - base.top}px`);
+  useLayoutEffect(() => {
+    const element = shell.current!;
+    const measure = () => setWide(element.clientWidth >= splitWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  // Side-by-side navigation always shows a page, so a narrowing root keeps the page in view rather than falling back to the list.
+  const first = entries[0]!.id;
+  useEffect(() => { if (wide && !openId) onOpen(first); }, [wide, openId, first]);
+  // Side-by-side navigation keeps focus where the user chose; the one-at-a-time layout moves focus to the page and back to its row.
+  useEffect(() => {
+    if (wide) return;
+    if (openId) heading.current?.focus({ preventScroll: true });
+    else if (lastOpen.current) rows.current.get(lastOpen.current)?.focus({ preventScroll: true });
+    lastOpen.current = null;
+  }, [openId]);
+
+  const select = async (id: string) => {
+    if (id === openId || !(await island.closeOwned())) return;
     onOpen(id);
   };
-  const close = async () => {
-    if (!openId || !(await island.closeOwned())) return;
-    lastCard.current = openId;
+  const back = async () => {
+    if (!(await island.closeOwned())) return;
+    lastOpen.current = openId;
     onClosed();
   };
-
   useIslandCancel(async () => {
-    if (open) await close();
+    if (open && !wide) await back();
     else if (await island.closeOwned()) onCancel();
   });
+  const rowRef = (id: string) => (node: HTMLButtonElement | null) => { if (node) rows.current.set(id, node); else rows.current.delete(id); };
+  const icon = (entry: SettingsEntry) => <entry.icon className="text-muted-foreground" aria-hidden="true" />;
 
-  return <div ref={stage} className="settings-stage">
+  return <div ref={shell} className="flex h-full min-h-0 min-w-0 bg-card-shell">
     <h1 className="sr-only">{i18n.formatMessage(settingsMessages.settings)}</h1>
-    {/* Details are absolutely positioned over the overview, and both enter and exit simultaneously; the overview recedes slightly around the origin while details grow from the card position. */}
-    <AnimatePresence initial={false}
-      onExitComplete={() => { const id = lastCard.current; if (id) cards.current.get(id)?.focus({ preventScroll: true }); lastCard.current = null; }}>
-      {!open ? <motion.div key="grid" className="flex h-full flex-col gap-8 overflow-y-auto"
-        ref={node => { if (node) node.scrollTop = overviewScroll.current; }}
-        onScroll={event => { overviewScroll.current = event.currentTarget.scrollTop; }}
-        style={{ transformOrigin: origin }}
-        initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={fadeTransition}>
-        <section className="shrink-0" aria-labelledby="application-settings-title">
-          <header className="mb-4 flex flex-col gap-2">
-            <h2 id="application-settings-title" className="type-section">{i18n.text(pluginsMessages.application)}</h2>
-            <p className="type-caption">{i18n.text(pluginsMessages.applicationSummary)}</p>
-          </header>
-          <div className="settings-grid">
-        {entries.map(({ id, title, summary, icon: Icon, source }) => <Item key={id} variant="outline" asChild className="surface h-full hover:bg-accent"><button type="button" className="settings-card group"
-          ref={node => { if (node) cards.current.set(id, node); else cards.current.delete(id); }}
-          onClick={() => openCard(id)}>
-          <ItemContent>
-            <Icon className="mb-2 size-4 text-muted-foreground" aria-hidden="true" />
-            <ItemTitle>{i18n.text(title)}</ItemTitle><ItemDescription>{i18n.text(summary)}</ItemDescription>
-            {source && <p className="type-caption">{i18n.formatMessage(pluginsMessages.contributedBy, { plugin_name: i18n.text(source) })}</p>}
-          </ItemContent>
-        </button></Item>)}
+    {wide && <nav aria-label={i18n.formatMessage(settingsMessages.settings)} className="flex w-48 shrink-0 flex-col overflow-y-auto p-2">
+      {groups.map(group => <div key={group.key} role="group" aria-label={group.title && i18n.text(group.title)} className="flex flex-col gap-0.5">
+        {group.title && <p aria-hidden="true" className="type-label truncate px-3 pt-4 pb-1">{i18n.text(group.title)}</p>}
+        {group.entries.map(entry => {
+          const selected = entry.id === shown?.id;
+          return <ListRow key={entry.id} variant="navigation" selected={selected} media={icon(entry)}
+            title={<span className="block truncate">{i18n.text(entry.title)}</span>} onOpen={() => void select(entry.id)}
+            buttonProps={{ ref: rowRef(entry.id), "aria-current": selected ? "page" : undefined }} />;
+        })}
+      </div>)}
+    </nav>}
+    <div className={cn("surface-inset m-1 flex min-w-0 flex-1 flex-col overflow-hidden", wide && "ml-0")}>
+      {shown ? <>
+        <header className={cn("island-panel-header", !wide && "pl-3")}>
+          {!wide && <IconButton size="icon-xs" label={i18n.formatMessage(settingsMessages.allSettings)} onClick={() => void back()}><ArrowLeft /></IconButton>}
+          <div className="flex min-w-0 flex-1 items-baseline gap-2">
+            <h2 ref={heading} tabIndex={-1} className="type-section min-w-0 truncate outline-none">{i18n.text(shown.title)}</h2>
+            {shown.source && <p className="type-caption min-w-0 truncate">{i18n.formatMessage(pluginsMessages.contributedBy, { plugin_name: i18n.text(shown.source.name) })}</p>}
           </div>
-        </section>
-      </motion.div> : <MotionCard layoutScroll key={`detail-${open.id}`} className="settings-detail gap-0 py-0" style={{ transformOrigin: origin }}
-        initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.96, transition: fadeTransition }}
-        transition={islandTransition}>
-        <div className="p-6">
-          <Button variant="ghost" size="sm" className="-ml-2 mb-4" onClick={() => void close()}><ArrowLeft />{i18n.formatMessage(settingsMessages.allSettings)}</Button>
-          {/* The About page uses the application identity card as its visible heading; retain the category title only for assistive technology and as a focus target. */}
-          <h2 ref={heading} tabIndex={-1} className={open.id === "about" ? "sr-only" : "type-page mb-2 outline-none"}>{i18n.text(open.title)}</h2>
-          {open.source && <p className="type-caption mb-4">{i18n.formatMessage(pluginsMessages.contributedBy, { plugin_name: i18n.text(open.source) })}</p>}
-          {configurationPages.has(open.id) && <ConfigurationReadStatus />}
-          {open.content()}
-        </div>
-      </MotionCard>}
-    </AnimatePresence>
+        </header>
+        {/* Keyed by page: switching remounts the scroller at its top and fades the new page in. */}
+        <motion.div layoutScroll key={shown.id} className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={fadeTransition}>
+          <div className="mx-auto max-w-3xl px-5 pt-3 pb-6">
+            {configurationPages.has(shown.id) && <ConfigurationReadStatus />}
+            {shown.content()}
+          </div>
+        </motion.div>
+      </> : <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+        <div className="flex flex-col gap-6">{groups.map(group => <section key={group.key} aria-label={group.title && i18n.text(group.title)}>
+          {group.title && <h2 className="type-label mb-2 px-1">{i18n.text(group.title)}</h2>}
+          <ItemGroup className="surface">{group.entries.map((entry, index) => <Fragment key={entry.id}>
+            {index > 0 && <ItemSeparator />}
+            <ListRow opens media={icon(entry)} mediaVariant="icon" title={i18n.text(entry.title)} description={i18n.text(entry.summary)}
+              onOpen={() => void select(entry.id)} buttonProps={{ ref: rowRef(entry.id) }} />
+          </Fragment>)}</ItemGroup>
+        </section>)}</div>
+      </div>}
+    </div>
   </div>;
 }
 
@@ -165,7 +195,7 @@ export function SettingsPage({ active, target, onCancel, screenRef }: { active: 
   useEffect(() => {
     if (openId?.startsWith("plugin:") && !registry.pages.has(openId)) setOpenId(null);
   }, [openId, registry.pages]);
-  // Return to the category overview when leaving settings (recreate the screen and clear its islands).
+  // Return to the first page when leaving settings (recreate the screen and clear its islands).
   // Reset after the page strip finishes sliding and settings leave the viewport, avoiding visible reconstruction during exit.
   useEffect(() => {
     if (active) return;
@@ -173,9 +203,9 @@ export function SettingsPage({ active, target, onCancel, screenRef }: { active: 
     return () => window.clearTimeout(timer);
   }, [active]);
   const root: IslandSpec = {
-    key: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false,
-    // Center the overview according to content; opening a category requires a wider minimum width, overflowing alongside detail islands in narrow windows.
-    width: openId ? { min: 440, grow: 1, max: 720 } : { min: 320, grow: 1, max: 768 },
+    key: "settings", label: i18n.formatMessage(settingsMessages.settings),
+    // Narrow windows give way to detail islands; the root then switches to one-at-a-time navigation.
+    width: { min: 360, grow: 1, max: 1000 },
     render: () => <SettingsRoot openId={openId} onOpen={id => { setLocation(undefined); setOpenId(id); }}
       onClosed={() => { setLocation(undefined); setOpenId(null); }} onCancel={onCancel} manager={manager} location={location} />,
   };

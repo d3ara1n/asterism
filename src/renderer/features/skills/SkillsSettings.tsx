@@ -17,7 +17,7 @@ import { commonMessages } from "@asterism-app/ui/messages/common";
 import { failureDisplay } from "@asterism-app/ui/error-display";
 import { useLifetimeSignal } from "@asterism-app/ui/use-lifetime";
 import { PluginCallScope, PluginIslandProvider } from "../plugins/scope";
-import { Section } from "../settings/layout";
+import { Section } from "@asterism-app/ui/settings-layout";
 import { toast } from "../../shared/toast";
 import { skillsMessages as messages } from "../../messages/skills";
 import { pluginName } from "../../../shared/plugin-name";

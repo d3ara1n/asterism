@@ -17,7 +17,7 @@ import { useI18n } from "../../shared/i18n";
 import { useIsland, useIslandCancel } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Editor, ReadStatus } from "../configuration/forms";
-import { Section } from "./layout";
+import { Section } from "@asterism-app/ui/settings-layout";
 
 type Mode = NetworkPreference["mode"];
 const modes: readonly Mode[] = ["system", "direct", "custom"];

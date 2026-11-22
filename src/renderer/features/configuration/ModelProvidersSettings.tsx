@@ -21,7 +21,7 @@ import { Switch } from "@asterism-app/ui/ui/switch";
 import { cn } from "@asterism-app/ui/utils";
 import { useIsland, useIslandCancel, useIslandKey } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
-import { Section } from "../settings/layout";
+import { Section } from "@asterism-app/ui/settings-layout";
 import { ConfigurationActionError, Editor, EditorSection, TextField, NumberField } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { ModelCompatibilityEditor } from "./ModelCompatibilityEditor";

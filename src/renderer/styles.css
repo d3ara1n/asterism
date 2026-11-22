@@ -317,7 +317,6 @@
   /* Usage statistics: panel cards fill the root island edge to edge; weave spacing alone separates them from docks and neighboring islands. */
   .dashboard-page { @apply h-full overflow-y-auto; }
 
-  /* Settings: category cards sit on the material; details overlay the overview absolutely and fade/scale from the card origin. */
   /* Island weave: left-to-right islands center in columns when they fit, otherwise overflow and follow focus. */
   /* Horizontal spacing sits outside the clipping boundary, so overflowing Islands still leave a gap beside Docks. */
   .weave-viewport { @apply relative min-h-0 min-w-0 overflow-clip; margin-inline: var(--space-inset); }
@@ -353,14 +352,6 @@
   .weave-segment[aria-current]::before { @apply bg-foreground/50; }
   .weave-segment:hover::before { @apply h-1 bg-foreground/40; }
   .weave-segment:focus-visible::before { @apply h-1 bg-ring; }
-  .settings-stage { @apply relative h-full; }
-  .settings-grid {
-    @apply grid gap-3;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  }
-  /* Card appearance comes from the official Item; detail surfaces come from Card. */
-  .settings-card { @apply text-left; }
-  .settings-detail { @apply absolute inset-x-0 top-0 max-h-full overflow-y-auto overscroll-contain; }
 }
 /* Startup screens display independently before workbench loading, preserving native window dragging and controls. */
 .startup-screen { display: flex; height: 100%; padding: 3rem 1.5rem; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; color: var(--muted-foreground); font-family: var(--font-sans); font-size: 0.8125rem; -webkit-app-region: drag; }

@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { sessionLifecycleDays, sessionLifecycleDaysSchema, type SessionLifecycle } from "../../../shared/configuration";
 import { useConfigurationAction, useSettingsConfiguration } from "../configuration/state";
 import { ConfigurationActionError, ReadStatus } from "../configuration/forms";
-import { Section, Row } from "./layout";
+import { Section, Row } from "@asterism-app/ui/settings-layout";
 import { existingFolder } from "../folders/context";
 
 /** Application data needed for session management: the application layer owns the session catalog and rereads it after restoration. */

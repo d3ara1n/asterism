@@ -4,7 +4,7 @@ import { NumberInput } from "@asterism-app/ui/ui/number-input";
 import { settingsMessages } from "../../messages/settings";
 import { useConfigurationAction, useSettingsConfiguration } from "../configuration/state";
 import { ConfigurationActionError, ReadStatus } from "../configuration/forms";
-import { Section, Row } from "./layout";
+import { Section, Row } from "@asterism-app/ui/settings-layout";
 
 /** Usage statistics keep every record; the monthly budget only sets the pace shown against this month's spending. */
 export function UsageSettings() {

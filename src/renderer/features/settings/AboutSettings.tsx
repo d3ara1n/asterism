@@ -3,7 +3,7 @@ import { Copy } from "lucide-react";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Switch } from "@asterism-app/ui/ui/switch";
-import { Separator } from "@asterism-app/ui/ui/separator";
+import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import appIcon from "../../../../assets/icon/asterism.svg";
 import darkAppIcon from "../../../../assets/icon/asterism-dark.svg";
@@ -16,7 +16,7 @@ import { useI18n } from "../../shared/i18n";
 import { toast } from "../../shared/toast";
 import { useUpdates } from "../updates/state";
 import { UpdateAction, UpdateStatus, UpdateVersions } from "../updates/controls";
-import { Row } from "./layout";
+import { Row } from "@asterism-app/ui/settings-layout";
 
 /** About page: the application identity card (icon, name, version) presents update state, with secondary information in compact rows afterward. */
 export function AboutSettings() {
@@ -29,20 +29,21 @@ export function AboutSettings() {
       <p className="type-caption mt-1">{i18n.text(settingsMessages.aboutSummary)}</p>
     </header>
     <UpdatePanel />
-    <Separator className="mt-6" />
-    <ChannelRow />
-    <Separator />
-    <Row label={i18n.text(settingsMessages.aboutIdentity)}>
-      <code className="type-code select-all text-xs text-muted-foreground">{applicationId}</code>
-      <CopyIdentity />
-    </Row>
-    <Separator />
-    <CrashReportsRow />
-    <Separator />
-    <Row label={i18n.text(settingsMessages.aboutLogs)}>
-      <Button size="sm" variant="outline" onClick={() => void window.host.openLogs().then(error => { if (error) console.error(`Log folder could not be opened: ${error}`); })}>
-        {i18n.text(settingsMessages.aboutOpenLogs)}</Button>
-    </Row>
+    <ItemGroup className="surface mt-6">
+      <ChannelRow />
+      <ItemSeparator />
+      <Row label={i18n.text(settingsMessages.aboutIdentity)}>
+        <code className="type-code select-all text-xs text-muted-foreground">{applicationId}</code>
+        <CopyIdentity />
+      </Row>
+      <ItemSeparator />
+      <CrashReportsRow />
+      <ItemSeparator />
+      <Row label={i18n.text(settingsMessages.aboutLogs)}>
+        <Button size="sm" variant="outline" onClick={() => void window.host.openLogs().then(error => { if (error) console.error(`Log folder could not be opened: ${error}`); })}>
+          {i18n.text(settingsMessages.aboutOpenLogs)}</Button>
+      </Row>
+    </ItemGroup>
   </div>;
 }
 

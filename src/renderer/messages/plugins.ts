@@ -1,9 +1,7 @@
 import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const pluginsMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
-  // Settings home
-  application: { id: "settings.application", defaultMessage: "Application" },
-  applicationSummary: { id: "settings.applicationSummary", defaultMessage: "Manage Asterism’s preferences and shared configuration." },
+  // Settings navigation
   plugins: { id: "settings.plugins", defaultMessage: "Plugins" },
   pluginsSummary: { id: "settings.pluginsSummary", defaultMessage: "Manage installed plugins and their availability" },
   contributedBy: { id: "settings.contributedBy", defaultMessage: "From {plugin_name}" },

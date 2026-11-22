@@ -33,7 +33,7 @@ import { useI18n } from "../../shared/i18n";
 import { toast } from "../../shared/toast";
 import { IslandPanel, panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { useIsland, useIslandCancel } from "../../shared/weave/Screen";
-import { Row, Section } from "../settings/layout";
+import { Row, Section } from "@asterism-app/ui/settings-layout";
 import { filterCounts, installSteps, matchesFilter, matchesQuery, pluginView, type InstallStep, type PluginFilter, type PluginView, type StepState } from "./model";
 import { changes, conditions, originLabels, pluginDiagnostics, PluginIcon, selectedVersion, useRestart } from "./parts";
 import { PluginRegion } from "./scope";

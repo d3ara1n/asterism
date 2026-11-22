@@ -19,7 +19,7 @@ import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
 import { cn } from "@asterism-app/ui/utils";
 import { Editor } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
-import { Section } from "../settings/layout";
+import { Section } from "@asterism-app/ui/settings-layout";
 import { ProviderKeyLink } from "./ProviderKeyLink";
 import { ProviderSettingFields } from "./ProviderSettingFields";
 import { settingValues, settingsComplete } from "./provider-settings";

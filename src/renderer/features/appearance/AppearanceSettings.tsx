@@ -13,7 +13,7 @@ import { NumberInput } from "@asterism-app/ui/ui/number-input";
 import { ItemGroup, ItemSeparator, Item, ItemContent, ItemTitle, ItemDescription, ItemActions } from "@asterism-app/ui/ui/item";
 import { SwatchGroup, ColorSwatch, TileSwatch } from "@asterism-app/ui/ui/swatch";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
-import { Section } from "../settings/layout";
+import { Section } from "@asterism-app/ui/settings-layout";
 import { ReadStatus } from "../configuration/forms";
 import { refreshAppearance, useAppearanceReadState, useAppearanceAction, useAppearance, useScheme } from "./state";
 
@@ -107,7 +107,10 @@ export function AppearanceSettings() {
   return <div className="flex flex-col">
     <ReadStatus loaded={read.ready} error={read.error} onRetry={() => void refreshAppearance()} />
     <fieldset disabled={!read.ready || busy} className="flex min-w-0 flex-col border-0 p-0">
-    <LivePreview appearance={appearance} />
+    {/* On tall windows the preview stays in view while lower sections are tuned. */}
+    <div className="z-10 -mx-1 bg-card px-1 pb-2 [@media(min-height:760px)]:sticky [@media(min-height:760px)]:top-0">
+      <LivePreview appearance={appearance} />
+    </div>
 
     <Section title={i18n.formatMessage(appearanceMessages.color)} action={<Button size="sm" variant="outline" onClick={() => setPicking(true)}><Palette />{i18n.formatMessage(appearanceMessages.choosePalette)}</Button>}>
       <ItemGroup className="surface">

@@ -11,7 +11,7 @@ import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
 import { useI18n } from "../../shared/i18n";
 import { useIsland, useIslandCancel, useIslandKey } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
-import { Section } from "../settings/layout";
+import { Section } from "@asterism-app/ui/settings-layout";
 import { Editor, TextField, ChoiceField, ToggleField } from "./forms";
 import { ProviderSettingFields } from "./ProviderSettingFields";
 import { settingValues, settingsComplete } from "./provider-settings";

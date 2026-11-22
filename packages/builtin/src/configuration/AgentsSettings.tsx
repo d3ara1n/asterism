@@ -95,7 +95,7 @@ function DefaultAgentSetting({ snapshot }: { snapshot: ConfigurationSnapshot }) 
   const label = i18n.text(agentsMessages.defaultAgentLabel);
   const available = snapshot.agents.filter(agent => agent.enabled);
   const unavailable = !available.some(agent => agent.id === snapshot.defaultAgentId);
-  return <Section title={i18n.text(agentsMessages.defaultAgent)}><Row label={label} hint={i18n.text(agentsMessages.defaultAgentHint)}>
+  return <Section title={i18n.text(agentsMessages.defaultAgent)}><ItemGroup className="surface"><Row label={label} hint={i18n.text(agentsMessages.defaultAgentHint)}>
     <Select value={snapshot.defaultAgentId} disabled={busy} onValueChange={id => { void run({ type: "agent.default", id }); }}>
       <SelectTrigger aria-label={label} className="w-40" aria-invalid={unavailable || undefined}><SelectValue /></SelectTrigger>
       <SelectContent><SelectGroup>
@@ -103,7 +103,7 @@ function DefaultAgentSetting({ snapshot }: { snapshot: ConfigurationSnapshot }) 
         {available.map(agent => <SelectItem key={agent.id} value={agent.id}>{agent.id}</SelectItem>)}
       </SelectGroup></SelectContent>
     </Select>
-  </Row></Section>;
+  </Row></ItemGroup></Section>;
 }
 
 function AgentRow({ agent, snapshot, selected, onOpen }: {
