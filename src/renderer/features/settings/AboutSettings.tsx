@@ -29,7 +29,7 @@ export function AboutSettings() {
       <p className="type-caption mt-1">{i18n.text(settingsMessages.aboutSummary)}</p>
     </header>
     <UpdatePanel />
-    <ItemGroup className="surface mt-6">
+    <ItemGroup className="surface-group mt-6">
       <ChannelRow />
       <ItemSeparator />
       <Row label={i18n.text(settingsMessages.aboutIdentity)}>

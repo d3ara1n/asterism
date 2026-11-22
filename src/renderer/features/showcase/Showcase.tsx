@@ -40,7 +40,7 @@ export function Showcase({ open, onOpenChange }: { open: boolean; onOpenChange: 
       </Section>
       <Section title="Card / Item">
         <Card className="w-56 py-4"><CardHeader className="px-4"><CardTitle>Card</CardTitle><CardDescription>Description text that wraps onto a second line.</CardDescription></CardHeader></Card>
-        <ItemGroup className="surface w-72"><Item size="sm"><ItemContent><ItemTitle>Item title</ItemTitle><ItemDescription>An extremely long description that should be truncated or wrapped correctly.</ItemDescription></ItemContent></Item></ItemGroup>
+        <ItemGroup className="surface-group w-72"><Item size="sm"><ItemContent><ItemTitle>Item title</ItemTitle><ItemDescription>An extremely long description that should be truncated or wrapped correctly.</ItemDescription></ItemContent></Item></ItemGroup>
       </Section>
     </DialogContent>
   </Dialog>;

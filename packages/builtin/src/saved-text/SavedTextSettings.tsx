@@ -37,7 +37,7 @@ export function SavedTextSettings() {
     {savedText.status === "invalid" && <Alert><AlertDescription>{i18n.text(settingsMessages.invalid)}</AlertDescription></Alert>}
     {savedText.ready && (savedText.items.length === 0
       ? <Empty><EmptyHeader><EmptyTitle>{i18n.text(messages.empty)}</EmptyTitle></EmptyHeader></Empty>
-      : <ItemGroup className="surface">
+      : <ItemGroup className="surface-group">
         {savedText.items.map((item, index) => <div key={item.id}>
           {index > 0 && <ItemSeparator />}
           <ListRow title={<span className="truncate">{item.name}</span>} description={item.content}

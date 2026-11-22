@@ -85,7 +85,7 @@ export function ModelCostEditor({ value, onChange }: { value: ModelCost | null; 
       <FieldDescription>{i18n.text(messages.tiersHint)}</FieldDescription>
       {cost.tiers.map((tier, index) => {
         const nextThreshold = cost.tiers[index + 1]?.fromInputTokens;
-        return <div key={index} className="surface flex flex-col gap-3 p-4">
+        return <div key={index} className="surface-group flex flex-col gap-3 p-4">
           <div className="flex items-end gap-3">
             <div className="flex-1"><NumberField label={i18n.text(messages.threshold)} value={tier.fromInputTokens}
               min={(cost.tiers[index - 1]?.fromInputTokens ?? -1) + 1}

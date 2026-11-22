@@ -151,7 +151,7 @@ function McpSettingsBody() {
         <h4 className="type-label">{i18n.text(messages.servers)}</h4>
         <Button size="sm" onClick={event => { void open(null, event.currentTarget); }}>{i18n.text(messages.add)}</Button>
       </div>
-      {servers.length > 0 ? <ItemGroup className="surface">
+      {servers.length > 0 ? <ItemGroup className="surface-group">
         {servers.flatMap((server, index) => index ? [<ItemSeparator key={`${server.id}-separator`} />, row(server)] : [row(server)])}
       </ItemGroup> : <p className="type-caption text-muted-foreground">{i18n.text(messages.empty)}</p>}
     </div>

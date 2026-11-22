@@ -73,7 +73,7 @@ export function WebProvidersSettings() {
   return <Section title={i18n.text(messages.title)} hint={i18n.text(messages.hint)}
     action={<Button size="sm" disabled={!snapshot || !types.length || busy} onClick={event => open(null, event.currentTarget)}>
       <Plus />{i18n.text(messages.add)}</Button>}>
-    {snapshot && !states.length ? <Empty className="border">
+    {snapshot && !states.length ? <Empty className="surface-group">
       <EmptyHeader><EmptyMedia variant="icon"><Globe /></EmptyMedia><EmptyDescription>{i18n.text(messages.empty)}</EmptyDescription></EmptyHeader>
       {types.length > 0 && <EmptyContent><Button size="sm" variant="outline" onClick={event => open(null, event.currentTarget)}>
         <Plus />{i18n.text(messages.addFirst)}</Button></EmptyContent>}
@@ -81,7 +81,7 @@ export function WebProvidersSettings() {
       latestOrder.current = ids;
       setDraftOrder(ids);
     }}>
-      <ItemGroup className="surface overflow-clip">{ordered.map((state, index) => {
+      <ItemGroup className="surface-group overflow-clip">{ordered.map((state, index) => {
         const type = types.find(type => type.id === state.id);
         const label = type ? i18n.text(type.label) : state.id;
         const issue = issueOf(type);

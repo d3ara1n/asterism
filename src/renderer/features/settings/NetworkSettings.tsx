@@ -47,7 +47,7 @@ export function NetworkSettings() {
   };
   return <Section title={i18n.text(messages.title)} hint={i18n.text(messages.summary)}>
     <ReadStatus loaded={!!state} error={readError} onRetry={() => { setReadError(null); setAttempt(value => value + 1); }} />
-    {state && preference && <ItemGroup className="surface">
+    {state && preference && <ItemGroup className="surface-group">
       <ListRow title={i18n.text(messages.proxy)}
         description={preference.mode === "custom" ? `${modeLabel} · ${preference.server}` : modeLabel}
         details={state.restartRequired ? i18n.text(messages.restartRequired) : undefined}

@@ -50,7 +50,7 @@ export function InterfaceSettings() {
       if (language.readError) language.retry();
       if (readError) void load();
     }} />
-    <ItemGroup className="surface">
+    <ItemGroup className="surface-group">
       <Row label={i18n.text(settingsMessages.languageLabel)} hint={i18n.text(settingsMessages.languageSummary)}>
         <Select value={preference ?? "system"} disabled={!language.state || language.busy} onValueChange={language.set}>
           <SelectTrigger className="w-40" aria-label={i18n.text(settingsMessages.languageLabel)}><SelectValue /></SelectTrigger>

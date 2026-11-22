@@ -81,7 +81,7 @@ export function AgentsSettings() {
     {snapshot && <DefaultAgentSetting snapshot={snapshot} />}
     <Section title={i18n.formatMessage(agentsMessages.agents)} hint={i18n.formatMessage(agentsMessages.summary)}
       action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(agentsMessages.addAgent)}</Button>}>
-      {snapshot && <ItemGroup className="surface">{agents.map((agent, index) =>
+      {snapshot && <ItemGroup className="surface-group">{agents.map((agent, index) =>
         <div key={agent.id}>{index > 0 && <ItemSeparator />}
           <AgentRow agent={agent} snapshot={snapshot} selected={island.has(agentIslandKey(agent.id))} onOpen={origin => open(agent.id, origin)} />
         </div>)}</ItemGroup>}
@@ -95,7 +95,7 @@ function DefaultAgentSetting({ snapshot }: { snapshot: ConfigurationSnapshot }) 
   const label = i18n.text(agentsMessages.defaultAgentLabel);
   const available = snapshot.agents.filter(agent => agent.enabled);
   const unavailable = !available.some(agent => agent.id === snapshot.defaultAgentId);
-  return <Section title={i18n.text(agentsMessages.defaultAgent)}><ItemGroup className="surface"><Row label={label} hint={i18n.text(agentsMessages.defaultAgentHint)}>
+  return <Section title={i18n.text(agentsMessages.defaultAgent)}><ItemGroup className="surface-group"><Row label={label} hint={i18n.text(agentsMessages.defaultAgentHint)}>
     <Select value={snapshot.defaultAgentId} disabled={busy} onValueChange={id => { void run({ type: "agent.default", id }); }}>
       <SelectTrigger aria-label={label} className="w-40" aria-invalid={unavailable || undefined}><SelectValue /></SelectTrigger>
       <SelectContent><SelectGroup>

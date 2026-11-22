@@ -1,7 +1,7 @@
 # Shell-and-sheet surface language and interaction motion
 
 Filed: 2026-11-22
-Status: Stage 1 implemented; visual acceptance pending. The user approved the direction and its staged rollout. Each stage needs the user's visual acceptance in light and dark modes before the next starts.
+Status: Stage 1 accepted. Stage 1b (design language and lineless groups and blocks) implemented; visual acceptance pending. The user approved the direction and its staged rollout. Each stage needs the user's visual acceptance in light and dark modes before the next starts.
 
 ## Direction
 
@@ -31,6 +31,8 @@ Motion explains cause and continuity. Every item uses the public motion tokens a
 Effects that do not map to one of these meanings are out of scope. A static treatment that does not stand on its own is not compensated with more effects.
 
 ## Stages
+
+1b. **Design language and lineless content.** Record the design language principles. Replace bordered groups on sheets with tone groups and move conversation process blocks to tone blocks whose lines express only state. Requested by the user after stage 1, who prefers lines that carry meaning over outlines everywhere.
 
 1. **Settings and panel islands.** Add the motion vocabulary to settings navigation and page changes. Move the shared panel island to the shell and sheet variant and promote the tray shadow to a shared utility. Update the design system's surface and motion sections and the surface comment in `styles.css`. Accept with settings and a provider detail open side by side, in wide and single-column layouts.
 2. **Home, usage statistics, and sidebar.** Apply the surface rules to their cards and the sliding selection indicator to sidebar and segmented controls.

@@ -80,7 +80,7 @@ export function RolesSettings() {
   return <Section title={i18n.formatMessage(rolesMessages.modelRoles)} hint={i18n.formatMessage(rolesMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(rolesMessages.addRole)}</Button>}>
     <ReadStatus loaded={!!snapshot} error={readError} onRetry={() => void load()} />
-    {snapshot && <ItemGroup className="surface">{roles.map((role, index) =>
+    {snapshot && <ItemGroup className="surface-group">{roles.map((role, index) =>
       <div key={role.id}>{index > 0 && <ItemSeparator />}
         <RoleRow role={role} snapshot={snapshot} selected={island.has(roleIslandKey(role.id))} onOpen={origin => open(role.id, origin)} />
       </div>)}</ItemGroup>}

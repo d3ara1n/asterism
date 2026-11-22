@@ -47,7 +47,7 @@ export function SessionsSettings() {
   const archived = snapshot?.archivedSessions.length ?? 0;
   return <Section title={i18n.text(settingsMessages.conversationsTitle)}>
     <ReadStatus loaded={!!configuration} error={readError} onRetry={() => void load()} />
-    <ItemGroup className="surface">
+    <ItemGroup className="surface-group">
       <Row label={i18n.text(settingsMessages.retentionDays)}>
         <LifecycleSelect value={lifecycle?.retentionDays} disabled={!lifecycle || busy}
           label={i18n.text(settingsMessages.retentionDays)} onChange={value => save("retentionDays", value)} />

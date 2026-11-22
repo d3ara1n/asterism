@@ -87,7 +87,7 @@ function SkillSettingsBody({ names }: { names: PluginNames }) {
       {i18n.text(messages.failed)}
       {failed && <Button variant="outline" size="sm" onClick={retry}>{i18n.text(messages.retry)}</Button>}
     </AlertDescription></Alert>}
-    <ItemGroup className="surface">
+    <ItemGroup className="surface-group">
       <div role="listitem">
         <ListRow opens disabled={!catalog} selected={island.has(catalogKey)} onOpen={origin => { void open(origin); }}
           media={<BookOpen className="size-4 text-folder-violet" />} title={i18n.text(messages.allSkills)}
@@ -99,7 +99,7 @@ function SkillSettingsBody({ names }: { names: PluginNames }) {
       </div>
     </ItemGroup>
     {catalog && catalog.length > 0 && <Section title={i18n.text(messages.sources)} hint={i18n.text(messages.composition)}>
-      <ItemGroup className="surface">{catalog.flatMap((group, index) => {
+      <ItemGroup className="surface-group">{catalog.flatMap((group, index) => {
         const row = <SourceRow key={group.id} group={group} names={names} />;
         return index ? [<ItemSeparator key={`${group.id}-separator`} />, row] : [row];
       })}</ItemGroup>

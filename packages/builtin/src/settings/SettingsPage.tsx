@@ -35,7 +35,7 @@ function StreamingSettingsPage() {
     </AlertDescription></Alert>}
     {config.status === "invalid" && <Alert><AlertDescription>{i18n.text(messages.invalid)}</AlertDescription></Alert>}
     {!config.ready && !config.error && <p className="type-caption flex items-center gap-2"><Spinner />{i18n.text(messages.loading)}</p>}
-    <ItemGroup className="surface">{row("autoExpand", messages.autoExpand)}<ItemSeparator />{row("autoCollapse", messages.autoCollapse)}</ItemGroup>
+    <ItemGroup className="surface-group">{row("autoExpand", messages.autoExpand)}<ItemSeparator />{row("autoCollapse", messages.autoCollapse)}</ItemGroup>
   </div>;
 }
 export const builtinSettingsPages: readonly PluginSettingsPage[] = [

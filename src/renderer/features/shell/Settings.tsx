@@ -87,7 +87,7 @@ export function ShellSettings({ value, disabled, save }: {
   return <div className="flex flex-col gap-4">
     <p className="type-caption">{i18n.text(messages.description)}</p>
     {discoveryFailed && <Alert variant="destructive"><AlertDescription>{i18n.text(messages.checkFailed)}</AlertDescription></Alert>}
-    <ItemGroup className="surface">
+    <ItemGroup className="surface-group">
       <Item>
         <ItemContent>
           <ItemTitle>{selectedLabel}</ItemTitle>
@@ -118,7 +118,7 @@ export function ShellSettings({ value, disabled, save }: {
           </Select>
         </div>
       </div>
-      {value.profiles.length > 0 && <ItemGroup className="surface">
+      {value.profiles.length > 0 && <ItemGroup className="surface-group">
         {value.profiles.flatMap((item, index) => index ? [<ItemSeparator key={`${item.id}-separator`} />, row(item)] : [row(item)])}
       </ItemGroup>}
     </div>

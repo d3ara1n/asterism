@@ -96,10 +96,10 @@ export function ModelProvidersSettings() {
   const providers = snapshot?.modelProviders ?? [];
   return <Section title={i18n.formatMessage(providersMessages.connections)} hint={i18n.formatMessage(providersMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addProvider)}</Button>}>
-    {snapshot && !providers.length ? <Empty className="border">
+    {snapshot && !providers.length ? <Empty className="surface-group">
       <EmptyHeader><EmptyMedia variant="icon"><Zap /></EmptyMedia><EmptyDescription>{i18n.formatMessage(providersMessages.emptyConnections)}</EmptyDescription></EmptyHeader>
       <EmptyContent><Button size="sm" variant="outline" onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addFirstProvider)}</Button></EmptyContent>
-    </Empty> : snapshot && <ItemGroup className="surface">{providers.map((provider, index) => {
+    </Empty> : snapshot && <ItemGroup className="surface-group">{providers.map((provider, index) => {
       return <div key={provider.id}>{index > 0 && <ItemSeparator />}
         <ProviderRow provider={provider} snapshot={snapshot} selected={island.has(providerIslandKey(provider.id))} onOpen={origin => open(provider.id, origin)} />
       </div>;
@@ -278,10 +278,10 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
         }}><Search />{i18n.text(providersMessages.fetchModels)}</Button>
         <Button size="sm" variant="outline" disabled={busy} onClick={event => openModel(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addModel)}</Button>
       </>}>
-      {models.length ? <ItemGroup className="surface">{models.map((model, index) => <div key={modelReference(model)}>{index > 0 && <ItemSeparator />}
+      {models.length ? <ItemGroup className="surface-group">{models.map((model, index) => <div key={modelReference(model)}>{index > 0 && <ItemSeparator />}
         <ModelRow model={model} provider={current} selected={island.has(modelIslandKey(current.id, modelReference(model)))} onOpen={origin => openModel(modelReference(model), origin)} />
       </div>)}</ItemGroup>
-        : <Empty className="border md:p-6"><EmptyHeader><EmptyDescription>{i18n.formatMessage(providersMessages.emptyModels)}</EmptyDescription></EmptyHeader></Empty>}
+        : <Empty className="surface-group md:p-6"><EmptyHeader><EmptyDescription>{i18n.formatMessage(providersMessages.emptyModels)}</EmptyDescription></EmptyHeader></Empty>}
     </EditorSection>}
   </Editor>;
 }
@@ -354,7 +354,7 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
         hint={parameters.hint}
         status={parameters.feedback}>
         <FieldSet><FieldLegend variant="label">{i18n.formatMessage(providersMessages.capabilities)}</FieldLegend>
-          <div className="surface">
+          <div className="surface-group">
             <FieldGroup className="gap-4 p-4">
               <Field orientation="horizontal">
                 <FieldContent><FieldLabel htmlFor={`${form}-capability-reasoning`}>{i18n.formatMessage(providersMessages.reasoning)}</FieldLabel></FieldContent>

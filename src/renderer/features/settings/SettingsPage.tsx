@@ -198,7 +198,7 @@ function SettingsRoot({ openId, onOpen, onClosed, onCancel, manager, location }:
               {shown.content()}
             </div> : <div className="flex flex-col gap-6 p-4">{groups.map(group => <section key={group.key} aria-label={group.title && i18n.text(group.title)}>
               {group.title && <h2 className="type-label mb-2 px-1">{i18n.text(group.title)}</h2>}
-              <ItemGroup className="surface">{group.entries.map((entry, index) => <Fragment key={entry.id}>
+              <ItemGroup className="surface-group">{group.entries.map((entry, index) => <Fragment key={entry.id}>
                 {index > 0 && <ItemSeparator />}
                 <ListRow opens media={icon(entry)} mediaVariant="icon" title={i18n.text(entry.title)} description={i18n.text(entry.summary)}
                   onOpen={() => void select(entry.id)} buttonProps={{ ref: rowRef(entry.id) }} />

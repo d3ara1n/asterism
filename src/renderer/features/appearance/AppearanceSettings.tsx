@@ -113,7 +113,7 @@ export function AppearanceSettings() {
     </div>
 
     <Section title={i18n.formatMessage(appearanceMessages.color)} action={<Button size="sm" variant="outline" onClick={() => setPicking(true)}><Palette />{i18n.formatMessage(appearanceMessages.choosePalette)}</Button>}>
-      <ItemGroup className="surface">
+      <ItemGroup className="surface-group">
         <Row label={i18n.formatMessage(appearanceMessages.mode)} hint={i18n.formatMessage(appearanceMessages.modeHint)}>
           <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.modeLabel)} value={appearance.mode}
             onValueChange={mode => mode && void save({ mode: mode as Appearance["mode"] })}>
@@ -149,7 +149,7 @@ export function AppearanceSettings() {
     </Section>
 
     <Section title={i18n.formatMessage(appearanceMessages.shape)}>
-      <ItemGroup className="surface">
+      <ItemGroup className="surface-group">
         <Row label={i18n.formatMessage(appearanceMessages.cornerRadius)}>
           <ToggleGroup type="single" variant="outline" size="sm" aria-label={i18n.formatMessage(appearanceMessages.cornerRadiusLabel)} value={appearance.radius}
             onValueChange={radius => radius && void save({ radius: radius as Appearance["radius"] })}>
@@ -172,7 +172,7 @@ export function AppearanceSettings() {
     </Section>
 
     <Section title={i18n.formatMessage(appearanceMessages.fonts)} hint={i18n.formatMessage(appearanceMessages.fontsHint)}>
-      <ItemGroup className="surface">
+      <ItemGroup className="surface-group">
         <Row label={i18n.formatMessage(appearanceMessages.interfaceFont)}>
           <FontPicker aria-label={i18n.formatMessage(appearanceMessages.interfaceFontLabel)} value={appearance.uiFont} onValueChange={uiFont => void save({ uiFont })} {...getFontText()} />
         </Row>
@@ -219,7 +219,7 @@ export function AppearanceSettings() {
  */
 function LivePreview({ appearance }: { appearance: Appearance }) {
   const i18n = useI18n();
-  return <div aria-hidden="true" className="surface relative mt-2 overflow-hidden bg-canvas">
+  return <div aria-hidden="true" className="relative mt-2 overflow-hidden rounded-lg bg-canvas">
     <Texture kind={appearance.canvas} gap={20} />
     <div className="relative flex items-center px-8 py-7">
       <div className="w-48 shrink-0 -translate-y-4 rounded-lg border bg-card p-3 shadow-sm">

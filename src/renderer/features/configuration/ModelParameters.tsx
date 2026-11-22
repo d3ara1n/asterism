@@ -37,7 +37,7 @@ function CatalogModelCard({ report: { model, parameters, unfilled } }: { report:
     model.inputModalities.length > 1 && model.inputModalities.map(modality => i18n.text(modalityLabels[modality])).join(" · "),
     model.openWeights && i18n.text(messages.openWeights),
   ].filter(fact => typeof fact === "string");
-  return <Item variant="outline" size="sm" role="status" className="surface">
+  return <Item size="sm" role="status" className="surface-group">
     <ItemContent className="min-w-0 gap-0.5">
       <ItemTitle>{model.name}</ItemTitle>
       <ItemDescription className="truncate font-mono text-xs">{model.id}</ItemDescription>

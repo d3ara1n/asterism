@@ -174,7 +174,7 @@ export function PluginsSettings() {
       <Button variant="outline" size="sm" disabled={manager.busy} onClick={() => { void manager.read(); }}><RefreshCw />{i18n.text(messages.retry)}</Button>
     </AlertDescription></Alert>}
     {error && <Alert variant="destructive"><AlertDescription className="select-text wrap-anywhere">{i18n.text(error)}</AlertDescription></Alert>}
-    {operation && operation.phase !== "cancelled" && <ItemGroup className="surface">
+    {operation && operation.phase !== "cancelled" && <ItemGroup className="surface-group">
       <ListRow opens media={<StatusIcon tone={phaseTones[operation.phase]} className="size-4" />}
         title={<span className="block truncate font-mono text-xs" translate="no">{operation.preview ? `${operation.preview.name}@${operation.preview.version}` : operation.spec}</span>}
         description={i18n.text(phaseLabels[operation.phase])}
@@ -182,7 +182,7 @@ export function PluginsSettings() {
         onOpen={origin => { void islands.installer(operation.targetSource ? { source: operation.targetSource } : {}, origin); }} />
     </ItemGroup>}
     {!manager.loaded ? !manager.readError && <p className="type-caption flex items-center justify-center gap-2 py-8" role="status"><Spinner />{i18n.text(commonMessages.loading)}</p>
-      : !views.length ? <Empty className="border">
+      : !views.length ? <Empty className="surface-group">
         <EmptyHeader><EmptyMedia variant="icon"><Puzzle /></EmptyMedia><EmptyDescription>{i18n.text(messages.empty)}</EmptyDescription></EmptyHeader>
         <EmptyContent><AddPluginMenu onError={setError} onNpm={origin => { void islands.installer({}, origin); }} /></EmptyContent>
       </Empty>
@@ -191,10 +191,10 @@ export function PluginsSettings() {
       </Empty>
       : <div>
         {installed.length > 0 && <Section title={i18n.text(messages.installed)} action={<span className="type-caption tabular-nums">{installed.length}</span>}>
-          <ItemGroup className="surface">{installed.map((view, index) => <Fragment key={view.entry.source}>{index > 0 && <ItemSeparator />}{row(view)}</Fragment>)}</ItemGroup>
+          <ItemGroup className="surface-group">{installed.map((view, index) => <Fragment key={view.entry.source}>{index > 0 && <ItemSeparator />}{row(view)}</Fragment>)}</ItemGroup>
         </Section>}
         {included.length > 0 && <Section title={i18n.text(messages.includedGroup)} action={<span className="type-caption tabular-nums">{included.length}</span>}>
-          <ItemGroup className="surface">{included.map((view, index) => <Fragment key={view.entry.source}>{index > 0 && <ItemSeparator />}{row(view)}</Fragment>)}</ItemGroup>
+          <ItemGroup className="surface-group">{included.map((view, index) => <Fragment key={view.entry.source}>{index > 0 && <ItemSeparator />}{row(view)}</Fragment>)}</ItemGroup>
         </Section>}
       </div>}
   </div>;
@@ -203,7 +203,7 @@ export function PluginsSettings() {
 function RestartBanner({ count }: { count: number }) {
   const i18n = useI18n();
   const { restart, restarting } = useRestart();
-  return <div role="status" className="surface flex items-center gap-3 py-2.5 pr-2.5 pl-4">
+  return <div role="status" className="surface-group flex items-center gap-3 py-2.5 pr-2.5 pl-4">
     <RotateCw className="size-4 shrink-0 text-primary-text" aria-hidden="true" />
     <p className="type-body min-w-0 flex-1">{count ? i18n.formatMessage(messages.pendingChanges, { count }) : i18n.text(messages.restartHint)}</p>
     <Button size="sm" disabled={restarting} aria-busy={restarting} onClick={restart}>{restarting && <Spinner data-icon="inline-start" />}{i18n.text(messages.restartNow)}</Button>
@@ -330,7 +330,7 @@ function PluginDetailPanel({ identity }: { identity: string }) {
         <AlertDescription className="select-text whitespace-pre-wrap wrap-anywhere">{diagnostics.join("\n")}</AlertDescription>
       </Alert>}
 
-      {entry.selection && <ItemGroup className="surface">
+      {entry.selection && <ItemGroup className="surface-group">
         <Row label={i18n.text(messages.enabled)} hint={i18n.text(messages.enabledHint)}>
           <Switch checked={entry.selection.enabled} disabled={manager.busy} aria-label={i18n.formatMessage(messages.enablePlugin, { plugin_name: name })}
             onCheckedChange={enabled => { void act({ type: "plugin.enable", source: entry.source, enabled }); }} />
@@ -338,7 +338,7 @@ function PluginDetailPanel({ identity }: { identity: string }) {
       </ItemGroup>}
 
       {ownPages.length > 0 && <Section title={i18n.text(messages.settingsPages)}>
-        <ItemGroup className="surface">{ownPages.map(([key, page], index) => <Fragment key={key}>
+        <ItemGroup className="surface-group">{ownPages.map(([key, page], index) => <Fragment key={key}>
           {index > 0 && <ItemSeparator />}
           <PageRow page={page} onOpen={() => { void openOwnPage(key); }} />
         </Fragment>)}</ItemGroup>
@@ -346,7 +346,7 @@ function PluginDetailPanel({ identity }: { identity: string }) {
 
       <Section title={i18n.text(messages.package)} action={entry.selection && entry.origin.kind === "npm" && <Button variant="outline" size="sm"
         disabled={manager.busy || npmPending} onClick={event => checkUpdates(event.currentTarget)}><RefreshCw data-icon="inline-start" />{i18n.text(messages.checkUpdates)}</Button>}>
-        <dl className="surface grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-6 gap-y-2.5 px-4 py-3.5">
+        <dl className="surface-group grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-6 gap-y-2.5 px-4 py-3.5">
           <dt className="type-label">{i18n.text(messages.source)}</dt>
           <dd className="flex min-w-0 items-center gap-1.5 text-sm">
             {entry.origin.kind === "bundled" ? i18n.text(messages.includedWithApp)
@@ -455,7 +455,7 @@ function NpmInstallerPanel({ target }: { target: InstallTarget }) {
         {matching && operation.phase === "cancelled" && <StatusText tone="neutral">{i18n.text(messages.installCancelled)}</StatusText>}
       </Field>
 
-      {current && preview && <div className="surface flex flex-col gap-3 p-4">
+      {current && preview && <div className="surface-group flex flex-col gap-3 p-4">
         <div className="flex items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted text-muted-foreground"><Package className="size-4" aria-hidden="true" /></span>
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -473,7 +473,7 @@ function NpmInstallerPanel({ target }: { target: InstallTarget }) {
 
       {current && (current.phase === "installing" || current.phase === "cancelling") && <StatusText tone="progress">{i18n.text(phaseLabels[current.phase])}</StatusText>}
 
-      {current?.phase === "awaiting-approval" && <FieldSet className="surface gap-3 p-4">
+      {current?.phase === "awaiting-approval" && <FieldSet className="surface-group gap-3 p-4">
         <FieldLegend variant="label" className="flex items-center gap-2"><StatusIcon tone="warning" className="size-4" />{i18n.text(messages.buildApproval)}</FieldLegend>
         <FieldDescription>{i18n.text(messages.buildTrust)}</FieldDescription>
         {current.blockedBuilds.map(name => <Field key={name} orientation="horizontal">
@@ -487,7 +487,7 @@ function NpmInstallerPanel({ target }: { target: InstallTarget }) {
         }}>{i18n.text(messages.approveBuilds)}</Button>
       </FieldSet>}
 
-      {current?.phase === "succeeded" && <div role="status" className="surface flex items-center gap-3 py-2.5 pr-2.5 pl-4">
+      {current?.phase === "succeeded" && <div role="status" className="surface-group flex items-center gap-3 py-2.5 pr-2.5 pl-4">
         <StatusIcon tone="success" className="size-4 shrink-0" />
         <p className="type-body min-w-0 flex-1">{i18n.text(messages.installSucceeded)}</p>
         <Button size="sm" disabled={restarting} aria-busy={restarting} onClick={restart}>{restarting && <Spinner data-icon="inline-start" />}{i18n.text(messages.restartNow)}</Button>

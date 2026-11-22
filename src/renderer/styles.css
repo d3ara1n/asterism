@@ -156,7 +156,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 /* Surfaces: content shells match Card (solid + 1px border), overlays match Popover (solid + border + shadow), and reading or editing
-   content inside a shell sits on an inset sheet. Use these utilities where Card components cannot be used, such as window parts,
+   content inside a shell sits on an inset sheet. Inside a sheet, groups and process blocks separate by tone; lines express state and focus. Use these utilities where Card components cannot be used, such as window parts,
    island bases, and animated elements. */
 /* Command surfaces share tokens projected by commandMotionStyle; ordinary dialogs and menus keep their own motion. */
 @utility command-surface-motion {
@@ -204,6 +204,24 @@
 @utility surface-floating { @apply rounded-lg border bg-popover text-popover-foreground shadow-md; }
 /* Content inset within a card shell: separated from the shell by background and a faint edge shadow, without a border. */
 @utility surface-inset { @apply rounded-lg bg-card; box-shadow: var(--shadow-sheet); }
+/* A group of rows or fields on a sheet: a recessed tone instead of a border; hairlines between rows carry the structure. */
+@utility surface-group { @apply rounded-lg bg-card-shell text-card-foreground; }
+/* A process block in a reading flow: the shell tone, with lines reserved for state through the data attributes below. */
+@utility surface-block {
+  @apply relative rounded-lg bg-card-shell;
+  transition: background-color var(--motion-fast) var(--ease-out);
+}
+/* State lines on a process block: forming blocks trace a moving dashed outline, interrupted blocks a still one, failures a red line on a faint red tone.
+   SVG draws the dash so it follows the rounded outline and can travel; reduced motion keeps the dash still. */
+.block-state { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+/* Geometry is set through CSS so the outline follows the block size and the shared radius. */
+.block-state rect { x: 0.5px; y: 0.5px; width: calc(100% - 1px); height: calc(100% - 1px); rx: calc(var(--radius) - 0.5px); fill: none; stroke-width: 1; }
+.block-state[data-state="forming"] rect, .block-state[data-state="interrupted"] rect { stroke: var(--ring); stroke-dasharray: 4 4; }
+.block-state[data-state="forming"] rect { animation: block-state-trace 0.8s linear infinite; }
+.block-state[data-state="failed"] rect { stroke: var(--destructive); }
+@keyframes block-state-trace { to { stroke-dashoffset: -8; } }
+.surface-block[data-tone="failed"] { background-color: color-mix(in oklab, var(--destructive) 6%, var(--card-shell)); }
+@media (prefers-reduced-motion: reduce) { .block-state rect { animation: none; } }
 @layer base {
   * { box-sizing: border-box; }
   html, body, #root { height: 100%; background: transparent; }

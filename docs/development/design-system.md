@@ -2,6 +2,15 @@
 
 The native window is the material base. Independent opaque content surfaces sit above it. Shared tokens and controls keep application and built-in plugin views consistent.
 
+## Design language
+
+Asterism separates regions by tone and depth rather than by outlines, and reserves lines for meaning. The rules below decide new surfaces; the sections that follow apply them to specific tokens and controls.
+
+- **Tone and depth form regions.** A shell holds titles, navigation, and toolbars. Reading and editing content sits on a raised sheet inside it. Within a sheet, groups of rows and process blocks recede to the shell tone. Floating elements lift with the shared shadow. Each layer uses its shared tone, shadow, and radius tokens.
+- **Lines carry meaning.** Lines appear for focus, persistent selection, drop targets, and state: a moving dashed line for content still forming, a still dashed line for content that ended incomplete, and a red line for failure. Hairlines separate consecutive rows inside a group. Outer shells keep their border as the window-material edge. A border does not separate two regions that tone already separates.
+- **Motion explains cause and continuity.** Movement shows where something came from, where it went, or that a value changed, using the interaction vocabulary in the motion section. Motion does not decorate a static state.
+- **Restraint over effects.** Shading stays restrained, and a treatment that does not stand on its own is not compensated with more effects.
+
 ## Color and surfaces
 
 Use semantic tokens from the theme implementation. The chosen accent expresses primary actions, active work, and persistent selection; the gray palette expresses ordinary labels and secondary surfaces.
@@ -26,6 +35,8 @@ Pair colored surfaces with their corresponding foreground token. Contrast requir
 `surface` is the ordinary bordered card surface; `surface-floating` adds the shared shadow for floating content. Menus and dialogs use their public control surfaces.
 
 Islands, docks, and object cards use a shell and sheet. The shell carries the title bar, navigation, and toolbars on the `card-shell` tone; reading and editing content sits on one inset sheet in the card tone, raised by the shared sheet shadow rather than a border. The shared panel provides this layering, so plugin islands opened through it inherit it. A sheet nests concentrically one 4px inset and the shell border inside its shell, which the shared inset radius token expresses. Content floating inside a shell, such as the Agent composer tray, uses the shared lift shadow; when it sits farther from its container edge than its own radius, it matches the container radius rather than shrinking toward a square corner. Feature code does not define its own shadows or nested radii.
+
+On a sheet, `surface-group` holds grouped rows, fields, and empty states in the shell tone with hairlines between rows, and `surface-block` holds collapsible process blocks such as thinking and tool calls. Neither has a border. A block's state line follows its rounded outline: a moving dash while input streams or the call waits to run, a still dash when the block ended incomplete or did not enter later context, and a red line over a faint red tone when the request generating it failed. Reduced motion keeps the moving dash still.
 
 Theme values, palette ordering, radii, density, and font settings have shared definitions. Components do not duplicate those values.
 

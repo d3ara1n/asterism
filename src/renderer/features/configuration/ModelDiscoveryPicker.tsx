@@ -68,7 +68,7 @@ function DiscoveryContent({ provider, discovery }: { provider: ModelProvider | u
       <Input autoFocus value={query} onChange={event => setQuery(event.target.value)}
         placeholder={i18n.text(messages.searchModels)} aria-label={i18n.text(messages.searchModels)} />
       <p className="type-caption">{i18n.formatMessage(messages.discoveredCount, { count: discovery.models.length })}</p>
-      <div className="surface flex flex-col gap-3 p-3">
+      <div className="surface-group flex flex-col gap-3 p-3">
         {matches.map((model, index) => {
           const added = existing.has(model.modelId);
           const checkboxId = `discovered-${discovery.id}-${index}`;

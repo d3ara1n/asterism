@@ -39,11 +39,11 @@ export function MessagingSettings() {
     action={<Button size="sm" disabled={!types.length} onClick={event => open(null, event.currentTarget)}>
       <Plus data-icon="inline-start" />{i18n.text(messages.add)}
     </Button>}>
-    {snapshot && !connections.length ? <Empty className="border">
+    {snapshot && !connections.length ? <Empty className="surface-group">
       <EmptyHeader><EmptyMedia variant="icon"><MessageSquare /></EmptyMedia><EmptyDescription>{i18n.text(messages.empty)}</EmptyDescription></EmptyHeader>
       {types.length > 0 && <EmptyContent><Button size="sm" variant="outline" onClick={event => open(null, event.currentTarget)}>
         <Plus data-icon="inline-start" />{i18n.text(messages.add)}</Button></EmptyContent>}
-    </Empty> : <ItemGroup className="surface overflow-clip">{connections.map((connection, index) => {
+    </Empty> : <ItemGroup className="surface-group overflow-clip">{connections.map((connection, index) => {
       const type = types.find(type => type.id === connection.providerId);
       // The registry reports an error only while a failure is retried or terminal, so its presence decides the description.
       const { status, identity, error } = connection.runtime;
