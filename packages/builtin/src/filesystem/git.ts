@@ -11,7 +11,7 @@ export class GitExit extends Error {
 /** Run a read-only git command in `cwd` and return stdout. Stdin is closed so commands reading it see empty input. */
 export function git(cwd: string, args: string[], signal: AbortSignal, maxBuffer = 64 * 1024 * 1024): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = execFile("git", ["--no-optional-locks", "-C", cwd, ...args], { encoding: "utf8", signal, maxBuffer },
+    const child = execFile("git", ["--no-optional-locks", "-C", cwd, ...args], { encoding: "utf8", signal, maxBuffer, windowsHide: true },
       (error, stdout) => error ? reject(new GitExit((error as { code?: number | string }).code, error.message, stdout)) : resolve(stdout));
     child.stdin?.end();
   });
