@@ -52,7 +52,8 @@ export const Edit = defineTool({
     "append/prepend take body. Each body item is one text line; an empty string represents a blank line.",
     "All operations refer to the same pre-edit content and commit as one batch. Anchor or overlap failures preserve the original text.",
     "Replace/delete ranges conflict when they share original lines. Insertions can share range boundaries; an insertion strictly inside a replaced or deleted range conflicts. Insertions at the same original gap appear in edits array order.",
-    "Anchor mismatch results include current-line or shifted candidates. Successful results include the actual diff and fresh anchors.",
+    "A successful edit reports the line counts and fresh LINE#HASH anchors for subsequent edits. The user-facing result contains the diff.",
+    "Anchor mismatch results include current-line or shifted candidates.",
   ],
   argsSchema: z.strictObject({
     edits: z.array(editOperationSchema).min(1).max(500).describe("One to 500 hashline operations referring to the same current text. Replace/delete ranges have no shared lines; insertions may share boundaries and use array order at the same gap."),
@@ -89,7 +90,7 @@ export const Replace = defineTool({
     "Literal mode matches find as text and inserts replace verbatim. Regex mode uses JavaScript regular expressions and replacement syntax.",
     "All non-overlapping matches are replaced. flags applies in both modes; global matching is always enabled.",
     "No matches returns an error without changing the target. Matches that produce identical content succeed without writing.",
-    "The result includes the match count, actual diff, and fresh anchors for changed lines. These anchors can be used by edit.",
+    "The receipt reports the match count and fresh anchors for edit. The user-facing result contains the diff.",
   ],
   argsSchema: z.strictObject({
     find: z.string().min(1).describe("Non-empty text to find, or a JavaScript regular expression source when regex is true."),

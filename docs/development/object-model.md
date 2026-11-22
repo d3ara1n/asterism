@@ -104,7 +104,9 @@ Resource tool names express operation semantics. Across resources that expose th
 
 An operation’s saved outcome identifies the implementation actually used and the relevant resource at that time. Historical rendering uses those facts even if the current resource or implementation disappears. Unknown data remains available through fallback presentation.
 
-Tool results are records, not a separate artifact entity. A diff view presents a tool result; a relationship inferred from a result does not create a second source of operation history.
+Tool results are records, not a separate artifact entity or a general audit log. Each result carries the data its consumers need. A diff is a user-facing view of a text change, not part of the model's write receipt.
+
+For an operation that writes supplied content rather than retrieving information, the model projection should be a short, reliable receipt. Report the actual outcome and any new facts the model needs for further calls, such as a created identifier or fresh edit anchors. Do not echo the submitted content or attach a display diff. On rejection, partial success, or uncertain effect, preserve what is known about the outcome and the information needed to recover; brevity must not imply success or safe repetition.
 
 ## Views
 

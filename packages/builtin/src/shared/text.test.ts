@@ -37,18 +37,16 @@ describe("text tool contracts", () => {
     expect(readText("p".repeat(5000), true).rows[0].excerpt).toBeNull();
   });
 
-  // When deleting or retaining very long lines, diff and anchor-mismatch errors previously echoed the entire line unchanged.
-  it("edit model diffs and mismatch errors excerpt very long lines and state their ranges", () => {
-    const long = "x".repeat(60_000), before = `first\n${long}\nlast`;
-    const change = textChange(before, "first\nlast", "a.txt");
-    const model = editToModel(change);
-    expect(model).toContain("Removed line 2 is shown as its first 400 of 60000 characters.");
-    expect(model.length).toBeLessThan(2000);
-    expect(applyPatch(before, change.diff)).toBe("first\nlast");
+  it("limits live mismatch previews across the batch without dropping recovery coordinates or splitting Unicode", () => {
+    const long = "😀".repeat(4000);
+    const before = Array(50).fill(long).join("\n");
+    const edits = Array.from({ length: 50 }, (_, i) => ({ op: "delete" as const, anchor: { line: i + 1, hash: computeLineHash(i + 1, `old-${i}`) } }));
     let message = "";
-    try { editText(before, [{ op: "delete", anchor: { line: 2, hash: "ZZZZ" } }]); } catch (error) { message = (error as Error).message; }
-    expect(message).toContain("The current line is an excerpt");
-    expect(message.length).toBeLessThan(2000);
+    try { editText(before, edits); } catch (error) { message = (error as Error).message; }
+    expect(message).toContain(`current line: 1#${computeLineHash(1, long)}│${"😀".repeat(80)}…`);
+    expect(message).toContain(`current line: 50#${computeLineHash(50, long)}│…`);
+    expect([...message.matchAll(/😀/gu)]).toHaveLength(320);
+    expect(message).toContain("An anchored read");
   });
 
   it("validates every anchor in a batch, uses shifts only for retry information, and requires reconfirmation for duplicate candidates", () => {
@@ -58,8 +56,8 @@ describe("text tool contracts", () => {
       { op: "replace", anchor: anchor(0), body: ["A"] },
       { op: "replace", anchor: anchor(1), body: ["B"] },
     ])).toThrow("original content preserved");
-    expect(() => editText("prefix\na\nb\nc", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow('"line":3');
-    expect(() => editText("prefix\na\nb\nb", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow("several nearby lines");
+    expect(() => editText("prefix\na\nb\nc", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow(`matching nearby line: 3#${computeLineHash(3, "b")}`);
+    expect(() => editText("prefix\na\nb\nb", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow(`several nearby lines match: 3#${computeLineHash(3, "b")}, 4#${computeLineHash(4, "b")}`);
   });
 
   it("preserves mixed line endings and missing final newlines, returning reusable anchors and an actual applicable diff", () => {
@@ -68,7 +66,7 @@ describe("text tool contracts", () => {
     const edited = editText(before, [{ op: "replace", anchor: { line: row.line, hash: row.hash! }, body: ["B"] }]);
     expect(edited.text).toBe("a\r\nB\nc");
     const change = textChange(before, edited.text, "text.txt", edited.touchedLines);
-    expect(change).toMatchObject({ added: 1, removed: 1, anchors: [{ line: 2, content: "B" }] });
+    expect(change).toMatchObject({ added: 1, removed: 1, anchors: [{ line: 2, hash: computeLineHash(2, "B") }] });
     expect(applyPatch(before, change.diff)).toBe(edited.text);
     expect(editText(edited.text, [{ op: "insert_after", anchor: { line: 2, hash: change.anchors[0].hash! }, body: ["new"] }]).text).toBe("a\r\nB\nnew\r\nc");
     const loneCr = readText("a\nlast\r", true).rows[0];
@@ -132,9 +130,9 @@ describe("text tool contracts", () => {
     expect(edited.text).toBe("a\nleft\nmiddle1\nmiddle2\nD1\nD2\ne");
     expect(edited.touchedLines).toEqual([1, 2, 3, 4, 5]);
     const change = textChange(text, edited.text, "text.txt", edited.touchedLines);
-    expect(change.anchors.map(row => [row.line, row.content])).toEqual([
+    expect(change.anchors).toEqual(([
       [2, "left"], [3, "middle1"], [4, "middle2"], [5, "D1"], [6, "D2"],
-    ]);
+    ] as const).map(([line, content]) => ({ line, hash: computeLineHash(line, content) })));
   });
 
   it("combines prepend and append with deletion to empty text and orders insertions into an empty target", () => {
@@ -177,9 +175,9 @@ describe("text tool contracts", () => {
     ]);
     expect(edited.text).toBe("head\r\na\r\nleft\r\nB1\nB2\r\nB3\r\nright\r\nd\r\ntail");
     const change = textChange(text, edited.text, "text.txt", edited.touchedLines);
-    expect(change.anchors.map(row => [row.line, row.content])).toEqual([
+    expect(change.anchors).toEqual(([
       [1, "head"], [3, "left"], [4, "B1"], [5, "B2"], [6, "B3"], [7, "right"], [9, "tail"],
-    ]);
+    ] as const).map(([line, content]) => ({ line, hash: computeLineHash(line, content) })));
     expect(applyPatch(text, change.diff)).toBe(edited.text);
     const last = change.anchors.at(-1)!;
     expect(editText(edited.text, [{ op: "replace", anchor: { line: last.line, hash: last.hash! }, body: ["TAIL"] }]).text)
@@ -200,23 +198,29 @@ describe("text tool contracts", () => {
     expect(applyPatch(before, change.diff)).toBe("a\nB\n");
   });
 
-  it("edit model diffs and new anchors have independent budgets, while write retains a brief description", () => {
-    const after = Array.from({ length: 50 }, (_, i) => `${i} ${"x".repeat(2000)}`).join("\n");
-    const change = textChange("", after, "text.txt", Array.from({ length: 50 }, (_, i) => i));
-    expect(change.anchorsTruncated).toBe(true);
-    const model = editToModel(change), lines = model.split("\n");
-    const diff = lines.filter(line => /^(?:@@ |--- |\+\+\+ |[ +\-\\])/.test(line)).join("\n");
-    const anchors = lines.filter(line => /^\d+#.*│/.test(line));
-    expect(Buffer.byteLength(diff)).toBeLessThanOrEqual(64 * 1024);
-    expect(anchors.length).toBeLessThanOrEqual(40);
-    expect(Buffer.byteLength(anchors.join("\n"))).toBeLessThanOrEqual(16 * 1024);
-    expect(model).toMatch(/truncat/i);
-    expect(model).toMatch(/omit/i);
-    for (const anchor of change.anchors) expect(model).toContain(String(anchor.line) + "#" + anchor.hash + "│" + anchor.content);
-    expect(writeToModel(change).split("\n")).toHaveLength(1);
-    expect(writeToModel(change)).not.toContain(change.diff);
-    expect(writeToModel(change)).not.toContain("│");
-    expect(applyPatch("", change.diff)).toBe(after);
+  it("keeps the full patch in the edit result without echoing old or new text to the model", () => {
+    const before = "surrounding context\nold body\nlast";
+    const replacement = "new body ".repeat(2000);
+    const edited = editText(before, [{ op: "replace", anchor: { line: 2, hash: computeLineHash(2, "old body") }, body: [replacement] }]);
+    const change = textChange(before, edited.text, "text.txt", edited.touchedLines);
+    const model = editToModel(change);
+    expect(model).toContain("Content saved (+1 -1).");
+    expect(model).not.toMatch(/@@|old body|new body|surrounding context/);
+    const [, line, hash] = /^(\d+)#([0-9A-Z]{4})$/m.exec(model)!;
+    expect(change.anchors).toEqual([{ line: 2, hash: computeLineHash(2, replacement) }]);
+    expect(editText(edited.text, [{ op: "delete", anchor: { line: Number(line), hash } }]).text).toBe("surrounding context\nlast");
+    expect(applyPatch(before, change.diff)).toBe(edited.text);
+    expect(writeToModel(change)).toBe("Content saved (+1 -1).");
+  });
+
+  it("returns usable anchors even when the first changed line would exhaust the former text budget", () => {
+    const long = "x".repeat(16_000);
+    const rows = [long, long, ...Array.from({ length: 40 }, (_, i) => `row ${i + 3}`)];
+    const change = textChange("", rows.join("\n"), "text.txt", rows.map((_, i) => i));
+    const model = editToModel(change);
+    expect(model).toContain(`40#${computeLineHash(40, rows[39])}`);
+    expect(model).not.toContain(`41#${computeLineHash(41, rows[40])}`);
+    expect(model).toContain("Some updated anchors were omitted.");
   });
   it("the user body-preview budget does not limit content returned to the model by read", () => {
     const text = Array.from({ length: 200 }, (_, index) => `line ${index + 1}`).join("\n");

@@ -24,7 +24,7 @@ export const WebSearch = defineImplementation({
   resource: WebResource, targetSchema, effect: "read", execution: "parallel",
   tool: defineTool({ id: builtin.name("web.tool.search"), name: "web_search",
     description: "Search the web for sources matching a query.",
-    guidelines: ["Results include source URLs, content, structured details and hints describing any conditions that were not applied."],
+    guidelines: ["The model receives source URLs and content, plus hints about conditions that were not applied or were adjusted."],
     argsSchema: webSearchRequestSchema,
   }),
 });

@@ -42,6 +42,12 @@ Providers may pass the budget upstream to reduce transfer. Only actual clipping 
 
 Scores retain their provider meaning and do not establish cross-provider ranking. Ordinary tool history and Agent compaction handle saved results. There is no separate Web response cache or result database.
 
+## Model-facing result design
+
+The Web tool model projection should carry source URLs, source content and relevant metadata, and conditions that change how to interpret the result: for example, an unapplied filter, clipped content, or an unavailable page. The provider is an execution detail, not the source. Keep provider identity, request IDs, billing usage, and provider attempt diagnostics outside the model projection. Report failures at the level needed to understand or recover from them without listing individual provider attempts.
+
+Use the content categories the provider supplies. Do not infer that a summary contains a page body, compare sections for overlap, or repair provider content in the model projection. Apply the declared request limits and report known truncation.
+
 ## Built-in adapters
 
 Adapters use official SDKs when their request interfaces support cancellation, or the provider's official HTTP API with a native cancellation signal. Both paths use the same provider lifecycle. Cancellation stops local transport and result consumption; it does not establish that the upstream service stopped processing or reversed a charge. Stopping only the caller's wait while leaving an unowned request running does not satisfy this contract.

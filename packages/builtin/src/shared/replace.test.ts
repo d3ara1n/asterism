@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applyPatch } from "diff";
-import { replaceText } from "./replace.ts";
+import { replaceText, replaceToModel } from "./replace.ts";
 import { editText, textChange } from "./text.ts";
+import { computeLineHash } from "./hashline/hash.ts";
 
 // Expectations follow global JavaScript replacement semantics and the shared text-change contract.
 describe("bulk text replacement", () => {
@@ -36,7 +37,7 @@ describe("bulk text replacement", () => {
     expect(replaced).toEqual({ text: after, matches: 2 });
     const data = textChange(before, replaced.text, "mixed.txt", "diff");
     expect(applyPatch(before, data.diff)).toBe(after);
-    expect(data.anchors.map(row => [row.line, row.content])).toEqual([[1, "new"], [3, "new"]]);
+    expect(data.anchors).toEqual([{ line: 1, hash: computeLineHash(1, "new") }, { line: 3, hash: computeLineHash(3, "new") }]);
     expect(replaceText("start\r\nend", { find: "start.*end", replace: "done", regex: true, flags: "s" }))
       .toEqual({ text: "done", matches: 1 });
   });
@@ -56,22 +57,33 @@ describe("bulk text replacement", () => {
     const before = `old\n${middle}\nold`;
     const replaced = replaceText(before, { find: "old", replace: "new" });
     const data = textChange(before, replaced.text, "sparse.txt", "diff");
-    expect(data.anchors.map(row => [row.line, row.content])).toEqual([[1, "new"], [62, "new"]]);
+    expect(data.anchors.map(row => row.line)).toEqual([1, 62]);
     expect(data.anchorsTruncated).toBe(false);
     const row = data.anchors[1];
     expect(editText(replaced.text, [{ op: "replace", anchor: { line: row.line, hash: row.hash! }, body: ["last"] }]).text)
       .toBe(`new\n${middle}\nlast`);
   });
 
+  it("keeps the actual patch for the user and gives the model match counts and a reusable deletion-gap anchor", () => {
+    const before = `first\n${"x".repeat(60_000)}\nlast`;
+    const { text, matches } = replaceText(before, { find: "^x+\\n", replace: "", regex: true, flags: "m" });
+    const data = textChange(before, text, "note", "diff");
+    const model = replaceToModel({ ...data, matches });
+    expect(model).toContain("Matched 1 occurrence.");
+    expect(model).toContain(`2#${computeLineHash(2, "last")}`);
+    expect(model).not.toMatch(/@@|first|last|xxx/);
+    expect(applyPatch(before, data.diff)).toBe("first\nlast");
+  });
+
   it("anchors inserted lines and surviving deletion gaps, including deletion at the end and to empty content", () => {
     const expanded = replaceText("head\nX\ntail", { find: "X", replace: "a\nb" });
-    expect(textChange("head\nX\ntail", expanded.text, "expand", "diff").anchors.map(row => [row.line, row.content]))
-      .toEqual([[2, "a"], [3, "b"]]);
+    expect(textChange("head\nX\ntail", expanded.text, "expand", "diff").anchors)
+      .toEqual([{ line: 2, hash: computeLineHash(2, "a") }, { line: 3, hash: computeLineHash(3, "b") }]);
     const removed = replaceText("head\nremove\ntail", { find: "remove\n", replace: "" });
-    expect(textChange("head\nremove\ntail", removed.text, "gap", "diff").anchors.map(row => [row.line, row.content]))
-      .toEqual([[2, "tail"]]);
+    expect(textChange("head\nremove\ntail", removed.text, "gap", "diff").anchors)
+      .toEqual([{ line: 2, hash: computeLineHash(2, "tail") }]);
     expect(textChange("head\ntail\n", "head\n", "end", "diff").anchors).toEqual([]);
     expect(textChange("all\n", "", "empty", "diff").anchors).toEqual([]);
-    expect(textChange("", "new", "insert", "diff").anchors.map(row => [row.line, row.content])).toEqual([[1, "new"]]);
+    expect(textChange("", "new", "insert", "diff").anchors).toEqual([{ line: 1, hash: computeLineHash(1, "new") }]);
   });
 });

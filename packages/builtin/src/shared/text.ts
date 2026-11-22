@@ -1,15 +1,16 @@
 import { Buffer } from "node:buffer";
 import { structuredPatch, formatPatch, type StructuredPatchHunk } from "diff";
 import { applyEdits } from "./hashline/apply.ts";
-import { clipDiffLine, excerptNote, READ_EXCERPT_THRESHOLD, rowText, textRow } from "./text-row.ts";
+import { computeLineHash } from "./hashline/hash.ts";
 import { hasFinalNewline, splitLines } from "./hashline/lines.ts";
 import type { ApplyFailure, Edit } from "./hashline/types.ts";
+import { excerptNote, READ_EXCERPT_THRESHOLD, rowText, textRow } from "./text-row.ts";
 import type { TextRead, TextChange } from "@asterism-app/builtin-api/contracts";
 import type { CallResult } from "@asterism-app/sdk/runtime";
 
 const MAX_ANCHOR_LINES = 40;
-const MAX_ANCHOR_BYTES = 16 * 1024;
-const MAX_MODEL_DIFF_BYTES = 64 * 1024;
+const MAX_RECOVERY_PREVIEW_PER_LINE = 80;
+const MAX_RECOVERY_PREVIEW_CHARS = 320;
 
 /** Expected text-operation failures occur before writing; the execution layer still owns unknown write outcomes. */
 export class TextError extends Error {
@@ -47,14 +48,27 @@ export function readToModel(data: TextRead, offsetField = "target.offset"): stri
 
 function failureMessage(failure: ApplyFailure): string {
   if (failure.kind !== "anchor") return failure.message;
-  return ["Anchor mismatch; original content preserved.", ...failure.failures.map(f => {
+  let remaining = MAX_RECOVERY_PREVIEW_CHARS;
+  let shortened = false;
+  const details = failure.failures.map(f => {
     const prefix = `edits[${f.opIndex}].${f.which} (${f.cited.line}#${f.cited.hash})`;
-    if (f.recovery.kind === "found") return `${prefix}: matching nearby line: {\"line\":${f.recovery.newLine},\"hash\":\"${f.recovery.newHash}\"}.`;
-    if (f.recovery.kind === "ambiguous") return `${prefix}: several nearby lines match: ${JSON.stringify(f.recovery.candidates)}.`;
+    if (f.recovery.kind === "found") return `${prefix}: matching nearby line: ${f.recovery.newLine}#${f.recovery.newHash}`;
+    if (f.recovery.kind === "ambiguous") return `${prefix}: several nearby lines match: ${f.recovery.candidates.map(c => `${c.line}#${c.hash}`).join(", ")}`;
     if (!f.current) return `${prefix}: line is out of range.`;
-    const current = { ...textRow(f.cited.line, f.current.content, false, READ_EXCERPT_THRESHOLD), hash: f.current.hash };
-    return `${prefix}: current line is ${rowText(current)}.${current.excerpt ? ` ${excerptNote(current, "The current line")}` : ""}`;
-  })].join("\n");
+    let preview = "", limit = Math.min(remaining, MAX_RECOVERY_PREVIEW_PER_LINE);
+    for (const character of f.current.content) {
+      if (limit === 0) break;
+      preview += character;
+      limit--;
+      remaining--;
+    }
+    const excerpt = preview.length < f.current.content.length;
+    shortened ||= excerpt;
+    return `${prefix}: current line: ${f.cited.line}#${f.current.hash}│${preview}${excerpt ? "…" : ""}`;
+  });
+  return ["Anchor mismatch; original content preserved.", ...details,
+    ...(shortened ? ["An anchored read can inspect the current lines shown as excerpts (…)."] : []),
+  ].join("\n");
 }
 export function editText(text: string, edits: Edit[]): { text: string; touchedLines: readonly number[] } {
   const applied = applyEdits(text, edits);
@@ -94,58 +108,19 @@ export function textChange(before: string, after: string, label: string, touched
   }
   const lines = splitLines(after);
   const indices = [...new Set(touched === "diff" ? diffTouchedLines(patch.hunks, lines.length) : touched)].sort((a, b) => a - b);
-  const anchors: TextChange["anchors"] = [];
-  let anchorBytes = 0;
-  for (const i of indices) {
-    const row = textRow(i + 1, lines[i], true, READ_EXCERPT_THRESHOLD);
-    const cost = Buffer.byteLength(`${rowText(row)}\n`);
-    if (anchors.length === MAX_ANCHOR_LINES || anchorBytes + cost > MAX_ANCHOR_BYTES) break;
-    anchors.push(row); anchorBytes += cost;
-  }
+  const anchors = indices.slice(0, MAX_ANCHOR_LINES).map(i => ({ line: i + 1, hash: computeLineHash(i + 1, lines[i]) }));
   return {
     changed: before !== after, diff: before === after ? "" : formatPatch(patch), added, removed,
     anchors, anchorsTruncated: anchors.length < indices.length,
   };
 }
-function changeSummary(data: TextChange): string {
+export function writeToModel(data: TextChange): string {
   return data.changed ? `Content saved (+${data.added} -${data.removed}).` : "Content was already identical; no change was needed.";
 }
-export function writeToModel(data: TextChange): string {
-  return changeSummary(data);
-}
-/** Clips very long unified-diff lines from the start, derives line numbers from hunk headers, and states each excerpt range after the diff. */
-function boundedDiff(diff: string): { lines: string[]; notes: string[]; truncated: boolean } {
-  const lines: string[] = [], notes: string[] = [];
-  let bytes = 0, oldLine = 0, newLine = 0, inHunk = false;
-  for (const raw of diff.split("\n")) {
-    const hunk = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(raw);
-    // Only ---/+++ file headers precede the first hunk; subsequent deletion lines starting with -- are still body content.
-    const clipped = hunk || !inHunk ? null : clipDiffLine(raw);
-    const text = clipped?.text ?? raw;
-    const cost = Buffer.byteLength(text) + 1;
-    if (bytes + cost > MAX_MODEL_DIFF_BYTES) return { lines, notes, truncated: true };
-    lines.push(text); bytes += cost;
-    if (hunk) { oldLine = Number(hunk[1]); newLine = Number(hunk[2]); inHunk = true; continue; }
-    if (!inHunk) continue;
-    const kind = raw[0];
-    if (clipped) {
-      const label = kind === "-" ? `Removed line ${oldLine}` : kind === "+" ? `Added line ${newLine}` : `Context line ${newLine}`;
-      notes.push(`${label} is shown as its first ${clipped.text.length - 1} of ${clipped.length} characters.`);
-    }
-    if (kind === " " || kind === "-") oldLine++;
-    if (kind === " " || kind === "+") newLine++;
-  }
-  return { lines, notes, truncated: false };
-}
 export function editToModel(data: TextChange): string {
-  // History retains the complete diff; the model receives a bounded diff and new anchors for further editing.
-  const diff = boundedDiff(data.diff);
   return [
-    changeSummary(data),
-    diff.lines.join("\n"),
-    ...diff.notes,
-    ...(diff.truncated ? ["Diff output was truncated; the full diff is saved in the tool result."] : []),
-    ...(data.anchors.length ? ["Updated anchors:", ...data.anchors.map(rowText), ...data.anchors.flatMap(row => excerptNote(row) ?? [])] : []),
+    writeToModel(data),
+    ...(data.anchors.length ? ["Updated anchors:", ...data.anchors.map(({ line, hash }) => `${line}#${hash}`)] : []),
     ...(data.anchorsTruncated ? ["Some updated anchors were omitted."] : []),
-  ].filter(Boolean).join("\n");
+  ].join("\n");
 }

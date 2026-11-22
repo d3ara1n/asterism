@@ -1,5 +1,5 @@
 import { webCard } from "../shared/card-appearance.ts";
-import { defineModule, implementResource, implementCreation, implementTool, WebError, type CallResult } from "@asterism-app/sdk/runtime";
+import { defineModule, implementResource, implementCreation, implementTool, type CallResult } from "@asterism-app/sdk/runtime";
 import type { Json, ResourceRef, WebFetchResult, WebSearchResult } from "@asterism-app/sdk/contracts";
 import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract.ts";
 import { exaWebProvider } from "./exa.ts";
@@ -8,13 +8,14 @@ import { perplexityWebProvider } from "./perplexity.ts";
 import { tavilyWebProvider } from "./tavily.ts";
 import { firecrawlWebProvider } from "./firecrawl.ts";
 import { deepseekWebProvider } from "./deepseek.ts";
+import { webToModel, webToolError } from "./projection.ts";
 import { costOf, emptyWebStats, finishRequest, projectStats, startRequest, type WebRequestKind, type WebSessionStats } from "./stats.ts";
 
-async function result<T extends Json>(work: () => Promise<T>, signal: AbortSignal): Promise<CallResult<T>> {
+async function result<T extends Json>(work: () => Promise<T>, signal: AbortSignal, kind: WebRequestKind): Promise<CallResult<T>> {
   try { signal.throwIfAborted(); return { kind: "succeeded", data: await work() }; }
   catch (error) {
     if (signal.aborted) return { kind: "cancelled", message: "The web request was cancelled." };
-    return { kind: "failed", error: { code: error instanceof WebError ? error.code : "request_failed", message: error instanceof Error ? error.message : String(error) } };
+    return { kind: "failed", error: webToolError(error, kind) };
   }
 }
 export default defineModule(plugin => {
@@ -34,7 +35,7 @@ export default defineModule(plugin => {
     work: () => Promise<T>, signal: AbortSignal): Promise<CallResult<T>> {
     const started = performance.now();
     update(sessionId, startRequest);
-    const outcome = await result(work, signal);
+    const outcome = await result(work, signal, kind);
     const durationMs = performance.now() - started;
     const at = Date.now();
     const status = outcome.kind === "succeeded" ? "succeeded" : outcome.kind === "cancelled" ? "cancelled" : "failed";
@@ -73,10 +74,12 @@ export default defineModule(plugin => {
       implementTool(WebSearch, {
         call: (_data, _target, request, { object, signal }) =>
           tracked(object.ref.sessionId, "search", request.query, () => plugin.web.search(request, { signal }), signal),
+        toModel: webToModel,
       }),
       implementTool(WebFetch, {
         call: (_data, _target, request, { object, signal }) =>
           tracked(object.ref.sessionId, "fetch", request.url, () => plugin.web.fetch(request, { signal }), signal),
+        toModel: webToModel,
       }),
     ],
   };

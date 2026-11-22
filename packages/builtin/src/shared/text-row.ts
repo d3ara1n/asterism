@@ -1,7 +1,7 @@
 import type { TextRow } from "@asterism-app/builtin-api/contracts";
 import { computeLineHash } from "./hashline/hash.ts";
 
-/** Long-line threshold for read/edit echoes: allows ordinary long paragraphs while limiting minified output and inline base64. */
+/** Long-line threshold for reads: allows ordinary long paragraphs while limiting minified output and inline base64. */
 export const READ_EXCERPT_THRESHOLD = 16_000;
 /** grep uses a lower threshold because it locates content. */
 export const SEARCH_EXCERPT_THRESHOLD = 1000;
@@ -46,12 +46,4 @@ export function displayText(row: Pick<TextRow, "content" | "excerpt">): string {
 export function displayLine(content: string, threshold = READ_EXCERPT_THRESHOLD): string {
   if (content.length <= threshold) return content;
   return `${content.slice(0, excerptWindow(content, 0).end)}…`;
-}
-
-/** diff lines retain their first character (space/ +/-/\); bodies exceeding the threshold are clipped from the line start. */
-export function clipDiffLine(line: string, threshold = READ_EXCERPT_THRESHOLD): { text: string; length: number } | null {
-  const body = line.slice(1);
-  if (body.length <= threshold) return null;
-  const { end } = excerptWindow(body, 0);
-  return { text: `${line[0]}${body.slice(0, end)}`, length: body.length };
 }

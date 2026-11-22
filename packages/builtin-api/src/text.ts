@@ -45,7 +45,7 @@ export const textChangeSchema = z.strictObject({
   diff: z.string().describe("The actual unified diff, preserving final-newline and CRLF differences."),
   added: z.number().int().nonnegative().describe("Number of added lines in the actual diff."),
   removed: z.number().int().nonnegative().describe("Number of removed lines in the actual diff."),
-  anchors: z.array(textRowSchema).describe("Fresh anchors for lines produced by edit or replace, including a line shifted into a deletion gap. Always empty for write."),
+  anchors: z.array(lineAnchorSchema).describe("Fresh anchors for lines produced by edit or replace, including a line shifted into a deletion gap. Always empty for write."),
   anchorsTruncated: z.boolean().describe("True when the fresh anchors cover a subset of the changed lines."),
 }).describe("The committed content change with an actual diff and bounded fresh edit anchors. write returns an empty anchors array.");
 export type TextRead = z.infer<typeof textReadSchema>;
