@@ -2,7 +2,7 @@
 
 Filed: 2026-11-20
 
-Status: Deferred. Retain the product direction and prototype findings. Resume with research and visual design only when requested; this plan does not authorize implementation.
+Status: Superseded on 2026-11-22. The user chose the shell-and-sheet surface language with interaction motion as the application-wide direction, which replaces the glass target below. The prototype findings remain as historical evidence.
 
 ## Product direction
 
