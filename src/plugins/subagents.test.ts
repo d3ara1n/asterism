@@ -90,7 +90,7 @@ async function fixture(child: (input: ModelInput, signal: AbortSignal) => AsyncI
     const result = await context.execution.run({
       access: caller, agent, interactive: true, target: { provider: "test", model: "test" }, signal, requestParentId: null,
       system: { blocks: [{ id: "test.parent", text: "Private parent context" }] },
-      messages: [{ kind: "input", parts: [{ kind: "text", text: JSON.stringify({ resource_id: pool.id, tool: `subagent_${tool}`, target, args }) }] }],
+      messages: [{ kind: "input", parts: [{ kind: "text", text: JSON.stringify({ resource_id: pool.id, tool: tool === "list" ? tool : `subagent_${tool}`, target, args }) }] }],
       observer: { event() {} },
     });
     return result.tools[0]!;
@@ -256,12 +256,13 @@ describe("Shared Subagent Pool", () => {
     expect(completed).toMatchObject({ status: { outcome: "succeeded" }, output: { result: "Task report", usage: { model: "test/test", requests: 1 } } });
   });
 
-  it("persists reports through rewind and restart, and resolves abandoned pending records without replay", async () => {
+  it("persists task names and reports through rewind and restart, and resolves abandoned pending records without replay", async () => {
     let requests = 0;
     const f = await fixture(async function* () { requests++; yield* report("Persistent report"); });
     const pool = await f.createPool();
     const before = f.context.session(f.sessionId).snapshot().position.nodeId;
-    const task = await f.delegate(pool, "Inspect");
+    const name = "  检查示例 / #1  ";
+    const task = await f.delegate(pool, "Inspect", { name });
     await f.invoke(pool, "wait", { ids: [task.input.id] });
     const delegated = f.context.session(f.sessionId).snapshot().records.first(Delegation, { scope: "timeline" })!;
     expect(delegated.record.pending).toBe(false);
@@ -273,11 +274,17 @@ describe("Shared Subagent Pool", () => {
     expect((await f.invoke(pool, "check", { id: task.input.id })).kind).toBe("rejected");
     await f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: delegated.record.id });
     expect((await f.check(pool, task.input.id)).output.result).toBe("Persistent report");
+    const { name: _name, ...legacyInput } = task.input;
     f.app.sessions.tree.appendToTimeline(f.sessionId, {
       contract: Delegation.id, source: { plugin: builtin.id, resource: { id: pool.id, sessionId: pool.sessionId, kind: pool.kind } }, model: null, recipient: null, pending: true,
-      data: { input: { ...task.input, id: "sub-9", runId: "interrupted-run" }, output: null },
+      data: { input: { ...legacyInput, id: "sub-9", runId: "interrupted-run" }, output: null },
     });
     await f.restart();
+    const listed = await f.invoke(pool, "list");
+    expect(listed).toMatchObject({ kind: "succeeded", data: { tasks: [
+      { id: task.input.id, name }, { id: "sub-9" },
+    ] } });
+    expect(listed.data).not.toHaveProperty(["tasks", "1", "name"]);
     expect((await f.check(pool, task.input.id)).output.result).toBe("Persistent report");
     expect((await f.check(pool, "sub-9")).status).toMatchObject({ outcome: "failed", code: "interrupted" });
     expect(requests).toBe(1);

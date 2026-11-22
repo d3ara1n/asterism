@@ -103,7 +103,8 @@ export class SubagentPoolRuntime {
   }
   delegate(args: DelegateInput, caller: ToolCaller): TaskSnapshot {
     if (this.closed) throw new PluginApiError("unavailable", "The subagent pool is closing.");
-    const input: DelegationInput = { id: `sub-${this.nextId++}`, runId: nanoid(), role: args.role, model: args.model ?? null,
+    const { name } = args;
+    const input: DelegationInput = { id: `sub-${this.nextId++}`, ...(name === undefined ? {} : { name }), runId: nanoid(), role: args.role, model: args.model ?? null,
       task: args.task, context: args.context ?? null, submittedBy: { id: caller.ref.id, title: caller.title } };
     let resolve!: () => void;
     const job: Job = {

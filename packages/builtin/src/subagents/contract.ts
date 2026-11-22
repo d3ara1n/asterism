@@ -21,6 +21,7 @@ export const modelOverrideSchema = z.strictObject({
 export const delegateSchema = z.strictObject({
   role: configurationIdSchema.describe("Target Agent role ID from list_agent. Availability is checked when the task is submitted; later visibility changes do not revoke the selection. Missing and unavailable target roles have the same selection error. The caller's delegates allowlist further determines which roles it can delegate to."),
   model: modelOverrideSchema.optional().describe("Optional model selection override. Other settings come from the Agent role."),
+  name: z.string().optional().describe("A simple task name."),
   task: z.string().min(1).describe("The work and the requested report. The task conversation receives only task and context, so every requirement and constraint appears in one of them."),
   context: z.string().optional().describe("Background material for the task, such as prior findings, selected code, or file lists; delivered separately from the instructions."),
 }).describe("An Agent role and explicit task material.");
@@ -50,7 +51,7 @@ export const outputSchema = z.strictObject({
   undelivered: z.array(z.string()).describe("Steering messages queued but not delivered before the task ended."),
 });
 export const delegationInputSchema = z.strictObject({
-  id: taskIdSchema, runId: z.string(), role: z.string(), model: modelOverrideSchema.nullable(),
+  id: taskIdSchema, name: z.string().optional(), runId: z.string(), role: z.string(), model: modelOverrideSchema.nullable(),
   task: z.string(), context: z.string().nullable(),
   submittedBy: z.strictObject({ id: z.string(), title: z.string() }),
 });
@@ -63,7 +64,7 @@ export const snapshotSchema = z.strictObject({
   createdAt: z.string(), finishedAt: z.string().nullable(),
 }).describe("Task identity and input, current status, report, and measured usage.");
 export const summarySchema = snapshotSchema.omit({ input: true, output: true }).extend({
-  id: taskIdSchema, role: z.string(), task: z.string(), usage: usageSchema,
+  id: taskIdSchema, name: delegationInputSchema.shape.name, role: z.string(), task: z.string(), usage: usageSchema,
 });
 export const recentActivity = 8;
 export const waitEntrySchema = summarySchema.extend({
@@ -90,6 +91,7 @@ const define = <T extends ToolInput, A extends ToolInput, D extends Json>(
 export const Delegate = define("delegate",
   "Submit an independent task to this shared pool and return its ID immediately. The task runs asynchronously with the Agent role's instructions and budget and the resources linked to the pool.",
   [
+    "Use the returned ID to check, wait for, steer, or cancel the task.",
     "Several delegations run concurrently; the pool executes up to four at once and queues the rest.",
     "subagent_wait blocks until selected tasks end; subagent_check then returns each report.",
   ],
@@ -145,8 +147,8 @@ export type ProcessFrame = { task: TaskSnapshot | null; queued: string[]; error:
 export const PoolChannel = defineChannel<{ id: string | null }, ProcessFrame>(builtin.name("subagent-pool.process"));
 
 export function summary(task: TaskSnapshot): TaskSummary {
-  const preview = task.input.task.split("\n")[0]!;
-  return { id: task.input.id, role: task.input.role, task: preview.length > 160 ? `${preview.slice(0, 160)}…` : preview, status: task.status,
+  const { id, name, role } = task.input, preview = task.input.task.split("\n")[0]!;
+  return { id, ...(name === undefined ? {} : { name }), role, task: preview.length > 160 ? `${preview.slice(0, 160)}…` : preview, status: task.status,
     usage: task.output.usage, createdAt: task.createdAt, finishedAt: task.finishedAt };
 }
 export function emptyOutput(): TaskOutput {

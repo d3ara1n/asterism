@@ -75,7 +75,7 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
   }, [id, object.ref.id, object.ref.sessionId, connection]);
   const reconnect = () => { setDisconnected(false); setConnection(value => value + 1); };
 
-  const task = frame?.task;
+  const task = frame?.task, name = task?.input.name;
   useEffect(() => {
     const element = scroll.current, previous = phase.current;
     phase.current = task?.status.phase ?? null;
@@ -107,8 +107,11 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
     <header className="flex min-w-0 items-center gap-2 border-b px-2 py-1.5">
       <IconButton size="icon-sm" variant="ghost" label={i18n.text(messages.back)}
         autoFocus={focus} onClick={back}><ArrowLeft /></IconButton>
+      {name !== undefined && <TooltipHint content={name}>
+        <bdi className="min-w-0 flex-1 truncate text-xs font-medium">{name}</bdi>
+      </TooltipHint>}
       <span className="shrink-0 font-mono text-xs">{id}</span>
-      <span className="min-w-0 flex-1 truncate type-caption">{task?.input.role}</span>
+      <span className={cn("min-w-0 truncate type-caption", name === undefined && "flex-1")}>{task?.input.role}</span>
       {task && <TaskStatus status={task.status} />}
       {working && <Popover open={confirming} onOpenChange={setConfirming}>
         <Tooltip>
@@ -207,7 +210,11 @@ export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
         {selected ? <TaskDetail id={selected} back={() => select(null)} focus={opened} /> : <>
           <p className="type-caption px-3 py-2" role="status" aria-atomic="true">{i18n.formatMessage(messages.active, { running, queued })}</p>
           {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VirtualList data={data.tasks.toReversed()}>{task =>
-              <ListRow key={task.id} title={`${task.id} · ${task.role}`} tooltip={task.task} onOpen={() => select(task.id)}
+              <ListRow key={task.id} title={<>
+                {task.name !== undefined && <bdi className="min-w-0 truncate">{task.name}</bdi>}
+                <span className={cn("min-w-0 shrink-0", task.name !== undefined && "type-caption")}>{task.id}</span>
+                <span className="min-w-0 truncate type-caption">{task.role}</span>
+              </>} tooltip={task.name === undefined ? task.task : `${task.name}\n${task.task}`} onOpen={() => select(task.id)}
                 className="[--list-row-gap:--spacing(2)] [--list-row-x:--spacing(3)] [--list-row-y:--spacing(1.5)] [&_[data-slot=item-title]]:text-xs [&_[data-slot=item-description]]:text-xs [&_[data-slot=item-description]]:leading-snug"
                 contentClassName="gap-0.5"
                 description={<span className="block truncate">{task.task}</span>}

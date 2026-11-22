@@ -59,7 +59,7 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
           return pool(object.ref).delegate(args, caller);
         });
       },
-      toModel: task => JSON.stringify({ id: task.input.id, role: task.input.role, status: task.status }),
+      toModel: ({ input: { id, name, role }, status }) => JSON.stringify({ id, name, role, status }),
     });
     return {
       resources: [implementResource(SubagentPool, PoolView, {
@@ -112,8 +112,9 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
           return operation(signal, () => pool(object.ref).check(target.id));
         }, toModel: task => {
           const current = currentActivity(task);
+          const { id, name, role } = task.input;
           return JSON.stringify({
-            id: task.input.id, role: task.input.role, status: task.status, usage: modelUsage(task.output.usage),
+            id, name, role, status: task.status, usage: modelUsage(task.output.usage),
             ...(current ? { current } : {}),
             ...(task.status.phase === "finished" ? { result: task.output.result } : {}),
             ...(task.output.undelivered.length ? { undelivered: task.output.undelivered } : {}),
@@ -122,7 +123,7 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
         implementTool(Wait, { call(_data, targets, _args, { object, signal, publish }) {
           return operation(signal, async () => ({ tasks: await pool(object.ref).wait(targets.ids, signal, tasks => publish({ tasks })) }));
         }, toModel: ({ tasks }) => JSON.stringify({ tasks: tasks.map(task => ({
-          id: task.id, role: task.role,
+          id: task.id, name: task.name, role: task.role,
           status: task.status.phase === "running" ? { phase: task.status.phase } : task.status,
         })) }) }),
         implementTool(Steer, { call(_data, target, args, { object, signal }) {

@@ -42,7 +42,7 @@ One resource-bound managed task supervises the queue and its active executions w
 
 ## Identity and audit
 
-A short ID such as `sub-1` is a target within one pool. A globally unique run ID identifies the execution for diagnostics. The Delegation record retains both their relationship and the run ID used for audit lookup.
+A short ID such as `sub-1` is a target within one pool. A globally unique run ID identifies the execution for diagnostics. The Delegation record retains both identities and any display name supplied at submission. Names are stored verbatim, may repeat, and do not participate in lookup or execution. An omitted name is absent from task summaries and views; the task ID remains available separately.
 
 Executed runs append internal process records to a JSONL file named by the run ID in plugin-owned storage as the run proceeds. Writes queue in order, with each line written before its attachment copies. Normal close awaits the queue. Abrupt interruption can leave an incomplete line and omit multiple queued entries or attachment copies. A task cancelled before admission has no process and no audit. Audit files are retained permanently for investigation. Normal result retrieval reads the Delegation record. The audit is not an alternative report delivery channel or a source for resuming execution.
 
