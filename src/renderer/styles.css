@@ -93,6 +93,12 @@
 }
 /* shadcn dark: classes bind to resolved light/dark mode; business code does not specify dark:. */
 @custom-variant dark (&:where([data-mode=dark], [data-mode=dark] *));
+/* Disabled controls keep pointer events so their tooltips can explain them; hover styling skips them instead. */
+@custom-variant hover {
+  @media (hover: hover) {
+    &:where(:not(:disabled)):hover { @slot; }
+  }
+}
 @theme inline {
   --color-background: var(--background);
   --color-canvas: var(--canvas);

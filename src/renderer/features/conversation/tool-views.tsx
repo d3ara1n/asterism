@@ -15,7 +15,7 @@ import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-co
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { cn } from "@asterism-app/ui/utils";
 import { scriptToolRenderer } from "./script-view";
 import { resourceStateFields, type StateField, type StateValue } from "./resource-state";
@@ -33,7 +33,7 @@ function ResourceListBody({ result }: ListProps) {
   if (!result?.data) return null;
   if (!result.data.resources.length) return <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoResources)}</p>;
   const restricted = i18n.formatMessage(toolsMessages.toolResourceRestricted);
-  return <TooltipProvider delayDuration={300}><ToolScrollArea className="max-h-80"><ul className="flex flex-col">
+  return <ToolScrollArea className="max-h-80"><ul className="flex flex-col">
     {result.data.resources.map(resource => {
       const description = registry.resource(resource.type);
       return <li key={resource.resource_id} className="flex h-7 min-w-0 items-center gap-2 text-sm [&>svg]:size-4 [&>svg]:shrink-0">
@@ -53,7 +53,7 @@ function ResourceListBody({ result }: ListProps) {
         <span className="ml-auto shrink-0 type-caption text-muted-foreground">{i18n.text(description.label)}</span>
       </li>;
     })}
-  </ul></ToolScrollArea></TooltipProvider>;
+  </ul></ToolScrollArea>;
 }
 const listView = { headerRenderer: ResourceListHeader, bodyRenderer: ResourceListBody };
 const list = toolRenderer(ResourceListResult, {
@@ -132,7 +132,7 @@ function ToolChips({ tools }: { tools: readonly InspectedTool[] }) {
   const i18n = useI18n();
   const registry = useModuleViews();
   const interaction = i18n.formatMessage(toolsMessages.toolRequiresInteraction);
-  return <TooltipProvider delayDuration={300}><ToolScrollArea className="max-h-80"><ul className="flex flex-wrap gap-1.5">
+  return <ToolScrollArea className="max-h-80"><ul className="flex flex-wrap gap-1.5">
     {tools.map(tool => {
       const label = registry.toolLabel(tool.implementation.id);
       return <li key={tool.name} className="min-w-0"><Tooltip>
@@ -146,11 +146,11 @@ function ToolChips({ tools }: { tools: readonly InspectedTool[] }) {
         <TooltipContent side="top" className="max-w-xs space-y-1 text-left">
           <p className="font-mono">{tool.name}</p>
           {tool.description && <p className="line-clamp-6">{tool.description}</p>}
-          {tool.requiresInteraction && <p className="opacity-70">{interaction}</p>}
+          {tool.requiresInteraction && <p className="text-muted-foreground">{interaction}</p>}
         </TooltipContent>
       </Tooltip></li>;
     })}
-  </ul></ToolScrollArea></TooltipProvider>;
+  </ul></ToolScrollArea>;
 }
 
 function ResourceInspectBody({ invocation, args, result }: InspectProps) {

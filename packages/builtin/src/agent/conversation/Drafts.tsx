@@ -339,7 +339,7 @@ function DraftRow({
               {senderChip}
 
               {/* Body preview (with preview Tooltip) */}
-              <Tooltip delayDuration={300}>
+              <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="type-caption min-w-0 flex-1 cursor-default select-none truncate">
                     {hasText ? text : files.length > 0
@@ -347,9 +347,7 @@ function DraftRow({
                       : "…"}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent
-                  side="top" sideOffset={6}
-                  className="max-w-[min(22rem,calc(100vw-2rem))] space-y-1.5 text-left whitespace-pre-wrap break-words">
+                <TooltipContent side="top" className="space-y-1.5 text-left whitespace-pre-wrap">
                   {hasText && <p className="type-body">{text}</p>}
                   {files.length > 0 && (
                     <div className="flex flex-wrap gap-1">
@@ -404,7 +402,7 @@ function DraftRow({
             </DropdownMenu>
 
             {/* Retrieve / exchange */}
-            <Tooltip delayDuration={300}>
+            <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   type="button" variant="ghost" size="icon-xs"
@@ -417,7 +415,7 @@ function DraftRow({
                   {editorHasContent ? <ArrowLeftRight aria-hidden /> : <ArrowDownToLine aria-hidden />}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="top" sideOffset={4} className="max-w-[14rem] space-y-0.5 text-left">
+              <TooltipContent side="top" className="max-w-56 space-y-0.5 text-left">
                 <p>{i18n.text(editorHasContent ? messages.exchangeDraft : messages.takeDraftHint)}</p>
                 {editorHasContent && <p className="type-caption">{i18n.text(messages.exchangeDraftHint)}</p>}
               </TooltipContent>

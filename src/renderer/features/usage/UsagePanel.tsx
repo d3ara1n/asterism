@@ -88,15 +88,15 @@ function ProviderLamp({ provider, state }: { provider: ModelProvider; state: Pro
   const i18n = useI18n();
   const lead = state ? leadingItem(state.items) : null;
   const note = stateNote(state);
-  return <Tooltip delayDuration={150}>
+  return <Tooltip>
     <TooltipTrigger asChild>
       <span className="flex rounded-full"><SignalDot level={state ? usageLevel(state.items) : null} /></span>
     </TooltipTrigger>
-    <TooltipContent side="top" sideOffset={6} collisionPadding={8} className="max-w-56 space-y-0.5">
+    <TooltipContent side="top" className="max-w-56 space-y-0.5">
       <p className="font-medium">{provider.name}</p>
-      {lead && <p className="tabular-nums opacity-80">{usageItemLabel(i18n, lead)} · {itemValue(i18n, lead)}</p>}
-      {!lead && note && <p className="opacity-80">{i18n.text(note)}</p>}
-      {state?.error && <p className="opacity-80">{i18n.text(errorMessage(state.error))}</p>}
+      {lead && <p className="tabular-nums text-muted-foreground">{usageItemLabel(i18n, lead)} · {itemValue(i18n, lead)}</p>}
+      {!lead && note && <p className="text-muted-foreground">{i18n.text(note)}</p>}
+      {state?.error && <p className="text-muted-foreground">{i18n.text(errorMessage(state.error))}</p>}
     </TooltipContent>
   </Tooltip>;
 }

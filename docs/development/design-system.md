@@ -47,7 +47,7 @@ Colored surfaces pair with their foreground token, and contrast holds in both sc
 | Shell | `card-shell` with a border against the material | Titles, navigation, toolbars, the composer and entry trays |
 | Sheet | `card`, raised by the sheet shadow, no border | Reading and editing content inside a shell |
 | Group | Shell tone recessed on a sheet, no border | Grouped rows, fields, empty states, process blocks |
-| Floating | Popover tone with the floating or lift shadow | Menus, popovers, dialogs, toasts, trays that float over content |
+| Floating | Popover tone with the floating or lift shadow | Menus, popovers, tooltips, hover cards, dialogs, toasts, trays that float over content |
 
 Islands, docks, and object cards are shells. The shared panel and the object surface supply their sheet, so plugin islands opened through the shared panel inherit the layering. Cards placed directly on the window material, such as template cards and usage panels, keep the shell border and hold a sheet inside. Embedded inside another sheet, the same panel drops its border and reads as a group. Panels and fields inside a group rise back to the sheet tone rather than adding outlines. Floating surfaces keep their outer edge and shadow because they cover arbitrary content; inside them, header, body, and footer separate by spacing and tone rather than rules.
 
@@ -156,6 +156,18 @@ Status uses the shared status components with text and icons. Feedback stays wit
 | Link | An action embedded in text |
 
 Icon-only actions use the shared icon button, which supplies the accessible label, tooltip, and shape. Menu and popover triggers compose inside it rather than recreating its styling. Adjacent icon buttons in a title bar share one size. Destructive entry points and their confirmation remain distinct steps.
+
+Disabled controls still show their tooltips, so a dimmed action can say what it does or why it is unavailable. Hover styling skips disabled elements instead of blocking pointer events.
+
+### Tooltips and hover surfaces
+
+A tooltip names or briefly explains the element under the pointer or keyboard focus: an icon action's label, a truncated value's full text, a mark's meaning, or the reason an action is unavailable. It is a floating surface like a popover, in the same tone with the same edge and shadow, and it has no arrow. It never holds the only copy of information the user needs to act, and nothing inside it is interactive.
+
+One rhythm applies everywhere. Hover opens a tooltip after a deliberate pause, and each trigger waits again, so moving the pointer across a toolbar does not set off a run of hints. Keyboard focus opens the hint at once. Focus that returns to a trigger after a pointer interaction, such as closing its menu, does not reopen it. Placement, offset, and a bounded width come from the shared control, so call sites choose only the side and the content.
+
+Because a tooltip shares the popover tone, its content uses the same tokens as content on a sheet: the foreground for primary lines, muted text for secondary lines, and status tones for warnings. Opacity does not stand in for muted text.
+
+A richer preview that the user reads while hovering, such as a reference card or a metric breakdown, uses a hover card. Content the user opens on purpose, scrolls, or acts on, such as a template's object list, uses a popover behind a button. Information shown only on hover stays reachable from the keyboard: either the trigger is focusable, or the same text is part of a focusable element's accessible name.
 
 ## Branding
 

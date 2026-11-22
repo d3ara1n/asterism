@@ -9,7 +9,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from "@asterism-app/ui/ui/command";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { cn } from "@asterism-app/ui/utils";
 import { conversationMessages } from "../../messages/conversation";
 import { messageSenderLabel } from "../message-presentation";
@@ -185,7 +185,7 @@ export function ConversationNavigation({ timeline, scroll, list, startMargin, on
             past ? "grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0")} inert={!past}>
             <div className="flex min-w-0 overflow-hidden">
               {multiple && <span aria-hidden="true" className="my-auto h-4 w-px shrink-0 bg-border" />}
-              <TooltipProvider delayDuration={400}><Tooltip>
+              <Tooltip>
                 <TooltipTrigger asChild>
                   <Button type="button" variant="ghost" size="sm" aria-label={`${backLabel}: ${current.summary.slice(0, 240)}`}
                     className="h-7 min-w-0 shrink rounded-full px-2.5 font-normal" onClick={() => select(current)}>
@@ -204,11 +204,11 @@ export function ConversationNavigation({ timeline, scroll, list, startMargin, on
                     </motion.span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6} collisionPadding={12} className="w-80 max-w-(--radix-tooltip-content-available-width) text-left text-wrap">
+                <TooltipContent side="bottom" className="w-80 text-left text-wrap">
                   <p className="line-clamp-6 whitespace-pre-wrap [overflow-wrap:anywhere]">{current.preview}</p>
-                  <p className="mt-1 opacity-70">{backLabel}</p>
+                  <p className="mt-1 text-muted-foreground">{backLabel}</p>
                 </TooltipContent>
-              </Tooltip></TooltipProvider>
+              </Tooltip>
             </div>
           </div>
         </div>

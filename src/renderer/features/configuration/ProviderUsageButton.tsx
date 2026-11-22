@@ -104,7 +104,7 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
     : state.error ? "error" : "empty";
   const dimmed = refreshing && view === "data";
 
-  return <Tooltip delayDuration={300}>
+  return <Tooltip>
     <TooltipTrigger asChild>
       <button type="button" onClick={refresh} aria-busy={refreshing} aria-disabled={refreshing}
         aria-label={i18n.text(messages.usageRefresh)}
@@ -156,8 +156,7 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
         </AnimatePresence>
       </button>
     </TooltipTrigger>
-    <TooltipContent side="bottom" align="end" sideOffset={6} collisionPadding={8}
-      className="w-64 max-w-[calc(100vw-1rem)] space-y-2.5 text-left">
+    <TooltipContent side="bottom" align="end" className="w-64 space-y-2.5 text-left">
       {state?.items.map(item => <div key={item.id} className="space-y-1">
         <div className="flex items-baseline justify-between gap-3">
           <span className="truncate">{usageItemLabel(i18n, item)}</span>
@@ -166,7 +165,7 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
               : percent(quotaRemaining(item))}</span>
         </div>
         {item.type === "quota" && <Progress className="h-1" value={quotaRemaining(item) * 100} aria-hidden="true" />}
-        {item.type === "quota" && item.window.resetAt !== null && <p className="opacity-70 tabular-nums">
+        {item.type === "quota" && item.window.resetAt !== null && <p className="text-muted-foreground tabular-nums">
           {i18n.formatMessage(messages.usageResets, { time: i18n.formatDate(item.window.resetAt, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) })}
         </p>}
       </div>)}
@@ -176,7 +175,7 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
         : state.error === "credential" ? messages.usageCredential
         : state.error === "authentication" ? messages.usageAuthentication
         : state.error === "rate_limit" ? messages.usageRateLimited : messages.usageFailed)}</p>}
-      <p className="opacity-70">{state?.updatedAt ? i18n.formatMessage(messages.usageUpdated, { time: i18n.formatDate(state.updatedAt, { hour: "numeric", minute: "2-digit" }) })
+      <p className="text-muted-foreground">{state?.updatedAt ? i18n.formatMessage(messages.usageUpdated, { time: i18n.formatDate(state.updatedAt, { hour: "numeric", minute: "2-digit" }) })
         : i18n.text(messages.usageRefresh)}</p>
     </TooltipContent>
   </Tooltip>;

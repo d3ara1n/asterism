@@ -2,6 +2,7 @@ import { createContext, Fragment, useCallback, useContext, useEffect, useId, use
 import { ChevronDown, ChevronRight, Check, FolderOpen, FolderPlus, Package, Plus, Puzzle, RefreshCw, RotateCw, Search, ShieldAlert, Trash2, Undo2, X } from "lucide-react";
 import type { PluginSettingsPage } from "@asterism-app/sdk/renderer";
 import type { UiMessage, UiText } from "@asterism-app/sdk/contracts";
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { Badge } from "@asterism-app/ui/ui/badge";
@@ -464,7 +465,7 @@ function NpmInstallerPanel({ target }: { target: InstallTarget }) {
           </div>
         </div>
         {preview.integrity && <p className="type-caption flex min-w-0 gap-2"><span className="shrink-0">{i18n.text(messages.integrity)}</span>
-          <span className="truncate font-mono select-text" title={preview.integrity} translate="no">{preview.integrity}</span></p>}
+          <TooltipHint content={preview.integrity}><span className="truncate font-mono select-text" translate="no">{preview.integrity}</span></TooltipHint></p>}
         {current.phase === "preview" && <Button size="sm" className="self-start" disabled={manager.busy || changed}
           onClick={() => { void run({ type: "plugin.npm.install", operationId: current.id }); }}>
           {i18n.text(target.source ? messages.confirmUpdate : messages.confirmInstall)}

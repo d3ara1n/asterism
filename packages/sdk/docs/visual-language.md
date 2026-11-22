@@ -15,7 +15,7 @@ Inside a sheet, a region reads as a region because its tone differs, not because
 - **Shell**: titles, navigation, and toolbars sit on the shell tone.
 - **Sheet**: reading and editing content sits on a raised sheet in the card tone.
 - **Group**: rows, fields, and repeated items that belong together recede into a group in the shell tone, with hairlines between rows.
-- **Floating**: menus, popovers, and dialogs lift above content and keep their outer edge.
+- **Floating**: menus, popovers, tooltips, hover cards, and dialogs lift above content and keep their outer edge.
 
 A plugin that needs a group fills it with the shell tone token, `--card-shell`, and leaves out the border; the shared settings layout and list controls already follow this rule. Inside something that is already recessed, such as a tool's output in the conversation, a sub-panel rises back to the card tone instead of adding an outline. When two areas are already separated by tone, adding a border makes the view feel heavier and louder than the rest of the application.
 
@@ -39,7 +39,10 @@ The shared controls encode what a choice is, so the same kind of choice looks th
 - An immediate on/off setting is a switch; a choice inside a form or a multi-selection is a checkbox; an explained single choice is a radio group.
 - A choice among many options, or one that needs search, uses the shared command and popover combination.
 - Icon-only actions use the shared icon button, which supplies the accessible label and tooltip.
+- A short name or explanation on hover is a tooltip; a preview read while hovering is a hover card; content the user opens on purpose, scrolls, or acts on is a popover behind a button.
 - Button variants carry roles: one default button for the primary action in a region, outline for supporting actions, ghost for compact and row actions, destructive for irreversible confirmation.
+
+Tooltips share the popover tone, so their content uses the same color tokens as any sheet content. The shared tooltip supplies its own delay, placement, and width; passing only a side and the content keeps every hint in the application on one rhythm. Disabled controls still show their tooltips, which is the natural place to say why an action is unavailable.
 
 Building a lookalike control loses these meanings and the accessibility the shared one provides. Shared controls also follow the user's appearance settings for color, radius, density, and fonts without extra work.
 

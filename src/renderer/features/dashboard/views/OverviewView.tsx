@@ -3,6 +3,7 @@ import { CircleAlert, Gauge, RotateCw, TrendingUp, Wallet } from "lucide-react";
 import { formatUsageAmount, usageItemLabel, useRendererSettings } from "@asterism-app/sdk/renderer";
 import { quotaRemaining, usageItemLevel, usageLevel } from "@asterism-app/sdk/contracts";
 import { usageLevelTones } from "@asterism-app/ui/usage-level";
+import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
@@ -91,8 +92,8 @@ function Headline({ metrics, previous, externalUsd, previousExternalUsd, ttft }:
   const rate = successRate(metrics);
   return <div className="grid grid-cols-2 divide-y md:grid-cols-3 md:divide-y-0 xl:grid-cols-5 xl:divide-x [&>*]:border-border">
     <Stat label={i18n.text(msg.cost)} value={formatUsd(i18n, cost)} change={previous ? change(cost, previous.costUsd + (previousExternalUsd ?? 0)) : undefined}
-      badge={metrics.costIncomplete > 0 ? <Badge variant="secondary" className="font-normal" title={i18n.formatMessage(msg.costPartial, { count: metrics.costIncomplete })}>
-        <CircleAlert />{i18n.formatNumber(metrics.costIncomplete)}</Badge> : undefined}
+      badge={metrics.costIncomplete > 0 ? <TooltipHint content={i18n.formatMessage(msg.costPartial, { count: metrics.costIncomplete })}>
+        <Badge variant="secondary" tabIndex={0} className="font-normal"><CircleAlert />{i18n.formatNumber(metrics.costIncomplete)}</Badge></TooltipHint> : undefined}
       detail={externalUsd > 0 ? i18n.formatMessage(msg.costExternal, { amount: formatUsd(i18n, externalUsd) }) : i18n.text(msg.costEstimated)} />
     <Stat label={i18n.text(msg.tokens)} value={formatTokens(metrics.totalTokens)} change={previous ? change(metrics.totalTokens, previous.totalTokens) : undefined}
       detail={i18n.formatMessage(msg.inOut, { input: formatTokens(metrics.inputTokens), output: formatTokens(metrics.outputTokens) })} />

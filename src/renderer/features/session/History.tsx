@@ -252,7 +252,7 @@ function HistoryViewPicker({ entries, value, onChange }: { entries: HistoryEntry
     <PopoverTrigger asChild><TooltipTrigger asChild><Button variant="outline" size="sm" role="combobox" aria-expanded={open} aria-label={`${i18n.formatMessage(historyMessages.historyView)}: ${label}`} className="min-w-0 flex-1 justify-start">
       <span aria-hidden="true">{icon}</span><span className="min-w-0 flex-1 truncate text-left">{label}</span><ChevronDown />
     </Button></TooltipTrigger></PopoverTrigger>
-    <TooltipContent className="max-w-[min(24rem,var(--radix-tooltip-content-available-width))] whitespace-pre-wrap break-words text-left">{label}</TooltipContent>
+    <TooltipContent className="whitespace-pre-wrap text-left">{label}</TooltipContent>
     </Tooltip><PopoverContent motionPreset="command" align="start" className="w-80 p-0"><Command>
       <CommandInput placeholder={i18n.formatMessage(historyMessages.searchHistoryViews)} /><CommandList><CommandEmpty>{i18n.formatMessage(commonMessages.noMatches)}</CommandEmpty>
         <CommandGroup>{presets.map(item => <CommandItem key={item.kind} value={`view:${item.kind}`} keywords={[item.label]} onSelect={() => choose({ kind: item.kind })}>
@@ -290,7 +290,7 @@ function ContinueAction({ controller, nodeId, createdAt, directory }: { controll
   const unsettled = progress.timelineBusy || progress.busyObjectIds.length > 0;
   const wait = i18n.formatMessage(historyMessages.waitForResources, { names: progress.busyObjectIds.map(id => resources?.get(id)?.title ?? i18n.formatMessage(historyMessages.unknownResource)).join(", ") });
   const disabled = saving || unsettled || state.navigating || state.status !== "ready" || (target !== null && leaving.status !== "ready") || warnings.status === "loading";
-  return <><TooltipHint content={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><span><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId, createdAt })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></span></TooltipHint>
+  return <><TooltipHint content={unsettled ? wait : i18n.formatMessage(historyMessages.continueFromHere)}><Button size="xs" disabled={nodeId === snapshot.cursor || disabled} onClick={() => setTarget({ id: nodeId, createdAt })}><GitBranch />{i18n.formatMessage(historyMessages.continueFromHere)}</Button></TooltipHint>
     <AlertDialog open={target !== null} onOpenChange={open => { if (!open && !saving) setTarget(null); }}><AlertDialogContent className="flex flex-col overflow-hidden">
       <AlertDialogHeader className="shrink-0"><AlertDialogTitle>{i18n.formatMessage(historyMessages.continueTitle)}</AlertDialogTitle><AlertDialogDescription>{i18n.formatMessage(historyMessages.continueDescription)}</AlertDialogDescription></AlertDialogHeader>
       <ScrollArea className="flex flex-col" contentClassName="flex flex-col gap-2 p-1 pr-3"

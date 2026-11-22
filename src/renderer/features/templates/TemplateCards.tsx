@@ -15,7 +15,8 @@ import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@asterism-app/ui/ui/select";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { StatusText } from "@asterism-app/ui/ui/status";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { ActionMenu, ActionMenuContent, ActionMenuGroup, ActionMenuItem, ActionMenuTrigger, ActionMenuTarget } from "@asterism-app/ui/ui/action-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { TemplateObjectLabel, templateKinds } from "./TemplateObjects";
@@ -160,21 +161,21 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
             </button>
           </Item></TooltipHint>
           <div className="absolute bottom-2 right-2">
-            <Tooltip delayDuration={250}>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon-xs" aria-label={i18n.text(templateMessages.info)}><Info /></Button>
-              </TooltipTrigger>
-              <TooltipContent side="top" align="end" sideOffset={6} className="max-w-80 text-left text-wrap">
+            <Popover>
+              <IconButton size="icon-xs" label={i18n.text(templateMessages.info)} asChild>
+                <PopoverTrigger><Info /></PopoverTrigger>
+              </IconButton>
+              <PopoverContent side="top" align="end" className="w-80 text-sm">
                 <p className="mb-2 font-medium">{template.title}</p>
                 <ul className="max-h-64 space-y-2 overflow-y-auto">
                   {template.objects.map(object => <li key={object.id}><TemplateObjectLabel object={object} /></li>)}
                 </ul>
                 <p className="mt-3 flex items-center gap-1.5">{i18n.text(folderMessages.folder)}:
                   {folder ? <><FolderDot color={folder.color} />{folder.name}</> : i18n.text(folderMessages.noFolder)}</p>
-                <p className="mt-3 opacity-70">{i18n.formatMessage(templateMessages.created, { time: Date.parse(template.createdAt) })}</p>
-                {template.lastUsedAt && <p className="opacity-70">{i18n.formatMessage(templateMessages.lastUsed, { time: Date.parse(template.lastUsedAt) })}</p>}
-              </TooltipContent>
-            </Tooltip>
+                <p className="type-caption mt-3">{i18n.formatMessage(templateMessages.created, { time: Date.parse(template.createdAt) })}</p>
+                {template.lastUsedAt && <p className="type-caption">{i18n.formatMessage(templateMessages.lastUsed, { time: Date.parse(template.lastUsedAt) })}</p>}
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="absolute right-2 top-2 opacity-0 has-[:focus-visible]:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
             <ActionMenuTrigger asChild>

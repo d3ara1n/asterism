@@ -17,7 +17,7 @@ function Metric({ label, hint, value, caption }: { label: UiMessage; hint: UiMes
     <TooltipTrigger asChild><span tabIndex={0} className="inline-flex max-w-full items-center gap-1 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
       <span>{i18n.text(label)}</span><Info className="size-3 shrink-0" aria-hidden="true" />
     </span></TooltipTrigger>
-    <TooltipContent className="max-w-64">{i18n.text(hint)}</TooltipContent>
+    <TooltipContent>{i18n.text(hint)}</TooltipContent>
   </Tooltip>} value={value} caption={caption} />;
 }
 

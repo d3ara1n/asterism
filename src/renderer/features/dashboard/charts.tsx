@@ -81,7 +81,7 @@ const levels = [0, 0.25, 0.5, 0.75, 1];
 const levelOf = (value: number, max: number) => value <= 0 || max <= 0 ? 0 : Math.min(4, Math.ceil(value / max * 4));
 function Cell({ level, label, onSelect, className }: { level: number; label: string; onSelect?: () => void; className?: string }) {
   const style = level ? { backgroundColor: "var(--chart-2)", opacity: 0.2 + levels[level]! * 0.8 } : undefined;
-  return <Tooltip delayDuration={150}>
+  return <Tooltip>
     <TooltipTrigger asChild>
       {onSelect
         ? <button type="button" aria-label={label} onClick={onSelect} style={style}

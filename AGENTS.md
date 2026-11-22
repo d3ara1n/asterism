@@ -37,12 +37,13 @@ Use the `@asterism-app` scope for Asterism core and framework packages, and the 
 
 - `input-group`: `InputGroupAddon` click focuses `[data-slot=input-group-control]` instead of the first `input`, so textareas receive focus and hidden file inputs are skipped.
 - `button`, `badge`: `destructive` uses `text-destructive-foreground` without dark overrides, `link` uses `text-primary-text`; button adds the `selected` variant, badge adds `success` and `warning`.
+- `button`, `toggle`: disabled state drops `pointer-events-none` so tooltips still open on disabled controls; the host `hover` variant skips disabled elements instead.
 - `empty`, `field`, `item`: link hover uses `text-primary-text`.
 - `dialog`, `popover`: accept a `motionPreset="command"` opt-in for shared command-surface motion; dialog applies matching scrim timing.
 - `dialog`, `alert-dialog`: content uses a shrinkable grid column, wraps long text, and scrolls at a viewport-relative maximum height by default. Callers that own inner scrolling can override the overflow.
 - `command`: `CommandDialog` puts its accessible title and description inside `DialogContent` and opts into command-surface motion; `CommandList` animates content height by default and accepts `animateHeight={false}` when a parent owns sizing.
 - `dialog`, `command`, `spinner`: built-in labels come from `useI18n()` and `commonMessages`; `DialogContent` accepts `closeLabel`, and `CommandDialog` title and description default to localized messages.
-- `tooltip`: Provider defaults to a 700 ms hover delay with no skip-delay window; explicit timing props remain supported.
+- `tooltip`: Provider defaults to a 700 ms hover delay with no skip-delay window; explicit timing props remain supported. Content uses the floating surface (popover tone, border, shadow) without an arrow, with a 4px side offset, 8px collision padding, and a bounded maximum width. The trigger opens on keyboard focus only, so focus restored after a pointer interaction does not show the hint.
 - `hover-card`, `tooltip`: fade and scale in place to keep the trigger under the pointer as the surface opens.
 - `progress`: forwards `value` to the Radix root so the value attributes are exposed.
 - `toggle-group`: adds the `segmented` variant, a recessed track whose single indicator travels to the selected item; items then use the default toggle styling without their own selected fill.
