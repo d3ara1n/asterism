@@ -75,6 +75,7 @@
       "kind": "message",
       "sourceLocale": "en"
     },
+    "manual": ["docs"],
     "i18n": {
       "catalogs": {
         "zh-Hans": "src/locales/zh-Hans.json"

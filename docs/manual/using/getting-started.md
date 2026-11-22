@@ -24,6 +24,14 @@ Treat the Agent's explanation, an operation's reported outcome, and the resultin
 
 Begin with ordinary conversation. Add another Agent when an independent context, a separate responsibility, or a continuing collaboration would help. More participants also create more handoffs and more work to reconcile their results.
 
+## Use the application command palette
+
+Press `Command+K` on macOS or `Alt+K` on Windows and Linux to open the application command palette. You can also choose **Commands** in the application menu. The palette works at the application level, so you do not need to focus an Agent first. It shows application commands and any plugin commands that apply where you are.
+
+Type to search, use the arrow keys to highlight a command, and press `Enter` to activate it. On a nested page, use the back button or press `Backspace` with an empty search field to return to the previous page. Press `Esc` to close the palette.
+
+A plugin can also provide shortcuts that work only when one of its views has focus. Look for a keyboard-shortcuts topic in that plugin’s Manual source if a shortcut works in one view but not in another.
+
 ## Leave a useful continuation
 
 Before setting work aside, make the current decision, unresolved questions, and next step clear. Keep durable agreements in material you can revisit rather than relying on the Agent to infer them from a long exchange.

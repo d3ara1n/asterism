@@ -16,6 +16,12 @@ An example is worth discussing when the explanation helps an author adapt it. Ex
 
 Write each article with enough context to stand alone. Organize it around an author or user question, not a tour of every available method. A reading sequence should not be necessary to understand a capability's purpose.
 
+## Document shortcuts where they work
+
+If your plugin provides keyboard shortcuts, publish a **Keyboard shortcuts** topic or section in its own manual. Group shortcuts by view or dialog. Say where focus must be, what the shortcut does, and which keys differ by platform. Include a command or button alternative when it helps users find the action.
+
+The application manual covers shortcuts owned by the host. A plugin topic covers the plugin’s shortcuts, including any context that determines when they are available. Declare the containing directory in `asterism.manual` in `package.json` and ship it with the plugin. This publishes the documentation through the Manual resource without changing how shortcuts are handled.
+
 ## Keep runtime guidance with tools
 
 Models consult the manual when helping with software use or plugin development. Ordinary tool use should not depend on reading it.

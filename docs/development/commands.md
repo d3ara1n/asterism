@@ -22,8 +22,8 @@ An action decides when to close the palette. Pending state and failure feedback 
 
 Search matches visible labels, group attribution, and declared aliases; internal identities are not search text. The command library scores and ranks matching results. Search is scoped to the current page, and navigation clears the query and navigation highlight. A fresh opening starts at the root.
 
-Search receives initial focus and retains it during arrow-key navigation. Enter activates the highlighted command. The return control or Backspace with an empty query returns to the parent page; Escape closes the palette. Closing returns focus to the opener when it still exists.
+Search owns focus during keyboard navigation. Closing returns focus to the opener when it still exists.
 
 ## Keyboard scopes
 
-The application palette uses the modifier beside Space with K: Command+K on macOS and Alt+K on Windows and Linux, where the Windows or Super key belongs to the system. It is also available from the application menu, which shows the platform's chord. Builtin's Agent palette uses Control+K on every platform, only within its Agent view. Application commands and Agent commands remain distinct even though they share command presentation and relevance matching.
+The host owns the application palette shortcut and shows the platform binding in the application menu. Its modifier differs by platform because Windows and Linux reserve the Windows or Super key for the system. Builtin owns the Agent palette shortcut and handles it only within the focused Agent view. The two scopes remain distinct even though they share command presentation and relevance matching.

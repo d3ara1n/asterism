@@ -20,17 +20,19 @@ For an endpoint that needs token-budget thinking, add the Custom thinking budget
 
 These choices apply to subsequent requests, not an already-running response. Adaptive thinking does not impose a wall-clock deadline, and switching modes is not evidence that a relay will complete a task.
 
-## Reuse a model choice without confusing it with a role
+## Configure models once through model roles
 
-A model role is a reusable model choice. An assistant role describes responsibility and expertise. Keeping them distinct lets you change the model without rewriting the working agreement, or use the same model for different responsibilities.
+A model role is a named, reusable choice of model and thinking level. Open **Roles** in the builtin plugin settings and assign a model to each role you use. Changing a role changes the model for later requests that use it. You do not have to update each Agent that shares the role or choose a model again when you use a feature that already has a role.
 
-Model roles organize your configuration; they do not give an Agent another identity or responsibility. The runtime resolves the configuration into the model and thinking settings used for a request. You do not need to teach the Agent your model-role names or use those names in task instructions.
+An Agent role defines what the Agent does. Its **Default model role** determines which model and thinking level it normally uses. Agent conversations and delegated subagent tasks can share a model role even when their responsibilities differ. For example, exploration and research both use `fast` in builtin's supplied Agent roles. An explicit choice of model can still override the default for a particular conversation or delegated task.
 
-Use reusable choices for work you repeat. Make a task-specific choice when the material or stakes differ. Configuration changes are captured at request boundaries, so do not expect an in-progress response to adopt a new selection halfway through.
+Session title generation and Peek use builtin's `utility` role directly, not the Agent's default model role. Peek lets you ask questions about a conversation without adding them to it. If you use Peek, choose a `utility` model that supports tool calling. If `utility` is unavailable, title generation leaves the title unchanged rather than falling back to the conversation model.
 
-Response usage and estimated cost concern model requests; account balance and quota concern the provider account or plan. Use each to answer its own question rather than treating one as confirmation of the other.
+Create a custom model role when you want a different reusable model choice for one or more Agent roles. Select it as the **Default model role** in **Agents** settings. Only Agent roles use custom model roles; to change the model for titles or Peek, edit `utility` itself.
 
 ## Read usage statistics as estimates over a permanent record
+
+Response usage and estimated cost concern model requests; account balance and quota concern the provider account or plan. Use each to answer its own question rather than treating one as confirmation of the other.
 
 Usage statistics collect every model request across sessions and plugins, so you can see where cost and tokens went by folder, session, model, purpose, and time. They record counts, timings, and outcomes, never conversation content. The record is kept until you delete it; archiving or deleting sessions and folders does not remove their usage, and restoring a recovery point does not rewind it.
 
