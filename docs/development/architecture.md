@@ -132,7 +132,7 @@ Each persistent format has its own version constant. Preparation reads versions 
 
 During internal development, incompatible data can be rebuilt within explicitly authorized cleanup scope. The first distribution to users, including sharing a prerelease with friends, establishes the continuous migration obligation. Internal maintainer test releases alone do not establish it.
 
-Migrations form consecutive n-to-n+1 steps. Validate the entire path before conversion. JSON commits with atomic file replacement; SQLite commits the chain and version update in one transaction. Released steps remain stable and do not call mutable business helpers.
+Migrations form consecutive n-to-n+1 steps. Validate the entire path before conversion. JSON commits with atomic file replacement; SQLite commits the chain and version update in one transaction. Released steps remain stable and do not call mutable business helpers. Keep old-format fixtures to verify migrations from distributed formats.
 
 Prepare host storage before plugin storage. Host failure opens recovery UI without starting business services. A plugin storage failure disables that plugin for the startup and reports the reason; unrelated plugins continue.
 

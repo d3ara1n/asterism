@@ -15,41 +15,16 @@ Asterism is an object-centered, plugin-based personal agent workbench for organi
 - **Trust the configured environment.** User-configured local paths, executables, and services are operational inputs, not an additional security boundary. Resolve them according to configuration and platform conventions, perform the requested operation, and expose actual failures. Validation protects explicit input contracts and application-owned invariants. Rely on standard library and operating system guarantees; additional preflight checks, recovery steps, or post-operation verification require an explicit application contract beyond what the underlying operation already provides.
 - **Paradigms are plugins.** A concept belongs to the host when its meaning is independent of the Agent paradigm and it has application-wide configuration or state shared by plugins. The host owns its configuration, the SDK owns its domain model and capabilities, and plugins own its usage: resources, tools, views, and model-facing text. Shape capabilities from current real consumers. Agent paradigms own roles, Agent configuration, request assembly, and conversation behavior. The host and SDK import no builtin package; builtin depends on the SDK like any plugin and publishes its paradigm API through `@asterism-app/builtin-api`. Built-in distribution grants no special lifecycle, validation, or host coupling.
 
-## Environment and implementation
+## Implementation
 
-Development starts with `npm run dev`. The stack is Electron, React, TypeScript, shadcn/Radix, Tailwind, React Flow, SQLite, Zod, an independent task runtime, and AI SDK adaptation. Installed versions belong to the lockfile. macOS is the main test platform; releases target macOS, Windows, and Linux.
+Keep application identity, data layout, and internal channel identities centralized. Keep development and installed data separate. Use isolated temporary data for tests and clean up afterward. Keep real sessions, resource snapshots, and credentials out of source control.
 
-Keep fixed application identity, data layout, and internal channel identities centralized. Development and installed data are separate. Tests use isolated temporary data and clean up. Real sessions, resource snapshots, and credentials stay outside source control. The one-off prototype remains on `feat/ux-prototype`; production code does not depend on it.
+Reuse maintained libraries for general controls, animation, layout, drag, and virtualization. Confirm new dependencies separately with rationale and alternatives; official shadcn controls do not count as new dependencies.
 
-Current example resources validate foundations and do not define the final product catalog. Workbench cards and auxiliary surfaces reuse the shared object and island presentation. Overall visual changes require user confirmation.
+- **UI changes:** Consult [the design system](docs/development/design-system.md) for shared presentation, interaction, and copy. Overall visual changes require user confirmation.
+- **Registry components:** Follow [vendored UI maintenance](docs/development/vendored-ui.md) when adding or updating a component from a registry.
 
-Interface copy serves user understanding and action, not code comments or schema documentation. State only what visuals cannot: encode state with bars, rings, icons, tones, and labeled values rather than explanatory sentences, and mark exceptional states with a short label. Field hints explain what a value represents, where it comes from, and what it affects; omit character rules, validation regexes, and UI conveniences such as prefilling from another field unless a constraint is non-obvious from the domain concept, letting inline validation report invalid input. Omit text that restates inherent domain semantics, describes implementation, or reassures the user; explanations for developers belong in code comments.
-
-Reuse maintained libraries for general controls, animation, layout, drag, and virtualization. Confirm new dependencies separately with rationale and alternatives. For a missing shadcn control, check the registry and use `npx shadcn@latest add <name>`; official controls do not count as new dependencies.
-
-### npm package naming
-
-Use the `@asterism-app` scope for Asterism core and framework packages, and the `@asterism-plugins` scope for official optional plugins (for example, `@asterism-plugins/context-fold`). Third-party authors use their own scope and an `asterism-` package prefix (for example, `@alice/asterism-my-plugin`). The npm package name is separate from the runtime plugin ID.
-
-### Vendored shadcn components
-
-`packages/ui/src/ui/` mixes shadcn registry files with project-owned controls. Run the shadcn CLI from the repository root: the `packages/ui` config cannot resolve its aliases, and the root config rewrites the `cn` import to an npm package named `cn` and adds it as a dependency. If workspace alias validation rejects `lib` or `hooks`, `add <name> --view` still exposes the registry source for applying it locally. After every `add` or `--overwrite` of a registry file, restore relative imports (`../utils`, `./button`), drop the `cn` dependency, and reapply the local changes below. `orb` and `orb-core` come unchanged from the Thinking Orbs registry (`https://thinkingorbs.com/r/orb.json`); the CLI cannot resolve the `packages/ui` aliases, so its files are written from the registry item into `packages/ui/src/ui/` as published. Registry files only the host uses, such as `sonner` and `chart`, live in `src/renderer/shared/ui/` instead, so plugins do not receive them through the shared UI modules; they import `cn` from `@asterism-app/ui/utils`. Keep this list current whenever a registry file gains or loses a local change.
-
-- `input-group`: `InputGroupAddon` click focuses `[data-slot=input-group-control]` instead of the first `input`, so textareas receive focus and hidden file inputs are skipped.
-- `button`, `badge`: `destructive` uses `text-destructive-foreground` without dark overrides, `link` uses `text-primary-text`; button adds the `selected` variant, badge adds `success` and `warning`.
-- `button`, `toggle`: disabled state drops `pointer-events-none` so tooltips still open on disabled controls; the host `hover` variant skips disabled elements instead.
-- `empty`, `field`, `item`: link hover uses `text-primary-text`.
-- `dialog`, `popover`: accept a `motionPreset="command"` opt-in for shared command-surface motion; dialog applies matching scrim timing.
-- `dialog`, `alert-dialog`: content uses a shrinkable grid column, wraps long text, and scrolls at a viewport-relative maximum height by default. Callers that own inner scrolling can override the overflow.
-- `command`: `CommandDialog` puts its accessible title and description inside `DialogContent` and opts into command-surface motion; `CommandList` animates content height by default and accepts `animateHeight={false}` when a parent owns sizing.
-- `dialog`, `command`, `spinner`: built-in labels come from `useI18n()` and `commonMessages`; `DialogContent` accepts `closeLabel`, and `CommandDialog` title and description default to localized messages.
-- `tooltip`: Provider defaults to a 700 ms hover delay with no skip-delay window; explicit timing props remain supported. Content uses the floating surface (popover tone, border, shadow) without an arrow, with a 4px side offset, 8px collision padding, and a bounded maximum width. The trigger opens on keyboard focus only, so focus restored after a pointer interaction does not show the hint.
-- `hover-card`, `tooltip`: use the shared command-surface motion from the trigger-facing edge, with travel shortened below the default side offset so the surface never covers its trigger.
-- `progress`: forwards `value` to the Radix root so the value attributes are exposed.
-- `toggle-group`: adds the `segmented` variant, a recessed track whose single indicator travels to the selected item; items then use the default toggle styling without their own selected fill.
-- `chart` (host): the dark theme selector is `[data-mode=dark]`; the tooltip uses the popover surface with sans tabular figures.
-- `scroll-area`: exposes viewport refs/props and content styling; supports both axes; uses an explicit Radix content element with caller-controlled display, a transparent track, and a semantic overlay thumb; normalizes Radix pointer coordinates for scaled canvases.
-- `message-scroller`: the jump button's screen-reader label comes from `commonMessages`; a nested Radix root preserves the primitive root's ref registration, while Viewport and Content compose through `asChild` so the same viewport owns scrolling and an overlay scrollbar; the viewport drops `scroll-fade-b` and native scrollbar styling.
+Use `@asterism-app` for core and framework npm packages, `@asterism-plugins` for official optional plugins, and the author's own scope with an `asterism-` package prefix for third-party plugins. The npm package name is separate from the runtime plugin ID.
 
 ## Language
 
@@ -61,47 +36,15 @@ User-facing application copy remains bilingual, English first. Preserve the orig
 
 The harness describes primitives. Host prompts, tool descriptions, and feedback use declarative input/output and infrastructure facts. Users compose workflows. Remove host-authored negative instructions, temporary missing-capability restrictions, and workflow prescriptions when maintaining harness text; preserve user instructions.
 
-Runtime tool guidance belongs in the owning tool's description, guidelines, and input/output schemas, available through tool discovery. A model must be able to understand and call a tool without reading the manual. Explain relationships between outputs and later inputs where needed, rather than relying on field names or external guides.
+A model must be able to understand and call a tool through discovery alone. In the tool contract, explain how to interpret results and reuse outputs as inputs where needed.
 
 Organize tool guidance around purpose and data flow, call shape and result handling, then execution boundaries. Short examples illustrate contracts without prescribing a task workflow. Role instructions and skills carry user-selected responsibilities and procedures.
 
 ## Documentation ownership
 
-Choose a primary home by the question the information answers. A primary home owns the complete facts; another surface can explain their consequences for its audience without becoming a parallel reference.
+Creation entries own creation guidance, resources own discovery state, and tools own operation contracts. The interface owns in-context feedback. Manuals explain choices and consequences; engineering docs explain internal design. Role instructions, skills, and task instructions carry user-selected procedures. Verify descriptions of current behavior against the implementation.
 
-| Information or question | Primary home |
-| --- | --- |
-| What resource can I create, what is it for, and what must I know before creating it? | Creation entry description, guidelines, and input schema |
-| What is this linked resource's current state? | Resource-owned discovery and inspection state |
-| How do I perform an operation, interpret its result, and understand its execution boundaries? | Owning tool description, guidelines, and input/output schemas |
-| What should the interface communicate at this point of use? | User-facing controls, labels, and contextual feedback |
-| When should I choose a resource, how should I relate it to other resources, and what tradeoffs matter? | Resource sections in the user manual |
-| Why does a resource behave this way, what should a user expect, and which caveats affect their work? | Resource sections in the user manual, grounded in current behavior |
-| How should a plugin author choose integration boundaries and use the public model? | Plugin-author manual and public-package guides; types and executable examples own concrete interfaces |
-| Which internal engineering principles and responsibility boundaries should implementation preserve? | `docs/development/`; local implementation rationale belongs in code comments |
-| What responsibilities, procedures, and completion criteria has the user selected? | Role instructions, skills, and task instructions |
-| What work is deferred, what was investigated, or what did a review find? | `plans/` tasks (`todo`), references (`ref`), and reviews (`review`) |
-
-### Manual scope
-
-`docs/manual/` serves users understanding and using Asterism and authors designing plugins, including public-package guides exposed through the Manual resource. Explain mental models, usage philosophy, design choices, and working principles. Models consult relevant topics on demand for those tasks; ordinary tool use is self-contained through discovery. There are no localized editions or public documentation site. Internal engineering documents serve maintainers, not plugin authors or application users.
-
-The user manual includes sections for individual resource types; related resources can share a chapter. Keep application resource topics in `docs/manual/using/resources/`, grouped by shared usage questions rather than by individual tools. Each section explains the resource's role in the work, when to choose it, meaningful relationships with other participants or material, and tradeoffs or common conceptual mistakes. Include user-relevant behavior, lifecycle caveats, and consequences that help explain an observed result or set expectations. These explanations are available on demand; they need not become always-loaded model instructions. Briefly identify the resource so the section stands alone, then contribute understanding beyond its creation description, inspection state, and tool contracts. Resource coverage is not a feature catalog or a reason to manufacture filler.
-
-Tool catalogs, introductions to individual tools, invocation recipes, parameter/output inventories, execution-environment references, control-by-control walkthroughs, and lists of defaults and limits belong in their owning contracts or interfaces. The manual can restate enough verified behavior to explain a caveat or answer why something happened; functional detail serves that explanation rather than cataloging operations. A manual example can illustrate a choice or relationship without reproducing an invocation sequence. Plugin guides explain integration choices and responsibility boundaries rather than maintaining a prose copy of public APIs.
-
-Manual and engineering pages are independently readable. Include enough context to explain each topic. Stable directory maps may describe organization and responsibilities. Keep these pages free of cross-document references, research-source trails, per-file source indexes, and API inventories. Models can search files and integrate information themselves.
-
-### Placement and completeness checks
-
-When adding, moving, or deleting explanatory content:
-
-1. **Classify the claim.** Separate current state, an executable contract, user-selected procedure, and conceptual guidance. Mixed paragraphs can need different homes. For example, a schedule operation's activation requirements belong in its tool contract; explaining how session sleep affects reminders also belongs in the manual as a user-facing caveat. Facts needed to use a tool correctly remain discoverable through its contract even when the manual explains their consequences.
-2. **Check the owner.** Read the current implementation and the relevant creation, resource, and tool projections. Verify what a reader can actually discover; neither missing manual prose nor the existence of a schema establishes a gap or adequate coverage. A model must be able to understand and call a tool without consulting the manual.
-3. **Keep the distinct contribution.** Ask what choice, expectation, or observed behavior the prose helps a reader understand beyond a bare statement of discoverable facts. Retain that explanation in the manual; place missing operational facts in the owning contract. Existing contract coverage does not by itself make a user-facing explanation redundant. A code move, parameter change, or new control alone should not require a manual update; a change in the underlying concept or design can.
-4. **Account for removals.** Identify whether removed material is redundant, obsolete, or still needed elsewhere. Before deleting unique, necessary guidance, preserve it at the appropriate home and verify that it is discoverable there. Review both duplication and omissions, including per-resource conceptual coverage; neither shorter prose nor one chapter per resource proves completeness.
-
-Verify claims while writing rather than promoting proposals or old acceptance records into current behavior. Source code, types, schemas, configuration, and executable examples own current interfaces and behavior; documentation adds intent, rationale, mental models, and principles for making choices.
+**Documentation changes:** Use the [placement and completeness checks](docs/development/README.md#placement-and-completeness-checks) when adding, moving, or deleting explanatory material.
 
 ## Plans
 
@@ -129,7 +72,7 @@ Internal wording, file organization, naming, decomposition, and implementation p
 
 Explain implementation scope and tradeoffs before proceeding; confirmed scope authorizes its routine details. Show the diff or a summary and obtain explicit permission before committing. Commit permission does not include push, release, or other remote writes.
 
-Before user distribution, incompatible development formats can be rebuilt without migration, with explicit authorization for real data cleanup. Internal test releases do not establish compatibility. First user distribution, including friend-facing prereleases, requires continuous n-to-n+1 migrations and old-format fixtures thereafter.
+Real data cleanup requires explicit authorization. For persistent-format changes, follow the [migration rules](docs/development/architecture.md#data-preparation).
 
 Main is the trunk; develop and commit directly on main by default. Branches and PRs are optional when useful for collaboration or review. Use Conventional Commits with a lowercase English type; commit subjects and bodies may use any language.
 

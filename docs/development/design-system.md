@@ -143,6 +143,10 @@ The Agent composer and the Home entry are trays: a shell lifted over the content
 
 While an Agent runs, one moving element shows it at a time. At the end of the conversation, a small dotted orb names the execution phase through its motion beside the phase text and elapsed time, with a distinct motion for working, compacting, retrying, and waiting to retry; retries take the warning tone, and successive phases cross-fade in place. As that row scrolls out of view, it folds into the composer: it fades while a light grows along the tray's top edge from the left, and scrolling back unfolds it again. The stop control and the card's title badge stay still. When an overlay hides the composer, the edge light remains where the tray would stand. Continuous activity traces run as CSS animations, so a view remounted mid-run under a presence boundary that skips entry animations still shows them moving.
 
+### Interface copy
+
+Interface copy serves user understanding and action, not code comments or schema documentation. State only what visuals cannot: encode state with bars, rings, icons, tones, and labeled values rather than explanatory sentences, and mark exceptional states with a short label. Field hints explain what a value represents, where it comes from, and what it affects; omit character rules, validation regexes, and UI conveniences such as prefilling from another field unless a constraint is non-obvious from the domain concept, letting inline validation report invalid input. Omit text that restates inherent domain semantics, describes implementation, or reassures the user; explanations for developers belong in code comments.
+
 ### Feedback and status
 
 Status uses the shared status components with text and icons. Feedback stays with the operation it belongs to: field errors with fields, command progress at its entry, and Agent execution errors and warnings inline in the owning conversation. Independent interface command failures use toasts. One failure is never shown both inline and as a toast, and a background reread never becomes a global saving indicator.
@@ -181,6 +185,6 @@ The Asterism identity is a triangular constellation of three rounded six-point s
 
 The theme owns color values, palettes, radius, density, and fonts. The host stylesheet owns the layer utilities, shadow and radius tokens, process-block state lines, and motion tokens. `packages/ui/` owns shared control semantics and appearance, and plugins receive those controls from the host so every plugin shares one copy. The window, its native material, and titlebar behavior belong to the main process and window components; island layout belongs to the weave.
 
-Feature code composes these parts and does not create parallel button, select, border, shadow, or motion styles. A new recurring need becomes a token, utility, or shared control first, then its uses adopt it. shadcn registry files with local changes stay listed in the project conventions so registry updates can reapply them.
+Feature code composes these parts instead of creating parallel button, select, border, shadow, or motion styles. Put recurring Asterism-specific appearance in shared theme tokens or styles, and recurring behavior in shared controls composed from upstream primitives. As registry components are revisited, move local design out of them into those shared layers so the upstream source can remain unchanged. Where composition cannot preserve the intended behavior through supported interfaces, let a project-owned control own that behavior explicitly.
 
 Visual changes are accepted manually on the actual platform in both schemes. Typechecks and builds support that acceptance; they do not establish appearance.
