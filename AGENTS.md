@@ -131,4 +131,15 @@ Explain implementation scope and tradeoffs before proceeding; confirmed scope au
 
 Before user distribution, incompatible development formats can be rebuilt without migration, with explicit authorization for real data cleanup. Internal test releases do not establish compatibility. First user distribution, including friend-facing prereleases, requires continuous n-to-n+1 migrations and old-format fixtures thereafter.
 
-Main is the trunk; develop and commit directly on main by default. Branches and PRs are optional when useful for collaboration or review. Use Conventional Commits with a lowercase English type; commit subjects and bodies may use any language. AI-assisted commits include a Co-Authored-By trailer using the actual model ID and its provider noreply address; use noreply@pi.dev only when the provider address is unknown. Obtain the actual model name from the available environment information and extract the provider's model ID; ask the user only when it cannot be determined. Keep only the provider's model ID: drop channel markers such as `[Kiro]` and variant suffixes such as `-thinking`, so `[Kiro]claude-opus-5-5-thinking` becomes `claude-opus-5-5`.
+Main is the trunk; develop and commit directly on main by default. Branches and PRs are optional when useful for collaboration or review. Use Conventional Commits with a lowercase English type; commit subjects and bodies may use any language.
+
+AI-assisted commits include both a `Co-Authored-By` trailer for the model and an `Agent-Harness` trailer for the agent software:
+
+```text
+Co-Authored-By: <model-id> <provider-noreply>
+Agent-Harness: <harness-name> (<harness-url>)
+```
+
+- **Model ID**: Obtain the actual model name from available environment information (for example, `get_agent_state`) and extract the vendor's model ID; ask the user only when it cannot be determined. Drop relay prefixes (such as `provider/`), channel markers (such as `[Kiro]`), and variant suffixes (such as `-thinking` or `-high`), so `[Kiro]claude-opus-5-5-thinking` becomes `claude-opus-5-5`.
+- **Provider email**: Always use the model vendor's noreply address regardless of relay or channel: `noreply@anthropic.com` (`claude-*`), `noreply@openai.com` (`gpt-*`, `o1*`, `o3*`, `o4*`, `codex-*`), `noreply@google.com` (`gemini-*`), `noreply@x.ai` (`grok-*`), `noreply@deepseek.com` (`deepseek-*`), `noreply@qwenlm.ai` (`qwen*`), `noreply@zhipuai.cn` (`glm-*`), `noreply@moonshot.cn` (`kimi-*`), or the known vendor's noreply address for other vendors. Only when the model vendor is genuinely unknown, use `noreply@unknown.invalid`; never invent a vendor domain or reuse an unrelated tool domain.
+- **Agent harness**: Identify the agent software from available environment information and include its canonical homepage URL in parentheses when known (for example, `Agent-Harness: Asterism (https://asterism.dearain.dev)`). If the harness URL is unknown, omit the parenthesized URL and write only `<harness-name>` rather than guessing.
