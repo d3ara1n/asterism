@@ -504,7 +504,7 @@ function NpmInstallerPanel({ target }: { target: InstallTarget }) {
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <ScrollArea className="mt-2 h-48 rounded-md bg-muted/50"><pre className="type-caption select-text whitespace-pre-wrap wrap-anywhere p-3 font-mono">{current.output}</pre></ScrollArea>
+          <ScrollArea className="surface-tint mt-2 h-48 rounded-md"><pre className="type-caption select-text whitespace-pre-wrap wrap-anywhere p-3 font-mono">{current.output}</pre></ScrollArea>
         </CollapsibleContent>
       </Collapsible>}
     </div>

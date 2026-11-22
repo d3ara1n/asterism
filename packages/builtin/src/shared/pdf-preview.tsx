@@ -79,7 +79,7 @@ export default function PdfPreview({ openFile }: { openFile(): AsyncIterable<Uin
           disabled={!naturalWidth} onClick={() => setZoom(null)}><MoveHorizontal /></IconButton>
       </div>
     </div>
-    <div ref={viewport} className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain rounded-md border bg-muted">
+    <div ref={viewport} className="surface-tint min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain rounded-md">
       {failed ? unavailable : locked ? <p className="p-4 text-muted-foreground" role="status">{i18n.text(messages.pdfPasswordRequired)}</p>
         : !file ? loading : <Document file={file} options={options} suspense={false} loading={loading} error={unavailable}
           onPassword={() => setLocked(true)} onSourceError={() => setFailed(true)} onLoadSuccess={({ numPages }) => setPages(numPages)}

@@ -352,7 +352,7 @@ function DraftRow({
                   {files.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {files.map((f, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 rounded border px-1.5 py-0.5 type-label text-foreground">
+                        <span key={i} className="surface-tint inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 type-label text-foreground">
                           <Paperclip className="size-2.5 shrink-0" aria-hidden />
                           {inputFileName(f)}
                         </span>

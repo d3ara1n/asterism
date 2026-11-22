@@ -28,8 +28,9 @@ export function MarkdownCode({ code, language }: { code: string; language: strin
     } finally { setCopying(false); }
   };
   const source = <CodeText contents={code} language={language} overflow={documentMode || lineWrapping ? "wrap" : "scroll"} themeType={documentMode ? "light" : "system"} />;
-  return <div className="my-4 overflow-hidden rounded-md border border-border bg-muted/40">
-    <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1">
+  // A small shell and sheet: the language and actions sit on a tint of the surrounding text color, the code on a nested sheet.
+  return <div className="surface-tint my-4 rounded-lg p-1">
+    <div className="flex items-center justify-between gap-2 py-0.5 pr-0.5 pl-2">
       <span className="min-w-0 truncate type-caption text-muted-foreground">{language || i18n.text(markdownMessages.markdownPlainText)}</span>
       {!documentMode && <div className="flex shrink-0 items-center gap-1">
         <IconButton size="icon-xs" label={i18n.text(commonMessages.wordWrap)} aria-pressed={lineWrapping}
@@ -37,8 +38,10 @@ export function MarkdownCode({ code, language }: { code: string; language: strin
         <IconButton size="icon-xs" label={i18n.text(markdownMessages.markdownCopyCode)} disabled={copying} onClick={() => { void copy(); }}><Copy /></IconButton>
       </div>}
     </div>
-    {language.toLowerCase() === "mermaid"
-      ? <MermaidDiagram code={code} streaming={streaming}>{source}</MermaidDiagram>
-      : source}
+    <div className="overflow-hidden rounded-sm bg-card shadow-(--shadow-sheet)">
+      {language.toLowerCase() === "mermaid"
+        ? <MermaidDiagram code={code} streaming={streaming}>{source}</MermaidDiagram>
+        : source}
+    </div>
   </div>;
 }

@@ -77,7 +77,7 @@ function ImageBody({ result }: ToolRenderProps<z.infer<typeof TerminalSee.schema
   }, [imageId, object.content]);
   if (!data) return null;
   return <div className="flex flex-col gap-2">
-    <div className="overflow-hidden rounded-md border bg-muted">
+    <div className="overflow-hidden rounded-md bg-card">
       {url
         ? <img src={url} alt={`Terminal ${data.cols}×${data.rows}`} className="block w-full" onError={() => setFailed(true)} />
         : <div className="flex min-h-20 items-center justify-center">

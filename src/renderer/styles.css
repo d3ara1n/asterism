@@ -162,7 +162,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 /* Surfaces: content shells match Card (solid + 1px border), overlays match Popover (solid + border + shadow), and reading or editing
-   content inside a shell sits on an inset sheet. Inside a sheet, groups and process blocks separate by tone; lines express state and focus. Use these utilities where Card components cannot be used, such as window parts,
+   content inside a shell sits on an inset sheet. Inside a sheet, groups and process blocks separate by tone; lines express state and focus. Regions inside content that can sit on any of these tones take a tint of the current text color. Use these utilities where Card components cannot be used, such as window parts,
    island bases, and animated elements. */
 /* Command and hover surfaces share tokens projected by commandMotionStyle; ordinary dialogs and menus keep their own motion.
    Tooltips report their open state as delayed-open or instant-open. */
@@ -213,6 +213,8 @@
 @utility surface-inset { @apply rounded-lg bg-card; box-shadow: var(--shadow-sheet); }
 /* A group of rows or fields on a sheet: a recessed tone instead of a border; hairlines between rows carry the structure. */
 @utility surface-group { @apply rounded-lg bg-card-shell text-card-foreground; }
+/* A region inside content whose container tone varies (sheets, message tones, process blocks, floating surfaces): a tint of the current text color separates it on any of them. */
+@utility surface-tint { background-color: color-mix(in oklab, currentColor 5%, transparent); }
 /* A process block in a reading flow: the shell tone, with lines reserved for state through the data attributes below. */
 @utility surface-block {
   @apply relative rounded-lg bg-card-shell;
@@ -441,16 +443,19 @@
 .markdown-content li > :where(ul, ol, p) { margin-block: 0.25rem; }
 .markdown-content blockquote { border-inline-start: 3px solid var(--border); padding-inline-start: 1rem; color: var(--muted-foreground); }
 .markdown-content a:not([data-reference]) { color: var(--primary-text); text-decoration: underline; text-underline-offset: 4px; }
-.markdown-content :not(pre) > code { border-radius: var(--radius); background: var(--muted); padding: 0.125em 0.25em; font-family: var(--font-mono); font-size: 0.9em; }
+.markdown-content :not(pre) > code { border-radius: var(--radius-sm); background: color-mix(in oklab, currentColor 8%, transparent); padding: 0.125em 0.25em; font-family: var(--font-mono); font-size: 0.9em; }
 .markdown-content pre { white-space: pre; overflow-wrap: normal; }
 .markdown-content pre code { font: inherit; }
+/* Tables sit in a tinted, rounded frame supplied by the Markdown component; hairlines separate rows, and the header row adds one more tint step. */
 .markdown-content table { width: 100%; border-collapse: collapse; }
-.markdown-content :where(th, td) { border: 1px solid var(--border); padding: 0.5rem 0.75rem; }
-.markdown-content th { background: var(--muted); font-weight: 600; }
+.markdown-content :where(th, td) { padding: 0.5rem 0.75rem; }
+.markdown-content thead { background: color-mix(in oklab, currentColor 4%, transparent); }
+.markdown-content th { font-weight: 600; }
+.markdown-content tbody tr > * { border-top: 1px solid color-mix(in oklab, currentColor 10%, transparent); }
 .markdown-content .katex-display { overflow-x: auto; overflow-y: hidden; padding-block: 0.25rem; }
 .markdown-content > :first-child, .markdown-content > .streamdown-animated > :first-child { margin-top: 0; }
 .markdown-content > :last-child, .markdown-content > .streamdown-animated > :last-child { margin-bottom: 0; }
-/* Pierre draws diffs and syntax colors itself; the host supplies shared fonts, sizes, and compact spacing. */
+/* Pierre draws diffs and syntax colors itself; the host supplies shared fonts, sizes, compact spacing, and the background tone. */
 .pierre-code {
   display: block;
   min-width: 0;
@@ -459,6 +464,12 @@
   --diffs-line-height: 1.5em;
   --diffs-gap-inline: 0.375rem;
   --diffs-min-number-column-width: 3ch;
+  /* Code reads on the sheet tone in both schemes rather than on the syntax theme's own editor background. */
+  --diffs-light-bg: var(--card);
+  --diffs-dark-bg: var(--card);
+  /* Code regions on group or tint tones read as nested sheets, so they share the nested corner. */
+  border-radius: var(--radius-sm);
+  overflow: clip;
 }
 .react-flow__edge-text { fill: var(--muted-foreground); font-family: var(--font-sans); font-size: 10px; }
 .react-flow__edge-textbg { fill: var(--canvas); }

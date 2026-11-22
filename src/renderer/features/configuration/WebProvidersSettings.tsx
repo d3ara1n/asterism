@@ -175,7 +175,7 @@ function FetchScope({ patterns }: { patterns: readonly string[] }) {
     <FieldLabel asChild><span>{i18n.text(messages.fetchScope)}</span></FieldLabel>
     {patterns.includes("*") ? <p className="type-body">{i18n.text(messages.allUrls)}</p>
       : <ul className="flex flex-wrap gap-1.5">{patterns.map(pattern => <li key={pattern}>
-        <code className="block break-all rounded-md bg-muted px-2 py-0.5 font-mono text-xs">{pattern}</code></li>)}</ul>}
+        <code className="surface-tint block break-all rounded-sm px-2 py-0.5 font-mono text-xs">{pattern}</code></li>)}</ul>}
     <FieldDescription>{i18n.text(messages.fetchScopeHint)}</FieldDescription>
   </Field>;
 }

@@ -47,11 +47,12 @@ Colored surfaces pair with their foreground token, and contrast holds in both sc
 | Shell | `card-shell` with a border against the material | Titles, navigation, toolbars, the composer and entry trays |
 | Sheet | `card`, raised by the sheet shadow, no border | Reading and editing content inside a shell |
 | Group | Shell tone recessed on a sheet, no border | Grouped rows, fields, empty states, process blocks |
+| Tint | A tint of the current text color, no border | Regions inside content whose container tone varies: inline code, code block frames, tables, small chips |
 | Floating | Popover tone with the floating or lift shadow | Menus, popovers, tooltips, hover cards, dialogs, toasts, trays that float over content |
 
 Islands, docks, and object cards are shells. The shared panel and the object surface supply their sheet, so plugin islands opened through the shared panel inherit the layering. Cards placed directly on the window material, such as template cards and usage panels, keep the shell border and hold a sheet inside. Embedded inside another sheet, the same panel drops its border and reads as a group. Panels and fields inside a group rise back to the sheet tone rather than adding outlines. Floating surfaces keep their outer edge and shadow because they cover arbitrary content; inside them, header, body, and footer separate by spacing and tone rather than rules.
 
-The stylesheet expresses these layers as `surface` (a bordered shell or card), `surface-floating`, `surface-inset` (a sheet), `surface-group`, and `surface-block` (a process block), together with tokens for the sheet shadow, the lift shadow, and the nested inset radius.
+The stylesheet expresses these layers as `surface` (a bordered shell or card), `surface-floating`, `surface-inset` (a sheet), `surface-group`, `surface-block` (a process block), and `surface-tint`, together with tokens for the sheet shadow, the lift shadow, and the nested inset radius.
 
 ### Shape
 
@@ -132,6 +133,8 @@ Settings rows and fields sit in groups on the page sheet, with hairlines between
 Thinking, tool calls, and summaries are process blocks: groups in the reading flow whose outline appears only for state. A tool header is one line: the operation name, then optional subject, summary, and trailing metadata. The subject is a low-emphasis badge naming the operation's focus, the summary is muted text that yields space first, and metadata stays visible. Resource creation and creation-entry inspection use the resource type as the subject, with an instance title in the summary when one exists; operations on an existing resource use its recorded name and kind icon, with paths, queries, or other details in the summary. Separate slots replace punctuation that would only join an object and its details, and the block itself presents exceptional outcomes. Unbounded inputs such as questions and commands appear as a single-line excerpt, with the full text in the body. Input, execution, and result reuse one block, so the reader's place survives each phase; content still being composed shows a bounded tail preview, and stable inputs and controls stay outside any live-output region.
 
 Code, diffs, Markdown, math, diagrams, and reference chips render through the shared controls, so every plugin's output reads the same.
+
+Rendered content can land on a sheet, a message tone, a process block, or a floating surface, so regions inside it take a tint rather than a fixed tone. Inline code and tables use the tint; a table separates rows with hairlines and its header row with one more tint step. A code block is a small shell and sheet: the language and actions sit on the tint, and the code sits on a nested sheet. Code and diff views use the sheet tone in both schemes instead of the syntax theme's own background, so a code region matches the editor and the sheets around it.
 
 ### Messages
 
