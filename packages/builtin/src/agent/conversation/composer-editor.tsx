@@ -127,7 +127,7 @@ function createOptions(bridge: { current: EditorBridge }) {
           // ProseMirror stringifies attribute values, so absent relations are omitted rather than undefined.
           ...listId ? { "aria-controls": listId } : {},
           ...activeId ? { "aria-activedescendant": activeId } : {},
-          class: "min-h-16 max-h-60 w-full cursor-text overflow-y-auto px-3 py-3 text-base outline-none md:text-sm [&[contenteditable=false]]:cursor-default "
+          class: "min-h-16 max-h-60 w-full cursor-text overflow-y-auto px-3 pt-3 pb-1.5 text-base outline-none md:text-sm [&[contenteditable=false]]:cursor-default "
             + "[&_p.is-editor-empty:first-child]:before:pointer-events-none [&_p.is-editor-empty:first-child]:before:float-left "
             + "[&_p.is-editor-empty:first-child]:before:h-0 [&_p.is-editor-empty:first-child]:before:text-muted-foreground "
             + "[&_p.is-editor-empty:first-child]:before:content-[attr(data-placeholder)]",

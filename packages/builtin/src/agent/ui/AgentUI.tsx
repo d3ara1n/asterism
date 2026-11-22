@@ -7,6 +7,7 @@ import { useSettingsConfiguration } from "../../configuration/renderer-state";
 import { agentUI, AgentUIRendererProvider, AgentModelSelectionProvider, type AgentModelSelection, type AgentToolbarItemProps, type AgentUIContribution, type AgentOverlayPosition, type AgentOverlayProps, type AgentModalProps } from "@asterism-app/builtin-api/renderer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@asterism-app/ui/ui/dialog";
 import { useRendererApplication } from "@asterism-app/sdk/renderer";
+import { cn } from "@asterism-app/ui/utils";
 import { createComposerVisibility } from "./composer-visibility";
 import { ScrollArea } from "./ScrollArea";
 import { AgentCommands } from "../command/AgentCommands";
@@ -56,9 +57,9 @@ export function AgentUI({ selection, children }: { selection: AgentSelection | n
   </AgentModelSelectionProvider></AgentUIRendererProvider></Context.Provider>;
 }
 
-export function AgentToolbar() {
+export function AgentToolbar({ className }: { className?: string }) {
   const { refs } = useCardUI();
-  return <div ref={refs.toolbar} className="flex min-w-0 flex-wrap items-center gap-0.5 empty:hidden" />;
+  return <div ref={refs.toolbar} className={cn("flex min-w-0 flex-wrap items-center gap-0.5 empty:hidden", className)} />;
 }
 
 export function AgentUIRegion({ position }: { position: "top" | "bottom" }) {

@@ -135,7 +135,7 @@ function DraftsBox({ drafts: current, pendingTake, open, onOpenChange, onTake }:
   return (
     // Content is bottom-anchored, so the box rises out of the editor and folds back into it.
     <motion.div className="flex shrink-0 flex-col justify-end overflow-hidden" inert={!present} {...boxMotion(reducedMotion)}>
-      <div className="shrink-0 border-t px-3 pb-1" aria-label={i18n.text(messages.drafts)}>
+      <div className="shrink-0 px-2 pb-1" aria-label={i18n.text(messages.drafts)}>
 
         {/* Handle / title row */}
         <button type="button" aria-expanded={open} aria-controls={contentId} onClick={() => onOpenChange(!open)}

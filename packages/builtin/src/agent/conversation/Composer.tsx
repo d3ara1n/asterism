@@ -2,7 +2,8 @@ import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useI18n, useRendererApplication } from "@asterism-app/sdk/renderer";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { Square, ArrowUp, Archive, Paperclip, FileType } from "lucide-react";
-import { useRef, useState, useSyncExternalStore, type DragEvent, type RefObject } from "react";
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
+import { useRef, useState, useSyncExternalStore, type DragEvent, type ReactNode, type RefObject } from "react";
 import { composerTextLimit, type MessageDraft } from "./draft";
 import type { AgentExecutionState } from "../state";
 import { AttachFiles, DraftFiles, fileInputEvents } from "./Files";
@@ -16,6 +17,7 @@ import { InputGroup, InputGroupAddon } from "@asterism-app/ui/ui/input-group";
 import { commonMessages } from "../../messages/common";
 import { conversationMessages } from "../../messages/conversation";
 import { mediaMessages } from "../../messages/media";
+import { conversationEase, conversationTransition, immediateTransition } from "./motion";
 
 const fileDropTargets = [
   { id: "attach", label: mediaMessages.attach, Icon: Paperclip },
@@ -28,6 +30,61 @@ function dropTarget(target: EventTarget): FileDropTarget | null {
   return id === "attach" || id === "paths" ? id : null;
 }
 
+/**
+ * The input tray: a shell holding the drafts box, the editor sheet and the toolbar lip, so everything that shapes the next
+ * message reads as one object. While the agent runs, a light travels along the top edge.
+ * The tray does not clip: the reference menu opens above the editor and must stay visible.
+ * The tray matches the card content corner rather than exceeding it; the wide footer gap keeps the two edges apart,
+ * and the editor sheet nests concentrically inside the tray's padding and border.
+ */
+export function ComposerTray({ running, children }: { running: boolean; children: ReactNode }) {
+  const reducedMotion = useReducedMotion() === true;
+  return <div className={cn("relative flex min-w-0 flex-col rounded-lg border bg-card-shell p-1",
+    "shadow-[0_1px_2px_0_rgb(0_0_0/0.04),0_8px_24px_-12px_rgb(0_0_0/0.16)] transition-[border-color] duration-200",
+    "has-[[data-slot=input-group-control]:focus]:border-ring")}>
+    <AnimatePresence>
+      {running && <motion.span key="working" aria-hidden className="pointer-events-none absolute inset-x-5 -top-px h-px"
+        style={{ backgroundImage: "linear-gradient(90deg, transparent, var(--primary) 50%, transparent)", backgroundSize: "50% 100%", backgroundRepeat: "no-repeat" }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, backgroundPosition: reducedMotion ? "50% 0%" : ["-100% 0%", "200% 0%"] }}
+        exit={{ opacity: 0 }}
+        transition={{ opacity: { duration: 0.2 }, backgroundPosition: reducedMotion ? { duration: 0 } : { duration: 1.8, ease: "easeInOut", repeat: Infinity } }} />}
+    </AnimatePresence>
+    {children}
+  </div>;
+}
+
+/** Send and stop share one round slot, so the action row keeps its width when execution starts or ends. */
+function PrimaryActionSlot({ swapKey, children }: { swapKey: string; children: ReactNode }) {
+  const reducedMotion = useReducedMotion() === true;
+  return <div className="relative size-8 shrink-0">
+    <AnimatePresence initial={false}>
+      <motion.div key={swapKey} className="absolute inset-0"
+        initial={{ opacity: 0, scale: 0.6, rotate: -45 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} exit={{ opacity: 0, scale: 0.6, rotate: 45 }}
+        transition={reducedMotion ? immediateTransition : { duration: 0.2, ease: conversationEase }}>
+        <LeavingInert>{children}</LeavingInert>
+      </motion.div>
+    </AnimatePresence>
+  </div>;
+}
+/** A leaving action finishes its exit without accepting clicks or focus. */
+function LeavingInert({ children }: { children: ReactNode }) {
+  const present = useIsPresent();
+  return <div className="contents" inert={!present}>{children}</div>;
+}
+
+/** An arc orbiting the stop button marks ongoing work; reduced motion shows a still ring. */
+function WorkingOrbit() {
+  const reducedMotion = useReducedMotion() === true;
+  return <motion.svg aria-hidden viewBox="0 0 40 40" className="pointer-events-none absolute -inset-1 size-10 text-primary"
+    animate={reducedMotion ? undefined : { rotate: 360 }}
+    transition={reducedMotion ? undefined : { duration: 1.1, ease: "linear", repeat: Infinity }}>
+    <circle cx="20" cy="20" r="18.25" fill="none" stroke="currentColor" strokeOpacity={0.15} strokeWidth="1.5" />
+    {!reducedMotion && <circle cx="20" cy="20" r="18.25" fill="none" stroke="currentColor" strokeWidth="1.5"
+      strokeLinecap="round" strokeDasharray="30 85" />}
+  </motion.svg>;
+}
+
 export function MessageComposer({ draft, inputRef, ready, executionState, writable, onSend, onSave, onCancel, onContinue }: {
   draft: MessageDraft; inputRef: RefObject<ComposerEditorHandle | null>;
   ready: boolean; executionState: AgentExecutionState; writable: boolean;
@@ -35,6 +92,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
 }) {
   const i18n = useI18n();
   const { pathForFile } = useRendererApplication();
+  const reducedMotion = useReducedMotion() === true;
   const [fileDrag, setFileDrag] = useState<FileDropTarget | "over" | null>(null);
   const state = useSyncExternalStore(draft.subscribe, draft.getSnapshot);
   const [controlPending, setControlPending] = useState(false);
@@ -48,6 +106,7 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
   const cancelDisabled = !ready || controlPending;
   const busy = state.locked;
   const dropsEnabled = ready && !busy;
+  const empty = !state.text.trim() && !state.files.length;
   const onFileError = (error: UiText) => toast.error(i18n.text(error));
   // Capture file drags before the editor or workbench can interpret them. Text and references pass through.
   const onFileDrag = (event: DragEvent) => {
@@ -76,7 +135,11 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
   };
   return <form ref={form} onPaste={fileInputEvents(draft, !dropsEnabled, onFileError).onPaste}
     onSubmit={event => { event.preventDefault(); void onSend(); }}>
-  <InputGroup onDragEnterCapture={onFileDrag} onDragOverCapture={onFileDrag} onDropCapture={onDrop}
+  {/* The editor sheet rests inside the tray, raised by the same faint edge shadow as card content. */}
+  <InputGroup className={cn("rounded-[max(0px,calc(var(--radius)-5px))] border-0 bg-card dark:bg-card",
+    "shadow-[0_1px_3px_0_rgb(0_0_0/0.06),0_0_2px_0_rgb(0_0_0/0.04)]",
+    "has-[[data-slot=input-group-control]:focus-visible]:ring-0")}
+    onDragEnterCapture={onFileDrag} onDragOverCapture={onFileDrag} onDropCapture={onDrop}
     onDragLeave={event => {
       if (!(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))) setFileDrag(null);
     }}>
@@ -84,24 +147,36 @@ export function MessageComposer({ draft, inputRef, ready, executionState, writab
       onSubmit={() => form.current?.requestSubmit()}
       label={i18n.formatMessage(conversationMessages.messagePlaceholder)}
       placeholder={i18n.formatMessage(conversationMessages.inputPlaceholder)} />
-    <InputGroupAddon align="block-end" data-disabled={busy} className="min-w-0 gap-1 data-[disabled=true]:cursor-default">
+    <InputGroupAddon align="block-end" data-disabled={busy} className="min-w-0 gap-1 px-1.5 pb-1.5 data-[disabled=true]:cursor-default">
       <AttachFiles draft={draft} disabled={busy || !ready} onError={onFileError} />
+      <IconButton type="button" variant="ghost" size="icon-sm" label={i18n.text(conversationMessages.saveDraft)}
+        disabled={busy || !ready || state.uploading || empty} onClick={() => { void onSave(); }}><Archive /></IconButton>
       <DraftFiles draft={draft} disabled={busy} />
-      <Button type="button" size="sm" variant="ghost" disabled={busy || !ready || state.uploading || (!state.text.trim() && !state.files.length)}
-        onClick={() => { void onSave(); }}><Archive />{i18n.text(conversationMessages.saveDraft)}</Button>
-      {running ? <Button type="button" size="sm" variant="secondary" disabled={cancelDisabled}
-        onClick={() => { void control(onCancel); }}><Square />{i18n.formatMessage(conversationMessages.stop)}</Button>
-        : <div className="flex shrink-0 gap-1">
-          {executionState === "incomplete" && <Button type="button" size="sm" variant="ghost" disabled={!writable || controlPending} onClick={() => { void control(onContinue); }}>{i18n.formatMessage(conversationMessages.continue)}</Button>}
-          <IconButton type="submit" variant="default" size="icon-sm" disabled={!writable || state.uploading || (!state.text.trim() && !state.files.length)} label={i18n.formatMessage(commonMessages.sendMessage)}><ArrowUp /></IconButton>
-        </div>}
+      <AnimatePresence initial={false}>
+        {!running && executionState === "incomplete" && <motion.div key="continue" className="shrink-0"
+          initial={{ opacity: 0, x: 6 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 6 }}
+          transition={reducedMotion ? immediateTransition : conversationTransition}>
+          <Button type="button" size="sm" variant="outline" className="rounded-full" disabled={!writable || controlPending}
+            onClick={() => { void control(onContinue); }}>{i18n.formatMessage(conversationMessages.continue)}</Button>
+        </motion.div>}
+      </AnimatePresence>
+      <PrimaryActionSlot swapKey={running ? "stop" : "send"}>
+        {running ? <>
+          <IconButton type="button" variant="secondary" size="icon-sm" className="rounded-full" disabled={cancelDisabled}
+            label={i18n.formatMessage(conversationMessages.stop)} onClick={() => { void control(onCancel); }}>
+            <Square className="size-3 fill-current" />
+          </IconButton>
+          <WorkingOrbit />
+        </> : <IconButton type="submit" variant="default" size="icon-sm" className="rounded-full transition-[opacity,transform] active:scale-90"
+          disabled={!writable || state.uploading || empty} label={i18n.formatMessage(commonMessages.sendMessage)}><ArrowUp /></IconButton>}
+      </PrimaryActionSlot>
     </InputGroupAddon>
-    {dropsEnabled && fileDrag && <div className="absolute inset-0 z-10 grid select-none grid-cols-2 divide-x overflow-hidden rounded-md bg-background">
+    {dropsEnabled && fileDrag && <div className="absolute inset-0 z-10 grid select-none grid-cols-2 gap-1 rounded-[inherit] bg-card p-1">
       {fileDropTargets.map(({ id, label, Icon }) => {
         const disabled = id === "attach" && state.uploading;
         return <div key={id} data-file-drop={id} aria-disabled={disabled || undefined}
-          className={cn("flex min-w-0 flex-col items-center justify-center gap-2 px-2 text-center type-caption",
-            disabled ? "opacity-50" : fileDrag === id ? "bg-accent text-accent-foreground" : "text-muted-foreground")}>
+          className={cn("flex min-w-0 flex-col items-center justify-center gap-2 rounded-md border border-dashed px-2 text-center type-caption transition-colors duration-150",
+            disabled ? "opacity-50" : fileDrag === id ? "border-primary bg-primary/5 text-primary-text" : "border-input text-muted-foreground")}>
           <Icon className="pointer-events-none size-4" aria-hidden />
           <span className="pointer-events-none">{i18n.text(label)}</span>
         </div>;

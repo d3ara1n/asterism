@@ -10,7 +10,7 @@ import { ConversationNavigation, type ConversationNavigationHandle } from "./Con
 import { ConversationSeam } from "./ConversationSeam";
 import { IconSwap } from "./IconSwap";
 
-import { MessageComposer } from "./Composer";
+import { ComposerTray, MessageComposer } from "./Composer";
 import type { ComposerEditorHandle } from "./composer-editor";
 import { conversationMessages } from "../../messages/conversation";
 import { useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk/renderer";
@@ -137,6 +137,8 @@ export function Conversation({ feedback, compressions, activity = null, executio
           <EmptyDescription className="text-xs">{i18n.formatMessage(conversationMessages.emptyHint)}</EmptyDescription>
         </EmptyHeader>
       </Empty>}
+      {/* Output fades as it passes under the floating input tray. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-5 bg-linear-to-t from-card to-transparent" />
       <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center">
         <AnimatePresence>
           {awayFromBottom && <motion.div className="surface-floating pointer-events-auto"
@@ -150,12 +152,14 @@ export function Conversation({ feedback, compressions, activity = null, executio
       </div>
     </div>
     <AgentUIRegion position="bottom" />
-    {!composerHidden && <AgentDraftsPanel onTake={() => composer.current?.focus()} />}
-    {!composerHidden && <footer className="shrink-0 space-y-1 border-t px-3 pt-1 pb-2">
-      <AgentToolbar />
-      <MessageComposer draft={interaction.draft} inputRef={composer}
-        ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
-        onSave={() => interaction.save()} onCancel={interaction.cancel} onContinue={resume} />
+    {!composerHidden && <footer className="shrink-0 px-2 pt-1 pb-2">
+      <ComposerTray running={running}>
+        <AgentDraftsPanel onTake={() => composer.current?.focus()} />
+        <MessageComposer draft={interaction.draft} inputRef={composer}
+          ready={ready} executionState={executionState} writable={interaction.writable} onSend={send}
+          onSave={() => interaction.save()} onCancel={interaction.cancel} onContinue={resume} />
+        <AgentToolbar className="px-0.5 pt-1" />
+      </ComposerTray>
     </footer>}
   </ConversationSharing>;
 }
