@@ -18,8 +18,12 @@ async function consume(events: AsyncIterable<ModelEvent>) { for await (const _ev
 const transportInput: ModelInput = { ...input, settings: { ...input.settings, thinking: "off" } };
 
 describe("AI SDK adaptation contract", () => {
-  // Upstream status and original text support diagnosis; HTTP 429 and 500 must not collapse into the same configuration/network guess.
-  it.each([401, 402, 429, 500])("HTTP %s preserves original error bodies and exposes upstream retryability without request credentials", async status => {
+  // Upstream provenance does not imply retryability, even when the SDK considers a conflict or any 5xx retryable.
+  it.each([
+    { status: 401, retryable: false }, { status: 402, retryable: false }, { status: 409, retryable: false },
+    { status: 408, retryable: true }, { status: 429, retryable: true },
+    { status: 500, retryable: true }, { status: 501, retryable: false },
+  ])("HTTP $status preserves the upstream error and sets retryable=$retryable", async ({ status, retryable }) => {
     const body = '{"type":"error","error":{"type":"upstream_error","message":"Original provider message","request_id":"req-1","extra":{"limit":12}}}';
     const response = new Response(body, {
       status, headers: { "content-type": "application/json", "X-Request-Id": "req-1" },
@@ -30,7 +34,7 @@ describe("AI SDK adaptation contract", () => {
     expect(failure).toBeInstanceOf(ModelFailure);
     expect(failure.response).toMatchObject({ connection: { id: "p" }, endpoint: input.settings.provider.baseUrl,
       model: "test", status, headers: { "x-request-id": "req-1" } });
-    expect(failure).toMatchObject({ origin: "model", retryable: true, message: "Original provider message", details: {
+    expect(failure).toMatchObject({ origin: "model", retryable, message: "Original provider message", details: {
       message: "Original provider message", statusCode: status, httpStatus: status, responseBody: body,
       responseHeaders: { "x-request-id": "req-1" },
     } });
@@ -44,16 +48,16 @@ describe("AI SDK adaptation contract", () => {
     const body = "<html><body>upstream unavailable</body></html>";
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(body, { status: 502 }));
     await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
-      .rejects.toMatchObject({ details: { statusCode: 502, httpStatus: 502, responseBody: body } });
+      .rejects.toMatchObject({ retryable: true, details: { statusCode: 502, httpStatus: 502, responseBody: body } });
   });
-  // Invalid bytes or structures delivered by an upstream server remain eligible for bounded recovery.
+  // An HTTP success with malformed content has no transient status, even though the data came from upstream.
   it.each(["not JSON", '{"choices":"invalid"}'])("invalid upstream response data is classified at the provider boundary: %s", async chunk => {
     const current = structuredClone(transportInput);
     current.settings.provider.protocol = "openai-chat";
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(
       `data: ${chunk}\n\n`, { headers: { "content-type": "text/event-stream" } }));
     const failure = await consume(adapter.prepare(current).stream(new AbortController().signal)).catch(error => error);
-    expect(failure).toMatchObject({ origin: "model", retryable: true, code: "response_parsing",
+    expect(failure).toMatchObject({ origin: "model", retryable: false, code: "response_parsing",
       message: "Model response parsing failed.", details: { httpStatus: 200 } });
     // Received data and validation issues remain diagnostic text instead of being copied into the failure summary.
     expect(failure.details.message).not.toBe(failure.message);
@@ -72,18 +76,25 @@ describe("AI SDK adaptation contract", () => {
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () =>
       new Response(raw, { headers: { "content-type": "text/event-stream" } }));
     await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
-      .rejects.toMatchObject({ details: { message: "Server busy", statusCode: 529, httpStatus: 200, rawResponse: raw } });
+      .rejects.toMatchObject({ retryable: true, details: { message: "Server busy", statusCode: 529, httpStatus: 200, rawResponse: raw } });
   });
   // SSE may report errors after HTTP 200; SDK decoding trims unknown fields, so raw error remains authoritative.
-  it("stream errors preserve HTTP status and complete server events", async () => {
-    const raw = { type: "error", error: { type: "overloaded_error", message: "Server busy", extra: { retry_after: 5 } } };
+  it.each([
+    { type: "overloaded_error", statusCode: 529, retryable: true },
+    { type: "authentication_error", statusCode: 401, retryable: false },
+    { type: "unrecognized_error", statusCode: undefined, retryable: false },
+  ])("stream $type uses the provider error status even when HTTP succeeds", async ({ type, statusCode, retryable }) => {
+    const raw = { type: "error", error: { type, message: "Upstream error", extra: { request_id: "provider-1" } } };
     const start = { type: "message_start", message: { id: "m1", type: "message", role: "assistant", model: "test",
       content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 2, output_tokens: 0 } } };
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(
       `event: message_start\ndata: ${JSON.stringify(start)}\n\nevent: error\ndata: ${JSON.stringify(raw)}\n\n`,
       { headers: { "content-type": "text/event-stream", "x-request-id": "stream-1" } }));
-    await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
-      .rejects.toMatchObject({ details: { statusCode: 529, httpStatus: 200, rawEvent: JSON.stringify(raw), responseHeaders: { "x-request-id": "stream-1" } } });
+    const failure = await consume(adapter.prepare(transportInput).stream(new AbortController().signal)).catch(error => error);
+    expect(failure).toMatchObject({ origin: "model", retryable, details: {
+      httpStatus: 200, rawEvent: JSON.stringify(raw), responseHeaders: { "x-request-id": "stream-1" },
+    } });
+    expect(failure.details.statusCode).toBe(statusCode);
   });
 
   // SDK streams must deliver the caller's limit to the provider without expanding the configured output limit.
@@ -152,7 +163,7 @@ describe("AI SDK adaptation contract", () => {
     });
   });
 
-  it("retries Responses only after upstream identifies the rejected attachment, without omitting it on later requests", async () => {
+  it("surfaces a Responses rejection of a historical attachment without dropping it or resending", async () => {
     const current = structuredClone(transportInput);
     current.settings.provider.protocol = "openai-responses";
     current.messages = [
@@ -161,60 +172,20 @@ describe("AI SDK adaptation contract", () => {
         { kind: "file", filename: "report.pdf", mediaType: "application/pdf", data: Uint8Array.of(42) }] },
     ];
     const original = structuredClone(current);
-    const transport = vi.fn<typeof fetch>(async () => {
-      if (transport.mock.calls.length === 1) return Response.json({ error: {
-        message: "This endpoint does not support MP4 files", param: "input[0].content[0].file_data",
-      } }, { status: 400 });
-      const response = { id: "response-1", model: "test", created_at: 0 };
-      return new Response([
-        { type: "response.created", response: { ...response, status: "in_progress" } },
-        { type: "response.completed", response: { ...response, status: "completed", usage: { input_tokens: 3, output_tokens: 2, total_tokens: 5 } } },
-      ].map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
-    });
-    const diagnostic = vi.fn();
+    const rejection = { error: { message: "This endpoint does not support MP4 files", param: "input[0].content[0].file_data" } };
+    const transport = vi.fn<typeof fetch>(async () => Response.json(rejection, { status: 400 }));
     const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
-    const run = async () => {
-      const events = [];
-      for await (const event of adapter.prepare(current).stream(new AbortController().signal, diagnostic)) events.push(event);
-      expect(events.at(-1)).toMatchObject({ type: "finish", reason: "stop", response: { status: 200 } });
-    };
-    await run();
-    expect(transport).toHaveBeenCalledTimes(2);
-    const body = (index: number) => JSON.parse(String(transport.mock.calls[index]![1]!.body));
-    expect(body(0).input[0].content[0]).toEqual({ type: "input_file", filename: "old.mp4", file_data: "data:video/mp4;base64,UA==" });
-    expect(body(1)).toEqual({ ...body(0), input: [
-      { ...body(0).input[0], content: [{ type: "input_text", text: expect.stringContaining('"old.mp4" (video/mp4) was rejected by the provider') }] },
-      body(0).input[1],
-    ] });
-    expect(diagnostic).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ type: "diagnostic", origin: "model", level: "warning",
-      code: "attachments_omitted", omittedFiles: ['"old.mp4" (video/mp4)'] }));
-    await run();
-    expect(transport).toHaveBeenCalledTimes(3);
-    expect(body(2)).toEqual(body(0));
-    expect(diagnostic).toHaveBeenCalledTimes(1);
+    await expect(consume(adapter.prepare(current).stream(new AbortController().signal)))
+      .rejects.toMatchObject({ origin: "model", code: "provider_error", message: rejection.error.message,
+        retryable: false, details: { httpStatus: 400, responseBody: JSON.stringify(rejection) } });
+    expect(transport).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String(transport.mock.calls[0]![1]!.body));
+    expect(body.input.map((message: { content: unknown }) => message.content)).toEqual([
+      [{ type: "input_file", filename: "old.mp4", file_data: "data:video/mp4;base64,UA==" }],
+      [{ type: "input_text", text: "Continue the conversation" },
+        { type: "input_file", filename: "report.pdf", file_data: "data:application/pdf;base64,Kg==" }],
+    ]);
     expect(current).toEqual(original);
-  });
-
-  it.each([
-    { param: "input[0].content[0].text", diagnostic: true, attempts: 1 },
-    { param: undefined, diagnostic: true, attempts: 1 },
-    { param: "input[0].content[1].file_data", diagnostic: false, attempts: 1 },
-    { param: "input[0].content[1].file_data", diagnostic: true, attempts: 2 },
-  ])("Responses limits attachment recovery to one targeted attempt when observable ($param, $diagnostic)", async ({ param, diagnostic, attempts }) => {
-    const current = structuredClone(transportInput);
-    current.settings.provider.protocol = "openai-responses";
-    current.messages = [{ kind: "input", parts: [{ kind: "text", text: "Read the file" },
-      { kind: "file", filename: "report.pdf", mediaType: "application/pdf", data: Uint8Array.of(42) }] }];
-    let sent = 0;
-    const transport = vi.fn<typeof fetch>(async () => Response.json({
-      error: { message: `Provider rejected attempt ${++sent}`, param },
-    }, { status: 400 }));
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
-    const report = vi.fn();
-    await expect(consume(adapter.prepare(current).stream(new AbortController().signal, diagnostic ? report : undefined)))
-      .rejects.toMatchObject({ origin: "model", code: "provider_error", message: `Provider rejected attempt ${attempts}`, details: { httpStatus: 400 } });
-    expect(transport).toHaveBeenCalledTimes(attempts);
-    expect(report).toHaveBeenCalledTimes(attempts - 1);
   });
 
   // Request projection contract: toggles do not alter history; off does not delete reasoning; filtering must not send empty assistants or lose tool calls.
@@ -532,7 +503,7 @@ describe("AI SDK adaptation contract", () => {
     try { for await (const _event of adapter.prepare(transportInput).stream(new AbortController().signal)) { /* Consume the stream. */ } }
     catch (error) { failure = error; }
     expect(failure).toBeInstanceOf(Error);
-    expect(failure).toMatchObject({ message: "fetch failed", retryable: true, origin: "model", details: {
+    expect(failure).toMatchObject({ message: "fetch failed", retryable: false, origin: "model", details: {
       message: "fetch failed", causes: [{ message: "getaddrinfo ENOTFOUND example.invalid", code: "ENOTFOUND" }],
     } });
     expect(transport).toHaveBeenCalledTimes(1);

@@ -62,7 +62,7 @@ export class ResponseBuffer {
     if (event.type === "finish") {
       this.finish = event;
       if ([...this.blocks.values()].some(block => block.endedAt === null)) {
-        throw new ModelFailure("incomplete", "The model response ended with incomplete blocks. No tools were executed.", undefined, "model", true);
+        throw new ModelFailure("incomplete", "The model response ended with incomplete blocks. No tools were executed.", undefined, "model");
       }
       return;
     }

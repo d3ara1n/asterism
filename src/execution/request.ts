@@ -89,7 +89,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
       return pendingProgress;
     };
     try {
-      for await (const event of prepared.stream(signal, emit)) {
+      for await (const event of prepared.stream(signal)) {
         if (event.type === "finish") responseMetadata = event.response ?? null;
         // The adapter handles aborts and delivers previously acquired terminal state; check cancellation again before the tool batch starts.
         buffer.accept(event);
@@ -101,11 +101,11 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
       }
       signal.throwIfAborted();
       const finish = buffer.finish;
-      if (!finish) throw new ModelFailure("interrupted", "The model stream ended without a terminal response.", undefined, "model", true);
-      if (buffer.empty) throw new ModelFailure("empty_response", "The model response ended without any content blocks.", undefined, "model", true);
+      if (!finish) throw new ModelFailure("interrupted", "The model stream ended without a terminal response.", undefined, "model");
+      if (buffer.empty) throw new ModelFailure("empty_response", "The model response ended without any content blocks.", undefined, "model");
       if (!["stop", "tool-calls"].includes(finish.reason)) throw new ModelFailure("incomplete",
         `The model response ended with finish reason "${finish.reason}"${finish.rawFinishReason ? ` (${finish.rawFinishReason})` : ""}. No tools were executed.`,
-        undefined, "model", finish.reason === "error" || finish.reason === "interrupted");
+        undefined, "model");
       await flushProgress();
       // Cancellation before publication leaves no tool input that looks submitted for execution.
       signal.throwIfAborted();

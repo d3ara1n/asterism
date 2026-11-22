@@ -90,8 +90,9 @@ describe("Stateless single model execution", () => {
       settings: { ...settings, provider: { ...settings.provider, protocol: "anthropic" as const } },
       system: request.system, messages: await resolveInput(request.messages, undefined, request.signal),
     }));
-    expect(result).toMatchObject({ reason: "failed", retryable: true, completion: {
-      providerResponseId: "upstream-id", termination: { reason: "failed", retryable: true },
+    const retryable = ending === "error";
+    expect(result).toMatchObject({ reason: "failed", retryable, completion: {
+      providerResponseId: "upstream-id", termination: { reason: "failed", retryable },
       usage: { input: 132, cacheRead: 9, output: null, total: null },
     } });
     expect(events.find(event => event.type === "block")).toMatchObject({ block: {

@@ -40,7 +40,7 @@ Restoring drafts on startup does not send them. The Agent owns scheduling and ru
 
 The workbench Agent has no request count or execution time limit; a turn continues while responses request tools or steering arrives. Agent configuration budgets apply only to subagent runs.
 
-Builtin uses bounded automatic recovery for upstream model failures before tool execution. The adapter identifies eligible failures at the transport or provider boundary; HTTP authentication and billing errors remain eligible because intermediaries can misclassify upstream failures. Local preparation and processing failures, explicit cancellation, and tool execution do not trigger model replay. Consecutive recovery attempts have a finite budget and cancellable backoff that honors valid provider delay headers. Subagent request and duration budgets also bound recovery.
+Builtin retries model requests only before tool execution and only when the adapter classifies a failure as transient. The adapter uses a shared status allowlist: 408, 429, 500, 502, 503, 504, and 529. An HTTP rejection takes precedence; a stream error can carry its own provider status after HTTP success. Failures without a recognized transient status, local errors, and explicit cancellation do not trigger replay. Consecutive retries have a finite budget and cancellable backoff that honors valid provider delay headers. Subagent request and duration budgets also bound recovery.
 
 Each retry is a new request projected from the current history and captures its own environment. Completed usable blocks remain input; incomplete blocks do not. Recovery does not fabricate a user message or continue an unfinished JSON argument. Provider restrictions on the resulting conversation remain visible as upstream errors. The Agent's live activity represents requesting, generating, tool execution, and waiting to retry.
 
@@ -198,7 +198,7 @@ Each request projects public history toward its target model. Native continuatio
 
 Tool call IDs transform deterministically when required, keeping calls and results paired. Chat Completions sends tool-result files as structured parts on the tool message and leaves acceptance of this extension to the endpoint. The explicit `toolFilesAsUserMessage` compatibility setting instead sends the files in a following user message, with a reference in the tool result.
 
-On the Responses execution path that can display diagnostics, a pre-stream HTTP rejection identifying a specific user attachment by its wire field path permits one retry. The retry replaces only that attachment with a notice and reports the omission; other errors are surfaced without guessing. The retry does not rewrite history or remember rejected media for later requests.
+Providers decide whether to accept attachments in the projected request. Rejections are exposed as request failures; the host does not replace attachments with notices or resend a reduced request.
 
 Reasoning text and summaries are distinct public data. Protocol-specific signatures and encrypted continuation never replace that text. The reasoning switch controls reasoning participation; explicit off requests disabled thinking, while an unset level leaves the upstream default after inheritance.
 

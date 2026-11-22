@@ -12,6 +12,8 @@ A report from another Agent is evidence of what it observed, not direct access t
 
 For a model failure, identify the connection and request that failed before changing the model choice. Authentication, account availability, unsupported input, and transport failures call for different remedies. An account balance display or a successful earlier test cannot explain every failed request.
 
+If the provider rejects an attachment, Asterism does not remove it and continue. An attachment in the current history path can still affect later requests, including after a model switch. Use a model that accepts it, or continue from before the message that added it and send the material in a supported form.
+
 Network behavior can differ between Asterism and an external process. Do not assume that a successful terminal command establishes that an application connection works, or that changing application networking changes every external program's environment.
 
 A running model request keeps the configuration it captured. Assess a changed model connection using a subsequent request rather than interpreting an earlier response as a test of your change.

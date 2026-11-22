@@ -9,26 +9,32 @@ import { projectHistory } from "./projection.ts";
 import { modelProtocol, type ModelProtocol } from "./protocols/index.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
-import { describeError, errorMessage, type ModelResponse, type ModelRunEvent } from "@asterism-app/sdk/contracts";
+import { describeError, errorMessage, type ModelResponse } from "@asterism-app/sdk/contracts";
 import { ZodError } from "zod";
-import { responsesFileRetry } from "./protocols/responses-file-recovery.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
 function responseParsingFailure(error: unknown): boolean {
   return error instanceof SyntaxError || error instanceof ZodError
     || JSONParseError.isInstance(error) || TypeValidationError.isInstance(error) || InvalidResponseDataError.isInstance(error);
 }
-/** Transport and provider decoding boundaries identify upstream failures independently of status-code retry hints. */
-function providerFailure(error: unknown, upstream = false): ModelFailure {
+const retryableStatuses = new Set([408, 429, 500, 502, 503, 504, 529]);
+
+/** Provenance explains who failed; only a transient response status justifies automatic retry. */
+function providerFailure(error: unknown, upstream = false, httpStatus?: number): ModelFailure {
   if (error instanceof ModelFailure) return error;
   const details = describeError(error);
   const parsing = responseParsingFailure(error);
-  const remote = upstream || APICallError.isInstance(error) || StreamProviderError.isInstance(error);
+  const providerError = APICallError.isInstance(error) || StreamProviderError.isInstance(error);
+  const httpRejected = httpStatus !== undefined && httpStatus >= 400;
+  const remote = upstream || providerError || httpRejected;
+  // An HTTP rejection takes precedence. After a successful HTTP response, use the SDK's stream error status.
+  const status = httpRejected ? httpStatus : providerError ? error.statusCode : undefined;
+  const retryable = status !== undefined && retryableStatuses.has(status);
   // SDK parsing/validation messages embed received values and issue trees; retain them only in details.
   const message = parsing ? "Model response parsing failed."
     : errorMessage(error, remote ? "Provider request failed." : "Model processing failed.");
   return new ModelFailure(parsing ? "response_parsing" : remote ? "provider_error" : "processing_error",
-    message, details, remote ? "model" : "software", remote);
+    message, details, remote ? "model" : "software", retryable);
 }
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
@@ -99,17 +105,15 @@ export class AiSdkAdapter implements ModelAdapter {
     const options = requestOptions(input.settings.provider, input.settings.model, {
       purpose: "execution", thinking: input.settings.thinking, system, maxOutputTokens: input.maxOutputTokens,
     });
-    return { stream: (signal, diagnostic) => this.stream(input, messages, options, signal, diagnostic) };
+    return { stream: signal => this.stream(input, messages, options, signal) };
   }
-  private async *stream(input: ModelInput, messages: ModelMessage[], options: ReturnType<typeof requestOptions>, signal: AbortSignal,
-    diagnostic?: (event: Extract<ModelRunEvent, { type: "diagnostic" }>) => void): AsyncIterable<ModelEvent> {
+  private async *stream(input: ModelInput, messages: ModelMessage[], options: ReturnType<typeof requestOptions>, signal: AbortSignal): AsyncIterable<ModelEvent> {
     const { provider, model } = input.settings;
     const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const controller = new AbortController();
     const streamSignal = AbortSignal.any([signal, controller.signal]);
     let responseMetadata: ModelResponse | null = null;
-    let omittedFile: string | undefined;
     // The SDK may consume the first SSE error before doStream returns; retain the received prefix and release it on first-block delivery.
     let capturePrefix = true, responsePrefix = "";
     const decoder = new TextDecoder();
@@ -117,16 +121,6 @@ export class AiSdkAdapter implements ModelAdapter {
       let response: Response;
       try {
         response = await this.transport(url, init);
-        if (diagnostic && provider.protocol === "openai-responses" && !this.languageModelFactory) {
-          const retry = await responsesFileRetry(response, init?.body, streamSignal);
-          if (retry) {
-            const headers = new Headers(init?.headers);
-            headers.delete("content-length");
-            void response.body?.cancel().catch(() => {});
-            omittedFile = retry.label;
-            response = await this.transport(url, { ...init, headers, body: retry.body });
-          }
-        }
       } catch (error) { throw providerFailure(error, true); }
       responseMetadata = {
         connection: { id: provider.id }, endpoint: provider.baseUrl, model: model.modelId,
@@ -152,12 +146,6 @@ export class AiSdkAdapter implements ModelAdapter {
       }
       return response;
     };
-    const emitAttachmentWarning = () => {
-      if (!omittedFile || signal.aborted) return;
-      diagnostic?.({ type: "diagnostic", origin: "model", level: "warning", code: "attachments_omitted",
-        message: `Retried without an attachment rejected by the provider: ${omittedFile}.`, omittedFiles: [omittedFile] });
-      omittedFile = undefined;
-    };
     const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, transport, input);
     const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
     signal.throwIfAborted();
@@ -167,20 +155,18 @@ export class AiSdkAdapter implements ModelAdapter {
     const cancelled = () => { timing.end("cancelled"); };
     signal.addEventListener("abort", cancelled, { once: true });
     try {
-      for await (const event of this.decode(measured, messages, tools, options, protocol, streamSignal, () => responseMetadata !== null)) {
-        emitAttachmentWarning();
+      for await (const event of this.decode(measured, messages, tools, options, protocol, streamSignal, () => responseMetadata?.status)) {
         capturePrefix = false; responsePrefix = "";
         yield event.type === "finish" ? { ...event, response: responseMetadata } : event;
       }
     } catch (error) {
-      emitAttachmentWarning();
       // Model termination may precede connection close or user cancellation; acquired metering must still be delivered.
       if (measured.completion) yield { ...measured.completion, response: responseMetadata };
-      const failure = providerFailure(error, responseMetadata !== null && responseParsingFailure(error));
-      failure.details ??= describeError(error);
-      if (responsePrefix) failure.details.rawResponse = responsePrefix;
       // An asynchronous transport callback assigns the response; narrow to the actual value obtained after the callback.
       const received = responseMetadata as ModelResponse | null;
+      const failure = providerFailure(error, received !== null && responseParsingFailure(error), received?.status);
+      failure.details ??= describeError(error);
+      if (responsePrefix) failure.details.rawResponse = responsePrefix;
       if (received) {
         failure.details = { ...failure.details,
           httpStatus: received.status,
@@ -200,7 +186,7 @@ export class AiSdkAdapter implements ModelAdapter {
   }
   private async *decode(measured: ReturnType<typeof measureModel>, messages: ModelMessage[], tools: ToolSet,
     options: ReturnType<typeof requestOptions>, protocol: ModelProtocol,
-    signal: AbortSignal, receivedResponse: () => boolean): AsyncIterable<ModelEvent> {
+    signal: AbortSignal, receivedStatus: () => number | undefined): AsyncIterable<ModelEvent> {
     const result = streamText({ model: measured.model, messages, tools,
       ...options, abortSignal: signal,
       include: { rawChunks: true },
@@ -270,7 +256,8 @@ export class AiSdkAdapter implements ModelAdapter {
         case "error":
           // Server and transport errors retain raw diagnostics separately from the failure summary.
           {
-            const failure = providerFailure(event.error, rawFailure !== undefined || (receivedResponse() && responseParsingFailure(event.error)));
+            const status = receivedStatus();
+            const failure = providerFailure(event.error, rawFailure !== undefined || (status !== undefined && responseParsingFailure(event.error)), status);
             failure.details ??= describeError(event.error);
             if (rawFailure !== undefined) failure.details.rawEvent = rawFailure;
             throw failure;
@@ -289,7 +276,7 @@ export class AiSdkAdapter implements ModelAdapter {
       }
     }
     // Received terminal state must be delivered; ResponseBuffer retains metering before rejecting blocks that remain unclosed.
-    if (!measured.completion) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.", undefined, "model", true);
+    if (!measured.completion) throw new ModelFailure("interrupted", "The provider stream ended without a finish event.", undefined, "model");
     yield measured.completion;
   }
 }

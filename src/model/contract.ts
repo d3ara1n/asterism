@@ -1,5 +1,5 @@
 import type { Json, ModelSettings } from "../shared/model.ts";
-import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, ModelRunEvent, RequestTiming, ErrorDetails, Usage } from "@asterism-app/sdk/contracts";
+import type { ModelItem, SystemPrompt, ModelInputPart, ModelRequestIdentity, ModelResponse, ModelEvent, RequestTiming, ErrorDetails, Usage } from "@asterism-app/sdk/contracts";
 
 /** message is a failure summary; details retain the original exception and response diagnostics. */
 export class ModelFailure extends Error {
@@ -20,7 +20,7 @@ export type ResolvedModelItem = Extract<ModelItem, { kind: "output" }>
 export interface ModelInput extends ModelRequestIdentity { settings: ModelSettings; system: SystemPrompt; messages: ResolvedModelItem[]; tools: ToolDeclaration[]; maxOutputTokens?: number }
 export type ModelValidationInput = Omit<ModelInput, "messages"> & { messages: readonly (ModelItem | ResolvedModelItem)[] };
 export interface PreparedModel {
-  stream(signal: AbortSignal, diagnostic?: (event: Extract<ModelRunEvent, { type: "diagnostic" }>) => void): AsyncIterable<ModelEvent>;
+  stream(signal: AbortSignal): AsyncIterable<ModelEvent>;
 }
 export interface ModelAdapter {
   /** Native continuation format this adapter produces for the target; recorded as the output's `adapter` origin. */
