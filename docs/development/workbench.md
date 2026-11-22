@@ -52,6 +52,8 @@ Session row navigation, status access, and the action menu retain separate hit t
 
 Every object uses `ObjectCard` and the shared `ObjectSurface`. Resource declarations supply default geometry. User size, position, visibility, folding, and viewport are view data outside history.
 
+Auxiliary panels respond to card width rather than window width or canvas zoom, and the host owns their title, close action, and containment.
+
 Card size presets are Small, Medium, and Large, with Medium using the resource's default geometry. Presets respect the resource's minimum dimensions and the workbench's maximum dimensions. Double-clicking the resize handle or choosing the menu's restore action clears the size override and restores the resource's current default geometry.
 
 New cards find a nearby empty rectangle using actual card sizes. Model-created resources prefer the caller’s location; user creation prefers the viewport. Drop placement uses the drop point. Existing cards retain their position.
@@ -70,6 +72,16 @@ The card shell owns panel focus, switching, closing, and Escape handling. Indepe
 
 Opening an object in an island moves its content out of the canvas card into an ordinary island. Each object has at most one island: while it is open, the card shows a placeholder with a return control and no open control, so the content mounts once. Several objects can be open side by side. Moving content between card and island may remount it but preserves object-retained state and backend work.
 
+## Window and island layout
+
+Window owns the titlebar and the managed space below it. Screens move within that space as units, with settings to the left of the main page; islands are columns within a screen. Descendants do not compensate for the titlebar themselves. Window state supplies the titlebar mode and native fullscreen state: fullscreen removes controls-specific space, maximization keeps it, and Windows and Linux use the actual controls-overlay safe region rather than a fixed button width. The Linux native-titlebar switch is resolved when the window is created and requires restart.
+
+Window gaps are draggable. Interactive surfaces exclude dragging explicitly, and a descendant drag-region reset keeps transformed canvas descendants from creating oversized exclusion areas.
+
+Islands declare a minimum width, a growth weight, and an optional maximum. When they fit, space is distributed and the strip is centered. When they overflow, islands fall back to their minimums and the focused island is revealed within the Island viewport without moving the docked sidebars; segment navigation reaches islands that are completely displaced. Layout calculations stay independent of business components, which request island operations through the shared interface.
+
+An island shell's border, clipping, and focus highlight are independent of its fill and stay outside clipped content. Content that paints its own background, such as the canvas, uses a transparent shell so entry and exit reveal the window material rather than an unrelated card fill. Page-region cleanup releases only the island instances that region opened; sharing a containing island does not join another region's islands to its lifetime.
+
 ## Islands
 
 The main page places the session navigation sidebar, the central Island viewport, and an optional auxiliary panel side by side. The sidebar and auxiliary panel stay docked within the page while visible. They reserve width rather than overlaying content, and users explicitly hide or close them to return that width to the central viewport. Island overflow and focus following move only the central working surfaces, never the sidebars.
@@ -78,7 +90,7 @@ Space switches the whole main page and settings as units. The main page remains 
 
 Screen coordinates the central root and ordinary Islands. In a session, the canvas is the root: it is always first and cannot close. Auxiliary panels share panel presentation with Island content but do not participate in Island ownership, arrangement, or focus following.
 
-Islands separate closing from cancelling an operation. Escape invokes a cancellation action only when the focused island explicitly declares one; it never closes a functional island merely because that island can close. A cancellation action owns its outcome and uses the normal close guards if it closes the island. Settings declares cancellation to return from an opened page to the navigation list when only one column fits, and otherwise to the main screen.
+Closing an island restores focus to the control that opened it when that control is still available. Islands separate closing from cancelling an operation. Escape invokes a cancellation action only when the focused island explicitly declares one; it never closes a functional island merely because that island can close. A cancellation action owns its outcome and uses the normal close guards if it closes the island. Settings declares cancellation to return from an opened page to the navigation list when only one column fits, and otherwise to the main screen.
 
 Ordinary islands behave like windows. A new island opens at the right end. Each live island has a stable host-owned instance identity and a content lookup key unique within its screen. Plugin keys are isolated by plugin identity. Opening an already bound key locates that instance without replacing its content or transferring ownership. Instance identity governs component lifetime, focus, arrangement, guards, cancellation, ownership, and targeted cleanup; a lookup key identifies the content to locate.
 

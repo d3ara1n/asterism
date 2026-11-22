@@ -1,163 +1,170 @@
 # Design system
 
-The native window is the material base. Independent opaque content surfaces sit above it. Shared tokens and controls keep application and built-in plugin views consistent.
+Asterism presents many plugins' work inside one workbench. The design system keeps that work reading as one application: the same layering, the same meaning for lines and motion, and the same controls for the same kinds of choice. This document records the language, its foundations, the patterns that apply it, and where each part is implemented. Exact values live in the theme, stylesheet, and shared controls; this document explains what they mean and how to choose among them.
 
 ## Design language
 
-Asterism separates regions by tone and depth rather than by outlines, and reserves lines for meaning. The rules below decide new surfaces; the sections that follow apply them to specific tokens and controls.
+The native window material is the base. Opaque content surfaces sit above it, and everything inside them follows four principles.
 
-- **Tone and depth form regions.** A shell holds titles, navigation, and toolbars. Reading and editing content sits on a raised sheet inside it. Within a sheet, groups of rows and process blocks recede to the shell tone. Floating elements lift with the shared shadow. Each layer uses its shared tone, shadow, and radius tokens.
-- **Lines carry meaning.** Lines appear for focus, persistent selection, drop targets, and state: a moving dashed line for content still forming, a still dashed line for content that ended incomplete, and a red line for failure. Hairlines separate consecutive rows inside a group. Outer shells keep their border as the window-material edge. A border does not separate two regions that tone already separates.
-- **Motion explains cause and continuity.** Movement shows where something came from, where it went, or that a value changed, using the interaction vocabulary in the motion section. Motion does not decorate a static state.
-- **Restraint over effects.** Shading stays restrained, and a treatment that does not stand on its own is not compensated with more effects.
+**Tone and depth form regions.** A shell holds titles, navigation, and toolbars. Reading and editing content sits on a raised sheet inside the shell. Within a sheet, groups of rows and process blocks recede back to the shell tone. Floating elements lift above everything with a shared shadow. Each layer has its own tone, shadow, and radius, so a region is recognizable without an outline around it.
 
-## Color and surfaces
+**Lines carry meaning.** A line tells the reader something: where focus is, what is selected, where a drop lands, or the state of a piece of work. Hairlines separate consecutive rows inside a group, and an outer shell keeps its border as the edge against the window material. A border never separates two regions that tone already separates. Because lines are rare, the ones that remain are noticed.
 
-Use semantic tokens from the theme implementation. The chosen accent expresses primary actions, active work, and persistent selection; the gray palette expresses ordinary labels and secondary surfaces.
+**Motion explains cause and continuity.** Movement shows where something came from, where it went, or that a value changed. A small vocabulary covers these meanings; motion that expresses none of them is omitted, and motion never decorates a static state.
+
+**Restraint over effects.** Shading stays restrained. A treatment that does not stand on its own is not compensated with more effects, gradients, or animation.
+
+When a new surface is designed, decide in this order: which layer the content belongs to, whether any line is needed and what it means, and only then whether a change deserves motion. Most questions resolve at the first step.
+
+## Foundations
+
+### Color
+
+Semantic tokens from the theme carry all color. The chosen accent expresses primary actions, active work, and persistent selection; the gray palette expresses ordinary labels and surfaces. Graphite derives emphasis from the gray palette instead of a separate chromatic accent.
 
 | Token family | Meaning |
 | --- | --- |
 | `primary` and its foreground | Solid primary actions |
 | `primary-text` | Accent text and icons on ordinary surfaces |
-| `secondary` | Neutral secondary surfaces |
+| `secondary` | Neutral secondary fills, such as chips and supported-capability marks |
 | `selected` | Persistent navigation or list selection |
 | `accent` | Temporary hover and keyboard highlight |
-| `muted` | Subdued regions and supporting text |
-| `external-message` | Incoming Agent messages |
-| `event-message` | Resource event messages |
+| `muted` | Recessed tracks, placeholders, and supporting text |
+| `card-shell`, `card` | The shell tone and the sheet tone |
+| `external-message`, `event-message` | Incoming Agent messages and resource event messages |
 | `success`, `warning`, `destructive` | Fixed semantic status colors |
-| `background` | Page and control backgrounds |
+| `background` | Control backgrounds |
 | `canvas` | Workbench backing surfaces |
-| `folder-*` | Decorative folder identity: dots and preview tints |
+| `folder-*`, `chart-*` | Decorative folder identity and chart categories, independent of status and accent |
 
-Pair colored surfaces with their corresponding foreground token. Contrast requirements apply in both schemes. Graphite derives emphasis from the chosen gray palette rather than a separate chromatic accent.
+Colored surfaces pair with their foreground token, and contrast holds in both schemes. Color never encodes meaning alone: status pairs with an icon or label, and a folder color appears with its name, visibly or through a tooltip and accessible name.
 
-`surface` is the ordinary bordered card surface; `surface-floating` adds the shared shadow for floating content. Menus and dialogs use their public control surfaces.
+### Layers
 
-Islands, docks, and object cards use a shell and sheet. The shell carries the title bar, navigation, and toolbars on the `card-shell` tone; reading and editing content sits on one inset sheet in the card tone, raised by the shared sheet shadow rather than a border. The shared panel provides this layering, so plugin islands opened through it inherit it. A sheet nests concentrically one 4px inset and the shell border inside its shell, which the shared inset radius token expresses. Content floating inside a shell, such as the Agent composer tray, uses the shared lift shadow; when it sits farther from its container edge than its own radius, it matches the container radius rather than shrinking toward a square corner. Feature code does not define its own shadows or nested radii.
+| Layer | Tone and depth | Holds |
+| --- | --- | --- |
+| Window material | Native vibrancy, Acrylic, or a solid fallback | Page backgrounds, gaps between surfaces |
+| Shell | `card-shell` with a border against the material | Titles, navigation, toolbars, the composer and entry trays |
+| Sheet | `card`, raised by the sheet shadow, no border | Reading and editing content inside a shell |
+| Group | Shell tone recessed on a sheet, no border | Grouped rows, fields, empty states, process blocks |
+| Floating | Popover tone with the floating or lift shadow | Menus, popovers, dialogs, toasts, trays that float over content |
 
-Cards placed directly on the window material, such as template cards and usage panels, keep the shell border as their material edge and hold a raised sheet inside, nested like object card content. Embedded in an island sheet, the same panel drops its border and reads as a tone group. Panels and fields inside a process block rise back to the card tone rather than adding outlines. Dialogs and floating surfaces keep their outer edge and shadow; their internal header, body, and footer separate by spacing and tone rather than rules.
+Islands, docks, and object cards are shells. The shared panel and the object surface supply their sheet, so plugin islands opened through the shared panel inherit the layering. Cards placed directly on the window material, such as template cards and usage panels, keep the shell border and hold a sheet inside. Embedded inside another sheet, the same panel drops its border and reads as a group. Panels and fields inside a group rise back to the sheet tone rather than adding outlines. Floating surfaces keep their outer edge and shadow because they cover arbitrary content; inside them, header, body, and footer separate by spacing and tone rather than rules.
 
-On a sheet, `surface-group` holds grouped rows, fields, and empty states in the shell tone with hairlines between rows, and `surface-block` holds collapsible process blocks such as thinking and tool calls. Neither has a border. A block's state line follows its rounded outline: a moving dash while input streams or the call waits to run, a still dash when the block ended incomplete or did not enter later context, and a red line over a faint red tone when the request generating it failed. Reduced motion keeps the moving dash still.
+The stylesheet expresses these layers as `surface` (a bordered shell or card), `surface-floating`, `surface-inset` (a sheet), `surface-group`, and `surface-block` (a process block), together with tokens for the sheet shadow, the lift shadow, and the nested inset radius.
 
-Theme values, palette ordering, radii, density, and font settings have shared definitions. Components do not duplicate those values.
+### Shape
 
-## Native windows
+One radius setting drives every corner. A sheet nests concentrically inside its shell: its radius is the shell radius minus the 4px inset and the shell border, which the inset radius token expresses. Content floating inside a shell farther from the edge than its own radius, such as the composer tray, matches the container radius instead of shrinking toward a square corner. Feature code does not compute its own nested radii or define its own shadows.
 
-macOS uses native controls and under-window vibrancy. Supported Windows uses Acrylic and controls overlay, with a solid fallback. Linux defaults to controls overlay with a solid background and supports native titlebar mode.
+### Typography, icons, and density
 
-Theme and reduced-transparency/high-contrast behavior originate in main. Keep the root transparent to the native material while content surfaces remain readable. CSS backdrop blur does not replace native window material.
+Text uses the shared display, page, section, body, caption, label, and code roles. Interface, terminal, and code fonts are independent settings; code text inherits the surrounding size unless the user sets one, and terminal size is independent of interface density. The host publishes typography as root tokens that plugin content inherits; renderers that need explicit font options read the resolved tokens and follow later changes. Interactive terminals and terminal images use the same font settings, and a font change recalculates terminal geometry without restarting the shell.
 
-Window state supplies the titlebar mode and native fullscreen state. Fullscreen removes controls-specific space; maximization retains it. Windows and Linux use the actual controls-overlay safe region rather than permanently assuming a fixed button width.
+Density scales the root size, so spacing and type scale together without component changes. Resizing a card or island changes its content area, never its typography or control size.
 
-Window gaps are draggable. Interactive surfaces explicitly exclude dragging, while descendant drag-region reset prevents transformed canvas descendants from creating oversized exclusion areas.
+Icons come from Lucide. Read-only abbreviated counts use the common formatter; editable and raw values stay complete.
 
-The Linux native-titlebar switch is resolved when creating the window and requires restart. It does not change the other platforms’ titlebar policy.
+### Native windows
 
-## Screens and islands
+macOS uses native controls and under-window vibrancy. Supported Windows versions use Acrylic with a controls overlay and a solid fallback. Linux defaults to a controls overlay on a solid background and offers a native titlebar mode. Theme, reduced transparency, and high contrast originate in the main process. The root stays transparent to the native material; CSS backdrop blur does not stand in for it.
 
-Window owns titlebar and managed space. Screens move within that space; islands are columns within a screen. Descendants do not independently compensate for the titlebar.
+## Lines
 
-Settings sits to the left of the main page. The main page lays out the navigation sidebar, a central Island viewport, and an optional auxiliary panel as neighboring regions. Sidebars stay docked within the page while visible and reserve width from the central viewport; users hide or close them explicitly. The page chosen in the sidebar is the central root Island; it cannot close, and its details open as ordinary islands to the right. The workbench is one canvas-backed island with the shared border, rounding, and focus highlight. Pages made of several cards, such as Home and usage statistics, place their cards directly on the window material. A page's controls for its content source, such as the workbench's object actions or the usage view, range, and filters, sit in the window titlebar's action area. Navigation switches whole pages, including their sidebars, rather than intercepting system gestures.
+| Line | Meaning |
+| --- | --- |
+| Ring or border in the ring tone | Keyboard focus, or the focused island, dock, or tray |
+| `selected` fill | Persistent selection; a fill rather than an outline |
+| Moving dashed outline | Content still forming: a tool call receiving input or waiting to run |
+| Still dashed outline | Content that ended incomplete or did not enter later model context |
+| Red line on a faint red tone | The request that produced the content failed |
+| Dashed target with an accent tint | Where a drop will land |
+| Hairline between rows | Structure inside one group |
+| Shell border | The edge between a shell and the window material |
 
-Islands declare minimum width, growth weight, and optional maximum. When they fit, distribute space and center them. When they overflow, use minimum widths and reveal the focused island within the Island viewport without moving the docked sidebars. Segment navigation makes completely displaced islands reachable.
-
-An ordinary island opens at the right end of the screen and belongs to the island that opened it; closing an island also closes the islands it opened. Escape invokes only an explicitly declared cancellation action on the focused island; closing capability does not imply cancellation. Local controls handle Escape first, and an island without a cancellation action does not delegate it to its owner. Closing restores the opener when available. Host-owned borders and focus highlights remain outside clipped content.
-
-Page-region cleanup releases only island instances opened by that region. Rebinding an editor from a creation key to its saved-object key preserves the instance, arrangement, focus, and ownership. Sharing a containing island does not make another region's islands part of its lifetime.
-
-An island shell's border, clipping, and focus highlight are independent of its background fill. Content that paints its own background, such as the canvas, uses a transparent shell so entry and exit animations reveal the native window material rather than an unrelated card fill.
-
-Feature code requests island operations through the shared interface. Layout calculations remain independent of business components.
-
-Panel islands (editors, details) are non-modal and have no bottom action bar. Operations that act on the island's whole subject sit in its title bar, between the title and the island menu and close controls: the primary action, such as Save, as a small button, and whole-subject actions such as delete, remove, or restore defaults as icon buttons, with destructive ones in the destructive tone and confirmed separately. Operations that affect only part of the content sit with their content section, in the section header's action slot. Plugin islands follow the same placement.
+Process blocks draw their state line along their rounded outline. Reduced motion keeps the moving dash still. A one-time warning ripple marks a newly raised notice and then disappears.
 
 ## Motion
 
-Use Motion for presence, layout changes, and shared elements. Public motion tokens own timing and curves. Respect reduced motion in both Motion and CSS.
+Motion uses the shared Motion library for presence, layout, and shared elements, with timing and curves taken from the public motion tokens. Reduced motion is respected in both Motion and CSS. Feature views choose what moves, not their own durations or easing.
 
-Interaction motion explains cause and continuity through a small vocabulary. A selection indicator travels between items instead of reappearing. Page changes move along the direction of navigation: siblings in a navigation list move along its order, and entering a deeper page comes from the side and returns the way it came. Arriving content takes the shared fade timing while leaving content clears on the shorter exit timing, so the arriving page reads as the subject. Rows join and leave lists by folding their height, and values animate only when they actually change. Effects that do not express one of these meanings are omitted, and a static treatment that does not stand on its own is not compensated with more motion.
+| Motion | Meaning |
+| --- | --- |
+| Travelling selection indicator | Selection moved; the same mark slides to the new item |
+| Directional page change | Order and depth: siblings move along their navigation order; a deeper page enters from the side and returns the way it came |
+| Asymmetric presence | Arriving content takes the shared fade; leaving content clears on the shorter exit timing, so the arrival reads as the subject |
+| Height folding | Items join or leave a list, or a section opens and closes |
+| Value transition | A value changed; unchanged values stay still |
+| Activity trace | Work is in progress: an orbit around a stop control, a light along a tray edge, a moving dash on a forming block |
 
-Command and searchable-choice surfaces share one motion definition across application palettes, Agent palettes, command popovers, and the composer's reference suggestions. Presence uses a short fade with restrained scale and translation: 180 ms to open and 120 ms to close. Anchored surfaces enter from the trigger-facing edge, including when collision placement changes their side; unanchored palettes enter from above. Scrims fade with the same timing. Ordinary dialogs and menus retain their own motion.
+Command and searchable-choice surfaces share one motion definition across application and Agent palettes, command popovers, and reference suggestions: a short fade with restrained scale and translation, entering from the trigger-facing edge. One container owns sizing in these surfaces, and nested pages preserve the focus and state ownership of their control instead of remounting it.
 
-Command content resizes over 150 ms. One container owns sizing: ordinary cmdk lists follow their measured content height, while fill-layout lists and lists inside an independently scrolling or animated shell leave sizing to that owner. Virtualized suggestions retain explicit viewport heights and animate the surrounding shell rather than the virtualizer's measurements. Nested pages enter over 160 ms with a small horizontal offset that reverses on return; filtering does not replay page entry. Page transitions preserve the focus and state ownership of their control rather than remounting an editor or restarting its focus scope.
+Motion does not fight measurement. Virtual lists own item positioning and scroll compensation; disclosure animates content without a second layout system. Streaming Markdown uses the renderer's own pacing. History remounts render statically, and transitions do not replay merely because an item scrolled into view. Home and the workbench keep the same backing container while content loads, and the first Home display plays no entrance.
 
-Shared command tokens project into Radix CSS animations, Motion presence, and in-place page animations. Feature views choose their surface and layout, not separate durations or easing curves. Reduced motion removes command presence, resize, and navigation animation; exiting suggestions become inert immediately while their visual exit completes.
+## Patterns
 
-Home/workbench transitions retain the same workbench backing container while content loads. Initial Home display does not play a navigation entrance.
+### Pages and islands
 
-Streaming Markdown uses the renderer library’s own pacing. Virtual lists own item measurement and positioning; disclosure transitions animate content without adding a second layout or scroll compensation system.
+A page made of several cards, such as Home and usage statistics, places its cards directly on the window material. Controls that choose the source of a page's content, such as the workbench's object actions or usage statistics' view, range, and filters, sit in the window titlebar's action area.
 
-History remounts render statically. Interaction transitions do not replay merely because an item scrolled into view.
+Panel islands, such as editors and details, are non-modal and have no bottom action bar. Operations on the island's whole subject sit in its title bar between the title and the island menu and close controls: the primary action, such as Save, as a small button, and whole-subject actions, such as delete or restore defaults, as icon buttons, destructive ones in the destructive tone and confirmed separately. Operations on part of the content sit in that section's header. Plugin islands follow the same placement.
 
-## Cards, tools, and reading
+### Navigation and selection
 
-All object cards use the shared header and `ObjectSurface`. Resource geometry supplies default and minimum sizes. Resizing changes the content area, not typography or control size.
+Persistent navigation uses the shared selection indicator: one fill per navigation set that travels between items. The sidebar's main views and sessions share one set; settings categories and the usage view switch each have their own. The selected item stays distinct from the focused control.
 
-Auxiliary panels respond to card width rather than window width or canvas zoom. The host owns their title, close action, and containment.
+A single choice among a few short options uses the segmented toggle group: a recessed track with one raised indicator that travels to the chosen option. Multiple-choice toggle groups keep independent toggles. Switches express immediate booleans, checkboxes express form or multi-selection, radios express explained single choices, tabs change content, and searchable choices use the shared command and popover combination. A two-state menu item is one checkbox item whose trailing indicator shows the state and whose label names the state rather than an action.
 
-Tool headers form single-line summaries with an operation name and three optional rich-content areas: subject, summary, and metadata. The operation name uses normal foreground emphasis. Subjects use a low-emphasis badge; summaries use muted text at the normal header size; trailing metadata uses muted caption text. Subjects and summaries yield space while trailing metadata remains visible. Preserve meaningful information across input, execution, and result phases.
+### Lists
 
-These areas provide presentation defaults, not restrictions on content or a required decomposition. Renderers may use text, icons, or composed content in any area, including placing all content in the summary. Local typography and semantic state colors remain available. The subject identifies the focus of the operation: resource creation and creation-entry inspection use the resource type, with an instance title in the summary when available. Inspection and operations on an existing resource use its recorded name and an available kind icon; inspection places the resource type in metadata, while operations place paths, queries, or other details in the summary. Separate areas replace punctuation used only to join an object and its details. The shell presents exceptional call outcomes independently of the content areas.
+An openable list row is one visual surface. Its primary button fills the row and holds the title, media, descriptions, and passive status. Menus, switches, status popovers, and drag handles are sibling controls with their own hit areas and focus. Hidden actions appear on row hover or visible keyboard focus and stay while their menu is open or their action is busy; retained pointer focus alone does not keep them visible.
 
-For content without a length bound, such as a question or command, use `HeaderExcerpt` from `@asterism-app/sdk/renderer` in the title's shrinkable area. It folds whitespace into one line, limits the rendered prefix to 160 Unicode code points with an ellipsis when more text exists, and ellipsizes again as the available width shrinks. Use the inherited font for prose and `font="mono"` for commands and other code. Keep the full text in the reading body, not in the title or its tooltip. Short labels and custom rich summaries can still use the header slots directly.
+An island whose whole content is a list uses the shared panel list body flush in a fill-layout panel: rows keep a small inset so fills stay inside the sheet, row text aligns with the panel title, hairlines separate rows, and the title bar carries the count. Empty, loading, failed, and no-match states replace the list with one centered icon and short label, plus a recovery action where one exists. Rows that open details end in a chevron and keep the selected tone while their island is open; rows whose operations finish in place carry those operations as row actions.
 
-The tool shell does not impose one global body height. Renderers choose local scroll or preview behavior. Code and diff views use the shared Pierre Diffs presentation in `packages/ui/`, available to every plugin. Markdown and reference chips also live there: every plugin renders Markdown, streaming output, footnotes, code, math, diagrams, and skill or resource links through the same control. The control relies on the host's `.markdown-content` and KaTeX styles. Full saved data remains distinct from presentation budgets.
+### Settings and forms
 
-Use a noninteractive, bounded tail preview for content still being composed. Execution bodies choose their own layout and may be entirely static or interactive. Where only part of an execution body streams, keep stable inputs, metadata, and controls outside the bounded `StreamingScrollArea` from the SDK renderer. That area follows updates at the end without interrupting a reader who has moved away from it. Reuse the same viewport when a live stream becomes a settled result to preserve the reading position while the body stays open.
+Settings rows and fields sit in groups on the page sheet, with hairlines between rows and the control at the row's end. Related fields and operations share a section, and values that override a baseline expose a reset. Every size-adjustment handle restores the default geometry on double-click and has a keyboard-accessible reset elsewhere.
 
-User, Agent, and resource event messages share body rendering. Source presentation has one definition across conversation headers, drafts, history, and navigation previews. Incoming Agent messages use the recorded Agent name and any name disambiguator; event messages use the recorded resource name and event label. Placement, labels, and icons distinguish sources alongside color. Process summaries and compaction markers use the common Marker presentation.
+### Process blocks and tool views
 
-## Controls and feedback
+Thinking, tool calls, and summaries are process blocks: groups in the reading flow whose outline appears only for state. A tool header is one line: the operation name, then optional subject, summary, and trailing metadata. The subject is a low-emphasis badge naming the operation's focus, the summary is muted text that yields space first, and metadata stays visible. Resource creation and creation-entry inspection use the resource type as the subject, with an instance title in the summary when one exists; operations on an existing resource use its recorded name and kind icon, with paths, queries, or other details in the summary. Separate slots replace punctuation that would only join an object and its details, and the block itself presents exceptional outcomes. Unbounded inputs such as questions and commands appear as a single-line excerpt, with the full text in the body. Input, execution, and result reuse one block, so the reader's place survives each phase; content still being composed shows a bounded tail preview, and stable inputs and controls stay outside any live-output region.
 
-Use shadcn/Radix controls and shared combinations in `packages/ui/src/ui/`. Feature code does not create parallel button, select, border, or shadow styles.
+Code, diffs, Markdown, math, diagrams, and reference chips render through the shared controls, so every plugin's output reads the same.
 
-| Button variant | Role |
+### Messages
+
+User, Agent, and resource event messages share body rendering, and source presentation has one definition wherever a message appears. Placement, labels, and icons distinguish sources alongside the message tones.
+
+### Inputs
+
+The Agent composer and the Home entry are trays: a shell lifted over the content, holding a raised editor sheet, with configuration on the tray's lower edge. The tray border takes the ring tone while the editor is focused. Send and stop share one round slot so the action row keeps its width across execution states.
+
+### Feedback and status
+
+Status uses the shared status components with text and icons. Feedback stays with the operation it belongs to: field errors with fields, command progress at its entry, and Agent execution errors and warnings inline in the owning conversation. Independent interface command failures use toasts. One failure is never shown both inline and as a toast, and a background reread never becomes a global saving indicator.
+
+### Buttons
+
+| Variant | Role |
 | --- | --- |
 | Default | Primary action within its region |
 | Outline | Supporting actions and recovery |
 | Ghost | Navigation, row actions, compact controls |
 | Secondary | Neutral secondary action |
-| Selected | Current navigation or opened item |
+| Selected | Current navigation or opened item where no travelling indicator applies |
 | Destructive | Irreversible confirmation |
 | Link | An action embedded in text |
 
-Use the shared `IconButton` for icon-only actions. It supplies the accessible label, tooltip, and rounded-square shape. Island title bars follow the same rule in Settings and the workbench, including more, close, return, and auxiliary panel controls. Match the size of adjacent icon buttons within a title bar and use the shared size variants for density. Compose a menu or popover trigger as the child of `IconButton` with `asChild` so it uses the same button element instead of recreating the styling and tooltip.
+Icon-only actions use the shared icon button, which supplies the accessible label, tooltip, and shape. Menu and popover triggers compose inside it rather than recreating its styling. Adjacent icon buttons in a title bar share one size. Destructive entry points and their confirmation remain distinct steps.
 
-Destructive entry points and their confirmation remain distinct.
+## Branding
 
-Every size-adjustment handle supports double-clicking to restore the affected surface's default geometry. Reset clears the user size override and uses the current default, subject to the surface's minimum and maximum dimensions. Handle hints describe both dragging and double-click reset. An explicit reset action also remains available through a keyboard-accessible control or menu.
+The Asterism identity is a triangular constellation of three rounded six-point stars. Application icons pair citron and deep green surfaces; interface marks use the same silhouette in the foreground color. The brand palette is independent of the configurable interface accent, and the mark stays recognizable without material effects. One geometry definition produces interface marks and exported artwork; the icon generator owns platform layouts and produces the committed assets.
 
-Status uses shared status components with text and icons. Feedback stays with the operation it belongs to: field errors stay with fields, command progress stays at its entry, and Agent execution errors and warnings stay inline in the owning conversation. Independent interface command failures use toast notifications. Diagnostic origin and transient lifetime do not determine placement; one execution failure is not repeated as both an inline alert and a toast.
+## Ownership and extension
 
-A workbench reread does not become a global saving badge or block ordinary interaction.
+The theme owns color values, palettes, radius, density, and fonts. The host stylesheet owns the layer utilities, shadow and radius tokens, process-block state lines, and motion tokens. `packages/ui/` owns shared control semantics and appearance, and plugins receive those controls from the host so every plugin shares one copy. The window, its native material, and titlebar behavior belong to the main process and window components; island layout belongs to the weave.
 
-## Typography, charts, and editors
+Feature code composes these parts and does not create parallel button, select, border, shadow, or motion styles. A new recurring need becomes a token, utility, or shared control first, then its uses adopt it. shadcn registry files with local changes stay listed in the project conventions so registry updates can reapply them.
 
-Use the shared display, page, section, body, caption, label, and code roles. Interface, terminal, and code fonts have independent settings. Code and terminal sizes accept pixel values from 1 to 100 with up to two decimal places in a single compact field with keyboard stepping and a reset action that appears once the value differs from its baseline. Automatic code sizing inherits the surrounding text and appears as placeholder text; clearing or resetting the code size restores it. Terminal size is independent of interface density and resets to 12 pixels. Read-only count abbreviations use the common formatter; editable and raw values remain complete.
-
-The host publishes typography through root CSS tokens. Plugin DOM content inherits those styles; renderers that require explicit font options consume the resolved tokens and apply changes to existing views. Interactive terminals and terminal images use the same font settings. Font changes recalculate terminal geometry without restarting the shell.
-
-Use Lucide icons. Charts use the shared chart container for tooltips, axes, and theme colors. Chart category colors and folder colors are independent of status and accent colors. Pair each graphic with visible labels and values; colors alone do not encode meaning, so a folder color always appears with its folder name, either visibly or, for compact membership marks in a list, through a tooltip and the row's accessible name.
-
-Switches express immediate booleans, checkboxes express form or multi-selection, radios express explained single choices, tabs change content, and searchable choices use the shared command/popover combination.
-
-A single choice among a few short options uses the segmented toggle group: a recessed track holding one raised indicator that travels to the chosen option. Multiple-choice toggle groups keep independent toggles. Persistent navigation selection, such as the sidebar's main views and sessions, settings categories, and the usage view switch, uses the shared selection indicator: one fill per navigation set that travels between items, so the selected item reads as the same mark moving rather than a new highlight appearing.
-
-A two-state menu item is one checkbox item. Its identity icon sits in the shared leading column, a trailing switch-shaped indicator shows the state, and the label names the state rather than an action. Icon and label stay fixed across states, and the row contains no separately interactive control.
-
-An openable list row has one visual surface. Its native primary button fills the available area and contains the title, media, descriptions, and passive status. Menus, switches, status popovers, and drag handles are sibling controls in the same row. Each control owns its hit area and keyboard focus; the shared background communicates hover and selection without forwarding clicks. Hidden actions reveal on row hover or visible keyboard focus and stay visible while their menu is open or their action is busy. Retained pointer focus alone does not keep them visible. The focused control remains visibly distinct from the selected row. Editors group related fields and operations in shared sections and expose reset where values override their baseline.
-
-An island whose whole content is a list uses the shared panel list body in a fill-layout panel. The list sits flush inside the island rather than in a nested card: rows keep a small inset so hover and selection fills stay inside the island border, row text aligns with the panel title, and hairlines separate consecutive rows. The title bar carries the item count; a search toolbar appears when the list can grow long. Optional group headings use the label role with a trailing count. Empty, loading, failed, and no-match states replace the list with one centered icon and short label, with a recovery action where one exists. Issues that affect the listed items scroll with the list as its first row.
-
-A list whose rows open further detail uses the same body with openable rows: each row is one hit surface ending in a chevron, the opened detail is an island owned by the list island, and the row keeps the selected tone while that island is open. Rows whose operations finish in place, such as restoring an archived conversation, carry those operations as row actions without a chevron.
-
-## Branding and implementation ownership
-
-The official Asterism identity is a triangular constellation of three rounded six-point stars. Application icons pair citron and deep green surfaces; interface marks use the same silhouette in the foreground color. The brand palette is independent of the configurable interface accent. Surface shading stays restrained, and the mark remains recognizable without material effects.
-
-Interface marks and exported artwork share one geometry definition. The icon generator owns surface colors and platform layouts, and produces the SVG, PNG, macOS ICNS, and Windows ICO assets. Packaging consumes the repository assets rather than requiring local generation tools. The About page selects light or dark artwork from application appearance; system icons use the primary citron version without automatic operating-system appearance switching.
-
-Shared control semantics belong to `packages/ui/`; window behavior belongs to main and Window; layout belongs to weave; UI messages belong to the relevant app or plugin.
-
-Visual changes require manual acceptance on the actual platform. Necessary typechecks and builds support that acceptance; they do not establish appearance.
+Visual changes are accepted manually on the actual platform in both schemes. Typechecks and builds support that acceptance; they do not establish appearance.
