@@ -164,7 +164,8 @@
 /* Surfaces: content shells match Card (solid + 1px border), overlays match Popover (solid + border + shadow), and reading or editing
    content inside a shell sits on an inset sheet. Inside a sheet, groups and process blocks separate by tone; lines express state and focus. Use these utilities where Card components cannot be used, such as window parts,
    island bases, and animated elements. */
-/* Command surfaces share tokens projected by commandMotionStyle; ordinary dialogs and menus keep their own motion. */
+/* Command and hover surfaces share tokens projected by commandMotionStyle; ordinary dialogs and menus keep their own motion.
+   Tooltips report their open state as delayed-open or instant-open. */
 @utility command-surface-motion {
   --command-enter-x: 0px;
   --command-exit-x: 0px;
@@ -186,7 +187,7 @@
     --command-enter-y: 0px;
     --command-exit-y: 0px;
   }
-  &[data-state="open"] { animation: command-enter var(--command-enter-duration) var(--command-ease); }
+  &:is([data-state="open"], [data-state="delayed-open"], [data-state="instant-open"]) { animation: command-enter var(--command-enter-duration) var(--command-ease); }
   &[data-state="closed"] { animation: command-exit var(--command-exit-duration) var(--command-exit-ease); }
   @media (prefers-reduced-motion: reduce) { &[data-state] { animation: none; } }
 }

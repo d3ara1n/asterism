@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { cn } from "../utils"
+import { hoverSurfaceMotionStyle } from "../command-motion"
 import { Tooltip as TooltipPrimitive } from "radix-ui"
 
 function TooltipProvider({
@@ -47,6 +48,7 @@ function TooltipContent({
   sideOffset = 4,
   collisionPadding = 8,
   children,
+  style,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
   return (
@@ -56,9 +58,10 @@ function TooltipContent({
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "z-50 w-fit max-w-[min(20rem,var(--radix-tooltip-content-available-width))] origin-(--radix-tooltip-content-transform-origin) animate-in rounded-md border bg-popover px-2.5 py-1.5 text-xs text-balance wrap-break-word text-popover-foreground shadow-md fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          "z-50 w-fit max-w-[min(20rem,var(--radix-tooltip-content-available-width))] origin-(--radix-tooltip-content-transform-origin) rounded-md border bg-popover px-2.5 py-1.5 text-xs text-balance wrap-break-word text-popover-foreground shadow-md command-surface-motion",
           className
         )}
+        style={{ ...hoverSurfaceMotionStyle, ...style }}
         {...props}
       >
         {children}

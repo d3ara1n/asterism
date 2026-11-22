@@ -44,7 +44,7 @@ Use the `@asterism-app` scope for Asterism core and framework packages, and the 
 - `command`: `CommandDialog` puts its accessible title and description inside `DialogContent` and opts into command-surface motion; `CommandList` animates content height by default and accepts `animateHeight={false}` when a parent owns sizing.
 - `dialog`, `command`, `spinner`: built-in labels come from `useI18n()` and `commonMessages`; `DialogContent` accepts `closeLabel`, and `CommandDialog` title and description default to localized messages.
 - `tooltip`: Provider defaults to a 700 ms hover delay with no skip-delay window; explicit timing props remain supported. Content uses the floating surface (popover tone, border, shadow) without an arrow, with a 4px side offset, 8px collision padding, and a bounded maximum width. The trigger opens on keyboard focus only, so focus restored after a pointer interaction does not show the hint.
-- `hover-card`, `tooltip`: fade and scale in place to keep the trigger under the pointer as the surface opens.
+- `hover-card`, `tooltip`: use the shared command-surface motion from the trigger-facing edge, with travel shortened below the default side offset so the surface never covers its trigger.
 - `progress`: forwards `value` to the Radix root so the value attributes are exposed.
 - `toggle-group`: adds the `segmented` variant, a recessed track whose single indicator travels to the selected item; items then use the default toggle styling without their own selected fill.
 - `chart` (host): the dark theme selector is `[data-mode=dark]`; the tooltip uses the popover surface with sans tabular figures.

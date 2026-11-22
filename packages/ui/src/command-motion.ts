@@ -28,6 +28,13 @@ export const commandMotionStyle = {
   "--command-exit-offset": `${commandMotion.exitOffset}px`,
 } as CSSProperties;
 
+/** Hover cards and tooltips open a few pixels from their trigger; travel stays inside that gap so the surface never covers the trigger. */
+export const hoverSurfaceMotionStyle = {
+  ...commandMotionStyle,
+  "--command-enter-offset": "3px",
+  "--command-exit-offset": "2px",
+} as CSSProperties;
+
 export const commandResizeTransition = "height var(--command-resize-duration) var(--command-ease)";
 
 /** Anchored surfaces move from their trigger; floating palettes use the same entry from above. */
