@@ -32,6 +32,7 @@ import { cn } from "@asterism-app/ui/utils";
 
 const KIND_PREVIEW_LIMIT = 6;
 
+const toolTrigger = "w-auto max-w-44 gap-1.5 border-0 bg-transparent shadow-none hover:bg-foreground/5 dark:bg-transparent dark:hover:bg-foreground/5";
 // Radix Select values cannot be null; folder identities are UUIDs, so these never collide.
 const allFolders = "all", noFolder = "none";
 const sortLabels: Record<TemplateSort, UiText> = {
@@ -59,10 +60,11 @@ export function TemplateCards({ templates, ready, onStart, onChanged }: {
   return <section aria-labelledby="templates-title" className="mt-10">
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <h2 id="templates-title" className="type-section mr-auto">{i18n.text(templateMessages.templates)}</h2>
-      {templates.length > 0 && <>
-        <div className="w-48"><SearchInput value={query} onChange={setQuery} label={i18n.text(templateMessages.searchTemplates)} /></div>
-        {folders.length > 0 && <Select value={folder === "all" ? allFolders : folder ?? noFolder} onValueChange={selectFolder}>
-          <SelectTrigger className="w-40" aria-label={i18n.text(templateMessages.folderFilter)}><SelectValue /></SelectTrigger>
+      {/* Search, folder, and sort read as one quiet tool strip on the window material: a tone track, no outlined fields. */}
+      {templates.length > 0 && <div className="flex min-w-0 items-center rounded-lg bg-foreground/[0.04] focus-within:bg-foreground/[0.06] dark:bg-foreground/[0.06]">
+        <div className="w-44"><SearchInput variant="inline" value={query} onChange={setQuery} label={i18n.text(templateMessages.searchTemplates)} /></div>
+        {folders.length > 0 && <><span aria-hidden="true" className="h-4 w-px shrink-0 bg-border" /><Select value={folder === "all" ? allFolders : folder ?? noFolder} onValueChange={selectFolder}>
+          <SelectTrigger size="sm" className={toolTrigger} aria-label={i18n.text(templateMessages.folderFilter)}><SelectValue /></SelectTrigger>
           <SelectContent position="popper" align="end"><SelectGroup>
             <SelectItem value={allFolders}><FolderIcon />{i18n.text(commonMessages.all)}</SelectItem>
             <SelectItem value={noFolder}><FolderIcon />{i18n.text(folderMessages.noFolder)}</SelectItem>
@@ -70,14 +72,15 @@ export function TemplateCards({ templates, ready, onStart, onChanged }: {
               <FolderDot color={item.color} className="mx-1" />{item.name}
             </SelectItem>)}
           </SelectGroup></SelectContent>
-        </Select>}
+        </Select></>}
+        <span aria-hidden="true" className="h-4 w-px shrink-0 bg-border" />
         <Select value={sort} onValueChange={value => { const next = value as TemplateSort; setSort(next); writeTemplateSort(next); }}>
-          <SelectTrigger className="w-40" aria-label={i18n.text(templateMessages.sort)}><ArrowUpDown /><SelectValue /></SelectTrigger>
+          <SelectTrigger size="sm" className={toolTrigger} aria-label={i18n.text(templateMessages.sort)}><ArrowUpDown /><SelectValue /></SelectTrigger>
           <SelectContent position="popper" align="end"><SelectGroup>
             {templateSorts.map(item => <SelectItem key={item} value={item}>{i18n.text(sortLabels[item])}</SelectItem>)}
           </SelectGroup></SelectContent>
         </Select>
-      </>}
+      </div>}
     </div>
     <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
       {visible.map(template => <TemplateCard key={template.id} template={template} ready={ready} onStart={onStart} onChanged={onChanged} />)}
@@ -140,7 +143,7 @@ function TemplateCard({ template, ready, onStart, onChanged }: {
     <ActionMenu modal={false}>
       <ActionMenuTarget asChild disabled={!ready || busy}>
         <div className="group relative">
-          <TooltipHint content={template.title}><Item variant="outline" asChild className="w-full overflow-hidden rounded-lg bg-card-shell p-1 text-left transition-colors hover:bg-accent/60 disabled:opacity-50">
+          <TooltipHint content={template.title}><Item variant="outline" asChild className="w-full gap-0 overflow-hidden rounded-lg bg-card-shell p-1 text-left transition-colors hover:bg-accent/60 disabled:opacity-50">
             <button type="button" data-action-menu-primary disabled={!ready || busy} aria-busy={starting} onClick={() => void run(() => onStart(template.id))}>
               {/* The folder color marks where new sessions land; the folder name stays in the information tooltip. */}
               {/* The preview is the card's sheet, nested concentrically inside the shell like object card content. */}
