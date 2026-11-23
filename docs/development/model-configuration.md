@@ -90,6 +90,8 @@ Provider and model lists merge by pack ID. A model entry replaces the whole prov
 
 Packs can adapt protocol placement, supported file transport, reasoning encoding, or request identity.
 
+Messages prompt caching is an explicit pack, not a default of the protocol. The official Anthropic preset includes it for new connections. It requests automatic caching with the service default lifetime and leaves connectivity probes unchanged. Compatible endpoints that cache implicitly do not need this pack.
+
 ## Account usage
 
 Account balance and quota are separate from response token usage and reference cost. A connection explicitly selects a usage provider.

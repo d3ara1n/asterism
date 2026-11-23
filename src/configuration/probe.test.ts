@@ -46,7 +46,7 @@ describe("Protocol connection tests", () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "environment-key-must-not-be-used");
     const transport = vi.fn<typeof fetch>(async () => Response.json(responses[protocol]));
     // Probes verify connectivity only; send a minimal request without reasoning options even when the model menu has no levels.
-    await runConnectionProbe({ provider: { ...provider(protocol), compatibility: [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }] }, model: { ...model,
+    await runConnectionProbe({ provider: { ...provider(protocol), compatibility: [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }, { id: "messagesPromptCaching" }] }, model: { ...model,
       capabilities: { ...model.capabilities, reasoning: true, thinkingLevels: [] },
       compatibility: [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }, { id: "toolFilesAsUserMessage" }],
       generation: { temperature: 0.3, topP: 0.8, maxOutputTokens: 1000 } },
@@ -65,6 +65,7 @@ describe("Protocol connection tests", () => {
     expect(body).not.toHaveProperty("reasoning");
     expect(body).not.toHaveProperty("reasoning_effort");
     expect(body).not.toHaveProperty("thinking");
+    if (protocol === "anthropic") expect(body).not.toHaveProperty("cache_control");
     if (protocol === "openai-responses") {
       expect(body.store).toBe(false);
       expect(body).not.toHaveProperty("include");

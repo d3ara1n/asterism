@@ -15,6 +15,10 @@ import { modelProtocolLabels } from "./protocols";
 const forms = new Map(modelCompatibilityDefinitions.filter(definition => definition.kind === "options")
   .map(definition => [definition.id, jsonSchema.parse(z.toJSONSchema(definition.schema, { io: "input" }))]));
 
+const localizedCopy = new Map([
+  ["messagesPromptCaching", { title: providersMessages.messagesPromptCaching, description: providersMessages.messagesPromptCachingDescription }],
+]);
+
 function Applicability({ definition }: { definition: ModelCompatibilityDefinition }) {
   return <span className="flex flex-col gap-1">
     <span className="flex flex-wrap gap-1">{definition.appliesTo.protocols.map(protocol =>
@@ -28,14 +32,19 @@ export function ModelCompatibilityEditor({ value, inherited, onChange }: {
   value: ModelCompatibility[]; inherited?: ModelCompatibility[]; onChange(value: ModelCompatibility[]): void;
 }) {
   const i18n = useI18n();
+  const copy = (definition: ModelCompatibilityDefinition) => {
+    const localized = localizedCopy.get(definition.id);
+    if (localized) return { title: i18n.text(localized.title), description: i18n.text(localized.description) };
+    const metadata = definition.schema.meta();
+    return { title: metadata?.title ?? definition.id, description: metadata?.description };
+  };
   const entries = mergeModelCompatibility(inherited ?? [], value);
   const available = modelCompatibilityDefinitions.filter(definition => !entries.some(entry => entry.id === definition.id));
   return <EditorSection collapsible defaultOpen={entries.length > 0} title={i18n.formatMessage(providersMessages.compatibility)}
     hint={i18n.formatMessage(inherited === undefined ? providersMessages.providerCompatibilityHint : providersMessages.modelCompatibilityHint)}>
     {entries.map(entry => {
       const definition = modelCompatibilityDefinition(entry.id)!;
-      const metadata = definition.schema.meta();
-      const title = metadata?.title ?? definition.id;
+      const { title } = copy(definition);
       const fromProvider = inherited?.some(item => item.id === entry.id);
       const readOnly = !value.some(item => item.id === entry.id);
       const remove = readOnly ? undefined : <Button type="button" variant="ghost" size="icon-xs"
@@ -66,13 +75,13 @@ export function ModelCompatibilityEditor({ value, inherited, onChange }: {
       </Button></DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {available.map(definition => {
-          const metadata = definition.schema.meta();
+          const { title, description } = copy(definition);
           return <DropdownMenuItem key={definition.id} className="flex-col items-start gap-1"
             onSelect={() => onChange([...value, definition.kind === "tag" ? { id: definition.id }
               : { id: definition.id, value: structuredClone(definition.initialValue) }])}>
-            <span>{metadata?.title ?? definition.id}</span>
+            <span>{title}</span>
             <Applicability definition={definition} />
-            {metadata?.description && <span className="type-caption max-w-sm whitespace-normal">{metadata.description}</span>}
+            {description && <span className="type-caption max-w-sm whitespace-normal">{description}</span>}
           </DropdownMenuItem>;
         })}
       </DropdownMenuContent>

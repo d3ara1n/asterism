@@ -359,6 +359,8 @@
   "discovery.saved": "已添加 {count} 个模型，请在模型设置中检查配置。",
   "discovery.saveFirst": "请先保存连接，再获取模型。",
   "compatibility.title": "兼容设置",
+  "compatibility.messagesPromptCaching.title": "提示词缓存",
+  "compatibility.messagesPromptCaching.description": "在支持自动缓存的 Messages 端点上请求提示词缓存。",
   "compatibility.providerHint": "保存后对该提供商下的所有模型生效。",
   "compatibility.modelHint": "自动使用提供商的兼容设置。模型设置整项覆盖同名设置；移除覆盖后恢复使用提供商设置。",
   "compatibility.fromProvider": "来自提供商",

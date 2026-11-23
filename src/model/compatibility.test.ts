@@ -369,33 +369,20 @@ describe("Explicit compatibility and target projection", () => {
     expect(body.messages).toEqual([{ role: "user", content: [{ type: "text", text: "Question" }] }]);
   });
 
-  // Only an explicit pack sends the top-level marker; the SDK forwards call-level cacheControl and omits ttl when unset. A model entry replaces the whole provider entry.
-  it.each<{ ttl?: "5m" | "1h" }>([{}, { ttl: "1h" }, { ttl: "5m" }])("Messages sends a top-level cache_control marker only with the prompt caching pack: %j", async value => {
-    const current = input("anthropic");
-    expect(await request(current)).not.toHaveProperty("cache_control");
-    current.settings.provider.compatibility = [{ id: "messagesPromptCaching", value }];
-    expect(await request(current)).toMatchObject({ cache_control: { type: "ephemeral", ...(value.ttl ? { ttl: value.ttl } : {}) } });
-    current.settings.model.compatibility = [{ id: "messagesPromptCaching", value: { ttl: "1h" } }];
-    expect(await request(current)).toMatchObject({ cache_control: { type: "ephemeral", ttl: "1h" } });
+  it("Messages omits automatic caching without the pack", async () => {
+    expect(await request(input("anthropic"))).not.toHaveProperty("cache_control");
   });
 
-  // Probes stay minimal, and a pack applied to a protocol without explicit caching does nothing.
-  it("prompt caching leaves probes and Responses requests untouched", async () => {
+  it.each(["provider", "model"] as const)("the %s pack enables Messages automatic caching with the service default TTL", async scope => {
     const current = input("anthropic");
-    current.settings.provider.compatibility = [{ id: "messagesPromptCaching", value: { ttl: "1h" } }];
-    const { provider, model } = current.settings;
-    const bodies: Record<string, unknown>[] = [];
-    const transport: typeof fetch = async (_url, init) => {
-      bodies.push(JSON.parse(String(init?.body)));
-      return Response.json({ id: "response", type: "message", role: "assistant", model: "test",
-        content: [{ type: "text", text: "OK" }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } });
-    };
-    const languageModel = createProviderModel(provider, model, "unused", transport);
-    await generateText({ model: languageModel, prompt: "Question", ...requestOptions(provider, model, { purpose: "probe" }) });
-    expect(bodies[0]).not.toHaveProperty("cache_control");
-    const responses = input();
-    responses.settings.provider.compatibility = [{ id: "messagesPromptCaching", value: {} }];
-    expect(await request(responses)).not.toHaveProperty("cache_control");
+    current.settings[scope].compatibility = [{ id: "messagesPromptCaching" }];
+    expect((await request(current)).cache_control).toEqual({ type: "ephemeral" });
+  });
+
+  it.each(["openai-responses", "openai-chat"] as const)("the Messages prompt caching pack leaves %s unchanged", async protocol => {
+    const current = input(protocol);
+    current.settings.provider.compatibility = [{ id: "messagesPromptCaching" }];
+    expect(await request(current)).not.toHaveProperty("cache_control");
   });
 
   // Plaintext reasoning must retain its position without being dropped by the SDK or disrupting adjacent images, tool pairing, or assistant text.
