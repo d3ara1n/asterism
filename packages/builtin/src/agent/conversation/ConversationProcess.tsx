@@ -43,7 +43,7 @@ export function ConversationProcess({ node, onToggle, onMount }: {
   const tones = node.tools.flatMap(call => { const kind = resultKind(call); return kind && kind !== "running" ? [toolOutcomeTone(kind)] : []; });
   const failed = tones.filter(tone => tone === "error").length;
   const partial = tones.filter(tone => tone === "warning").length;
-  return <ConversationSeam open={node.open} aria-expanded={node.open} onClick={onToggle}
+  return <ConversationSeam open={node.open} aria-expanded={node.open} onClick={onToggle} className="h-6"
     ref={button => { if (button) onMount(node.id, button); }}>
     <IconSwap swapKey={node.open ? "open" : "folded"}>{node.open ? <ChevronsDownUp className="size-3.5" /> : <ChevronsUpDown className="size-3.5" />}</IconSwap>
     <span className="shrink-0">{i18n.formatMessage(conversationMessages.executionProcess)}</span>
