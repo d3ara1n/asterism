@@ -14,10 +14,6 @@ Resource tool implementations (`implementTool`) have no `recordUsage` in their c
 
 Each kind needs a host meaning before a view presents it. Until then it appears only in raw subject queries.
 
-## Agent message references
-
-References inside Agent messages (Mesh and direct sends) are not declared. Declaring them requires a relation that keeps them apart from user references, so that model-chosen reads stay measured against user intent.
-
 ## Host-level audit
 
 Records stay attributable through request context, and plugin-owned logs such as the subagent audit cover the remaining detail. A host-observed record of every service access (catalog reads, shell, MCP, web), independent of plugin declarations, is an open product decision. It would bind host services per call rather than per plugin. Decide it on its own merits, not as a side effect of a statistics feature.

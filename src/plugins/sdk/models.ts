@@ -2,12 +2,10 @@ import type { ModelServices } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../lifecycle.ts";
 import type { PluginHostServices } from "../loader.ts";
 import { inputReferences } from "../../model/input.ts";
-import { declaredSubject } from "../../telemetry/subjects.ts";
-import type { UsageSubject } from "@asterism-app/sdk/contracts";
+import { declaredSubjects } from "../../telemetry/subjects.ts";
 
 /** Protocol execution accepts explicit inputs; workbench binding is supplied by the execution service. */
 export function bindModels(owner: string, host: PluginHostServices, runs: RunGroup, checkAvailable: () => void): ModelServices {
-  const subjects = (usage: readonly UsageSubject[] | undefined) => (usage ?? []).map(subject => declaredSubject(subject, owner));
   return {
     validate(request, options) {
       checkAvailable();
@@ -17,7 +15,7 @@ export function bindModels(owner: string, host: PluginHostServices, runs: RunGro
     },
     stream(request, options) {
       checkAvailable();
-      const declared = subjects(request.usage);
+      const declared = declaredSubjects(request.usage, owner);
       return runs.iterate(signal => host.models.stream({ ...request, signal }, {
         content: messages => host.content?.captureReader(inputReferences(messages), options?.content, owner),
         telemetry: { pluginId: owner, purposeId: request.purpose ?? null, subjects: declared },
@@ -25,7 +23,7 @@ export function bindModels(owner: string, host: PluginHostServices, runs: RunGro
     },
     run(request, options) {
       checkAvailable();
-      const declared = subjects(request.usage);
+      const declared = declaredSubjects(request.usage, owner);
       return runs.start(signal => host.models.run({ ...request, signal,
         content: messages => host.content?.captureReader(inputReferences(messages), options?.content, owner),
         telemetry: { pluginId: owner, purposeId: request.purpose ?? null, subjects: declared },

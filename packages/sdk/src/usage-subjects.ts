@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const text = z.string().trim().min(1).max(512);
+const text = z.string().min(1);
 
 /**
  * Something a model request or one of its tool calls used, declared by the plugin that knows the fact. The host records it in the usage
@@ -13,7 +13,7 @@ export const usageSubjectSchema = z.strictObject({
   id: text,
   /** Owner scope within the kind, such as the skill source an entry resolved from; null when unresolved. */
   source: text.nullable().optional(),
-  /** How the subject was used, such as `read`, `referenced`, or `context` (`usageRelations`). */
+  /** How the subject was used, such as `read` or `context` (`usageRelations`). */
   relation: text,
   /** Part within the subject, such as a package-relative file. */
   part: text.nullable().optional(),
@@ -27,6 +27,8 @@ export const usageSubjectKinds = {
   skill: "skill",
   /** A skill catalog projected into a request; quantity is its prompt characters. */
   skillCatalog: "skill-catalog",
+  /** Execution unit context: id is the performer label/key, source its instance scope, and part the unit identity if available. */
+  workUnit: "work-unit",
 } as const;
-/** Relations whose meaning the host owns: the model read the subject, an input message referenced it, or it occupied request context. */
-export const usageRelations = { read: "read", referenced: "referenced", context: "context" } as const;
+/** Relations whose meaning the host owns: the model tried to read the subject, or it occupied request context. */
+export const usageRelations = { read: "read", context: "context" } as const;

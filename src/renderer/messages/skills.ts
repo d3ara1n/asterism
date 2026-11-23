@@ -24,7 +24,7 @@ export const skillsMessages = pluginNamespace("asterism.host").messages("en", de
   skillRemoved: { id: "skills.skillRemoved", defaultMessage: "This skill is no longer in the catalog." },
   documentFailed: { id: "skills.documentFailed", defaultMessage: "SKILL.md could not be read." },
   usage: { id: "skills.usage", defaultMessage: "Usage" },
-  usageSummary: { id: "skills.usageSummary", defaultMessage: "Last used {time} \u00b7 {sessions, plural, one {# session} other {# sessions}} in 30 days" },
-  usageNever: { id: "skills.usageNever", defaultMessage: "No recorded use" },
+  usageSummary: { id: "skills.usageSummary", defaultMessage: "Last read {time} \u00b7 {sessions, plural, one {# session} other {# sessions}} in 30 days" },
+  usageNever: { id: "skills.usageNever", defaultMessage: "No successful read recorded" },
   usageOpen: { id: "skills.usageOpen", defaultMessage: "View usage" },
 }));

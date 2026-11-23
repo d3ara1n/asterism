@@ -2,7 +2,7 @@ import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useState } from "react";
 import { BookOpen, Folder, FolderOpen, Puzzle, RefreshCw, Search, TriangleAlert } from "lucide-react";
 import { IslandPanel, useI18n, useRendererApplication, useRendererCalls, useRendererIsland } from "@asterism-app/sdk/renderer";
-import { usageSubjectKinds, type UiText } from "@asterism-app/sdk/contracts";
+import type { UiText } from "@asterism-app/sdk/contracts";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -24,6 +24,7 @@ import { pluginName } from "../../../shared/plugin-name";
 import type { AppSnapshot } from "../../../shared/contracts";
 import { ReadSkillDocument, RefreshSkills, type SkillSource } from "../../../shared/skills";
 import { useSkillCatalog } from "./use-skill-catalog";
+import { successfulSkillReads } from "./usage-query";
 import { useSkillUsageNavigation } from "./usage-navigation";
 import { runtime } from "../../runtime";
 
@@ -204,7 +205,7 @@ function SkillDetailPanel({ source, name, names }: { source: string; name: strin
 }
 
 const usageWindowMs = 30 * 86_400_000;
-/** Recorded use of this source's copy over the last 30 days and its latest use ever; opens the usage page on this skill. */
+/** Successful reads of this copy over the last 30 days and its latest recorded read. */
 function SkillUsageRow({ source, name }: { source: string; name: string }) {
   const i18n = useI18n();
   const navigation = useSkillUsageNavigation();
@@ -213,15 +214,14 @@ function SkillUsageRow({ source, name }: { source: string; name: string }) {
     let current = true;
     const now = Date.now();
     const filter = { from: null, to: null, utcOffsetMinutes: -new Date(now).getTimezoneOffset() };
-    void runtime.telemetry.execute({ type: "query", filter, query: { kind: "subjects", subjectKind: usageSubjectKinds.skill } }).then(result => {
-      if (!current || !result.ok || result.reply.kind !== "query" || result.reply.result.kind !== "subjects") return;
-      const rows = result.reply.result.rows.filter(row => row.id === name && row.source === source);
-      return runtime.telemetry.execute({ type: "query", filter: { ...filter, from: now - usageWindowMs, subject: { kind: usageSubjectKinds.skill, id: name, source } },
-        query: { kind: "summary", compare: null } }).then(recent => {
-        if (!current) return;
-        const sessions = recent.ok && recent.reply.kind === "query" && recent.reply.result.kind === "summary" ? recent.reply.result.sessions : 0;
-        setUsage({ sessions, lastAt: rows.reduce<number | null>((last, row) => row.lastAt === null ? last : Math.max(last ?? 0, row.lastAt), null) });
-      });
+    const query = { kind: "subjects", subject: { ...successfulSkillReads, id: name, source } } as const;
+    void Promise.all([
+      runtime.telemetry.execute({ type: "query", filter, query }),
+      runtime.telemetry.execute({ type: "query", filter: { ...filter, from: now - usageWindowMs }, query }),
+    ]).then(([ever, recent]) => {
+      if (!current || !ever.ok || ever.reply.kind !== "query" || ever.reply.result.kind !== "subjects"
+        || !recent.ok || recent.reply.kind !== "query" || recent.reply.result.kind !== "subjects") return;
+      setUsage({ sessions: recent.reply.result.successfulSessions, lastAt: ever.reply.result.rows[0]?.lastSuccessfulAt ?? null });
     }, () => {});
     return () => { current = false; };
   }, [source, name]);

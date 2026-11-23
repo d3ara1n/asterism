@@ -194,7 +194,7 @@ describe("Usage ledger queries", () => {
       expect(service.execute({ type: "clear", before: 2_000 })).toEqual({ kind: "clear", deleted: 1 });
       // The remaining request keeps its tool call even though the call's own timestamp precedes the bound.
       expect(query(service, { kind: "tools", groupBy: "tool" }).rows.map(row => row.calls)).toEqual([1]);
-      expect(query(service, { kind: "subjects", subjectKind: "skill" }).rows.map(row => row.id)).toEqual(["b"]);
+      expect(query(service, { kind: "subjects", subject: { kind: "skill" } }).rows.map(row => row.id)).toEqual(["b"]);
     } finally { service.close(); }
   });
 });
@@ -205,22 +205,53 @@ const readCall = (subjects: UsageSubjectRecord[], outcome = "succeeded") =>
   ({ startedAt: 0, durationMs: 1, toolName: "skill_read", implementationId: null, resourceKind: null, outcome, errorCode: null, subjects });
 
 describe("Declared usage subjects", () => {
-  // Model-chosen reads are the signal that a skill's description works; a reference earlier in the session explains the read instead.
-  it("counts reads as unprompted only without an earlier reference in the same session", () => {
+  it("separates successful reads from failed attempts, historical references, and other owners", () => {
     const service = new TelemetryService(root(), workspace().lookup);
     try {
-      service.recordModelUsage(record({ sessionId: "s1", startedAt: 100, subjects: [skill("referenced", "a", { source: null })] }));
-      service.recordModelUsage(record({ sessionId: "s1", startedAt: 200, tools: [readCall([skill("read", "a", { part: "SKILL.md" })])] }));
-      // A reference after the read, or in another session, does not prompt it.
-      service.recordModelUsage(record({ sessionId: "s2", startedAt: 300, tools: [readCall([skill("read", "a", { part: "refs/guide.md" })])] }));
-      service.recordModelUsage(record({ sessionId: "s2", startedAt: 400, subjects: [skill("referenced", "a")] }));
-      service.recordModelUsage(record({ sessionId: "s3", startedAt: 500, tools: [readCall([skill("read", "a")], "rejected")] }));
-      const rows = query(service, { kind: "subjects", subjectKind: "skill" }).rows;
-      const user = rows.find(row => row.source === "/user")!;
-      expect(user).toMatchObject({ requests: 4, sessions: 3, lastAt: 500, unprompted: 2, failedCalls: 1, parts: ["SKILL.md", "refs/guide.md"] });
-      expect(user.relations.read).toMatchObject({ count: 3, sessions: 3 });
-      // An unresolved reference keeps its own row rather than merging into the resolved source.
-      expect(rows.find(row => row.source === null)).toMatchObject({ id: "a", requests: 1, unprompted: 0 });
+      service.recordModelUsage(record({ sessionId: "s1", startedAt: 100, tools: [readCall([skill("read", "a", { part: "SKILL.md" })])] }));
+      service.recordModelUsage(record({ sessionId: "s1", startedAt: 200, tools: [readCall([skill("read", "a", { part: "guide.md" })])] }));
+      service.recordModelUsage(record({ sessionId: "s2", startedAt: 300, tools: [readCall([skill("read", "a", { part: "missing.md" })], "rejected")] }));
+      service.recordModelUsage(record({ sessionId: "s3", startedAt: 400, subjects: [skill("referenced", "b")] }));
+      service.recordModelUsage(record({ sessionId: "s4", startedAt: 500, tools: [readCall([skill("read", "a", { declaredBy: "other" })])] }));
+      const subject = { kind: "skill", relation: "read", declaredBy: "plugin" };
+      const result = query(service, { kind: "subjects", subject });
+      expect(result.successfulSessions).toBe(1);
+      expect(result.rows).toEqual([{ id: "a", source: "/user", requests: 3, quantity: null,
+        successfulCalls: 2, failedCalls: 1, successfulSessions: 1, lastSuccessfulAt: 200 }]);
+      const hits = query(service, { kind: "summary", compare: null }, { ...everything, subject: { ...subject, id: "a", source: "/user", successfulTool: true } });
+      expect(hits.metrics.requests).toBe(2);
+      service.recordModelUsage(record({ startedAt: 50, tools: [readCall([skill("read", "failed-only")], "rejected")] }));
+      const overview = query(service, { kind: "subjects", subject: { ...subject, successfulTool: true } });
+      expect(overview.rows.map(row => [row.id, row.successfulCalls])).toEqual([["a", 2]]);
+      expect(overview.firstAt).toBe(100);
+    } finally { service.close(); }
+  });
+
+  it("ranks successful calls rather than requests and counts independent Agent turns", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      const day = 86_400_000;
+      const turn = (source: string, part: string) => skill("context", "worker", { kind: "work-unit", source, part });
+      const doc = skill("read", "a", { part: "SKILL.md" });
+      const notes = skill("read", "a", { part: "notes.md" });
+      // Three calls in one request, another request in the same turn, and the same role in a different Agent.
+      service.recordModelUsage(record({ sessionId: "s1", modelId: "x", startedAt: 100, subjects: [turn("agent-a", "turn-1")],
+        tools: [readCall([doc, doc]), readCall([doc]), readCall([notes])] }));
+      service.recordModelUsage(record({ sessionId: "s1", modelId: "x", startedAt: 200, subjects: [turn("agent-a", "turn-1")], tools: [readCall([doc])] }));
+      service.recordModelUsage(record({ sessionId: "s1", modelId: "y", startedAt: day + 100, subjects: [turn("agent-b", "turn-1")], tools: [readCall([notes])] }));
+      // Older records still count, but only the owner of a read can describe its work unit.
+      service.recordModelUsage(record({ sessionId: "s2", modelId: "y", startedAt: day + 200,
+        subjects: [{ ...turn("other", "foreign"), declaredBy: "different-plugin" }],
+        tools: [readCall([doc]), readCall([skill("read", "a", { part: "missing.md" })], "rejected"), readCall([skill("read", "b")])] }));
+      const activity = query(service, { kind: "subject-activity", subject: { kind: "skill", id: "a", source: "/user", relation: "read", declaredBy: "plugin" }, granularity: "day" },
+        { ...everything, from: 0, to: 3 * day });
+      expect(activity).toMatchObject({ successfulCalls: 6, failedCalls: 1, successfulSessions: 2, turns: 2, unknownTurns: 1,
+        points: [{ start: 0, count: 4 }, { start: day, count: 2 }, { start: 2 * day, count: 0 }],
+        roles: [{ label: "worker", calls: 5 }, { label: null, calls: 1 }],
+        files: [{ label: "SKILL.md", calls: 4 }, { label: "notes.md", calls: 2 }],
+      });
+      expect(activity.models.map(({ group, calls }) => [group.key, calls])).toEqual([[JSON.stringify(["p", "x"]), 4], [JSON.stringify(["p", "y"]), 2]]);
+      expect(activity.sessions.map(({ group, calls }) => [group.key, calls])).toEqual([[JSON.stringify(["s1"]), 5], [JSON.stringify(["s2"]), 1]]);
     } finally { service.close(); }
   });
 
@@ -256,7 +287,7 @@ describe("Declared usage subjects", () => {
     try {
       migrated.recordModelUsage(record({ subjects: [skill("referenced", "a")] }));
       expect(query(migrated, { kind: "summary", compare: null }).metrics.requests).toBe(2);
-      expect(query(migrated, { kind: "subjects", subjectKind: "skill" }).rows).toHaveLength(1);
+      expect(query(migrated, { kind: "subjects", subject: { kind: "skill" } }).rows).toHaveLength(1);
     } finally { migrated.close(); }
   });
 });

@@ -1,8 +1,9 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
+import { usageRelations, usageSubjectKinds } from "@asterism-app/sdk/contracts";
 import {
   distributionEdges, type BreakdownRow, type CurrencyAmount, type ExternalRow, type ExternalTotals, type Percentiles, type SeriesPoint,
   type TelemetryClearReply, type TelemetryDimension, type TelemetryEvent, type TelemetryExportReply, type TelemetryFacets, type TelemetryFilter,
-  type TelemetryGroup, type TelemetryQuery, type TelemetryQueryResult, type ToolRow, type UsageMetrics, type SubjectRow, type SubjectRelation,
+  type TelemetryGroup, type TelemetryQuery, type TelemetryQueryResult, type ToolRow, type UsageMetrics, type SubjectRow, type SubjectMatch,
 } from "../shared/telemetry.ts";
 import { bucketKeys, bucketStart, localDateKey, type Granularity } from "../shared/telemetry-time.ts";
 import type { WorkspaceLookup } from "./types.ts";
@@ -28,6 +29,18 @@ export function bucketSql(column: string, granularity: Granularity, offset: numb
   return `strftime('%Y-%m', ${time})`;
 }
 
+/** Both request filtering and subject aggregation match the same declaration fields. */
+function subjectWhere(subject: SubjectMatch) {
+  const clauses = ["s.kind = ?"];
+  const params: SQLInputValue[] = [subject.kind];
+  for (const [column, value] of [["subject_id", subject.id], ["source_id", subject.source], ["relation", subject.relation], ["declared_by", subject.declaredBy]] as const) {
+    if (value === null) clauses.push(`s.${column} IS NULL`);
+    else if (value !== undefined) { clauses.push(`s.${column} = ?`); params.push(value); }
+  }
+  if (subject.successfulTool) clauses.push("t.outcome = 'succeeded'");
+  return { sql: clauses.join(" AND "), params };
+}
+
 /** Model events in the filter, each with its effective folder: the live session's folder, or the recorded one after deletion. */
 function modelEvents(filter: TelemetryFilter, range: { from: number | null; to: number | null } = filter): Scope {
   const where: string[] = [];
@@ -42,14 +55,10 @@ function modelEvents(filter: TelemetryFilter, range: { from: number | null; to: 
   if (filter.thinking !== undefined) filter.thinking === null ? add("e.thinking IS NULL") : add("e.thinking = ?", filter.thinking);
   if (filter.sessionId !== undefined) add("e.session_id = ?", filter.sessionId);
   if (filter.subject !== undefined) {
-    const subject = filter.subject;
-    const clauses = ["s.model_event_id = e.id", "s.kind = ?"];
-    const values: SQLInputValue[] = [subject.kind];
-    if (subject.id !== undefined) { clauses.push("s.subject_id = ?"); values.push(subject.id); }
-    if (subject.source !== undefined) { clauses.push(subject.source === null ? "s.source_id IS NULL" : "s.source_id = ?"); if (subject.source !== null) values.push(subject.source); }
-    if (subject.relation !== undefined) { clauses.push("s.relation = ?"); values.push(subject.relation); }
-    where.push(`EXISTS (SELECT 1 FROM usage_subjects s WHERE ${clauses.join(" AND ")})`);
-    params.push(...values);
+    const subject = subjectWhere(filter.subject);
+    const tools = filter.subject.successfulTool ? " JOIN tool_usage_events t ON t.id = s.tool_event_id" : "";
+    where.push(`EXISTS (SELECT 1 FROM usage_subjects s${tools} WHERE s.model_event_id = e.id AND ${subject.sql})`);
+    params.push(...subject.params);
   }
   let sql = `SELECT e.*, CASE WHEN ls.id IS NULL THEN e.folder_id_snapshot ELSE ls.folder_id END AS folder_id
     FROM model_usage_events e LEFT JOIN temp.live_sessions ls ON ls.id = e.session_id${where.length ? ` WHERE ${where.join(" AND ")}` : ""}`;
@@ -218,7 +227,8 @@ export class TelemetryReader {
       case "events": return this.events(filter, query.offset, query.limit, query.only);
       case "tools": return this.tools(filter, query.groupBy);
       case "external": return this.external(filter);
-      case "subjects": return this.subjects(filter, query.subjectKind);
+      case "subjects": return this.subjects(filter, query.subject);
+      case "subject-activity": return this.subjectActivity(filter, query.subject, query.granularity);
     }
   }
 
@@ -376,35 +386,60 @@ export class TelemetryReader {
     })) };
   }
 
-  private subjects(filter: TelemetryFilter, kind: string): TelemetryQueryResult {
-    const scope = modelEvents(filter);
-    const declared: Scope = { sql: `sv AS (SELECT s.*, ev.session_id, ev.started_at, t.outcome AS tool_outcome
-      FROM usage_subjects s JOIN ev ON ev.id = s.model_event_id LEFT JOIN tool_usage_events t ON t.id = s.tool_event_id WHERE s.kind = ?)`, params: [kind] };
-    const totals = this.all([scope, declared], `SELECT subject_id, source_id, COUNT(DISTINCT model_event_id) AS requests, COUNT(DISTINCT session_id) AS sessions,
-      MAX(started_at) AS last, TOTAL(relation = 'read' AND tool_outcome IS NOT NULL AND tool_outcome NOT IN ('succeeded', 'partial')) AS failed
-      FROM sv GROUP BY subject_id, source_id ORDER BY sessions DESC, requests DESC, subject_id`);
-    const relations = this.all([scope, declared], `SELECT subject_id, source_id, relation, COUNT(*) AS count, COUNT(DISTINCT model_event_id) AS requests,
-      COUNT(DISTINCT session_id) AS sessions, SUM(quantity) AS quantity, MAX(started_at) AS last FROM sv GROUP BY subject_id, source_id, relation`);
-    const parts = this.all([scope, declared], "SELECT DISTINCT subject_id, source_id, part FROM sv WHERE relation = 'read' AND part IS NOT NULL ORDER BY part");
-    // A read is prompted when the same session referenced the subject at or before that request, under any source.
-    const unprompted = this.all([scope, declared], `SELECT r.subject_id, r.source_id, COUNT(*) AS count FROM sv r WHERE r.relation = 'read' AND NOT EXISTS (
-      SELECT 1 FROM usage_subjects x JOIN model_usage_events m ON m.id = x.model_event_id
-      WHERE x.kind = r.kind AND x.subject_id = r.subject_id AND x.relation = 'referenced'
-        AND m.session_id IS r.session_id AND r.session_id IS NOT NULL AND m.started_at <= r.started_at)
-      GROUP BY r.subject_id, r.source_id`);
-    const key = (row: Row) => groupKey([text(row.subject_id), text(row.source_id)]);
-    const rows = new Map<string, SubjectRow>(totals.map(row => [key(row), {
-      id: String(row.subject_id), source: text(row.source_id), requests: num(row.requests), sessions: num(row.sessions), lastAt: nullableNum(row.last),
-      relations: {}, unprompted: 0, parts: [], failedCalls: num(row.failed),
-    }]));
-    for (const row of relations) rows.get(key(row))!.relations[String(row.relation)] = {
-      count: num(row.count), requests: num(row.requests), sessions: num(row.sessions), quantity: nullableNum(row.quantity), lastAt: nullableNum(row.last),
-    } satisfies SubjectRelation;
-    for (const row of parts) rows.get(key(row))!.parts.push(String(row.part));
-    for (const row of unprompted) rows.get(key(row))!.unprompted = num(row.count);
-    const [all] = this.all([scope, declared], "SELECT COUNT(DISTINCT model_event_id) AS requests, COUNT(DISTINCT session_id) AS sessions FROM sv");
-    const first = this.db.prepare("SELECT MIN(m.started_at) AS first FROM usage_subjects s JOIN model_usage_events m ON m.id = s.model_event_id WHERE s.kind = ?").get(kind) as Row | undefined;
-    return { kind: "subjects", subjectKind: kind, rows: [...rows.values()], requests: num(all?.requests), sessions: num(all?.sessions), firstAt: nullableNum(first?.first) };
+  private subjects(filter: TelemetryFilter, subject: SubjectMatch): TelemetryQueryResult {
+    const match = subjectWhere(subject);
+    const scope = [modelEvents(filter), { sql: `sv AS (SELECT s.*, ev.session_id, ev.started_at, t.outcome AS tool_outcome
+      FROM usage_subjects s JOIN ev ON ev.id = s.model_event_id LEFT JOIN tool_usage_events t ON t.id = s.tool_event_id
+      WHERE ${match.sql})`, params: match.params }];
+    const totals = this.all(scope, `SELECT subject_id, source_id, COUNT(DISTINCT model_event_id) AS requests, SUM(quantity) AS quantity,
+      COUNT(CASE WHEN tool_outcome = 'succeeded' THEN 1 END) AS succeeded,
+      COUNT(CASE WHEN tool_outcome <> 'succeeded' THEN 1 END) AS failed,
+      COUNT(DISTINCT CASE WHEN tool_outcome = 'succeeded' THEN session_id END) AS sessions,
+      MAX(CASE WHEN tool_outcome = 'succeeded' THEN started_at END) AS last
+      FROM sv GROUP BY subject_id, source_id ORDER BY sessions DESC, succeeded DESC, subject_id`);
+    const rows: SubjectRow[] = totals.map(row => ({
+      id: String(row.subject_id), source: text(row.source_id), requests: num(row.requests), quantity: nullableNum(row.quantity),
+      successfulCalls: num(row.succeeded), failedCalls: num(row.failed), successfulSessions: num(row.sessions), lastSuccessfulAt: nullableNum(row.last),
+    }));
+    const [all] = this.all(scope, `SELECT COUNT(DISTINCT CASE WHEN tool_outcome = 'succeeded' THEN session_id END) AS sessions,
+      MIN(started_at) AS first FROM sv`);
+    return { kind: "subjects", rows, successfulSessions: num(all?.sessions), firstAt: nullableNum(all?.first) };
+  }
+
+  private subjectActivity(filter: TelemetryFilter, subject: SubjectMatch, granularity: Granularity): TelemetryQueryResult {
+    const match = subjectWhere(subject);
+    // Use the request's time and filters, but count each matching tool call once.
+    const scope = [modelEvents(filter), { sql: `calls AS (
+      SELECT ev.started_at, ev.session_id, ev.provider_id, ev.model_id, t.outcome, s.part AS file, u.subject_id AS role,
+        CASE WHEN u.part IS NOT NULL THEN json_array(ev.session_id, u.source_id, u.part) END AS work_unit
+      FROM usage_subjects s JOIN tool_usage_events t ON t.id = s.tool_event_id JOIN ev ON ev.id = s.model_event_id
+      LEFT JOIN usage_subjects u ON u.id = (
+        SELECT w.id FROM usage_subjects w WHERE w.model_event_id = ev.id AND w.tool_event_id IS NULL
+          AND w.declared_by = s.declared_by AND w.kind = ? AND w.relation = ? LIMIT 1
+      ) WHERE ${match.sql} GROUP BY t.id
+    ), reads AS (SELECT * FROM calls WHERE outcome = 'succeeded')`, params: [usageSubjectKinds.workUnit, usageRelations.context, ...match.params] }];
+    const [totals] = this.all(scope, `SELECT COUNT(DISTINCT work_unit) AS turns, COUNT(*) - COUNT(work_unit) AS unknown,
+      COUNT(*) AS succeeded, COUNT(DISTINCT session_id) AS sessions, MIN(started_at) AS first, MAX(started_at) AS last,
+      (SELECT COUNT(*) FROM calls WHERE outcome <> 'succeeded') AS failed FROM reads`);
+    const buckets = this.all(scope, `SELECT ${bucketSql("started_at", granularity, filter.utcOffsetMinutes)} AS bucket, COUNT(*) AS count FROM reads GROUP BY bucket`);
+    const counts = new Map(buckets.map(row => [String(row.bucket), num(row.count)]));
+    const start = filter.from ?? nullableNum(totals?.first);
+    const end = Math.max(filter.to ?? this.now, num(totals?.last) + 1);
+    const keys = start === null ? [] : bucketKeys(start, end, granularity, filter.utcOffsetMinutes);
+    if (keys.length > maxBuckets) throw new TelemetryError("invalid_request", `The range has more than ${maxBuckets} ${granularity} buckets.`);
+    const labelRanks = (column: "file" | "role") => this.all(scope, `SELECT ${column} AS label, COUNT(*) AS count FROM reads
+      GROUP BY ${column} ORDER BY count DESC, label LIMIT 8`).map(row => ({ label: text(row.label), calls: num(row.count) }));
+    const groupRanks = (dimension: "session" | "model") => {
+      const spec = dimensionSpecs[dimension];
+      return this.all(scope, `SELECT ${dimensionSelect(spec)}, COUNT(*) AS count FROM reads${spec.where ? ` WHERE ${spec.where}` : ""}
+        GROUP BY ${spec.columns.join(", ")} ORDER BY count DESC, ${spec.columns.join(", ")} LIMIT 8`)
+        .map(row => ({ group: this.groups.resolve(dimension, dimensionValues(spec, row)), calls: num(row.count) }));
+    };
+    return { kind: "subject-activity", granularity,
+      points: keys.map(key => ({ start: bucketStart(key, granularity, filter.utcOffsetMinutes), count: counts.get(key) ?? 0 })),
+      successfulCalls: num(totals?.succeeded), failedCalls: num(totals?.failed), successfulSessions: num(totals?.sessions),
+      lastSuccessfulAt: nullableNum(totals?.last), turns: num(totals?.turns), unknownTurns: num(totals?.unknown), roles: labelRanks("role"), files: labelRanks("file"),
+      sessions: groupRanks("session"), models: groupRanks("model") };
   }
 
   private facets(): TelemetryFacets {

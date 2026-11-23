@@ -45,8 +45,9 @@ export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ca
                 latest = encode(data); publish?.(latest);
               },
               recordUsage(subject) {
+                if (!scope.active) return;
                 const record = declaredSubject(subject, sdk.context.id);
-                if (scope.active) usage?.(record);
+                if (record) usage?.(record);
               },
             });
             const withData = result.data !== undefined && result.data !== null || result.kind === "succeeded" || result.kind === "partial";

@@ -1,4 +1,4 @@
-import { ResourceNoticeRaised, type UsageSubject } from "@asterism-app/sdk/contracts";
+import { ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ExecutionServices, type ResourceRef, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../lifecycle.ts";
 import type { PluginHostServices } from "../loader.ts";
@@ -10,7 +10,7 @@ import { bindModelTools } from "../../execution/core.ts";
 import type { ContentLease } from "../../runtime/content-store.ts";
 import type { PluginEventScope } from "../event-scope.ts";
 import type { ToolUsageRecord } from "../../telemetry/types.ts";
-import { declaredSubject } from "../../telemetry/subjects.ts";
+import { declaredSubjects } from "../../telemetry/subjects.ts";
 
 interface ExecutionBinding {
   owner: string;
@@ -83,9 +83,7 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
         target: request.target, messages: request.messages, userAgent: request.userAgent, requestParentId: request.requestParentId, purpose: request.purpose,
       });
       const usage = request.usage;
-      const declare = (items: readonly UsageSubject[]) => items.map(subject => declaredSubject(subject, owner));
-      // Static subjects validate before work starts; deferred ones join after the system prompt is prepared and before the request is sent.
-      const subjects = typeof usage === "function" ? [] : declare(usage ?? []);
+      const subjects = typeof usage === "function" ? [] : declaredSubjects(usage, owner);
       const system = typeof request.system === "function" ? request.system : structuredClone(request.system);
       const release = host.holds.acquire(ref, linkedRefs);
       const work = runs.start(async signal => {
@@ -96,7 +94,7 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
           const boundTools = topLevelTools(caller, policy, linkedRefs, interactive, kind => capabilities.resourceToolRestriction(kind));
           const preparedSystem = host.sessions.context(linked).then(files => {
             const prepared = typeof system === "function" ? system(files) : system;
-            if (typeof usage === "function") subjects.push(...declare(usage()));
+            if (typeof usage === "function") subjects.push(...declaredSubjects(usage, owner));
             return prepared;
           });
           const settledTools: ToolUsageRecord[] = [];

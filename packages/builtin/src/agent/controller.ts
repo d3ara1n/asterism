@@ -13,8 +13,8 @@ import type { WorkMessages } from "./work-projection.ts";
 import { compressContext, compressionDue, estimateContext, planCompression, type PreparedCompression } from "./compression.ts";
 import { deliverDrafts } from "./drafts.ts";
 import { turnStartRead } from "./input-message.ts";
-import { newUserInput } from "./input-usage.ts";
-import { referencedSkillNames, referencedSkills, skillCatalogUsage } from "../skills/usage.ts";
+import { agentTurnUsage } from "./usage.ts";
+import { skillCatalogUsage } from "../skills/usage.ts";
 import { readRecords } from "../shared/record-reading.ts";
 import type { AgentRequestState } from "./self-state/contract.ts";
 
@@ -33,8 +33,7 @@ interface AgentControllerDependencies {
 /** Bind the Agent loop to resource scheduling, timeline records, persistent drafts, and workbench feedback. */
 export function createAgentController(deps: AgentControllerDependencies) {
   // One owned task accepts inputs at a time; task cleanup remains tracked by the host lifecycle.
-  // inputMark is the last input message sequence already declared with a request of this run; the first request reads it from history.
-  const active = new Map<string, { key: string; startedAt: number; entered: boolean; request: AgentRequestState | null; inputMark?: number; end(reason: AgentTurnEndReason): void }>();
+  const active = new Map<string, { key: string; startedAt: number; entered: boolean; request: AgentRequestState | null; end(reason: AgentTurnEndReason): void }>();
   const waiters = new Map<string, Set<() => void>>();
   // Conversation and compression exits both release callers waiting for this Agent to settle.
   const finish = (id: string) => {
@@ -165,6 +164,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
         return { inputId: input?.id ?? null, position: snapshot.position };
       };
       startTask(object, "conversation", async signal => {
+        let turn: string | null = null;
         return runAgentLoop({
           retry: {
             maxRetries: agentRequestRetries,
@@ -179,7 +179,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
             return true;
           },
           completed: async current => { await maybeCompact(object, current); },
-          async request(_index, current) {
+          async request(index, current) {
             // Preparation failures end execution before consuming another input.
             await maybeCompact(object, current);
             const selection = selectionOf(object).selection, agent = deps.selection.agent(selection);
@@ -209,12 +209,13 @@ export function createAgentController(deps: AgentControllerDependencies) {
               run.request = { role: agent.id, model: formatModelExpression(target), thinking: target.thinking ?? null };
               const prepare = deps.prepareRequest(agent);
               let prepared: ReturnType<typeof prepare>;
-              const input = newUserInput(snapshot, object.ref.id, run.inputMark);
-              run.inputMark = input.mark;
               result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
                 agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },
                 userAgent: deps.userAgent, purpose: "conversation", completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
-                usage: () => [...referencedSkills(referencedSkillNames(input.texts), prepared.catalogSkills), ...skillCatalogUsage(prepared.catalogBlock)],
+                usage: () => {
+                  if (index === 0) turn = readRecords(turnStartRead(object.ref.id), snapshot.records.all)?.id ?? null;
+                  return [agentTurnUsage(agent.id, object.ref.id, turn), ...skillCatalogUsage(prepared.catalogBlock)];
+                },
                 target, system: files => { prepared = prepare(files); return prepared.system; }, messages: (deps.projectMessages ?? projectForAgent)(snapshot, object.ref.id), signal: current,
                 observer: { event(event) { progress.event(event); return observer.event(event); } },
               }));

@@ -527,13 +527,15 @@ describe("Host implementation of the workbench SDK", () => {
   // Attribution comes from the call and request context; a declaration after settlement must not land on a later call.
   it("records subjects declared by a top-level tool with its call and deferred request subjects with the request", async () => {
     const c = counter(), other = pluginNamespace("test.usage");
+    using warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const path = `${Array(6).fill("a".repeat(91)).join("/")}/guide.md`;
     let late: (() => void) | undefined;
     const declaration = defineTopLevelTool({
       id: other.name("use"), name: "use", description: "Use a subject.", guidelines: [],
       argsSchema: z.strictObject({}).describe("No parameters."), resultSchema: z.null().describe("Nothing."), effect: "read", execution: "parallel",
       async execute(_args, context) {
-        expect(() => context.recordUsage({ kind: "", id: "x", relation: "read" })).toThrow("Invalid usage subject");
-        context.recordUsage({ kind: "skill", id: "a", source: "/user", relation: "read", part: "SKILL.md" });
+        context.recordUsage({ kind: "", id: "x", relation: "read" });
+        context.recordUsage({ kind: "skill", id: "a", source: "/user", relation: "read", part: path });
         late = () => context.recordUsage({ kind: "skill", id: "late", relation: "read" });
         return { kind: "succeeded", data: null };
       },
@@ -556,18 +558,21 @@ describe("Host implementation of the workbench SDK", () => {
     } }));
     const target = await configureModel(service);
     const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
-    let prepared = false;
-    const run = (allow: string[]) => c.context().execution.run({
+    const run = (allow: string[], usage: () => { kind: string; id: string; relation: string; quantity: number }[]) => c.context().execution.run({
       access: object, interactive: true, target, requestParentId: null, tools: { allow }, signal: new AbortController().signal, observer: { event() {} },
-      system: () => { prepared = true; return { blocks: [] }; }, messages: [],
-      usage: () => { expect(prepared).toBe(true); return [{ kind: "skill-catalog", id: "catalog", relation: "context", quantity: 120 }]; },
+      system: () => ({ blocks: [] }), messages: [], usage,
     });
-    await run(["use"]);
+    const result = await run(["use"], () => [{ kind: "skill-catalog", id: "catalog", relation: "context", quantity: 120 }]);
+    expect(result.tools.map(tool => tool.kind)).toEqual(["succeeded"]);
     late!();
-    await run([]);
-    const read = (subjectKind: string) => service.telemetry.execute({ type: "query", filter: { from: null, to: null, utcOffsetMinutes: 0 }, query: { kind: "subjects", subjectKind } });
-    expect(read("skill")).toMatchObject({ kind: "query", result: { rows: [{ id: "a", source: "/user", requests: 1, parts: ["SKILL.md"] }] } });
-    expect(read("skill-catalog")).toMatchObject({ kind: "query", result: { rows: [{ id: "catalog", requests: 2, relations: { context: { quantity: 240 } } }] } });
+    expect((await run([], () => { throw new Error("bad declaration"); })).reason).toBe("completed");
+    expect(warning).toHaveBeenCalledTimes(2);
+    const read = (subjectKind: string) => service.telemetry.execute({ type: "query", filter: { from: null, to: null, utcOffsetMinutes: 0 }, query: { kind: "subjects", subject: { kind: subjectKind } } });
+    expect(read("skill")).toMatchObject({ kind: "query", result: { rows: [{ id: "a", source: "/user", requests: 1, successfulCalls: 1 }] } });
+    expect(service.telemetry.execute({ type: "query", filter: { from: null, to: null, utcOffsetMinutes: 0 },
+      query: { kind: "subject-activity", subject: { kind: "skill", id: "a" }, granularity: "day" },
+    })).toMatchObject({ kind: "query", result: { files: [{ label: path, calls: 1 }] } });
+    expect(read("skill-catalog")).toMatchObject({ kind: "query", result: { rows: [{ id: "catalog", requests: 1, quantity: 120 }] } });
   });
 
   // Top-level tools override complete declarations in user-list order; failed contributions reserve no names, and model declarations and execution identities share the same winner.

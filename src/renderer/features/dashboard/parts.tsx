@@ -74,26 +74,37 @@ export function RankedList({ rows, measure, onOpen, selected, limit }: {
 }) {
   const i18n = useI18n();
   const shown = limit === undefined ? rows : rows.slice(0, limit);
-  const max = Math.max(0, ...shown.map(row => measureOf(row.metrics, measure)));
+  return <RankedValues selected={selected} format={value => formatMeasure(i18n, measure, value)} rows={shown.map(row => ({
+    key: groupId(row.group), label: <GroupName group={row.group} />, color: groupColor(row.group),
+    value: measureOf(row.metrics, measure), open: (origin: HTMLElement) => onOpen(row, origin),
+  }))} />;
+}
+
+/** Share ranked bars between navigable dashboard groups and read-only dimensions such as skill files. */
+export function RankedValues({ rows, format, selected }: {
+  rows: readonly { key: string; label: ReactNode; value: number; color?: string | null; open?: (origin: HTMLElement) => void }[];
+  format: (value: number) => string; selected?: string | null;
+}) {
+  const max = Math.max(0, ...rows.map(row => row.value));
   return <ul className="flex flex-col p-1">
-    {shown.map(row => {
-      const value = measureOf(row.metrics, measure);
-      const color = groupColor(row.group);
-      const id = groupId(row.group);
-      return <li key={id}>
-        <button type="button" aria-current={selected === id || undefined} onClick={event => onOpen(row, event.currentTarget)}
-          className={cn("group/row flex w-full min-w-0 flex-col gap-1.5 rounded-md px-3 py-2 text-left text-sm transition-colors outline-none hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
-            selected === id && "bg-selected text-selected-foreground hover:bg-selected")}>
-          <span className="flex min-w-0 items-center gap-3">
-            <span className="min-w-0 flex-1"><GroupName group={row.group} /></span>
-            <span className="shrink-0 tabular-nums font-medium">{formatMeasure(i18n, measure, value)}</span>
-            <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/row:text-foreground" />
-          </span>
-          <span aria-hidden="true" className="h-1 w-full overflow-hidden rounded-full bg-muted">
-            <span className={cn("block h-full rounded-full transition-[width] duration-500 ease-out", !color && "bg-primary/60")}
-              style={{ width: `${max > 0 ? Math.max(2, value / max * 100) : 0}%`, ...(color ? { backgroundColor: `var(--folder-${color})` } : {}) }} />
-          </span>
-        </button>
+    {rows.map(({ key, label, value, color, open }) => {
+      const content = <>
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="min-w-0 flex-1">{label}</span>
+          <span className="shrink-0 tabular-nums font-medium">{format(value)}</span>
+          {open && <ChevronRight aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover/row:text-foreground" />}
+        </span>
+        <span aria-hidden="true" className="h-1 w-full overflow-hidden rounded-full bg-muted">
+          <span className={cn("block h-full rounded-full transition-[width] duration-500 ease-out", !color && "bg-primary/60")}
+            style={{ width: `${max > 0 ? Math.max(2, value / max * 100) : 0}%`, ...(color ? { backgroundColor: `var(--folder-${color})` } : {}) }} />
+        </span>
+      </>;
+      const layout = "flex w-full min-w-0 flex-col gap-1.5 rounded-md px-3 py-2 text-left text-sm";
+      return <li key={key}>{open
+        ? <button type="button" aria-current={selected === key || undefined} onClick={event => open(event.currentTarget)}
+          className={cn(layout, "group/row transition-colors outline-none hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring",
+            selected === key && "bg-selected text-selected-foreground hover:bg-selected")}>{content}</button>
+        : <div className={layout}>{content}</div>}
       </li>;
     })}
   </ul>;

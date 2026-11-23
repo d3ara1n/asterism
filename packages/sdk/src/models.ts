@@ -95,7 +95,7 @@ export interface ModelRequestIdentity {
   sessionId?: string;
   /** Optional plugin-defined purpose identifier (e.g. `naming`). The host groups usage by plugin and purpose, and shows this value verbatim. */
   purpose?: string;
-  /** Subjects this request used, such as skills referenced by newly delivered input; recorded with the request when it settles. Invalid subjects reject the request. */
+  /** Subjects this request used, such as prompt sections; recorded with the request when it settles. Invalid subjects are logged and omitted. */
   usage?: readonly UsageSubject[];
 }
 /** Transient metadata from the actual HTTP response; contains no request credentials or body and is not automatically written to history. */

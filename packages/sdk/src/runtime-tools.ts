@@ -18,7 +18,7 @@ export interface TopLevelToolContext<D extends Json = Json> {
   publish(data: D): void;
   /**
    * Declare a subject this call used, such as the skill it read. The host records declarations with this call when it settles,
-   * attributed to the declaring plugin and the calling request; declarations after the call settles are ignored. Invalid subjects throw.
+   * attributed to the declaring plugin and the calling request; declarations after the call settles are ignored. Invalid subjects are logged and omitted.
    */
   recordUsage(subject: UsageSubject): void;
 }

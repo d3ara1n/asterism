@@ -26,8 +26,7 @@ export function createRequestAssembly(plugin: PluginContext, catalog: SkillCatal
       const prepared = prepare({ skills, blocks });
       const catalogBlock = prepared.skills.length ? skillCatalogPrompt(prepared.skills) : null;
       if (catalogBlock) prepared.blocks.push(catalogBlock);
-      // catalogSkills resolves skill references the way skill_read does, independently of preparer filtering.
-      return { ...prepared, catalogBlock, catalogSkills: skills, system: projectAgentPrompt(prepared.blocks) };
+      return { ...prepared, catalogBlock, system: projectAgentPrompt(prepared.blocks) };
     };
   };
 }

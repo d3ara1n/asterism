@@ -11,7 +11,7 @@ export interface ResourceModelRequest extends Omit<ModelRunRequest, "tools" | "s
   system: SystemPrompt | ((files: readonly PromptFile[]) => SystemPrompt);
   /**
    * Subjects this request used, recorded with the request when it settles. A function is called once after `system` is prepared,
-   * so subjects can describe the prepared prompt. Invalid subjects reject the request.
+   * so subjects can describe the prepared prompt. Invalid declarations are logged and omitted.
    */
   usage?: readonly UsageSubject[] | (() => readonly UsageSubject[]);
   tools?: { allow?: readonly string[]; exclude?: readonly string[] };

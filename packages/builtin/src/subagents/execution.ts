@@ -12,6 +12,7 @@ import { agentRequestRetries } from "../agent/retry.ts";
 import { ended, type DelegationInput, type FinishedStatus, type TaskCompletion, type TaskSnapshot, type ProcessBlock } from "./contract.ts";
 import type { AuditLog } from "./audit.ts";
 import { activityOf, type DeliveredSteer } from "./activity.ts";
+import { agentTurnUsage } from "../agent/usage.ts";
 import { skillCatalogUsage } from "../skills/usage.ts";
 
 export interface ActiveRun {
@@ -178,7 +179,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
             agent: currentAgent.id, resources: { allow: currentAgent.resources ?? undefined, exclude: currentAgent.excludeResources ?? undefined },
             userAgent: deps.userAgent, purpose: "subagent", messages, observer: { event },
             tools: { exclude: ["resource_create", "creation_list", "creation_inspect"] },
-            usage: () => skillCatalogUsage(catalogBlock),
+            usage: () => [agentTurnUsage(currentAgent.id, deps.access.id, snapshot.input.runId), ...skillCatalogUsage(catalogBlock)],
             system: files => {
               const prepared = prepare(files);
               catalogBlock = prepared.catalogBlock;

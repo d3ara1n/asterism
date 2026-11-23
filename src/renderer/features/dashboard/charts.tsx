@@ -7,7 +7,7 @@ import type { TelemetryMatrix, TelemetrySeries } from "../../../shared/telemetry
 import { bucketKeys, dateKeyStart, type Granularity } from "../../../shared/telemetry-time";
 import { useI18n } from "../../shared/i18n";
 import { dashboardMessages as msg } from "../../messages/dashboard";
-import { formatMeasure, groupLabel, measureLabels, seriesColor } from "./format";
+import { formatInteger, formatMeasure, groupLabel, measureLabels, seriesColor } from "./format";
 import { measureOf, type Measure } from "./metrics";
 
 function bucketLabel(locale: string, start: number, granularity: Granularity, long: boolean): string {
@@ -36,7 +36,26 @@ export function TrendChart({ series, measure, onSelectDay, className }: {
     });
     return { data, config, keys };
   }, [series, measure, stacked, i18n]);
-  const clickable = onSelectDay && series.granularity === "day";
+  return <BucketTrend data={data} config={config} keys={keys} granularity={series.granularity} className={className} onSelectDay={onSelectDay}
+    format={(value, compact) => formatMeasure(i18n, measure, value, compact)} />;
+}
+
+/** A single count series without reinterpreting counts as model-request metrics. */
+export function CountTrend({ series, label, className }: {
+  series: { granularity: Granularity; points: readonly { start: number; count: number }[] }; label: string; className?: string;
+}) {
+  const i18n = useI18n();
+  const data = series.points.map(point => ({ start: point.start, label: bucketLabel(i18n.locale, point.start, series.granularity, false), total: point.count }));
+  return <BucketTrend data={data} config={{ total: { label, color: "var(--chart-1)" } }} keys={["total"]} granularity={series.granularity} className={className}
+    format={value => formatInteger(i18n, value)} />;
+}
+
+function BucketTrend({ data, config, keys, granularity, className, onSelectDay, format }: {
+  data: readonly Record<string, number | string>[]; config: ChartConfig; keys: string[]; granularity: Granularity; className?: string;
+  onSelectDay?: (dayStart: number) => void; format: (value: number, compact?: boolean) => string;
+}) {
+  const i18n = useI18n();
+  const clickable = onSelectDay && granularity === "day";
   return <ChartContainer config={config} className={cn("aspect-auto h-64 w-full", className)}>
     <BarChart data={data} margin={{ top: 12, right: 12, left: 4, bottom: 0 }} accessibilityLayer
       onClick={state => {
@@ -46,18 +65,18 @@ export function TrendChart({ series, measure, onSelectDay, className }: {
       }}>
       <CartesianGrid vertical={false} />
       <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} minTickGap={24} />
-      <YAxis tickLine={false} axisLine={false} width={56} tickFormatter={value => formatMeasure(i18n, measure, Number(value), true)} />
+      <YAxis tickLine={false} axisLine={false} width={56} tickFormatter={value => format(Number(value), true)} />
       <ChartTooltip cursor={{ fillOpacity: 0.5 }} content={<ChartTooltipContent
         labelFormatter={(_, payload) => {
           const start = Number(payload?.[0]?.payload?.start);
-          return Number.isFinite(start) ? bucketLabel(i18n.locale, start, series.granularity, true) : null;
+          return Number.isFinite(start) ? bucketLabel(i18n.locale, start, granularity, true) : null;
         }}
         formatter={(value, name, item) => <div className="flex w-full items-center gap-2">
           <span aria-hidden="true" className="size-2.5 shrink-0 rounded-[2px]" style={{ backgroundColor: item.color }} />
           <span className="min-w-0 flex-1 truncate text-muted-foreground">{config[String(name)]?.label}</span>
-          <span className="font-medium tabular-nums text-foreground">{formatMeasure(i18n, measure, Number(value))}</span>
+          <span className="font-medium tabular-nums text-foreground">{format(Number(value))}</span>
         </div>} />} />
-      {keys.map((key, index) => <Bar key={key} dataKey={key} stackId={stacked ? "groups" : undefined} fill={`var(--color-${key})`}
+      {keys.map((key, index) => <Bar key={key} dataKey={key} stackId={keys.length > 1 ? "groups" : undefined} fill={`var(--color-${key})`}
         radius={index === keys.length - 1 ? [3, 3, 0, 0] : 0} maxBarSize={32} className={clickable ? "cursor-pointer" : undefined} />)}
     </BarChart>
   </ChartContainer>;
