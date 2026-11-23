@@ -12,16 +12,16 @@ import { TaskStateIcon, TaskStateText, TaskStatus, Usage } from "./task-parts";
 import type { DelegateInput, TaskSnapshot, TaskSummary, WaitEntry } from "./contract";
 import { currentActivity } from "./activity";
 
-/** One task: display name or task preview, identity, and optional status. */
+/** One task: ID, optional name, role, and status. */
 function TaskLine({ task, showStatus = true, leading }: {
-  task: Pick<TaskSummary, "id" | "name" | "role" | "task" | "status">; showStatus?: boolean; leading?: ReactNode;
+  task: Pick<TaskSummary, "id" | "name" | "role" | "status">; showStatus?: boolean; leading?: ReactNode;
 }) {
   return <div className="flex min-w-0 items-center gap-2">
     {leading}
-    <TooltipHint content={task.name === undefined ? task.task : `${task.name}\n${task.task}`}>
-      <bdi className="min-w-0 flex-1 truncate">{task.name ?? task.task}</bdi>
-    </TooltipHint>
     <span className="shrink-0 font-mono">{task.id}</span>
+    <TooltipHint content={task.name}>
+      <bdi className="min-w-0 flex-1 truncate">{task.name}</bdi>
+    </TooltipHint>
     <span className="min-w-0 truncate type-caption">{task.role}</span>
     {showStatus && <TaskStatus status={task.status} />}
   </div>;
@@ -32,10 +32,12 @@ function TaskLine({ task, showStatus = true, leading }: {
 type DelegateProps = ToolRenderProps<TaskSnapshot, null, DelegateInput>;
 function DelegateHeader({ phase, args, result }: DelegateProps) {
   const i18n = useI18n();
-  const role = phase === "input" ? undefined : args.role;
+  const role = phase === "input" ? inputText(args, "role") : args.role;
   const name = phase === "input" ? inputText(args, "name") : args.name;
-  return <ToolHeader label={i18n.text(messages.delegate)} subject={name ?? role}
-    summary={name === undefined ? undefined : role} meta={result?.data?.input.id} />;
+  const id = result?.data?.input.id;
+  return <ToolHeader label={i18n.text(messages.delegate)}
+    subject={id && <span className="font-mono">{id}</span>} summary={name}
+    meta={role && <TooltipHint content={role}><span className="inline-block max-w-32 truncate align-bottom">{role}</span></TooltipHint>} />;
 }
 function DelegateBody({ args, phase }: DelegateProps) {
   if (phase === "input") {
@@ -57,8 +59,9 @@ type CheckProps = ToolRenderProps<TaskSnapshot, { id: string }>;
 function CheckHeader({ phase, target, result }: CheckProps) {
   const i18n = useI18n();
   const status = result?.data?.status, name = result?.data?.input.name;
+  const id = phase === "input" ? inputText(target, "id") : target.id;
   return <ToolHeader label={i18n.text(messages.check)}
-    subject={name} summary={phase !== "input" && <span className="font-mono">{target.id}</span>}
+    subject={id && <span className="font-mono">{id}</span>} summary={name}
     meta={status && <TaskStateText status={status} />} />;
 }
 function CheckBody({ result }: CheckProps) {
@@ -68,7 +71,6 @@ function CheckBody({ result }: CheckProps) {
   const current = currentActivity(task);
   const tool = current?.activity.startsWith("tool:") ? current.activity.slice(5) : "";
   return <div className="flex min-w-0 flex-col gap-3">
-    <TaskLine showStatus={false} task={{ ...task.input, task: task.input.task.split("\n")[0]!, status }} />
     {current && <p className="type-caption">
       {i18n.formatMessage(messages.activity, { activity: tool ? "tool" : current.activity, tool })}
       {current.subject && <> · <span className="font-mono">{current.subject}</span></>}
@@ -138,8 +140,9 @@ export const steerViews = {
 type CancelProps = ToolRenderProps<TaskSummary, { id: string }, { reason?: string }>;
 function CancelHeader({ phase, target, result }: CancelProps) {
   const status = result?.data?.status, name = result?.data?.name;
+  const id = phase === "input" ? inputText(target, "id") : target.id;
   return <ToolHeader label={useI18n().text(messages.cancel)}
-    subject={name} summary={phase !== "input" && <span className="font-mono">{target.id}</span>}
+    subject={id && <span className="font-mono">{id}</span>} summary={name}
     meta={status && <TaskStateText status={status} />} />;
 }
 function CancelBody({ phase, args }: CancelProps) {
