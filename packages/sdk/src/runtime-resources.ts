@@ -7,7 +7,7 @@ import type { RecordContract } from "./records.ts";
 import { reference, present, type DataContract } from "./presentation.ts";
 import { PluginApiError } from "./runtime.ts";
 import type { ContextFile, ObjectReader, ObjectExecutor, CreationContribution, ActionContribution, CommandPreparer, CreationPreparation, ActionPreparation, ExternalPreparation, ResourceContribution, ToolContribution, Preparation, CallResult, Lifetime } from "./runtime-contracts.ts";
-import { validationMessage } from "./tool-validation.ts";
+import { resourceValidationMessage, validationMessage } from "./tool-validation.ts";
 import type { ToolCaller } from "./runtime-contracts.ts";
 import { encodeJson } from "./data-encoding.ts";
 import type { ResourceSnapshot } from "./workspace.ts";
@@ -82,13 +82,13 @@ export function implementTool<S extends Json, T extends ToolInput, A extends Too
       const state = contract.resource.stateSchema.safeParse(resource.data);
       if (!state.success) return { kind: "failed", implementation: identity,
         error: { code: "invalid_resource", message: "The resource state does not match its backend contract." } };
-      const parsedTarget = contract.targetSchema.safeParse(target);
-      const parsedArgs = contract.tool.argsSchema.safeParse(args);
+      const parsedTarget = contract.targetSchema.safeParse(target, { reportInput: true });
+      const parsedArgs = contract.tool.argsSchema.safeParse(args, { reportInput: true });
       if (!parsedTarget.success || !parsedArgs.success) return { kind: "rejected", implementation: identity,
         error: { code: "invalid_arguments", message: [
           `Invalid arguments for ${contract.resource.kind}/${contract.tool.name}.`,
-          ...(!parsedTarget.success ? [validationMessage(parsedTarget.error, "target")] : []),
-          ...(!parsedArgs.success ? [validationMessage(parsedArgs.error, "args")] : []),
+          ...(!parsedTarget.success ? [resourceValidationMessage(parsedTarget.error, "target", contract.tool.argsSchema)] : []),
+          ...(!parsedArgs.success ? [resourceValidationMessage(parsedArgs.error, "args", contract.targetSchema)] : []),
         ].join("\n") } };
       return {
         effect: contract.effect, execution: contract.execution, implementation: identity,

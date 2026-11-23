@@ -3,7 +3,6 @@ import { coreId } from "../shared/core.ts";
 import { toolInputSchema, jsonSchema, toolInvocationSchema, toolCompletionSchema } from "@asterism-app/sdk/contracts";
 import { defineTool, MAX_TIMEOUT_SECONDS } from "@asterism-app/sdk/contracts";
 import { contractReferenceSchema, defineData } from "@asterism-app/sdk/contracts";
-import { jsonArgumentHint } from "./validation.ts";
 
 export const ResourceListResult = defineData(coreId("resource-list"), z.strictObject({
   resources: z.array(z.strictObject({ resource_id: z.string(), type: z.string(), title: z.string(), state: jsonSchema, notice: z.string().optional() })),
@@ -81,7 +80,8 @@ export const ResourceInspect = defineTool({
   name: "resource_inspect",
   description: "Read a linked resource's current state and available tool definitions in one call.",
   guidelines: [
-    "With only resource_id, the result contains state and tools with all available call definitions. A tool's name, target, and args define a call via resource_call or a resource_script handle.",
+    "With only resource_id, the result contains state and all available tool definitions.",
+    "Each definition pairs the tool's shared args schema with the target schema for that tool on the inspected resource. The pair applies to resource_call and resource_script handles.",
     "Resource state is read at inspection time. The tool catalog reflects the links, configuration, and execution policy captured for the request. Tool definitions can be reused while they remain available.",
   ],
   argsSchema: z.strictObject({
@@ -96,17 +96,18 @@ export const ResourceCall = defineTool({
   name: "resource_call",
   description: "Use an available tool on a linked resource.",
   guidelines: [
-    "A tool name identifies an operation. Across resources that expose the same tool, its meaning and args schema remain consistent.",
-    "resource_id selects the resource, args supplies the operation's shared parameters, and target selects content, scope, or a resource-specific view. Available tools and target schemas can differ by resource; resource_inspect describes them for the selected resource.",
+    "resource_id selects the resource; tool selects the operation.",
+    "args belongs to the tool. It supplies operation parameters whose schema stays the same across resources that expose the same tool.",
+    "target belongs to the tool's implementation on the selected resource. It selects content, scope, filters, or a view; its schema can differ across resources for the same tool.",
+    "resource_inspect returns both schemas for the selected resource and tool. Each field goes in the object whose schema declares it.",
     "Domain qualifiers in tool names describe the operation's scope, such as terminal_input for terminal interaction.",
     "Omitting target is equivalent to null; this is valid only when the implementation accepts null.",
     "If the outer resource_call arguments repeatedly fail schema validation, resource_script offers a different call format for non-interactive resource tools, even for a single call. The script handle binds the resource ID and tool name; target and args still follow the schemas from resource_inspect.",
-    jsonArgumentHint,
   ],
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),
     tool: z.string().min(1).describe("An available resource tool name supplied by resource_inspect."),
-    target: toolInputSchema.default(null).describe("A JSON object or null matching the resource tool's target schema. Example: {\"path\":\"README.md\"}."),
-    args: toolInputSchema.default({}).describe("A JSON object or null matching the tool's args schema. Example: {\"title\":\"New title\"}."),
+    target: toolInputSchema.default(null).describe("A JSON object or null matching this tool implementation's target schema on the selected resource."),
+    args: toolInputSchema.default({}).describe("A JSON object or null matching the selected tool's shared operation args schema."),
   }).describe("Select a linked resource and a tool, then supply its implementation-specific target and shared operation args."),
 });
