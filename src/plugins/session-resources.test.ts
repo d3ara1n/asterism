@@ -1128,6 +1128,21 @@ describe("Agent resource operation entries", () => {
     expect(f.session.snapshot().resources.all().map(item => item.ref.id)).toEqual([actor.id]);
   });
 
+  it("rejects missing and non-object creation input before applying the entry schema", async () => {
+    const creation_id = ns.name("new");
+    const args: Json[] = [
+      { creation_id }, { creation_id, input: null }, { creation_id, input: '{"initial":8}' },
+      { creation_id, input: [8] }, { creation_id, input: 8 }, { creation_id, input: {} },
+    ];
+    const f = open({ adapter: adapter(() => args.map(args => ({ name: "resource_create", args }))) });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    const { tools } = await runner(f, actor, target)();
+    expect(tools.map(tool => tool.kind === "rejected" ? tool.error.code : tool.kind)).toEqual([
+      "invalid_arguments", "invalid_arguments", "invalid_arguments", "invalid_arguments", "invalid_arguments", "invalid_argument",
+    ]);
+    expect(f.session.snapshot().resources.all().map(item => item.ref.id)).toEqual([actor.id]);
+  });
+
   // Explicit domain entry contract: without inspect, adapted model input uses the same creation pipeline and results link automatically without inheriting links.
   it("creates known entries directly with parameter conversion and tool policies and supports uniform removal", async () => {
     let calls = [{ name: "resource_create", args: { creation_id: ns.name("new"), input: { initial: 8 } } as Json }];
@@ -1143,7 +1158,7 @@ describe("Agent resource operation entries", () => {
     calls = [{ name: "resource_remove", args: { resource_id: result.resource_id } }];
     expect((await run()).tools[0]?.kind).toBe("succeeded");
     expect(f.session.snapshot().resources.all().map(item => item.ref.id)).toEqual([actor.id]);
-    calls = [{ name: "resource_create", args: { creation_id: Create.id, input: 1 } }];
+    calls = [{ name: "resource_create", args: { creation_id: Create.id, input: {} } }];
     expect((await run()).tools[0]).toMatchObject({ kind: "rejected", error: { code: "not_found" } });
   });
 
@@ -1178,11 +1193,38 @@ describe("Agent resource operation entries", () => {
     expect(() => saved.unlink(actor.id)).toThrow("scope is closed");
   });
 
+  it("rejects direct scalar Agent entries at registration while allowing object variants to adapt to scalar creation", async () => {
+    const scalar = pluginNamespace("test.scalar-entry"), object = pluginNamespace("test.object-entry");
+    const rejected = definePlugin({ namespace: scalar, modules: [
+      // @ts-expect-error A raw scalar creation contract requires an Agent input adapter.
+      defineAgentCreation({ id: scalar.name("new"), description: "Create an item from a number.", creation: Create }),
+    ] });
+    const adapted = definePlugin({ namespace: object, modules: [
+      defineAgentCreation({ id: object.name("new"), description: "Create an item with a custom or default value.", creation: Create,
+        inputSchema: z.discriminatedUnion("mode", [
+          z.strictObject({ mode: z.literal("custom"), value: z.number() }), z.strictObject({ mode: z.literal("default") }),
+        ]).meta({ id: "item-input" }),
+        toInput: input => input.mode === "custom" ? input.value : 0 }),
+    ] });
+    const f = open({ plugins: [rejected, adapted], adapter: adapter(() => [
+      { name: "resource_create", args: { creation_id: object.name("new"), input: { mode: "custom", value: 5 } } },
+    ]) });
+    expect(f.app.sessions.plugins.find(plugin => plugin.id === scalar.id)).toMatchObject({
+      status: "failed", error: expect.stringContaining("needs an object input schema"),
+    });
+    const target = await model(f.app), actor = await f.session.create(Create, 0);
+    const { tools } = await runner(f, actor, target)();
+    expect(tools[0]?.kind).toBe("succeeded");
+    const { resource_id } = tools[0]!.data as { resource_id: string };
+    expect(f.plugin.object(f.sessionId, Item, resource_id).get(State)).toBe(6);
+  });
+
   // Plugin lifetime and public service scope contract: failed contributions disappear immediately without leaking into another host instance.
   it("creation catalogs are isolated by host and public queries include third-party types but exclude failed registrations", async () => {
     const extra = pluginNamespace("test.extra"), missing = defineAction(extra.resource("missing", z.object({})), { id: extra.name("missing"), schema: z.null() });
     const failed = definePlugin({ namespace: extra, modules: [
-      defineAgentCreation({ id: extra.name("new"), description: "Invalid contribution.", creation: Create }),
+      defineAgentCreation({ id: extra.name("new"), description: "Create an item.", creation: Create,
+        inputSchema: z.object({}), toInput: () => 0 }),
       defineModule(() => ({ preparers: [implementPreparer(missing, { id: "missing", prepare: () => ({ action: "accept" }) })] })),
     ] });
     const first = open({ plugins: [failed] }), second = open();

@@ -1,11 +1,14 @@
 import { z } from "zod";
-import { belongsTo, jsonSchema, type CreationContract, type Json, type SessionDirectory } from "@asterism-app/sdk/contracts";
+import { belongsTo, jsonSchema, type CreationContract, type Json, type JsonObject, type SessionDirectory } from "@asterism-app/sdk/contracts";
 import { defineModule, PluginApiError, type PluginContext, type PluginModule, type ObjectReader, type TopLevelToolContext } from "@asterism-app/sdk/runtime";
 
 export { agentServices, registerAgentServices, type AgentServices } from "./agent-services.ts";
 export { defineAgentPreparer, captureAgentPreparers, type AgentPreparation, type AgentPromptBlock } from "./preparation.ts";
 export { defineAgentContextTransform, captureAgentContextTransforms,
   type AgentContextUnit, type AgentContextItem, type AgentContextRequest } from "./context-transform.ts";
+
+/** The Agent's argument envelope; each entry defines the object's fields. */
+export const agentCreationInputSchema = z.object({}).catchall(jsonSchema);
 
 export interface AgentCreationDescription {
   readonly id: string;
@@ -16,7 +19,7 @@ export interface AgentCreationDescription {
 }
 interface Entry {
   readonly description: AgentCreationDescription;
-  create(input: Json, context: TopLevelToolContext): ReturnType<TopLevelToolContext["session"]["create"]>;
+  create(input: JsonObject, context: TopLevelToolContext): ReturnType<TopLevelToolContext["session"]["create"]>;
 }
 type CreationOptions = Parameters<TopLevelToolContext["session"]["create"]>[2];
 /** Catalogs are isolated by host runtime instance; shared public exports do not mix plugin registrations from different hosts. */
@@ -33,25 +36,40 @@ function entry(plugin: PluginContext, id: string): Entry {
   return value;
 }
 
+/** Zod can project object variants as unions and named schemas as local definitions. */
+function describesObject(root: z.core.JSONSchema.BaseSchema): boolean {
+  function check(schema: z.core.JSONSchema.BaseSchema, refs: readonly string[] = []): boolean {
+    if (schema.type === "object" || schema.allOf?.some(branch => check(branch, refs))) return true;
+    const variants = schema.anyOf ?? schema.oneOf;
+    if (variants?.length && variants.every(branch => check(branch, refs))) return true;
+    const ref = schema.$ref;
+    if (!ref?.startsWith("#/$defs/") || refs.includes(ref)) return false;
+    const name = ref.slice("#/$defs/".length).replaceAll("~1", "/").replaceAll("~0", "~");
+    const definition = root.$defs && Object.hasOwn(root.$defs, name) ? root.$defs[name] : undefined;
+    return definition !== undefined && check(definition, [...refs, ref]);
+  }
+  return check(root);
+}
+
 /** The domain service shared by built-in creation tools and plugins; querying is not a prerequisite for creation. */
 export const agentCreations = {
   list(plugin: PluginContext) {
     return [...directory(plugin).values()].map(({ description: { id, resourceKind, description } }) => ({ id, resourceKind, description }));
   },
   inspect(plugin: PluginContext, id: string): AgentCreationDescription { return structuredClone(entry(plugin, id).description); },
-  create(plugin: PluginContext, id: string, input: Json, context: TopLevelToolContext) {
+  create(plugin: PluginContext, id: string, input: JsonObject, context: TopLevelToolContext) {
     return entry(plugin, id).create(input, context);
   },
 };
 
-/** Agent creation entry points are independent domain contributions; they reuse creation input directly or explicitly adapt model input. */
+/** Agent creation entries accept objects. Use an adapter if the underlying creation takes a different input shape. */
 export function defineAgentCreation<I, S extends Json, O extends Json, A extends Json = Json>(definition: {
   id: string;
   description: string;
   guidelines?: readonly string[];
+} & ({ creation: CreationContract<I & JsonObject, S, O>; inputSchema?: never; toInput?: never; toOptions?: never } | {
   creation: CreationContract<I, S, O>;
-} & ({ inputSchema?: never; toInput?: never; toOptions?: never } | {
-  inputSchema: z.ZodType<A>;
+  inputSchema: z.ZodType<A, JsonObject>;
   toInput(input: A, context: { object: ObjectReader }): I & Json;
   toOptions?(input: A, context: { object: ObjectReader }): CreationOptions;
 })): PluginModule {
@@ -60,7 +78,10 @@ export function defineAgentCreation<I, S extends Json, O extends Json, A extends
     if (!definition.description.trim()) throw new PluginApiError("invalid_argument", "An Agent creation entry needs a description.");
     const entries = directory(plugin);
     if (entries.has(definition.id)) throw new PluginApiError("conflict", `Duplicate Agent creation entry: ${definition.id}`);
-    const input = jsonSchema.parse(z.toJSONSchema(definition.inputSchema ?? definition.creation.schema, { io: "input" }));
+    const projected = z.toJSONSchema(definition.inputSchema ?? definition.creation.schema, { io: "input" });
+    if (!describesObject(projected)) throw new PluginApiError("invalid_argument",
+      `Agent creation entry ${definition.id} needs an object input schema. Use inputSchema and toInput to adapt other creation inputs.`);
+    const input = jsonSchema.parse(projected);
     const value: Entry = {
       description: { id: definition.id, resourceKind: definition.creation.resource.kind,
         description: definition.description, guidelines: [...definition.guidelines ?? []], input },

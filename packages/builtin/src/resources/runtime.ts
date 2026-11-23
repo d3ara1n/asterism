@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { jsonSchema, resourceTitleSchema, type Json } from "@asterism-app/sdk/contracts";
+import { resourceTitleSchema, type Json } from "@asterism-app/sdk/contracts";
 import { defineModule, defineTopLevelTool, implementCall, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
-import { agentCreations } from "@asterism-app/builtin-api/runtime";
+import { agentCreationInputSchema, agentCreations } from "@asterism-app/builtin-api/runtime";
 import { ReadAgentCreations } from "@asterism-app/builtin-api/contracts";
 import { builtinConfiguration } from "../configuration/runtime.ts";
 import { AgentListResult, CreationListResult, CreationInspectResult, ResourceCreateResult, ResourceRemoveResult, ResourceRenameResult, ResourceExposeResult } from "./contract.ts";
@@ -69,12 +69,11 @@ export default defineModule(plugin => ({
       id: ResourceCreateResult.id, name: "resource_create",
       description: "Create a resource in this session using a declared creation entry and link it to you.",
       guidelines: [
-        "input is a JSON value matching the creation entry's input schema.",
         "Creation and the link to you are committed together. Your new resource link becomes available on your next model request.",
       ],
       argsSchema: z.strictObject({
         creation_id: id,
-        input: jsonSchema.describe("JSON input matching the selected creation entry."),
+        input: agentCreationInputSchema.describe("JSON object matching the selected entry’s schema from creation_inspect. An empty object supplies no fields."),
       }).describe("Creation entry and its structured input."),
       resultSchema: ResourceCreateResult.schema,
       effect: "write", execution: "sequential",
