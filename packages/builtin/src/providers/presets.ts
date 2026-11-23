@@ -36,7 +36,7 @@ export const modelProviderPresets: readonly ModelProviderPreset[] = [
   },
   {
     id: "anthropic", name: "Anthropic", billing: "usage",
-    connection: { fixedFields, protocol: "anthropic", baseUrl: "https://api.anthropic.com/v1", auth: "api_key", compatibility: [], usage: "anthropic" },
+    connection: { fixedFields, protocol: "anthropic", baseUrl: "https://api.anthropic.com/v1", auth: "api_key", compatibility: [{ id: "messagesPromptCaching", value: {} }], usage: "anthropic" },
     keyUrl: "https://platform.claude.com/settings/keys",
     sources: ["https://platform.claude.com/docs/en/api/overview", "https://platform.claude.com/docs/en/build-with-claude/thinking-tool-workflows"],
     verifiedOn: "2026-10-14", keywords: ["claude"],

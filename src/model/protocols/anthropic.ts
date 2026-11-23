@@ -7,6 +7,13 @@ import { withAnthropicThinking } from "./anthropic-thinking.ts";
 import { anthropicUsage } from "./anthropic-usage.ts";
 import { inlineBase64, projectInlineFiles } from "./inline-file-projection.ts";
 
+/** The service moves a top-level marker to the last cacheable block. Without the pack, no cache_control is sent: many compatible endpoints cache on their own and ignore the field. */
+function cacheControl(target: Parameters<ModelProtocol["callOptions"]>[0], request: Parameters<ModelProtocol["callOptions"]>[1]): ProviderOptions {
+  const caching = compatibility(target).value<{ ttl?: "5m" | "1h" }>("messagesPromptCaching");
+  if (request.purpose !== "execution" || !caching) return {};
+  return { anthropic: { cacheControl: { type: "ephemeral", ...(caching.ttl ? { ttl: caching.ttl } : {}) } } };
+}
+
 const projectFiles = (prompt: Parameters<typeof projectInlineFiles>[0]) => {
   const document: Parameters<typeof projectInlineFiles>[1] = part => {
     if (part.mediaType.startsWith("image/") || part.mediaType === "application/pdf") return;
@@ -67,9 +74,9 @@ export const anthropicMessages: ModelProtocol = {
       { forwardReasoning: false, projectPrompt: projectFiles },
     );
   },
-  callOptions: (_target, request) => ({
+  callOptions: (target, request) => ({
     ...(request.purpose === "execution" ? { system: request.system } : {}),
-    providerOptions: {},
+    providerOptions: cacheControl(target, request),
   }),
   capture: metadata => pickNative(namespaced(metadata, "anthropic"), nativeKeys),
   restore: value => pickNative(value, nativeKeys),

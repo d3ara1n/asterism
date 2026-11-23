@@ -54,6 +54,20 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
     }),
   },
   {
+    id: "messagesPromptCaching",
+    kind: "options",
+    initialValue: {},
+    appliesTo: { protocols: ["anthropic"] },
+    schema: z.strictObject({
+      ttl: z.enum(["5m", "1h"]).optional().meta({
+        title: "Cache lifetime", description: "Defaults to 5m. 1h writes at twice the base input price instead of 1.25x.",
+      }),
+    }).meta({
+      title: "Prompt caching",
+      description: "Send a top-level Messages cache_control marker so the service caches the prompt prefix. Only endpoints that honor cache_control benefit; caches reported without a marker do not need it.",
+    }),
+  },
+  {
     id: "customUserAgent",
     kind: "options",
     initialValue: { userAgent: "" },
