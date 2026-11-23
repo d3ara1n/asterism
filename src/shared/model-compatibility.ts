@@ -1,10 +1,15 @@
 import { z } from "zod";
-import { jsonSchema, modelProtocolIds, thinkingLevels, type Json, type ThinkingLevel } from "@asterism-app/sdk/contracts";
+import { jsonSchema, modelProtocolIds, thinkingLevels, type Json, type ThinkingLevel, type UiText } from "@asterism-app/sdk/contracts";
+import { thinkingLabels } from "@asterism-app/ui/messages/model-selection";
 import type { ModelProviderInput } from "./configuration.ts";
+import { modelCompatibilityMessages as messages } from "./model-compatibility-messages.ts";
+
+type CompatibilityCopy = { title: UiText; description: UiText };
 
 /** Application-predefined declaration catalog; parameters and display share a source and request projection interprets behavior by id. */
 export type ModelCompatibilityDefinition = {
   id: string;
+  copy: CompatibilityCopy;
   /** User reference only; not used for automatic enablement, addition restrictions, or runtime matching. */
   appliesTo: {
     protocols: readonly ModelProviderInput["protocol"][];
@@ -15,17 +20,32 @@ export type ModelCompatibilityDefinition = {
   | { kind: "options"; schema: z.ZodType<Json>; initialValue: Json }
 );
 
+const fieldCopy = z.registry<CompatibilityCopy>();
+
+/** Resolve display metadata for the form without changing validation or saved values. */
+export function modelCompatibilityForm(definition: Extract<ModelCompatibilityDefinition, { kind: "options" }>, text: (value: UiText) => string): Json {
+  const form = z.toJSONSchema(definition.schema, {
+    io: "input",
+    override: ({ zodSchema, jsonSchema: field }) => {
+      const copy = fieldCopy.get(zodSchema);
+      if (copy) {
+        field.title = text(copy.title);
+        field.description = text(copy.description);
+      }
+    },
+  });
+  return jsonSchema.parse({ ...form, title: text(definition.copy.title), description: text(definition.copy.description) });
+}
+
 const activeThinkingLevels = thinkingLevels.filter(level => level !== "off");
 const customThinkingLevelsSchema = z.strictObject(Object.fromEntries(thinkingLevels.map(level => [
-  level, z.string().trim().min(1).nullable().optional().meta({
-    title: level,
-    description: "An upstream effort string, or null to omit effort. Unset uses the protocol default.",
+  level, z.string().trim().min(1).nullable().optional().register(fieldCopy, {
+    title: thinkingLabels[level], description: messages.thinkingLevel,
   }),
 ]))) as z.ZodObject<{ [Level in ThinkingLevel]: z.ZodOptional<z.ZodNullable<z.ZodString>> }>;
 const customThinkingBudgetsSchema = z.strictObject(Object.fromEntries(activeThinkingLevels.map(level => [
-  level, z.number().int().positive().optional().meta({
-    title: level,
-    description: "Thinking tokens for this level. Unset uses the built-in budget based on the total output cap.",
+  level, z.number().int().positive().optional().register(fieldCopy, {
+    title: thinkingLabels[level], description: messages.thinkingBudget,
   }),
 ]))) as z.ZodObject<{ [Level in Exclude<ThinkingLevel, "off">]: z.ZodOptional<z.ZodNumber> }>;
 
@@ -36,86 +56,79 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
   {
     id: "customThinkingLevels",
     kind: "options",
+    copy: { title: messages.thinkingLevels, description: messages.thinkingLevelsDescription },
     initialValue: {},
     appliesTo: { protocols: modelProtocolIds },
-    schema: customThinkingLevelsSchema.meta({
-      title: "Custom thinking levels",
-      description: "Map standard levels to upstream effort values. Does not change available levels, history or token budgets.",
-    }),
+    schema: customThinkingLevelsSchema,
   },
   {
     id: "customThinkingBudgets",
     kind: "options",
+    copy: { title: messages.thinkingBudgets, description: messages.thinkingBudgetsDescription },
     initialValue: {},
     appliesTo: { protocols: ["anthropic"] },
-    schema: customThinkingBudgetsSchema.meta({
-      title: "Custom thinking budgets",
-      description: "Use manual thinking instead of adaptive thinking for Messages requests. Empty settings use built-in budgets; specified levels override them in tokens.",
-    }),
+    schema: customThinkingBudgetsSchema,
   },
   {
     id: "messagesPromptCaching",
     kind: "tag",
+    copy: { title: messages.promptCaching, description: messages.promptCachingDescription },
     appliesTo: { protocols: ["anthropic"] },
     schema: z.undefined(),
   },
   {
     id: "customUserAgent",
     kind: "options",
+    copy: { title: messages.customUserAgent, description: messages.customUserAgentDescription },
     initialValue: { userAgent: "" },
     appliesTo: { protocols: modelProtocolIds },
     schema: z.strictObject({
-      userAgent: z.string().trim().min(1).regex(/^[\x20-\x7e]+$/u).meta({
-        title: "User-Agent", description: "HTTP client identity. Overrides the identity supplied by the caller.",
+      userAgent: z.string().trim().min(1).regex(/^[\x20-\x7e]+$/u).register(fieldCopy, {
+        title: "User-Agent", description: messages.userAgent,
       }),
-    }).meta({
-      title: "Custom User-Agent",
-      description: "Override the User-Agent header for model requests and connection tests.",
     }),
   },
   {
     id: "opencodeSession",
     kind: "tag",
+    copy: { title: messages.opencodeSession, description: messages.opencodeSessionDescription },
     appliesTo: {
       protocols: modelProtocolIds,
       endpoints: ["https://opencode.ai/inference/go/v1"],
     },
-    schema: z.undefined().meta({
-      title: "OpenCode session header",
-      description: "Send a stable conversation ID in x-opencode-session. Standalone calls use a temporary ID.",
-    }),
+    schema: z.undefined(),
   },
   {
     id: "systemMessageInMessages",
     kind: "tag",
+    copy: { title: messages.systemMessageInMessages, description: messages.systemMessageInMessagesDescription },
     appliesTo: { protocols: ["openai-responses"] },
-    schema: z.undefined().meta({
-      title: "System prompt in messages",
-      description: "Send the system prompt as the first system message instead of the instructions field.",
-    }),
+    schema: z.undefined(),
   },
   {
     id: "responsesReasoning",
     kind: "options",
+    copy: { title: messages.responsesReasoning, description: messages.responsesReasoningDescription },
     initialValue: {},
     appliesTo: { protocols: ["openai-responses"] },
     schema: z.strictObject({
-      content: z.enum(["array", "object"]).optional().meta({ title: "Reasoning content shape", description: "Defaults to an array of reasoning_text parts." }),
-      encryptedContent: z.boolean().optional().meta({ title: "Request encrypted content", description: "Defaults to true. Disable when the endpoint does not accept reasoning.encrypted_content in include." }),
-      summary: z.boolean().optional().meta({ title: "Request a reasoning summary", description: "Defaults to true. Disable when the endpoint does not accept reasoning.summary." }),
-    }).meta({
-      title: "Responses reasoning fields",
-      description: "Adapt endpoint field shapes and accepted request parameters. Plain text, summaries and opaque continuation remain native capabilities.",
+      content: z.enum(["array", "object"]).optional().register(fieldCopy, {
+        title: messages.reasoningContent, description: messages.reasoningContentDescription,
+      }),
+      encryptedContent: z.boolean().optional().register(fieldCopy, {
+        title: messages.encryptedReasoning, description: messages.encryptedReasoningDescription,
+      }),
+      summary: z.boolean().optional().register(fieldCopy, {
+        title: messages.reasoningSummary, description: messages.reasoningSummaryDescription,
+      }),
     }),
   },
   {
     id: "toolFilesAsUserMessage",
     kind: "tag",
+    copy: { title: messages.toolFilesAsUserMessage, description: messages.toolFilesAsUserMessageDescription },
     appliesTo: { protocols: ["openai-chat"] },
-    schema: z.undefined().meta({
-      title: "Tool files in a user message",
-      description: "Send files from tool results in a following user message, with a reference in the tool result.",
-    }),
+    schema: z.undefined(),
   },
 ];
 

@@ -1,7 +1,6 @@
-import { z } from "zod";
+import { useMemo } from "react";
 import { Plus, X } from "lucide-react";
-import { jsonSchema } from "@asterism-app/sdk/contracts";
-import { mergeModelCompatibility, modelCompatibilityDefinition, modelCompatibilityDefinitions, type ModelCompatibility, type ModelCompatibilityDefinition } from "../../../shared/model-compatibility";
+import { mergeModelCompatibility, modelCompatibilityDefinition, modelCompatibilityDefinitions, modelCompatibilityForm, type ModelCompatibility, type ModelCompatibilityDefinition } from "../../../shared/model-compatibility";
 import { providersMessages } from "../../messages/providers";
 import { ConfigurationValue } from "../../shared/ConfigurationValue";
 import { useI18n } from "../../shared/i18n";
@@ -11,13 +10,6 @@ import { Card } from "@asterism-app/ui/ui/card";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@asterism-app/ui/ui/dropdown-menu";
 import { EditorSection } from "./forms";
 import { modelProtocolLabels } from "./protocols";
-
-const forms = new Map(modelCompatibilityDefinitions.filter(definition => definition.kind === "options")
-  .map(definition => [definition.id, jsonSchema.parse(z.toJSONSchema(definition.schema, { io: "input" }))]));
-
-const localizedCopy = new Map([
-  ["messagesPromptCaching", { title: providersMessages.messagesPromptCaching, description: providersMessages.messagesPromptCachingDescription }],
-]);
 
 function Applicability({ definition }: { definition: ModelCompatibilityDefinition }) {
   return <span className="flex flex-col gap-1">
@@ -32,19 +24,15 @@ export function ModelCompatibilityEditor({ value, inherited, onChange }: {
   value: ModelCompatibility[]; inherited?: ModelCompatibility[]; onChange(value: ModelCompatibility[]): void;
 }) {
   const i18n = useI18n();
-  const copy = (definition: ModelCompatibilityDefinition) => {
-    const localized = localizedCopy.get(definition.id);
-    if (localized) return { title: i18n.text(localized.title), description: i18n.text(localized.description) };
-    const metadata = definition.schema.meta();
-    return { title: metadata?.title ?? definition.id, description: metadata?.description };
-  };
+  const forms = useMemo(() => new Map(modelCompatibilityDefinitions.filter(definition => definition.kind === "options")
+    .map(definition => [definition.id, modelCompatibilityForm(definition, i18n.text)])), [i18n]);
   const entries = mergeModelCompatibility(inherited ?? [], value);
   const available = modelCompatibilityDefinitions.filter(definition => !entries.some(entry => entry.id === definition.id));
   return <EditorSection collapsible defaultOpen={entries.length > 0} title={i18n.formatMessage(providersMessages.compatibility)}
     hint={i18n.formatMessage(inherited === undefined ? providersMessages.providerCompatibilityHint : providersMessages.modelCompatibilityHint)}>
     {entries.map(entry => {
       const definition = modelCompatibilityDefinition(entry.id)!;
-      const { title } = copy(definition);
+      const title = i18n.text(definition.copy.title);
       const fromProvider = inherited?.some(item => item.id === entry.id);
       const readOnly = !value.some(item => item.id === entry.id);
       const remove = readOnly ? undefined : <Button type="button" variant="ghost" size="icon-xs"
@@ -75,13 +63,12 @@ export function ModelCompatibilityEditor({ value, inherited, onChange }: {
       </Button></DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {available.map(definition => {
-          const { title, description } = copy(definition);
           return <DropdownMenuItem key={definition.id} className="flex-col items-start gap-1"
             onSelect={() => onChange([...value, definition.kind === "tag" ? { id: definition.id }
               : { id: definition.id, value: structuredClone(definition.initialValue) }])}>
-            <span>{title}</span>
+            <span>{i18n.text(definition.copy.title)}</span>
             <Applicability definition={definition} />
-            {description && <span className="type-caption max-w-sm whitespace-normal">{description}</span>}
+            <span className="type-caption max-w-sm whitespace-normal">{i18n.text(definition.copy.description)}</span>
           </DropdownMenuItem>;
         })}
       </DropdownMenuContent>
