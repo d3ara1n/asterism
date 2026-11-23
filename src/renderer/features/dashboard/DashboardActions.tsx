@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { Activity, BarChart3, Cpu, Download, Gauge, MoreHorizontal, PieChart, Wrench, Trash2 } from "lucide-react";
+import { Activity, BarChart3, BookOpen, Cpu, Download, Gauge, MoreHorizontal, PieChart, Wrench, Trash2 } from "lucide-react";
 import type { UiMessage } from "@asterism-app/sdk/contracts";
 import { useRendererApplication, useRendererSettings } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -24,6 +24,7 @@ export const viewTabs: Record<DashboardView, { label: UiMessage; icon: typeof Ba
   models: { label: msg.viewModels, icon: Cpu },
   activity: { label: msg.viewActivity, icon: Activity },
   tools: { label: msg.viewTools, icon: Wrench },
+  skills: { label: msg.viewSkills, icon: BookOpen },
 };
 const rangeLabels: Record<RangePreset, UiMessage> = { today: msg.rangeToday, "7d": msg.range7d, "30d": msg.range30d, "90d": msg.range90d, "365d": msg.range365d, all: msg.rangeAll };
 

@@ -7,8 +7,9 @@ import { bucketKey, bucketKeys, dateKeyStart } from "../shared/telemetry-time.ts
 import type { QueryResultOf, TelemetryFilter, TelemetryQuery } from "../shared/telemetry.ts";
 import { bucketSql } from "./queries.ts";
 import { TelemetryService } from "./service.ts";
-import { openTelemetryDatabase } from "./storage.ts";
-import type { LiveFolder, LiveSession, ModelUsageRecord, WorkspaceLookup } from "./types.ts";
+import { openTelemetryDatabase, telemetryDatabasePath, telemetryDatabaseVersion, telemetryStorage } from "./storage.ts";
+import type { LiveFolder, LiveSession, ModelUsageRecord, UsageSubjectRecord, WorkspaceLookup } from "./types.ts";
+import { DatabaseSync } from "node:sqlite";
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -37,7 +38,7 @@ function record(overrides: Partial<ModelUsageRecord>): ModelUsageRecord {
   return {
     id: `r${++sequence}`, startedAt: 0, durationMs: 1_000, firstOutputMs: 200, pluginId: "plugin", purposeId: null, sessionId: null,
     providerId: "p", providerName: "Provider", modelId: "m", thinking: null, usage: usage(100, 10), cost, hasFiles: false,
-    outcome: "completed", errorOrigin: null, errorCode: null, tools: [], ...overrides,
+    outcome: "completed", errorOrigin: null, errorCode: null, tools: [], subjects: [], ...overrides,
   };
 }
 const everything: TelemetryFilter = { from: null, to: null, utcOffsetMinutes: 0 };
@@ -183,15 +184,79 @@ describe("Usage ledger queries", () => {
     } finally { service.close(); }
   });
 
-  it("clears records before a time together with the tool calls of cleared requests", () => {
+  it("clears records before a time together with the tool calls and subjects of cleared requests", () => {
     const service = new TelemetryService(root(), workspace().lookup);
     try {
-      const tool = { durationMs: 5, toolName: "read", implementationId: null, resourceKind: "directory", outcome: "succeeded", errorCode: null };
-      service.recordModelUsage(record({ startedAt: 1_000, tools: [{ ...tool, startedAt: 1_100 }] }));
-      service.recordModelUsage(record({ startedAt: 5_000, tools: [{ ...tool, startedAt: 900 }] }));
+      const tool = { durationMs: 5, toolName: "read", implementationId: null, resourceKind: "directory", outcome: "succeeded", errorCode: null, subjects: [] };
+      const read = skill("read", "a");
+      service.recordModelUsage(record({ startedAt: 1_000, tools: [{ ...tool, startedAt: 1_100, subjects: [read] }] }));
+      service.recordModelUsage(record({ startedAt: 5_000, tools: [{ ...tool, startedAt: 900 }], subjects: [skill("referenced", "b")] }));
       expect(service.execute({ type: "clear", before: 2_000 })).toEqual({ kind: "clear", deleted: 1 });
       // The remaining request keeps its tool call even though the call's own timestamp precedes the bound.
       expect(query(service, { kind: "tools", groupBy: "tool" }).rows.map(row => row.calls)).toEqual([1]);
+      expect(query(service, { kind: "subjects", subjectKind: "skill" }).rows.map(row => row.id)).toEqual(["b"]);
     } finally { service.close(); }
+  });
+});
+
+const skill = (relation: string, id: string, extra: Partial<UsageSubjectRecord> = {}): UsageSubjectRecord =>
+  ({ kind: "skill", id, source: "/user", relation, part: null, quantity: null, declaredBy: "plugin", ...extra });
+const readCall = (subjects: UsageSubjectRecord[], outcome = "succeeded") =>
+  ({ startedAt: 0, durationMs: 1, toolName: "skill_read", implementationId: null, resourceKind: null, outcome, errorCode: null, subjects });
+
+describe("Declared usage subjects", () => {
+  // Model-chosen reads are the signal that a skill's description works; a reference earlier in the session explains the read instead.
+  it("counts reads as unprompted only without an earlier reference in the same session", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      service.recordModelUsage(record({ sessionId: "s1", startedAt: 100, subjects: [skill("referenced", "a", { source: null })] }));
+      service.recordModelUsage(record({ sessionId: "s1", startedAt: 200, tools: [readCall([skill("read", "a", { part: "SKILL.md" })])] }));
+      // A reference after the read, or in another session, does not prompt it.
+      service.recordModelUsage(record({ sessionId: "s2", startedAt: 300, tools: [readCall([skill("read", "a", { part: "refs/guide.md" })])] }));
+      service.recordModelUsage(record({ sessionId: "s2", startedAt: 400, subjects: [skill("referenced", "a")] }));
+      service.recordModelUsage(record({ sessionId: "s3", startedAt: 500, tools: [readCall([skill("read", "a")], "rejected")] }));
+      const rows = query(service, { kind: "subjects", subjectKind: "skill" }).rows;
+      const user = rows.find(row => row.source === "/user")!;
+      expect(user).toMatchObject({ requests: 4, sessions: 3, lastAt: 500, unprompted: 2, failedCalls: 1, parts: ["SKILL.md", "refs/guide.md"] });
+      expect(user.relations.read).toMatchObject({ count: 3, sessions: 3 });
+      // An unresolved reference keeps its own row rather than merging into the resolved source.
+      expect(rows.find(row => row.source === null)).toMatchObject({ id: "a", requests: 1, unprompted: 0 });
+    } finally { service.close(); }
+  });
+
+  it("narrows every query to requests that declared a subject and excludes plugin-reported usage", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      service.recordModelUsage(record({ modelId: "x", tools: [readCall([skill("read", "a")])] }));
+      service.recordModelUsage(record({ modelId: "y", subjects: [skill("referenced", "a")] }));
+      service.recordModelUsage(record({ modelId: "z" }));
+      service.recordExternalUsage({ recordedAt: 0, pluginId: "plugin", sessionId: null, category: "web.search", providerLabel: null,
+        quantity: 1, unit: "request", currency: "usd", amount: 0.01, outcome: "succeeded", durationMs: null });
+      const subject = { kind: "skill", id: "a" };
+      const models = (filter: TelemetryFilter) => query(service, { kind: "breakdown", dimension: "model", limit: 10, latency: false }, filter).rows.map(row => row.group.key).sort();
+      expect(models({ ...everything, subject })).toEqual([JSON.stringify(["p", "x"]), JSON.stringify(["p", "y"])]);
+      expect(models({ ...everything, subject: { ...subject, relation: "read" } })).toEqual([JSON.stringify(["p", "x"])]);
+      expect(models({ ...everything, subject: { ...subject, source: null } })).toEqual([]);
+      expect(query(service, { kind: "summary", compare: null }, { ...everything, subject }).external.count).toBe(0);
+    } finally { service.close(); }
+  });
+
+  it("migrates a version 1 ledger by adding the subject table and keeping existing records", () => {
+    const directory = root();
+    const service = new TelemetryService(directory, workspace().lookup);
+    service.recordModelUsage(record({ id: "kept" }));
+    service.close();
+    const db = new DatabaseSync(telemetryDatabasePath(directory));
+    db.exec("DROP TABLE usage_subjects; PRAGMA user_version = 1;");
+    db.close();
+    const plan = telemetryStorage(directory).inspect();
+    expect(plan?.change).toEqual({ id: "telemetry", from: 1, to: telemetryDatabaseVersion });
+    plan!.apply();
+    const migrated = new TelemetryService(directory, workspace().lookup);
+    try {
+      migrated.recordModelUsage(record({ subjects: [skill("referenced", "a")] }));
+      expect(query(migrated, { kind: "summary", compare: null }).metrics.requests).toBe(2);
+      expect(query(migrated, { kind: "subjects", subjectKind: "skill" }).rows).toHaveLength(1);
+    } finally { migrated.close(); }
   });
 });

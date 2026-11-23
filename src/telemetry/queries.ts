@@ -2,7 +2,7 @@ import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import {
   distributionEdges, type BreakdownRow, type CurrencyAmount, type ExternalRow, type ExternalTotals, type Percentiles, type SeriesPoint,
   type TelemetryClearReply, type TelemetryDimension, type TelemetryEvent, type TelemetryExportReply, type TelemetryFacets, type TelemetryFilter,
-  type TelemetryGroup, type TelemetryQuery, type TelemetryQueryResult, type ToolRow, type UsageMetrics,
+  type TelemetryGroup, type TelemetryQuery, type TelemetryQueryResult, type ToolRow, type UsageMetrics, type SubjectRow, type SubjectRelation,
 } from "../shared/telemetry.ts";
 import { bucketKeys, bucketStart, localDateKey, type Granularity } from "../shared/telemetry-time.ts";
 import type { WorkspaceLookup } from "./types.ts";
@@ -41,6 +41,16 @@ function modelEvents(filter: TelemetryFilter, range: { from: number | null; to: 
   if (filter.purposeId !== undefined) filter.purposeId === null ? add("e.purpose_id IS NULL") : add("e.purpose_id = ?", filter.purposeId);
   if (filter.thinking !== undefined) filter.thinking === null ? add("e.thinking IS NULL") : add("e.thinking = ?", filter.thinking);
   if (filter.sessionId !== undefined) add("e.session_id = ?", filter.sessionId);
+  if (filter.subject !== undefined) {
+    const subject = filter.subject;
+    const clauses = ["s.model_event_id = e.id", "s.kind = ?"];
+    const values: SQLInputValue[] = [subject.kind];
+    if (subject.id !== undefined) { clauses.push("s.subject_id = ?"); values.push(subject.id); }
+    if (subject.source !== undefined) { clauses.push(subject.source === null ? "s.source_id IS NULL" : "s.source_id = ?"); if (subject.source !== null) values.push(subject.source); }
+    if (subject.relation !== undefined) { clauses.push("s.relation = ?"); values.push(subject.relation); }
+    where.push(`EXISTS (SELECT 1 FROM usage_subjects s WHERE ${clauses.join(" AND ")})`);
+    params.push(...values);
+  }
   let sql = `SELECT e.*, CASE WHEN ls.id IS NULL THEN e.folder_id_snapshot ELSE ls.folder_id END AS folder_id
     FROM model_usage_events e LEFT JOIN temp.live_sessions ls ON ls.id = e.session_id${where.length ? ` WHERE ${where.join(" AND ")}` : ""}`;
   if (filter.folderId !== undefined) { sql = `SELECT * FROM (${sql}) WHERE folder_id IS ?`; params.push(filter.folderId); }
@@ -49,7 +59,8 @@ function modelEvents(filter: TelemetryFilter, range: { from: number | null; to: 
 
 /** External events in the filter; model-only dimensions select none of them. */
 function externalEvents(filter: TelemetryFilter, range: { from: number | null; to: number | null } = filter): Scope | null {
-  if (filter.providerId !== undefined || filter.modelId !== undefined || filter.purposeId !== undefined || filter.thinking !== undefined) return null;
+  if (filter.providerId !== undefined || filter.modelId !== undefined || filter.purposeId !== undefined || filter.thinking !== undefined
+    || filter.subject !== undefined) return null;
   const where: string[] = [];
   const params: SQLInputValue[] = [];
   if (range.from !== null) { where.push("x.recorded_at >= ?"); params.push(range.from); }
@@ -207,6 +218,7 @@ export class TelemetryReader {
       case "events": return this.events(filter, query.offset, query.limit, query.only);
       case "tools": return this.tools(filter, query.groupBy);
       case "external": return this.external(filter);
+      case "subjects": return this.subjects(filter, query.subjectKind);
     }
   }
 
@@ -364,6 +376,37 @@ export class TelemetryReader {
     })) };
   }
 
+  private subjects(filter: TelemetryFilter, kind: string): TelemetryQueryResult {
+    const scope = modelEvents(filter);
+    const declared: Scope = { sql: `sv AS (SELECT s.*, ev.session_id, ev.started_at, t.outcome AS tool_outcome
+      FROM usage_subjects s JOIN ev ON ev.id = s.model_event_id LEFT JOIN tool_usage_events t ON t.id = s.tool_event_id WHERE s.kind = ?)`, params: [kind] };
+    const totals = this.all([scope, declared], `SELECT subject_id, source_id, COUNT(DISTINCT model_event_id) AS requests, COUNT(DISTINCT session_id) AS sessions,
+      MAX(started_at) AS last, TOTAL(relation = 'read' AND tool_outcome IS NOT NULL AND tool_outcome NOT IN ('succeeded', 'partial')) AS failed
+      FROM sv GROUP BY subject_id, source_id ORDER BY sessions DESC, requests DESC, subject_id`);
+    const relations = this.all([scope, declared], `SELECT subject_id, source_id, relation, COUNT(*) AS count, COUNT(DISTINCT model_event_id) AS requests,
+      COUNT(DISTINCT session_id) AS sessions, SUM(quantity) AS quantity, MAX(started_at) AS last FROM sv GROUP BY subject_id, source_id, relation`);
+    const parts = this.all([scope, declared], "SELECT DISTINCT subject_id, source_id, part FROM sv WHERE relation = 'read' AND part IS NOT NULL ORDER BY part");
+    // A read is prompted when the same session referenced the subject at or before that request, under any source.
+    const unprompted = this.all([scope, declared], `SELECT r.subject_id, r.source_id, COUNT(*) AS count FROM sv r WHERE r.relation = 'read' AND NOT EXISTS (
+      SELECT 1 FROM usage_subjects x JOIN model_usage_events m ON m.id = x.model_event_id
+      WHERE x.kind = r.kind AND x.subject_id = r.subject_id AND x.relation = 'referenced'
+        AND m.session_id IS r.session_id AND r.session_id IS NOT NULL AND m.started_at <= r.started_at)
+      GROUP BY r.subject_id, r.source_id`);
+    const key = (row: Row) => groupKey([text(row.subject_id), text(row.source_id)]);
+    const rows = new Map<string, SubjectRow>(totals.map(row => [key(row), {
+      id: String(row.subject_id), source: text(row.source_id), requests: num(row.requests), sessions: num(row.sessions), lastAt: nullableNum(row.last),
+      relations: {}, unprompted: 0, parts: [], failedCalls: num(row.failed),
+    }]));
+    for (const row of relations) rows.get(key(row))!.relations[String(row.relation)] = {
+      count: num(row.count), requests: num(row.requests), sessions: num(row.sessions), quantity: nullableNum(row.quantity), lastAt: nullableNum(row.last),
+    } satisfies SubjectRelation;
+    for (const row of parts) rows.get(key(row))!.parts.push(String(row.part));
+    for (const row of unprompted) rows.get(key(row))!.unprompted = num(row.count);
+    const [all] = this.all([scope, declared], "SELECT COUNT(DISTINCT model_event_id) AS requests, COUNT(DISTINCT session_id) AS sessions FROM sv");
+    const first = this.db.prepare("SELECT MIN(m.started_at) AS first FROM usage_subjects s JOIN model_usage_events m ON m.id = s.model_event_id WHERE s.kind = ?").get(kind) as Row | undefined;
+    return { kind: "subjects", subjectKind: kind, rows: [...rows.values()], requests: num(all?.requests), sessions: num(all?.sessions), firstAt: nullableNum(first?.first) };
+  }
+
   private facets(): TelemetryFacets {
     const all = modelEvents({ from: null, to: null, utcOffsetMinutes: 0 });
     const distinct = (dimension: TelemetryDimension) => {
@@ -424,6 +467,7 @@ export function clearTelemetry(db: DatabaseSync, before: number | null): Telemet
   try {
     const bound = before === null ? "" : " WHERE started_at < ?";
     const params = before === null ? [] : [before];
+    db.prepare(`DELETE FROM usage_subjects WHERE model_event_id IN (SELECT id FROM model_usage_events${bound})`).run(...params);
     db.prepare(`DELETE FROM tool_usage_events WHERE model_event_id IN (SELECT id FROM model_usage_events${bound})`).run(...params);
     const models = db.prepare(`DELETE FROM model_usage_events${bound}`).run(...params).changes;
     const external = db.prepare(`DELETE FROM external_usage_events${before === null ? "" : " WHERE recorded_at < ?"}`).run(...params).changes;

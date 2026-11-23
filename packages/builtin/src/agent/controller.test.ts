@@ -119,7 +119,7 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
     roles: () => [{ id: "default", builtin: true, enabled: true, model: "p/m", thinking: null, description: "" }],
   });
   const controller = createAgentController({ selection, tasks: driver.tasks, models, execution, feedback, userAgent: "test",
-    prepareRequest: () => () => ({ blocks: [], skills: [], system: { blocks: [] } }),
+    prepareRequest: () => () => ({ blocks: [], skills: [], catalogBlock: null, catalogSkills: [], system: { blocks: [] } }),
   });
   return { activities: () => activities, controller, object, path, snapshot, driver, feedback, stream, execution, publish,
     turn: () => projectAgentTurnState(snapshot(), "a", feedback.get(object).interruptions),

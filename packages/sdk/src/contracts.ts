@@ -39,6 +39,7 @@ export * from "./messaging.ts";
 export * from "./session-title.ts";
 
 export * from "./usage-state.ts";
+export * from "./usage-subjects.ts";
 
 export * from "./shell.ts";
 export * from "./terminal.ts";

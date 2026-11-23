@@ -1,13 +1,19 @@
 import type { ContentReader, RetainedContentScope } from "./content-runtime.ts";
 import type { ModelRunRequest, ModelRunResult, ModelRunObserver, PromptFile, SystemPrompt } from "./models.ts";
+import type { UsageSubject } from "./usage-subjects.ts";
 import type { ResourceRef } from "./workspace.ts";
 
-export interface ResourceModelRequest extends Omit<ModelRunRequest, "tools" | "system" | "sessionId"> {
+export interface ResourceModelRequest extends Omit<ModelRunRequest, "tools" | "system" | "sessionId" | "usage"> {
   /** Resource whose current links and tool caller identity supply this request's access. */
   access: ResourceRef;
   /** Paradigm-defined Agent role name, passed to tool implementations as caller identity. */
   agent?: string;
   system: SystemPrompt | ((files: readonly PromptFile[]) => SystemPrompt);
+  /**
+   * Subjects this request used, recorded with the request when it settles. A function is called once after `system` is prepared,
+   * so subjects can describe the prepared prompt. Invalid subjects reject the request.
+   */
+  usage?: readonly UsageSubject[] | (() => readonly UsageSubject[]);
   tools?: { allow?: readonly string[]; exclude?: readonly string[] };
   /** Resource type policy for calls; inspection retains information and adds a restriction notice. */
   resources?: { allow?: readonly string[]; exclude?: readonly string[] };

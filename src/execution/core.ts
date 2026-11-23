@@ -12,7 +12,7 @@ import type { ContentLease } from "../runtime/content-store.ts";
 import type { BoundTopLevelTool } from "../plugins/top-level-tools.ts";
 import { ToolScheduler } from "./scheduler.ts";
 import { executeResourceScript, scriptToModel } from "./script.ts";
-import type { ToolUsageRecord } from "../telemetry/types.ts";
+import type { ToolUsageRecord, UsageSubjectRecord } from "../telemetry/types.ts";
 
 export type PendingCall = ModelToolCall;
 export type ToolObserver = ModelToolObserver;
@@ -134,6 +134,7 @@ class ToolDispatcher {
   }
 
   private async invoke({ call, result, info }: PreparedCall, signal: AbortSignal, observer: ToolObserver): Promise<ToolOutcome> {
+    const subjects: UsageSubjectRecord[] = [];
     const complete = (completion: CallResult, latest: Json = null) => {
       const finishedAt = Date.now();
       const outcome = finishToolResult(completion, { ...info, finishedAt }, latest, "execute" in result ? result.toModel : undefined);
@@ -141,7 +142,7 @@ class ToolDispatcher {
       const resourceTool = call.name === ResourceCall.name && args && typeof args === "object" && !Array.isArray(args) && typeof args.tool === "string" ? args.tool : null;
       this.onToolSettled?.({ startedAt: info.startedAt ?? finishedAt, durationMs: info.startedAt === undefined ? null : finishedAt - info.startedAt,
         toolName: resourceTool ?? call.name, implementationId: info.implementation?.id ?? null, resourceKind: info.resource?.kind ?? null,
-        outcome: outcome.kind, errorCode: "error" in outcome ? outcome.error.code : null });
+        outcome: outcome.kind, errorCode: "error" in outcome ? outcome.error.code : null, subjects });
       return outcome;
     };
     if (signal.aborted) return complete({ kind: "cancelled", message: "The operation was not started." });
@@ -160,7 +161,7 @@ class ToolDispatcher {
         if (!active) return;
         latest = jsonSchema.parse(data);
         observer.published?.(call, latest);
-      }, this.handover);
+      }, this.handover, subject => { if (active) subjects.push(subject); });
       // Validate completion data at the execution boundary; schema failures must still finalize and retain prior valid output.
       completion = resolveToolCompletion(completion, latest);
     } catch {

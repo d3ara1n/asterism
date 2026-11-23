@@ -4,6 +4,7 @@ import type { ToolInvocationInfo } from "@asterism-app/sdk/contracts";
 import type { ToolContract, ToolInput } from "@asterism-app/sdk/contracts";
 import type { ContractReference } from "@asterism-app/sdk/contracts";
 import type { FoldedObject } from "../session/fold.ts";
+import type { UsageSubjectRecord } from "../telemetry/types.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
 import type { ToolCaller } from "@asterism-app/sdk/runtime";
 
@@ -14,7 +15,8 @@ export interface Invocation extends ToolInvocationInfo {
   requiresNotice?: boolean;
   effect: "read" | "write";
   execution: "parallel" | "sequential";
-  execute(signal: AbortSignal, publish?: (data: Json) => void, handover?: ContentLease): Promise<CallResult>;
+  /** usage receives subjects the implementation declares while it runs; the dispatcher records them with the settled call. */
+  execute(signal: AbortSignal, publish?: (data: Json) => void, handover?: ContentLease, usage?: (subject: UsageSubjectRecord) => void): Promise<CallResult>;
   toModel?: (data: Json) => ToolModelOutput;
 }
 /** Host catalogs retain execution interfaces adapted from SDK contributions. */

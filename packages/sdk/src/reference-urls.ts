@@ -58,3 +58,9 @@ export function parseModelUrl(value: string): ModelExpression | null {
 export function referenceMarkdown(label: string, url: string): string {
   return `[${label.replace(/[\r\n]+/gu, " ").replace(/[\\[\]]/gu, "\\$&")}](${url})`;
 }
+
+/** Markdown links whose destination uses a reference scheme; the label is unescaped. Destinations are not parsed further. */
+export function* referenceLinks(text: string): Generator<{ index: number; length: number; label: string; url: string }> {
+  for (const match of text.matchAll(/\[((?:\\[^\r\n]|[^\\\]\r\n])*)\]\(((?:resource|skill|model):[^()\s]+)\)/gu))
+    yield { index: match.index, length: match[0].length, label: match[1]!.replace(/\\([\\[\]])/gu, "$1"), url: match[2]! };
+}

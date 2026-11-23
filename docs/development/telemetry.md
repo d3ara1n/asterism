@@ -1,10 +1,10 @@
 # Usage statistics
 
-The host keeps a usage ledger of model requests, the tool calls those requests make, and plugin-reported metered usage. The ledger is paradigm-neutral: host model services record usage for every plugin without requiring plugins to register any purposes.
+The host keeps a usage ledger of model requests, the tool calls those requests make, the subjects that work declared it used, and plugin-reported metered usage. The ledger is paradigm-neutral: host model services record usage for every plugin without requiring plugins to register any purposes.
 
 ## Storage and lifetime
 
-The ledger is its own SQLite database beside the workspace database. It holds structured facts only: identifiers, token counts, timings, cost estimates, outcomes, error codes, and display-name snapshots. Prompts, responses, and tool payloads never enter it.
+The ledger is its own SQLite database beside the workspace database. It holds structured facts only: identifiers, token counts, timings, cost estimates, outcomes, error codes, and display-name snapshots. Prompts, responses, and tool payloads never enter it. A declared subject contributes identifiers, such as a skill name and a package-relative file path, and an optional amount, not the content it names.
 
 Usage history is permanent analytical record rather than workspace state. Records stay until the user deletes them by age or all at once; nothing expires automatically, and deleting or archiving sessions and folders leaves their usage in place. Recovery points do not include the ledger, so restoring workspace state never rewinds usage, but data preparation migrates its format together with other host storage. The format follows the same continuous n-to-n+1 migration rule as the workspace database.
 
@@ -18,14 +18,28 @@ Plugins can pass a purpose identifier with a model request. The host groups by p
 
 Each model record snapshots the session title, folder, and provider name at recording time. Reads prefer live workspace names and folder membership, so renaming or moving a session regroups its history; snapshots take over after deletion.
 
+## Declared subjects
+
+A fact is recorded by the party that observes it. Requests and tool calls pass through host model services, so the host records them. What the work used is often known only to a plugin: which skill a tool read, which skill an input message referenced, or how large a prompt section was. Plugins declare these facts as usage subjects; the host attaches each declaration to the request or tool call that is current where it is declared and stamps the declaring plugin. A plugin cannot name another plugin, session, request, or call, so attribution stays correct even when the declared content is wrong.
+
+There are two declaration scopes. A top-level tool declares through its call context while it runs; declarations after the call settles are dropped, and they are recorded with the settled call whatever its outcome. A model request declares through its request identity: static subjects with the request, or, for execution requests, a function evaluated once after the system prompt is prepared so the subjects can describe that prompt. Invalid subjects reject at the declaration boundary.
+
+A subject has a kind, an identity within the kind, an optional source that scopes the identity, a relation, an optional part, and an optional non-negative quantity. Kind and relation are open identifiers stored verbatim, like purposes, so new kinds need no format change. The host owns the meaning of the kinds and relations it presents: `skill` subjects whose identity is the skill name and whose source is the catalog source the name resolved from, `skill-catalog` subjects whose quantity is the catalog's prompt characters, and the `read`, `referenced`, and `context` relations. Other kinds appear only in raw queries until a host view gives them meaning.
+
+The builtin paradigm declares three skill facts. `skill_read` declares a `read` of the resolved skill with the requested file as its part, including when the file read fails; a name absent from the catalog is rejected before resolution and shows only as a failed `skill_read` call. Agent requests declare a `referenced` subject for every `skill:` reference in user messages first delivered to a model by that request, so a reference counts once even though the message stays in later context. Agent and subagent requests declare the catalog block as `context`. Model requests made outside execution, such as naming and compaction, declare none.
+
+Prompted and model-chosen reads are derived when reading, not recorded: a read is model-chosen when no earlier request in the same session referenced the same skill name. The ledger does not scan sessions; every figure comes from recorded requests, calls, and subjects.
+
 ## Reading
 
-The renderer reads through composable queries over one filter: totals with an optional comparison range, time series with optional grouping and a remainder group, breakdowns by dimension, weekday-by-hour matrices, timing distributions, request logs, tool-call groupings, and external usage. Aggregation runs in SQLite inside the runtime process; results carry identities, snapshots, and raw sums, and the renderer derives ratios, labels, and localized text. Time bucketing uses the caller's UTC offset; the shared calendar helpers and the SQL bucket expressions must agree on every key.
+The renderer reads through composable queries over one filter: totals with an optional comparison range, time series with optional grouping and a remainder group, breakdowns by dimension, weekday-by-hour matrices, timing distributions, request logs, tool-call groupings, external usage, and declared subjects of one kind per source and identity. The filter can select requests that declared a matching subject, which narrows every other query to them and excludes plugin-reported usage. Aggregation runs in SQLite inside the runtime process; results carry identities, snapshots, and raw sums, and the renderer derives ratios, labels, and localized text. Time bucketing uses the caller's UTC offset; the shared calendar helpers and the SQL bucket expressions must agree on every key.
 
 New records and deletions notify connected renderers through a throttled change event, and open views reread.
 
 ## Presentation
 
-Usage opens as a sidebar page and is the root island of the main screen. Its panel cards share the object-card shell and sit directly on the window material. The view switch, range, filters, and page operations sit in the window titlebar's action area, as the workbench's object actions do, because they choose the source of everything below. Details of a model, folder, session, purpose, plugin, or day open as ordinary islands to the right, owned by the root; nested details open from within them. The page, its titlebar actions, and its detail islands share one view model for the application run, so details follow later range and filter changes and the chosen view survives navigation.
+Usage opens as a sidebar page and is the root island of the main screen. Its panel cards share the object-card shell and sit directly on the window material. The view switch, range, filters, and page operations sit in the window titlebar's action area, as the workbench's object actions do, because they choose the source of everything below. Details of a model, folder, session, purpose, plugin, skill, or day open as ordinary islands to the right, owned by the root; nested details open from within them. The page, its titlebar actions, and its detail islands share one view model for the application run, so details follow later range and filter changes and the chosen view survives navigation.
+
+The skills view joins recorded subjects with the current skill catalog, which supplies the skills that declared nothing. Unused skills are listed by name across sources, longest unused first, with the date skill recording began, because earlier use is unknown rather than absent. The catalog's share of input is an estimate at four characters per token against the reported input of the requests that carried it. Skill settings show a skill's latest use and recent session count and open its details on the usage page.
 
 The monthly budget is a configuration value; it changes only the pace shown for the current calendar month.

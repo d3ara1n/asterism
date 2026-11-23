@@ -3,6 +3,7 @@ import type { Json } from "./json.ts";
 import type { ObjectReader, ToolSession } from "./objects.ts";
 import type { CallResult, ToolCaller } from "./runtime-contracts.ts";
 import type { ToolModelOutput } from "./tool-result.ts";
+import type { UsageSubject } from "./usage-subjects.ts";
 import type { z } from "zod";
 
 export interface TopLevelToolContext<D extends Json = Json> {
@@ -15,6 +16,11 @@ export interface TopLevelToolContext<D extends Json = Json> {
   /** Captured resource-type tool-call restriction, or null when calls are allowed; creation and discovery remain available. */
   resourceToolRestriction(kind: string): string | null;
   publish(data: D): void;
+  /**
+   * Declare a subject this call used, such as the skill it read. The host records declarations with this call when it settles,
+   * attributed to the declaring plugin and the calling request; declarations after the call settles are ignored. Invalid subjects throw.
+   */
+  recordUsage(subject: UsageSubject): void;
 }
 /** Top-level tools declare their definition and implementation together, independently of resource support relationships. */
 export interface TopLevelTool<A extends ToolInput = ToolInput, D extends Json = Json> extends ToolContract<A> {

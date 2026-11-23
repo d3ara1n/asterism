@@ -29,6 +29,8 @@ export const telemetryFilterSchema = z.strictObject({
   purposeId: id.nullable().optional(),
   sessionId: id.optional(),
   thinking: id.nullable().optional(),
+  /** Requests that declared a matching subject: its kind, optionally its id, source (null selects none), and relation. Excludes plugin-reported usage. */
+  subject: z.strictObject({ kind: id, id: id.optional(), source: id.nullable().optional(), relation: id.optional() }).optional(),
 }).refine(filter => filter.modelId === undefined || filter.providerId !== undefined, { message: "A model filter requires its provider." });
 export type TelemetryFilter = z.infer<typeof telemetryFilterSchema>;
 
@@ -51,6 +53,8 @@ export const telemetryQuerySchema = z.discriminatedUnion("kind", [
   z.strictObject({ kind: z.literal("tools"), groupBy: z.enum(["tool", "resource"]) }),
   /** Plugin-reported non-model usage; model, provider, purpose, and thinking filters exclude all of it. */
   z.strictObject({ kind: z.literal("external") }),
+  /** Declared subjects of one kind on requests in the filter, per source and subject identity. */
+  z.strictObject({ kind: z.literal("subjects"), subjectKind: id }),
 ]);
 export type TelemetryQuery = z.infer<typeof telemetryQuerySchema>;
 
@@ -202,9 +206,36 @@ export interface ExternalRow {
   amount: number | null;
 }
 export interface TelemetryExternal { kind: "external"; rows: ExternalRow[] }
+/** Per-relation counts of one subject: declarations, distinct requests and sessions, and summed quantity (null when none was declared). */
+export interface SubjectRelation { count: number; requests: number; sessions: number; quantity: number | null; lastAt: number | null }
+export interface SubjectRow {
+  id: string;
+  source: string | null;
+  /** Distinct requests and sessions with any relation, and the latest such request. */
+  requests: number;
+  sessions: number;
+  lastAt: number | null;
+  relations: Record<string, SubjectRelation>;
+  /**
+   * Read declarations in sessions where no request up to that point declared a `referenced` subject with the same kind and id:
+   * reads the model chose without an input reference.
+   */
+  unprompted: number;
+  /** Distinct parts declared with read relations, such as package files other than the main document. */
+  parts: string[];
+  /** Read declarations from tool calls that did not succeed. */
+  failedCalls: number;
+}
+export interface TelemetrySubjects {
+  kind: "subjects"; subjectKind: string; rows: SubjectRow[];
+  /** Distinct requests and sessions in the filter that declared any subject of this kind. */
+  requests: number; sessions: number;
+  /** Earliest recorded declaration of this kind in the whole ledger; earlier use is unknown. */
+  firstAt: number | null;
+}
 
 export type TelemetryQueryResult = TelemetryFacets | TelemetrySummary | TelemetrySeries | TelemetryBreakdown | TelemetryMatrix
-  | TelemetryDistribution | TelemetryEvents | TelemetryTools | TelemetryExternal;
+  | TelemetryDistribution | TelemetryEvents | TelemetryTools | TelemetryExternal | TelemetrySubjects;
 export type QueryResultOf<Q extends TelemetryQuery> = Extract<TelemetryQueryResult, { kind: Q["kind"] }>;
 
 export interface TelemetryExportReply { kind: "export"; format: "csv" | "json"; filename: string; content: string; rows: number }

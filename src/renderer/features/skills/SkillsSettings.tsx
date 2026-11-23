@@ -1,8 +1,8 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { BookOpen, Folder, FolderOpen, Puzzle, RefreshCw, Search, TriangleAlert } from "lucide-react";
-import { IslandPanel, useI18n, useRendererApplication, useRendererCalls, useRendererEvents, useRendererIsland } from "@asterism-app/sdk/renderer";
-import type { UiText } from "@asterism-app/sdk/contracts";
+import { IslandPanel, useI18n, useRendererApplication, useRendererCalls, useRendererIsland } from "@asterism-app/sdk/renderer";
+import { usageSubjectKinds, type UiText } from "@asterism-app/sdk/contracts";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -22,7 +22,10 @@ import { toast } from "../../shared/toast";
 import { skillsMessages as messages } from "../../messages/skills";
 import { pluginName } from "../../../shared/plugin-name";
 import type { AppSnapshot } from "../../../shared/contracts";
-import { ReadSkillDocument, ReadSkills, RefreshSkills, SkillsChanged, type SkillSource } from "../../../shared/skills";
+import { ReadSkillDocument, RefreshSkills, type SkillSource } from "../../../shared/skills";
+import { useSkillCatalog } from "./use-skill-catalog";
+import { useSkillUsageNavigation } from "./usage-navigation";
+import { runtime } from "../../runtime";
 
 type Skill = SkillSource["skills"][number];
 /** Display names of loaded plugins by ID; sources of unknown plugins fall back to the plugin ID. */
@@ -38,24 +41,6 @@ function sourceTitle(source: Pick<SkillSource, "plugin">, names: PluginNames): U
   return source.plugin === null ? messages.userDirectory : names.get(source.plugin) ?? source.plugin;
 }
 
-/** Settings and catalog islands independently subscribe to the same catalog snapshot; SkillsChanged synchronizes refresh results to all subscribers. */
-function useSkillCatalog() {
-  const calls = useRendererCalls(), events = useRendererEvents();
-  const [catalog, setCatalog] = useState<SkillSource[] | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  useEffect(() => {
-    const controller = new AbortController();
-    setFailed(false);
-    const subscription = events.subscribe(SkillsChanged, { delivery: "latest", signal: controller.signal }, ({ data }) => setCatalog(data));
-    void subscription.ready.then(() => calls.invoke(ReadSkills, {}, { signal: controller.signal }))
-      .then(value => { if (!controller.signal.aborted) setCatalog(value); },
-        () => { if (!controller.signal.aborted) setFailed(true); });
-    return () => controller.abort();
-  }, [calls, events, attempt]);
-  const retry = useCallback(() => setAttempt(value => value + 1), []);
-  return { catalog, failed, retry };
-}
 
 /**
  * Settings show the catalog entry and a source summary. Skills are browsed in one catalog island grouped by source,
@@ -206,6 +191,7 @@ function SkillDetailPanel({ source, name, names }: { source: string; name: strin
           <TooltipHint content={source}><dd className="type-caption truncate font-mono select-text" translate="no">{source}</dd></TooltipHint>
           <dt className="type-label">{i18n.text(messages.directory)}</dt>
           <dd className="type-caption break-all font-mono select-text" translate="no">{skill.directory}</dd>
+          <SkillUsageRow source={source} name={name} />
         </dl>
       </div>
       <div className="border-t pt-5">
@@ -215,4 +201,39 @@ function SkillDetailPanel({ source, name, names }: { source: string; name: strin
       </div>
     </div>)}
   </IslandPanel>;
+}
+
+const usageWindowMs = 30 * 86_400_000;
+/** Recorded use of this source's copy over the last 30 days and its latest use ever; opens the usage page on this skill. */
+function SkillUsageRow({ source, name }: { source: string; name: string }) {
+  const i18n = useI18n();
+  const navigation = useSkillUsageNavigation();
+  const [usage, setUsage] = useState<{ sessions: number; lastAt: number | null } | null>(null);
+  useEffect(() => {
+    let current = true;
+    const now = Date.now();
+    const filter = { from: null, to: null, utcOffsetMinutes: -new Date(now).getTimezoneOffset() };
+    void runtime.telemetry.execute({ type: "query", filter, query: { kind: "subjects", subjectKind: usageSubjectKinds.skill } }).then(result => {
+      if (!current || !result.ok || result.reply.kind !== "query" || result.reply.result.kind !== "subjects") return;
+      const rows = result.reply.result.rows.filter(row => row.id === name && row.source === source);
+      return runtime.telemetry.execute({ type: "query", filter: { ...filter, from: now - usageWindowMs, subject: { kind: usageSubjectKinds.skill, id: name, source } },
+        query: { kind: "summary", compare: null } }).then(recent => {
+        if (!current) return;
+        const sessions = recent.ok && recent.reply.kind === "query" && recent.reply.result.kind === "summary" ? recent.reply.result.sessions : 0;
+        setUsage({ sessions, lastAt: rows.reduce<number | null>((last, row) => row.lastAt === null ? last : Math.max(last ?? 0, row.lastAt), null) });
+      });
+    }, () => {});
+    return () => { current = false; };
+  }, [source, name]);
+  if (!usage) return null;
+  const summary = usage.lastAt === null ? i18n.text(messages.usageNever)
+    : i18n.formatMessage(messages.usageSummary, { time: new Intl.RelativeTimeFormat(i18n.locale, { numeric: "auto" })
+      .format(Math.round((usage.lastAt - Date.now()) / 86_400_000), "day"), sessions: usage.sessions });
+  return <>
+    <dt className="type-label">{i18n.text(messages.usage)}</dt>
+    <dd className="type-caption flex min-w-0 items-center gap-2">
+      <span className="min-w-0 truncate">{summary}</span>
+      {navigation && <Button variant="link" size="xs" className="h-auto p-0" onClick={() => navigation.open({ id: name, source })}>{i18n.text(messages.usageOpen)}</Button>}
+    </dd>
+  </>;
 }

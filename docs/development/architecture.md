@@ -188,6 +188,6 @@ The renderer uses restricted desktop capabilities and direct validated business 
 
 Published content uses controlled rendering: untrusted HTML is not executed, KaTeX uses untrusted mode, and Mermaid uses strict rendering. Remote images do not broaden script or connection policy.
 
-Resource authorization defines model context and operation scope, not an operating system sandbox. Shells, terminals, MCP servers, and trusted plugins run with the current user’s capabilities. Asterism does not implement a general permission model or agent behavior audit.
+Resource authorization defines model context and operation scope, not an operating system sandbox. Shells, terminals, MCP servers, and trusted plugins run with the current user’s capabilities. Asterism does not implement a general permission model. Auditability comes from attributable records rather than a separate audit layer: history, the usage ledger, and plugin-owned logs take their identity, such as the session, request, tool call, and declaring plugin, from the request context instead of from content a plugin supplies. A new capability becomes auditable by recording its facts through these records.
 
 Credentials are stored as entered in host configuration with owner-only file permissions; external credential managers are reached through user-configured commands. Raw keys remain separate from history and diagnostics.

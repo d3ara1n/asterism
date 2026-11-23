@@ -24,8 +24,10 @@ export function createRequestAssembly(plugin: PluginContext, catalog: SkillCatal
         ...files.map(({ file, text }, index): AgentPromptBlock => ({ id: builtin.name(`context.${index}`), kind: "context", file, text, source: { id: file, plugin: null } })),
       ];
       const prepared = prepare({ skills, blocks });
-      if (prepared.skills.length) prepared.blocks.push(skillCatalogPrompt(prepared.skills));
-      return { ...prepared, system: projectAgentPrompt(prepared.blocks) };
+      const catalogBlock = prepared.skills.length ? skillCatalogPrompt(prepared.skills) : null;
+      if (catalogBlock) prepared.blocks.push(catalogBlock);
+      // catalogSkills resolves skill references the way skill_read does, independently of preparer filtering.
+      return { ...prepared, catalogBlock, catalogSkills: skills, system: projectAgentPrompt(prepared.blocks) };
     };
   };
 }

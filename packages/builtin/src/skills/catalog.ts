@@ -20,8 +20,10 @@ export class SkillCatalog {
   skills(): AgentSkill[] { return effectiveSkills(this.catalog.skills()); }
   refresh(signal: AbortSignal): void { this.catalog.refresh(signal); }
   summary() { return { count: this.skills().length, issues: this.catalog.skills().flatMap(source => source.issues) }; }
-  async read(args: SkillReadArgs, signal: AbortSignal) {
+  /** resolved receives the effective skill before its file is read, so a failed file read still identifies the skill. */
+  async read(args: SkillReadArgs, signal: AbortSignal, resolved?: (skill: AgentSkill) => void) {
     const skill = this.find(args.name);
+    resolved?.(skill);
     const text = await this.catalog.read(skill, args.path, signal);
     return { name: skill.name, path: args.path, directory: skill.directory,
       ...readText(text, false, { offset: args.offset, limit: args.limit, maxBytes: 64 * 1024 }) };

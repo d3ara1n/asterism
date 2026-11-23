@@ -4,7 +4,7 @@ import { estimateCacheSavings, estimateUsageCost } from "@asterism-app/sdk/contr
 import { telemetryCommandSchema, type TelemetryReply } from "../shared/telemetry.ts";
 import { openTelemetryDatabase } from "./storage.ts";
 import { clearTelemetry, TelemetryError, TelemetryReader } from "./queries.ts";
-import type { ExternalUsageRecord, ModelUsageRecord, UsageRecorder, WorkspaceLookup } from "./types.ts";
+import type { ExternalUsageRecord, ModelUsageRecord, UsageRecorder, UsageSubjectRecord, WorkspaceLookup } from "./types.ts";
 
 export { TelemetryError };
 
@@ -59,8 +59,18 @@ export class TelemetryService implements UsageRecorder {
         );
         const tool = this.db.prepare(`INSERT INTO tool_usage_events (id, model_event_id, started_at, duration_ms, tool_name, implementation_id, resource_kind, outcome, error_code)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-        for (const call of record.tools) tool.run(randomUUID(), record.id, Math.max(0, Math.round(call.startedAt)), milliseconds(call.durationMs),
-          call.toolName, call.implementationId, call.resourceKind, call.outcome, call.errorCode);
+        const subject = this.db.prepare(`INSERT INTO usage_subjects (id, model_event_id, tool_event_id, declared_by, kind, subject_id, source_id, relation, part, quantity)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+        const subjects = (toolEventId: string | null, items: readonly UsageSubjectRecord[]) => {
+          for (const item of items) subject.run(randomUUID(), record.id, toolEventId, item.declaredBy, item.kind, item.id, item.source, item.relation, item.part, item.quantity);
+        };
+        subjects(null, record.subjects);
+        for (const call of record.tools) {
+          const id = randomUUID();
+          tool.run(id, record.id, Math.max(0, Math.round(call.startedAt)), milliseconds(call.durationMs),
+            call.toolName, call.implementationId, call.resourceKind, call.outcome, call.errorCode);
+          subjects(id, call.subjects);
+        }
         this.db.exec("COMMIT;");
       } catch (error) { this.db.exec("ROLLBACK;"); throw error; }
       this.changed();

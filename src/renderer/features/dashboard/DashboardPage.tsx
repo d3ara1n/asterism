@@ -21,10 +21,11 @@ import { AttributionView } from "./views/AttributionView";
 import { ModelsView } from "./views/ModelsView";
 import { OverviewView } from "./views/OverviewView";
 import { ToolsView } from "./views/ToolsView";
+import { SkillsView } from "./views/SkillsView";
 import type { ViewProps } from "./views/context";
 
 const views: Record<DashboardView, (props: ViewProps) => ReactNode> = {
-  overview: OverviewView, attribution: AttributionView, models: ModelsView, activity: ActivityView, tools: ToolsView,
+  overview: OverviewView, attribution: AttributionView, models: ModelsView, activity: ActivityView, tools: ToolsView, skills: SkillsView,
 };
 
 /**
@@ -59,6 +60,14 @@ export function DashboardPage({ model, active, onOpenSession }: { model: Dashboa
   }, [island, model, onOpenSession]);
   const openGroup = useCallback((group: TelemetryGroup, origin: HTMLElement) => openSubject({ kind: "group", group }, groupLabel(i18n, group), origin), [openSubject, i18n]);
   const openDay = useCallback((start: number) => openSubject({ kind: "day", start }, i18n.formatDate(start, { dateStyle: "medium" })), [openSubject, i18n]);
+  const openSkill = useCallback((row: { id: string; source: string | null }, origin: HTMLElement) =>
+    openSubject({ kind: "skill", id: row.id, source: row.source }, row.id, origin), [openSubject]);
+  useEffect(() => {
+    if (!active || !state.focus || !facets.data) return;
+    const skill = state.focus;
+    model.clearFocus();
+    openSubject({ kind: "skill", id: skill.id, source: skill.source }, skill.id);
+  }, [active, state.focus, facets.data, model, openSubject]);
 
   const empty = facets.data !== null && facets.data.firstEventAt === null;
   const View = views[state.view];
@@ -73,7 +82,7 @@ export function DashboardPage({ model, active, onOpenSession }: { model: Dashboa
         : empty ? status("empty", msg.emptyTitle, msg.emptyBody)
         : <AnimatePresence mode="popLayout" initial={false}>
           <motion.div key={state.view} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6, transition: exitTransition }} transition={fadeTransition}>
-            <View model={model} state={state} page={page} openGroup={openGroup} openDay={openDay} openKey={openKey} />
+            <View model={model} state={state} page={page} openGroup={openGroup} openDay={openDay} openSkill={openSkill} openKey={openKey} />
           </motion.div>
         </AnimatePresence>}
       {state.facets?.firstEventAt != null && <p className="type-caption text-center">

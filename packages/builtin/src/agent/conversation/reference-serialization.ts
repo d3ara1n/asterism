@@ -1,12 +1,9 @@
-import { referenceMarkdown } from "@asterism-app/sdk/contracts";
+import { referenceLinks, referenceMarkdown } from "@asterism-app/sdk/contracts";
 import type { JSONContent } from "@tiptap/core";
 import { referenceKind } from "@asterism-app/ui/references";
 
 /** Tiptap node type of a composer reference chip. */
 export const referenceNodeName = "referenceChip";
-
-/** Markdown link whose destination uses an app-defined reference scheme. */
-const referencePattern = /\[((?:\\[^\r\n]|[^\\\]\r\n])*)\]\(((?:resource|skill|model):[^()\s]+)\)/gu;
 
 /** Whether a destination addresses a resource location, skill, or configured model. */
 export function isReferenceHref(href: string): boolean {
@@ -53,12 +50,11 @@ function parseLine(line: string): JSONContent[] {
   const content: JSONContent[] = [];
   let last = 0;
   const text = (value: string) => { if (value) content.push({ type: "text", text: value }); };
-  for (const match of line.matchAll(referencePattern)) {
-    const [source, label = "", href = ""] = match;
-    if (!isReferenceHref(href)) continue;
-    text(line.slice(last, match.index));
-    content.push({ type: referenceNodeName, attrs: { label: label.replace(/\\([\\[\]])/gu, "$1"), href } });
-    last = match.index + source.length;
+  for (const link of referenceLinks(line)) {
+    if (!isReferenceHref(link.url)) continue;
+    text(line.slice(last, link.index));
+    content.push({ type: referenceNodeName, attrs: { label: link.label, href: link.url } });
+    last = link.index + link.length;
   }
   text(line.slice(last));
   return content;

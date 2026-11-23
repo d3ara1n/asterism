@@ -2,7 +2,7 @@ import { useMemo, useSyncExternalStore } from "react";
 import { type TelemetryDimension, type TelemetryFacets, type TelemetryFilter, type TelemetryGroup } from "../../../shared/telemetry";
 import { localOffset, rangeWindow, type RangePreset, type RangeWindow } from "./range";
 
-export const dashboardViews = ["overview", "attribution", "models", "activity", "tools"] as const;
+export const dashboardViews = ["overview", "attribution", "models", "activity", "tools", "skills"] as const;
 export type DashboardView = typeof dashboardViews[number];
 export type FilterDimensions = Omit<TelemetryFilter, "from" | "to" | "utcOffsetMinutes">;
 export type FilterKey = keyof FilterDimensions;
@@ -20,6 +20,8 @@ export interface DashboardState {
   /** The page is rereading after a change. */
   pending: boolean;
   now: number;
+  /** A skill whose details the page opens when it next shows, then clears; set by navigation from outside the page. */
+  focus: { id: string; source: string | null } | null;
 }
 
 /**
@@ -29,7 +31,7 @@ export interface DashboardState {
  */
 export class DashboardModel {
   private state: DashboardState = {
-    view: "overview", range: "30d", attribution: "folder", filters: {}, labels: {}, facets: null, revision: 0, pending: false, now: Date.now(),
+    view: "overview", range: "30d", attribution: "folder", filters: {}, labels: {}, facets: null, revision: 0, pending: false, now: Date.now(), focus: null,
   };
   private readonly listeners = new Set<() => void>();
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
@@ -39,6 +41,9 @@ export class DashboardModel {
     for (const listener of this.listeners) listener();
   }
   setView(view: DashboardView) { this.set({ view }); }
+  /** Show the skills view and open one skill's details when the page shows. */
+  focusSkill(skill: { id: string; source: string | null }) { this.set({ view: "skills", focus: skill }); }
+  clearFocus() { if (this.state.focus) this.set({ focus: null }); }
   setRange(range: RangePreset) { this.set({ range, now: Date.now() }); }
   setAttribution(attribution: TelemetryDimension) { this.set({ attribution }); }
   setFacets(facets: TelemetryFacets) { this.set({ facets }); }

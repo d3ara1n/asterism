@@ -30,6 +30,7 @@ import { Dock } from "../shared/weave/Dock";
 import { DockSlot } from "../shared/weave/DockSlot";
 import { SettingsPage, isSettingsCategory, type SettingsTarget } from "../features/settings/SettingsPage";
 import { SessionArchiveContext } from "../features/settings/SessionsSettings";
+import { SkillUsageContext } from "../features/skills/usage-navigation";
 import { settingsPageKey, usePluginSettingsRegistry } from "../modules/settings";
 import { RendererCatalogProvider } from "../modules/object-context";
 import { IslandStrip, Screen, type IslandSpec, type ScreenHandle } from "../shared/weave/Screen";
@@ -178,6 +179,10 @@ export function App({ controller }: { controller: ApplicationController }) {
   const goDashboard = () => {
     void navigate({ kind: "dashboard" });
   };
+  const skillUsage = { open(skill: { id: string; source: string }) {
+    dashboard.focusSkill(skill);
+    void navigate({ kind: "dashboard" });
+  } };
   const openSession = (sessionId: string) => {
     void navigate({ kind: "conversation", sessionId });
   };
@@ -356,7 +361,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     <Window skipTarget={`screen-${page}`} titlebar={<Titlebar navigation={titleNavigation} actions={actions} actionsHidden={inSettings} />}>
       <Space active={page} screens={[
         { id: "settings", label: i18n.formatMessage(settingsMessages.settings), surface: false, content:
-          <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SettingsPage screenRef={settingsScreen} active={inSettings} target={settingsTarget} onCancel={() => { void go("main"); }} /></SessionArchiveContext.Provider> },
+          <SessionArchiveContext.Provider value={{ snapshot, restore: restoreSession }}><SkillUsageContext.Provider value={skillUsage}><SettingsPage screenRef={settingsScreen} active={inSettings} target={settingsTarget} onCancel={() => { void go("main"); }} /></SkillUsageContext.Provider></SessionArchiveContext.Provider> },
         { id: "main", label: mainTitle, surface: false,
           // Docked sidebars reserve width; Island overflow and focus following stay inside Screen.
           content: <div className="main-page">

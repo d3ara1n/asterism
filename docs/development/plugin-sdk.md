@@ -181,6 +181,8 @@ The host's shared usage service reads configured credentials, caches query resul
 
 Backend credentials remain explicit trusted-plugin capabilities. Plugin secrets are stored as given in the plugin's managed directory. Frontend consumption uses typed domain calls.
 
+Plugins declare what their work used as usage subjects: a top-level tool through its call context, a model request through its request identity. The host records declarations with the current call or request and the declaring plugin; plugins supply only the subject. Non-model metered charges use the separate external usage report. The usage-statistics design describes subject kinds, relations, and how the interface reads them.
+
 ## Persistence and content
 
 Plugin-private files live under the plugin data directory. Managed configuration and a database are optional facilities, not prerequisites for plugin identity.

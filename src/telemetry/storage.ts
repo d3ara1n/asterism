@@ -5,10 +5,31 @@ import { applicationStorage } from "../shared/application.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 
 /** Ledger format; increment on changes and append an n → n+1 step to `telemetryStorage`. */
-export const telemetryDatabaseVersion = 1;
+export const telemetryDatabaseVersion = 2;
 
 /**
- * Usage ledger: one row per model request, per tool call made by an execution request, and per plugin-reported external use.
+ * Subjects that plugins declared for a model request or one of its tool calls: what the work used, such as a skill it read.
+ * kind and relation are open identifiers; the remaining columns are identities, a part within the subject, and an optional amount.
+ */
+const subjectsSql = `
+  CREATE TABLE usage_subjects (
+    id TEXT PRIMARY KEY,
+    model_event_id TEXT NOT NULL,
+    tool_event_id TEXT,
+    declared_by TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    subject_id TEXT NOT NULL,
+    source_id TEXT,
+    relation TEXT NOT NULL,
+    part TEXT,
+    quantity REAL
+  ) STRICT;
+  CREATE INDEX usage_subjects_model_event ON usage_subjects(model_event_id);
+  CREATE INDEX usage_subjects_subject ON usage_subjects(kind, subject_id);
+`;
+
+/**
+ * Usage ledger: one row per model request, per tool call made by an execution request, per declared subject, and per plugin-reported external use.
  * Rows hold identifiers, counts, timings, cost estimates, and display-name snapshots for later deletion of sessions, folders, or plugins;
  * never prompts, responses, or tool payloads.
  */
@@ -94,7 +115,10 @@ export function telemetryDatabasePath(root: string): string {
 
 /** Pre-window preparation migrates the ledger with host storage; the ledger stays outside recovery points. */
 export function telemetryStorage(root: string) {
-  return sqliteStorage({ id: "telemetry", file: telemetryDatabasePath(root), version: telemetryDatabaseVersion, migrations: {} });
+  return sqliteStorage({ id: "telemetry", file: telemetryDatabasePath(root), version: telemetryDatabaseVersion, migrations: {
+    // Declared subjects start with this format; earlier requests have none.
+    1: db => { db.exec(subjectsSql); },
+  } });
 }
 
 export class TelemetryVersionError extends Error {
@@ -112,7 +136,7 @@ export function openTelemetryDatabase(root: string): DatabaseSync {
     const version = (db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
     if (version === 0 && !db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").get()) {
       db.exec("BEGIN IMMEDIATE;");
-      db.exec(schemaSql);
+      db.exec(schemaSql + subjectsSql);
       db.exec(`PRAGMA user_version = ${telemetryDatabaseVersion}; COMMIT;`);
     } else if (version !== telemetryDatabaseVersion) throw new TelemetryVersionError(version);
     // Per-connection mirror of live session folders, rewritten before each read so folder grouping follows the workspace.

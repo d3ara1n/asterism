@@ -40,6 +40,8 @@ Costs are estimates computed from the prices configured for each model when the 
 
 Folders and session names follow your current organization. Moving a session to another folder moves its history with it; names recorded at the time remain visible after a session or folder is deleted. A monthly budget sets the pace shown for the current calendar month; it does not limit requests.
 
+The **Skills** view shows whether installed skills are pulling their weight. A skill counts as used when an Agent read it or a message you sent referenced it; a read is *model-chosen* when nothing earlier in the session referenced that skill, which tells you the skill's description is doing its job. Skills unused in the range are listed with their last recorded use. Skill use is recorded only from the version that introduced it, so "never recorded" means unknown before that date, not proven idle. The catalog size shows how much of each request the list of skill names and descriptions occupies; a large catalog with few model-chosen reads is a reason to remove or narrow skills. Reading a skill shows that it was loaded, not that it improved the result.
+
 ## Put lasting responsibility in Agent instructions
 
 An Agent configuration can leave its role instructions empty. The factory conversation default does so: it adds no role prompt or identity to the model context. Shared environment instructions, selected skills, and linked resource context still apply. Add role instructions when you want expertise, standards, and responsibilities that should survive individual tasks. Put the current goal, permitted scope, acceptance criteria, and reserved decisions in the task. This avoids turning a reusable role into a collection of stale project instructions.

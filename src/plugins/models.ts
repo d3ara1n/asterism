@@ -10,7 +10,7 @@ import { PluginApiError } from "@asterism-app/sdk/runtime";
 import type { ModelServices } from "@asterism-app/sdk/runtime";
 import { inputReferences, resolveInput, type ModelContent } from "../model/input.ts";
 import type { ModelItem, RequestTiming, Usage } from "@asterism-app/sdk/contracts";
-import type { ModelUsageRecord, ToolUsageRecord } from "../telemetry/types.ts";
+import type { ModelUsageRecord, ToolUsageRecord, UsageSubjectRecord } from "../telemetry/types.ts";
 
 /** Model targets identify concrete provider/model pairs; paradigms resolve their own configuration. */
 export type { ModelTarget, StreamRequest } from "@asterism-app/sdk/contracts";
@@ -21,7 +21,7 @@ export class ModelTargetFailure extends PluginApiError {
 
 interface ResolvedTarget { settings: ModelSettings; adapter: ModelAdapter }
 /** Usage attribution of one model call; execution requests collect their settled tool calls into `tools`. */
-export interface ModelCallTelemetry { pluginId: string; purposeId: string | null; tools?: readonly ToolUsageRecord[] }
+export interface ModelCallTelemetry { pluginId: string; purposeId: string | null; subjects?: readonly UsageSubjectRecord[]; tools?: readonly ToolUsageRecord[] }
 export type RecordModelUsage = (record: ModelUsageRecord) => void;
 /** Cost estimates price only text quantities, so requests carrying files keep an incomplete estimate. */
 function hasFileParts(messages: readonly ModelItem[]): boolean {
@@ -44,7 +44,7 @@ function usageRecord(telemetry: ModelCallTelemetry, settings: ModelSettings, ses
     pluginId: telemetry.pluginId, purposeId: telemetry.purposeId, sessionId: sessionId ?? null,
     providerId: settings.provider.id, providerName: settings.provider.name, modelId: settings.model.modelId, thinking: settings.thinking,
     usage: settled.usage, cost: settings.model.cost, hasFiles,
-    outcome: settled.outcome, errorOrigin: settled.errorOrigin, errorCode: settled.errorCode, tools: telemetry.tools ?? [],
+    outcome: settled.outcome, errorOrigin: settled.errorOrigin, errorCode: settled.errorCode, tools: telemetry.tools ?? [], subjects: telemetry.subjects ?? [],
   };
 }
 export interface RunRequest extends Omit<ModelRunRequest, "system"> {

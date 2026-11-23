@@ -1,4 +1,4 @@
-import { ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
+import { ResourceNoticeRaised, type UsageSubject } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ExecutionServices, type ResourceRef, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../lifecycle.ts";
 import type { PluginHostServices } from "../loader.ts";
@@ -10,6 +10,7 @@ import { bindModelTools } from "../../execution/core.ts";
 import type { ContentLease } from "../../runtime/content-store.ts";
 import type { PluginEventScope } from "../event-scope.ts";
 import type { ToolUsageRecord } from "../../telemetry/types.ts";
+import { declaredSubject } from "../../telemetry/subjects.ts";
 
 interface ExecutionBinding {
   owner: string;
@@ -81,6 +82,10 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
       const { target, messages, userAgent, requestParentId, purpose } = structuredClone({
         target: request.target, messages: request.messages, userAgent: request.userAgent, requestParentId: request.requestParentId, purpose: request.purpose,
       });
+      const usage = request.usage;
+      const declare = (items: readonly UsageSubject[]) => items.map(subject => declaredSubject(subject, owner));
+      // Static subjects validate before work starts; deferred ones join after the system prompt is prepared and before the request is sent.
+      const subjects = typeof usage === "function" ? [] : declare(usage ?? []);
       const system = typeof request.system === "function" ? request.system : structuredClone(request.system);
       const release = host.holds.acquire(ref, linkedRefs);
       const work = runs.start(async signal => {
@@ -89,11 +94,15 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
           handover = host.content?.handover(ref.sessionId, ref.id);
           const capabilities = host.sessions.capabilities(linked, policy, caller, interactive, resourcePolicy);
           const boundTools = topLevelTools(caller, policy, linkedRefs, interactive, kind => capabilities.resourceToolRestriction(kind));
-          const preparedSystem = host.sessions.context(linked).then(files => typeof system === "function" ? system(files) : system);
+          const preparedSystem = host.sessions.context(linked).then(files => {
+            const prepared = typeof system === "function" ? system(files) : system;
+            if (typeof usage === "function") subjects.push(...declare(usage()));
+            return prepared;
+          });
           const settledTools: ToolUsageRecord[] = [];
           return await host.models.run({ target, system: preparedSystem,
             messages, userAgent, sessionId: ref.sessionId, requestParentId,
-            telemetry: { pluginId: owner, purposeId: purpose ?? null, tools: settledTools },
+            telemetry: { pluginId: owner, purposeId: purpose ?? null, subjects, tools: settledTools },
             signal, tools: bindModelTools(capabilities, boundTools, handover, () => {
               events.publish(ResourceNoticeRaised, { title: source.title, kind: "attention" }, { plugin: owner, resource: ref });
             }, settled => settledTools.push(settled)),

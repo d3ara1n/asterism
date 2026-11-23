@@ -1,4 +1,5 @@
 import { defineModule, defineTopLevelTool, implementCall, PluginApiError } from "@asterism-app/sdk/runtime";
+import { usageRelations, usageSubjectKinds } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
 import { TextError, readToModel } from "../shared/text.ts";
 import { filesystemFailure } from "../filesystem/errors.ts";
@@ -31,8 +32,12 @@ export function createSkillsModule(catalog: SkillCatalog) {
         ],
         argsSchema: skillReadArgsSchema, resultSchema: SkillRead.schema,
         effect: "read", execution: "parallel",
-        async execute(args, { signal }) {
-          try { return { kind: "succeeded", data: await catalog.read(args, signal) }; }
+        async execute(args, { signal, recordUsage }) {
+          try {
+            return { kind: "succeeded", data: await catalog.read(args, signal, skill => recordUsage({
+              kind: usageSubjectKinds.skill, id: skill.name, source: skill.source.id, relation: usageRelations.read, part: args.path,
+            })) };
+          }
           catch (error) {
             if (signal.aborted) return { kind: "cancelled", message: "Skill reading was cancelled." };
             if (error instanceof PluginApiError) return { kind: "rejected", error: { code: error.reason ?? error.code, message: error.message } };

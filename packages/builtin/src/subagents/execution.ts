@@ -12,6 +12,7 @@ import { agentRequestRetries } from "../agent/retry.ts";
 import { ended, type DelegationInput, type FinishedStatus, type TaskCompletion, type TaskSnapshot, type ProcessBlock } from "./contract.ts";
 import type { AuditLog } from "./audit.ts";
 import { activityOf, type DeliveredSteer } from "./activity.ts";
+import { skillCatalogUsage } from "../skills/usage.ts";
 
 export interface ActiveRun {
   snapshot: TaskSnapshot;
@@ -171,15 +172,18 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
             snapshot.output.usage.elapsedMs = Math.round(performance.now() - started);
             deps.changed();
           };
+          let catalogBlock: ReturnType<typeof prepare>["catalogBlock"] = null;
           const response = await deps.execution.run({
             access: deps.access, interactive: false, target, signal: current, requestParentId: parent,
             agent: currentAgent.id, resources: { allow: currentAgent.resources ?? undefined, exclude: currentAgent.excludeResources ?? undefined },
             userAgent: deps.userAgent, purpose: "subagent", messages, observer: { event },
             tools: { exclude: ["resource_create", "creation_list", "creation_inspect"] },
+            usage: () => skillCatalogUsage(catalogBlock),
             system: files => {
-              const system = prepare(files).system;
-              run.audit.append({ type: "request", index, target, system });
-              return system;
+              const prepared = prepare(files);
+              catalogBlock = prepared.catalogBlock;
+              run.audit.append({ type: "request", index, target, system: prepared.system });
+              return prepared.system;
             },
           }, { content, output: content });
           parent = response.responseId;

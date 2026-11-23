@@ -524,6 +524,52 @@ describe("Host implementation of the workbench SDK", () => {
     subscription.close();
   });
 
+  // Attribution comes from the call and request context; a declaration after settlement must not land on a later call.
+  it("records subjects declared by a top-level tool with its call and deferred request subjects with the request", async () => {
+    const c = counter(), other = pluginNamespace("test.usage");
+    let late: (() => void) | undefined;
+    const declaration = defineTopLevelTool({
+      id: other.name("use"), name: "use", description: "Use a subject.", guidelines: [],
+      argsSchema: z.strictObject({}).describe("No parameters."), resultSchema: z.null().describe("Nothing."), effect: "read", execution: "parallel",
+      async execute(_args, context) {
+        expect(() => context.recordUsage({ kind: "", id: "x", relation: "read" })).toThrow("Invalid usage subject");
+        context.recordUsage({ kind: "skill", id: "a", source: "/user", relation: "read", part: "SKILL.md" });
+        late = () => context.recordUsage({ kind: "skill", id: "late", relation: "read" });
+        return { kind: "succeeded", data: null };
+      },
+    });
+    const plugin = definePlugin({ namespace: other, modules: [defineModule(() => ({ topLevelTools: [declaration] }))] });
+    let calls = 0;
+    const { service, sessionId } = open([c.plugin, plugin], () => ({ format: () => "test/1", validate() {}, prepare() {
+      return { async *stream() {
+        if (calls++ === 0) {
+          yield { type: "part.start", part: { id: "u", kind: "toolcall", name: "use", callId: "use" } };
+          yield { type: "part.end", partId: "u", arguments: {} };
+          yield { type: "finish", reason: "tool-calls", usage: null };
+        } else {
+          yield { type: "part.start", part: { id: "t", kind: "text" } };
+          yield { type: "part.delta", partId: "t", delta: "done" };
+          yield { type: "part.end", partId: "t" };
+          yield { type: "finish", reason: "stop", usage: null };
+        }
+      } };
+    } }));
+    const target = await configureModel(service);
+    const object = { id: await create(service, sessionId), sessionId, kind: Counter.kind };
+    let prepared = false;
+    const run = (allow: string[]) => c.context().execution.run({
+      access: object, interactive: true, target, requestParentId: null, tools: { allow }, signal: new AbortController().signal, observer: { event() {} },
+      system: () => { prepared = true; return { blocks: [] }; }, messages: [],
+      usage: () => { expect(prepared).toBe(true); return [{ kind: "skill-catalog", id: "catalog", relation: "context", quantity: 120 }]; },
+    });
+    await run(["use"]);
+    late!();
+    await run([]);
+    const read = (subjectKind: string) => service.telemetry.execute({ type: "query", filter: { from: null, to: null, utcOffsetMinutes: 0 }, query: { kind: "subjects", subjectKind } });
+    expect(read("skill")).toMatchObject({ kind: "query", result: { rows: [{ id: "a", source: "/user", requests: 1, parts: ["SKILL.md"] }] } });
+    expect(read("skill-catalog")).toMatchObject({ kind: "query", result: { rows: [{ id: "catalog", requests: 2, relations: { context: { quantity: 240 } } }] } });
+  });
+
   // Top-level tools override complete declarations in user-list order; failed contributions reserve no names, and model declarations and execution identities share the same winner.
   it.each(["loaded", "setup-failed", "validation-failed"] as const)("same-name top-level tools replace built-in ask_user when the latter's state is %s", async state => {
     const c = counter(), first = pluginNamespace("test.first"), last = pluginNamespace("test.last");

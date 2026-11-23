@@ -5,6 +5,7 @@ import type { SdkContext } from "./sdk-context.ts";
 import type { RunGroup } from "./lifecycle.ts";
 import { interactionUnavailable, resolveToolCompletion } from "../tools/result.ts";
 import { encodePluginData } from "./data-encoding.ts";
+import { declaredSubject } from "../telemetry/subjects.ts";
 
 export interface BoundTopLevelTool {
   tool: ToolContract;
@@ -26,7 +27,7 @@ export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ca
           const decoded = tool.resultSchema.parse(data);
           return tool.toModel ? tool.toModel(decoded) : defaultToolModel(decoded);
         },
-        execute: (signal, publish) => runs.start(async current => {
+        execute: (signal, publish, _handover, usage) => runs.start(async current => {
           current.throwIfAborted();
           const scope = { active: true, execution: true };
           let latest: Json = null;
@@ -42,6 +43,10 @@ export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ca
               publish(data) {
                 if (!scope.active) return;
                 latest = encode(data); publish?.(latest);
+              },
+              recordUsage(subject) {
+                const record = declaredSubject(subject, sdk.context.id);
+                if (scope.active) usage?.(record);
               },
             });
             const withData = result.data !== undefined && result.data !== null || result.kind === "succeeded" || result.kind === "partial";

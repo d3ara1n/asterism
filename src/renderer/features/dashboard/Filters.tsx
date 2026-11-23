@@ -72,7 +72,7 @@ export function FilterPicker({ model, facets, filters }: { model: DashboardModel
 
 const chipLabels: Record<FilterKey, UiMessage> = {
   folderId: msg.filterFolder, providerId: msg.filterProvider, modelId: msg.filterModel, pluginId: msg.filterPlugin,
-  purposeId: msg.filterPurpose, sessionId: msg.filterSession, thinking: msg.filterThinking,
+  purposeId: msg.filterPurpose, sessionId: msg.filterSession, thinking: msg.filterThinking, subject: msg.filterSkill,
 };
 
 /** Removable chips for active filters; a model chip stands for its provider too. */

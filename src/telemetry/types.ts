@@ -2,6 +2,17 @@ import type { ModelCost, UiText, Usage } from "@asterism-app/sdk/contracts";
 import type { ExternalUsageOutcome } from "@asterism-app/sdk/runtime";
 import type { SessionStatus } from "../shared/telemetry.ts";
 
+/** A subject declared by a plugin for a model request or one of its tool calls, with the declaring plugin stamped by the host. */
+export interface UsageSubjectRecord {
+  kind: string;
+  id: string;
+  source: string | null;
+  relation: string;
+  part: string | null;
+  quantity: number | null;
+  declaredBy: string;
+}
+
 /** One tool call settled inside an execution request. */
 export interface ToolUsageRecord {
   startedAt: number;
@@ -11,6 +22,8 @@ export interface ToolUsageRecord {
   resourceKind: string | null;
   outcome: string;
   errorCode: string | null;
+  /** Subjects the tool declared while it ran. */
+  subjects: readonly UsageSubjectRecord[];
 }
 
 /** One settled model request, with the configured price used to estimate its cost. */
@@ -33,6 +46,8 @@ export interface ModelUsageRecord {
   errorOrigin: string | null;
   errorCode: string | null;
   tools: readonly ToolUsageRecord[];
+  /** Subjects the requesting plugin declared for the request itself. */
+  subjects: readonly UsageSubjectRecord[];
 }
 
 export interface ExternalUsageRecord {

@@ -17,15 +17,17 @@ import { RankedList, Stat } from "./parts";
 import { TrendChart } from "./charts";
 import { useTelemetry } from "./use-telemetry";
 import { dimensionLabels } from "./views/dimensions";
+import { skillDetailKey } from "./skills";
+import { SkillDetail } from "./SkillDetail";
 
 export const detailWidth = { min: 420, grow: 0.6, max: 560 };
 
-/** What a detail island describes: one dimension value, or one local day. */
-export type DetailSubject = { kind: "group"; group: TelemetryGroup } | { kind: "day"; start: number };
+/** What a detail island describes: one dimension value, one local day, or one skill as recorded from one source. */
+export type DetailSubject = { kind: "group"; group: TelemetryGroup } | { kind: "day"; start: number } | { kind: "skill"; id: string; source: string | null };
 
 export const detailPrefix = "usage:";
 export function detailKey(subject: DetailSubject): string {
-  return `${detailPrefix}${subject.kind === "day" ? `day:${subject.start}` : groupId(subject.group)}`;
+  return `${detailPrefix}${subject.kind === "day" ? `day:${subject.start}` : subject.kind === "skill" ? skillDetailKey(subject) : groupId(subject.group)}`;
 }
 
 /** Breakdowns that add information for each subject: a model's folders, a folder's sessions, and so on. */
@@ -39,6 +41,11 @@ const related: Record<TelemetryDimension | "day", readonly TelemetryDimension[]>
  * so it never shows a stale scope. Groups inside open nested details owned by this island.
  */
 export function DetailIsland({ model, subject, onOpenSession }: { model: DashboardModel; subject: DetailSubject; onOpenSession: (id: string) => void }) {
+  return subject.kind === "skill" ? <SkillDetail model={model} skill={subject} onOpenSession={onOpenSession} />
+    : <GroupDetail model={model} subject={subject} onOpenSession={onOpenSession} />;
+}
+
+function GroupDetail({ model, subject, onOpenSession }: { model: DashboardModel; subject: Exclude<DetailSubject, { kind: "skill" }>; onOpenSession: (id: string) => void }) {
   const i18n = useI18n();
   const island = useIsland();
   const state = useDashboard(model);

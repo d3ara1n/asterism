@@ -7,6 +7,7 @@ import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.
 import type { RequestTiming } from "./model-records.ts";
 import type { Presentation } from "./presentation.ts";
 import type { ErrorDetails } from "./error-details.ts";
+import type { UsageSubject } from "./usage-subjects.ts";
 
 /** Standard levels shared across the application; protocol encoding does not change public values. */
 export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -87,13 +88,15 @@ export type ModelRunEvent =
   | { type: "diagnostic"; origin: "model" | "software"; code: string; message: string; level: "error" | "warning"; details?: ErrorDetails; responseId?: string; omittedFiles?: readonly string[] };
 /** Deliver execution events synchronously; consumers save finalized records, exceptions stop execution, and no further events are delivered after returning. */
 export interface ModelRunObserver { event(event: ModelRunEvent): undefined }
-/** Used only for HTTP request identity; does not enter model messages, history, or resource authorization. */
+/** Request identity for HTTP and the usage ledger; does not enter model messages, history, or resource authorization. */
 export interface ModelRequestIdentity {
   userAgent?: string;
   /** Stable within a session; may be omitted for a one-off call without a session. */
   sessionId?: string;
   /** Optional plugin-defined purpose identifier (e.g. `naming`). The host groups usage by plugin and purpose, and shows this value verbatim. */
   purpose?: string;
+  /** Subjects this request used, such as skills referenced by newly delivered input; recorded with the request when it settles. Invalid subjects reject the request. */
+  usage?: readonly UsageSubject[];
 }
 /** Transient metadata from the actual HTTP response; contains no request credentials or body and is not automatically written to history. */
 export interface ModelResponse {
