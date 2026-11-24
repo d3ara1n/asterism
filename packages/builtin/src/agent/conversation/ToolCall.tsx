@@ -7,8 +7,8 @@ import { JsonView } from "@asterism-app/ui/json-view";
 import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
-import { cn } from "@asterism-app/ui/utils";
 import { toolOutcomeLabels, toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
+import { ToolFailure, unsuccessful } from "@asterism-app/ui/tool-failure";
 import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
 import { toolCallState, type ToolCallNode } from "./tool-state";
@@ -36,8 +36,9 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const disclosure = useStreamingDisclosure(viewStateKeys.disclosure, stage,
     (view.streaming === true && view.body != null) || fallbackPreview, preferences, view.attention === true && view.body != null);
   const result = state.props.result;
-  const diagnostic = result && ("error" in result ? result.error.message : "message" in result ? result.message : null);
   const settled = result && result.kind !== "running" ? result.kind : null;
+  // Content bodies describe what the operation was about; the failure block owns how it ended.
+  const failure = settled ? unsuccessful(result) : null;
   // Request-level failure belongs to the outer shell and notice; the badge reports how local execution ended.
   const status = settled && settled !== "succeeded" ? i18n.text(toolOutcomeLabels[settled]) : null;
   const icon = state.phase === "input"
@@ -59,10 +60,10 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   return <Disclosure header={header} {...disclosure} {...blockShell(node)} expandable={!filling || hasInputBody}
     pending={state.phase === "input" || state.phase === "ready"} noticeAt={"noticeAt" in node ? node.noticeAt : undefined}>
     <div className="space-y-3 [--code-font-size:var(--text-xs)]">
+      {failure && <ToolFailure result={failure} />}
       {view.body ?? (fallbackPreview ? <StreamingScrollArea label={i18n.formatMessage(toolsMessages.toolCallDetails)}>
         <JsonView value={toolTextTail(freeform)} scrollable={false} />
       </StreamingScrollArea> : !filling && state.phase !== "incomplete" && <DefaultToolBody {...view.props} />)}
-      {diagnostic && <p className={cn("type-caption whitespace-pre-wrap", "error" in result && "text-destructive")}>{diagnostic}</p>}
       {view.details !== false && (state.phase === "settled" || state.phase === "incomplete") && <ToolCallDetails node={node} />}
     </div>
   </Disclosure>;
@@ -74,8 +75,9 @@ function ToolCallDetails({ node }: { node: ToolCallNode }) {
   const { call, result, model, counts } = useMemo(() => {
     const call = node.draft?.text ?? (node.input?.kind === "freeform" ? node.input.text
       : JSON.stringify({ tool: node.name, arguments: node.input?.value ?? null }, null, 2));
-    const result = outcome && outcome.data !== null && outcome.model.every(part => part.kind === "text")
-      ? JSON.stringify(outcome.data, null, 2) : null;
+    // Raw result details stay reachable for every ending, including the error an unsuccessful outcome records.
+    const result = outcome && outcome.model.every(part => part.kind === "text")
+      ? JSON.stringify(outcome.kind === "succeeded" || outcome.kind === "partial" ? outcome.data : outcome, null, 2) : null;
     const model = outcome?.model.map(part => part.kind === "text" ? part.text : JSON.stringify(part, null, 2)) ?? [];
     return { call, result, model, counts: {
       call: characterCount(call),

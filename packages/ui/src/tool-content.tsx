@@ -65,7 +65,9 @@ export function DefaultToolHeader({ props, label }: { props: Pick<AnyToolRenderP
   const i18n = useI18n();
   return <ToolHeader label={label === undefined ? props.name : i18n.text(label)} subject={useToolResourceSubject(props.invocation.resource)} />;
 }
+/** Unsuccessful outcomes carry no result data; the shared failure block states why, so this body stays out of the way. */
 export function DefaultToolBody({ result }: Pick<AnyToolRenderProps, "result">) {
   const i18n = useI18n();
+  if (result && result.kind !== "succeeded" && result.kind !== "partial") return null;
   return result?.data !== null && result?.data !== undefined ? <JsonView value={result.data} /> : <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoOutput)}</p>;
 }

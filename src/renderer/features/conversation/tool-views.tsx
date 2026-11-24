@@ -229,5 +229,9 @@ export function resolveToolView(props: AnyToolRenderProps, registry: ViewRegistr
     if (entry) return fixed(entry.renderer, props);
     if (props.name === ResourceCall.name) return resourceCall(props, registry);
   }
-  return { props, icon: <Wrench className="size-3.5" />, ...registry.tool(props.invocation.implementation, props) };
+  // A view declines arguments that fail its contract, but the implementation still owns the name and icon shown for the call.
+  const identity = props.invocation.implementation?.id ?? null;
+  return { props, label: identity ? registry.toolLabel(identity) : undefined,
+    icon: (identity ? registry.toolIcon(identity) : undefined) ?? <Wrench className="size-3.5" />,
+    ...registry.tool(props.invocation.implementation, props) };
 }
