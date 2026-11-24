@@ -48,17 +48,15 @@ export class DashboardModel {
   setAttribution(attribution: TelemetryDimension) { this.set({ attribution }); }
   setFacets(facets: TelemetryFacets) { this.set({ facets }); }
   setPending(pending: boolean) { if (this.state.pending !== pending) this.set({ pending }); }
-  /** Narrow the page by dimensions. Changing a provider or plugin clears the model or purpose that belonged to the previous one. */
+  /** Narrow the page by dimensions, each independent of the others. Changing a plugin clears the purpose that belonged to the previous one. */
   applyFilters(patch: FilterDimensions, labels: Partial<Record<FilterKey, string>> = {}) {
     const filters = { ...this.state.filters, ...patch };
-    if (patch.providerId !== undefined && !("modelId" in patch) && this.state.filters.providerId !== patch.providerId) delete filters.modelId;
     if (patch.pluginId !== undefined && !("purposeId" in patch) && this.state.filters.pluginId !== patch.pluginId) delete filters.purposeId;
     this.set({ filters, labels: { ...this.state.labels, ...labels } });
   }
   removeFilter(key: FilterKey) {
     const filters = { ...this.state.filters };
     delete filters[key];
-    if (key === "providerId") delete filters.modelId;
     if (key === "pluginId") delete filters.purposeId;
     this.set({ filters });
   }

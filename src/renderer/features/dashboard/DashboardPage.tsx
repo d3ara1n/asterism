@@ -12,7 +12,6 @@ import { exitTransition, fadeTransition } from "../../shared/weave/motion";
 import { useIsland, useIslandStrip } from "../../shared/weave/Screen";
 import { dashboardMessages as msg } from "../../messages/dashboard";
 import { DetailIsland, detailKey, detailPrefix, detailWidth, type DetailSubject } from "./DetailIsland";
-import { FilterChips } from "./Filters";
 import { groupLabel } from "./format";
 import { useDashboard, usePageFilter, type DashboardModel, type DashboardView } from "./model";
 import { useTelemetry } from "./use-telemetry";
@@ -75,7 +74,6 @@ export function DashboardPage({ model, active, onOpenSession }: { model: Dashboa
     <PageState kind={kind} title={i18n.text(title)} body={body && i18n.text(body)} action={action} className="min-h-80" />;
   return <div className="dashboard-page">
     <div className="flex w-full flex-col gap-3">
-      {Object.keys(state.filters).length > 0 && <FilterChips model={model} facets={state.facets} filters={state.filters} labels={state.labels} />}
       {facets.error && !facets.data ? status("error", msg.loadFailed, undefined,
         <Button variant="outline" size="sm" onClick={() => model.refresh()}>{i18n.text(commonMessages.retry)}</Button>)
         : !facets.data ? <div className="flex min-h-80 items-center justify-center"><Spinner /></div>

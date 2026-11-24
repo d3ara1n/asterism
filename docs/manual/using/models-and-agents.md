@@ -36,6 +36,8 @@ Response usage and estimated cost concern model requests; account balance and qu
 
 Usage statistics collect every model request across sessions and plugins, so you can see where cost and tokens went by folder, session, model, purpose, and time. They record counts, timings, and outcomes, never conversation content. The record is kept until you delete it; archiving or deleting sessions and folders does not remove their usage, and restoring a recovery point does not rewind it.
 
+Filters choose a model, a provider, or both. A model names one model ID across every provider that served it, so the same model reached through two relays reports one result; adding a provider narrows that to the relay. Measurements that belong to a connection, such as price, output speed, and first-output time, stay per provider in breakdowns and details, because a relay may price and serve the same model differently.
+
 Costs are estimates computed from the prices configured for each model when the request finished. Changing a price later does not rewrite earlier estimates, and requests whose price was unknown or only partly known are counted as such rather than as free. A provider's bill can still differ: relays, discounts, and charges the protocol does not report fall outside the estimate. Use provider balances for what the account actually holds, and usage statistics to understand which work consumed it.
 
 Folders and session names follow your current organization. Moving a session to another folder moves its history with it; names recorded at the time remain visible after a session or folder is deleted. A monthly budget sets the pace shown for the current calendar month; it does not limit requests.

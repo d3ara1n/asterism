@@ -1127,6 +1127,7 @@
   "dashboard.filter.chip": "{dimension}：{value}",
   "dashboard.filter.remove": "移除筛选 {name}",
   "dashboard.filter.clear": "清除筛选",
+  "dashboard.filter.providerCount": "{count} 个提供商",
   "dashboard.filter.apply": "按此筛选",
   "dashboard.folder.none": "无文件夹",
   "dashboard.purpose.none": "未声明",

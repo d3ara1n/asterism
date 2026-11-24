@@ -24,8 +24,9 @@ export type SubjectMatch = z.infer<typeof subjectMatchSchema>;
 
 /**
  * from/to bound event start times as [from, to); null leaves that side open. utcOffsetMinutes is positive east of UTC (+480 for UTC+8)
- * and places hour, day, weekday, and month boundaries. Optional dimensions narrow the ledger; null selects the absent value
- * (no folder, no purpose, the provider's default thinking level).
+ * and places hour, day, weekday, and month boundaries. Optional dimensions narrow the ledger independently; null selects the absent
+ * value (no folder, no purpose, the provider's default thinking level). A model ID selects it across every provider that served it,
+ * while a provider narrows the same way whether or not a model is chosen.
  */
 export const telemetryFilterSchema = z.strictObject({
   from: time.nullable(),
@@ -40,7 +41,7 @@ export const telemetryFilterSchema = z.strictObject({
   thinking: id.nullable().optional(),
   /** Requests that declared a matching subject. Excludes plugin-reported usage. */
   subject: subjectMatchSchema.optional(),
-}).refine(filter => filter.modelId === undefined || filter.providerId !== undefined, { message: "A model filter requires its provider." });
+});
 export type TelemetryFilter = z.infer<typeof telemetryFilterSchema>;
 
 export const telemetryQuerySchema = z.discriminatedUnion("kind", [

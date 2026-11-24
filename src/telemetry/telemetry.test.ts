@@ -184,6 +184,22 @@ describe("Usage ledger queries", () => {
     } finally { service.close(); }
   });
 
+  it("selects a model ID across every provider that served it", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      service.recordModelUsage(record({ providerId: "p", providerName: "Provider", modelId: "shared" }));
+      service.recordModelUsage(record({ providerId: "q", providerName: "Relay", modelId: "shared" }));
+      service.recordModelUsage(record({ providerId: "q", providerName: "Relay", modelId: "other" }));
+      // Grouping keeps connections apart, so one ID still reports each provider that served it.
+      const rows = query(service, { kind: "breakdown", dimension: "model", limit: 10, latency: false }, { ...everything, modelId: "shared" }).rows;
+      expect(rows.map(row => row.group.dimension === "model" && [row.group.providerId, row.metrics.requests]).sort()).toEqual([["p", 1], ["q", 1]]);
+      expect(query(service, { kind: "summary", compare: null }, { ...everything, modelId: "shared" }).metrics.requests).toBe(2);
+      // A provider narrows independently, with or without a model.
+      expect(query(service, { kind: "summary", compare: null }, { ...everything, providerId: "q", modelId: "shared" }).metrics.requests).toBe(1);
+      expect(query(service, { kind: "summary", compare: null }, { ...everything, providerId: "q" }).metrics.requests).toBe(2);
+    } finally { service.close(); }
+  });
+
   it("clears records before a time together with the tool calls and subjects of cleared requests", () => {
     const service = new TelemetryService(root(), workspace().lookup);
     try {

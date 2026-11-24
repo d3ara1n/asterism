@@ -69,7 +69,7 @@ export function DashboardActions({ model }: { model: DashboardModel }) {
       <SelectTrigger size="sm" className="h-8 w-28 border-0 bg-transparent shadow-none dark:bg-transparent" aria-label={i18n.text(msg.range)}><SelectValue /></SelectTrigger>
       <SelectContent align="end">{rangePresets.map(range => <SelectItem key={range} value={range}>{i18n.text(rangeLabels[range])}</SelectItem>)}</SelectContent>
     </Select>
-    <FilterPicker model={model} facets={state.facets} filters={state.filters} />
+    <FilterPicker model={model} facets={state.facets} filters={state.filters} labels={state.labels} />
     <DropdownMenu modal={false}>
       <IconButton label={i18n.text(msg.more)} asChild><DropdownMenuTrigger><MoreHorizontal /></DropdownMenuTrigger></IconButton>
       <DropdownMenuContent align="end">

@@ -31,6 +31,7 @@ export const dashboardMessages = pluginNamespace("asterism.host").messages("en",
   removeFilter: { id: "dashboard.filter.remove", defaultMessage: "Remove filter {name}" },
   clearFilters: { id: "dashboard.filter.clear", defaultMessage: "Clear filters" },
   applyFilter: { id: "dashboard.filter.apply", defaultMessage: "Filter by this" },
+  providerCount: { id: "dashboard.filter.providerCount", defaultMessage: "{count, plural, one {# provider} other {# providers}}" },
 
   noFolder: { id: "dashboard.folder.none", defaultMessage: "No folder" },
   noPurpose: { id: "dashboard.purpose.none", defaultMessage: "Undeclared" },
