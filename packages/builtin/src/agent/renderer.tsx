@@ -43,6 +43,6 @@ function AgentBody({ data }: { data: z.infer<typeof AgentView.schema> }) {
   const interaction = useAgentConversation(object, data.selection !== null, data.executionState, data.drafts);
   return <SkillReferences><AgentConversationProvider value={interaction}>
     <AgentUI selection={data.selection}><Conversation feedback={data.feedback} compressions={data.compressions}
-      interruptions={data.interruptions} activity={data.activity} executionStartedAt={data.executionStartedAt} /></AgentUI>
+      activity={data.activity} executionStartedAt={data.executionStartedAt} /></AgentUI>
   </AgentConversationProvider></SkillReferences>;
 }

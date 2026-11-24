@@ -2,7 +2,6 @@ import type { ModelBlock, ModelLiveBlock, RecordInfo, SessionRecord } from "@ast
 import { decodeExecution, ContextSummary, AgentInputMessage, type AgentMessageSender, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { turnMetrics, type TurnMeasurement, type TurnMetricsData } from "./turn-metrics.ts";
 import type { CompressionActivity, InlineFeedback } from "../feedback.ts";
-import { explainsOutcome, type TurnOutcome } from "../state.ts";
 import type { HistoryBoundary } from "./history-window.ts";
 import { isCompletedResponse, participatingBlocks } from "../response-messages.ts";
 
@@ -20,8 +19,6 @@ export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "compression"; id: string; status: Exclude<CompressionActivity["status"], "running"> | "completed"; details?: CompressionActivity["details"] }
   | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null; replyCreatedAt: string | null }
   | { kind: "conversation-process"; id: string; content: readonly ("text" | "thinking")[]; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; incomplete: boolean; notices: number; compressions: number; open: boolean }
-  /** The turn owns its ending, stated once at its boundary rather than as an event inside it. */
-  | { kind: "turn-outcome"; id: string; outcome: TurnOutcome }
   | ({ kind: "notice" } & InlineFeedback);
 /** Saved and live model blocks; notices may carry a responseId but are not blocks. */
 export function isModelBlock(item: TimelineItem): item is SavedBlock | ModelLiveBlock {
@@ -64,12 +61,8 @@ export interface ConversationProjection {
   turns: readonly TurnMeasurement[];
   boundary: HistoryBoundary | null;
 }
-export interface SavedTimeline { items: readonly TimelineItem[]; keys: ReadonlySet<string>;
-  /** The last turn has no following input to sit before, so its measurements and ending trail the list. */
-  tail: readonly TimelineItem[] }
-type ProjectionOptions = { boundary?: HistoryBoundary | null; from?: string;
-  /** Stops this runtime observed that left no response behind, keyed by the node they follow. */
-  interruptions?: readonly (string | null)[] };
+export interface SavedTimeline { items: readonly TimelineItem[]; keys: ReadonlySet<string>; tail: TimelineItem | null }
+type ProjectionOptions = { boundary?: HistoryBoundary | null; from?: string };
 
 /** Decode and measure while bodies are owned by the read, then release all non-display history. */
 export function projectConversation(path: readonly RecordInfo[], agentId: string, options: ProjectionOptions = {},
@@ -129,7 +122,7 @@ export function projectConversation(path: readonly RecordInfo[], agentId: string
     entries.push({ id: record.id, value });
   }
   return { entries, keys, notices, failedResponses, boundary: options.boundary ?? null,
-    turns: turnMetrics(bodies, agentId, false, options.interruptions).filter(turn => visibleTurns.has(turn.inputId)) };
+    turns: turnMetrics(bodies, agentId).filter(turn => visibleTurns.has(turn.inputId)) };
 }
 
 /** Transient feedback and execution state can change without rereading or retaining raw history bodies. */
@@ -156,22 +149,16 @@ export function conversationTimeline(projection: ConversationProjection, running
   }
   const summaries = projection.turns.filter(turn => !running || turn.nextInputId !== null);
   const before = new Map(summaries.map(turn => [turn.nextInputId, turn]));
-  // A turn states its own ending, so the reason sits with the content it describes rather than as an event inside it.
-  const measured = (turn: typeof summaries[number]): TimelineItem[] => {
-    const metrics: TimelineItem = {
-      kind: "turn-metrics", id: `turn-metrics:${turn.inputId}`, inputId: turn.inputId, metrics: turn.metrics,
-      incomplete: turn.outcome !== "completed", replyMarkdown: turn.replyMarkdown, replyCreatedAt: turn.replyCreatedAt,
-    };
-    return explainsOutcome(turn.outcome)
-      ? [{ kind: "turn-outcome", id: `turn-outcome:${turn.inputId}`, outcome: turn.outcome }, metrics]
-      : [metrics];
-  };
+  const measured = (turn: TurnMeasurement): TimelineItem => ({
+    kind: "turn-metrics", id: `turn-metrics:${turn.inputId}`, inputId: turn.inputId, metrics: turn.metrics,
+    incomplete: turn.incomplete, replyMarkdown: turn.replyMarkdown, replyCreatedAt: turn.replyCreatedAt,
+  });
   const items = saved.flatMap(value => {
     const turn = value.kind === "message" ? before.get(value.id) : undefined;
-    return turn ? [...measured(turn), value] : [value];
+    return turn ? [measured(turn), value] : [value];
   });
   const last = before.get(null);
-  return { items, keys: projection.keys, tail: last ? measured(last) : [] };
+  return { items, keys: projection.keys, tail: last ? measured(last) : null };
 }
 
 /** Actual blocks come from the current path; local history readers use the same projection as remote conversation reads. */
@@ -185,7 +172,7 @@ export function withLive(saved: SavedTimeline, live: readonly ModelLiveBlock[]):
   const active = new Map(live.map(block => [timelineKey(block), block]));
   return [...saved.items.map(item => isModelBlock(item) && "outcome" in item && item.outcome === null
     ? active.get(timelineKey(item)) ?? item : item),
-    ...live.filter(block => !saved.keys.has(timelineKey(block))), ...saved.tail];
+    ...live.filter(block => !saved.keys.has(timelineKey(block))), ...(saved.tail ? [saved.tail] : [])];
 }
 
 export interface LiveTimelineState {

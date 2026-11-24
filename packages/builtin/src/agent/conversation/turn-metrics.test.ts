@@ -28,24 +28,10 @@ describe("Per-turn conversation measurements", () => {
       node("follow2", "follow1", message("a", "More", false)),
       node("r3", "follow2", text("a", "r3", 0, "Next answer", { completion: completion(300, 40, 200, 1000) })),
     ];
-    expect(turnMetrics(records(path), "a", false)).toMatchObject([
-      { inputId: "u1", nextInputId: "follow1", outcome: "completed", metrics: { count: 2, usage: { input: { value: 300 } } } },
-      { inputId: "follow1", nextInputId: null, outcome: "completed", metrics: { count: 1 } },
+    expect(turnMetrics(records(path), "a")).toMatchObject([
+      { inputId: "u1", nextInputId: "follow1", incomplete: false, metrics: { count: 2, usage: { input: { value: 300 } } } },
+      { inputId: "follow1", nextInputId: null, incomplete: false, metrics: { count: 1 } },
     ]);
-    expect(turnMetrics(records(path), "a", true)).toHaveLength(1);
-  });
-
-  // Hide only the currently running turn; historical turn measurements remain in the conversation.
-  it("Hides measurements while the current turn runs and preserves the previous turn's summary when the next turn starts", () => {
-    const path = [
-      node("u1", null, message("a", "First")),
-      node("r1", "u1", text("a", "r1", 0, "Done", { completion: completion(100, 20, 50, 2000) })),
-    ];
-    expect(turnMetrics(records(path), "a", true)).toEqual([]);
-    expect(turnMetrics(records(path), "a", false)[0]?.metrics.count).toBe(1);
-    path.push(node("u2", "r1", message("a", "Next")));
-    expect(turnMetrics(records(path), "a", true)).toMatchObject([{ inputId: "u1", nextInputId: "u2", outcome: "completed", metrics: { count: 1 } }]);
-    expect(turnMetrics(records(path), "a", false)).toHaveLength(1);
   });
 
   // This turn starts at this agent's latest turn-opening input; earlier turns, other agents' messages, and auxiliary compression cannot change its range or affect weighting.
@@ -60,7 +46,7 @@ describe("Per-turn conversation measurements", () => {
         completion: completion(999, 999, 0, 1000) }, { source: agentSource("a") })),
       node("r2", "compression", text("a", "r2", 0, "Continued", { completion: completion(300, 80, 270, 1000) })),
     ];
-    const turns = turnMetrics(records(path), "a", false);
+    const turns = turnMetrics(records(path), "a");
     expect(turns.map(turn => turn.inputId)).toEqual(["old-user", "u"]);
     const metrics = turns[1]!.metrics;
     expect(metrics.count).toBe(2);
@@ -76,8 +62,8 @@ describe("Per-turn conversation measurements", () => {
       node("u", null, message("a", "Work")),
       node("partial", "u", text("a", "interrupted", 0, "Partial", { complete: false })),
     ];
-    const interruptedTurn = turnMetrics(records(path), "a", false)[0]!;
-    expect(interruptedTurn.outcome).toBe("incomplete");
+    const interruptedTurn = turnMetrics(records(path), "a")[0]!;
+    expect(interruptedTurn.incomplete).toBe(true);
     expect(interruptedTurn.replyMarkdown).toBeNull();
     expect(interruptedTurn.replyCreatedAt).toBeNull();
     const interrupted = interruptedTurn.metrics;
@@ -85,9 +71,8 @@ describe("Per-turn conversation measurements", () => {
     expect(interrupted.usage.output).toEqual({ value: null, count: 0 });
     expect(tokensPerSecond(interrupted.performance.rates.output)).toBeNull();
     path.push(node("resumed", "partial", text("a", "resumed", 0, "Done", { completion: completion(100, 20, 50, 2000) })));
-    expect(turnMetrics(records(path), "a", true)).toEqual([]);
-    const resumedTurn = turnMetrics(records(path), "a", false)[0]!;
-    expect(resumedTurn.outcome).toBe("completed");
+    const resumedTurn = turnMetrics(records(path), "a")[0]!;
+    expect(resumedTurn.incomplete).toBe(false);
     expect(resumedTurn.replyMarkdown).toBe("Done");
     const resumed = resumedTurn.metrics;
     expect(resumed.count).toBe(2);
@@ -111,7 +96,7 @@ describe("Per-turn conversation measurements", () => {
       node("u2", "other", message("a", "Next question")),
       node("next", "u2", text("a", "next", 0, "Next answer", { completion: completion(100, 20, 50, 2000) }), "2026-10-10T10:03:00Z"),
     ];
-    expect(turnMetrics(records(path), "a", false).map(turn => ({ text: turn.replyMarkdown, at: turn.replyCreatedAt })))
+    expect(turnMetrics(records(path), "a").map(turn => ({ text: turn.replyMarkdown, at: turn.replyCreatedAt })))
       .toEqual([
         { text: `${first}\n\n${second}`, at: "2026-10-10T10:01:02Z" },
         { text: "Next answer", at: "2026-10-10T10:03:00Z" },
@@ -129,6 +114,6 @@ describe("Per-turn conversation measurements", () => {
       node("earlier", "u", text("a", "earlier", 0, "Earlier response", { completion: completion(100, 20, 50, 2000) })),
       node("last", "earlier", last),
     ];
-    expect(turnMetrics(records(path), "a", false)[0]).toMatchObject({ replyMarkdown: null, replyCreatedAt: null });
+    expect(turnMetrics(records(path), "a")[0]).toMatchObject({ replyMarkdown: null, replyCreatedAt: null });
   });
 });

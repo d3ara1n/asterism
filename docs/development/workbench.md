@@ -144,7 +144,7 @@ Markdown uses shared rendering for history and live output. Code preserves copya
 
 Markdown footnotes navigate within their containing Markdown surface, with document-local anchor identities and return links. During generation, parsing operates on individual blocks; cross-block footnotes resolve when the response settles into whole-document rendering. External web destinations open in the browser. Resource destinations carry an instance ID and an opaque location and use the same resource opening capability as resource views. File contents retain their own viewer contract rather than inheriting the Agent interface's link behavior.
 
-Composer controls follow the Agent’s execution state: stop while running, continue for incomplete work, and ordinary send otherwise. Configuration changes apply to the next request.
+Composer controls follow the Agent’s execution state: stop while running, continue for incomplete work, and ordinary send otherwise. Once execution settles, the current history path determines whether the latest input has a final reply. A completed tool batch can still be waiting for that reply. The timeline shows recorded output and outcomes without adding a separate turn cancellation entry or changing earlier results. Configuration changes apply to the next request.
 
 ## Drafts and conversation presentation
 

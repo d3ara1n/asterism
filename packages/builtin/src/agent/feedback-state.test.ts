@@ -12,22 +12,21 @@ it("Keeps model and software feedback at their occurrence positions and releases
   } as unknown as ObjectExecutor;
   const state = createAgentFeedback();
   const model = { form: "incident" as const, origin: "model" as const, code: "provider_error", message: "HTTP 429" };
-  state.report(object, { ...model, origin: "software", code: "execution_failed", message: "fetch failed" }, true);
-  state.report(object, model, true);
-  state.report(object, { ...model, message: "HTTP 500" }, true);
+  state.report(object, { ...model, origin: "software", code: "execution_failed", message: "fetch failed" });
+  state.report(object, model);
+  state.report(object, { ...model, message: "HTTP 500" });
   nodeId = "answer";
   const software = { ...model, origin: "software" as const, code: "event_delivery", message: "Disk unavailable" };
-  state.report(object, software, true);
+  state.report(object, software);
   expect(state.get(object).inline.map(item => [item.afterNodeId, item.message])).toEqual([
     ["input", "fetch failed"], ["input", "HTTP 429"], ["input", "HTTP 500"], ["answer", "Disk unavailable"],
   ]);
   expect(new Set(state.get(object).inline.map(item => item.id)).size).toBe(4);
-  expect(state.get(object).interruptions).toEqual(["input", "input", "input", "answer"]);
   expect(state.get(object).inline.at(-1)).toMatchObject(software);
   expect(publish).not.toHaveBeenCalled();
   expect(commit).not.toHaveBeenCalled();
   state.delete(object.ref.id);
-  expect(state.get(object)).toEqual({ inline: [], interruptions: [], compressions: [], activity: null });
+  expect(state.get(object)).toEqual({ inline: [], compressions: [], activity: null });
 });
 
 // Error feedback may be appended during compression; finalizing the activity must preserve it, hand successful activity over to persistent records, and keep failures/cancellations at their original positions.

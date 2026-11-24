@@ -1407,7 +1407,9 @@ describe("Host implementation of the workbench SDK", () => {
     }
     expect(await done).toMatchObject({ reason: "cancelled" });
     const saved = events.filter(event => event.type !== "progress");
-    expect(saved.some(event => event.type === "block")).toBe(true);
+    expect(saved).toMatchObject([{
+      type: "block", block: { kind: "text", text: "Partial", complete: false, completion: { termination: { reason: "cancelled" } } },
+    }]);
     if (mode === "cancel") expect(service.sessions.running).toBe(false);
     else expect(() => object.session.snapshot()).toThrow();
   });

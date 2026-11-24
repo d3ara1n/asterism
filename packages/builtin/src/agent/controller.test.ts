@@ -12,7 +12,7 @@ import { AgentDrafts, AgentSelection } from "./data.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
 import { projectForAgent } from "./projection.ts";
 import { createSelection } from "./selection.ts";
-import { projectAgentTurnOutcome } from "./state-projection.ts";
+import { projectAgentTurnState } from "./state-projection.ts";
 
 function deferred() {
   let resolve!: () => void;
@@ -123,7 +123,7 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
     prepareRequest: { estimate: prepare, forRequest: async () => prepare },
   });
   return { activities: () => activities, controller, object, path, snapshot, driver, feedback, stream, execution, publish,
-    turn: () => projectAgentTurnOutcome(snapshot(), "a", feedback.get(object).interruptions),
+    turn: () => projectAgentTurnState(snapshot(), "a"),
     notices: () => publish.mock.calls.filter(([contract]) => contract === ResourceNoticeRaised).map(([, value]) => value.kind),
     turnEnds: () => publish.mock.calls.filter(([contract]) => contract === AgentTurnEnded),
   };
@@ -216,7 +216,6 @@ describe("Agent controller manual compaction", () => {
     expect(f.path).toEqual(before);
     expect(projectForAgent(f.snapshot(), "a")).toEqual(projected);
     expect(f.turn()).toBe(completed ? "completed" : "incomplete");
-    expect(f.feedback.get(f.object).interruptions).toEqual([]);
     expect(f.feedback.get(f.object).compressions).toEqual([expect.objectContaining({ status: "cancelled", afterNodeId: "3" })]);
     expect(f.notices()).toEqual([]);
     expect(f.activities()).toBe(0);
@@ -236,7 +235,6 @@ describe("Agent controller manual compaction", () => {
     expect(f.controller.running(f.object)).toBe(false);
     expect(f.path).toEqual(before);
     expect(f.turn()).toBe(completed ? "completed" : "incomplete");
-    expect(f.feedback.get(f.object).interruptions).toEqual([]);
     expect(f.feedback.get(f.object).compressions).toEqual([expect.objectContaining({ status: "cancelled", afterNodeId: "3" })]);
     expect(f.stream).not.toHaveBeenCalled();
     expect(f.turnEnds()).toEqual([]);

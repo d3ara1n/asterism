@@ -141,7 +141,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
     if (error instanceof ModelFailure) { usage = error.usage ?? null; providerResponseId = error.providerResponseId; }
     if (deliveryFailed) termination = { reason: "failed", code: "event_delivery" };
     else if (request.signal.aborted) {
-      // The termination carries the cancellation to the turn boundary; an inline diagnostic would state it twice.
+      // Cancellation does not report an incident or change an already sealed generation.
       termination = { reason: "cancelled" };
       if (!generationCompleted) generation = { reason: "cancelled" };
     } else {

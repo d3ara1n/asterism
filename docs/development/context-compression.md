@@ -20,7 +20,7 @@ Compaction is a context-only interlude. The summary operation neither starts an 
 
 The independent compaction entry requires a settled Agent, whether its last turn completed or remains incomplete. The controller checks that condition and registers its task synchronously, so the condition applies to backend callers as well as interface commands. An existing conversation or compaction task rejects another independent start. No eligible prefix is a normal no-op without a model request.
 
-Manual compaction owns a managed task and shares the Agent's busy state and stop action. It does not consume drafts, emit a turn-ended event, or resume conversation execution afterward. Input accepted during it remains queued. Success, failure, and cancellation preserve the preceding conversation's turn state; cancelling this interlude does not record a turn interruption.
+Manual compaction owns a managed task and shares the Agent's busy state and stop action. It does not consume drafts, emit a turn-ended event, or resume conversation execution afterward. Input accepted during it remains queued. Success, failure, and cancellation preserve the preceding conversation's turn state.
 
 ## Summary request
 

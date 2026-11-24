@@ -58,19 +58,15 @@ export function createAgentController(deps: AgentControllerDependencies) {
       title: object.snapshot()!.title, kind: noticeKinds[reason],
     });
   };
-  const report = (object: ObjectExecutor, error: unknown, signal: AbortSignal, interrupted: boolean) => {
-    // A stop is not an incident: it ends the turn, and the turn boundary states it.
-    if (signal.aborted) {
-      if (interrupted) deps.feedback.interrupt(object);
-      return;
-    }
+  const report = (object: ObjectExecutor, error: unknown, signal: AbortSignal) => {
+    if (signal.aborted) return;
     const details = describeError(error);
     deps.feedback.report(object, { form: "incident", origin: feedbackOrigin(error),
       code: error instanceof PluginApiError ? error.code : "execution_failed",
-      message: errorMessage(error, "Agent execution failed."), details }, interrupted);
+      message: errorMessage(error, "Agent execution failed."), details });
   };
   // Task registration is synchronous; callers check their domain conditions before handing off owned work.
-  const startTask = (object: ObjectExecutor, kind: "conversation" | "compression",
+  const startTask = (object: ObjectExecutor,
     work: (signal: AbortSignal) => Promise<AgentTurnEndReason>,
     ended: (reason: AgentTurnEndReason, entered: boolean) => () => void) => {
     const run = {
@@ -91,7 +87,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
         reason = await deps.execution.withActivity(object.ref, context => work(context.signal), { signal });
       } catch (error) {
         reason = signal.aborted ? "cancelled" : "failed";
-        report(object, error, signal, kind === "conversation");
+        report(object, error, signal);
       } finally { run.end(reason); }
     }, { object: object.ref }); }
     catch (error) { run.end("failed"); throw error; }
@@ -150,7 +146,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
       const { target, context, tokensBefore } = compressionContext(object);
       const plan = planCompression(context);
       if (!plan) return false;
-      startTask(object, "compression", async signal => {
+      startTask(object, async signal => {
         const completed = await compress(object, target, { plan, tokensBefore }, signal);
         return completed ? "completed" : "failed";
       }, (reason, entered) => {
@@ -166,7 +162,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
         const input = readRecords(turnStartRead(object.ref.id), snapshot.records.all);
         return { inputId: input?.id ?? null, position: snapshot.position };
       };
-      startTask(object, "conversation", async signal => {
+      startTask(object, async signal => {
         let turn: string | null = null;
         return runAgentLoop({
           retry: {
@@ -230,23 +226,21 @@ export function createAgentController(deps: AgentControllerDependencies) {
                 observer: { event(event) { progress.event(event); return observer.event(event); } },
               }));
             } catch (error) {
-              report(object, error, current, true);
+              report(object, error, current);
               return { reason: current.aborted ? "cancelled" : "failed", hasTools: false };
             } finally { run.request = null; }
             if (result.response) deps.usage?.consume(result.response);
             if (result.reason === "failed" && result.code === "event_delivery") {
               deps.feedback.report(object, { form: "incident", origin: "software", code: "event_delivery",
                 message: "The model response could not be saved to the timeline. Execution stopped.",
-                ...(result.details ? { details: result.details } : {}) }, true);
+                ...(result.details ? { details: result.details } : {}) });
               return { reason: "failed", hasTools: false, halt: true };
             }
             return { reason: result.reason, hasTools: result.tools.length > 0,
               ...(result.reason === "failed" ? { retryable: result.retryable, details: result.details } : {}) };
           },
         }, signal);
-      }, (reason, entered) => {
-        if (!entered && reason === "cancelled")
-          deps.feedback.interrupt(object);
+      }, reason => {
         deps.feedback.activity(object, null);
         const ended = boundary();
         return () => {

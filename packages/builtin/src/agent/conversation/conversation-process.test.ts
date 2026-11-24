@@ -129,8 +129,10 @@ describe("Conversation process folding by input groups", () => {
       node("reply", "u", text("a", "final", 0, "Hello", { completion })),
       node("steer", "reply", message("a", "More", false)),
     ];
-    expect(ids(project(path))).toEqual(["u", "reply", "steer", "turn-metrics:u"]);
-    expect(project(path).processIds.size).toBe(0);
+    const settled = project(path);
+    expect(ids(settled)).toEqual(["u", "reply", "steer", "turn-metrics:u"]);
+    expect(settled.processIds.size).toBe(0);
+    expect(settled.items.at(-1)).toMatchObject({ incomplete: true, replyMarkdown: null });
   });
 
   // Multiple steer deliveries can split one execution turn into more than two independently expandable groups.
@@ -172,11 +174,9 @@ describe("Conversation process folding by input groups", () => {
       { id: "earlier-error", afterNodeId: "progress", form: "incident", origin: "model", code: "provider_error", message: "HTTP 429" },
     ];
     const grouped = project(path, false, [], feedback);
-    expect(ids(grouped)).toEqual(["u", "reply1", "steer", "conversation-process:failed", "response-error:failed",
-      "turn-outcome:u", "turn-metrics:u"]);
+    expect(ids(grouped)).toEqual(["u", "reply1", "steer", "conversation-process:failed", "response-error:failed", "turn-metrics:u"]);
     expect(ids(grouped, ["conversation-process:failed"]))
-      .toEqual(["u", "reply1", "steer", "progress", "earlier-error", "partial", "conversation-process:failed", "response-error:failed",
-        "turn-outcome:u", "turn-metrics:u"]);
+      .toEqual(["u", "reply1", "steer", "progress", "earlier-error", "partial", "conversation-process:failed", "response-error:failed", "turn-metrics:u"]);
     expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ incomplete: true });
   });
 

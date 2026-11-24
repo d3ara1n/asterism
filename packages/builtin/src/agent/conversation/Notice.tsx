@@ -25,7 +25,7 @@ export function OccurrenceRow({ children, details }: { children: ReactNode; deta
  * on a failed process block, and the diagnostics stay reachable beneath the message.
  */
 export function IncidentBlock({ message, details }: { message: ReactNode; details?: ReactNode }) {
-  return <div role="alert" data-tone="failed" className="surface-block px-3 py-2 text-sm">
+  return <div data-tone="failed" className="surface-block px-3 py-2 text-sm">
     <BlockStateLine state="failed" />
     <div className="flex min-w-0 items-start gap-2">
       <StatusIcon tone="error" className="mt-0.5 size-3.5 shrink-0" />

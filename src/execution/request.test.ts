@@ -118,11 +118,29 @@ describe("Stateless single model execution", () => {
 
   it("does not make local preparation failures or explicit cancellation eligible for retry", async () => {
     const signal = AbortSignal.abort();
-    const request = input([], { signal });
+    const events: ModelRunEvent[] = [], request = input(events, { signal });
     const cancelled = await runModelRequest(request, Promise.resolve({ adapter: model(text), settings, system: request.system, messages: [] }));
-    expect(cancelled.reason).toBe("cancelled");
+    expect(cancelled).toMatchObject({ reason: "cancelled", completion: null });
+    expect(events).toEqual([{ type: "progress", blocks: [] }]);
     const failed = await execute(input([]), model(text, () => { throw new Error("Local assembly failed"); }));
     expect(failed).toMatchObject({ reason: "failed", retryable: false });
+  });
+
+  it("keeps recorded generation and completed tool results when the remainder of a tool batch is stopped", async () => {
+    const abort = new AbortController(), events: ModelRunEvent[] = [];
+    const request = input(events, { signal: abort.signal });
+    const result = await runModelRequest(request, Promise.resolve({
+      adapter: model(calls(["first", "second"])), settings, system: request.system, messages: [],
+      tools: { declarations: [], async execute(batch, signal, settle) {
+        settle(batch[0]!, { kind: "succeeded", data: 42, model: [] });
+        abort.abort();
+        signal.throwIfAborted();
+      } },
+    }));
+    expect(result).toMatchObject({ reason: "cancelled", completion: { finishReason: "tool-calls", termination: { reason: "completed" } } });
+    expect(events.filter(event => event.type === "tool.complete")).toMatchObject([
+      { block: { callId: "first", outcome: { kind: "succeeded", data: 42 } } },
+    ]);
   });
 
   it("does not execute tools when their pending input cannot be saved", async () => {

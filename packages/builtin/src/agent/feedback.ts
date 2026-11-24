@@ -4,7 +4,7 @@ import { errorDetailsSchema } from "@asterism-app/sdk/contracts";
 /**
  * Feedback inside a turn has two forms. An incident is a failure: the request or the software around it went wrong and the
  * diagnostics stay reachable. An occurrence happened without failing: content was left out, or background work ran and
- * stopped. Neither describes how the turn itself ended; that is the turn outcome.
+ * stopped. Feedback does not determine whether the input has a final reply.
  */
 export const incidentSchema = z.strictObject({
   form: z.literal("incident"),

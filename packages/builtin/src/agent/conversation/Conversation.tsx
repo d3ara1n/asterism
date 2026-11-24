@@ -49,9 +49,8 @@ export function ConversationActions({ data }: { data: { executionState: AgentExe
 const viewStateKey = "asterism.builtin/agent.timeline-view";
 
 /** Agent card content: the final view of the current path and the input area; branches are not exposed here, and rewinding takes place in session history. */
-export function Conversation({ feedback, compressions, interruptions, activity = null, executionStartedAt }: {
+export function Conversation({ feedback, compressions, activity = null, executionStartedAt }: {
   feedback: readonly InlineFeedback[]; compressions: readonly CompressionActivity[];
-  interruptions: readonly (string | null)[];
   activity?: AgentActivity | null; executionStartedAt: number | null;
 }) {
   const i18n = useI18n();
@@ -68,7 +67,7 @@ export function Conversation({ feedback, compressions, interruptions, activity =
   }));
   const running = executionState === "running";
   const { read, items, loadEarlier } = useConversationHistory(snapshot, historyWindow, models.blocks, running, feedback,
-    compressions, interruptions);
+    compressions);
   const { timeline: target, processOwners, toggle } = useConversationProcesses(items, viewState, running);
   const reducedMotion = useReducedMotion() === true;
   const presence = useTimelinePresence(target, processOwners, reducedMotion);

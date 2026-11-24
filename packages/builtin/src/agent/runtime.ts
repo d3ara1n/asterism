@@ -17,9 +17,8 @@ import { createAgentStateTool } from "./self-state/runtime.ts";
 import { CompactAgentConversation } from "./compression-contract.ts";
 import { commandMessages } from "../messages/command.ts";
 import { createAdmission } from "./admission.ts";
-import { projectAgentTurnOutcome } from "./state-projection.ts";
-import { agentExecutionState } from "./state.ts";
-import type { TurnOutcome } from "./state.ts";
+import { projectAgentTurnState } from "./state-projection.ts";
+import type { AgentTurnState } from "./state.ts";
 import type { ProviderUsage } from "@asterism-app/sdk/runtime";
 import { createPeekChannel, createPeekClient, createPeekTool } from "./peek/service.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
@@ -58,7 +57,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
       peek: peekAgent,
     });
     // Draft and configuration updates reuse the current path's turn state; rederive it only when the history position changes.
-    const turns = new Map<string, { nodeId: string | null; interruptions: readonly (string | null)[]; outcome: TurnOutcome | "empty" }>();
+    const turns = new Map<string, { nodeId: string | null; state: AgentTurnState }>();
     return {
       calls: [implementCall(StartAgentSession, async (input, context) => {
         let accepted: { ref: ResourceRef; input: SubmitAgentInputData } | undefined;
@@ -106,19 +105,16 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
           if (controller.running(object))
             return { agentId: object.ref.id, selection: value?.selection ?? null,
               executionState: "running" as const, executionStartedAt: controller.startedAt(object), drafts,
-              feedback: [...transient.inline], compressions: [...transient.compressions],
-              interruptions: [...transient.interruptions], activity: transient.activity };
+              feedback: [...transient.inline], compressions: [...transient.compressions], activity: transient.activity };
           const history = object.session.snapshot();
           let turn = turns.get(object.ref.id);
-          if (!turn || turn.nodeId !== history.position.nodeId || turn.interruptions !== transient.interruptions) {
-            turn = { nodeId: history.position.nodeId, interruptions: transient.interruptions,
-              outcome: projectAgentTurnOutcome(history, object.ref.id, transient.interruptions) };
+          if (!turn || turn.nodeId !== history.position.nodeId) {
+            turn = { nodeId: history.position.nodeId, state: projectAgentTurnState(history, object.ref.id) };
             turns.set(object.ref.id, turn);
           }
           return { agentId: object.ref.id, selection: value?.selection ?? null,
-            executionState: agentExecutionState(turn.outcome, false), executionStartedAt: null, drafts,
-            feedback: [...transient.inline], compressions: [...transient.compressions],
-            interruptions: [...transient.interruptions], activity: null };
+            executionState: turn.state, executionStartedAt: null, drafts,
+            feedback: [...transient.inline], compressions: [...transient.compressions], activity: null };
         },
         async inspect(_data, object) {
           return { type: Agent.kind, title: object.snapshot()?.title ?? "Agent" };

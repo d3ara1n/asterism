@@ -6,12 +6,8 @@ import { readRecordsAsync, type RecordRead } from "../../shared/record-reading";
 import { conversationRecordIds, type ConversationHistoryWindow } from "./history-window";
 import { projectConversation, type ConversationProjection } from "./timeline";
 
-/**
- * Reading windows belong to the conversation; history and diagnostics choose their own generic record ranges. The
- * interruption positions come from this runtime, because a stop that left no response behind is not in the records.
- */
-export function readConversation(snapshot: RendererSessionSnapshot, window: ConversationHistoryWindow, signal?: AbortSignal,
-  interruptions: readonly (string | null)[] = []) {
+/** Reading windows belong to the conversation; history and diagnostics choose their own generic record ranges. */
+export function readConversation(snapshot: RendererSessionSnapshot, window: ConversationHistoryWindow, signal?: AbortSignal) {
   const { agentId } = window;
   const index = snapshot.records.index({ scope: "timeline" });
   function* read(): RecordRead<ConversationReading> {
@@ -24,7 +20,7 @@ export function readConversation(snapshot: RendererSessionSnapshot, window: Conv
     const path = snapshot.records.index(query);
     // Metadata keeps every positional anchor; unrelated resource bodies never enter the conversation read.
     const bodies = yield { ...query, source: agentId, contracts: conversationRecordIds };
-    return { projection: projectConversation(path, agentId, { ...range, interruptions }, bodies), index, ...range };
+    return { projection: projectConversation(path, agentId, range, bodies), index, ...range };
   }
   return readRecordsAsync(read(), query => snapshot.records.all(query, { signal }), signal);
 }

@@ -104,8 +104,6 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
     id: "conversation.output.incomplete",
     defaultMessage: "Incomplete",
   },
-  turnCancelled: { id: "conversation.turn.cancelled", defaultMessage: "Stopped" },
-  turnFailed: { id: "conversation.turn.failed", defaultMessage: "Failed before finishing" },
   you: {
     id: "conversation.participant.you",
     defaultMessage: "You",

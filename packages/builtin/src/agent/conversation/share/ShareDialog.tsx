@@ -97,7 +97,7 @@ export default function ShareDialog({ snapshot, messages: initial, anchor, histo
       const read = await readConversation(snapshot, historyWindow, signal);
       signal.throwIfAborted();
       const timeline = conversationTimeline(read.projection, false);
-      const loaded = shareMessages([...timeline.items, ...timeline.tail]);
+      const loaded = shareMessages([...timeline.items, ...(timeline.tail ? [timeline.tail] : [])]);
       setCandidates(current => prependEarlierShareMessages(loaded, current));
       setEarlier(read.earlier);
     } catch (error) {
