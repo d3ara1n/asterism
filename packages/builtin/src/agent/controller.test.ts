@@ -118,8 +118,9 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
       subagent: { instructions: "", budget: { maxRequests: 1, maxDurationSeconds: 1 } }, resources: null, excludeResources: null, delegates: null }],
     roles: () => [{ id: "default", builtin: true, enabled: true, model: "p/m", thinking: null, description: "" }],
   });
+  const prepare = () => ({ blocks: [], skills: [], catalogBlock: null, system: { blocks: [] } });
   const controller = createAgentController({ selection, tasks: driver.tasks, models, execution, feedback, userAgent: "test",
-    prepareRequest: () => () => ({ blocks: [], skills: [], catalogBlock: null, system: { blocks: [] } }),
+    prepareRequest: { estimate: prepare, forRequest: async () => prepare },
   });
   return { activities: () => activities, controller, object, path, snapshot, driver, feedback, stream, execution, publish,
     turn: () => projectAgentTurnState(snapshot(), "a", feedback.get(object).interruptions),

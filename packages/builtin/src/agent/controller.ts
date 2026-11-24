@@ -103,7 +103,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
   const compressionContext = (object: ObjectReader) => {
     const selection = selectionOf(object).selection;
     const target = deps.selection.target(selection);
-    const { system } = deps.prepareRequest(deps.selection.agent(selection))();
+    const { system } = deps.prepareRequest.estimate(deps.selection.agent(selection));
     const systemTokens = Math.ceil(system.blocks.reduce((size, block) => size + block.text.length, 0) / 4);
     const context = projectAgentContext(object.session.snapshot(), object.ref.id);
     const tokensBefore = estimateContext(context, object.ref.id, formatModelExpression(target), systemTokens);
@@ -210,7 +210,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
               const target = deps.selection.target(selection);
               const model = formatModelExpression(target);
               run.request = { role: agent.id, model, thinking: target.thinking ?? null };
-              const prepare = deps.prepareRequest(agent);
+              const prepare = await deps.prepareRequest.forRequest(agent);
               let prepared: ReturnType<typeof prepare>;
               const projected = (deps.projectMessages ?? projectForAgent)(snapshot, object.ref.id);
               const modalities = deps.models.list().find(entry => entry.model === model)?.capabilities.inputModalities ?? [];

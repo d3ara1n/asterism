@@ -84,14 +84,14 @@ The Agent stores selection and activity state, not a second message history. Sys
 
 - Infrastructure descriptions explain primitives, inputs, outputs, and request boundaries.
 - Agent instructions define its selected role and work requirements.
-- Linked-directory `AGENTS.md` files supply current context.
+- Builtin adds `~/.agents/AGENTS.md` and linked-directory `AGENTS.md` files as file context.
 - The skill catalog supplies names and descriptions for selective reading.
 
 Host-authored harness text uses declarative descriptions of primitives. Workflows come from user prompts and skills. User instructions retain their meaning, including negative requirements.
 
 Context selection guides model behavior toward the user's intended work. Omitting a skill from a prompt does not make its files inaccessible, and hiding a tool does not establish an operating system sandbox. Resource identity and captured access still govern the shared resource dispatcher. Shells, terminals, and MCP operate with the configured user's access; prompt preparation does not attempt to police equivalent operations through those capabilities.
 
-Builtin owns structured prompt blocks and their projection. The host model service accepts neutral source/text blocks; session-bound execution supplies captured linked context for the requesting plugin to assemble. Builtin's ordered request preparers can filter skills and edit blocks before projection. Captured blocks provide identity and origin for diagnostics; their text delimiters do not establish an additional instruction hierarchy.
+Builtin owns structured prompt blocks and their projection. It loads the optional user-level `AGENTS.md` before linked file context, without creating a resource or changing request capabilities. The host model service accepts neutral source/text blocks; session-bound execution supplies captured linked context for the requesting plugin to assemble. Builtin's ordered request preparers can filter skills and edit blocks before projection. Captured blocks provide identity and origin for diagnostics; their text delimiters do not establish an additional instruction hierarchy.
 
 ## Skills
 

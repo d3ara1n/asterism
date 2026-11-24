@@ -36,7 +36,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
   return defineModule(plugin => {
     const projectMessages = createWorkProjection(plugin);
     const prepareRequest = createRequestAssembly(plugin, skills);
-    const systemPrompt = (agent: Parameters<typeof prepareRequest>[0]) => prepareRequest(agent)().system;
+    const systemPrompt = (agent: Parameters<typeof prepareRequest.estimate>[0]) => prepareRequest.estimate(agent).system;
     const selection = createSelection({ agents: () => builtinConfiguration(plugin).agents, roles: () => builtinConfiguration(plugin).roles });
     const peek = { models: plugin.models, userAgent: application.userAgent, usage,
       utility: () => resolveRoleTarget(builtinConfiguration(plugin).roles, "utility") };

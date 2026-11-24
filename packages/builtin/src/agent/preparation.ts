@@ -1,13 +1,26 @@
+import { realpath } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { builtin, type AgentConfiguration } from "@asterism-app/builtin-api/contracts";
 import { captureAgentPreparers, type AgentPromptBlock } from "@asterism-app/builtin-api/runtime";
 import type { PluginContext } from "@asterism-app/sdk/runtime";
 import type { PromptFile } from "@asterism-app/sdk/contracts";
 import { skillCatalogPrompt, type SkillCatalog } from "../skills/catalog.ts";
 import { projectAgentPrompt } from "./system-prompt.ts";
+import { readAgentContext } from "../filesystem/agent-context.ts";
 
-/** Capture catalog and preparers before awaiting linked context; prepare once for this request. */
-export function createRequestAssembly(plugin: PluginContext, catalog: SkillCatalog) {
-  return (agent: Pick<AgentConfiguration, "id" | "systemPrompt">) => {
+type Agent = Pick<AgentConfiguration, "id" | "systemPrompt">;
+
+async function readGlobalAgentContext(home: string) {
+  try { return await readAgentContext(await realpath(join(home, ".agents", "AGENTS.md"))); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+export function createRequestAssembly(plugin: PluginContext, catalog: SkillCatalog, home = homedir()) {
+  function capture(agent: Agent) {
     const instructions = plugin.agentCatalog.instructions(), skills = catalog.skills(), prepare = captureAgentPreparers(plugin);
     return (files: readonly PromptFile[] = []) => {
       // Preparers edit these lists in place; each projection builds its own.
@@ -28,5 +41,15 @@ export function createRequestAssembly(plugin: PluginContext, catalog: SkillCatal
       if (catalogBlock) prepared.blocks.push(catalogBlock);
       return { ...prepared, catalogBlock, system: projectAgentPrompt(prepared.blocks) };
     };
+  }
+  return {
+    // Admission and compression estimates do not load file context.
+    estimate: (agent: Agent) => capture(agent)(),
+    async forRequest(agent: Agent) {
+      const assemble = capture(agent);
+      const global = await readGlobalAgentContext(home);
+      return (files: readonly PromptFile[] = []) => assemble(global
+        ? [global, ...files.filter(file => file.file !== global.file)] : files);
+    },
   };
 }

@@ -1,7 +1,7 @@
 import { directoryCard } from "../shared/card-appearance.ts";
 import { createReadStream } from "node:fs";
 import { z } from "zod";
-import { readFile, stat } from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { defineModule, implementResource, implementTool, implementCall, implementChannel, PluginApiError, type CallResult, type ObjectReader } from "@asterism-app/sdk/runtime";
@@ -26,6 +26,7 @@ import { fileFailure } from "./file-io.ts";
 import { editorCalls } from "./editor-runtime.ts";
 import { directoryCreation } from "./creation-runtime.ts";
 import { inspectPathTool } from "./inspect-path.ts";
+import { readAgentContext } from "./agent-context.ts";
 
 function textFailure(error: unknown, signal: AbortSignal, operation: string): CallResult<never> {
   if (signal.aborted) return { kind: "cancelled", message: `${operation} was cancelled before committing file content.` };
@@ -80,9 +81,8 @@ export function createFilesystemModule(shell: ShellServices) {
     creation: directoryCreation,
     async context(directory) {
       const file = await withinDirectory(directory.path, "AGENTS.md").catch(() => null);
-      if (!file) return [];
-      const text = await readFile(file, "utf8").catch(() => null);
-      return text === null ? [] : [{ file, text: text.slice(0, 64 * 1024) }];
+      const context = file && await readAgentContext(file).catch(() => null);
+      return context ? [context] : [];
     },
   })],
   tools: [

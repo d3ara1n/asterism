@@ -144,7 +144,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
           const blocks: ModelBlock[] = [];
           const submitted = new Set<string>();
           const currentAgent = resolveAgent(deps.configuration(), snapshot.input.role);
-          const prepare = deps.prepare({ ...currentAgent, systemPrompt: [
+          const prepare = await deps.prepare.forRequest({ ...currentAgent, systemPrompt: [
             currentAgent.systemPrompt,
             currentAgent.subagent.instructions,
           ].filter(text => text.trim()).join("\n\n") });
