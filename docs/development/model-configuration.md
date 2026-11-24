@@ -40,7 +40,9 @@ Parameter lookup from models.dev returns supported capabilities and prices for t
 
 Valid mapped fields overwrite the current draft values, using the same change detection and explicit save as manual editing. Lookup works before the model is saved and does not persist configuration or invalidate connection tests. Missing or unrepresentable metadata retains draft values with a diagnostic. Lookup does not infer compatibility packs from model names.
 
-Input files are sent with their media types; the service determines accepted modalities and input limits. The client’s model capability switches govern reasoning and tool declaration.
+The builtin Agent uses the active model's configured input modalities, the Agent's accepted media types, and the inline size limit to project attachments for each request. A file not sent natively is represented by a text envelope in the same position as the file part. The envelope states why the file was not sent natively when the reason is known. A user attachment can include a local path when a copy is available; a preparation failure is reported separately and has no path. This projection also keeps incompatible media from saved tool results out of subsequent requests. It does not change the original records, so a different model can receive the same saved file natively without uploading it again.
+
+For media sent natively, the service still determines what the endpoint accepts. Client configuration is not a capability probe. Reasoning and tool declarations also depend on the current model configuration.
 
 Client validation protects request structure, resource authorization, and application-owned identity and history invariants. Configured generation values reach the service unchanged by provider-range assumptions or SDK model-name heuristics. A caller’s explicit output cap still combines with the configured cap under the public request contract; service acceptance and errors remain upstream responsibilities.
 

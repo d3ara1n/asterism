@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { ModelFilePart, ModelInputPart, ModelItem, ModelMediaModality } from "@asterism-app/sdk/contracts";
 import type { ContentReader, PluginContext } from "@asterism-app/sdk/runtime";
 import { saveFileContent } from "../filesystem/save.ts";
-import { acceptsModelMedia, MAX_INLINE_FILE_BYTES } from "../shared/model-media.ts";
+import { modelMediaModality, MAX_INLINE_FILE_BYTES } from "../shared/model-media.ts";
 
 const key = (value: string) => createHash("sha256").update(value).digest("hex");
 const safeName = (name: string) => name.split(/[\\/]/u).at(-1)?.replace(/[<>:"|?*\x00-\x1f]/gu, "_").replace(/^[. ]+|[. ]+$/gu, "").slice(-60) || "attachment";
@@ -12,7 +12,7 @@ const escapeText = (text: string) => text.replace(/[&<>]/gu, value => ({ "&": "&
 const attachmentText = (metadata: object) => ({ kind: "text" as const, text: `<attachment>${escapeText(JSON.stringify(metadata))}</attachment>` });
 
 /** Derived working files carry a stable path while the original remains in the authorized content store. */
-export function createAttachmentProjection(root: string) {
+export function createAttachmentProjection(root: string, log?: Pick<PluginContext["log"], "error">) {
   return async (messages: readonly ModelItem[], sessionId: string, content: ContentReader,
     modalities: readonly ModelMediaModality[], signal: AbortSignal): Promise<ModelItem[]> => {
     const sessionRoot = join(root, key(sessionId));
@@ -36,14 +36,21 @@ export function createAttachmentProjection(root: string) {
     const projectFile = async (part: ModelFilePart, toolResult: boolean): Promise<ModelInputPart> => {
       signal.throwIfAborted();
       const filename = part.filename ?? "attachment";
-      const mime = part.mediaType;
-      const inline = acceptsModelMedia(modalities, mime, toolResult);
-      if (toolResult && !inline)
-        return attachmentText({ filename, mediaType: mime, error: "This model is not configured for this tool result format." });
+      const mediaType = part.mediaType;
+      const modality = modelMediaModality(mediaType, toolResult);
+      let reason = modality === undefined ? "This media type is not sent as native input by the Agent."
+        : !modalities.includes(modality) ? `The current model is not configured for ${modality} input.` : undefined;
+      let size = part.size;
+      let phase: "size" | "copy" = "size";
+      if (toolResult && reason) return attachmentText({ filename, mediaType, size, reason });
       try {
-        let size = await sizeOf(part);
-        if (inline && size <= MAX_INLINE_FILE_BYTES) return part;
-        if (toolResult) return attachmentText({ filename, mediaType: mime, error: "Tool result file exceeds the 8 MiB inline limit." });
+        const measured = await sizeOf(part);
+        if (!reason && measured <= MAX_INLINE_FILE_BYTES) return part;
+        reason ??= "The file exceeds the 8 MiB native input limit.";
+        // A streaming size probe can stop at the limit rather than report the full length.
+        if (content.size || measured <= MAX_INLINE_FILE_BYTES) size = measured;
+        if (toolResult) return attachmentText({ filename, mediaType, size, reason });
+        phase = "copy";
         const id = part.file["$asterism.content"];
         const path = join(sessionRoot, key(id), `file-${safeName(filename)}`);
         const existing = await stat(path).catch(error => {
@@ -55,12 +62,15 @@ export function createAttachmentProjection(root: string) {
           size = await saveFileContent(path, content.open(part.file), signal);
           sizes.set(id, size);
         }
-        return attachmentText({ filename, mediaType: mime, size, path });
+        return attachmentText({ filename, mediaType, size, reason, path });
       } catch (error) {
         signal.throwIfAborted();
         const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
-        return attachmentText({ filename, mediaType: mime, error: code === "ENOSPC"
-          ? "There is not enough disk space to prepare this attachment." : "The attachment could not be read or prepared." });
+        const message = phase === "size" ? "The attachment size could not be read from the content store."
+          : code === "ENOSPC" ? "There is not enough disk space to prepare a local copy of the attachment."
+          : "A local copy of the attachment could not be prepared.";
+        log?.error(message, error);
+        return attachmentText({ filename, mediaType, size, reason, error: message });
       }
     };
     const output: ModelItem[] = [];
@@ -85,6 +95,6 @@ export function agentAttachmentProjection(plugin: PluginContext) {
       await rm(join(root, entry.name), { recursive: true, force: true });
   }).catch(error => { if (error.code !== "ENOENT") plugin.log.warn("Could not clean the attachment cache."); });
   plugin.lifetime.defer(() => ready);
-  const project = createAttachmentProjection(root);
+  const project = createAttachmentProjection(root, plugin.log);
   return async (...args: Parameters<typeof project>) => { await ready; return project(...args); };
 }
