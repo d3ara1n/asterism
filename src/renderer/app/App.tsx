@@ -125,7 +125,6 @@ export function App({ controller }: { controller: ApplicationController }) {
   const writable = ready && !sessionBlocked && !!session;
   const inSettings = page === "settings";
   const commandSession = useMemo(() => !inSettings ? active?.recordSnapshot() ?? null : null, [inSettings, active, sessionState]);
-  const completed = view.kind === "conversation" && !!snapshot?.sessions.find(item => item.id === view.sessionId)?.completed;
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
     : view.kind === "dashboard" ? i18n.formatMessage(dashboardMessages.title)
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? i18n.formatMessage(commonMessages.conversation);
@@ -258,7 +257,7 @@ export function App({ controller }: { controller: ApplicationController }) {
       setSettingsTarget({ category: "about", sequence: ++navigation.current });
     }} />
     <span className="h-4 w-px shrink-0 bg-border" />
-    <span className={completed && !inSettings ? "window-session-title line-through" : "window-session-title"}>{inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}</span>
+    <span className="window-session-title">{inSettings ? i18n.formatMessage(settingsMessages.settings) : mainTitle}</span>
   </>;
   const actions = session ? <>
     <DropdownMenu modal={false}><DropdownMenuTrigger asChild>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
-import { BarChart3, Check, ChevronRight, MessageSquare, Moon, Search } from "lucide-react";
+import { BarChart3, Check, ChevronRight, Search } from "lucide-react";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import {
   RendererPreferencesProvider,
@@ -13,6 +13,7 @@ import { CommandBack, isCommandBackKey, useCommandPageMotion } from "@asterism-a
 import { commandDetail, commandEmpty, commandHeading, commandRow } from "@asterism-app/ui/command-styles";
 import type { AppSnapshot } from "../../../shared/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
+import { SessionGlyph } from "../../app/SessionStatus";
 import { appMessages } from "../../messages/app";
 import { dashboardMessages } from "../../messages/dashboard";
 import { useFolders } from "../folders/context";
@@ -86,11 +87,12 @@ function SessionSection({ sessions, navigation, close }: {
       return <CommandItem key={session.id} value={JSON.stringify([sessionsNamespace, "search", session.id])}
         keywords={[session.title]} disabled={!sessions.ready} className={commandRow}
         onSelect={() => { close(); sessions.open(session.id); }}>
-        {session.sleeping ? <Moon aria-hidden="true" /> : <MessageSquare aria-hidden="true" />}
+        <SessionGlyph session={session} />
         <div className="min-w-0 flex-1">
-          <div className={cn("truncate", session.completed && "line-through")}>{session.title}</div>
+          <div className="truncate">{session.title}</div>
           {folder && <div className={cn("mt-0.5 truncate", commandDetail)}>{folder.name}</div>}
           {session.sleeping && <span className="sr-only">{i18n.text(appMessages.sleeping)}</span>}
+          {!session.sleeping && session.keepAwake && <span className="sr-only">{i18n.text(appMessages.keepAwake)}</span>}
           {session.completed && <span className="sr-only">{i18n.text(appMessages.completed)}</span>}
         </div>
         {current && <><Check className="ml-auto" aria-hidden="true" /><span className="sr-only">{i18n.text(messages.currentSession)}</span></>}

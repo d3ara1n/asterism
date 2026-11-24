@@ -1,9 +1,10 @@
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@asterism-app/ui/ui/hover-card";
 import { ProgressRing } from "@asterism-app/ui/ui/progress-ring";
 import { cn } from "@asterism-app/ui/utils";
-import { CircleCheck, Flame, Hand, OctagonAlert, createLucideIcon, type LucideIcon } from "lucide-react";
+import { CircleCheck, Flame, Hand, MessageSquare, Moon, OctagonAlert, createLucideIcon, type LucideIcon } from "lucide-react";
 import type { ResourceActivity, ResourceNotice } from "@asterism-app/sdk/contracts";
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import type { AppSnapshot } from "../../shared/contracts";
 import { resourceStatusMessages as messages } from "../messages/resource-status";
 import { useI18n } from "../shared/i18n";
 import type { ResourceNoticeMark, SessionIndicator, SessionResourceState } from "./resource-status";
@@ -42,7 +43,7 @@ function InstanceMark({ className }: { className: string }) {
  * Lucide's coffee with the cup body and handle as separate paths, so a filled variant fills only the cup.
  * The outline renders the same as the original.
  */
-export const CoffeeCup = createLucideIcon("coffee-cup", [
+const CoffeeCup = createLucideIcon("coffee-cup", [
   ["path", { d: "M10 2v2", key: "a" }], ["path", { d: "M14 2v2", key: "b" }], ["path", { d: "M6 2v2", key: "c" }],
   ["path", { d: "M17 9v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1z", key: "d" }],
   ["path", { d: "M17 8h1a4 4 0 1 1 0 8h-1", fill: "none", key: "e" }],
@@ -52,13 +53,20 @@ export const CoffeeCup = createLucideIcon("coffee-cup", [
  * The session icon carries session state, filled once the session is completed; the top-right badge carries resource state
  * and the bottom-right mark open instances. Icons fill through currentColor, so open strokes such as a cup handle opt out per path.
  */
-export function SessionGlyph({ icon: Icon, filled, indicator }: { icon: LucideIcon; filled: boolean; indicator: SessionIndicator }) {
-  const layers = [indicator.state && masks.state, indicator.instances > 0 && masks.instances].filter(Boolean);
+export function SessionGlyph({ session, indicator }: {
+  session: Pick<AppSnapshot["sessions"][number], "sleeping" | "keepAwake" | "completed">;
+  indicator?: SessionIndicator;
+}) {
+  // Keep-awake takes effect once the session is awake; completion fills any of the three icons.
+  const Icon = session.sleeping ? Moon : session.keepAwake ? CoffeeCup : MessageSquare;
+  const state = indicator?.state;
+  const hasInstances = (indicator?.instances ?? 0) > 0;
+  const layers = [state && masks.state, hasInstances && masks.instances].filter(Boolean);
   const style: CSSProperties | undefined = layers.length === 0 ? undefined : { maskImage: layers.join(", "), maskComposite: "intersect", maskRepeat: "no-repeat" };
   return <span className="relative flex size-4 shrink-0">
-    <Icon aria-hidden="true" fill={filled ? "currentColor" : "none"} className="size-4 text-muted-foreground" style={style} />
-    {indicator.state && <span className="absolute -top-1 -right-1 flex"><StateBadge state={indicator.state} /></span>}
-    {indicator.instances > 0 && <InstanceMark className="absolute -right-1 -bottom-1 size-2.5" />}
+    <Icon aria-hidden="true" fill={session.completed ? "currentColor" : "none"} className="size-4 text-muted-foreground" style={style} />
+    {state && <span className="absolute -top-1 -right-1 flex"><StateBadge state={state} /></span>}
+    {hasInstances && <InstanceMark className="absolute -right-1 -bottom-1 size-2.5" />}
   </span>;
 }
 

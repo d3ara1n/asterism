@@ -6,7 +6,7 @@ import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { ActionMenu, ActionMenuContent, ActionMenuItem, ActionMenuSeparator, ActionMenuTrigger, ActionMenuTarget } from "@asterism-app/ui/ui/action-menu";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
-import { BarChart3, ChevronRight, Moon, Folder as FolderIcon, FolderPlus, House, MessageSquare, MoreHorizontal, PanelLeftClose, Pencil, Trash2 } from "lucide-react";
+import { BarChart3, ChevronRight, Folder as FolderIcon, FolderPlus, House, MoreHorizontal, PanelLeftClose, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@asterism-app/ui/utils";
 
 import { appMessages } from "../messages/app";
@@ -20,7 +20,7 @@ import type { AppSnapshot, RuntimeStatus } from "../../shared/contracts";
 import type { SessionResult } from "../../shared/session";
 import { SessionActions } from "./SessionActions";
 import { indicatorItem, SelectionIndicator } from "../shared/selection-indicator";
-import { CoffeeCup, SessionGlyph, SessionStatus, hasSessionIndicator } from "./SessionStatus";
+import { SessionGlyph, SessionStatus, hasSessionIndicator } from "./SessionStatus";
 import { sessionIndicator, type ResourceNoticeMark } from "./resource-status";
 import type { ResourceActivity } from "@asterism-app/sdk/contracts";
 import { useFolders } from "../features/folders/context";
@@ -91,9 +91,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
     const notices = resourceNotices.filter(notice => notice.resource.sessionId === session.id);
     const folder = marked && session.folder_id !== null ? folderById.get(session.folder_id) : undefined;
     const indicator = sessionIndicator(activities, notices);
-    // One mutually exclusive session state: sleep outranks keep-awake, which only takes effect once the session is awake.
-    // Completion is independent and fills whichever icon is shown.
-    const icon = <SessionGlyph icon={session.sleeping ? Moon : session.keepAwake ? CoffeeCup : MessageSquare} filled={session.completed} indicator={indicator} />;
+    const icon = <SessionGlyph session={session} indicator={indicator} />;
     // Resource details open from the icon; the row button cannot contain another button, so the icon then moves beside it with the same spacing.
     const interactive = hasSessionIndicator(indicator);
     const glyph = interactive ? <SessionStatus indicator={indicator} activities={activities} notices={notices}>{icon}</SessionStatus> : icon;
