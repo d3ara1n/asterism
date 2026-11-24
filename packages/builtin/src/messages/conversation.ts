@@ -23,6 +23,8 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
   processToolCount: { id: "conversation.process.toolCount", defaultMessage: "{count, plural, one {# tool call} other {# tool calls}}" },
   processFailedCount: { id: "conversation.process.failedCount", defaultMessage: "{count} failed" },
   processPartialCount: { id: "conversation.process.partialCount", defaultMessage: "{count} partial" },
+  processNoticeCount: { id: "conversation.process.noticeCount", defaultMessage: "{count, plural, one {# notice} other {# notices}}" },
+  processCompressionCount: { id: "conversation.process.compressionCount", defaultMessage: "{count, plural, one {# compaction} other {# compactions}}" },
   drafts: { id: "conversation.drafts.title", defaultMessage: "Drafts" },
   draftMoreActions: { id: "conversation.drafts.moreActions", defaultMessage: "More actions" },
   saveDraft: { id: "conversation.drafts.save", defaultMessage: "Save draft" },

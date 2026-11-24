@@ -48,7 +48,7 @@ describe("Conversation process folding by input groups", () => {
       .toMatchObject({ content: ["thinking"], tools: [] });
   });
 
-  // Steer splits presentation without splitting execution measurements; errors retain their original position.
+  // Steer splits presentation without splitting execution measurements. This group never completed, so its error stays visible instead of folding.
   it("Supplemental inputs create separate processes while errors and a single turn footer remain visible", () => {
     const path = [
       node("u", null, message("a", "Work")),
@@ -61,9 +61,11 @@ describe("Conversation process folding by input groups", () => {
       { id: "error", afterNodeId: "progress", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
     ];
     const grouped = project(path, false, [], feedback);
+    // The work group ended without a completed response, so folding never happens and its error stays where it occurred.
     expect(ids(grouped)).toEqual(["u", "conversation-process:work", "error", "steer", "conversation-process:final", "reply", "turn-metrics:u"]);
     expect(ids(grouped, [...grouped.processIds]))
       .toEqual(["u", "progress", "conversation-process:work", "error", "steer", "tool", "conversation-process:final", "reply", "turn-metrics:u"]);
+    expect(grouped.items.find(item => item.id === "conversation-process:work")).toMatchObject({ notices: 0, compressions: 0 });
   });
 
   // The boundary follows input position, including when the previous response completed before steer arrived.
@@ -196,7 +198,7 @@ describe("Conversation process folding by input groups", () => {
     expect(grouped.owners.has(JSON.stringify(["work", 1]))).toBe(false);
   });
 
-  // Stopping leaves no final reply; resuming continues the original turn, whose process must reappear, with folding offered again only when the turn settles anew.
+  // Stopping leaves no final reply; resuming continues the original turn, and stopping's own notice folds once that turn finally succeeds.
   it("Interruption collapses process items and preserves feedback; resuming restores the original stream without presenting partial output as a final reply", () => {
     const path = [
       node("u", null, message("a", "Work")),
@@ -210,7 +212,8 @@ describe("Conversation process folding by input groups", () => {
     expect(stopped.items.find(item => item.kind === "conversation-process")).toMatchObject({ incomplete: true });
     expect(ids(project(path, true, [], feedback))).toEqual(["u", "partial", "stopped"]);
     path.push(node("done", "partial", text("a", "resumed", 0, "Done", { completion })));
-    expect(ids(project(path, false, [], feedback))).toEqual(["u", "conversation-process:resumed", "stopped", "done", "turn-metrics:u"]);
+    expect(ids(project(path, false, [], feedback))).toEqual(["u", "conversation-process:resumed", "done", "turn-metrics:u"]);
+    expect(project(path, false, [], feedback).items.find(item => item.kind === "conversation-process")).toMatchObject({ notices: 1 });
   });
 
   // Compression markers represent events and do not participate in process folding; a fold button should not appear out of nowhere when there is no body text.
@@ -232,8 +235,8 @@ describe("Conversation process folding by input groups", () => {
     expect(grouped.processIds.size).toBe(0);
   });
 
-  // Compression may also follow a normal final response; organizing final body text must not move compression markers before the reply or fold them into the process.
-  it("Compression during the process and after the reply both remain visible in their original relative order", () => {
+  // Compaction markers fold as events of a successful group, and their count is reported once by the summary row.
+  it("Compaction markers inside a successful group fold with it and the summary row counts them", () => {
     const summary = (keptFrom: string) => event(ContextSummary.id, { summary: "Internal summary", keptFrom,
       model: "p/m", tokensBefore: 1000, completion }, { source: agentSource("a") });
     const path = [
@@ -243,8 +246,10 @@ describe("Conversation process folding by input groups", () => {
       node("reply", "before", text("a", "final", 0, "Done", { completion })),
       node("after", "reply", summary("reply")),
     ];
-    expect(ids(project(path))).toEqual(["u", "conversation-process:final", "before", "reply", "after", "turn-metrics:u"]);
-    expect(ids(project(path), ["conversation-process:final"])).toEqual(["u", "tool", "conversation-process:final", "before", "reply", "after", "turn-metrics:u"]);
+    expect(ids(project(path))).toEqual(["u", "conversation-process:final", "reply", "turn-metrics:u"]);
+    expect(ids(project(path), ["conversation-process:final"]))
+      .toEqual(["u", "tool", "conversation-process:final", "before", "reply", "after", "turn-metrics:u"]);
+    expect(project(path).items.find(item => item.kind === "conversation-process")).toMatchObject({ notices: 0, compressions: 2 });
   });
 
   // A direct answer has nothing to hide, while a thinking-only completion has no final body; neither may generate fabricated output.

@@ -86,10 +86,12 @@ describe("Conversation reading range after compression", () => {
     const saved = project(path, new ConversationHistoryWindow("a"));
     expect(ids(saved)).toEqual(["compression-boundary:summary", "kept", "reply", "summary", "turn-metrics:u"]);
     const grouped = groupConversationProcesses(withLive(saved, []), false);
+    // The compaction marker that closed the successful group folds with it and is counted by the summary row.
     expect(visibleConversationProcesses(grouped, new Set()).map(item => item.id))
-      .toEqual(["compression-boundary:summary", "conversation-process:final", "reply", "summary", "turn-metrics:u"]);
+      .toEqual(["compression-boundary:summary", "conversation-process:final", "reply", "turn-metrics:u"]);
     expect(visibleConversationProcesses(grouped, new Set(["conversation-process:final"])).map(item => item.id))
       .toEqual(["compression-boundary:summary", "kept", "conversation-process:final", "reply", "summary", "turn-metrics:u"]);
+    expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ compressions: 1 });
   });
 
   // Completion is a fact of the full response, even when the reading window omits its initial blocks.

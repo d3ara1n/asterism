@@ -319,6 +319,8 @@
   "conversation.process.toolCount": "{count} 次工具调用",
   "conversation.process.failedCount": "{count} 个失败",
   "conversation.process.partialCount": "{count} 个部分完成",
+  "conversation.process.noticeCount": "{count} 条提示",
+  "conversation.process.compressionCount": "{count} 次压缩",
   "conversation.outline.title": "对话大纲",
   "conversation.outline.position": "第 {current} 条输入，共 {total} 条",
   "conversation.outline.search": "搜索输入",
