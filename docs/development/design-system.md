@@ -161,6 +161,8 @@ Interface copy serves user understanding and action, not code comments or schema
 
 Status uses the shared status components with text and icons. Feedback stays with the operation it belongs to: field errors with fields, command progress at its entry, and Agent execution errors and warnings inline in the owning conversation. Independent interface command failures use toasts. One failure is never shown both inline and as a toast, and a background reread never becomes a global saving indicator.
 
+Execution notices inside a conversation follow the same rule as process blocks: a failure keeps the shell tone of the content it belongs to and shows the failed state line, and a warning, such as a cancellation or an omitted attachment, stays a marker row with its icon and text. A notice does not add a bordered box that repeats an edge tone already draws. Pending operation feedback such as an unconfirmed draft exchange uses the same two forms rather than a local tinted border.
+
 ### Buttons
 
 | Variant | Role |

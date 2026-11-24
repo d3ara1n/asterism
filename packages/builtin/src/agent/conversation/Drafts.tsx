@@ -166,7 +166,7 @@ function DraftsBox({ drafts: current, pendingTake, open, onOpenChange, onTake }:
               {pendingTake && <motion.div key="pending-take"
                 initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }} transition={transition}
-                className="mb-1 flex items-center gap-2 rounded-md border border-warning/40 bg-warning/5 px-2 py-1">
+                className="mb-1 flex items-center gap-2 px-2 py-1">
                 <StatusText tone="warning" className="min-w-0 flex-1">
                   {i18n.text(messages.draftExchangePending)}
                 </StatusText>

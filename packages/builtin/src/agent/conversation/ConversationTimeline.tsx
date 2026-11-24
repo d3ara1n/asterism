@@ -1,10 +1,10 @@
 import { RendererViewStateProvider, useI18n, useRendererObject, useRendererViewState, type RendererViewStateEntry, type ContentReader } from "@asterism-app/sdk/renderer";
-import { TriangleAlert, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { memo, useLayoutEffect, useMemo, useState, type ReactNode, type Ref, type RefObject } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Virtualizer, type VirtualizerHandle } from "virtua";
 
-import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
+import { ExecutionNotice } from "./Notice";
 import { cn } from "@asterism-app/ui/utils";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "@asterism-app/ui/markdown";
@@ -19,7 +19,6 @@ import { MessageSender } from "./MessageSender";
 import { MessageFooter } from "./MessageFooter";
 import { messageAppearance } from "../message-presentation";
 import { TimelineViewState, viewStateKeys } from "./view-state";
-import { ExecutionErrorDetails } from "../ErrorDetails";
 import { ConversationProcess } from "./ConversationProcess";
 import { CompressionMarker } from "./CompressionMarker";
 import { CompressionSummary } from "./CompressionSummary";
@@ -112,12 +111,7 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "compression-summary": return <CompressionSummary text={node.text} />;
     case "compression": return <CompressionMarker node={node} />;
     case "turn-metrics": return <TurnFooter inputId={node.inputId} metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} replyCreatedAt={node.replyCreatedAt} />;
-    case "notice": return <Alert variant={node.level === "error" ? "destructive" : "default"}>
-      {node.level === "error" ? <TriangleAlert /> : <Info />}<AlertDescription>
-        <p className="whitespace-pre-wrap break-words">{node.omittedFiles
-          ? i18n.formatMessage(conversationMessages.attachmentsOmitted, { files: node.omittedFiles.join(", ") }) : node.message}</p>
-        {node.details && <ExecutionErrorDetails code={node.code} details={node.details} />}
-      </AlertDescription></Alert>;
+    case "notice": return <ExecutionNotice node={node} />;
     default: return null;
   }
 }
