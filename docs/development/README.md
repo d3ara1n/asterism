@@ -23,14 +23,14 @@ Choose a primary home by the question the information answers. Another surface c
 | How do I perform an operation, interpret its result, and understand its execution boundaries? | Owning tool description, guidelines, and input/output schemas |
 | What should the interface communicate at this point of use? | User-facing controls, labels, and contextual feedback |
 | When should I choose a resource, what does it relate to, and why did it behave this way? | Resource sections in the user manual, grounded in current behavior |
-| How should a plugin author choose integration boundaries and use the public model? | Plugin-author manual and public-package guides; types and executable examples own concrete interfaces |
+| How should a plugin author choose integration boundaries and use the public model? | Plugin-author guides; target-release public exports, source, and tests own interfaces and concrete assembly |
 | What internal design should implementation preserve? | Engineering documentation; local implementation rationale belongs in code comments |
 | What responsibilities, procedures, and completion criteria has the user selected? | Role instructions, skills, and task instructions |
 | What was deferred or investigated, or what did a review find? | `plans/` tasks (`todo`), references (`ref`), and reviews (`review`) |
 
 ### Manual scope
 
-`docs/manual/` serves users and plugin authors, including public-package guides exposed through the Manual resource. It explains mental models, usage choices, and responsibility boundaries. Models consult relevant topics on demand; ordinary tool use is self-contained through discovery. Internal engineering documents serve maintainers.
+The Manual resource exposes application and public-package guides on demand. Guides explain decisions and source examples illustrate a prototype an Agent can inspect without running it. The target release’s SDK exports and declarations own current interfaces; application source and tests show how those interfaces behave. Ordinary tool use is self-contained through discovery. Internal engineering documents serve maintainers.
 
 Group application resource topics in `docs/manual/using/resources/` by shared usage questions rather than by individual tools. Cover each resource's role, when to choose it, meaningful relationships, and tradeoffs or common mistakes. Include behavior and lifecycle caveats that help readers set expectations or understand an observed result. Briefly identify each resource so the section stands alone; related resources can share a chapter.
 

@@ -1,61 +1,39 @@
-# Manage data and lifecycle
+# Own data and work over time
 
-Choose storage from the meaning of the data. Latest values, historical facts, immutable bytes, and running processes answer different questions and need different owners.
+Choose storage and lifetime from what a value means. Current values, historical facts, preserved bytes, and running processes answer different questions and have different owners.
 
-## Separate current state from history
+## Choose what to preserve
 
-Current data answers what is true now. History explains what happened. Saving a current value is not a promise that browsing history will restore it; restoration needs a domain operation with a defined meaning.
+Current data answers what is true now. History explains what happened. A counter might keep its latest value and record each increment; a document editor might promise a restorable body at each revision. Make restoration an explicit domain operation rather than promising it just because something is recorded.
 
-For example, a counter can keep its latest value while recording each increment for explanation. A document editor may instead need a restorable body at each revision. Decide which experience the resource promises before choosing its records and current data.
+Keep plugin-wide data with the plugin and transient interface choices with the view. Keep business state separate from host identity and presentation. A domain field called “title” need not be the card title, and a domain identifier need not be the host resource identity.
 
-Keep plugin-wide private data with the plugin. Keep temporary interface choices with the view unless users need them to survive reopening. A running process is neither saved data nor a historical fact: it needs a live owner and cleanup.
-
-## Treat encoding as a domain boundary
-
-Use a codec when the value plugin code works with differs from its stored representation. Keep conversion semantics with that declaration rather than scattering normalization through readers and writers. A one-way input transformation and a reversible storage conversion solve different problems.
-
-Check meaningful round trips for custom conversions. In particular, reading an old representation and writing a new one should preserve the domain value even when their JSON differs. Compatibility decoding can make an old fact readable without rewriting what was originally recorded.
-
-Separate host identity and presentation from business state. A domain field named “title” need not be the card title, and a domain identifier need not be the host resource identity. Conflating them makes renaming and reuse surprising.
-
-## Decide what a template can reuse
-
-A data-copy template is appropriate when selected saved values remain meaningful under new host identities. A note can reuse its body; an Agent can reuse configuration without carrying pending work into a new session.
-
-Treat copying an address differently from cloning what it addresses. A resource that depends on an external account, embedded object identities, or private files may need an explicit domain-specific cloning operation instead of a data-copy template. Such an operation can explain what will be shared, copied, or reconnected.
-
-Choose titles according to the same distinction. Preserving a descriptive source title can help users recognize a reusable setup; generating a title can make sense when each instance represents new work.
+A template copies setup that remains meaningful under new identities. It may reuse a note's body or an Agent's configuration, not their running work. Decide which saved values should carry over and what a copied address shares rather than clones. Decide whether a new object needs the original title or one derived from the new task.
 
 ## Commit facts, then observe them
 
-Complete network and file processing outside synchronous transactions, then commit the resulting state. Keep the commit focused on the facts that must become visible together.
+Finish asynchronous preparation before committing related facts together. If an operation must be visible while pending, give it one durable identity from submission to final outcome. Keep progress transient unless it has lasting domain meaning.
 
-Use a pending operation record when consumers need to know about work before its result exists. Its identity represents one operation from published input to final outcome. Keep progress transient unless it has lasting domain meaning, and assign responsibility for ending abandoned work to the owner that started it.
+A snapshot fixes the evidence being read, not the destination of future writes. Reuse it for related queries that need a common basis. Notifications are prompts to observe: read current state for a current-state consumer, and use durable facts if missing an event during downtime changes the result.
 
-A snapshot fixes the evidence being read; it does not redirect later writes into the past. Reuse one snapshot for related queries when their conclusions need a common basis. Obtain a fresh one when the question is about current state.
+Read another domain's history through its original public contract. Unreadable evidence is not absent evidence. Restoring an object's current presence does not mean it was just created; observe committed creation facts for historical reactions and attachment lifetimes for present work.
 
-Notifications are prompts to observe, not substitutes for saved state. A state-driven consumer should subscribe and read the current value, then reread when notified. An occurrence-driven consumer must decide whether missing an event during downtime is acceptable or whether the domain needs durable records.
+## Evolve a saved format without changing the fact
 
-## Read history through its owner
+Use a codec when the stored representation differs from what domain code should see. Check that round trips preserve meaning. When an older encoding is still straightforward to read, compatible decoding can leave the saved bytes alone. When an incompatible representation must be converted together before the plugin runs, declare a startup migration instead of scattering repairs through readers and service startup. If the meaning changes rather than just the encoding, give the new fact a new contract.
 
-Import the original public record contract rather than interpreting another domain's JSON by convention. Shared decoding keeps the meaning and compatibility policy with the author who owns the fact.
+Version private formats independently of session history. A record group is for owned timeline contracts that must evolve together. Keep its identity and membership stable; do not move existing contracts between groups or assume a changed member inherits the correct version. Convert only the recorded data, using rules tied to the old format rather than today's business defaults. Preserve source, position, and the content the fact retains. Migration changes the persisted format; readers remain responsible for interpreting and validating the content. Do not revise past decisions, recreate resources, or repeat external effects.
 
-Unreadable evidence is different from absent evidence. Preserve that distinction when reporting or deciding whether to recover. A failed transfer is also not an empty query result. An interface should expose those differences rather than presenting an apparently complete account.
+Test the conversion with a real old-format fixture and an expected encoding. Include records on alternate paths and retained content when relevant. Check that a second startup leaves the prepared data unchanged and that an interrupted or failed upgrade has a recovery path. Do not assume independent stores upgrade as one transaction; the plugin may remain unavailable while a previously prepared store is already on the new version.
 
-Distinguish a creation fact from current presence. Reconstructing an object while browsing history does not mean it was just created. Use historical observation to react to committed facts and attachment lifetimes to own work while a resource is present.
+## Separate addresses from preserved bytes
 
-## Choose between an address and preserved bytes
+Use a file reference when the consumer should decide whether and when to read current external content. Use retained content when a record or export must still mean the same bytes later. Passing an address does not preserve a version or confer access.
 
-A file reference is an address interpreted by its source resource. It is useful when a consumer should decide whether and when to read external content. Passing the address does not preserve a version of that content.
-
-Retained immutable content is appropriate when a record, attachment, or export must continue to mean the same bytes. For example, a reference to a working file suits “review the current draft”; a retained attachment suits “explain the draft that was submitted.”
-
-Content identifiers alone are not ownership or access. Preserve retained references in the saved encoding, and transfer ownership before closing temporary content scopes. A reference synthesized only while decoding cannot preserve bytes that were never retained.
+Keep retained references in the saved encoding and transfer ownership before closing temporary scopes. A reference synthesized only when reading cannot preserve bytes that were never retained.
 
 ## End work with its owner
 
-Bind shared services to the plugin lifetime and object-owned work to the resource lifetime. Register cleanup when creating the work, while its ownership is clear. Pass cancellation into the I/O it controls and wait for actual completion before releasing dependencies that work still uses.
+Bind shared services to the plugin and object-owned work to the resource. Register cleanup at the point of ownership, pass cancellation into the I/O it controls, and wait for actual completion before releasing dependencies.
 
-Use timeline activity tracking for work whose writes depend on the current history position. An external service may need to stop when its resource disappears without otherwise preventing history navigation. Choose based on that dependency, not merely on whether the operation is asynchronous.
-
-Declare persistent format changes in the plugin's `storage` entry, independently of ordinary service startup. Private files have their own versions. For an incompatible timeline payload change, use a `kind: "records"` storage declaration with a stable `id`, the owned record `contracts`, a target `version`, and synchronous `migrations`. Changes in a record group do not change the workspace database's structural version. The callback receives the contract ID and encoded record data; the host preserves provenance, history position, and content reference membership.
+Track timeline activity when work depends on a history position. A service may otherwise need to stop when its resource disappears without preventing history navigation. Choose based on that dependency, not simply because an operation is asynchronous.

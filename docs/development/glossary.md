@@ -73,8 +73,8 @@ These terms distinguish the concepts used when developing Asterism. Each definit
 | Lifetime | Cancellation signal and owned cleanup scope |
 | Top-level tool | Static operation directly declared to the model protocol |
 | Resource tool | Operation selected for a linked resource through dispatch |
-| Tool implementation | Resource-specific target, result, and handler for a tool contract |
-| Target | Implementation-defined location within a selected resource |
+| Tool implementation | Resource-specific handler and result contract, with a target contract for structured tools |
+| Target | Structured selection of content, scope, or view within a resource |
 | Tool outcome | Final success, rejection, failure, cancellation, partial result, or unknown effect |
 | Agent creation entry | Built-in domain adapter exposing resource creation to models |
 | ContentRef | Reserved JSON value identifying immutable bytes |

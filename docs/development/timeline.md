@@ -1,6 +1,6 @@
 # Timeline and history
 
-Each session owns a record tree with fixed identity and ancestry and one execution cursor. The host stores generic records and workbench events; plugins interpret their own domain records. Completed records are immutable. An explicitly pending operation can fill its result once at its original position.
+Each session owns a record tree with fixed identity and ancestry and one execution cursor. The host stores generic records and workbench events; plugins interpret their own domain records. At runtime, completed records are immutable and an explicitly pending operation can fill its result once at its original position. [Storage preparation](architecture.md#data-preparation) can migrate a payload's encoding before runtime without changing the recorded fact.
 
 ## Record identity and provenance
 
@@ -40,7 +40,7 @@ Publication and completion have distinct notifications. Observers receive a comp
 
 ## Preserve partial output
 
-Cancelled or interrupted generation can save incomplete blocks. They advance the cursor and remain visible in history. Agent model projection excludes unfinished text, thinking, and tool arguments while retaining usable completed content from the same response. Complete tool arguments without an outcome project with an explicit explanation: a call never handed to execution is reported as not executed, and a call handed to execution without a recorded result is reported as having unknown effects. Projection does not execute the call or rewrite history.
+Cancelled or interrupted generation can save incomplete blocks. They advance the cursor and remain visible in history. Agent model projection excludes unfinished blocks, including tool input drafts, while retaining usable completed content from the same response. A complete tool input without an outcome projects with an explicit explanation: a call never handed to execution is reported as not executed, and a call handed to execution without a recorded result is reported as having unknown effects. Projection does not execute the call or rewrite history.
 
 A tool that started execution obtains an outcome. Confirmed cancellation differs from an unknown write effect. Neither outcome implies rollback.
 

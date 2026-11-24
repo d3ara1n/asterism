@@ -130,15 +130,13 @@ Application metadata and historical records share synchronous transactions. File
 
 ## Data preparation
 
-Each persistent format has its own version constant. Preparation reads versions rather than validating business data shapes. Missing files remain absent until their owner creates them.
+Version the workspace database structure, plugin-private formats, and plugin-owned record groups independently. A change to a record payload is not a change to the workspace schema. Preparation uses versions to select format conversions. Consumers remain responsible for validating domain data. Missing files remain absent until their owner creates them. For an unregistered record group, matching existing records start at version 1; an empty group starts at its declared version before runtime writes any records.
 
 During internal development, incompatible data can be rebuilt within explicitly authorized cleanup scope. The first distribution to users, including sharing a prerelease with friends, establishes the continuous migration obligation. Internal maintainer test releases alone do not establish it.
 
-Migrations form consecutive n-to-n+1 steps. Validate the entire path before conversion. JSON commits with atomic file replacement; SQLite commits the chain and version update in one transaction. Released steps remain stable and do not call mutable business helpers. Keep old-format fixtures to verify migrations from distributed formats.
+Migrations form consecutive n-to-n+1 steps. Validate the entire path before conversion. JSON commits with atomic file replacement; SQLite commits the changes and version together in one transaction. For a record group that transaction updates only payload data selected by contract and stamped plugin provenance, preserving record identity, history position, and content references. Released steps remain stable and do not call mutable business helpers. Keep old-format fixtures to verify migrations from distributed formats.
 
-Workspace structure and plugin-owned record payloads have independent versions. A plugin declares a stable group of owned timeline record contracts and payload transforms in its storage entry. Preparation selects rows by contract and stamped plugin provenance, and commits the payload updates and group version in one workspace transaction. It leaves record identity, history position, and references intact. Untagged existing history starts at version 1; unused groups start at their current version before runtime writes any records. A later payload change does not advance the workspace schema version. An older package cannot start against a newer group, including when that package omits the declaration altogether.
-
-Prepare host storage before plugin storage. Host failure opens recovery UI without starting business services. A plugin storage failure disables that plugin for the startup and reports the reason; unrelated plugins continue.
+Prepare host storage before plugin storage. Host failure opens recovery UI without starting business services. A plugin storage failure disables that plugin for the startup and reports the reason; unrelated plugins continue. This prevents a downgraded package from writing an older payload format into a migrated group, even if the package no longer declares that group.
 
 Before migration, save a complete recovery point of persistent application data with database connections closed. Caches and logs are excluded. Sealed immutable content can share bytes through hard links; unsupported filesystems use copies. Completion metadata is written last. Migrations within one preparation invocation share that point. Cross-invocation reuse is limited to matching transitions when the first migration is host-owned, preserving blocked-host retries without consuming retention slots. A plugin-first invocation always takes a fresh full snapshot because a previous plugin failure could have allowed startup and intervening writes. Repeated plugin-first attempts therefore consume slots in the existing seven-point retention window.
 
@@ -176,7 +174,7 @@ Query selection has one implementation shared by storage and memory readers. Par
 
 Commands return when their action completes, independently of the view update. Each UI entry owns pending state. Input submission identity supports exact retry without duplicating accepted input.
 
-Streaming deltas align by response and block identity. Progress materialization is batched within the response lifetime, and terminal transitions flush outstanding progress. Persistent records arrive before removal of their live counterparts; readers retain the last live observation while the corresponding saved range is loading. Partial arguments are display-only; execution uses validated complete arguments.
+Streaming deltas align by response and block identity. Progress materialization is batched within the response lifetime, and terminal transitions flush outstanding progress. Persistent records arrive before removal of their live counterparts; readers retain the last live observation while the corresponding saved range is loading. Input drafts are display-only; execution uses validated complete inputs.
 
 ## Releases and updates
 

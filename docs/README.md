@@ -1,14 +1,12 @@
 # Documentation directories
 
-The internal manual explains software use and plugin development. Engineering documents support development of Asterism itself. Both collections are English and organized by independently readable topics.
+Choose material by the question it answers. The Manual resource exposes guides and examples from the application, public packages, and loaded plugins. Use guides to understand a decision and examples to see a prototype; use the target SDK to resolve interfaces.
 
-| Directory | Purpose |
+| Question | Where to look |
 | --- | --- |
-| `docs/manual/using/` | Software-use guides |
-| `packages/sdk/docs/` and `packages/sdk/examples/` | Generic plugin-development guides and source examples |
-| `packages/builtin-api/docs/` and `packages/builtin-api/examples/` | Built-in domain guides and source examples |
-| `docs/development/` | Internal software engineering topics |
-| `plans/` | Active tasks, references, and reviews |
-| `plans/archived/` | Closed tasks, consumed references, and resolved reviews |
-
-The manual resource exposes the application and public-package directories directly, plus documentation directories declared by loaded plugins. Articles remain independently readable in their owning packages.
+| How should work be organized in Asterism? | [Application manual](manual/README.md) |
+| How should a plugin fit the host or a built-in domain? | [SDK guide](../packages/sdk/docs/getting-started.md), [built-in Agent guide](../packages/builtin-api/docs/agents.md), [artifact guide](../packages/plugin-build/docs/building-plugins.md) |
+| What does a small plugin look like? | [SDK counter example](../packages/sdk/examples/counter/README.md), [built-in Agent examples](../packages/builtin-api/examples/README.md) |
+| Which interface actually implements a capability? | The target release's public exports, application source, and tests |
+| What should an internal change preserve? | [Engineering documentation](development/README.md) |
+| What is under investigation or explicitly deferred? | `plans/`; closed work is in `plans/archived/` |

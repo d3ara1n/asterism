@@ -190,7 +190,7 @@ Question drafts are scoped by session, Agent, and waiting instance. Repeated sub
 
 ## Tool views and Agent extensions
 
-Input, execution, and result use one call shell. Resource-call rendering delegates to the selected implementation rather than nesting another shell. Partial arguments support preview only.
+Input, execution, and result use one call shell. Resource-call rendering delegates to the selected implementation rather than nesting another shell. Input drafts support preview only.
 
 Streaming disclosure begins when previewable content exists and follows the saved preference and manual interaction. Attention opens an execution body once immediately; it remains user-collapsible afterward. A tool that declares `requiresNotice` raises attention when its validated invocation starts, independently of running activity; the notice does not suspend the call or track whether a question remains unanswered. Result details appear only after termination.
 

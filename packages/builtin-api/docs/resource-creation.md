@@ -4,7 +4,7 @@ A plugin can make its resource available through builtin's model-facing creation
 
 ## Reuse creation meaning
 
-Build on the original public creation contract rather than creating a parallel initialization path. Agent entries receive a parameter object even when there are no fields to supply. Reuse the creation schema directly when it describes an object, or use `inputSchema` and `toInput` to adapt that object to the underlying contract. This lets the domain contract keep inputs like `null` or a number without exposing them as the entire Agent input. An adapter can also expose a smaller meaningful input, such as a short note from which the plugin derives a titled document.
+Build on the original public creation contract rather than creating a parallel initialization path. Give the Agent the choices that express the user's intent; adapt them when the domain needs a different representation or can derive remaining values. For example, a short note can be enough input to create a titled document.
 
 Keep that adaptation explainable. It should translate intent into the same domain creation operation, not bypass validation or hide unrelated effects. Descriptions and schemas should make the resulting object's purpose understandable without a manual recipe.
 

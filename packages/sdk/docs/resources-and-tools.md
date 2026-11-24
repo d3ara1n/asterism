@@ -1,53 +1,29 @@
-# Design resources and callable capabilities
+# Design resources and tool calls
 
-A resource represents an object with identity and lifetime. A tool represents a model-callable operation. Keeping them independent lets the same operation work across different objects without forcing those objects into one domain model.
+A resource is an object with identity and lifetime. A tool is an operation a model can choose. Keep them independent so the same operation can work across different objects without making them share a domain model.
 
-## Choose the object boundary
+## Decide which capability should be callable
 
-Use a resource for something that belongs in a session and can be recognized or operated on independently. Give it responsibility for its state, model-facing projection, and object-owned work.
+Use a resource when the work has a recognizable subject with its own state or lifetime. Keep model-facing state with that resource; it should let a model recognize the subject and its relevant condition. A card presents the object, but hiding it neither ends its work nor revokes links.
 
-A card is a presentation of that object, not its backend lifetime. Hiding a card should not silently end work that remains meaningful without it. Conversely, retaining saved data is not a reason to keep a live process running.
+Expose a tool when a model needs to choose and perform the operation. When application code already knows what to do, use the owning domain service or typed action rather than routing through a model. Share the same business logic behind these surfaces. Choose a resource tool for work on a linked object; choose a top-level tool for work on the execution context or shared lifecycle that has no such subject.
 
-Ask for disposal confirmation when ending a live instance has consequences the user should decide about. Base the warning on work that actually exists, not on saved state that could hypothetically be restored. Warning discovery and cleanup have different purposes.
+## Design the call around intent
 
-## Design information and access separately
+Reuse a public tool contract when its meaning and shared input are the same across resources. A structured read, for example, can express the same operation while each implementation decides how to address its own content and views. A different effect or meaning deserves a different contract, even if it uses similar code. Name the operation for what the caller is asking it to do.
 
-A resource's model-facing state should let a model recognize the object and understand its relevant condition. Keep that projection with the resource implementation rather than relying on the host to interpret private saved state. Tool definitions explain operations; they are not a substitute for object state.
+Choose structured input when the model must supply independent choices or when a distinct target makes resource-specific selection clearer. Choose freeform when the whole input belongs to one text syntax, and validate that syntax at the operation boundary. An operation that takes text and independent options can still be structured. Keep provider-specific encoding out of the domain contract.
 
-Directed links express availability to a receiver. The reverse relationship is independent, and a path through another object is not implicit access. A readable title, reference, or member directory does not grant authority over the object it names.
+Design for discovery: explain the purpose, required context, result, and how its outputs can be used next in the tool's own guidance and schemas. Explain the absence of a result or an uncertain effect where it changes the caller's next decision. A short write receipt should report what changed, not repeat the input or the display diff. The model should be able to call the tool without having read this manual.
 
-For example, a bridge can choose recipients from its direct links without acquiring their private business state. Read current relationships when handling a new external event; a model request already in progress uses its captured scope.
+## Keep execution with its owner
 
-## Choose a callable boundary
+Treat links, tool discovery, and permission to execute as separate facts. A visible card or known address is not authority; a reverse link is independent. Bind access and configuration at the request boundary, but read ordinary mutable content when handling the operation.
 
-An application action or service call need not be a model tool. Expose it when a model needs that capability, and keep the implementation's business logic shared with other callers where appropriate.
+Order operations according to their dependencies rather than whether they read or write. Require interaction only if a user's response is necessary to complete the work. Keep progress separate from durable results, and distinguish rejection, cancellation, partial completion, and uncertain effects. Stopping a caller does not undo completed effects.
 
-Reuse a tool declaration when the operation has the same meaning and shared arguments across resources. Keep resource-specific selection with the implementation. A distinct meaning deserves a distinct contract even when its code happens to resemble another operation.
+## Compose and verify calls through their actual surface
 
-A read operation illustrates the distinction: reading keeps its meaning while a resource decides how content is addressed and which view is useful. Name operations by that meaning, not by the file or package that happens to declare them.
+Use session-bound execution when a model should work through the session's links and real resources. Use direct model execution when the caller supplies its own messages and executable tools without a workbench object. The caller owns conversation policy, recording, and retry decisions; session access alone does not make work depend on the current history position.
 
-Use a top-level capability for operations on the execution context or shared resource lifecycle, rather than inventing a placeholder resource solely to host them.
-
-## Put invocation knowledge in the contract
-
-Tool descriptions, guidelines, and schemas must support use independently of the manual. Explain purpose, how outputs relate to later inputs, input meaning, result interpretation, and execution boundaries in the owning contract.
-
-Use examples to clarify data flow without prescribing a workflow. Describe an operation's own use of a file reference rather than assuming which resource produced it or which consumer follows it. Distinguish failure, cancellation, partial output, and uncertain effects when those differences affect what a caller can conclude.
-
-Choose scheduling according to ordering requirements, not simply whether an operation reads or writes. Require interaction only when completion depends on a user response; showing progress alone does not make backend work interactive.
-
-## Compose model execution deliberately
-
-Session-bound model execution is useful when a request should act through a resource's links and real session. Direct model execution suits work whose messages and executable tools are supplied by the caller without a workbench object. Choose based on the access and history relationship, not on a presumed requirement to create an Agent.
-
-Capture configuration and authorization at the request boundary. Read ordinary mutable content when handling an operation. For a resource addressing a selected network, this keeps the meaning of its addresses stable through the tool batch without pretending the network's content is frozen.
-
-The caller owns conversation policy, historical recording, and retry decisions. Keep transient progress distinct from durable operation results. A generation failure does not necessarily mean that every earlier tool effect failed or that repeating the request is safe.
-
-Resource access and timeline activity are also separate. Work that depends on a history position needs the appropriate activity scope; merely holding access to a resource does not establish that dependency. Temporary conversations need explicit ownership of attachments that must survive into later requests.
-
-## Separate services from their interfaces
-
-A backend capability does not automatically need a resource card or a model tool. Typed calls, events, and sustained channels serve different interaction needs; choose them according to whether the consumer requests a result, observes a change, or maintains a live connection.
-
-For example, a one-shot shell process and a persistent terminal need different owners. Cancelling a command concerns that process; closing one terminal view need not end a shell shared with other views. Host services supply the execution mechanics, while the plugin chooses the domain object, presentation, and callable interface.
+Start at the target SDK's public declarations and follow a similar tool from registration to dispatch and result projection in the application source. Verify what discovery actually shows and run the operation through its intended caller, not just its handler. Check invalid input, inaccessible targets where relevant, and whether the result gives the caller enough evidence to continue without guessing or repeating an effect.

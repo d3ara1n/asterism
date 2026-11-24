@@ -17,7 +17,7 @@ Inside a sheet, a region reads as a region because its tone differs, not because
 - **Group**: rows, fields, and repeated items that belong together recede into a group in the shell tone, with hairlines between rows.
 - **Floating**: menus, popovers, tooltips, hover cards, and dialogs lift above content and keep their outer edge.
 
-A plugin that needs a group fills it with the shell tone token, `--card-shell`, and leaves out the border; the shared settings layout and list controls already follow this rule. Inside something that is already recessed, such as a tool's output in the conversation, a sub-panel rises back to the card tone instead of adding an outline. When two areas are already separated by tone, adding a border makes the view feel heavier and louder than the rest of the application.
+A plugin that needs a group uses the shell tone rather than adding a border; the shared settings layout and list controls already follow this rule. Inside something that is already recessed, such as a tool's output in the conversation, a sub-panel rises back to the card tone instead of adding an outline. When two areas are already separated by tone, adding a border makes the view feel heavier and louder than the rest of the application.
 
 ## Use lines only when they mean something
 
@@ -29,7 +29,7 @@ A plugin that draws decorative borders dilutes those meanings. Prefer the host's
 
 Motion in the workbench answers a question for the reader: where did this come from, where did it go, or what changed? Selection indicators travel to the new item, deeper pages enter from the side and leave the way they came, arriving content fades in while leaving content clears quickly, lists fold their height as items join or leave, and values animate only when they change.
 
-Plugin views can use the host-provided Motion library for the same purposes, with the shared timing. Shared controls already carry their own motion; a segmented toggle's indicator, for example, slides without any plugin code. Avoid motion that decorates a static state, replays when an item merely scrolls into view, or competes with a list's own scrolling. Respect reduced motion, which the host's Motion configuration and CSS already follow.
+Plugin views should use the same motion cues and timing. Shared controls already carry their own motion; a segmented toggle's indicator, for example, slides without any plugin code. Avoid motion that decorates a static state, replays when an item merely scrolls into view, or competes with a list's own scrolling. Respect reduced motion in custom transitions as well.
 
 ## Choose controls by the kind of choice
 

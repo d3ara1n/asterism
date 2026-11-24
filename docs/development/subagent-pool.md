@@ -46,7 +46,7 @@ A short ID such as `sub-1` is a target within one pool. A globally unique run ID
 
 Executed runs append process records to a diagnostic JSONL file in the system temporary directory. Pool inspection describes the file layout. Writes queue in order, with each line written before its attachment copies. Normal close awaits the queue; abrupt interruption may leave an incomplete audit, and system cleanup may remove it at any time. A task cancelled before admission has no audit. Audit files are outside recovery points. Normal result retrieval reads the Delegation record, independent of audit availability.
 
-Audit entries preserve the original input, queued and delivered steering, request instructions, finalized model blocks, diagnostics, and completion measurements. Attachments from delivered tool outcomes are queued for copying beside the audit while the temporary content scope is open. Rejected or invented references in tool arguments remain recorded arguments and do not acquire content ownership. A write failure logs a warning without changing the task outcome. Missing audit files alone are normal.
+Audit entries preserve the original input, queued and delivered steering, request instructions, finalized model blocks, diagnostics, and completion measurements. Attachments from delivered tool outcomes are queued for copying beside the audit while the temporary content scope is open. Rejected or invented references remain part of the recorded tool input without acquiring content ownership. A write failure logs a warning without changing the task outcome. Missing audit files alone are normal.
 
 ## Observation
 

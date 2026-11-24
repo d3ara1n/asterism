@@ -96,13 +96,13 @@ Requests hold each captured relationship until their work finishes. A disconnect
 
 ## Tools and saved results
 
-A tool contract owns its identity, meaning, shared argument schema, description, and usage guidance. Its argument schema stays the same across resource implementations. Resource implementations own target schemas and execution behavior. Targets select content, scope, or a resource-specific view, including supported reading ranges and edit-anchor presentation. Top-level tools declare their operation directly.
+A tool contract owns its identity, meaning, input kind, description, and usage guidance. A structured resource tool shares an argument schema across implementations, while each implementation defines the target schema for selecting content, scope, or a view. A freeform tool defines a text contract in its guidance; the implementation receives the text unchanged and interprets it without a separate target. A top-level tool declares its input directly, without a resource implementation.
 
-Resource tool input errors identify the failing field within `args` or `target`. A misplaced-field hint uses only the selected implementation’s two schemas and points to a field explicitly declared on the other side. Rejected inputs are not rewritten.
+Resource tool names express operation semantics. Across resources that expose the same tool, its meaning and shared input contract remain consistent; selection within the resource, execution behavior, and results belong to the implementation. Distinct operation contracts use distinct names. Domain qualifiers describe the operation's scope, not the package or file that declares it.
 
-A result schema is a decoding and encoding contract. It defines how an implementation's output is stored, transferred, and projected. Direct calls deliver the tool's model projection, so calling a tool requires only its guidance and argument and target contracts; inspection publishes those by default. Scripts consume encoded result data, so a schema view pairs argument and target contracts with the encoded result schema. Tool definitions are fixed for a request, so later inspections can narrow the listing to selected tools or to resource state alone.
+Inspection exposes the input kind and the information that a direct call needs: guidance and, for structured tools, the argument and target schemas. Structured input errors identify the failing field within `args` or `target`. A misplaced-field hint uses only the selected implementation's schemas, and rejection never rewrites the input.
 
-Resource tool names express operation semantics. Across resources that expose the same tool, its meaning and operation arguments remain consistent; available operations, target selection, and results can vary by resource. Distinct operation contracts use distinct names. Domain qualifiers describe the scope of an operation and can remain appropriate when several resource types support it. Naming follows observable behavior independently of declaration visibility or code organization.
+The result contract is independent of the input kind. Direct model calls receive the tool's model projection; scripts consume encoded result data. The inspection schema view exposes that encoded result schema for either input kind.
 
 An operation’s saved outcome identifies the implementation actually used and the relevant resource at that time. Historical rendering uses those facts even if the current resource or implementation disappears. Unknown data remains available through fallback presentation.
 

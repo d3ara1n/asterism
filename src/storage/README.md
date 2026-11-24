@@ -39,7 +39,7 @@ Recovery covers the workspace database directory, global configuration, plugin p
 
 Generated plugin artifacts, temporary content, UI state, shell integration files, Chromium data, and logs are outside that recovery group. Recovery points do not contain other recovery points. External resource files, local plugin source packages, installed package code, and service effects are outside application-data restoration.
 
-Recovery membership and format registration are separate responsibilities. Recovery can cover a directory containing several formats or files without migration declarations. Format registration identifies versioned JSON documents and databases that need preparation; it does not define the backup set.
+Recovery membership and format registration are separate. A recovery directory can cover several formats and undeclared files. Versioned formats can also share a file, as workspace structure and plugin record groups do, without needing separate recovery entries.
 
 Plugin preparation is independent of normal runtime setup. A plugin data failure can prevent that plugin from loading without preventing unrelated application use.
 
@@ -47,6 +47,6 @@ Plugin preparation is independent of normal runtime setup. A plugin data failure
 
 For a new host-owned store, define its fixed layout name, assign its read/write owner, and decide whether it is persistent user data or reconstructible state. Include persistent data in the application recovery group and register versioned formats for preparation. A store already covered by a parent recovery directory needs no separate recovery entry.
 
-For plugin-owned data, use the plugin's directory and declare versioned formats through the plugin storage entry. The plugin directory is already part of the recovery group. Credentials follow their owning connection or plugin rather than a new central secrets directory.
+Use the plugin's directory for private files and the workspace database for session records. Declare versioned formats for either through the plugin storage entry. Both locations are already covered by recovery. Credentials follow their owning connection or plugin rather than a new central secrets directory.
 
 Changes to physical layout or saved formats require an explicit storage decision and the applicable migration or authorized development-data cleanup. Internal path-reference cleanup alone does not change versions or move data.

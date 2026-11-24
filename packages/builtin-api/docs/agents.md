@@ -6,15 +6,7 @@ The built-in public API lets plugins integrate with existing Agents without impo
 
 Use the public Agent boundary when the work belongs in an existing Agent conversation. A plugin that needs its own execution model can instead compose host capabilities without adopting that conversation model.
 
-Import original contracts from the domain package. Shared declaration identity lets an extension participate in existing behavior; a copied schema or an implementation import is not an equivalent integration. Depending on the public API also means depending on its enabled implementation provider.
-
-## Build against the enabled provider
-
-Declare `@asterism-app/builtin-api` as a peer dependency. The builder then keeps builtin API imports external in the completed artifact, including contracts, runtime helpers, and renderer exports reached through other modules of the plugin. A development dependency supplies the authoring declarations; neither declaration activates builtin.
-
-Build explicitly with `asterism-plugin-build` before adding the package directory to Asterism, then restart. The build writes loaded output into `dist`; source entries belong in `asterism.build`. A source checkout and a distributed package use the same loading contract. Rebuilding does not replace a graph already running in the application.
-
-Binding to the provider's native ESM exports preserves the original operation declarations and renderer services. A consumer-local copy is not a fallback when builtin is disabled or unavailable. Validate with the intended provider enabled; successful typechecking or artifact generation alone does not establish that integration.
+Follow the target release's public domain exports into its declarations and the shipped integrations. Import those same contracts and verify with the provider enabled; a copied declaration is not a fallback for a missing provider.
 
 ## Make messages readable and attributable
 
@@ -22,7 +14,7 @@ Sender attribution explains where input came from independently of the Agent tha
 
 Keep the body useful as ordinary readable text. For example, a pull-request notification can state the repository, change, author, and URL. The integration understands those facts and should explain them; the receiving Agent's instructions supply its responsibilities. A domain event does not need a private machine payload disguised as a message.
 
-A resource event can separate the two audiences. Leading YAML frontmatter carries metadata of any shape for the receiving Agent, such as the event kind and the identifiers its tools accept; the Markdown after it is the message people read in the conversation, which hides the frontmatter. Put each fact where its reader needs it rather than repeating identifiers in prose or squeezing the readable summary into metadata. A body may be empty when the following parts already form the message, as when a chat event is followed by the received messages themselves.
+Separate machine-useful event metadata from the explanation shown to people. Put useful tool identifiers where the receiving Agent can use them; keep the visible message readable without them. If the received content already explains the event, avoid repeating it.
 
 Use retained attachments when the message must preserve submitted bytes. Use file references when the message should carry an address for later consumption. Forwarding an address does not mean its content has been read or captured.
 
@@ -80,7 +72,7 @@ Keep preparation deterministic within the captured request environment. Changes 
 
 ## Transform model context without rewriting history
 
-Agent context transforms compose in registration order after the built-in timeline projection. Each synchronous transform gets the preceding transform's standard context units. It can preserve, replace, add, or remove units; tool calls and results must stay paired within a unit. An invalid transform fails the request instead of silently restoring another projection. Keep transforms deterministic for a captured request, especially when reusing a provider's cached prefix.
+Use context transforms to shape what a particular request needs, not to change the recorded facts. Keep tool calls and results paired. Treat earlier transforms as part of the input, and make the result deterministic within the captured request so unchanged context can stay reusable.
 
 Provenance accompanies the model items but is not sent to the model. Preserve a part's original identity only when forwarding that part. Synthetic or replaced parts do not claim its provenance. Treat a recall ticket as an address, not authority: resolve it on the calling Agent's request path and return the original content as a new tool result. Projection changes neither the saved timeline nor user-facing history.
 

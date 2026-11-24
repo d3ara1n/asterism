@@ -69,7 +69,7 @@ Each backend or frontend environment has one module instance for a shared declar
 
 The built-in public API is a separate package associated with the built-in implementation plugin. Its release version is independent of the SDK package version.
 
-Public packages own their development guides and source examples according to domain responsibility. Generic authoring material belongs to the SDK; built-in domain material belongs to the built-in public API. Package contents include that material for development outside the application. The manual exposes source directories directly without copying or merging their contents. Compile-time counterexamples remain internal verification material.
+Public packages own design guidance and prototype examples for their domains. The Manual exposes both as reference material without loading the examples as plugins. Authors resolve implementation interfaces from the target SDK and public domain exports.
 
 Public history facts have contracts at the same ownership boundary as their meaning. The SDK owns host resource lifecycle and relationship records; paradigm and business records belong to their public domain packages. Host writers, reconstruction, presentation, and plugin readers share those declarations. Exporting a read contract does not transfer record ownership or permit plugins to write host-originated facts.
 
@@ -187,11 +187,9 @@ Plugins declare what their work used as usage subjects: a top-level tool through
 
 Plugin-private files live under the plugin data directory. Managed configuration and a database are optional facilities, not prerequisites for plugin identity.
 
-Storage preparation imports a separate declaration entry before runtime setup. Private JSON and SQLite files and owned session record payloads use independent versioned migration chains. A plugin preparation failure prevents its setup for that startup.
-
-For incompatible timeline payload changes, declare a record storage group in `defineStorage`. A group has a stable identifier and a disjoint set of plugin-owned contracts. Each step transforms encoded data for its contract; it has no database handle and must keep the set of content references unchanged. The host changes payloads and the group version together, so normal decoders can read only the current format. Unknown or unavailable records outside a migration retain their original payloads.
-
 Data write boundaries encode decoded domain values through the declared Zod schema and validate the resulting JSON before saving or publishing it. Readers decode stored or transported JSON. Ordinary schemas use the same representation in both directions; synchronous codecs explicitly convert between representations. Operation-input parsing remains a forward-only boundary.
+
+Storage declarations run before setup, separately from live services. A record migration operates on encoded data for the plugin’s own timeline contracts, not on runtime values or another owner’s data. Keep contract membership stable and preserve content references; read the prepared encoding through the ordinary contract. Unknown or unavailable records retain their stored payloads.
 
 Configuration defaults and update callbacks use decoded values. File writes and configuration responses encode those values; frontend configuration readers decode the responses. Missing current-data rows remain distinct from a saved JSON null. Templates copy encoded state and data without applying another encoding pass.
 
@@ -201,9 +199,7 @@ Template participation is explicit resource behavior. The resource declares whic
 
 A resource may declare a synchronous title generator for template instances. This declaration omits the source title from saved templates and overrides any previously saved title at instantiation. Saving and catalog reads do not invoke the generator; previews show the resource type without an instance title. Without a generator, instantiation requires a saved title. The generated title enters ordinary resource creation history, so later reads and restoration preserve it.
 
-Tool declarations choose an input contract independently of resource support and output encoding. Structured declarations pair their shared argument schema with each implementation's target schema. Free-form declarations describe the accepted text in their guidance and receive the original string without an argument or target schema. The same declaration and implementation entry points support both kinds. Plugins do not translate provider tool encodings; each model adapter projects the contract and decodes calls at its boundary.
-
-Tool progress and terminal data carry encoded payloads. Typed renderers and model projections decode them. Without a declared projection, a decoded string reaches the model as text and any other value as JSON text; only a declared projection can return model parts such as files. Resource tools and top-level tools share this rule. Non-null tool data cannot encode as null because the tool-result protocol reserves null for absent output.
+Tool progress and terminal data use the same encoding boundary regardless of input kind. Typed renderers and model projections decode those payloads. Without a declared projection, a decoded string reaches the model as text and any other value as JSON text; only a declared projection can return model parts such as files. Resource tools and top-level tools share this rule. Non-null tool data cannot encode as null because the tool-result protocol reserves null for absent output.
 
 The content service manages byte references and temporary retention. Public IDs alone grant neither access nor retention.
 

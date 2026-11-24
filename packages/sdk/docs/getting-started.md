@@ -1,41 +1,33 @@
-# Prepare for plugin development
+# Design and deliver a plugin
 
-Plugin development starts with a capability users need, not a complete framework of extension points. Build one useful path through the application, then add other contributions when that path requires them.
+Start with one useful path from a user's intent to a domain result. Decide who owns the state, what changes it, and how the result becomes visible. Add more surfaces only when that path needs them. A plugin owns installation, identity, and lifetime; features can share that ownership without sharing every implementation detail.
 
-## Target a real application
+## Choose what to integrate with
 
-Choose the application release your plugin supports and develop against compatible public packages. Development declarations help the editor and type checker; they do not upgrade the APIs supplied by a running application. Use the exact development-dependency pins in the complete examples supplied by that target application, or its release's listed public-package versions. Release preparation pairs those examples with their target build. Registry tags such as `latest` and `next` identify channel heads, not the appropriate declarations for every installed or development application.
+Extend an existing domain through its public contracts when that domain should still own the work. Own a resource when the capability has its own identity and lifetime. Own a paradigm only when you need to decide how work starts, how requests are assembled, and how execution is presented. A session does not require an Agent.
 
-Validate a copied project outside the application checkout. Workspace dependencies can hide missing authoring dependencies; an independent install and typecheck reveal what an external author actually receives.
+Keep shared declarations separate from backend work and frontend presentation. Organize each capability so its state transitions remain understandable together. Publish contracts when other plugins need their meaning, not to expose the provider's internal structure. Import the original declarations: a copy can match their types without sharing their runtime identity.
 
-Host-provided public packages are shared boundaries, not private libraries to bundle into a plugin. Declare them, and other plugins' public packages you import, as peer dependencies; add development dependencies for the declarations the editor reads. The build keeps peer imports external so they bind to the running application's instances or the enabled provider. Ordinary private libraries remain the plugin's dependencies.
+## Resolve interfaces from the target release
 
-Preserve imports of original shared contracts. A copied declaration can look identical in TypeScript while no longer identifying the same operation at runtime.
+Use the Manual's SDK counter and built-in Agent examples to inspect a small plugin before writing one. Read them to see how responsibilities fit together; there is no need to run or install them to learn from them.
 
-## Build a narrow vertical slice
+For implementation, start at the target release's public SDK or domain package exports, follow the types to their declarations, and trace a similar shipped capability and its tests in the application source. Check which parts are public before reusing them. Use the builder's source and CLI help for build configuration.
 
-Start with the plugin's business state, the operation that changes or reads it, and the smallest presentation needed to use it. Keep shared declarations independent of backend and frontend implementations. This makes the boundary visible without exposing implementation details as public API.
+Develop against the packages for the application release you intend to support. The application and enabled providers supply shared packages at runtime; adding a development dependency does not install or upgrade the provider. Treat host-supplied packages as peer dependencies and keep ordinary private libraries with the plugin.
 
-Choose a stable plugin identity before sharing the package. Treat its display name and release version as product information, distinct from the contracts and namespace that identify its behavior.
+## Validate what users will load
 
-Avoid scaffolding unused services, views, and persistence. A small working capability makes ownership and cleanup easier to verify; an empty abstraction says little about whether the plugin works.
+The application loads a completed artifact, even when using a local checkout. Build separately, restart to activate it, and test the package outside the development workspace so dependency hoisting cannot hide missing declarations. Rebuild and restart after changing source; replacing files under a running graph can break a later lazy load.
 
-## Build before loading
+Follow one action from its initiating surface to the committed result and back to the user. Check rejection, cancellation, reopening saved work, and cleanup with the owner gone. Type checking tests agreement with declarations; loading the delivered artifact tests the provider, dependencies, and files users actually receive. Use both.
 
-A plugin directory contains package metadata and a completed artifact in `dist`. Source entries are authoring inputs under `asterism.build`. The official `@asterism-app/plugin-build` package supplies the `asterism-plugin-build` command. Keep it as a development dependency and expose an explicit package build script.
+## Find the next design decision
 
-Install authoring dependencies, typecheck, and build before adding the package directory to Asterism. Then restart to activate the selection. Repeat the build and restart after source changes. A checkout is a user-owned package directory, not a separate plugin mode: the application neither compiles changed source at startup nor silently substitutes source when output is missing.
-
-A successful build replaces `dist` as a whole; a failed build leaves the previous output. Restart a running application after building, because it may still load parts of the replaced output lazily.
-
-## Validate distinct boundaries
-
-Type checking establishes agreement with the declarations. Loading and exercising the plugin in the target application establishes whether its contributions and dependencies work together. Neither replaces the other.
-
-Check the normal path, meaningful invalid input, visible failures, and cleanup when the owning resource or plugin ends. Reopen saved work to distinguish durable state from accidental reliance on a live instance.
-
-## Verify what users receive
-
-Test the distributed package in an installed application, not only the source checkout. Build before packing, and inspect the actual tarball. Use a clean release checkout. Include the completed output, root metadata, documentation, and translation catalogs, and declare every package the plugin imports at runtime in `dependencies` or `peerDependencies`. Installation must not need to compile plugin source. Files available only on the author's machine should not be necessary.
-
-Update public package versions intentionally and repeat the relevant integration checks. A compatible editor view is useful evidence, but the application remains the provider of runtime capabilities.
+| If you need to decide… | Read |
+| --- | --- |
+| What an Agent can discover, call, and learn from an operation | [Resources and tools](resources-and-tools.md) |
+| What to persist, migrate, or release | [Data and lifecycle](data-and-lifecycle.md) |
+| How a workflow starts or receives external events | [Session entries](session-entries.md), [messaging](messaging.md) |
+| What a view owns and how it fits the workbench | [Views and settings](views-and-settings.md), [visual language](visual-language.md) |
+| What belongs in a plugin's own manual | [Plugin documentation](manual.md) |
