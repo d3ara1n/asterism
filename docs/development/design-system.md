@@ -68,6 +68,8 @@ Density scales the root size, so spacing and type scale together without compone
 
 Icons come from Lucide. Read-only abbreviated counts use the common formatter; editable and raw values stay complete.
 
+File size labels use the shared file size formatter. It scales byte counts by powers of 1024, so labels use the same IEC units as file limits. Only the number is localized; a localized count abbreviation such as `万` is not a byte unit.
+
 ### Native windows
 
 macOS uses native controls and under-window vibrancy. Supported Windows versions use Acrylic with a controls overlay and a solid fallback. Linux defaults to a controls overlay on a solid background and offers a native titlebar mode. Theme, reduced transparency, and high contrast originate in the main process. The root stays transparent to the native material; CSS backdrop blur does not stand in for it.

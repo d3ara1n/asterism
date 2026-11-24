@@ -10,6 +10,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { failureDisplay } from "@asterism-app/ui/error-display";
+import { formatFileSize } from "@asterism-app/ui/format-file-size";
 import { ResourceSourceChip } from "@asterism-app/ui/reference-chip";
 import type { TextEditorNavigation } from "../editor/navigation";
 import type { ReadDirectoryFile } from "./editor-contract";
@@ -49,7 +50,7 @@ export function FileView({ resource, path, readFile, TextView, navigation }: {
       <EmptyMedia variant="icon">{file.kind === "directory" ? <Folder /> : <File />}</EmptyMedia>
       <EmptyTitle>{i18n.text(file.kind === "directory" ? messages.folder : messages.previewUnavailable)}</EmptyTitle>
       {file.kind === "unsupported" && <EmptyDescription>
-        {i18n.formatNumber(file.size, { style: "unit", unit: "byte", notation: "compact", maximumFractionDigits: 1 })}
+        {formatFileSize(i18n, file.size)}
         {file.reason === "size" && <> · {i18n.text(messages.tooLarge)}</>}
       </EmptyDescription>}
     </EmptyHeader></Empty>

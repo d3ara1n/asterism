@@ -23,6 +23,7 @@
     "./json-view": "./src/json-view.tsx",
     "./utils": "./src/utils.ts",
     "./format-count": "./src/format-count.ts",
+    "./format-file-size": "./src/format-file-size.ts",
     "./configuration-forms": "./src/configuration-forms.tsx",
     "./settings-layout": "./src/settings-layout.tsx",
     "./messages/forms": "./src/messages/forms.ts",

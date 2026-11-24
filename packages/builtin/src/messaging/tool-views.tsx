@@ -6,6 +6,7 @@ import { toolRenderer, useI18n, useRendererObject, type ContentReader, type Tool
 import { fileReferencePartSchema, messagingText, type Json, type MessagingConnectionInfo, type MessagingConversation,
   type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { inputFileName } from "@asterism-app/builtin-api/contracts";
+import { formatFileSize } from "@asterism-app/ui/format-file-size";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
@@ -13,7 +14,7 @@ import { Badge } from "@asterism-app/ui/ui/badge";
 import { Marker, MarkerContent } from "@asterism-app/ui/ui/marker";
 import { StatusIcon } from "@asterism-app/ui/ui/status";
 import { cn } from "@asterism-app/ui/utils";
-import { FilePreview, MessageAttachments, formatFileSize } from "../shared/attachments";
+import { FilePreview, MessageAttachments } from "../shared/attachments";
 import { partsOf } from "../shared/send-view";
 import { inputField, inputText, toolTextTail } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
