@@ -151,7 +151,7 @@ User, Agent, and resource event messages share body rendering, and source presen
 
 The Agent composer and the Home entry are trays: a shell lifted over the content, holding a raised editor sheet, with configuration on the tray's lower edge. The tray border takes the ring tone while the editor is focused. Send and stop share one round slot so the action row keeps its width across execution states.
 
-While an Agent runs, one moving element shows it at a time. At the end of the conversation, a small dotted orb names the execution phase through its motion beside the phase text and elapsed time, with a distinct motion for working, compacting, retrying, and waiting to retry; retries take the warning tone, and successive phases cross-fade in place. As that row scrolls out of view, it folds into the composer: it fades while a light grows along the tray's top edge from the left, and scrolling back unfolds it again. The stop control and the card's title badge stay still. When an overlay hides the composer, the edge light remains where the tray would stand. Continuous activity traces run as CSS animations, so a view remounted mid-run under a presence boundary that skips entry animations still shows them moving.
+In the conversation, the execution phase and elapsed time appear together at the end of the timeline. When that row scrolls out of view, the composer edge carries the activity indicator instead, including when an overlay hides the composer.
 
 ### Interface copy
 
@@ -159,7 +159,7 @@ Interface copy serves user understanding and action, not code comments or schema
 
 ### Feedback and status
 
-Status uses the shared status components with text and icons. Feedback stays with the operation it belongs to: field errors with fields, command progress at its entry, and Agent execution errors and warnings inline in the owning conversation, without live announcements. Independent interface command failures use toasts. One failure is never shown both inline and as a toast, and a background reread never becomes a global saving indicator.
+Status uses the shared status components with text and icons. Use animated progress for ongoing work in live views. A point-in-time result uses a static indicator even when the observed state is running. Feedback stays with the operation it belongs to: field errors with fields, command progress at its entry, and Agent execution errors and warnings inline in the owning conversation, without live announcements. Independent interface command failures use toasts. One failure is never shown both inline and as a toast, and a background reread never becomes a global saving indicator.
 
 ### Buttons
 

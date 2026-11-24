@@ -33,17 +33,14 @@ import { useTimelinePresence } from "./timeline-presence";
 import { conversationTransition, immediateTransition } from "./motion";
 import { ExecutionEdge, ExecutionStatus } from "./ExecutionStatus";
 
-/**
- * Execution status in the card title bar; history belongs to the session and is accessed from the window title bar.
- * The badge stays still: the conversation end and the composer edge carry the live activity, and this badge only names the state at a glance.
- */
+/** Live execution status in the Agent card title bar. */
 export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const snapshot = object.session.snapshot();
   const agentRunning = data.executionState === "running";
   if (!snapshot) return null;
-  return <StatusBadge tone={agentRunning ? "progress" : "neutral"} still role="status">
+  return <StatusBadge tone={agentRunning ? "progress" : "neutral"} role="status">
     {agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}
   </StatusBadge>;
 }
