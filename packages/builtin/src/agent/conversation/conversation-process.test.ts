@@ -199,7 +199,7 @@ describe("Conversation process folding by input groups", () => {
       node("progress", "u", text("a", "work", 0, "Need your answer")),
     ];
     const live: ModelLiveBlock = { id: "question", responseId: "work", ordinal: 1, kind: "toolcall",
-      name: "ask_user", arguments: {}, argumentsText: "{}", state: "executing", invocation: null, result: null };
+      name: "ask_user", input: { kind: "structured", value: {} }, draft: null, state: "executing", invocation: null, result: null };
     const grouped = project(path, true, [live]);
     expect(ids(grouped)).toEqual(["old", "conversation-process:old-final", "old-reply", "turn-metrics:old", "u", "progress", "question"]);
     expect(grouped.owners.has(JSON.stringify(["work", 1]))).toBe(false);

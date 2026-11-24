@@ -179,7 +179,7 @@ export interface ToolContribution {
   readonly contract: ImplementationContract<Json, ToolInput, ToolInput, Json>;
   /** Bind resource-specific access and configuration at the model request boundary. The returned contribution handles that request's calls. */
   capture?(resource: ResourceSnapshot, object: ObjectReader, caller: ToolCaller): ToolContribution;
-  /** Raw model inputs are validated against the target and argument contracts before execution. */
+  /** Validate raw input before execution. Structured inputs use target and args; freeform uses a null target and the exact text in args. */
   prepare(resource: ResourceSnapshot, object: ObjectExecutor, target: Json, args: Json, caller: ToolCaller, interactive: boolean): ToolInvocation | PreparedResult;
 }
 export interface ModuleContribution {
@@ -207,8 +207,8 @@ export interface PluginContribution extends ModuleContribution {
   modules?: readonly PluginModule[];
 }
 /**
- * Format declarations for persistent plugin files; paths are relative to extensions/<pluginId>, and migration key n means n → n+1.
- * Versions are stamped by the writer: JSON uses a `{ version, data }` envelope, and SQLite uses `PRAGMA user_version`.
+ * Persistent plugin formats. Migration key n means n → n+1.
+ * Private files use paths relative to extensions/<pluginId> and store their version in the JSON envelope or SQLite header.
  */
 export type PluginStorageDeclaration = {
   kind: "json"; path: string; version: number;
@@ -216,11 +216,22 @@ export type PluginStorageDeclaration = {
 } | {
   kind: "sqlite"; path: string; version: number;
   migrations: Readonly<Record<number, (db: DatabaseSync) => void>>;
-};
+} | PluginRecordStorageDeclaration;
+/** A versioned set of owned session record contracts. The host migrates encoded data before plugin setup. */
+export interface PluginRecordStorageDeclaration {
+  kind: "records";
+  /** Stable identifier within the plugin, independent of display names and file paths. */
+  id: string;
+  /** Stable, disjoint set of qualified contracts owned by this plugin. Existing untracked history starts at version 1. */
+  contracts: readonly string[];
+  version: number;
+  /** Synchronous transforms of encoded record data. Identity, provenance, and content reference membership stay fixed. */
+  migrations: Readonly<Record<number, (contract: string, data: Json) => Json>>;
+}
 /** Default export of the storage entry point (manifest `asterism.storage`); the host imports it separately before the plugin runtime. */
 export function defineStorage(declarations: readonly PluginStorageDeclaration[]): readonly PluginStorageDeclaration[] {
   for (const item of declarations) if (!Number.isSafeInteger(item.version) || item.version < 1)
-    throw new Error(`Storage ${item.path} must declare a positive integer version.`);
+    throw new Error(`Storage ${item.kind === "records" ? item.id : item.path} must declare a positive integer version.`);
   return Object.freeze([...declarations]);
 }
 export interface PluginDefinition {

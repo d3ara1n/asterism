@@ -12,7 +12,7 @@ import { resolveToolView, toolPreparation } from "../../../../../src/renderer/fe
 const args = { resource_id: "directory", tool: "list", target: { path: "src" }, args: {} };
 const invocation = { implementation: reference(DirectoryList), resource: { id: "directory", kind: "asterism.builtin/directory", title: "Saved title" }, startedAt: 100 };
 const live: Extract<ModelLiveBlock, { kind: "toolcall" }> = {
-  id: "r:0", responseId: "r", ordinal: 0, kind: "toolcall", name: "resource_call", argumentsText: "", arguments: null,
+  id: "r:0", responseId: "r", ordinal: 0, kind: "toolcall", name: "resource_call", draft: { kind: "structured", text: "" }, input: null,
   state: "input", invocation: null, result: null,
 };
 const data = { path: "src", entries: [{ name: "main.ts", type: "file" as const }], truncated: false };
@@ -29,19 +29,19 @@ describe("Tool call display projection", () => {
   });
 
   it("Preserves partial input arguments and distinguishes waiting from execution through phase and output", () => {
-    expect(toolCallState({ ...live, argumentsText: '{"tool":"list",', arguments: { tool: "list" } })).toMatchObject({
-      phase: "input", props: { phase: "input", args: { tool: "list" }, result: null },
-    });
-    expect(toolCallState({ ...live, state: "ready", arguments: args, invocation })).toMatchObject({ phase: "ready", props: { result: null } });
-    expect(toolCallState({ ...live, state: "executing", arguments: args, invocation, result: { kind: "running", data } })).toMatchObject({
+    const state = toolCallState({ ...live, draft: { kind: "structured", text: '{"tool":"list",' } });
+    expect(state).toMatchObject({ phase: "input", props: { phase: "input", args: null, result: null } });
+    expect(resolveToolView(state.props, new ViewRegistry([])).props).toMatchObject({ name: "list" });
+    expect(toolCallState({ ...live, state: "ready", draft: null, input: { kind: "structured", value: args }, invocation })).toMatchObject({ phase: "ready", props: { result: null } });
+    expect(toolCallState({ ...live, state: "executing", draft: null, input: { kind: "structured", value: args }, invocation, result: { kind: "running", data } })).toMatchObject({
       phase: "executing", props: { result: { kind: "running", data }, invocation },
     });
   });
 
   it("resource_call normalizes the internal tool name, target, arguments and result", () => {
     const registry = new ViewRegistry([filesystem]);
-    const state = toolCallState({ ...live, state: "executing", arguments: args, invocation, result: { kind: "running", data } });
-    const view = resolveToolView(state.props!, registry);
+    const state = toolCallState({ ...live, state: "executing", draft: null, input: { kind: "structured", value: args }, invocation, result: { kind: "running", data } });
+    const view = resolveToolView(state.props, registry);
     expect(view.props).toMatchObject({ name: "list", target: { path: "src" }, args: {}, result: { kind: "running", data } });
   });
 
@@ -49,13 +49,30 @@ describe("Tool call display projection", () => {
     const node: Extract<TimelineItem, { kind: "toolcall"; createdAt: string }> = {
       id: "saved", createdAt: "2026-10-01", kind: "toolcall",
       responseId: "r", ordinal: 0, complete: true,
-      callId: "c", name: "resource_call", argumentsText: "", arguments: args,
+      callId: "c", name: "resource_call", draft: null, input: { kind: "structured", value: args },
       outcome: { ...invocation, finishedAt: 300, kind: "cancelled", data, model: [{ kind: "text", text: "Stopped" }], message: "Stopped." },
     };
     const state = toolCallState(node);
     expect(state).toMatchObject({ phase: "settled", props: { invocation, result: { kind: "cancelled", data } } });
-    expect(toolCallState({ ...node, complete: false, outcome: null, argumentsText: null, invocation })).toMatchObject({
+    expect(toolCallState({ ...node, complete: false, outcome: null, invocation })).toMatchObject({
       phase: "incomplete", props: { phase: "input", args, invocation, result: null },
+    });
+  });
+
+  it("forwards a freeform draft as exact text, even when it resembles JSON", () => {
+    const text = '  {"value":"literal"}\n';
+    const state = toolCallState({ ...live, name: "example_text", draft: { kind: "freeform", text } });
+    expect(resolveToolView(state.props, new ViewRegistry([])).props).toMatchObject({ kind: "freeform", text });
+    const ready = toolCallState({ ...live, name: "example_text", state: "ready", input: { kind: "freeform", text }, draft: null });
+    expect(resolveToolView(ready.props, new ViewRegistry([])).props).toMatchObject({ kind: "freeform", text });
+  });
+
+  it("strips only the resource selection line from a freeform call preview and preserves its identity", () => {
+    const text = '  {"literal":true}\r\n';
+    const state = toolCallState({ ...live, name: "resource_call_text", invocation,
+      draft: { kind: "freeform", text: `directory annotate\r\n${text}` } });
+    expect(resolveToolView(state.props, new ViewRegistry([])).props).toEqual({
+      phase: "input", name: "annotate", kind: "freeform", text, invocation, result: null,
     });
   });
 
@@ -65,14 +82,12 @@ describe("Tool call display projection", () => {
       invocation: { ...invocation, implementation: reference(DirectoryWrite) },
       args: { resource_id: "directory", tool: "write", target: { path: "src/comp" }, args: { content: "hello\nwor" } } };
     const view = resolveToolView(props, registry);
-    expect(view.props.target).toEqual({ path: "src/comp" });
-    expect(view.props.args).toEqual({ content: "hello\nwor" });
+    expect(view.props).toMatchObject({ target: { path: "src/comp" }, args: { content: "hello\nwor" } });
     for (const phase of ["ready", "executing", "settled"] as const) {
       const next = resolveToolView(phase === "settled"
         ? { ...props, phase, result: { kind: "succeeded", data: null } }
         : { ...props, phase }, registry);
-      expect(next.props.target).toEqual({ path: "src/comp" });
-      expect(next.props.args).toEqual({ content: "hello\nwor" });
+      expect(next.props).toMatchObject({ target: { path: "src/comp" }, args: { content: "hello\nwor" } });
     }
     expect(resolveToolView({ ...props, invocation: {} }, registry).body).toBeUndefined();
   });

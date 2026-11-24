@@ -4,9 +4,9 @@ import { previewArguments } from "../../../shared/partial-arguments";
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import type { Json, UiText } from "@asterism-app/sdk/contracts";
-import { toolRenderer, useRendererResources, useRendererViewState, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism-app/sdk/renderer";
+import { toolRenderer, useRendererResources, useRendererViewState, type AnyToolRenderProps, type FreeformToolRenderProps, type ToolRenderProps, type ToolRenderer, type ToolView } from "@asterism-app/sdk/renderer";
 
-import { ResourceCall, ResourceInspect, ResourceInspectResult, ResourceList, ResourceListResult, ResourceScript } from "../../../tools/core";
+import { parseResourceCallText, ResourceCall, ResourceCallText, ResourceInspect, ResourceInspectResult, ResourceList, ResourceListResult, ResourceScript } from "../../../tools/core";
 import { toolsMessages } from "../../messages/tools";
 import { useModuleViews } from "../../modules/views";
 import type { ViewRegistry } from "../../modules/registry";
@@ -177,7 +177,7 @@ const inspect = toolRenderer(ResourceInspectResult, {
   input: { headerRenderer: ResourceInspectHeader }, execution: inspectView, result: inspectView,
 });
 
-export interface ResolvedToolView extends ToolView { props: ToolRenderProps }
+export interface ResolvedToolView extends ToolView { props: AnyToolRenderProps }
 /** Host entries with fixed names; each renderer carries the entry's label and icon. */
 const fixedTools = new Map<string, { preparation: UiText; renderer: ToolRenderer }>([
   [ResourceList.name, { preparation: toolsMessages.toolPreparingList, renderer: list }],
@@ -194,12 +194,18 @@ function resourceCall(props: ToolRenderProps, registry: ViewRegistry): ResolvedT
   if (props.phase === "input") {
     const args = props.args;
     if (!args || typeof args !== "object" || Array.isArray(args) || typeof args.tool !== "string") return { props };
-    const inner = { ...props, name: args.tool, target: args.target ?? null, args: args.args ?? null };
+    const inner = { ...props, draft: null, name: args.tool, target: args.target ?? null, args: args.args ?? null };
     return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
   }
   const parsed = ResourceCall.argsSchema.safeParse(props.args);
   if (!parsed.success) return { props, label: toolsMessages.toolResourceCall };
   const inner = { ...props, name: parsed.data.tool, target: parsed.data.target, args: parsed.data.args };
+  return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
+}
+function resourceCallText(props: FreeformToolRenderProps, registry: ViewRegistry): ResolvedToolView {
+  const selection = props.text !== null ? parseResourceCallText(props.text) : null;
+  if (!selection) return { props, label: toolsMessages.toolResourceCall };
+  const inner = { ...props, name: selection.tool, text: selection.body };
   return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
 }
 export function toolPreparation(name: string): string {
@@ -213,11 +219,15 @@ export function toolLabel(name: string, implementation: string | null, registry:
 export function toolIcon(name: string, implementation: string | null, registry: ViewRegistry): ReactNode {
   return fixedTools.get(name)?.renderer.icon ?? (implementation ? registry.toolIcon(implementation) : undefined) ?? null;
 }
-export function resolveToolView(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView {
-  if (props.phase === "input" && props.argumentsText !== undefined)
-    props = { ...props, args: previewArguments(props.argumentsText) };
-  const entry = fixedTools.get(props.name);
-  if (entry) return fixed(entry.renderer, props);
-  if (props.name === ResourceCall.name) return resourceCall(props, registry);
+export function resolveToolView(props: AnyToolRenderProps, registry: ViewRegistry): ResolvedToolView {
+  if (props.kind === "freeform") {
+    if (props.name === ResourceCallText.name) return resourceCallText(props, registry);
+  } else {
+    if (props.phase === "input" && props.draft?.kind === "structured")
+      props = { ...props, args: previewArguments(props.draft.text) };
+    const entry = fixedTools.get(props.name);
+    if (entry) return fixed(entry.renderer, props);
+    if (props.name === ResourceCall.name) return resourceCall(props, registry);
+  }
   return { props, icon: <Wrench className="size-3.5" />, ...registry.tool(props.invocation.implementation, props) };
 }

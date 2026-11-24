@@ -32,6 +32,27 @@ describe("Tool streaming preview declarations", () => {
     expect(bodyRenderer).not.toHaveBeenCalled();
   });
 
+  it("keeps freeform text out of argument validation while decoding result data", () => {
+    const freeform = { ...contract, tool: { kind: "freeform" as const } };
+    const raw = ' \r\n{"value": 1}\n';
+    const preview = { kind: "freeform" as const, phase: "input" as const, text: raw, name: "review", result: null, invocation: {} };
+    const rendered = vi.fn();
+    const renderer = toolRenderer(freeform, {
+      input: { bodyRenderer: () => null, streaming: ({ text }) => text === raw },
+      execution: { bodyRenderer: () => null, streaming: props => {
+        rendered(props.text, props.result?.data?.text);
+        return true;
+      } },
+    });
+    expect(renderer.resolve(input)).toBeNull();
+    expect(toolRenderer(contract, { input: { bodyRenderer: () => null } }).resolve(preview)).toBeNull();
+    expect(renderer.resolve(preview)?.streaming).toBe(true);
+    const running = { ...preview, phase: "executing" as const, result: { kind: "running" as const, data: { text: " result " } } };
+    expect(renderer.resolve(running)?.streaming).toBe(true);
+    expect(rendered).toHaveBeenCalledWith(raw, "result");
+    expect(renderer.resolve({ ...running, result: { ...running.result, data: { text: 7 } } })).toBeNull();
+  });
+
   // Declarations must use the same decoded data as the body; otherwise whitespace or invalid types in raw payloads may cause premature expansion or exceptions.
   it("execution declarations consume decoded results, and invalid payloads do not reach declarations", () => {
     const streaming = vi.fn(({ result }: { result: { data: { text: string } | null } | null }) => !!result?.data?.text);

@@ -11,7 +11,7 @@ import { responseMessages } from "../agent/response-messages.ts";
 import { agentRequestRetries } from "../agent/retry.ts";
 import { ended, type DelegationInput, type FinishedStatus, type TaskCompletion, type TaskSnapshot, type ProcessBlock } from "./contract.ts";
 import type { AuditLog } from "./audit.ts";
-import { activityOf, type DeliveredSteer } from "./activity.ts";
+import { activityOf, toolCall, type DeliveredSteer } from "./activity.ts";
 import { agentTurnUsage } from "../agent/usage.ts";
 import { skillCatalogUsage } from "../skills/usage.ts";
 
@@ -154,9 +154,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
               run.live = [...event.blocks];
               const last = event.blocks.at(-1);
               if (snapshot.status.phase === "running" && last) {
-                const args = last.kind === "toolcall" ? last.arguments : null;
-                const tool = args && typeof args === "object" && !Array.isArray(args) && typeof args.tool === "string" ? args.tool : null;
-                snapshot.status.activity = last.kind === "toolcall" ? `tool:${tool ?? last.name}` : last.kind;
+                snapshot.status.activity = last.kind === "toolcall" ? `tool:${toolCall(last.name, last.input, last.draft).name}` : last.kind;
               }
             } else {
               run.audit.append({ type: "execution", event });

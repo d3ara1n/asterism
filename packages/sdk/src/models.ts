@@ -19,10 +19,18 @@ export interface SystemPrompt { blocks: readonly PromptBlock[] }
 /** Reasoning text is the plaintext delivered by the protocol, and summary is an independent summary; both can coexist or be empty, and neither fills the other.
  * continuation carries only native data such as signatures/ciphertext, shaped by the producing protocol; target projection determines whether it can be reused.
  */
+/** Completed tool input in Asterism's vocabulary, independent of provider wire encoding. */
+export type ToolCallInput = { kind: "structured"; value: Json } | { kind: "freeform"; text: string };
+/** Unfinished generation for display and recording, never for execution. */
+export interface ToolInputDraft { kind: ToolCallInput["kind"]; text: string }
+export type ModelToolDeclaration = { name: string; description: string } & (
+  { kind: "structured"; parameters: Json } | { kind: "freeform" }
+);
+
 export type ModelPart =
   | { kind: "thinking"; text: string; summary: string; continuation: Json }
   | { kind: "text"; text: string; continuation: Json }
-  | { kind: "toolcall"; callId: string; name: string; arguments: Json; continuation: Json };
+  | { kind: "toolcall"; callId: string; name: string; input: ToolCallInput; continuation: Json };
 export type ModelItem =
   | { kind: "input" | "context"; parts: readonly ModelInputPart[] }
   // scope and adapter (the producing protocol's continuation format) constrain native data; they do not gate public content in cross-model requests.
@@ -34,11 +42,11 @@ export interface Usage {
 }
 export type StreamPart =
   | { id: string; kind: "text" | "thinking" }
-  | { id: string; kind: "toolcall"; callId: string; name: string };
+  | { id: string; kind: "toolcall"; callId: string; name: string; inputKind: ToolCallInput["kind"] };
 export type ModelEvent =
   | { type: "part.start"; part: StreamPart }
   | { type: "part.delta"; partId: string; delta: string; channel?: "summary" }
-  | { type: "part.end"; partId: string; arguments?: Json; continuation?: Json }
+  | { type: "part.end"; partId: string; input?: ToolCallInput; continuation?: Json }
   | { type: "finish"; reason: string; usage: Usage | null; responseId?: string; rawFinishReason?: string; source?: ModelSource; timing?: RequestTiming; response?: ModelResponse | null };
 export type ModelSource = { model: string; adapter: string; scope: string };
 /** Failure message is a standalone English summary; details preserve original diagnostic text and response data. */
@@ -66,15 +74,14 @@ export type ModelBlock = {
 } & (
   | { kind: "thinking"; text: string; summary: string }
   | { kind: "text"; text: string }
-  | { kind: "toolcall"; callId: string; name: string; argumentsText: string | null; arguments: Json; outcome: ToolOutcome | null;
+  | { kind: "toolcall"; callId: string; name: string; input: ToolCallInput | null; draft: ToolInputDraft | null; outcome: ToolOutcome | null;
       /** Original input preview identity; available even when execution never produced an outcome. */
       invocation?: ToolInvocationInfo }
 );
 export type ModelLiveBlock = { id: string; responseId: string; ordinal: number } & (
   | { kind: "text"; text: string; endedAt: number | null }
   | { kind: "thinking"; text: string; startedAt: number; endedAt: number | null }
-  /** During the input phase, arguments is a display preview parsed tolerantly and cannot be used for execution; other phases contain complete arguments. */
-  | { kind: "toolcall"; name: string; argumentsText: string; arguments: Json; state: "input" | "ready" | "executing";
+  | { kind: "toolcall"; name: string; input: ToolCallInput | null; draft: ToolInputDraft | null; state: "input" | "ready" | "executing";
       invocation: ToolInvocationInfo | null; result: Extract<ToolResult, { kind: "running" }> | null;
       /** One-shot attention time, present only in live execution; history does not replay notices. */
       noticeAt?: number }
@@ -107,7 +114,7 @@ export interface ModelResponse {
   receivedAt: number;
   headers: Readonly<Record<string, string>>;
 }
-export interface ModelToolCall { callId: string; name: string; arguments: Json }
+export interface ModelToolCall { callId: string; name: string; input: ToolCallInput }
 export interface ModelToolObserver {
   prepared?(call: ModelToolCall, info: ToolInvocationInfo): void;
   started?(call: ModelToolCall, info: ToolInvocationInfo): void;
@@ -117,8 +124,8 @@ export interface ModelToolObserver {
 }
 /** Executable tools supplied by the requesting paradigm or a host-bound request environment. */
 export interface ModelTools {
-  readonly declarations: readonly { name: string; description: string; parameters: Json }[];
-  preview?(name: string, args: Json): ToolInvocationInfo;
+  readonly declarations: readonly ModelToolDeclaration[];
+  preview?(name: string, input: ToolCallInput | null): ToolInvocationInfo;
   execute(calls: readonly ModelToolCall[], signal: AbortSignal,
     settle: (call: ModelToolCall, outcome: ToolOutcome) => void, observer: ModelToolObserver): Promise<void>;
 }
@@ -144,7 +151,7 @@ export type ModelRunResult = {
 /** The final request's input context; an independent copy for domain extension producers to read. */
 export interface ModelRequestContext {
   system: SystemPrompt;
-  tools: readonly { name: string; description: string; parameters: Json }[];
+  tools: readonly ModelToolDeclaration[];
 }
 export interface StreamRequest extends ModelRequestIdentity {
   target: ModelTarget;
@@ -152,7 +159,7 @@ export interface StreamRequest extends ModelRequestIdentity {
   messages: ModelItem[];
   /** The output limit for this completion; uses the smaller of this value and the model's configured limit. */
   maxOutputTokens?: number;
-  tools?: { name: string; description: string; parameters: Json }[];
+  tools?: ModelToolDeclaration[];
   signal: AbortSignal;
 }
 export interface ModelInputOptions { content?: ContentReader }

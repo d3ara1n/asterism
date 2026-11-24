@@ -1,7 +1,6 @@
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { errorDisplay } from "../../../shared/error-display.ts";
 import { applyLive } from "../../../shared/live-patch.ts";
-import { viewLive } from "../../../shared/partial-arguments.ts";
 import type { SessionBridge, SessionMutation, SessionResult, SessionData, SessionProgress, SessionChanged, LiveBlock } from "../../../shared/session.ts";
 import type { RendererSessionSnapshot } from "@asterism-app/sdk/renderer";
 import { SessionRecordStore } from "./records";
@@ -43,7 +42,7 @@ export class SessionController {
   private readonly records: SessionRecordStore;
   private state: SessionViewState = { data: null, status: "loading", navigating: false, readError: null, missing: false };
   private activity: SessionActivity = emptyActivity;
-  /** Wire-format streaming blocks: the baseline for applying deltas; display blocks grouped by object derive preview arguments from these. */
+  /** Wire-format streaming blocks: the baseline for applying deltas; grouped for display without conversion. */
   private wire: LiveBlock[] = [];
   private live = new Map<string, readonly LiveBlock[]>();
   private listeners = new Set<() => void>();
@@ -77,14 +76,14 @@ export class SessionController {
     if (event.kind === "session.opened") {
       const { progress, ...data } = event.data;
       this.wire = progress.live;
-      this.live = groupLive(new Map(), this.wire.map(viewLive));
+      this.live = groupLive(new Map(), this.wire);
       this.setActivity(progress);
       this.update({ data, status: "ready", readError: null, missing: false });
       this.progressListeners.forEach(listener => listener());
     } else if (event.kind === "session.progress") {
       if (event.live) {
         this.wire = applyLive(this.wire, event.live);
-        this.live = groupLive(this.live, this.wire.map(viewLive));
+        this.live = groupLive(this.live, this.wire);
       }
       this.setActivity(event);
       this.progressListeners.forEach(listener => listener());

@@ -18,9 +18,9 @@ function* text(value: string, id = "text"): Generator<ModelEvent> {
   yield { type: "part.end", partId: id, continuation: { openai: { phase: "final_answer" } } };
 }
 function* query(): Generator<ModelEvent> {
-  yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "c1", name: "read_records" } };
+  yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "c1", name: "read_records", inputKind: "structured" } };
   yield { type: "part.delta", partId: "call", delta: '{"id":' };
-  yield { type: "part.end", partId: "call", arguments: { id: "saved" } };
+  yield { type: "part.end", partId: "call", input: { kind: "structured", value: { id: "saved" } } };
 }
 const model = { model: "p/m", provider: "p", name: "Model", contextWindow: 65536, cost: null, generation: { maxOutputTokens: null },
   capabilities: { reasoning: false, tools: true, thinkingLevels: [] } };

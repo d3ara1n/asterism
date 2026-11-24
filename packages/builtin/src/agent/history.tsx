@@ -16,7 +16,7 @@ export const agentRecordViews: RecordRenderer[] = [
     label: data => {
       const block = data.input;
       if (block.kind !== "toolcall") return "";
-      const args = record(block.arguments), target = record(args.target);
+      const args = record(block.input?.kind === "structured" ? block.input.value : null), target = record(args.target);
       const tool = block.name === "resource_call" && typeof args.tool === "string" ? args.tool : block.name;
       return typeof target.path === "string" ? `${tool} · ${target.path}` : tool;
     },
@@ -40,7 +40,7 @@ export const agentRecordViews: RecordRenderer[] = [
     label: data => {
       const block = data.block;
       if (block.kind !== "toolcall") return block.kind === "thinking" ? block.text || block.summary : block.text;
-      const args = record(block.arguments), target = record(args.target);
+      const args = record(block.input?.kind === "structured" ? block.input.value : null), target = record(args.target);
       const tool = block.name === "resource_call" && typeof args.tool === "string" ? args.tool : block.name;
       return typeof target.path === "string" ? `${tool} · ${target.path}` : tool;
     },

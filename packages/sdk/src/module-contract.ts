@@ -12,12 +12,10 @@ export type ToolInput = JsonObject | null;
 /** The transport supplies JSON values; this schema constrains only their root shape. */
 export const toolInputSchema = z.looseObject({}).nullable() as z.ZodType<ToolInput>;
 
-export interface ToolContract<A extends ToolInput = ToolInput> extends ContractReference {
+interface ToolMetadata extends ContractReference {
   name: string;
   description: string;
   guidelines: readonly string[];
-  /** Structured parameters; a tool determines its fields and whether null is accepted. */
-  argsSchema: z.ZodType<A>;
   /** Execution requires an endpoint that can receive user interaction. Output rendering alone does not require it. */
   requiresInteraction?: boolean;
   /**
@@ -27,16 +25,35 @@ export interface ToolContract<A extends ToolInput = ToolInput> extends ContractR
    */
   requiresNotice?: boolean;
 }
-/** Tool definitions fix selection descriptions, usage guidance, and args; implementations add only target/result and execution information. */
-export interface ImplementationContract<S extends Json, T extends ToolInput, A extends ToolInput, O extends Json> extends DataContract<O> {
+export interface StructuredToolContract<A extends ToolInput = ToolInput> extends ToolMetadata {
+  kind?: "structured";
+  /** Structured parameters; a tool determines its fields and whether null is accepted. */
+  argsSchema: z.ZodType<A>;
+}
+export interface FreeformToolContract extends ToolMetadata {
+  kind: "freeform";
+  argsSchema?: never;
+}
+export type ToolContract<A extends ToolInput = ToolInput> = StructuredToolContract<A> | FreeformToolContract;
+
+interface ImplementationMetadata<S extends Json, O extends Json> extends DataContract<O> {
   resource: ResourceContract<S>;
-  tool: ToolContract<A>;
-  /** Structured selection within the resource; each implementation determines whether null is accepted. */
-  targetSchema: z.ZodType<T>;
   effect: "read" | "write";
   /** Sequential operations share submission order; parallel operations can overlap either lane. */
   execution: "parallel" | "sequential";
 }
+/** Implementations of structured tools add a target schema; freeform implementations receive the original text. */
+export interface StructuredImplementationContract<S extends Json, T extends ToolInput, A extends ToolInput, O extends Json> extends ImplementationMetadata<S, O> {
+  tool: StructuredToolContract<A>;
+  /** Structured selection within the resource; each implementation determines whether null is accepted. */
+  targetSchema: z.ZodType<T>;
+}
+export interface FreeformImplementationContract<S extends Json, O extends Json> extends ImplementationMetadata<S, O> {
+  tool: FreeformToolContract;
+  targetSchema?: never;
+}
+export type ImplementationContract<S extends Json, T extends ToolInput, A extends ToolInput, O extends Json> =
+  StructuredImplementationContract<S, T, A, O> | FreeformImplementationContract<S, O>;
 export function defineResource<S extends Json>(kind: string, stateSchema: z.ZodType<S>): ResourceContract<S> {
   return { kind, stateSchema };
 }
@@ -45,16 +62,31 @@ function requireDescription(schema: z.ZodType, subject: string): void {
   if (!schema.description?.trim()) throw new Error(`Missing schema description: ${subject}`);
   try { z.toJSONSchema(schema); } catch (error) { throw new Error(`Schema is not representable as JSON Schema: ${subject}`, { cause: error }); }
 }
-export function defineTool<A extends ToolInput>(definition: ToolContract<A>): ToolContract<A> {
+export function defineTool<A extends ToolInput>(definition: StructuredToolContract<A>): StructuredToolContract<A>;
+export function defineTool(definition: FreeformToolContract): FreeformToolContract;
+export function defineTool(definition: ToolContract): ToolContract;
+export function defineTool(definition: ToolContract): ToolContract {
   if (!definition.name.trim() || !definition.description.trim()) throw new Error("Tool name and description must not be empty.");
   if (definition.guidelines.some(guideline => !guideline.trim())) throw new Error(`Empty tool guideline: ${definition.name}`);
-  requireDescription(definition.argsSchema, `${definition.name}.args`);
+  if (definition.kind === "freeform") {
+    if (/\s/.test(definition.name)) throw new Error(`Freeform tool names must be a single token: ${definition.name}`);
+    if ("argsSchema" in definition) throw new Error(`Freeform tools do not declare an args schema: ${definition.name}`);
+  } else requireDescription(definition.argsSchema, `${definition.name}.args`);
   return { ...definition, ...contractReferenceSchema.parse({ id: definition.id }), guidelines: [...definition.guidelines] };
 }
 export function defineImplementation<S extends Json, T extends ToolInput, A extends ToolInput, O extends Json>(
+  definition: StructuredImplementationContract<S, T, A, O>,
+): StructuredImplementationContract<S, T, A, O>;
+export function defineImplementation<S extends Json, O extends Json>(
+  definition: FreeformImplementationContract<S, O>,
+): FreeformImplementationContract<S, O>;
+export function defineImplementation<S extends Json, T extends ToolInput, A extends ToolInput, O extends Json>(
   definition: ImplementationContract<S, T, A, O>,
-): ImplementationContract<S, T, A, O> {
-  requireDescription(definition.targetSchema, `${definition.id}.target`);
+): ImplementationContract<S, T, A, O>;
+export function defineImplementation(definition: ImplementationContract<Json, ToolInput, ToolInput, Json>) {
+  if (definition.tool.kind === "freeform") {
+    if ("targetSchema" in definition) throw new Error(`Freeform tools do not declare a target schema: ${definition.id}`);
+  } else requireDescription(definition.targetSchema!, `${definition.id}.target`);
   requireDescription(definition.schema, `${definition.id}.result`);
   return definition;
 }

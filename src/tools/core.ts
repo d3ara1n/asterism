@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { coreId } from "../shared/core.ts";
 import { toolInputSchema, jsonSchema, toolInvocationSchema, toolCompletionSchema } from "@asterism-app/sdk/contracts";
-import { defineTool, MAX_TIMEOUT_SECONDS } from "@asterism-app/sdk/contracts";
+import { defineTool, MAX_TIMEOUT_SECONDS, type ToolCallInput } from "@asterism-app/sdk/contracts";
 import { contractReferenceSchema, defineData } from "@asterism-app/sdk/contracts";
 
 export const ResourceListResult = defineData(coreId("resource-list"), z.strictObject({
@@ -13,6 +13,7 @@ export const ResourceInspectResult = defineData(coreId("resource-inspect"), z.st
   notice: z.string().optional(),
   tools: z.array(z.strictObject({
     name: z.string(),
+    kind: z.enum(["structured", "freeform"]).optional().describe("Input format; absent only from older inspection results."),
     description: z.string().optional().describe("Present in the default view."),
     guidelines: z.array(z.string()).optional().describe("Present in the default view."),
     args: jsonSchema.optional().describe("Present in the default and schema views."),
@@ -45,8 +46,8 @@ export const ResourceScript = defineTool({
   description: "Compose tool calls in JavaScript using their results, conditional logic, loops, and concurrency. Return selected values to the model.",
   guidelines: [
     "code is an async JavaScript function body with top-level await and return. Intermediate values are available to the script as local variables.",
-    "tools.<name>(args) calls a top-level tool exposed to the script. Object.keys(tools) lists these bindings. For example: const r = await tools.resource_inspect({ resource_id }); on success, r.data contains state and tools.",
-    "resources.get(resource_id) creates a local call handle, separate from tool discovery. Invoke handle.read({ target, args }) or select a tool dynamically with handle[name]({ target, args }). Definitions from resource_inspect supply name and the target and args schemas. Handle properties then and toJSON are reserved.",
+    "tools.<name>(args) calls a structured top-level tool; tools.<name>(text) calls a freeform top-level tool. Object.keys(tools) lists these bindings. For example: const r = await tools.resource_inspect({ resource_id }); on success, r.data contains state and tools.",
+    "resources.get(resource_id) creates a local call handle, separate from tool discovery. Invoke handle.read({ target, args }) or select a tool dynamically with handle[name]({ target, args }). For a freeform resource tool, invoke handle[name](text) with a string. resource_inspect reports each tool’s input kind and the target and args schemas for structured tools. Handle properties then and toJSON are reserved.",
     "Each call resolves to { kind, data } with error: { code, message } for rejected and failed, or message for partial, cancelled, and unknown. kind is succeeded for success and partial for partial success; unknown means effects may have occurred. data is the encoded result and may be null. The result schema from resource_inspect with detail: \"schema\" describes data, not the envelope.",
     "All tool outcome kinds fulfill the promise, including failures. Branch on result.kind; try/catch handles JavaScript exceptions. An unsuccessful child outcome alone leaves the script and other calls running.",
     "text(result) returns the text of the tool's model-facing view. It takes the original result object from a call in the current script. File parts, such as images, are outside this text view.",
@@ -81,7 +82,7 @@ export const ResourceInspect = defineTool({
   description: "Read a linked resource's current state and available tool definitions in one call.",
   guidelines: [
     "With only resource_id, the result contains state and all available tool definitions.",
-    "Each definition pairs the tool's shared args schema with the target schema for that tool on the inspected resource. The pair applies to resource_call and resource_script handles.",
+    "Each definition reports its input kind. Structured tools use resource_call or a script handle with target and args; freeform tools use resource_call_text or a script handle with one text string.",
     "Resource state is read at inspection time. The tool catalog reflects the links, configuration, and execution policy captured for the request. Tool definitions can be reused while they remain available.",
   ],
   argsSchema: z.strictObject({
@@ -94,7 +95,7 @@ export const ResourceInspect = defineTool({
 export const ResourceCall = defineTool({
   id: "core.tool.resource_call",
   name: "resource_call",
-  description: "Use an available tool on a linked resource.",
+  description: "Use an available structured tool on a linked resource.",
   guidelines: [
     "resource_id selects the resource; tool selects the operation.",
     "args belongs to the tool. It supplies operation parameters whose schema stays the same across resources that expose the same tool.",
@@ -111,3 +112,28 @@ export const ResourceCall = defineTool({
     args: toolInputSchema.default({}).describe("A JSON object or null matching the selected tool's shared operation args schema."),
   }).describe("Select a linked resource and a tool, then supply its implementation-specific target and shared operation args."),
 });
+
+export const ResourceCallText = defineTool({
+  id: "core.tool.resource_call_text",
+  kind: "freeform",
+  name: "resource_call_text",
+  description: "Use an available freeform tool on a linked resource.",
+  guidelines: [
+    "The first line is <resource_id> <tool>, separated by a single space and terminated by LF or CRLF.",
+    "Everything after that line ending is passed unchanged as the tool input, including whitespace, line endings, and an empty body.",
+    "resource_inspect identifies freeform tools and describes what their text means. A resource_script handle accepts the body alone as a string.",
+  ],
+});
+
+export function parseResourceCallText(text: string): { id: string; tool: string; body: string } | null {
+  const header = /^([^\s]+) ([^\s]+)\r?\n/.exec(text);
+  return header ? { id: header[1]!, tool: header[2]!, body: text.slice(header[0].length) } : null;
+}
+
+/** Select the resource tool for usage records and script summaries without recording its input. */
+export function resourceToolName(name: string, input: ToolCallInput): string | undefined {
+  if (name === ResourceCallText.name && input.kind === "freeform") return parseResourceCallText(input.text)?.tool;
+  if (name !== ResourceCall.name || input.kind !== "structured") return undefined;
+  const args = input.value;
+  return args && typeof args === "object" && !Array.isArray(args) && typeof args.tool === "string" ? args.tool : undefined;
+}

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { belongsTo, pluginNamespace, defineCall, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type ToolContract } from "@asterism-app/sdk/contracts";
+import { belongsTo, pluginNamespace, defineCall, defineAction, defineRecord, defineImplementation, defineTool, type ResourceContract, type StructuredToolContract } from "@asterism-app/sdk/contracts";
 import { defineTopLevelTool, definePlugin, defineModule, defineAgentInstructions, implementCall, implementTool, implementResource, type PluginDefinition, type PluginContext } from "@asterism-app/sdk/runtime";
 import { AgentCatalogService } from "./agent-catalog.ts";
 import { loadPlugins } from "./loader.ts";
@@ -20,10 +20,10 @@ function load(plugins: readonly PluginDefinition[], pluginDependencies?: Readonl
 }
 const args = z.strictObject({}).describe("No parameters.");
 const tool = (description: string, id = "test.tools/read") => defineTool({ id, name: "read", description, guidelines: [], argsSchema: args });
-function plugin(id: string, contract: ToolContract, options: { extra?: ToolContract[]; resource?: ResourceContract } = {}): PluginDefinition {
+function plugin(id: string, contract: StructuredToolContract, options: { extra?: StructuredToolContract[]; resource?: ResourceContract } = {}): PluginDefinition {
   const ns = pluginNamespace(id);
   const resource = options.resource ?? ns.resource("thing", z.object({}));
-  const impl = (name: string, t: ToolContract) => implementTool(defineImplementation({
+  const impl = (name: string, t: StructuredToolContract) => implementTool(defineImplementation({
     ...ns.data(name, z.null().describe("No result.")), resource, tool: t,
     targetSchema: z.null().describe("Whole resource."), effect: "read", execution: "parallel",
   }), { async call() { return { kind: "succeeded", data: null }; } });
@@ -292,8 +292,8 @@ describe("Plugin assembly", () => {
       ["acme.c/thing.read", true, null], ["acme.d/thing.read", false, "acme.c"]]);
     expect(loaded.tools.match({ id: "old", kind: "acme.a/thing", title: "Old", data: {} })).toEqual([]);
     const [active] = loaded.tools.match({ id: "new", kind: "acme.c/thing", title: "New", data: {} });
-    expect(active?.tool.argsSchema.safeParse({}).success).toBe(false);
-    expect(active?.tool.argsSchema.parse({ query: "text" })).toEqual({ query: "text" });
+    expect(active?.tool.argsSchema?.safeParse({}).success).toBe(false);
+    expect(active?.tool.argsSchema?.parse({ query: "text" })).toEqual({ query: "text" });
     expect(order.manifest.flatMap(entry => entry.implementations.map(item => item.active))).toEqual([false, true, true]);
   });
   // Replace only the specified resource type for a shared contract; public dependency initialization order must not alter user-list override precedence.

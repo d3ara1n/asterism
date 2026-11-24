@@ -54,7 +54,7 @@ const decode = (text: string): Json => { try { return JSON.parse(text) as Json; 
 type Decoded = ToolOutcome extends infer O ? O extends ToolOutcome ? Omit<O, "model"> & { model: Json } : never : never;
 async function invoke(capabilities: AgentCapabilities, name: string, args: Json): Promise<Decoded> {
   const results: ToolOutcome[] = [];
-  await executeCoreBatch([{ callId: "call", name, arguments: args }], capabilities, signal, (_call, outcome) => results.push(outcome));
+  await executeCoreBatch([{ callId: "call", name, input: { kind: "structured" as const, value: args } }], capabilities, signal, (_call, outcome) => results.push(outcome));
   expect(results).toHaveLength(1);
   const outcome = results[0]!;
   const text = outcome.model.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
@@ -219,7 +219,7 @@ describe("Tool/resource matching and authorization", () => {
     controller.abort();
     const results: ToolOutcome[] = [];
     await executeCoreBatch([{ callId: "cancelled", name: "resource_call",
-      arguments: { resource_id: resource.id, tool: "list", args: {} } }],
+      input: { kind: "structured" as const, value: { resource_id: resource.id, tool: "list", args: {} } } }],
     scope(), controller.signal, (_call, result) => results.push(result));
     expect(results).toMatchObject([{
       kind: "cancelled", implementation: { id: "asterism.builtin/directory.list" }, data: null,
@@ -246,7 +246,7 @@ describe("Tool/resource matching and authorization", () => {
     const capabilities = new AgentCapabilities(resources, tools, [resource], () => true, toolCaller);
     const results: ToolOutcome[] = [];
     await executeCoreBatch(["a", "b"].map(id => ({ callId: id, name: "resource_call",
-      arguments: { resource_id: resource.id, tool: "work", args: { id } } })), capabilities, signal, (_call, outcome) => results.push(outcome));
+      input: { kind: "structured" as const, value: { resource_id: resource.id, tool: "work", args: { id } } } })), capabilities, signal, (_call, outcome) => results.push(outcome));
     expect(results.map(result => result.kind)).toEqual(["succeeded", "succeeded"]);
     expect(order).toEqual(execution === "parallel" ? ["start:a", "start:b", "end:a", "end:b"] : ["start:a", "end:a", "start:b", "end:b"]);
   });

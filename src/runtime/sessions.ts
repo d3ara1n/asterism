@@ -23,7 +23,6 @@ import { SessionError, SessionTree } from "../session/tree.ts";
 import type { ModelSettings } from "../shared/model.ts";
 import { sessionCommandSchema, type SessionChanged, type SessionCommand, type SessionData, type SessionProgress, type SessionReply, type SessionNode } from "../shared/session.ts";
 import { diffLive } from "../shared/live-patch.ts";
-import { wireLive } from "../shared/partial-arguments.ts";
 import type { ToolRegistry } from "../tools/registry.ts";
 import { sessionPluginError } from "./plugin-errors.ts";
 import { SessionWorkbench } from "./workbench.ts";
@@ -315,7 +314,7 @@ export class SessionService {
       timelineBusy: [...this.pendingCreations.values()].some(item => item.sessionId === sessionId)
         || this.retiring(sessionId).length > 0,
       // During input, tool arguments travel only as argumentsText; the frontend derives previews.
-      live: [...resources.flatMap(a => a.live), ...plugin.live].map(wireLive) };
+      live: [...resources.flatMap(a => a.live), ...plugin.live] };
   }
   private progressChanged(sessionId: string): void {
     if (this.sleepPolicy?.isWaiting(sessionId) && this.settled(sessionId)) this.sleepPolicy.refresh();

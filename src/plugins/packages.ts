@@ -258,8 +258,10 @@ async function importEntry(id: string, file: string, label: string): Promise<unk
 }
 /** Storage declarations check structural shape only; migration chains and plugins own format contents. */
 function storageDeclarations(id: string, value: unknown): readonly PluginStorageDeclaration[] {
-  if (!Array.isArray(value) || value.some(item => !item || typeof item !== "object" || (item.kind !== "json" && item.kind !== "sqlite")
-    || typeof item.path !== "string" || !Number.isSafeInteger(item.version) || item.version < 1 || !item.migrations || typeof item.migrations !== "object"))
+  if (!Array.isArray(value) || value.some(item => !item || typeof item !== "object" || (!["json", "sqlite", "records"].includes(item.kind))
+    || (item.kind === "records"
+      ? typeof item.id !== "string" || !Array.isArray(item.contracts) || item.contracts.some((contract: unknown) => typeof contract !== "string")
+      : typeof item.path !== "string") || !Number.isSafeInteger(item.version) || item.version < 1 || !item.migrations || typeof item.migrations !== "object"))
     throw new PluginPackageError("invalid_entry", `Storage entry of ${id} must default-export defineStorage([...]).`);
   return value as readonly PluginStorageDeclaration[];
 }

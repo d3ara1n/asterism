@@ -29,7 +29,7 @@ function capabilities(handler: (value: number, signal: AbortSignal) => Promise<C
 }
 async function script(code: string, cap = capabilities(async value => ({ kind: "succeeded", data: { value } })), observer: ToolObserver = {}) {
   let outcome: ToolOutcome | undefined;
-  await executeCoreBatch([{ callId: "script", name: "resource_script", arguments: { code } }], cap,
+  await executeCoreBatch([{ callId: "script", name: "resource_script", input: { kind: "structured" as const, value: { code } } }], cap,
     new AbortController().signal, (_call, result) => { outcome = result; }, observer);
   return outcome!;
 }
@@ -316,12 +316,12 @@ describe("Resource script execution", () => {
       signal.addEventListener("abort", () => resolve({ kind: "cancelled", message: "Stopped." }), { once: true });
     }));
     let outcome: ToolOutcome | undefined;
-    const running = executeCoreBatch([{ callId: "script", name: "resource_script", arguments: { code: `
+    const running = executeCoreBatch([{ callId: "script", name: "resource_script", input: { kind: "structured", value: { code: `
       log("Waiting for steps");
       return await Promise.all([1, 2].map(value => resources.get("r").step({
         args: { value }
       })));
-    ` } }], cap, controller.signal, (_call, result) => { outcome = result; }, {
+    ` } } }], cap, controller.signal, (_call, result) => { outcome = result; }, {
       published(_call, data) {
         if (ResourceScriptResult.schema.parse(data).calls.length === 2) queued.resolve();
       },
@@ -363,12 +363,12 @@ describe("Shared tool scheduling", () => {
       return { kind: "succeeded", data: { value } };
     });
     const running = executeCoreBatch([
-      { callId: "direct", name: "resource_call", arguments: input(1) },
-      { callId: "script", name: "resource_script", arguments: { code: `
+      { callId: "direct", name: "resource_call", input: { kind: "structured" as const, value: input(1) } },
+      { callId: "script", name: "resource_script", input: { kind: "structured", value: { code: `
         resources.get("r").step({ args: { value: 2 } });
         return "selected";
-      ` } },
-      { callId: "later", name: "resource_call", arguments: input(3) },
+      ` } } },
+      { callId: "later", name: "resource_call", input: { kind: "structured" as const, value: input(3) } },
     ], cap, new AbortController().signal, (call, result) => {
       if (call.callId === "script") scriptDone.resolve(result);
     });
@@ -401,14 +401,14 @@ describe("Shared tool scheduling", () => {
     });
     const cap = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([step, parallel]), [resource], () => true, toolCaller);
     const calls: PendingCall[] = [
-      { callId: "first", name: "resource_call", arguments: input(1) },
-      { callId: "script", name: "resource_script", arguments: { code: `
+      { callId: "first", name: "resource_call", input: { kind: "structured" as const, value: input(1) } },
+      { callId: "script", name: "resource_script", input: { kind: "structured", value: { code: `
         return (await Promise.all([
           resources.get("r").step({ args: { value: 2 } }),
           resources.get("r").parallel({ args: { value: 3 } }),
         ])).map(result => result.kind);
-      ` } },
-      { callId: "last", name: "resource_call", arguments: input(4) },
+      ` } } },
+      { callId: "last", name: "resource_call", input: { kind: "structured" as const, value: input(4) } },
     ];
     const results: ToolOutcome[] = [];
     const running = executeCoreBatch(calls, cap, new AbortController().signal, (_call, result) => results.push(result), {

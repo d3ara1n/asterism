@@ -6,11 +6,12 @@ import { sessionSchemaSql, pendingRecordsIndexSql, folderSchemaSql, folderColumn
 import { applicationStorage } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
 import { templateLastUsedColumnSql, templateSchemaSql } from "./templates.ts";
+import { recordStorageSchemaSql } from "../storage/record-storage.ts";
 import { sqliteStorage } from "../storage/migrations.ts";
 import { mcpSchemaSql } from "../mcp/storage.ts";
 import { tutorialTemplate } from "./tutorial-template.ts";
 
-export const workspaceDatabaseVersion = 35;
+export const workspaceDatabaseVersion = 36;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
@@ -67,7 +68,8 @@ function initializeWorkspace(db: DatabaseSync): void {
         PRIMARY KEY(session_id, object_id, contract_id)
       ) STRICT;
       ${templateSchemaSql}
-      ${contentSchemaSql}`);
+      ${contentSchemaSql}
+      ${recordStorageSchemaSql}`);
   db.prepare("INSERT INTO workspace VALUES (?, ?)").run(randomUUID(), "Personal workspace");
   // Seed an ordinary user template only when the workspace is created, never on reopen or upgrade.
   db.prepare("INSERT INTO templates (id, title, created_at, data_json, folder_id) VALUES (?, ?, ?, ?, NULL)")
@@ -85,6 +87,7 @@ const islandsTableSql = `
 export function workspaceStorage(root: string) {
   return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
     version: workspaceDatabaseVersion, migrations: {
+      35: db => { db.exec(recordStorageSchemaSql); },
       // Earlier starts were not recorded; existing templates begin without a use time.
       34: db => { db.exec(`ALTER TABLE templates ADD COLUMN ${templateLastUsedColumnSql};`); },
       // Existing sessions get a fresh inactivity baseline instead of inheriting their historical creation time.

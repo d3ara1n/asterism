@@ -37,7 +37,7 @@ export function projectPeekRecords(snapshot: Pick<SessionSnapshot, "records">, a
             add("thinking", [block.text, block.summary && `Saved thinking summary:\n${block.summary}`].filter(Boolean).join("\n\n"), status);
         } else add("tool", JSON.stringify({
           name: block.name, callId: block.callId,
-          arguments: block.arguments ?? block.argumentsText,
+          input: block.input, draft: block.draft,
           outcome: block.outcome ? {
             kind: block.outcome.kind, resource: block.outcome.resource,
             data: block.outcome.data, text: partsText(block.outcome.model),

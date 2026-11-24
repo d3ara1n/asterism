@@ -14,8 +14,8 @@ export const Execution = defineRecord(builtin.name("agent.execution"), {
 });
 /** Tool inputs keep their model-order position; execution fills the outcome once. */
 export const ToolExecution = defineOperationRecord(builtin.name("agent.tool-execution"), {
-  input: modelToolCallBlockSchema.refine(block => !block.complete && block.outcome === null && block.argumentsText === null,
-    "Tool operation input must have complete arguments and a pending outcome."),
+  input: modelToolCallBlockSchema.refine(block => !block.complete && block.outcome === null && block.input !== null && block.draft === null,
+    "Tool operation input must have complete input and a pending outcome."),
   output: toolOutcomeSchema,
 });
 export const executionRecordIds = [Execution.id, ToolExecution.id];

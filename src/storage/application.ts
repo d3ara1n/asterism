@@ -10,6 +10,7 @@ import { collectManagedInstallations } from "../plugins/npm-installation.ts";
 import { savePluginBuild } from "../plugins/artifacts.ts";
 import runtimeHostModules from "virtual:asterism/runtime-host-modules";
 import { applicationStorage, preferenceVersion } from "../shared/application.ts";
+import { pluginRecordStorage, recordStorages, requireRegisteredRecordStorages } from "./record-storage.ts";
 import { jsonStorage, sqliteStorage, type StorageDefinition } from "./migrations.ts";
 import { prepareData, restorePoint, startFresh, type DataPath, type PluginStorageGroup } from "./preparation.ts";
 import type { PreparationProgress, PreparationResult } from "../shared/recovery.ts";
@@ -44,7 +45,10 @@ export function hostStorages(root: string, decrypt?: (ciphertext: string) => Pro
 
 export function pluginStorages(root: string, id: string, declarations: readonly PluginStorageDeclaration[]): StorageDefinition[] {
   const directory = resolve(root, applicationStorage.pluginDataDirectory, id);
-  return declarations.map(declaration => {
+  const records = recordStorages(id, declarations);
+  requireRegisteredRecordStorages(root, id, records);
+  return [...records.map(declaration => pluginRecordStorage(root, id, declaration)), ...declarations.flatMap(declaration => {
+    if (declaration.kind === "records") return [];
     const file = resolve(directory, declaration.path);
     if (!pathWithin(directory, file))
       throw new Error(`Storage path is outside plugin ${id}: ${declaration.path}.`);
@@ -52,7 +56,7 @@ export function pluginStorages(root: string, id: string, declarations: readonly 
     return declaration.kind === "json"
       ? jsonStorage({ id: identity, file, version: declaration.version, migrations: declaration.migrations, envelope: true })
       : sqliteStorage({ id: identity, file, version: declaration.version, migrations: declaration.migrations });
-  });
+  })];
 }
 
 /** Import captured storage entries only; task processes own plugin runtime and setup. */
@@ -60,12 +64,12 @@ async function discoverPluginStorage(root: string, built: readonly BuiltPackage[
   const packages = await importPackages(built, runtimeHostModules, { runtime: false });
   const groups: PluginStorageGroup[] = [];
   for (const item of packages) {
-    if (!item.manifest || !item.storageEntry || item.status === "disabled") continue;
+    if (!item.manifest || item.status === "disabled") continue;
     const id = item.manifest.id;
-    if (item.status === "ready" && item.storage) {
-      try { groups.push({ id, stores: pluginStorages(root, id, item.storage) }); }
+    if (item.status === "ready") {
+      try { groups.push({ id, stores: pluginStorages(root, id, item.storage ?? []) }); }
       catch (error) { groups.push({ id, stores: [], error: error instanceof Error ? error.message : String(error) }); }
-    } else groups.push({ id, stores: [], error: item.diagnostic?.message ?? "The storage entry could not be loaded." });
+    } else if (item.storageEntry) groups.push({ id, stores: [], error: item.diagnostic?.message ?? "The storage entry could not be loaded." });
   }
   return groups;
 }

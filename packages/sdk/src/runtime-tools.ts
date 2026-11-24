@@ -1,4 +1,4 @@
-import { defineTool, type ToolContract, type ToolInput } from "./module-contract.ts";
+import { defineTool, type StructuredToolContract, type FreeformToolContract, type ToolInput } from "./module-contract.ts";
 import type { Json } from "./json.ts";
 import type { ObjectReader, ToolSession } from "./objects.ts";
 import type { CallResult, ToolCaller } from "./runtime-contracts.ts";
@@ -23,20 +23,31 @@ export interface TopLevelToolContext<D extends Json = Json> {
   recordUsage(subject: UsageSubject): void;
 }
 /** Top-level tools declare their definition and implementation together, independently of resource support relationships. */
-export interface TopLevelTool<A extends ToolInput = ToolInput, D extends Json = Json> extends ToolContract<A> {
+interface TopLevelExecution<D extends Json> {
   /** Encodes D for progress/history and decodes it for views and model projection. */
   readonly resultSchema: z.ZodType<D>;
   readonly effect: "read" | "write";
   /** Sequential operations share submission order; parallel operations can overlap either lane. */
   readonly execution: "parallel" | "sequential";
-  execute(args: A, context: TopLevelToolContext<D>): Promise<CallResult<D>>;
   toModel?(data: D): ToolModelOutput;
 }
-export function defineTopLevelTool<A extends ToolInput, D extends Json>(definition: TopLevelTool<A, D>): TopLevelTool {
+export interface StructuredTopLevelTool<A extends ToolInput, D extends Json> extends StructuredToolContract<A>, TopLevelExecution<D> {
+  execute(args: A, context: TopLevelToolContext<D>): Promise<CallResult<D>>;
+}
+export interface FreeformTopLevelTool<D extends Json> extends FreeformToolContract, TopLevelExecution<D> {
+  execute(input: string, context: TopLevelToolContext<D>): Promise<CallResult<D>>;
+}
+export type TopLevelTool<A extends ToolInput = ToolInput, D extends Json = Json> = StructuredTopLevelTool<A, D> | FreeformTopLevelTool<D>;
+export function defineTopLevelTool<A extends ToolInput, D extends Json>(definition: StructuredTopLevelTool<A, D>): StructuredTopLevelTool<ToolInput, Json>;
+export function defineTopLevelTool<D extends Json>(definition: FreeformTopLevelTool<D>): FreeformTopLevelTool<Json>;
+export function defineTopLevelTool(definition: TopLevelTool): TopLevelTool {
   if (!definition.resultSchema.description?.trim()) throw new Error(`Missing result schema description: ${definition.id}`);
-  const tool = defineTool(definition);
-  return { ...definition, ...tool,
-    execute: (args, context) => definition.execute(args as A, context as TopLevelToolContext<D>),
-    ...(definition.toModel ? { toModel: (data: Json) => definition.toModel!(data as D) } : {}),
-  } as TopLevelTool;
+  if (definition.kind === "freeform") return { ...definition, ...defineTool(definition),
+    execute: (input: string, context: TopLevelToolContext) => definition.execute(input, context),
+    ...(definition.toModel ? { toModel: data => definition.toModel!(data) } : {}),
+  };
+  return { ...definition, ...defineTool(definition),
+    execute: (args, context) => definition.execute(args, context),
+    ...(definition.toModel ? { toModel: data => definition.toModel!(data) } : {}),
+  };
 }

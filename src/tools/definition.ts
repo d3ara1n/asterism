@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { jsonSchema, type Json } from "@asterism-app/sdk/contracts";
-import type { ToolContract } from "@asterism-app/sdk/contracts";
+import type { ModelToolDeclaration, ToolContract } from "@asterism-app/sdk/contracts";
 
 /** Model-facing schemas are embedded in larger payloads, so the root `$schema` dialect URL is dropped from each one. */
 export function schemaOf(schema: z.ZodType<Json>, io: "input" | "output" = "output"): Json {
@@ -27,18 +27,18 @@ export function projectTool(tool: ToolContract) {
     name: tool.name,
     description: tool.description,
     guidelines: [...tool.guidelines],
-    args: schemaOf(tool.argsSchema),
+    ...(tool.kind === "freeform" ? { kind: "freeform" as const } : { kind: "structured" as const, args: schemaOf(tool.argsSchema) }),
     requiresInteraction: tool.requiresInteraction === true,
     requiresNotice: tool.requiresNotice === true,
   };
 }
 
 /** Providers do not recognize guidelines; fixed entries project guidance into protocol descriptions. */
-export function declareTool(tool: ToolContract) {
+export function declareTool(tool: ToolContract): ModelToolDeclaration {
   const { name, description, guidelines } = tool;
   return {
     name,
     description: guidelines.length ? `${description}\n\nGuidelines:\n${guidelines.map(line => `- ${line}`).join("\n")}` : description,
-    parameters: toolParameters(tool.argsSchema, name),
+    ...(tool.kind === "freeform" ? { kind: "freeform" } : { kind: "structured", parameters: toolParameters(tool.argsSchema, name) }),
   };
 }

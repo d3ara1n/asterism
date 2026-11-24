@@ -3,7 +3,7 @@ import type { Json } from "./json.ts";
 import type { DataContract } from "./presentation.ts";
 import type { ConfigContract } from "./config.ts";
 import type { ModelLiveBlock } from "./models.ts";
-import type { ToolRenderProps, ToolView } from "./renderer-tools.ts";
+import type { AnyToolRenderProps, ToolView } from "./renderer-tools.ts";
 import type { EventSubscriber } from "./events.ts";
 import type { ResourceDescription } from "./renderer.ts";
 import type { UiText } from "./i18n.ts";
@@ -15,7 +15,7 @@ export interface RendererResources {
 }
 export interface RendererCatalogs { get<T extends Json>(contract: DataContract<T>): T | null; error: UiText | null }
 export interface RendererTools {
-  resolve(props: ToolRenderProps): ToolView & { props: ToolRenderProps };
+  resolve(props: AnyToolRenderProps): ToolView & { props: AnyToolRenderProps };
   preparation(name: string): string;
   /** Localized name of a tool by its model-facing name and implementation contract; null when no view declares one. */
   label(name: string, implementation: string | null): string | null;

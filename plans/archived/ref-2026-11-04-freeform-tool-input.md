@@ -2,6 +2,9 @@
 
 Reference. Research snapshot: 2026-11-04. Filed against a possible future need: `resource_script` embeds JavaScript in a JSON string parameter, so the model must JSON-escape its code. No escaping failures had been observed at filing time; the motivation was precautionary. Recheck provider capabilities before using this material in new work.
 
+
+Disposition: implementation made freeform an explicit Asterism tool input kind. The adapter-only proposal below remains as historical research, not the implemented design.
+
 ## The two-field question
 
 A freeform tool call seems to require two fields (tool name and parameters), which appears to force a JSON wrapper and therefore escaping. The survey found three escape paths in production systems:

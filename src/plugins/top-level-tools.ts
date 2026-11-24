@@ -1,5 +1,5 @@
 import { defaultToolModel, reference, type Json, type ResourceRef, type ToolContract, type ToolInput } from "@asterism-app/sdk/contracts";
-import { PluginApiError, type TopLevelTool, type ToolCaller } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type TopLevelTool, type TopLevelToolContext, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { Invocation, PreparedResult } from "../tools/contract.ts";
 import type { SdkContext } from "./sdk-context.ts";
 import type { RunGroup } from "./lifecycle.ts";
@@ -10,7 +10,7 @@ import { declaredSubject } from "../telemetry/subjects.ts";
 export interface BoundTopLevelTool {
   tool: ToolContract;
   available: boolean;
-  resolve(args: ToolInput, callId: string, interactive?: boolean): Invocation | PreparedResult;
+  resolve(args: ToolInput | string, callId: string, interactive?: boolean): Invocation | PreparedResult;
 }
 export interface RegisteredTopLevelTool { tool: TopLevelTool; sdk: SdkContext; runs: RunGroup }
 export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], requestInteractive: boolean, resourceToolRestriction: (kind: string) => string | null): BoundTopLevelTool[] {
@@ -38,7 +38,7 @@ export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ca
             return encoded;
           };
           try {
-            const result = await tool.execute(args, {
+            const context: TopLevelToolContext = {
               object: sdk.reader(ref, scope), caller, session: sdk.toolSession(ref, linked, scope, current), callId, signal: current, interactive: canInteract, resourceToolRestriction,
               publish(data) {
                 if (!scope.active) return;
@@ -49,7 +49,8 @@ export function bindTopLevelTools(entries: readonly RegisteredTopLevelTool[], ca
                 const record = declaredSubject(subject, sdk.context.id);
                 if (record) usage?.(record);
               },
-            });
+            };
+            const result = await (tool.kind === "freeform" ? tool.execute(args as string, context) : tool.execute(args as ToolInput, context));
             const withData = result.data !== undefined && result.data !== null || result.kind === "succeeded" || result.kind === "partial";
             return resolveToolCompletion(withData ? { ...result, data: encode(result.data as Json) } : result, latest);
           } finally { scope.active = false; }

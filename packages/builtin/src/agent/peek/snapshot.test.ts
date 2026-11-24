@@ -49,7 +49,7 @@ describe("peek record projection and retrieval", () => {
     expect(outline).toContain('"kind":"tool"');
     expect(outline).toContain('"kind":"thinking"');
     expect(outline).not.toMatch(/hidden-tool-argument|hidden-thinking-body/);
-    expect(retrieve(records, { name: "read_records", callId: "read", arguments: { id: "4" } }).result.outcome.data)
+    expect(retrieve(records, { name: "read_records", callId: "read", input: { kind: "structured", value: { id: "4" } } }).result.outcome.data)
       .toMatchObject({ text: "hidden-thinking-body" });
   });
 
@@ -59,7 +59,7 @@ describe("peek record projection and retrieval", () => {
     }));
     const excluded = projectPeekRecords(view, "a", false);
     expect(excluded).toEqual([]);
-    expect(retrieve(excluded, { name: "read_records", callId: "read", arguments: { id: "0" } }).result.outcome.kind).toBe("rejected");
+    expect(retrieve(excluded, { name: "read_records", callId: "read", input: { kind: "structured", value: { id: "0" } } }).result.outcome.kind).toBe("rejected");
     const admitted = projectPeekRecords(view, "a", true);
     expect(admitted[0]!.text).toContain("Readable reasoning");
     expect(admitted[0]!.text).toContain("Thinking summary");
@@ -68,14 +68,14 @@ describe("peek record projection and retrieval", () => {
 
   it("Paginates searches and record text, and rejects IDs outside the snapshot", () => {
     const records = projectPeekRecords(snapshot(message("a", "First evidence"), message("a", "Second EVIDENCE")), "a", false);
-    const first = retrieve(records, { name: "search_records", callId: "s1", arguments: { query: "evidence", limit: 1 } });
+    const first = retrieve(records, { name: "search_records", callId: "s1", input: { kind: "structured", value: { query: "evidence", limit: 1 } } });
     expect(first.ids).toEqual(["0"]);
     expect(first.result.outcome.data).toMatchObject({ nextCursor: 1 });
-    expect(retrieve(records, { name: "search_records", callId: "s2", arguments: { query: "", cursor: 1 } }).ids).toEqual(["1"]);
-    const part = retrieve(records, { name: "read_records", callId: "r1", arguments: { id: "0", limit: 6 } });
+    expect(retrieve(records, { name: "search_records", callId: "s2", input: { kind: "structured", value: { query: "", cursor: 1 } } }).ids).toEqual(["1"]);
+    const part = retrieve(records, { name: "read_records", callId: "r1", input: { kind: "structured", value: { id: "0", limit: 6 } } });
     expect(part.result.outcome.data).toMatchObject({ text: "First ", nextOffset: 6 });
-    expect(retrieve(records, { name: "read_records", callId: "r2", arguments: { id: "0", offset: 6 } }).result.outcome.data)
+    expect(retrieve(records, { name: "read_records", callId: "r2", input: { kind: "structured", value: { id: "0", offset: 6 } } }).result.outcome.data)
       .toMatchObject({ text: "evidence", nextOffset: null });
-    expect(retrieve(records, { name: "read_records", callId: "bad", arguments: { id: "other-agent" } }).result.outcome.kind).toBe("rejected");
+    expect(retrieve(records, { name: "read_records", callId: "bad", input: { kind: "structured", value: { id: "other-agent" } } }).result.outcome.kind).toBe("rejected");
   });
 });

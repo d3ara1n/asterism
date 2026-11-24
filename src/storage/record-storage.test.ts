@@ -1,0 +1,113 @@
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { afterEach, expect, it } from "vitest";
+import type { Json } from "@asterism-app/sdk/contracts";
+import type { PluginRecordStorageDeclaration } from "@asterism-app/sdk/runtime";
+import { SessionTree } from "../session/tree.ts";
+import { openDatabase, workspaceStorage } from "../runtime/storage.ts";
+import { pluginStorages } from "./application.ts";
+import { listRecoveryPoints, prepareData, recoveryPointDirectory } from "./preparation.ts";
+import { initializePluginRecordStorage } from "./record-storage.ts";
+
+const roots: string[] = [];
+function setup() {
+  const root = mkdtempSync(join(tmpdir(), "asterism-record-storage-"));
+  roots.push(root);
+  return root;
+}
+afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { force: true, recursive: true }); });
+
+const owner = "test.notes";
+const contract = `${owner}/entry`;
+const declaration: PluginRecordStorageDeclaration = {
+  kind: "records", id: "history", contracts: [contract], version: 2,
+  migrations: { 1: (_contract, data) => ({ input: data }) },
+};
+function prepare(root: string, storage: PluginRecordStorageDeclaration | null = declaration) {
+  return prepareData(root, {
+    version: "test", stores: [workspaceStorage(root)], paths: [{ path: "db" }],
+    discover: async () => {
+      try { return [{ id: owner, stores: pluginStorages(root, owner, storage ? [storage] : []) }]; }
+      catch (error) { return [{ id: owner, stores: [], error: (error as Error).message }]; }
+    },
+  });
+}
+function add(tree: SessionTree, sessionId: string, data: Json, name = contract, plugin = owner) {
+  return tree.appendToTimeline(sessionId, { contract: name, data, source: { plugin, resource: null }, model: null, recipient: null });
+}
+
+it("migrates only owned, declared timeline records, keeps session positions, and does not rerun at the same version", async () => {
+  const root = setup();
+  const before = openDatabase(root);
+  const tree = new SessionTree(before), sessionId = tree.create("Notes");
+  const old = add(tree, sessionId, { body: "owned" });
+  const otherContract = add(tree, sessionId, { body: "different contract" }, `${owner}/other`);
+  const otherAuthor = add(tree, sessionId, { body: "different author" }, contract, "test.other");
+  tree.select(sessionId, old.id);
+  const branch = add(tree, sessionId, { body: "another branch" });
+  // Reconstruct the prior physical format with no record-version registry.
+  before.exec("DROP TABLE plugin_record_versions; PRAGMA user_version = 35;");
+  before.close();
+
+  expect(await prepare(root)).toEqual({ ok: true, plugins: [] });
+  const [point] = listRecoveryPoints(root);
+  expect(point?.notice).toBe(true);
+  expect(point?.changes).toEqual([{ id: "workspace", from: 35, to: 36 }, { id: `records:${owner}/history`, from: 1, to: 2 }]);
+  const snapshotPath = join(recoveryPointDirectory(root, point!.id), "files");
+  const snapshot = new DatabaseSync(join(snapshotPath, "db", "workspace.sqlite"), { readOnly: true });
+  try { expect(new SessionTree(snapshot).node(sessionId, old.id)).toEqual(old); } finally { snapshot.close(); }
+  const after = openDatabase(root);
+  try {
+    const next = new SessionTree(after);
+    expect(next.nodes(sessionId)).toEqual([
+      { ...old, data: { input: old.data } }, otherContract, otherAuthor, { ...branch, data: { input: branch.data } },
+    ]);
+    expect(next.cursor(sessionId)).toBe(branch.id);
+  } finally { after.close(); }
+  expect(await prepare(root)).toEqual({ ok: true, plugins: [] });
+  expect(listRecoveryPoints(root).map(item => item.id)).toEqual([point!.id]);
+  expect(await prepare(root, null)).toMatchObject({ ok: true, plugins: [{ id: owner, error: expect.stringContaining("does not declare record storage history") }] });
+  expect(await prepare(root)).toEqual({ ok: true, plugins: [] });
+  const v3 = { ...declaration, version: 3, migrations: { ...declaration.migrations, 2: (_contract: string, data: Json) => ({ updated: data }) } };
+  expect(await prepare(root, v3)).toEqual({ ok: true, plugins: [] });
+  expect(listRecoveryPoints(root)[0]?.changes).toEqual([{ id: `records:${owner}/history`, from: 2, to: 3 }]);
+});
+
+it("rolls back earlier updates and leaves the version unstamped if a later record transform violates content ownership", async () => {
+  const root = setup();
+  const before = openDatabase(root);
+  const tree = new SessionTree(before), sessionId = tree.create("Notes");
+  const first = add(tree, sessionId, "first");
+  const second = add(tree, sessionId, "second");
+  before.close();
+  const invalid = { ...declaration, migrations: { 1: (_contract: string, data: Json): Json => data === "first" ? "changed"
+    : { "$asterism.content": "3684ddbf-8ef5-4f42-aec5-202eb28fb5db" } } };
+  expect(await prepare(root, invalid)).toMatchObject({ ok: true, plugins: [{ id: owner, error: expect.stringContaining("preserve content references") }] });
+  const after = openDatabase(root);
+  try { expect(new SessionTree(after).nodes(sessionId)).toEqual([first, second]); } finally { after.close(); }
+  expect(pluginStorages(root, owner, [declaration])[0]?.inspect()?.change).toMatchObject({ from: 1, to: 2 });
+});
+
+it("seeds a new record store before its first write so current records are not mistaken for unversioned history", async () => {
+  const root = setup();
+  // An interrupted first launch can leave the workspace file present but uninitialized.
+  mkdirSync(join(root, "db"));
+  new DatabaseSync(join(root, "db", "workspace.sqlite")).close();
+  expect(await prepare(root)).toEqual({ ok: true, plugins: [] });
+  const db = openDatabase(root);
+  try {
+    initializePluginRecordStorage(db, { declarations: new Map([[owner, [declaration]]]), failures: new Map() });
+    const tree = new SessionTree(db), sessionId = tree.create("Fresh");
+    add(tree, sessionId, { input: "already current" });
+  } finally { db.close(); }
+  expect(await prepare(root)).toEqual({ ok: true, plugins: [] });
+  expect(listRecoveryPoints(root)).toEqual([]);
+});
+
+it("rejects declarations for another plugin's records and overlapping version scopes", () => {
+  const root = setup();
+  expect(() => pluginStorages(root, owner, [{ ...declaration, contracts: ["test.other/entry"] }])).toThrow("owned contract");
+  expect(() => pluginStorages(root, owner, [declaration, { ...declaration, id: "other" }])).toThrow("unique owned contract");
+});

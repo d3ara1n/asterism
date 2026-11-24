@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { LivePatch } from "./live-patch.ts";
 import {
-  resourceCallSchema, contractReferenceSchema, toolInvocationSchema,
+  resourceCallSchema, contractReferenceSchema, toolInvocationSchema, toolCallInputSchema, toolInputDraftSchema,
   toolRunningResultSchema, uiTextSchema,
 } from "@asterism-app/sdk/contracts";
 import { jsonSchema } from "./model.ts";
@@ -59,8 +59,8 @@ const liveBase = { id, objectId: id, responseId: id, ordinal: z.number().int().n
 export const liveBlockSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...liveBase, kind: z.literal("text"), text: z.string(), endedAt: z.number().nonnegative().nullable() }),
   z.strictObject({ ...liveBase, kind: z.literal("thinking"), text: z.string(), startedAt: z.number().nonnegative(), endedAt: z.number().nonnegative().nullable() }),
-  z.strictObject({ ...liveBase, kind: z.literal("toolcall"), name: id, argumentsText: z.string(),
-    arguments: jsonSchema, state: z.enum(["input", "ready", "executing"]),
+  z.strictObject({ ...liveBase, kind: z.literal("toolcall"), name: id, input: toolCallInputSchema.nullable(),
+    draft: toolInputDraftSchema.nullable(), state: z.enum(["input", "ready", "executing"]),
     invocation: toolInvocationSchema.nullable(), result: toolRunningResultSchema.nullable() }),
 ]);
 export type LiveBlock = z.infer<typeof liveBlockSchema>;

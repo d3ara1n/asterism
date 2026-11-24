@@ -53,11 +53,14 @@ export class AgentCapabilities {
   private project(available: readonly ToolImplementation[], { tools, detail = "default" }: InspectSelection): Json[] {
     const chosen = tools ? available.filter(implementation => tools.includes(implementation.tool.name)) : available;
     return chosen.map((implementation): Json => {
-      const { name, description, guidelines, args, requiresInteraction, requiresNotice } = projectTool(implementation.tool);
-      const tool: Record<string, Json> = { name, implementation: implementation.reference };
+      const projected = projectTool(implementation.tool);
+      const { name, kind, description, guidelines, requiresInteraction, requiresNotice } = projected;
+      const tool: Record<string, Json> = { name, kind, implementation: implementation.reference };
       if (detail === "default") { tool.description = description; tool.guidelines = guidelines; }
-      tool.args = args;
-      tool.target = schemaOf(implementation.targetSchema);
+      if (kind === "structured") {
+        tool.args = projected.args;
+        tool.target = schemaOf(implementation.targetSchema!);
+      }
       // Scripts receive encoded data, which is the decoding input of the result contract.
       if (detail === "schema") tool.result = schemaOf(implementation.resultSchema, "input");
       if (requiresInteraction) tool.requiresInteraction = true;
@@ -100,6 +103,15 @@ export class AgentCapabilities {
   }
 
   resolve(id: string, name: string, selector: Json, args: Json, interactive = this.interactive): Invocation | PreparedResult {
+    return this.resolveInput(id, name, { kind: "structured", selector, args }, interactive);
+  }
+
+  resolveText(id: string, name: string, text: string, interactive = this.interactive): Invocation | PreparedResult {
+    return this.resolveInput(id, name, { kind: "freeform", text }, interactive);
+  }
+
+  private resolveInput(id: string, name: string,
+    input: { kind: "structured"; selector: Json; args: Json } | { kind: "freeform"; text: string }, interactive: boolean): Invocation | PreparedResult {
     const target = this.linked.get(id);
     if (!target) return denied();
     const restriction = this.resourceToolRestriction(target.resource.kind);
@@ -110,8 +122,12 @@ export class AgentCapabilities {
     if (!tool) return { ...this.identity(id), kind: "rejected", error: { code: "tool_unavailable", message: "This tool is unavailable for the resource." } };
     const canInteract = this.interactive && interactive;
     if (!canInteract && tool.tool.requiresInteraction) return { ...this.identity(id), ...interactionUnavailable() };
+    const kind = tool.tool.kind ?? "structured";
+    if (kind !== input.kind) return { ...this.identity(id), implementation: tool.reference, kind: "rejected",
+      error: { code: "invalid_arguments", message: `This resource tool uses ${kind} input. Call it with ${kind === "freeform" ? "resource_call_text" : "resource_call"}.` } };
     if (!this.caller) throw new Error("Tool execution requires a bound caller.");
-    const result = tool.prepare(target.resource, selector, args, this.caller, canInteract);
+    const result = tool.prepare(target.resource, input.kind === "freeform" ? null : input.selector,
+      input.kind === "freeform" ? input.text : input.args, this.caller, canInteract);
     return { ...result, ...this.identity(id), ...("execute" in result && tool.tool.requiresNotice ? { requiresNotice: true } : {}) };
   }
 }

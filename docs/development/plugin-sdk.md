@@ -187,9 +187,9 @@ Plugins declare what their work used as usage subjects: a top-level tool through
 
 Plugin-private files live under the plugin data directory. Managed configuration and a database are optional facilities, not prerequisites for plugin identity.
 
-Storage preparation imports a separate declaration entry before runtime setup. JSON and SQLite formats use independent versioned migration chains. A plugin preparation failure prevents its setup for that startup.
+Storage preparation imports a separate declaration entry before runtime setup. Private JSON and SQLite files and owned session record payloads use independent versioned migration chains. A plugin preparation failure prevents its setup for that startup.
 
-Historical payload compatibility comes from schema decoding. Unknown or unavailable data retains its original payload. Private file migration and historical record decoding are distinct responsibilities.
+For incompatible timeline payload changes, declare a record storage group in `defineStorage`. A group has a stable identifier and a disjoint set of plugin-owned contracts. Each step transforms encoded data for its contract; it has no database handle and must keep the set of content references unchanged. The host changes payloads and the group version together, so normal decoders can read only the current format. Unknown or unavailable records outside a migration retain their original payloads.
 
 Data write boundaries encode decoded domain values through the declared Zod schema and validate the resulting JSON before saving or publishing it. Readers decode stored or transported JSON. Ordinary schemas use the same representation in both directions; synchronous codecs explicitly convert between representations. Operation-input parsing remains a forward-only boundary.
 
@@ -200,6 +200,8 @@ Resource creation records separate host identity, kind, and card title from plug
 Template participation is explicit resource behavior. The resource declares which plugin-owned current-data contracts are reusable alongside its creation state. Object writers already require matching resource and data ownership; the resource author determines its own copy policy. Saving selects only those current entries. Instantiation validates the saved state and current entries against the installed policy before creating a session, preserves their encoded values, and remaps only host identities and links. Historical records, private storage, and running instances are excluded. Creation handlers are not replayed. External cloning, embedded-reference mapping, and restoration require explicit domain capabilities.
 
 A resource may declare a synchronous title generator for template instances. This declaration omits the source title from saved templates and overrides any previously saved title at instantiation. Saving and catalog reads do not invoke the generator; previews show the resource type without an instance title. Without a generator, instantiation requires a saved title. The generated title enters ordinary resource creation history, so later reads and restoration preserve it.
+
+Tool declarations choose an input contract independently of resource support and output encoding. Structured declarations pair their shared argument schema with each implementation's target schema. Free-form declarations describe the accepted text in their guidance and receive the original string without an argument or target schema. The same declaration and implementation entry points support both kinds. Plugins do not translate provider tool encodings; each model adapter projects the contract and decodes calls at its boundary.
 
 Tool progress and terminal data carry encoded payloads. Typed renderers and model projections decode them. Without a declared projection, a decoded string reaches the model as text and any other value as JSON text; only a declared projection can return model parts such as files. Resource tools and top-level tools share this rule. Non-null tool data cannot encode as null because the tool-result protocol reserves null for absent output.
 

@@ -71,16 +71,23 @@ function pump() {
 }
 
 try {
-  const bridge = vm.newFunction("invoke", (name, args) => {
-    const argumentsValue = JSON.parse(vm.getString(args));
+  const postCall = (request: Omit<Extract<ScriptRequest, { type: "call" }>, "type" | "id">) => {
     const id = nextId++;
     const promise = vm.newPromise();
     pending.set(id, promise);
-    send({ type: "call", id, name: vm.getString(name), args: argumentsValue });
+    send({ type: "call", id, ...request });
     return promise.handle;
-  });
+  };
+  const bridge = vm.newFunction("invoke", (name, args) =>
+    postCall({ name: vm.getString(name), input: JSON.parse(vm.getString(args)) }));
   vm.setProp(vm.global, "__invoke", bridge);
   bridge.dispose();
+  const resourceText = vm.newFunction("resourceText", (resource, tool, text) => postCall({
+    name: "resource_call_text", input: { kind: "freeform", text: JSON.parse(vm.getString(text)) },
+    address: { resourceId: JSON.parse(vm.getString(resource)), tool: JSON.parse(vm.getString(tool)) },
+  }));
+  vm.setProp(vm.global, "__resourceText", resourceText);
+  resourceText.dispose();
   const logBridge = vm.newFunction("log", value => {
     send({ type: "log", value: JSON.parse(vm.getString(value)) });
     return vm.undefined;
@@ -91,6 +98,8 @@ try {
   const bootstrap = vm.evalCode(`(() => {
     const invoke = globalThis.__invoke;
     delete globalThis.__invoke;
+    const resourceText = globalThis.__resourceText;
+    delete globalThis.__resourceText;
     const log = globalThis.__log;
     delete globalThis.__log;
     const parse = JSON.parse, stringify = JSON.stringify;
@@ -109,10 +118,14 @@ try {
     const projections = new WeakMap();
     const getText = projections.get.bind(projections);
     const setText = projections.set.bind(projections);
-    const call = async (name, args) => {
-      const reply = parse(await invoke(name, stringify(args)));
+    const result = async pending => {
+      const reply = parse(await pending);
       setText(reply.result, reply.text);
       return reply.result;
+    };
+    const call = (name, value) => {
+      const input = typeof value === "string" ? { kind: "freeform", text: value } : { kind: "structured", value };
+      return result(invoke(name, stringify(input)));
     };
     const tools = Object.create(null);
     for (const name of ${JSON.stringify(input.tools)}) {
@@ -124,7 +137,10 @@ try {
         get: (_target, tool) => {
           // Keep JS promise assimilation and JSON serialization from invoking resource operations.
           if (typeof tool !== "string" || tool === "then" || tool === "toJSON") return undefined;
-          return (input = {}) => call("resource_call", { ...input, resource_id, tool });
+          return (input = {}) => {
+            if (typeof input !== "string") return call("resource_call", { ...input, resource_id, tool });
+            return result(resourceText(stringify(typeof resource_id === "string" ? resource_id : ""), stringify(tool), stringify(input)));
+          };
         },
       }),
     };

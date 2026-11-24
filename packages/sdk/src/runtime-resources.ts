@@ -2,7 +2,7 @@ import type { ActionContract, CreationContract } from "./commands.ts";
 import type { z } from "zod";
 import { jsonSchema, type Json } from "./json.ts";
 import { defaultToolModel, type ToolModelOutput } from "./tool-result.ts";
-import type { ResourceContract, ImplementationContract, ToolInput } from "./module-contract.ts";
+import type { ResourceContract, ImplementationContract, StructuredImplementationContract, FreeformImplementationContract, ToolInput } from "./module-contract.ts";
 import type { RecordContract } from "./records.ts";
 import { reference, present, type DataContract } from "./presentation.ts";
 import { PluginApiError } from "./runtime.ts";
@@ -67,13 +67,29 @@ export function implementResource<S extends Json, V extends Json>(
       attach(parse(resource.stateSchema, snapshot.data, "resource"), object, lifetime) } : {}),
   };
 }
+interface ResourceToolContext<D extends Json> {
+  object: ObjectExecutor;
+  caller: ToolCaller;
+  signal: AbortSignal;
+  interactive: boolean;
+  publish(data: D): void;
+}
+interface StructuredToolHandler<S extends Json, T extends ToolInput, A extends ToolInput, D extends Json> {
+  call(data: S, target: T, args: A, context: ResourceToolContext<NoInfer<D>>): Promise<CallResult<NoInfer<D>>>;
+  toModel?(data: D): ToolModelOutput;
+}
+interface FreeformToolHandler<S extends Json, D extends Json> {
+  call(data: S, input: string, context: ResourceToolContext<NoInfer<D>>): Promise<CallResult<NoInfer<D>>>;
+  toModel?(data: D): ToolModelOutput;
+}
 export function implementTool<S extends Json, T extends ToolInput, A extends ToolInput, D extends Json>(
-  contract: ImplementationContract<S, T, A, D>, definition: {
-    call(data: S, target: T, args: A, context: {
-      object: ObjectExecutor; caller: ToolCaller; signal: AbortSignal; interactive: boolean; publish(data: NoInfer<D>): void;
-    }): Promise<CallResult<NoInfer<D>>>;
-    toModel?(data: D): ToolModelOutput;
-  },
+  contract: StructuredImplementationContract<S, T, A, D>, definition: StructuredToolHandler<S, T, A, D>,
+): ToolContribution;
+export function implementTool<S extends Json, D extends Json>(
+  contract: FreeformImplementationContract<S, D>, definition: FreeformToolHandler<S, D>,
+): ToolContribution;
+export function implementTool<S extends Json, T extends ToolInput, A extends ToolInput, D extends Json>(
+  contract: ImplementationContract<S, T, A, D>, definition: StructuredToolHandler<S, T, A, D> | FreeformToolHandler<S, D>,
 ): ToolContribution {
   const identity = reference(contract);
   return {
@@ -82,14 +98,25 @@ export function implementTool<S extends Json, T extends ToolInput, A extends Too
       const state = contract.resource.stateSchema.safeParse(resource.data);
       if (!state.success) return { kind: "failed", implementation: identity,
         error: { code: "invalid_resource", message: "The resource state does not match its backend contract." } };
-      const parsedTarget = contract.targetSchema.safeParse(target, { reportInput: true });
-      const parsedArgs = contract.tool.argsSchema.safeParse(args, { reportInput: true });
-      if (!parsedTarget.success || !parsedArgs.success) return { kind: "rejected", implementation: identity,
-        error: { code: "invalid_arguments", message: [
-          `Invalid arguments for ${contract.resource.kind}/${contract.tool.name}.`,
-          ...(!parsedTarget.success ? [resourceValidationMessage(parsedTarget.error, "target", contract.tool.argsSchema)] : []),
-          ...(!parsedArgs.success ? [resourceValidationMessage(parsedArgs.error, "args", contract.targetSchema)] : []),
-        ].join("\n") } };
+      let invoke: (context: ResourceToolContext<D>) => Promise<CallResult<D>>;
+      if (contract.tool.kind === "freeform") {
+        if (target !== null || typeof args !== "string") return { kind: "rejected", implementation: identity,
+          error: { code: "invalid_arguments", message: "This resource tool requires freeform text." } };
+        const handler = definition as FreeformToolHandler<S, D>;
+        invoke = context => handler.call(state.data, args, context);
+      } else {
+        const targetSchema = contract.targetSchema!;
+        const parsedTarget = targetSchema.safeParse(target, { reportInput: true });
+        const parsedArgs = contract.tool.argsSchema.safeParse(args, { reportInput: true });
+        if (!parsedTarget.success || !parsedArgs.success) return { kind: "rejected", implementation: identity,
+          error: { code: "invalid_arguments", message: [
+            `Invalid arguments for ${contract.resource.kind}/${contract.tool.name}.`,
+            ...(!parsedTarget.success ? [resourceValidationMessage(parsedTarget.error, "target", contract.tool.argsSchema)] : []),
+            ...(!parsedArgs.success ? [resourceValidationMessage(parsedArgs.error, "args", targetSchema)] : []),
+          ].join("\n") } };
+        const handler = definition as StructuredToolHandler<S, T, A, D>;
+        invoke = context => handler.call(state.data, parsedTarget.data, parsedArgs.data, context);
+      }
       return {
         effect: contract.effect, execution: contract.execution, implementation: identity,
         // Model projections consume decoded values.
@@ -106,7 +133,7 @@ export function implementTool<S extends Json, T extends ToolInput, A extends Too
             return encoded;
           };
           try {
-            const result = await definition.call(state.data, parsedTarget.data, parsedArgs.data, { object, caller, signal, interactive,
+            const result = await invoke({ object, caller, signal, interactive,
               publish(data) { if (active) publish?.(snapshot(data)); } });
             if (result.kind === "succeeded" || result.kind === "partial") {
               if (result.data === undefined) throw new PluginApiError("invalid_argument", "The tool did not provide final data.");

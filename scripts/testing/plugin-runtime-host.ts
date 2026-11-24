@@ -82,10 +82,11 @@ if (mode === "fixtures") {
   const lifetime = new AbortController();
   const context = { id: "asterism.context-fold", sessions: {}, lifetime: { signal: lifetime.signal } } as PluginContext;
   const tool = fold.definition!.modules!.flatMap(module => module.setup(context).topLevelTools ?? [])[0]!;
+  assert(tool.kind !== "freeform");
   const image = { kind: "file", mediaType: "image/png", file: { "$asterism.content": "550e8400-e29b-41d4-a716-446655440000" } } as const;
   const outcome = { kind: "succeeded", data: null, model: [image] };
   const original = { turn: 1, items: [
-    { item: { kind: "output", scope: "session", adapter: "test", parts: [{ kind: "toolcall", callId: "original", name: "see", arguments: {}, continuation: null }] } },
+    { item: { kind: "output", scope: "session", adapter: "test", parts: [{ kind: "toolcall", callId: "original", name: "see", input: { kind: "structured", value: {} }, continuation: null }] } },
     { item: { kind: "result", callId: "original", name: "see", outcome }, origin: { recordId: "shot", parts: [0] } },
   ] };
   const transformed = api.captureAgentContextTransforms(context)([original], { sessionId: "session", agentId: "agent", turn: 3 });
@@ -93,12 +94,12 @@ if (mode === "fixtures") {
   const ref = { sessionId: "session", id: "agent", kind: contracts.Agent.kind };
   const at = (id: string, parentId: string | null) => ({ id, parentId, sessionId: ref.sessionId,
     source: { plugin: "asterism.builtin", resource: ref }, createdAt: "2026-11-18T00:00:00Z", model: null, recipient: null });
-  const block = { responseId: "response", ordinal: 0, kind: "toolcall", argumentsText: null, continuation: null,
+  const block = { responseId: "response", ordinal: 0, kind: "toolcall", draft: null, continuation: null,
     source: { model: "provider/model", adapter: "test", scope: "session" } };
   const toolAt = (id: string, parent: string, pending: boolean, data: import("@asterism-app/sdk/contracts").Json) =>
     ({ ...at(id, parent), pending, contract: contracts.ToolExecution.id, data });
   const operation = (callId: string, name: string, requestParentId: string, args: import("@asterism-app/sdk/contracts").Json) =>
-    ({ ...block, complete: false, callId, name, requestParentId, arguments: args, outcome: null });
+    ({ ...block, complete: false, callId, name, requestParentId, input: { kind: "structured", value: args }, outcome: null });
   const start = { ...at("first", null), contract: "test.input", data: null };
   const shot = toolAt("shot", "first", false, { input: operation("first-call", "see", "first", {}), output: outcome });
   const sibling = toolAt("sibling", "first", false, { input: operation("side-call", "see", "first", {}), output: outcome });

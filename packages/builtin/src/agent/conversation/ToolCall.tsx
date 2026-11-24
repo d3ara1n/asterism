@@ -1,10 +1,10 @@
-import { useI18n, useRendererTools, useRendererConfig } from "@asterism-app/sdk/renderer";
+import { HeaderExcerpt, StreamingScrollArea, useI18n, useRendererTools, useRendererConfig } from "@asterism-app/sdk/renderer";
 import { useMemo } from "react";
 import { TextCursorInput, Wrench } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import { JsonView } from "@asterism-app/ui/json-view";
-import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher } from "@asterism-app/ui/tool-content";
+import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
 import { cn } from "@asterism-app/ui/utils";
@@ -17,7 +17,7 @@ import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { viewStateKeys } from "./view-state";
 import { blockShell } from "./block-shell";
 import { IconSwap } from "./IconSwap";
-import { characterCount } from "../../shared/tool-preview";
+import { characterCount, toolTextTail } from "../../shared/tool-preview";
 
 /** The shell manages only lifecycle and expansion; the two content entry points fall back independently, and updates or persistence do not reset expansion. */
 export function ToolCall({ node }: { node: ToolCallNode }) {
@@ -27,12 +27,15 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const state = toolCallState(node);
   const preferences = useRendererConfig(BuiltinSettings);
   const filling = state.phase === "input";
-  const view = state.props ? tools.resolve(state.props) : null;
-  const hasInputBody = filling && view?.body !== undefined && view.body !== null;
+  const view = tools.resolve(state.props);
+  const freeform = view.props.kind === "freeform" ? view.props.text : null;
+  const subject = useToolResourceSubject(view.props.invocation.resource);
+  const fallbackPreview = filling && freeform !== null && freeform.length > 0 && view.body == null;
+  const hasInputBody = filling && (view.body != null || fallbackPreview);
   const stage = filling ? "input" : state.phase === "executing" ? "output" : null;
   const disclosure = useStreamingDisclosure(viewStateKeys.disclosure, stage,
-    view?.streaming === true && view.body != null, preferences, view?.attention === true && view.body != null);
-  const result = state.props?.result;
+    (view.streaming === true && view.body != null) || fallbackPreview, preferences, view.attention === true && view.body != null);
+  const result = state.props.result;
   const diagnostic = result && ("error" in result ? result.error.message : "message" in result ? result.message : null);
   const settled = result && result.kind !== "running" ? result.kind : null;
   // Request-level failure belongs to the outer shell and notice; the badge reports how local execution ended.
@@ -40,12 +43,14 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   const icon = state.phase === "input"
     ? <motion.span className="inline-flex" animate={reducedMotion ? undefined : { opacity: [0.45, 1, 0.45] }} transition={{ duration: 1.4, repeat: Infinity }}><TextCursorInput className="size-3.5" /></motion.span>
     : state.phase === "executing" ? <StatusIcon tone="progress" className="size-3.5" />
-      : view?.icon ?? <Wrench className="size-3.5" />;
+      : view.icon ?? <Wrench className="size-3.5" />;
   const iconKey = state.phase === "input" ? "input" : state.phase === "executing" ? "executing" : "icon";
   const header = <>
     <IconSwap swapKey={iconKey}>{icon}</IconSwap>
     <span className="min-w-0 flex-1 text-left">
-      {view && (!filling || view.header !== undefined || view.body !== undefined || view.label !== undefined) ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
+      {freeform !== null && view.header == null ? <ToolHeader label={view.label ? i18n.text(view.label) : view.props.name}
+        subject={subject} summary={<HeaderExcerpt text={freeform} />} />
+      : !filling || view.header !== undefined || view.body !== undefined || view.label !== undefined ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
         : <ToolHeader label={state.phase === "incomplete" ? tools.label(node.name, node.invocation?.implementation?.id ?? null) ?? node.name : tools.preparation(node.name)} />}
     </span>
     {status && settled && <StatusBadge tone={toolOutcomeTone(settled)}>{status}</StatusBadge>}
@@ -54,9 +59,11 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
   return <Disclosure header={header} {...disclosure} {...blockShell(node)} expandable={!filling || hasInputBody}
     pending={state.phase === "input" || state.phase === "ready"} noticeAt={"noticeAt" in node ? node.noticeAt : undefined}>
     <div className="space-y-3 [--code-font-size:var(--text-xs)]">
-      {view && (view.body ?? (!filling && state.phase !== "incomplete" && <DefaultToolBody {...view.props} />))}
+      {view.body ?? (fallbackPreview ? <StreamingScrollArea label={i18n.formatMessage(toolsMessages.toolCallDetails)}>
+        <JsonView value={toolTextTail(freeform)} scrollable={false} />
+      </StreamingScrollArea> : !filling && state.phase !== "incomplete" && <DefaultToolBody {...view.props} />)}
       {diagnostic && <p className={cn("type-caption whitespace-pre-wrap", "error" in result && "text-destructive")}>{diagnostic}</p>}
-      {view?.details !== false && (state.phase === "settled" || state.phase === "incomplete") && <ToolCallDetails node={node} />}
+      {view.details !== false && (state.phase === "settled" || state.phase === "incomplete") && <ToolCallDetails node={node} />}
     </div>
   </Disclosure>;
 }
@@ -65,7 +72,8 @@ function ToolCallDetails({ node }: { node: ToolCallNode }) {
   const i18n = useI18n();
   const outcome = "outcome" in node ? node.outcome : null;
   const { call, result, model, counts } = useMemo(() => {
-    const call = JSON.stringify({ tool: node.name, arguments: node.arguments ?? node.argumentsText }, null, 2);
+    const call = node.draft?.text ?? (node.input?.kind === "freeform" ? node.input.text
+      : JSON.stringify({ tool: node.name, arguments: node.input?.value ?? null }, null, 2));
     const result = outcome && outcome.data !== null && outcome.model.every(part => part.kind === "text")
       ? JSON.stringify(outcome.data, null, 2) : null;
     const model = outcome?.model.map(part => part.kind === "text" ? part.text : JSON.stringify(part, null, 2)) ?? [];
@@ -74,7 +82,7 @@ function ToolCallDetails({ node }: { node: ToolCallNode }) {
       result: result === null ? 0 : characterCount(result),
       model: model.reduce((sum, text) => sum + characterCount(text), 0),
     } };
-  }, [node.name, node.arguments, node.argumentsText, outcome]);
+  }, [node.name, node.input, node.draft, outcome]);
   return <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
     { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails), characterCount: counts.call,
       render: () => <JsonView scrollable={false} value={call} /> },

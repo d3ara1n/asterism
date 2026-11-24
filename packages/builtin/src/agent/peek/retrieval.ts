@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Json, ModelItem, StreamRequest } from "@asterism-app/sdk/contracts";
+import type { Json, ModelItem, ModelToolCall, StreamRequest } from "@asterism-app/sdk/contracts";
 import type { PeekRecord } from "./snapshot.ts";
 
 const search = z.strictObject({
@@ -13,18 +13,19 @@ const read = z.strictObject({
   limit: z.number().int().min(1).max(16000).optional().describe("Maximum UTF-16 text length, default 8000."),
 });
 export const retrievalTools: NonNullable<StreamRequest["tools"]> = [
-  { name: "search_records", description: "Search this fixed Agent record snapshot, or enumerate its record directory with an empty query.", parameters: z.toJSONSchema(search) as Json },
-  { name: "read_records", description: "Read a saved record's text with explicit pagination.", parameters: z.toJSONSchema(read) as Json },
+  { name: "search_records", kind: "structured", description: "Search this fixed Agent record snapshot, or enumerate its record directory with an empty query.", parameters: z.toJSONSchema(search) as Json },
+  { name: "read_records", kind: "structured", description: "Read a saved record's text with explicit pagination.", parameters: z.toJSONSchema(read) as Json },
 ];
 
 /** The sole retrieval source is the authorized target's record projection; call results are paired using the public model protocol. */
-export function retrieve(records: readonly PeekRecord[], call: { name: string; callId: string; arguments: Json }): {
+export function retrieve(records: readonly PeekRecord[], call: ModelToolCall): {
   result: Extract<ModelItem, { kind: "result" }>; ids: string[];
 } {
   let data: Json, ids: string[] = [];
   try {
+    if (call.input.kind !== "structured") throw new Error("Record queries take structured input.");
     if (call.name === "search_records") {
-      const args = search.parse(call.arguments), query = args.query.toLowerCase();
+      const args = search.parse(call.input.value), query = args.query.toLowerCase();
       const matches: Json[] = [];
       let cursor = args.cursor ?? 0;
       for (; cursor < records.length && matches.length < (args.limit ?? 8); cursor++) {
@@ -36,7 +37,7 @@ export function retrieve(records: readonly PeekRecord[], call: { name: string; c
       }
       data = { matches, nextCursor: cursor < records.length ? cursor : null };
     } else if (call.name === "read_records") {
-      const args = read.parse(call.arguments), record = records.find(record => record.id === args.id);
+      const args = read.parse(call.input.value), record = records.find(record => record.id === args.id);
       if (!record) throw new Error("The record ID is outside this investigation snapshot.");
       const offset = args.offset ?? 0;
       if (offset > record.text.length) throw new Error(`offset exceeds the record length (${record.text.length}).`);

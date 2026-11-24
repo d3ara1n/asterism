@@ -16,7 +16,7 @@ export function serializeForSummary(messages: readonly ModelItem[]): string {
       return [`[Tool result ${item.callId}, ${item.outcome.kind}]: ${excerpt}`];
     }
     if (item.kind === "output") return item.parts.flatMap(part => part.kind === "toolcall"
-      ? [`[Assistant tool call ${part.callId}]: ${part.name}(${JSON.stringify(part.arguments)})`]
+      ? [`[Assistant tool call ${part.callId}]: ${part.name}(${part.input.kind === "structured" ? JSON.stringify(part.input.value) : part.input.text})`]
       : part.kind === "text" ? [`[Assistant]: ${part.text}`] : []);
     return [`[${item.kind === "input" ? "Input" : "Context"}]: ${describeParts(item.parts)}`];
   }).join("\n\n");

@@ -18,7 +18,7 @@ it("copies delivered attachments once while preserving rejected argument referen
   const event: ModelRunEvent = { type: "block", block: {
     responseId: "response", requestParentId: null, ordinal: 0, complete: true, continuation: null,
     source: { model: "test/model", adapter: "test", scope: "test" },
-    kind: "toolcall", callId: "call", name: "file", argumentsText: null, arguments: { unknown: invalid },
+    kind: "toolcall", callId: "call", name: "file", draft: null, input: { kind: "structured", value: { unknown: invalid } },
     outcome: { kind: "succeeded", data: { file }, model: [{ kind: "file", file, mediaType: "application/octet-stream" }] },
   } };
   const audit = new AuditLog(root, "run");
@@ -33,7 +33,7 @@ it("copies delivered attachments once while preserving rejected argument referen
   expect(readFileSync(join(root, "run", "attachments", file["$asterism.content"]))).toEqual(Buffer.from(bytes));
   const lines = readFileSync(join(root, "run", "audit.jsonl"), "utf8").trimEnd().split("\n").map(line => JSON.parse(line));
   expect(lines).toHaveLength(2);
-  expect(lines[0].event.block.arguments).toEqual({ unknown: invalid });
+  expect(lines[0].event.block.input).toEqual({ kind: "structured", value: { unknown: invalid } });
 });
 
 // Entries recorded before execution are buffered as values; later mutation of the source must not change the record.

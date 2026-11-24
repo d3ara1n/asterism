@@ -44,14 +44,19 @@ export function completionData<T extends Json>(completion: ModelCompletion | nul
   const result = contract.schema.safeParse(structuredClone(extension.data));
   return result.success ? result.data : null;
 }
+export const toolCallInputSchema = z.discriminatedUnion("kind", [
+  z.strictObject({ kind: z.literal("structured"), value: jsonSchema }),
+  z.strictObject({ kind: z.literal("freeform"), text: z.string() }),
+]);
+export const toolInputDraftSchema = z.strictObject({ kind: z.enum(["structured", "freeform"]), text: z.string() });
+
 const block = { responseId: id, requestParentId: id.nullable(), ordinal: z.number().int().nonnegative(),
   complete: z.boolean(), continuation: jsonSchema, source: modelSourceSchema, completion: modelCompletionSchema.nullable().optional(),
   /** Block generation start and end times (millisecond timestamps); blocks finalized before generation ends have a null end time, and unrecorded times are omitted. See outcome for tool execution times. */
   startedAt: z.number().nonnegative().optional(), endedAt: z.number().nonnegative().nullable().optional() };
 /** Tool call block shape without the completion invariant, for contracts that store input and outcome separately. */
 export const modelToolCallBlockSchema = z.strictObject({ ...block, kind: z.literal("toolcall"), callId: id, name: id,
-  /** Original model text; retained only when parsed arguments are unavailable (the call is incomplete), otherwise arguments is authoritative. */
-  argumentsText: z.string().nullable(), arguments: jsonSchema, outcome: toolOutcomeSchema.nullable(), invocation: toolInvocationSchema.optional() });
+  input: toolCallInputSchema.nullable(), draft: toolInputDraftSchema.nullable(), outcome: toolOutcomeSchema.nullable(), invocation: toolInvocationSchema.optional() });
 export const modelBlockSchema = z.discriminatedUnion("kind", [
   z.strictObject({ ...block, kind: z.literal("thinking"), text: z.string(), summary: z.string() }),
   z.strictObject({ ...block, kind: z.literal("text"), text: z.string() }),

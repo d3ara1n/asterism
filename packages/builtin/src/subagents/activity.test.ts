@@ -7,7 +7,7 @@ const source = { model: "test/model", adapter: "test", scope: "test" };
 function tool(responseId: string, ordinal: number, name: string, args: Json,
   outcome: "succeeded" | "failed" | null = "succeeded"): ProcessBlock {
   return { responseId, requestParentId: null, ordinal, complete: true, continuation: null, source,
-    kind: "toolcall", callId: `${responseId}-${ordinal}`, name, argumentsText: null, arguments: args,
+    kind: "toolcall", callId: `${responseId}-${ordinal}`, name, draft: null, input: { kind: "structured", value: args },
     outcome: outcome === null ? null : outcome === "succeeded"
       ? { kind: "succeeded", data: null, model: [] } : { kind: "failed", data: null, error: { code: "x", message: "x" }, model: [] } } as ProcessBlock;
 }
@@ -54,7 +54,7 @@ describe("Subagent activity log", () => {
     const live: ModelLiveBlock[] = [
       { id: "a", responseId: "r1", ordinal: 0, kind: "thinking", text: "Checking", startedAt: 100, endedAt: 200 },
       { id: "b", responseId: "r1", ordinal: 1, kind: "text", text: "Reading the file.", endedAt: null },
-      { id: "c", responseId: "r1", ordinal: 2, kind: "toolcall", name: "read", argumentsText: "", arguments: null,
+      { id: "c", responseId: "r1", ordinal: 2, kind: "toolcall", name: "read", draft: { kind: "structured", text: "" }, input: null,
         state: "input", invocation: null, result: null },
     ];
     expect(activityOf([], live, [])).toEqual([
@@ -67,7 +67,7 @@ describe("Subagent activity log", () => {
   // A live block that has also been finalized must appear once, with its final state; text not yet streamed has no step.
   it("adds only unfinalized live steps and marks a finalized call without outcome as cancelled", () => {
     const live: ModelLiveBlock[] = [
-      { id: "a", responseId: "r1", ordinal: 0, kind: "toolcall", name: "exec", argumentsText: "", arguments: { command: "ls" },
+      { id: "a", responseId: "r1", ordinal: 0, kind: "toolcall", name: "exec", draft: null, input: { kind: "structured", value: { command: "ls" } },
         state: "executing", invocation: null, result: null },
       { id: "b", responseId: "r1", ordinal: 1, kind: "thinking", text: "", startedAt: 0, endedAt: null },
       { id: "c", responseId: "r1", ordinal: 2, kind: "text", text: "Report", endedAt: null },

@@ -1,8 +1,11 @@
-import type { ModelBlock, ModelItem, ModelPart, ToolOutcome } from "@asterism-app/sdk/contracts";
+import type { ModelBlock, ModelItem, ModelPart, ToolCallInput, ToolOutcome } from "@asterism-app/sdk/contracts";
 
-/** Complete arguments can be paired with an unavailable result; unfinished JSON never becomes executable input. */
-export function hasModelContent(block: ModelBlock): boolean {
-  return block.kind === "toolcall" ? block.argumentsText === null : block.complete;
+type ParticipatingBlock = Exclude<ModelBlock, { kind: "toolcall" }>
+  | (Extract<ModelBlock, { kind: "toolcall" }> & { input: ToolCallInput; draft: null });
+
+/** Complete input can be paired with an unavailable result; drafts do not enter model history. */
+export function hasModelContent(block: ModelBlock): block is ParticipatingBlock {
+  return block.kind === "toolcall" ? block.input !== null && block.draft === null : block.complete;
 }
 
 /** A normal reply contains every block of a stopped response and no tool calls; the terminal ordinal establishes the expected block count. */
@@ -15,7 +18,7 @@ export function isCompletedResponse(blocks: readonly ModelBlock[]): boolean {
 }
 
 /** Shared by model input and history shells. Each response precedes its following user/context boundary. */
-export function participatingBlocks(blocks: readonly ModelBlock[]): ModelBlock[] {
+export function participatingBlocks(blocks: readonly ModelBlock[]): ParticipatingBlock[] {
   const ordered = blocks.filter(hasModelContent).sort((a, b) => a.ordinal - b.ordinal);
   while (ordered.at(-1)?.kind === "thinking") ordered.pop();
   return ordered;
@@ -34,11 +37,12 @@ export function responseMessages(blocks: readonly ModelBlock[], submitted: Reado
   const ordered = participatingBlocks(blocks);
   const first = ordered[0];
   if (!first) return [];
-  const parts: ModelPart[] = ordered.map(block => block.kind === "toolcall"
-    ? { kind: "toolcall", callId: block.callId, name: block.name, arguments: block.arguments, continuation: block.continuation }
-    : block.kind === "thinking"
-      ? { kind: "thinking", text: block.text, summary: block.summary, continuation: block.continuation }
-      : { kind: "text", text: block.text, continuation: block.continuation });
+  const parts: ModelPart[] = ordered.map(block => {
+    const { continuation } = block;
+    if (block.kind === "toolcall") return { kind: "toolcall", callId: block.callId, name: block.name, input: block.input, continuation };
+    return block.kind === "thinking" ? { kind: "thinking", text: block.text, summary: block.summary, continuation }
+      : { kind: "text", text: block.text, continuation };
+  });
   const items: ModelItem[] = parts.length ? [{ kind: "output", scope: first.source.scope, adapter: first.source.adapter, parts }] : [];
   for (const block of ordered) if (block.kind === "toolcall")
     items.push({ kind: "result", callId: block.callId, name: block.name, outcome: block.outcome ?? (submitted.has(block.callId) ? unrecorded : notExecuted) });

@@ -103,17 +103,17 @@ describe("Current session data", () => {
     disconnect();
   });
 
-  // Streaming progress: input-phase tool arguments are transmitted only as argumentsText deltas, and the frontend derives previews; only appended argument text is sent.
-  it("derives input-phase tool arguments on the frontend from appended argument text, then uses complete backend arguments upon entering ready", () => {
+  it.each(["structured", "freeform"] as const)("keeps %s draft deltas separate from finalized input", kind => {
     const f = fixture(), disconnect = f.open();
-    const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "toolcall" as const, name: "write", argumentsText: '{"path":"a.txt","content":"hel',
-      arguments: null, state: "input" as const, invocation: null, result: null };
+    const draft = { kind, text: ' {"content":"hel' };
+    const block = { id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "toolcall" as const, name: "write",
+      input: null, draft, state: "input" as const, invocation: null, result: null };
     f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "put", block }] } });
-    expect(f.controller.liveOf("a")[0]).toMatchObject({ arguments: { path: "a.txt", content: "hel" } });
-    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "update", ops: [{ path: ["argumentsText"], append: 'lo"}' }] }] } });
-    expect(f.controller.liveOf("a")[0]).toMatchObject({ argumentsText: '{"path":"a.txt","content":"hello"}', arguments: { path: "a.txt", content: "hello" } });
-    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "update", ops: [{ path: ["state"], set: "ready" }, { path: ["arguments"], set: { path: "b.txt" } }] }] } });
-    expect(f.controller.liveOf("a")[0]).toMatchObject({ state: "ready", arguments: { path: "b.txt" } });
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "update", ops: [{ path: ["draft", "text"], append: 'lo"} ' }] }] } });
+    expect(f.controller.liveOf("a")).toEqual([{ ...block, draft: { kind, text: ' {"content":"hello"} ' } }]);
+    const input = kind === "structured" ? { kind, value: { content: "hello" } } : { kind, text: ' {"content":"hello"} ' };
+    f.notify({ kind: "session.progress", sessionId: "s", busyObjectIds: ["a"], timelineBusy: false, live: { order: [block.id], changes: [{ id: block.id, kind: "update", ops: [{ path: ["state"], set: "ready" }, { path: ["input"], set: input }, { path: ["draft"], set: null }] }] } });
+    expect(f.controller.liveOf("a")).toEqual([{ ...block, state: "ready", input, draft: null }]);
     disconnect();
   });
 

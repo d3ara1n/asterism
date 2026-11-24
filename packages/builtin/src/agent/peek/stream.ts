@@ -1,8 +1,9 @@
-import type { ModelEvent, ModelItem, ModelPart } from "@asterism-app/sdk/contracts";
+import type { ModelEvent, ModelItem, ModelPart, ToolCallInput } from "@asterism-app/sdk/contracts";
 import type { PeekResult } from "./contract.ts";
 
 type Finish = Extract<ModelEvent, { type: "finish" }>;
-type Part = { value: ModelPart; ended: boolean; argumentsReady: boolean };
+type Call = Extract<ModelPart, { kind: "toolcall" }>;
+type Part = { value: Exclude<ModelPart, Call> | (Omit<Call, "input"> & { input: ToolCallInput | null }); ended: boolean };
 
 /** Delivers tool calls only after a complete terminal state; native continuation data stays in this investigation's temporary messages. */
 export async function collectPeekResponse(events: AsyncIterable<ModelEvent>, signal: AbortSignal, callbacks: {
@@ -22,8 +23,8 @@ export async function collectPeekResponse(events: AsyncIterable<ModelEvent>, sig
     if (event.type === "part.start") {
       if (parts.has(event.part.id)) throw new Error("The investigation stream started a duplicate part.");
       const part = event.part;
-      parts.set(part.id, { ended: false, argumentsReady: false, value: part.kind === "toolcall"
-        ? { kind: "toolcall", name: part.name, callId: part.callId, arguments: null, continuation: null }
+      parts.set(part.id, { ended: false, value: part.kind === "toolcall"
+        ? { kind: "toolcall", name: part.name, callId: part.callId, input: null, continuation: null }
         : part.kind === "thinking" ? { kind: "thinking", text: "", summary: "", continuation: null }
           : { kind: "text", text: "", continuation: null } });
       if (part.kind === "text" && report) {
@@ -48,20 +49,27 @@ export async function collectPeekResponse(events: AsyncIterable<ModelEvent>, sig
       }
     } else {
       part.ended = true; part.value.continuation = event.continuation ?? null;
-      if (part.value.kind === "toolcall" && event.arguments !== undefined) {
-        part.value.arguments = event.arguments; part.argumentsReady = true;
-      }
+      if (part.value.kind === "toolcall") part.value.input = event.input ?? null;
     }
   }
   signal.throwIfAborted();
   if (!finish) throw new Error("The investigation stream ended without completion.");
   const values = [...parts.values()];
-  const calls = values.flatMap(part => part.value.kind === "toolcall" ? [part.value] : []);
-  const complete = values.every(part => part.ended && (part.value.kind !== "toolcall" || part.argumentsReady));
-  if (new Set(calls.map(call => call.callId)).size !== calls.length)
-    throw new Error("The investigation response contains duplicate tool-call IDs.");
+  const ids = new Set<string>();
+  const calls: Call[] = [];
+  const outputParts: ModelPart[] = [];
+  for (const { value } of values) {
+    if (value.kind !== "toolcall") { outputParts.push(value); continue; }
+    if (ids.has(value.callId)) throw new Error("The investigation response contains duplicate tool-call IDs.");
+    ids.add(value.callId);
+    if (!value.input) continue;
+    const call = { ...value, input: value.input };
+    outputParts.push(call);
+    calls.push(call);
+  }
+  const complete = values.every(part => part.ended) && calls.length === ids.size;
   const output: Extract<ModelItem, { kind: "output" }> = {
-    kind: "output", parts: values.map(part => part.value),
+    kind: "output", parts: outputParts,
     scope: finish.source?.scope ?? "", adapter: finish.source?.adapter ?? "",
   };
   return { finish, complete, calls, output, report: report.trim() };

@@ -127,7 +127,7 @@ ${peekOutline(records)}
         update(call.name === "read_records" ? "reading" : "searching");
         const query = retrieve(records, call);
         messages.push(query.result);
-        data.queries.push({ tool: call.name, arguments: call.arguments, records: query.ids });
+        data.queries.push({ tool: call.name, arguments: call.input.kind === "structured" ? call.input.value : call.input.text, records: query.ids });
       }
     }
     return { kind: "failed", data, error: { code: "peek_request_limit", message: "The investigation reached its model request limit before completing a report." } };

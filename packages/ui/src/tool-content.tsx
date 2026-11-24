@@ -1,4 +1,4 @@
-import { type ToolRenderProps, useI18n, useRendererResources, useRendererViewState } from "@asterism-app/sdk/renderer";
+import { type AnyToolRenderProps, useI18n, useRendererResources, useRendererViewState } from "@asterism-app/sdk/renderer";
 import { useId, type ReactNode } from "react";
 
 import { TooltipHint } from "./tooltip-hint";
@@ -48,7 +48,7 @@ function resourceSubject(icon: ReactNode, title: string): ReactNode {
 }
 
 /** Resource identity comes from the call; only its static kind icon comes from the current renderer catalog. */
-export function useToolResourceSubject(resource: ToolRenderProps["invocation"]["resource"]): ReactNode {
+export function useToolResourceSubject(resource: AnyToolRenderProps["invocation"]["resource"]): ReactNode {
   const resources = useRendererResources();
   return resource && resourceSubject(resources.get(resource.kind).icon, resource.title);
 }
@@ -61,11 +61,11 @@ export function useToolResourceTypeSubject(kind: string | undefined): ReactNode 
   return description && resourceSubject(description.icon, i18n.text(description.label));
 }
 
-export function DefaultToolHeader({ props, label }: { props: ToolRenderProps; label?: import("@asterism-app/sdk/contracts").UiText }) {
+export function DefaultToolHeader({ props, label }: { props: Pick<AnyToolRenderProps, "name" | "invocation">; label?: import("@asterism-app/sdk/contracts").UiText }) {
   const i18n = useI18n();
   return <ToolHeader label={label === undefined ? props.name : i18n.text(label)} subject={useToolResourceSubject(props.invocation.resource)} />;
 }
-export function DefaultToolBody({ result }: ToolRenderProps) {
+export function DefaultToolBody({ result }: Pick<AnyToolRenderProps, "result">) {
   const i18n = useI18n();
   return result?.data !== null && result?.data !== undefined ? <JsonView value={result.data} /> : <p className="type-caption">{i18n.formatMessage(toolsMessages.toolNoOutput)}</p>;
 }

@@ -1,5 +1,5 @@
 import { pluginOf, withValues, type ContractReference, type Presentation, type SessionRecord, type UiText } from "@asterism-app/sdk/contracts";
-import type { RecordRenderer, RecordRenderContext, RecordView, CardRenderer, CardView, CreationEntry, ResourceDescription, RendererModule, RendererObjectContext, ToolRenderProps, ToolRenderer, ToolView } from "@asterism-app/sdk/renderer";
+import type { RecordRenderer, RecordRenderContext, RecordView, CardRenderer, CardView, CreationEntry, ResourceDescription, RendererModule, RendererObjectContext, AnyToolRenderProps, ToolRenderer, ToolView } from "@asterism-app/sdk/renderer";
 import { Box } from "lucide-react";
 import { createElement, type ReactNode } from "react";
 
@@ -54,7 +54,7 @@ export class ViewRegistry {
     try { return this.records.get(record.contract.id)?.resolve(record, context) ?? null; }
     catch (error) { console.error(`Record view ${record.contract.id} failed.`, error); return null; }
   }
-  tool(contract: ContractReference | undefined, props: ToolRenderProps): ToolView | null {
+  tool(contract: ContractReference | undefined, props: AnyToolRenderProps): ToolView | null {
     return contract ? this.tools.get(contract.id)?.resolve(props) ?? null : null;
   }
   /** Display name declared by the tool view registered for an implementation contract. */

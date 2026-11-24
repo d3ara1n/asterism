@@ -1,4 +1,4 @@
-import type { Json, ModelLiveBlock } from "@asterism-app/sdk/contracts";
+import type { Json, ModelLiveBlock, ToolCallInput, ToolInputDraft } from "@asterism-app/sdk/contracts";
 import type { ActivityEntry, ProcessBlock, TaskSnapshot } from "./contract.ts";
 
 /** A check describes the current activity, using a tool subject only when it matches that activity. */
@@ -33,10 +33,11 @@ function preview(value: Json | undefined, depth = 0): string | null {
   return null;
 }
 /** Resource operations dispatch through resource_call; show the operation and its own arguments. */
-function toolCall(name: string, args: Json): { name: string; subject: string | null } {
+export function toolCall(name: string, input: ToolCallInput | null, draft: ToolInputDraft | null): { name: string; subject: string | null } {
+  const args = input?.kind === "structured" ? input.value : null;
   if (name === "resource_call" && args && typeof args === "object" && !Array.isArray(args) && typeof args.tool === "string")
     return { name: args.tool, subject: preview(args.target ?? null) ?? preview(args.args) };
-  return { name, subject: preview(args) };
+  return { name, subject: preview(input?.kind === "freeform" ? input.text : draft?.kind === "freeform" ? draft.text : args) };
 }
 
 /**
@@ -64,7 +65,7 @@ export function activityOf(blocks: readonly ProcessBlock[], live: readonly Model
       finalized.add(`${block.responseId}:${block.ordinal}`);
       if (block.kind === "thinking") entries.push({ kind: "thinking", state: "done" });
       else if (block.kind === "text") { const text = oneLine(block.text); if (text) entries.push({ kind: "text", preview: text }); }
-      else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.arguments),
+      else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.input, block.draft),
         implementation: block.outcome?.implementation?.id ?? null, state: block.outcome?.kind ?? "cancelled" });
     }
     count += group.length;
@@ -74,7 +75,7 @@ export function activityOf(blocks: readonly ProcessBlock[], live: readonly Model
     if (finalized.has(`${block.responseId}:${block.ordinal}`)) continue;
     if (block.kind === "thinking") entries.push({ kind: "thinking", state: block.endedAt === null ? "running" : "done" });
     else if (block.kind === "text") { const text = oneLine(block.text); if (text) entries.push({ kind: "text", preview: text }); }
-    else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.arguments),
+    else if (block.kind === "toolcall") entries.push({ kind: "tool", ...toolCall(block.name, block.input, block.draft),
       implementation: block.invocation?.implementation?.id ?? null, state: "running" });
   }
   deliver(Infinity);

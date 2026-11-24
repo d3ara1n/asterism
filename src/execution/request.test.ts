@@ -23,10 +23,10 @@ const text: ModelEvent[] = [
   { type: "part.start", part: { id: "t", kind: "text" } }, { type: "part.delta", partId: "t", delta: "Hello" },
   { type: "part.end", partId: "t" }, { type: "finish", reason: "stop", usage: null },
 ];
-const calls = (ids: string[], name = "resource_list", args = {}) => [
-  ...ids.flatMap(id => [
-    { type: "part.start" as const, part: { id, kind: "toolcall" as const, callId: id, name } },
-    { type: "part.end" as const, partId: id, arguments: args },
+const calls = (ids: string[], name = "resource_list", args = {}): ModelEvent[] => [
+  ...ids.flatMap<ModelEvent>(id => [
+    { type: "part.start" as const, part: { id, kind: "toolcall" as const, inputKind: "structured", callId: id, name } },
+    { type: "part.end" as const, partId: id, input: { kind: "structured", value: args } },
   ]), { type: "finish" as const, reason: "tool-calls", usage: null },
 ];
 function input(events: ModelRunEvent[], extra: Partial<ModelRunRequest> = {}): ModelRunRequest {
@@ -104,7 +104,7 @@ describe("Stateless single model execution", () => {
     const events: ModelRunEvent[] = [];
     const request = input(events);
     const tools = {
-      declarations: [{ name: "read", description: "Read", parameters: { type: "object" } }],
+      declarations: [{ kind: "structured" as const, name: "read", description: "Read", parameters: { type: "object" } }],
       async execute(batch: readonly import("@asterism-app/sdk/contracts").ModelToolCall[], _signal: AbortSignal,
         settle: (call: import("@asterism-app/sdk/contracts").ModelToolCall, result: import("@asterism-app/sdk/contracts").ToolOutcome) => void) {
         expect(events.filter(event => event.type === "tool.begin").map(event => event.block.kind === "toolcall" && event.block.callId)).toEqual(["a", "b"]);
@@ -187,7 +187,7 @@ describe("Stateless single model execution", () => {
   it("truncated responses deliver only incomplete audit blocks, retain reported terminal state, and execute no tools", async () => {
     const events: ModelRunEvent[] = [];
     const result = await execute(input(events), model([
-      { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "resource_list" } },
+      { type: "part.start", part: { id: "c", kind: "toolcall", inputKind: "structured", callId: "c", name: "resource_list" } },
       { type: "part.delta", partId: "c", delta: "{" }, { type: "finish", reason: "tool-calls", usage: null },
     ]));
     expect(result).toMatchObject({ reason: "failed", code: "incomplete", tools: [], completion: { finishReason: "tool-calls" } });
@@ -257,9 +257,9 @@ describe("Stateless single model execution", () => {
     expect(extensions).toHaveBeenCalledTimes(1);
     expect(system.blocks[0]?.text).toBe("Environment");
     const saved = modelCompletionSchema.parse(result.completion);
-    expect(saved.extensions).toContainEqual({ contract: { id: contract.id }, data: ["resource_list", "resource_inspect", "resource_call", "resource_script"] });
+    expect(saved.extensions).toContainEqual({ contract: { id: contract.id }, data: ["resource_list", "resource_inspect", "resource_call", "resource_call_text", "resource_script"] });
     expect(saved.extensions).toContainEqual(unknown);
-    expect(completionData(saved, contract)).toEqual({ tools: ["resource_list", "resource_inspect", "resource_call", "resource_script"] });
+    expect(completionData(saved, contract)).toEqual({ tools: ["resource_list", "resource_inspect", "resource_call", "resource_call_text", "resource_script"] });
     expect(completionData(saved, defineData("missing/plugin", z.string()))).toBeNull();
     expect(completionData(saved, defineData(contract.id, z.number()))).toBeNull();
     extensions.mockClear();

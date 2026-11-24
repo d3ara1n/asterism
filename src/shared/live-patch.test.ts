@@ -3,7 +3,7 @@ import { applyLive, diffLive } from "./live-patch.ts";
 import type { LiveBlock } from "./session.ts";
 
 const tool = (result: unknown, extra: Partial<LiveBlock> = {}) => ({ id: "r:0", objectId: "a", responseId: "r", ordinal: 0, kind: "toolcall", name: "exec",
-  argumentsText: "", arguments: { command: "ls" }, state: "executing", invocation: null, result: { kind: "running", data: result }, ...extra }) as LiveBlock;
+  draft: null, input: { kind: "structured", value: { command: "ls" } }, state: "executing", invocation: null, result: { kind: "running", data: result }, ...extra }) as LiveBlock;
 
 // Streaming progress: applying patches in order from the baseline must reconstruct current backend lists; append-only content sends tails only.
 it.each([
@@ -23,6 +23,6 @@ it("append-only live output sends only new tails while unchanged fields retain o
   const patch = diffLive([before], [after])!;
   expect(patch.changes).toEqual([{ id: "r:0", kind: "update", ops: [{ path: ["result", "data", "output"], append: "tail" }] }]);
   const [applied] = applyLive([before], patch);
-  expect((applied as Extract<LiveBlock, { kind: "toolcall" }>).arguments).toBe((before as Extract<LiveBlock, { kind: "toolcall" }>).arguments);
+  expect((applied as Extract<LiveBlock, { kind: "toolcall" }>).input).toBe((before as Extract<LiveBlock, { kind: "toolcall" }>).input);
   expect(diffLive([after], [after])).toBeNull();
 });

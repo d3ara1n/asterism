@@ -1,9 +1,9 @@
 import { Worker } from "node:worker_threads";
 import { defaultToolModel, modelInputText, type Json, type ToolCompletion, type ToolOutcome } from "@asterism-app/sdk/contracts";
 import type { CallResult } from "../tools/contract.ts";
-import { ResourceCall, ResourceScriptResult, type ScriptCall } from "../tools/core.ts";
+import { resourceToolName, ResourceScriptResult, type ScriptCall } from "../tools/core.ts";
 import type { PendingCall, ToolObserver } from "./core.ts";
-import type { ScriptInput, ScriptReply, ScriptRequest } from "./script-protocol.ts";
+import type { ScriptInput, ScriptReply, ScriptRequest, ScriptResourceAddress } from "./script-protocol.ts";
 
 type ScriptData = { calls: ScriptCall[]; logs: Json[]; value?: Json };
 interface ScriptOptions {
@@ -13,18 +13,12 @@ interface ScriptOptions {
   tools: string[];
   signal: AbortSignal;
   publish(data: Json): void;
-  execute(call: PendingCall, signal: AbortSignal, observer: ToolObserver): Promise<ToolOutcome>;
+  execute(call: PendingCall, signal: AbortSignal, observer: ToolObserver, address?: ScriptResourceAddress): Promise<ToolOutcome>;
 }
 
 /** Drops absent fields so summaries hold JSON values and later updates never erase earlier facts. */
 function defined<T extends object>(value: T): Partial<T> {
   return Object.fromEntries(Object.entries(value).filter(([, field]) => field !== undefined)) as Partial<T>;
-}
-/** Resource methods always dispatch through resource_call; the summary names the selected resource tool. */
-function resourceTool(call: PendingCall): string | undefined {
-  const args = call.arguments;
-  return call.name === ResourceCall.name && args && typeof args === "object" && !Array.isArray(args) && typeof args.tool === "string"
-    ? args.tool : undefined;
 }
 /** Identity, timing, and diagnostics of a child outcome; arguments, data, and model output stay out of history. */
 function settledSummary(outcome: ToolOutcome): Partial<ScriptCall> {
@@ -92,14 +86,14 @@ export async function executeResourceScript(options: ScriptOptions): Promise<Cal
           logs.push(message.value);
           publish();
         } else {
-          const call: PendingCall = { callId: `${options.id}/${message.id}`, name: message.name, arguments: message.args };
-          const summary: ScriptCall = { id: call.callId, name: call.name, kind: "queued", ...defined({ tool: resourceTool(call) }) };
+          const call: PendingCall = { callId: `${options.id}/${message.id}`, name: message.name, input: message.input };
+          const summary: ScriptCall = { id: call.callId, name: call.name, kind: "queued", ...defined({ tool: message.address?.tool ?? resourceToolName(call.name, call.input) }) };
           calls.push(summary);
           const task = (async () => {
             const outcome = await options.execute(call, signal, {
               prepared(_call, info) { Object.assign(summary, defined(info)); publish(); },
               started(_call, info) { Object.assign(summary, defined(info), { kind: "running" }); publish(); },
-            });
+            }, message.address);
             Object.assign(summary, settledSummary(outcome));
             publish();
             if (!finished) worker!.postMessage({

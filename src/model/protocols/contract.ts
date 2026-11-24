@@ -1,13 +1,12 @@
-import type { ModelProtocolId } from "@asterism-app/sdk/contracts";
-import type { wrapLanguageModel } from "ai";
+import type { ModelPart, ModelProtocolId } from "@asterism-app/sdk/contracts";
+import type { Tool, wrapLanguageModel } from "ai";
 import type { ProtocolTarget } from "../compatibility.ts";
-import type { ModelEvent } from "../contract.ts";
+import type { ModelEvent, ToolDeclaration } from "../contract.ts";
 import { jsonSchema, type Json, type Usage } from "../../shared/model.ts";
 import type { LanguageModelV4 } from "../request-encoding.ts";
 
 export type ProviderOptions = Record<string, Record<string, Json>>;
 export type ProviderPart = Awaited<ReturnType<ReturnType<typeof wrapLanguageModel>["doStream"]>>["stream"] extends ReadableStream<infer Part> ? Part : never;
-export type ReplayPart = { kind: "thinking"; summary: string; continuation: Json } | { kind: "text" | "toolcall"; continuation: Json };
 export type ProtocolRequest =
   | { purpose: "probe" }
   /** `reasoning` is the resolved standard level sent as the SDK reasoning option, when the model reasons and a level is set. */
@@ -36,6 +35,8 @@ export interface ModelProtocol {
   readonly sdkReasoning: boolean;
   /** Where tool-result files are carried: inside the result, or in a following user message. */
   toolResultFiles(target: ProtocolTarget): "content" | "user-message";
+  /** Native declaration for protocols with text tool input; other protocols use the shared JSON envelope. */
+  declareFreeformTool?(declaration: Extract<ToolDeclaration, { kind: "freeform" }>): Tool;
   createModel(target: ProtocolTarget, connection: ModelConnection): LanguageModelV4;
   callOptions(target: ProtocolTarget, request: ProtocolRequest): { system?: string; providerOptions: ProviderOptions };
   /** Extract allowlisted native values from SDK provider metadata into this protocol's flat continuation record. */
@@ -43,7 +44,7 @@ export interface ModelProtocol {
   /** Re-read stored continuation through the same allowlist. */
   restore(value: Json): Record<string, Json>;
   /** Convert restored continuation into SDK provider options for one replayed part. */
-  replay(part: ReplayPart, continuation: Record<string, Json>): ProviderOptions;
+  replay(part: ModelPart, continuation: Record<string, Json>): ProviderOptions;
   /** Whether a thinking part has input this protocol can encode. */
   replaysThinking(part: { text: string; summary: string }, continuation: Record<string, Json>): boolean;
   decoder?(): RawDecoder;

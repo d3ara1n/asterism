@@ -57,7 +57,7 @@ it("migrates format 34 templates without a use time and keeps their catalog fiel
   const before = db.prepare("SELECT id, title, created_at, data_json, folder_id FROM templates").all();
   expect(before).toHaveLength(1);
   revertTemplateUse(db);
-  db.exec("PRAGMA user_version = 34;");
+  db.exec("DROP TABLE plugin_record_versions; PRAGMA user_version = 34;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
   const reopened = openDatabase(root); databases.push(reopened);
@@ -75,7 +75,7 @@ it("migrates format 33 with a fresh inactivity baseline and preserves saved hist
   tree.archive(archived, "2020-01-01T00:00:00.000Z");
   db.prepare("UPDATE sessions SET created_at = ?").run("2019-01-01T00:00:00.000Z");
   revertSleeping(db);
-  db.exec("PRAGMA user_version = 33;");
+  db.exec("DROP TABLE plugin_record_versions; PRAGMA user_version = 33;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
   const reopened = openDatabase(root); databases.push(reopened);
@@ -93,7 +93,7 @@ it("migrates existing sessions to uncompleted without changing history", () => {
   const { root, db, tree } = setup(), sessionId = tree.create("Existing");
   const original = tree.appendToTimeline(sessionId, event("example/final", { text: "Saved response" }));
   revertSleeping(db); revertIslands(db);
-  db.exec("ALTER TABLE sessions DROP COLUMN completed; PRAGMA user_version = 31;");
+  db.exec("ALTER TABLE sessions DROP COLUMN completed; DROP TABLE plugin_record_versions; PRAGMA user_version = 31;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
   const reopened = openDatabase(root); databases.push(reopened);
@@ -129,7 +129,7 @@ it("upgrades the preceding workspace format without rewriting existing history",
   // Represent an existing workspace created before the bundled template was introduced.
   db.exec("DELETE FROM templates;");
   revertSleeping(db); revertIslands(db); revertFolders(db);
-  db.exec("DROP INDEX session_nodes_pending; PRAGMA user_version = 29;");
+  db.exec("DROP INDEX session_nodes_pending; DROP TABLE plugin_record_versions; PRAGMA user_version = 29;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
   const reopened = openDatabase(root); databases.push(reopened);
@@ -151,7 +151,7 @@ it("adds folder membership without assigning existing rows, and deleting a folde
   db.prepare("INSERT INTO templates (id, title, created_at, data_json) VALUES (?, ?, ?, ?)")
     .run(templateId, "Template", new Date().toISOString(), JSON.stringify({ objects: [], links: [], views: [] }));
   revertSleeping(db); revertIslands(db); revertFolders(db);
-  db.exec("PRAGMA user_version = 30;");
+  db.exec("DROP TABLE plugin_record_versions; PRAGMA user_version = 30;");
   db.close(); databases.splice(databases.indexOf(db), 1);
   workspaceStorage(root).inspect()!.apply();
   const reopened = openDatabase(root); databases.push(reopened);

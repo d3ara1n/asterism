@@ -7,7 +7,7 @@ import { modelProtocol } from "./protocols/index.ts";
 import { modelScope, type Json } from "../shared/model.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 
-import type { ModelInput } from "./contract.ts";
+import type { ModelEvent, ModelInput } from "./contract.ts";
 import { mergeModelCompatibility, type ModelCompatibility } from "../shared/model-compatibility.ts";
 import { requestOptions } from "./request-options.ts";
 import { modelInputSchema } from "../shared/configuration.ts";
@@ -27,7 +27,6 @@ function input(protocol: ModelInput["settings"]["provider"]["protocol"] = "opena
 
 // Use the real SDK streaming interface and replace only transport; capture final HTTP bodies instead of checking intermediate options alone.
 async function request(value: ModelInput, inspectHeaders?: (headers: Headers) => void): Promise<Record<string, unknown>> {
-  let body: Record<string, unknown> | undefined;
   const frames = value.settings.provider.protocol === "anthropic" ? [
     { type: "message_start", message: { id: "response", type: "message", role: "assistant", model: "test", content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } },
     { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
@@ -47,15 +46,152 @@ async function request(value: ModelInput, inspectHeaders?: (headers: Headers) =>
     { type: "response.output_item.done", output_index: 0, item: { id: "message", type: "message", role: "assistant", status: "completed", content: [{ type: "output_text", text: "OK", annotations: [] }] } },
     { type: "response.completed", response: { id: "response", model: "test", created_at: 0, status: "completed", usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } } },
   ];
+  return (await wireRequest(value, frames, inspectHeaders)).body;
+}
+
+async function wireRequest(value: ModelInput, frames: readonly unknown[], inspectHeaders?: (headers: Headers) => void) {
+  let body: Record<string, unknown> | undefined;
   const transport: typeof fetch = async (_url, init) => {
     body = JSON.parse(String(init?.body));
     inspectHeaders?.(new Headers(init?.headers));
     return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
   };
-  const adapter = new AiSdkAdapter(async () => "unused", (current, key) => createProviderModel(current.settings.provider, current.settings.model, key, transport, current));
-  for await (const _event of adapter.prepare(value).stream(new AbortController().signal)) { /* Consume the complete stream; serialization errors cannot be ignored. */ }
-  return body!;
+  const adapter = new AiSdkAdapter(async () => "unused", undefined, transport);
+  const events: ModelEvent[] = [];
+  for await (const event of adapter.prepare(value).stream(new AbortController().signal)) events.push(event);
+  return { body: body!, events };
 }
+
+const freeformTool = { name: "format_note", kind: "freeform", description: "Format a note" } as const;
+const noteDeltas = ['  { "label": ', '"☃" }\n'];
+const noteText = noteDeltas.join("");
+const fallbackCall = (protocol: "anthropic" | "openai-chat", argumentsChunks: string[]) => {
+  if (protocol === "anthropic") return [
+    { type: "message_start", message: { id: "response", type: "message", role: "assistant", model: "test",
+      content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 1, output_tokens: 0 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "call_note", name: freeformTool.name, input: {} } },
+    ...argumentsChunks.map(partial_json => ({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json } })),
+    { type: "content_block_stop", index: 0 },
+    { type: "message_delta", delta: { stop_reason: "tool_use", stop_sequence: null }, usage: { output_tokens: 1 } },
+    { type: "message_stop" },
+  ];
+  const chunk = (delta: unknown, finish_reason: string | null = null) => ({
+    id: "response", object: "chat.completion.chunk", model: "test", created: 0, choices: [{ index: 0, delta, finish_reason }],
+  });
+  return [
+    ...argumentsChunks.map((args, index) => chunk({ tool_calls: [{ index: 0,
+      ...(index === 0 ? { id: "call_note", type: "function" } : {}), function: { ...(index === 0 ? { name: freeformTool.name } : {}), arguments: args },
+    }] })),
+    chunk({}, "tool_calls"),
+  ];
+};
+
+describe("Freeform tools on the provider wire", () => {
+  it("declares a native Responses custom tool and streams text unchanged, even if it looks like JSON", async () => {
+    const current = input();
+    current.tools = [freeformTool];
+    const item = { type: "custom_tool_call", id: "ctc_note", call_id: "call_note", name: freeformTool.name };
+    const { body, events } = await wireRequest(current, [
+      { type: "response.created", response: { id: "response", model: "test", created_at: 0, status: "in_progress" } },
+      { type: "response.output_item.added", output_index: 0, item: { ...item, input: "" } },
+      ...noteDeltas.map(delta => ({ type: "response.custom_tool_call_input.delta", item_id: item.id, output_index: 0, delta })),
+      { type: "response.custom_tool_call_input.done", item_id: item.id, output_index: 0, input: noteText },
+      { type: "response.output_item.done", output_index: 0, item: { ...item, input: noteText, status: "completed" } },
+      { type: "response.completed", response: { id: "response", model: "test", created_at: 0, status: "completed", usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } } },
+    ]);
+    expect(body.tools).toEqual([{ type: "custom", name: freeformTool.name, description: freeformTool.description }]);
+    expect(events).toEqual([
+      { type: "part.start", part: { id: "tool:call_note", kind: "toolcall", callId: "call_note", name: freeformTool.name, inputKind: "freeform" } },
+      ...noteDeltas.map(delta => ({ type: "part.delta", partId: "tool:call_note", delta })),
+      { type: "part.end", partId: "tool:call_note", input: { kind: "freeform", text: noteText }, continuation: { itemId: "ctc_note" } },
+      expect.objectContaining({ type: "finish", reason: "tool-calls" }),
+    ]);
+    const end = events.find(event => event.type === "part.end" && event.partId === "tool:call_note");
+    if (end?.type !== "part.end" || !end.input) throw new Error("Expected completed tool input.");
+    current.messages.push(
+      { kind: "output", scope: modelScope(current.settings), adapter: modelProtocol("openai-responses").continuationFormat, parts: [
+        { kind: "toolcall", callId: item.call_id, name: item.name, input: end.input, continuation: end.continuation ?? null },
+      ] },
+      { kind: "result", callId: item.call_id, name: item.name, error: false, parts: [{ kind: "text", text: "Formatted" }] },
+    );
+    expect(((await request(current)).input as unknown[]).slice(-2)).toEqual([
+      { ...item, input: noteText },
+      { type: "custom_tool_call_output", call_id: item.call_id, output: "Formatted" },
+    ]);
+  });
+
+  it.each(["anthropic", "openai-chat"] as const)("%s uses a JSON envelope without exposing its syntax as a draft", async protocol => {
+    const current = input(protocol);
+    current.tools = [freeformTool];
+    const { body, events } = await wireRequest(current, fallbackCall(protocol, ['{"in', `put":${JSON.stringify(noteText)}}`]));
+    const schema = { type: "object", properties: { input: { type: "string" } }, required: ["input"], additionalProperties: false };
+    expect(body.tools).toMatchObject(protocol === "anthropic" ? [{ name: freeformTool.name, input_schema: schema }]
+      : [{ type: "function", function: { name: freeformTool.name, parameters: schema } }]);
+    expect(events).toEqual([
+      { type: "part.start", part: { id: "tool:call_note", kind: "toolcall", callId: "call_note", name: freeformTool.name, inputKind: "freeform" } },
+      { type: "part.delta", partId: "tool:call_note", delta: noteText },
+      { type: "part.end", partId: "tool:call_note", input: { kind: "freeform", text: noteText }, continuation: {} },
+      expect.objectContaining({ type: "finish", reason: "tool-calls" }),
+    ]);
+  });
+
+  it("does not promote an invalid fallback envelope to executable freeform input", async () => {
+    const current = input("anthropic");
+    current.tools = [freeformTool];
+    await expect(wireRequest(current, fallbackCall("anthropic", ['{"input":"note","unexpected":true}'])))
+      .rejects.toMatchObject({ code: "invalid_tool_input", origin: "model" });
+  });
+
+  const history = (target: ModelInput, itemId = "foreign_id"): ModelInput["messages"] => [...target.messages,
+    { kind: "output", scope: "foreign", adapter: "foreign/1", parts: [
+      { kind: "toolcall", callId: "call_note", name: freeformTool.name, input: { kind: "freeform", text: noteText }, continuation: { itemId } },
+    ] },
+    { kind: "result", callId: "call_note", name: freeformTool.name, error: false, parts: [{ kind: "text", text: "Formatted" }] },
+  ];
+
+  it.each(["openai-responses", "anthropic", "openai-chat"] as const)("%s replays an undeclared, foreign freeform call together with its result", async protocol => {
+    const current = input(protocol);
+    current.messages = history(current);
+    const body = await request(current);
+    expect(body.tools ?? []).toEqual([]);
+    if (protocol === "openai-responses") expect((body.input as unknown[]).slice(-2)).toEqual([
+      { type: "custom_tool_call", call_id: "call_note", name: freeformTool.name, input: noteText },
+      { type: "custom_tool_call_output", call_id: "call_note", output: "Formatted" },
+    ]);
+    if (protocol === "anthropic") expect((body.messages as unknown[]).slice(-2)).toMatchObject([
+      { role: "assistant", content: [{ type: "tool_use", id: "call_note", name: freeformTool.name, input: { input: noteText } }] },
+      { role: "user", content: [{ type: "tool_result", tool_use_id: "call_note", content: "Formatted" }] },
+    ]);
+    if (protocol === "openai-chat") expect((body.messages as unknown[]).slice(-2)).toMatchObject([
+      { role: "assistant", tool_calls: [{ type: "function", id: "call_note", function: { name: freeformTool.name, arguments: JSON.stringify({ input: noteText }) } }] },
+      { role: "tool", tool_call_id: "call_note", content: "Formatted" },
+    ]);
+  });
+
+  it("keeps Responses replay in model order and uses each stored call kind, not a same-name declaration", async () => {
+    const current = input();
+    current.messages = history(current, "ctc_note");
+    const output = current.messages.at(-2);
+    if (output?.kind !== "output") throw new Error("Expected model output.");
+    output.scope = modelScope(current.settings);
+    output.adapter = modelProtocol("openai-responses").continuationFormat;
+    output.parts.unshift({ kind: "thinking", text: "Think", summary: "", continuation: null });
+    output.parts.push({ kind: "toolcall", callId: "call_old", name: "label", input: { kind: "structured", value: { text: "note" } }, continuation: null });
+    current.messages.push({ kind: "result", callId: "call_old", name: "label", error: false, parts: [{ kind: "text", text: "Labeled" }] });
+    current.tools = [
+      { name: freeformTool.name, description: freeformTool.description, kind: "structured", parameters: { type: "object" } },
+      { name: "label", description: "Label text", kind: "freeform" },
+    ];
+    const body = await request(current);
+    expect((body.input as unknown[]).slice(-5)).toEqual([
+      { type: "reasoning", content: [{ type: "reasoning_text", text: "Think" }] },
+      { type: "custom_tool_call", id: "ctc_note", call_id: "call_note", name: freeformTool.name, input: noteText },
+      { type: "function_call", call_id: "call_old", name: "label", arguments: '{"text":"note"}' },
+      { type: "custom_tool_call_output", call_id: "call_note", output: "Formatted" },
+      { type: "function_call_output", call_id: "call_old", output: "Labeled" },
+    ]);
+  });
+});
 
 describe("Reasoning level and budget mappings", () => {
   // Transmitted values follow explicit mappings rather than SDK enums or model-name defaults; history retains standard levels.
@@ -275,7 +411,7 @@ describe("Explicit compatibility and target projection", () => {
     current.messages = [{ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
       { kind: "thinking", text: "  Signed\n", summary: "Display only", continuation: { signature: "signed" } },
       { kind: "thinking", text: "", summary: "", continuation: { signature: "empty-signed" } },
-      { kind: "toolcall", callId: "call", name: "read", arguments: {}, continuation: null },
+      { kind: "toolcall", callId: "call", name: "read", input: { kind: "structured", value: {} }, continuation: null },
       { kind: "thinking", text: "Unsigned", summary: "", continuation: null },
       { kind: "thinking", text: "", summary: "Not a full thought", continuation: null },
       { kind: "thinking", text: "", summary: "", continuation: { redactedData: "opaque" } },
@@ -395,7 +531,7 @@ describe("Explicit compatibility and target projection", () => {
       { kind: "output", ...foreign, parts: [
         { kind: "thinking", summary: "", text: "Before tool", continuation: { signature: "foreign-signature" } },
         { kind: "text", text: "Checking", continuation: { itemId: "foreign-item" } },
-        { kind: "toolcall", callId: "vendor/call.with.dots", name: "lookup", arguments: { query: "value" }, continuation: null },
+        { kind: "toolcall", callId: "vendor/call.with.dots", name: "lookup", input: { kind: "structured", value: { query: "value" } }, continuation: null },
       ] },
       { kind: "result", callId: "vendor/call.with.dots", name: "lookup", error: false, parts: [{ kind: "text", text: "Found" }] },
       { kind: "output", ...foreign, parts: [
@@ -459,11 +595,11 @@ describe("Explicit compatibility and target projection", () => {
     const current = input();
     current.messages = [
       { kind: "output", adapter: "foreign", scope: "foreign", parts: [
-        { kind: "toolcall", callId: "same_id", name: "lookup", arguments: {}, continuation: null },
+        { kind: "toolcall", callId: "same_id", name: "lookup", input: { kind: "structured", value: {} }, continuation: null },
       ] },
       { kind: "result", callId: "same_id", name: "lookup", error: false, parts: [{ kind: "text", text: "Foreign result" }] },
       { kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
-        { kind: "toolcall", callId: "same_id", name: "lookup", arguments: {}, continuation: null },
+        { kind: "toolcall", callId: "same_id", name: "lookup", input: { kind: "structured", value: {} }, continuation: null },
       ] },
       { kind: "result", callId: "same_id", name: "lookup", error: false, parts: [{ kind: "text", text: "Native result" }] },
     ];
@@ -483,7 +619,7 @@ describe("Explicit compatibility and target projection", () => {
     current.settings.model.generation.maxOutputTokens = null;
     current.messages.push(
       { kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings),
-        parts: ["call", "second"].map(callId => ({ kind: "toolcall", callId, name: "lookup", arguments: {}, continuation: null })) },
+        parts: ["call", "second"].map(callId => ({ kind: "toolcall", callId, name: "lookup", input: { kind: "structured", value: {} }, continuation: null })) },
       { kind: "result", callId: "call", name: "lookup", error: false, parts: [
         { kind: "text", text: "First result" },
         { kind: "file", data: new Uint8Array([1, 2, 3]), mediaType: "image/png", filename: "result.png" },

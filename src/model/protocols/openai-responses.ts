@@ -1,9 +1,9 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAI, openai } from "@ai-sdk/openai";
 import { ModelFailure, type ModelEvent } from "../contract.ts";
 import { compatibility, thinkingMappings, type CompatibilityTarget } from "../compatibility.ts";
 import { mappedEffort, setEffort, withRequestEncoding } from "../request-encoding.ts";
 import { bearerHeaders, namespaced, pickNative, type ModelProtocol, type ProviderOptions } from "./contract.ts";
-import { withResponsesReasoning } from "./responses-reasoning.ts";
+import { withResponsesInput } from "./responses-input.ts";
 
 const nativeKeys = ["itemId", "reasoningEncryptedContent", "phase"] as const;
 
@@ -68,12 +68,13 @@ export const openaiResponses: ModelProtocol = {
   continuationFormat: "openai-responses/1",
   sdkReasoning: false,
   toolResultFiles: () => "content",
+  declareFreeformTool: declaration => openai.tools.customTool({ description: declaration.description }),
   createModel(target, connection) {
     const fields = responsesFields(target);
     const mappings = thinkingMappings(target);
     const responses = (fetch: typeof connection.fetch) => createOpenAI({ ...connection, fetch }).responses(target.model.modelId);
     return withRequestEncoding(
-      transport => withResponsesReasoning(responses, transport, fields),
+      transport => withResponsesInput(responses, transport, fields),
       connection.fetch,
       (body, level) => { if (level !== null) setEffort(body, "reasoning", mappedEffort(level, mappings)); },
     );
@@ -101,6 +102,7 @@ export const openaiResponses: ModelProtocol = {
     const options: ProviderOptions = Object.keys(native).length ? { openai: native } : {};
     // The reasoning encoder pairs summaries with encrypted items; summaries are never sent as reasoning text.
     if (part.kind === "thinking") options.asterism = { summary: part.summary };
+    if (part.kind === "toolcall" && part.input.kind === "freeform") options.asterism = { freeform: true };
     return options;
   },
   replaysThinking: (part, native) => Boolean(part.text || part.summary || typeof native.reasoningEncryptedContent === "string"),

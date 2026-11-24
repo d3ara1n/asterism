@@ -117,7 +117,10 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
       const calls = buffer.calls();
       callIds = calls.map(call => call.part.callId);
       const byCall = new Map(calls.map(call => [call.part.callId, call]));
-      await execution.execute(calls.map(call => ({ callId: call.part.callId, name: call.part.name, arguments: call.arguments })),
+      await execution.execute(calls.map(call => {
+        if (!call.input) throw new ModelFailure("protocol", "An incomplete tool call cannot execute.");
+        return { callId: call.part.callId, name: call.part.name, input: call.input };
+      }),
         signal, (call, outcome) => {
           outcomes.set(call.callId, outcome);
           buffer.settle(byCall.get(call.callId)!, outcome); progress();

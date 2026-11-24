@@ -44,8 +44,8 @@ function* report(text: string): Generator<ModelEvent> {
   yield { type: "finish", reason: "stop", usage: { input: 5, output: 2, total: 7, reasoning: null, cacheRead: 0, cacheWrite: null } };
 }
 function* call(resource: string, tool: string, target: Json = null, args: Json = {}): Generator<ModelEvent> {
-  yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "resource_call" } };
-  yield { type: "part.end", partId: "call", arguments: { resource_id: resource, tool, target, args } };
+  yield { type: "part.start", part: { id: "call", kind: "toolcall", inputKind: "structured", callId: "call", name: "resource_call" } };
+  yield { type: "part.end", partId: "call", input: { kind: "structured", value: { resource_id: resource, tool, target, args } } };
   yield { type: "finish", reason: "tool-calls", usage: null };
 }
 function inputText(input: ModelInput) {

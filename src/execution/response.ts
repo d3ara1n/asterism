@@ -1,4 +1,4 @@
-import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult, Presentation, ModelTermination, RequestTiming, Usage } from "@asterism-app/sdk/contracts";
+import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult, Presentation, ToolCallInput, ToolInputDraft, ModelTermination, RequestTiming, Usage } from "@asterism-app/sdk/contracts";
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import { previewArguments } from "../shared/partial-arguments.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
@@ -10,8 +10,8 @@ type BufferedBlock = {
   summary: string;
   startedAt: number;
   endedAt: number | null;
-  arguments: Json;
-  previewArguments: Json;
+  input: ToolCallInput | null;
+  previewInput: ToolCallInput | null;
   previewText: string;
   continuation: Json;
   emitted: boolean;
@@ -55,7 +55,7 @@ export class ResponseBuffer {
         throw new ModelFailure("protocol", "The provider started a duplicate response block.");
       }
       if (event.part.kind === "toolcall") this.callIds.add(event.part.callId);
-      this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", summary: "", startedAt: Date.now(), arguments: null, previewArguments: null, previewText: "", continuation: null,
+      this.blocks.set(event.part.id, { part: event.part, ordinal: this.blocks.size, text: "", summary: "", startedAt: Date.now(), input: null, previewInput: null, previewText: "", continuation: null,
         endedAt: null, emitted: false, published: false, executing: false, invocation: null, result: null });
       return;
     }
@@ -75,7 +75,11 @@ export class ResponseBuffer {
       } else block.text += event.delta;
       return;
     }
-    block.arguments = event.arguments ?? null;
+    if (block.part.kind === "toolcall" && event.input?.kind !== block.part.inputKind)
+      throw new ModelFailure("protocol", "The provider completed a call without matching tool input.");
+    if (block.part.kind !== "toolcall" && event.input)
+      throw new ModelFailure("protocol", "Only tool calls can carry tool input.");
+    block.input = event.input ?? null;
     block.continuation = event.continuation ?? null;
     block.endedAt = Date.now();
   }
@@ -104,15 +108,17 @@ export class ResponseBuffer {
     }
   }
 
-  /** Tolerant parsing serves live display only; it cannot replace execution arguments or arguments in incomplete history. */
-  async preview(identity: (name: string, args: Json) => ToolInvocationInfo): Promise<void> {
+  /** Project a draft for identity hints without promoting it to executable input. */
+  async preview(identity: (name: string, input: ToolCallInput | null) => ToolInvocationInfo): Promise<void> {
     for (const block of this.calls()) {
       if (block.emitted || block.executing) continue;
       if (block.endedAt === null && block.previewText !== block.text) {
         block.previewText = block.text;
-        block.previewArguments = previewArguments(block.text);
+        block.previewInput = block.part.inputKind === "freeform"
+          ? { kind: "freeform", text: block.text }
+          : { kind: "structured", value: previewArguments(block.text) };
       }
-      block.invocation = identity(block.part.name, block.endedAt !== null ? block.arguments : block.previewArguments);
+      block.invocation = identity(block.part.name, block.input ?? block.previewInput);
     }
   }
 
@@ -121,7 +127,7 @@ export class ResponseBuffer {
       const base = { id: `${this.identity.responseId}:${block.ordinal}`,
         responseId: this.identity.responseId, ordinal: block.ordinal };
       return block.part.kind === "toolcall"
-        ? { ...base, kind: "toolcall", name: block.part.name, argumentsText: block.text, arguments: block.endedAt !== null ? block.arguments : block.previewArguments,
+        ? { ...base, kind: "toolcall", name: block.part.name, input: block.input, draft: this.draft(block, block.part.inputKind),
           state: block.executing ? "executing" : block.endedAt !== null ? "ready" : "input", invocation: block.invocation, result: block.result, ...(block.noticeAt === undefined ? {} : { noticeAt: block.noticeAt }) }
         : block.part.kind === "thinking" ? { ...base, kind: "thinking", text: block.text || block.summary, startedAt: block.startedAt, endedAt: block.endedAt }
           : { ...base, kind: "text", text: block.text, endedAt: block.endedAt };
@@ -161,6 +167,10 @@ export class ResponseBuffer {
     this.finalized = true;
   }
 
+  private draft(block: BufferedBlock, kind: ToolInputDraft["kind"]): ToolInputDraft | null {
+    return block.input === null ? { kind, text: block.text } : null;
+  }
+
   private emitBlock(block: BufferedBlock, complete: boolean, outcome: ToolOutcome | null = null,
     type: "block" | "tool.begin" | "tool.complete" = "block"): void {
     if (block.emitted) throw new ModelFailure("protocol", "The response block has already been emitted.");
@@ -169,7 +179,7 @@ export class ResponseBuffer {
       startedAt: block.startedAt, endedAt: block.endedAt };
     this.onBlock(block.part.kind === "toolcall"
       ? { ...common, kind: "toolcall" as const, callId: block.part.callId, name: block.part.name,
-          argumentsText: block.endedAt === null ? block.text : null, arguments: block.arguments, outcome,
+          input: block.input, draft: this.draft(block, block.part.inputKind), outcome,
           ...(block.invocation ? { invocation: block.invocation } : {}) }
       : block.part.kind === "thinking" ? { ...common, kind: "thinking", text: block.text, summary: block.summary }
         : { ...common, kind: "text", text: block.text }, type);

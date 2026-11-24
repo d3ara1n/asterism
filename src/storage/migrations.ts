@@ -3,9 +3,9 @@ import { DatabaseSync } from "node:sqlite";
 import { readJson, writeJson } from "./files.ts";
 
 export interface StorageChange { id: string; from: number; to: number }
-/** An existing outdated file; `apply` executes the full migration chain and commits the new version. */
+/** An outdated storage unit; `apply` executes the full migration chain and commits the new version. */
 export interface StoragePlan { change: StorageChange; apply(): void | Promise<void> }
-/** Read versions only: absent or current files need no plan; business logic creates or reads them in current format. */
+/** Discover required work without writing; absent or current stores need no plan. */
 export interface StorageDefinition { id: string; file: string; inspect(): StoragePlan | null }
 
 /** Each key represents v → v+1; validate the entire chain before any conversion. */

@@ -10,7 +10,7 @@ describe("Agent request context extensions", () => {
         { id: "a", source: { id: "a", plugin: "builtin" }, kind: "agent", role: "worker", text: "role" },
         { id: "c", source: { id: "c", plugin: null }, kind: "context", file: "/work/AGENTS.md", text: "中文" },
       ], { system: { blocks: [] },
-      tools: [{ name: "resource_list", description: "List resources.", parameters: { type: "object" } }],
+      tools: [{ kind: "structured", name: "resource_list", description: "List resources.", parameters: { type: "object" } }],
     });
     expect(extension).toEqual({ contract: { id: AgentRequestContext.id }, data: {
       system: [

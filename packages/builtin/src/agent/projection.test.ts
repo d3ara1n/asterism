@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { projectForAgent } from "./projection.ts";
 import { sessionView } from "../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../src/session/view.ts";
-import { attached, call, event, message, node, text, thinking } from "../../../../src/session/test-nodes.ts";
+import { agentSource, attached, call, event, message, node, text, thinking } from "../../../../src/session/test-nodes.ts";
 import type { NewNode, SessionNode } from "../../../../src/shared/session.ts";
 import { projectPeekRecords } from "./peek/snapshot.ts";
 import { contextInsight } from "./context/insight.ts";
@@ -25,7 +25,7 @@ describe("Agent model projection", () => {
     expect(items.map(item => item.kind)).toEqual(["input", "output", "result"]);
     expect(items[1]).toMatchObject({ parts: [
       { kind: "thinking", text: "Read the notes" },
-      { kind: "toolcall", callId: "read-1", arguments: { path: "notes.md" } },
+      { kind: "toolcall", callId: "read-1", input: { kind: "structured", value: { path: "notes.md" } } },
     ] });
     expect(items[2]).toMatchObject({ callId: "read-1", outcome: { kind: "unknown", model: [
       { kind: "text", text: "This tool call was submitted for execution, but its result was not recorded. Its effects are unknown." },
@@ -40,6 +40,19 @@ describe("Agent model projection", () => {
     expect(items[2]).toMatchObject({ callId: "write-1", outcome: { kind: "cancelled", model: [
       { kind: "text", text: "This tool call was not executed because the response did not complete." },
     ] } });
+  });
+
+  it("replays exact freeform input and excludes unfinished drafts from model history", () => {
+    const body = '  {"literal":true}\r\n';
+    const common = { kind: "toolcall", name: "example_text", responseId: "r", requestParentId: "0",
+      complete: false, outcome: null, continuation: null, source: { model: "p/m", adapter: "test", scope: "scope" } };
+    const path = records(message("a", "go"),
+      event(Execution.id, { type: "block", block: { ...common, ordinal: 0, callId: "closed", input: { kind: "freeform", text: body }, draft: null } }, { source: agentSource("a") }),
+      event(Execution.id, { type: "block", block: { ...common, ordinal: 1, callId: "unfinished", input: null, draft: { kind: "structured", text: '{"value":' } } }, { source: agentSource("a") }));
+    const items = project(path);
+    expect(items.map(item => item.kind)).toEqual(["input", "output", "result"]);
+    expect(items[1]).toMatchObject({ parts: [{ kind: "toolcall", callId: "closed", input: { kind: "freeform", text: body } }] });
+    expect(items[2]).toMatchObject({ callId: "closed", outcome: { kind: "cancelled" } });
   });
 
   it("retains closed text from a failed response and trims thinking before subsequent user input", () => {

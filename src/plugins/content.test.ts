@@ -480,8 +480,8 @@ describe("Models consuming immutable content", () => {
   it("hands a resource tool's existing content to its caller without restaging the bytes", async () => {
     let sourceId = "";
     const f = fixture({ adapter: { format: () => "resource-file", validate() {}, prepare() { return { async *stream() {
-      yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "resource_call" } };
-      yield { type: "part.end", partId: "call", arguments: { resource_id: sourceId, tool: "file", target: null, args: {} } };
+      yield { type: "part.start", part: { id: "call", kind: "toolcall", inputKind: "structured", callId: "call", name: "resource_call" } };
+      yield { type: "part.end", partId: "call", input: { kind: "structured", value: { resource_id: sourceId, tool: "file", target: null, args: {} } } };
       yield { type: "finish", reason: "tool-calls", usage: null };
     } }; } } });
     await configure(f, true);
@@ -511,8 +511,8 @@ describe("Models consuming immutable content", () => {
       effect: "read", execution: "parallel",
       async execute(_args, { object }) { await object.content.read(file); return { kind: "succeeded", data: file }; },
     })], adapter: { format: () => "existing", validate() {}, prepare() { return { async *stream() {
-      yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "existing" } };
-      yield { type: "part.end", partId: "call", arguments: {} };
+      yield { type: "part.start", part: { id: "call", kind: "toolcall", inputKind: "structured", callId: "call", name: "existing" } };
+      yield { type: "part.end", partId: "call", input: { kind: "structured", value: {} } };
       yield { type: "finish", reason: "tool-calls", usage: null };
     } }; } } });
     await configure(f, true);

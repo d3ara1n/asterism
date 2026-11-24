@@ -12,7 +12,7 @@ const input: ModelInput = {
     model: { name: "Model", modelId: "test", providerId: "p", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: true, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: 0.2, topP: null, maxOutputTokens: 1000 } }, thinking: "low" },
   system: { blocks: [{ id: "test", text: "System" }] }, messages: [{ kind: "input", parts: [{ kind: "text", text: "Read" }] }],
-  tools: [{ name: "read", description: "Read", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
+  tools: [{ name: "read", description: "Read", kind: "structured", parameters: { type: "object", properties: { resource_id: { type: "string" } }, required: ["resource_id"] } }],
 };
 async function consume(events: AsyncIterable<ModelEvent>) { for await (const _event of events) { /* Consume through terminal state or error. */ } }
 const transportInput: ModelInput = { ...input, settings: { ...input.settings, thinking: "off" } };
@@ -252,7 +252,7 @@ describe("AI SDK adaptation contract", () => {
       { kind: "output", adapter: adapter.format(current.settings), scope: modelScope(current.settings), parts: [
         { kind: "thinking", summary: "", text: "Saved thought", continuation: { signature: "saved-signature" } },
         { kind: "text", text: "Saved answer", continuation: null },
-        { kind: "toolcall", callId: "call", name: "read", arguments: {}, continuation: null },
+        { kind: "toolcall", callId: "call", name: "read", input: { kind: "structured", value: {} }, continuation: null },
       ] },
       { kind: "result", callId: "call", name: "read", error: false, parts: [{ kind: "text", text: "Tool answer" }] },
     ];
@@ -484,7 +484,7 @@ describe("AI SDK adaptation contract", () => {
     const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(input).stream(new AbortController().signal)) events.push(event);
-    expect(events.find(e => e.type === "part.end")).toMatchObject({ arguments: { resource_id: "note" } });
+    expect(events.find(e => e.type === "part.end")).toMatchObject({ input: { kind: "structured", value: { resource_id: "note" } } });
     expect(events.at(-1)).toMatchObject({ type: "finish", reason: "tool-calls" });
     expect(JSON.stringify(events)).not.toContain("NoSuchToolError");
   });
@@ -510,7 +510,7 @@ describe("AI SDK adaptation contract", () => {
     expect(model.doStreamCalls).toHaveLength(1);
     expect(model.doStreamCalls[0]).toMatchObject({ reasoning: "low", temperature: 0.2, maxOutputTokens: 1000 });
     expect(model.doStreamCalls[0]?.prompt[0]).toEqual({ role: "system", content: projectSystemPrompt(input.system) });
-    expect(events.find(e => e.type === "part.end" && e.partId === "tool:call-1")).toMatchObject({ arguments: { resource_id: "note" } });
+    expect(events.find(e => e.type === "part.end" && e.partId === "tool:call-1")).toMatchObject({ input: { kind: "structured", value: { resource_id: "note" } } });
     const end = events.at(-1)!;
     expect(end).toMatchObject({ type: "finish", reason: "tool-calls", responseId: "response-1", rawFinishReason: "tool_use", usage: { input: 10, output: 5, total: 15, reasoning: 2, cacheRead: 2 } });
     if (end.type !== "finish") throw new Error();
@@ -518,7 +518,7 @@ describe("AI SDK adaptation contract", () => {
     expect(serialized).toContain("signature-value"); expect(serialized).not.toContain("credential-not-for-history"); expect(serialized).not.toContain("secret-metadata");
     const thinking = events.find(e => e.type === "part.end" && e.partId === "thinking:r");
     if (thinking?.type !== "part.end") throw new Error("Missing thinking completion.");
-    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", summary: "", text: "Think", continuation: thinking.continuation ?? null }, { kind: "toolcall", callId: "call-1", name: "read", arguments: { resource_id: "note" }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.format(input.settings) },
+    const next = sdkMessages({ ...input, messages: [...input.messages, { kind: "output", parts: [{ kind: "thinking", summary: "", text: "Think", continuation: thinking.continuation ?? null }, { kind: "toolcall", callId: "call-1", name: "read", input: { kind: "structured", value: { resource_id: "note" } }, continuation: null }], scope: modelScope(input.settings), adapter: adapter.format(input.settings) },
       { kind: "result", callId: "call-1", name: "read", error: false, parts: [{ kind: "text", text: "Note text" }] }] });
     expect(next.map(m => m.role)).toEqual(["user", "assistant", "tool"]);
     expect(JSON.stringify(next)).toContain("signature-value");

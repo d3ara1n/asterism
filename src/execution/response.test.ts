@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { modelBlockSchema, type ModelBlock } from "@asterism-app/sdk/contracts";
 import type { ModelEvent } from "../model/contract.ts";
 import { ResponseBuffer } from "./response.ts";
@@ -12,7 +12,7 @@ function setup() {
   ) };
 }
 const start: ModelEvent = { type: "part.start", part: { id: "t", kind: "text" } };
-const call: ModelEvent = { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c1", name: "read" } };
+const call: ModelEvent = { type: "part.start", part: { id: "c", kind: "toolcall", inputKind: "structured", callId: "c1", name: "read" } };
 const finish: ModelEvent = { type: "finish", reason: "stop", usage: null };
 
 describe("Response block state machine", () => {
@@ -39,35 +39,52 @@ describe("Response block state machine", () => {
     const { response, nodes } = setup();
     response.accept(call);
     response.accept({ type: "part.delta", partId: "c", delta: '{"target":{"path":"src/comp' });
-    await response.preview(() => ({}));
-    expect(response.live()[0]).toMatchObject({ state: "input", arguments: { target: { path: "src/comp" } } });
-    expect(response.calls()[0]!.arguments).toBeNull();
+    const preview = vi.fn(() => ({}));
+    await response.preview(preview);
+    expect(preview).toHaveBeenLastCalledWith("read", { kind: "structured", value: { target: { path: "src/comp" } } });
+    expect(response.live()[0]).toMatchObject({ state: "input", input: null });
     response.accept({ type: "part.delta", partId: "c", delta: 'onent.ts"},"args":{"content":"hello\\nworld\\u4' });
-    await response.preview(() => ({}));
-    expect(response.live()[0]).toMatchObject({ arguments: { args: { content: "hello\nworld" } } });
+    await response.preview(preview);
+    expect(preview).toHaveBeenLastCalledWith("read", { kind: "structured", value: { args: { content: "hello\nworld" }, target: { path: "src/component.ts" } } });
     response.close();
-    expect(nodes[0]).toMatchObject({ complete: false, arguments: null, outcome: null });
+    expect(nodes[0]).toMatchObject({ complete: false, input: null, outcome: null });
   });
 
   it("interleaved calls retain separate previews and obtain complete arguments from terminal events rather than repaired results", async () => {
     const { response } = setup();
     response.accept(call);
-    response.accept({ type: "part.start", part: { id: "other", kind: "toolcall", callId: "other", name: "write" } });
+    response.accept({ type: "part.start", part: { id: "other", kind: "toolcall", inputKind: "structured", callId: "other", name: "write" } });
     response.accept({ type: "part.delta", partId: "c", delta: '{"path":"first' });
     response.accept({ type: "part.delta", partId: "other", delta: '{"content":"second' });
-    await response.preview(() => ({}));
-    expect(response.live().map(block => block.kind === "toolcall" && block.arguments)).toEqual([{ path: "first" }, { content: "second" }]);
-    response.accept({ type: "part.end", partId: "c", arguments: { path: "first.txt" } });
-    expect(response.live()[0]).toMatchObject({ state: "ready", arguments: { path: "first.txt" } });
-    expect(response.calls()[0]!.arguments).toEqual({ path: "first.txt" });
+    const preview = vi.fn(() => ({}));
+    await response.preview(preview);
+    expect(preview.mock.calls).toEqual([
+      ["read", { kind: "structured", value: { path: "first" } }],
+      ["write", { kind: "structured", value: { content: "second" } }],
+    ]);
+    response.accept({ type: "part.end", partId: "c", input: { kind: "structured", value: { path: "first.txt" } } });
+    expect(response.live()[0]).toMatchObject({ state: "ready", input: { kind: "structured", value: { path: "first.txt" } }, draft: null });
+  });
+
+  it("keeps JSON-looking freeform deltas as text and never promotes a cancelled draft", async () => {
+    const { response, nodes } = setup();
+    response.accept({ type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "plain", inputKind: "freeform" } });
+    const text = ' {"path":"README.md"}\r\n ';
+    response.accept({ type: "part.delta", partId: "c", delta: text });
+    const preview = vi.fn(() => ({}));
+    await response.preview(preview);
+    expect(preview).toHaveBeenCalledWith("plain", { kind: "freeform", text });
+    expect(() => response.accept({ type: "part.end", partId: "c", input: { kind: "structured", value: {} } })).toThrow("matching tool input");
+    response.close();
+    expect(nodes[0]).toMatchObject({ draft: { kind: "freeform", text }, input: null });
   });
 
   it("tool inputs publish in model order before results arrive and terminal measurements remain on the last input", () => {
     const { response, nodes, events } = setup();
     response.accept(call);
-    response.accept({ type: "part.end", partId: "c", arguments: {} });
-    response.accept({ type: "part.start", part: { id: "c2", kind: "toolcall", callId: "c2", name: "read" } });
-    response.accept({ type: "part.end", partId: "c2", arguments: {} });
+    response.accept({ type: "part.end", partId: "c", input: { kind: "structured", value: {} } });
+    response.accept({ type: "part.start", part: { id: "c2", kind: "toolcall", inputKind: "structured", callId: "c2", name: "read" } });
+    response.accept({ type: "part.end", partId: "c2", input: { kind: "structured", value: {} } });
     const usage = { input: 5, output: 2, total: 7, reasoning: null, cacheRead: null, cacheWrite: null };
     response.accept({ type: "finish", reason: "tool-calls", usage, responseId: "remote", rawFinishReason: "tool_use" });
     response.seal(response.terminate({ reason: "completed" }));
@@ -109,7 +126,7 @@ describe("Response block state machine", () => {
     response.accept({ type: "part.delta", partId: "c", delta: "{\"path\":" });
     expect(() => response.accept(finish)).toThrow();
     response.close();
-    expect(nodes).toEqual([expect.objectContaining({ kind: "toolcall", argumentsText: "{\"path\":", complete: false, outcome: null })]);
+    expect(nodes).toEqual([expect.objectContaining({ kind: "toolcall", draft: { kind: "structured", text: "{\"path\":" }, complete: false, outcome: null })]);
   });
 
   it("text and pending tool inputs publish together, and later outcomes preserve the original tool input", () => {
@@ -120,12 +137,12 @@ describe("Response block state machine", () => {
     expect(nodes).toEqual([]);
     expect(response.live()).toEqual([expect.objectContaining({ kind: "text", text: "hello" })]);
     response.accept(call);
-    response.accept({ type: "part.end", partId: "c", arguments: {} });
+    response.accept({ type: "part.end", partId: "c", input: { kind: "structured", value: {} } });
     response.accept(finish);
     response.seal(response.terminate({ reason: "completed" }));
     expect(nodes).toEqual([
       expect.objectContaining({ kind: "text", text: "hello", complete: true, completion: null }),
-      expect.objectContaining({ kind: "toolcall", arguments: {}, outcome: null }),
+      expect.objectContaining({ kind: "toolcall", input: { kind: "structured", value: {} }, outcome: null }),
     ]);
     expect(response.live()).toEqual([expect.objectContaining({ kind: "toolcall", state: "ready" })]);
     response.start(response.calls()[0]!);
@@ -153,6 +170,6 @@ describe("Response block state machine", () => {
   it("blocks cannot reuse call IDs and misattribute tool results to the wrong nodes", () => {
     const { response } = setup();
     response.accept(call);
-    expect(() => response.accept({ type: "part.start", part: { id: "other", kind: "toolcall", callId: "c1", name: "read" } })).toThrow();
+    expect(() => response.accept({ type: "part.start", part: { id: "other", kind: "toolcall", inputKind: "structured", callId: "c1", name: "read" } })).toThrow();
   });
 });

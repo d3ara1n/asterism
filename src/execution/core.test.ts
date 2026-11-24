@@ -21,7 +21,7 @@ const contract = defineImplementation({
   targetSchema: z.null().describe("Use the resource."), effect: "read", execution: "parallel",
 });
 const resource = { id: "r", kind: "test", title: "At request start", data: {} };
-const call = { callId: "c", name: "resource_call", arguments: { resource_id: "r", tool: "stream", args: {} } };
+const call = { callId: "c", name: "resource_call", input: { kind: "structured" as const, value: { resource_id: "r", tool: "stream", args: {} } } };
 type Data = { text: string };
 type Handler = (context: { signal: AbortSignal; publish(data: Data): void }) => Promise<CallResult<Data>>;
 async function run(handler: Handler, options: { effect?: "read" | "write"; signal?: AbortSignal; observer?: ToolObserver; toModel?: (data: Data) => ToolModelOutput } = {}) {
@@ -48,12 +48,12 @@ describe("Tool output and completion", () => {
     const snapshot = { ...resource };
     const capabilities = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [snapshot], () => true);
     snapshot.title = "Changed later";
-    expect(previewCoreCall("resource_call", call.arguments, capabilities)).toEqual({
+    expect(previewCoreCall("resource_call", call.input, capabilities)).toEqual({
       implementation: reference(contract), resource: { id: "r", kind: "test", title: "At request start" },
     });
-    expect(previewCoreCall("resource_call", { ...call.arguments, resource_id: "unknown" }, capabilities)).toEqual({});
+    expect(previewCoreCall("resource_call", { kind: "structured", value: { ...call.input.value, resource_id: "unknown" } }, capabilities)).toEqual({});
     const denied = new AgentCapabilities(new ResourceRegistry([]), new ToolRegistry([tool]), [resource], () => false);
-    expect(previewCoreCall("resource_call", call.arguments, denied).implementation).toBeUndefined();
+    expect(previewCoreCall("resource_call", call.input, denied).implementation).toBeUndefined();
     expect(prepare).not.toHaveBeenCalled();
   });
   it("publish creates independent snapshots projected to the model only at completion; callbacks expire after completion", async () => {

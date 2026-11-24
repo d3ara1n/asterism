@@ -64,8 +64,8 @@ function adapter(next: () => { name: string; args: Json }[]): ModelAdapter {
     const calls = next();
     return { async *stream() {
       for (const [index, call] of calls.entries()) {
-        yield { type: "part.start" as const, part: { id: `p${index}`, kind: "toolcall" as const, name: call.name, callId: `call${index}` } };
-        yield { type: "part.end" as const, partId: `p${index}`, arguments: call.args };
+        yield { type: "part.start" as const, part: { id: `p${index}`, kind: "toolcall" as const, inputKind: "structured", name: call.name, callId: `call${index}` } };
+        yield { type: "part.end" as const, partId: `p${index}`, input: { kind: "structured", value: call.args } };
       }
       yield { type: "finish" as const, reason: "tool-calls", usage: null };
     } };
@@ -195,8 +195,8 @@ describe("SDK session resource lifetimes", () => {
       const index = request++;
       return { async *stream(): AsyncIterable<ModelEvent> {
         if (index < 2) { entered[index]!.release(); await finish[index]!.promise; }
-        yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "resource_list" } };
-        yield { type: "part.end", partId: "call", arguments: {} };
+        yield { type: "part.start", part: { id: "call", kind: "toolcall", inputKind: "structured", callId: "call", name: "resource_list" } };
+        yield { type: "part.end", partId: "call", input: { kind: "structured", value: {} } };
         yield { type: "finish", reason: "tool-calls", usage: null };
       } };
     } } });
@@ -399,8 +399,8 @@ describe("SDK session resource lifetimes", () => {
       const index = request++;
       return { async *stream(): AsyncIterable<ModelEvent> {
         if (index < 2) { entered[index]!.release(); await finishRequest[index]!.promise; }
-        yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: index < 2 ? "resource_call" : "resource_list" } };
-        yield { type: "part.end", partId: "call", arguments: index < 2 ? { resource_id: resourceId, tool: "read", args: {} } : {} };
+        yield { type: "part.start", part: { id: "call", kind: "toolcall", inputKind: "structured", callId: "call", name: index < 2 ? "resource_call" : "resource_list" } };
+        yield { type: "part.end", partId: "call", input: { kind: "structured", value: index < 2 ? { resource_id: resourceId, tool: "read", args: {} } : {} } };
         yield { type: "finish", reason: "tool-calls", usage: null };
       } };
     } } });
@@ -898,8 +898,8 @@ describe("Agent resource operation entries", () => {
       return { async *stream() {
         if (first) {
           await f.session.invoke(ConfigureAgent, agent, { selection: { agent: "general", model: "test/test", thinking: "low" } });
-          yield { type: "part.start", part: { id: "state", kind: "toolcall", callId: "state", name: "get_agent_state" } };
-          yield { type: "part.end", partId: "state", arguments: {} };
+          yield { type: "part.start", part: { id: "state", kind: "toolcall", inputKind: "structured", callId: "state", name: "get_agent_state" } };
+          yield { type: "part.end", partId: "state", input: { kind: "structured", value: {} } };
         } else {
           yield { type: "part.start", part: { id: "text", kind: "text" } };
           yield { type: "part.delta", partId: "text", delta: "Done" };

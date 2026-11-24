@@ -1,5 +1,6 @@
 import { jsonSchema as sdkJsonSchema, streamText, tool,
   type ModelMessage, type ToolResultPart, type ToolSet, type LanguageModel } from "ai";
+import { z } from "zod";
 import { jsonSchema, unauthenticatedApiKey, type Json, type ModelSettings } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
@@ -9,7 +10,7 @@ import { projectHistory } from "./projection.ts";
 import { modelProtocol, type ModelProtocol } from "./protocols/index.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
-import { describeError, type ModelResponse } from "@asterism-app/sdk/contracts";
+import { describeError, type ModelResponse, type ToolCallInput } from "@asterism-app/sdk/contracts";
 import { providerFailure } from "./provider-failure.ts";
 
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
@@ -36,8 +37,10 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
       if (parts.length) messages.push({ role: "assistant", content: parts.map(p => {
         // Projection has restored continuation through the target protocol's allowlist.
         const providerOptions = protocol.replay(p, p.continuation as Record<string, Json>);
-        return p.kind === "toolcall" ? { type: "tool-call" as const, toolCallId: p.callId, toolName: p.name, input: p.arguments, providerOptions }
-          : { type: p.kind === "text" ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
+        if (p.kind !== "toolcall") return { type: p.kind === "text" ? "text" as const : "reasoning" as const, text: p.text, providerOptions };
+        const input = p.input.kind === "structured" ? p.input.value
+          : protocol.declareFreeformTool ? p.input.text : { input: p.input.text };
+        return { type: "tool-call" as const, toolCallId: p.callId, toolName: p.name, input, providerOptions };
       }) });
     }
     if (item.kind === "result") {
@@ -61,6 +64,40 @@ export function sdkMessages(input: ModelInput): ModelMessage[] {
   flushAttachments();
   return messages;
 }
+const freeformEnvelope = z.strictObject({ input: z.string() });
+
+type WireInput = "structured" | "native-text" | "text-envelope";
+
+function toolCallInput(wire: WireInput, value: unknown): ToolCallInput {
+  switch (wire) {
+    case "structured": return { kind: "structured", value: json(value) };
+    case "native-text":
+      if (typeof value === "string") return { kind: "freeform", text: value };
+      break;
+    case "text-envelope": {
+      const envelope = freeformEnvelope.safeParse(value);
+      if (envelope.success) return { kind: "freeform", text: envelope.data.input };
+      break;
+    }
+  }
+  throw new ModelFailure("invalid_tool_input", "The provider returned invalid freeform tool input.", undefined, "model");
+}
+
+type RequestTools = { tools: ToolSet; textEnvelopes: ReadonlySet<string> };
+
+function requestTools(input: ModelInput, protocol: ModelProtocol): RequestTools {
+  const textEnvelopes = new Set<string>();
+  const tools: ToolSet = Object.fromEntries(input.tools.map(declaration => {
+    if (declaration.kind === "structured") return [declaration.name, tool({
+      description: declaration.description, inputSchema: sdkJsonSchema(declaration.parameters as Record<string, unknown>),
+    })];
+    if (protocol.declareFreeformTool) return [declaration.name, protocol.declareFreeformTool(declaration)];
+    textEnvelopes.add(declaration.name);
+    return [declaration.name, tool({ description: declaration.description, inputSchema: freeformEnvelope })];
+  }));
+  return { tools, textEnvelopes };
+}
+
 export class AiSdkAdapter implements ModelAdapter {
   constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
     private readonly languageModelFactory?: (input: ModelInput, key: string) => Exclude<LanguageModel, string>,
@@ -82,9 +119,12 @@ export class AiSdkAdapter implements ModelAdapter {
     const options = requestOptions(input.settings.provider, input.settings.model, {
       purpose: "execution", thinking: input.settings.thinking, system, maxOutputTokens: input.maxOutputTokens,
     });
-    return { stream: signal => this.stream(input, messages, options, signal) };
+    const protocol = modelProtocol(input.settings.provider.protocol);
+    const tools = requestTools(input, protocol);
+    return { stream: signal => this.stream(input, messages, tools, options, protocol, signal) };
   }
-  private async *stream(input: ModelInput, messages: ModelMessage[], options: ReturnType<typeof requestOptions>, signal: AbortSignal): AsyncIterable<ModelEvent> {
+  private async *stream(input: ModelInput, messages: ModelMessage[], tools: RequestTools,
+    options: ReturnType<typeof requestOptions>, protocol: ModelProtocol, signal: AbortSignal): AsyncIterable<ModelEvent> {
     const { provider, model } = input.settings;
     const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
@@ -127,10 +167,8 @@ export class AiSdkAdapter implements ModelAdapter {
       return response;
     };
     const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, transport, input);
-    const tools: ToolSet = Object.fromEntries(input.tools.map(t => [t.name, tool({ description: t.description, inputSchema: sdkJsonSchema(t.parameters as Record<string, unknown>) })]));
     signal.throwIfAborted();
     const timing = new RequestTimer();
-    const protocol = modelProtocol(provider.protocol);
     const measured = measureModel(languageModel, protocol, timing);
     let outputStarted = false;
     const classifyFailure = (error: unknown, upstream = false) => providerFailure(error, {
@@ -170,7 +208,7 @@ export class AiSdkAdapter implements ModelAdapter {
       controller.abort();
     }
   }
-  private async *decode(measured: ReturnType<typeof measureModel>, messages: ModelMessage[], tools: ToolSet,
+  private async *decode(measured: ReturnType<typeof measureModel>, messages: ModelMessage[], { tools, textEnvelopes }: RequestTools,
     options: ReturnType<typeof requestOptions>, protocol: ModelProtocol,
     signal: AbortSignal, classifyFailure: (error: unknown, upstream: boolean) => ModelFailure): AsyncIterable<ModelEvent> {
     const result = streamText({ model: measured.model, messages, tools,
@@ -181,7 +219,12 @@ export class AiSdkAdapter implements ModelAdapter {
     });
     // Use the SDK's consuming branch to receive continuously so waiting for caller progress handling does not slow sampling.
     void result.consumeStream();
-    const calls = new Set<string>();
+    const calls = new Map<string, WireInput>();
+    const startCall = (callId: string, name: string, wire: WireInput): ModelEvent => {
+      calls.set(callId, wire);
+      return { type: "part.start", part: { id: `tool:${callId}`, kind: "toolcall", callId, name, inputKind: wire === "structured" ? "structured" : "freeform" } };
+    };
+    const functionInput = (name: string): WireInput => textEnvelopes.has(name) ? "text-envelope" : "structured";
     const decodeRaw = protocol.decoder?.();
     const continuations = new Map<string, Record<string, Json>>();
     const collectContinuation = (id: string, metadata: unknown) => {
@@ -225,20 +268,27 @@ export class AiSdkAdapter implements ModelAdapter {
           continuations.delete(partId);
           break;
         }
-        case "tool-input-start":
+        case "tool-input-start": {
           if (event.providerExecuted) throw new ModelFailure("server_tool", "Provider-executed tools are not supported.");
-          calls.add(event.id);
-          yield { type: "part.start", part: { id: `tool:${event.id}`, kind: "toolcall", callId: event.id, name: event.toolName } }; break;
+          const wire = event.inputEncoding === "text" ? "native-text" : functionInput(event.toolName);
+          yield startCall(event.id, event.toolName, wire);
+          break;
+        }
         case "tool-input-delta":
-          yield { type: "part.delta", partId: `tool:${event.id}`, delta: event.delta }; break;
-        case "tool-call":
+          // The SDK forwards native text deltas unchanged. A JSON envelope is not a public freeform draft.
+          if (calls.get(event.id) !== "text-envelope") yield { type: "part.delta", partId: `tool:${event.id}`, delta: event.delta };
+          break;
+        case "tool-call": {
           if (event.providerExecuted) throw new ModelFailure("invalid_tool_call", "Provider-executed tools are not supported.");
           if (event.invalid) rejectedBySdk.add(event.toolCallId);
-          if (!calls.has(event.toolCallId)) {
-            calls.add(event.toolCallId);
-            yield { type: "part.start", part: { id: `tool:${event.toolCallId}`, kind: "toolcall", callId: event.toolCallId, name: event.toolName } };
-          }
-          yield { type: "part.end", partId: `tool:${event.toolCallId}`, arguments: json(event.input), continuation: protocol.capture(event.providerMetadata) }; break;
+          const wire = calls.get(event.toolCallId) ?? functionInput(event.toolName);
+          if (!calls.has(event.toolCallId)) yield startCall(event.toolCallId, event.toolName, wire);
+          const input = toolCallInput(wire, event.input);
+          const partId = `tool:${event.toolCallId}`;
+          if (wire === "text-envelope" && input.kind === "freeform" && input.text) yield { type: "part.delta", partId, delta: input.text };
+          yield { type: "part.end", partId, input, continuation: protocol.capture(event.providerMetadata) };
+          break;
+        }
         case "error":
           // Server and transport errors retain raw diagnostics separately from the failure summary.
           {

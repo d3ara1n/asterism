@@ -20,6 +20,7 @@ import type { PreparedPluginStorage } from "../plugins/loader.ts";
 import { SessionService } from "./sessions.ts";
 import { FolderStore } from "../session/folders.ts";
 import { SessionError } from "../shared/session-timeline.ts";
+import { initializePluginRecordStorage } from "../storage/record-storage.ts";
 import { collectExpiredSessions, openDatabase } from "./storage.ts";
 import { ContentTransferService } from "./content-transfer.ts";
 import type { ManualSource } from "@asterism-app/sdk/runtime";
@@ -62,6 +63,7 @@ export class ApplicationService {
     } });
     let telemetry: TelemetryService | undefined;
     try {
+      if (options.preparedStorage) initializePluginRecordStorage(this.db, options.preparedStorage);
       this.configuration = new ConfigurationService(root, () => {
         this.sessions?.refreshSleep();
         options.onConfigurationChanged?.();

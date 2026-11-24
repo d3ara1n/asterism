@@ -169,7 +169,8 @@ export function adaptTool(contribution: ToolContribution, sdk: SdkContext, host:
   const { contract } = contribution;
   return {
     reference: reference(contract), resourceKind: contract.resource.kind, tool: contract.tool,
-    effect: contract.effect, targetSchema: contract.targetSchema, resultSchema: contract.schema,
+    effect: contract.effect, resultSchema: contract.schema,
+    ...(contract.targetSchema ? { targetSchema: contract.targetSchema } : {}),
     ...(contribution.capture ? { capture(resource: FoldedObject, caller: ToolCaller) {
       const captured = snapshot(host, resource);
       const bound = contribution.capture!(captured, sdk.reader(captured.ref, undefined, captured), caller);

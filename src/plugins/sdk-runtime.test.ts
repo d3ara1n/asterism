@@ -117,8 +117,8 @@ describe("Host implementation of the workbench SDK", () => {
     const { service, sessionId } = open([c.plugin], () => ({ format: () => "generic", validate() {}, prepare(input) {
       expect(input.tools.map(tool => tool.name)).toEqual(["calculate"]);
       return { async *stream() {
-        yield { type: "part.start", part: { id: "call", kind: "toolcall", callId: "call", name: "calculate" } };
-        yield { type: "part.end", partId: "call", arguments: {} };
+        yield { type: "part.start", part: { id: "call", kind: "toolcall", inputKind: "structured", callId: "call", name: "calculate" } };
+        yield { type: "part.end", partId: "call", input: { kind: "structured", value: {} } };
         yield { type: "finish", reason: "tool-calls", usage: null };
       } };
     } }));
@@ -127,7 +127,7 @@ describe("Host implementation of the workbench SDK", () => {
     const result = await c.context().models.run({ target, system: { blocks: [] }, messages: [], requestParentId: "temporary-position",
       signal: new AbortController().signal, observer: { event(event) { events.push(event); } },
       tools: {
-        declarations: [{ name: "calculate", description: "Calculate a value.", parameters: { type: "object", properties: {} } }],
+        declarations: [{ kind: "structured", name: "calculate", description: "Calculate a value.", parameters: { type: "object", properties: {} } }],
         async execute(calls, _signal, settle) {
           for (const call of calls) settle(call, { kind: "succeeded", data: 42, model: [{ kind: "text", text: "42" }] });
         },
@@ -488,8 +488,8 @@ describe("Host implementation of the workbench SDK", () => {
     const { service, sessionId } = open([c.plugin, plugin], () => ({ format: () => "test/1", validate() {}, prepare(input) {
       requests.push(input);
       return { async *stream() {
-        yield { type: "part.start", part: { id: "q", kind: "toolcall", name: "prompt", callId: "question" } };
-        yield { type: "part.end", partId: "q", arguments: { text: "Hello" } };
+        yield { type: "part.start", part: { id: "q", kind: "toolcall", inputKind: "structured", name: "prompt", callId: "question" } };
+        yield { type: "part.end", partId: "q", input: { kind: "structured", value: { text: "Hello" } } };
         yield { type: "finish", reason: "tool-calls", usage: null };
       } };
     } }));
@@ -503,14 +503,14 @@ describe("Host implementation of the workbench SDK", () => {
       system: { blocks: [] }, messages: [], tools: { allow }, signal: new AbortController().signal, observer: { event() {} },
     });
     const allowed = await run(["prompt"]);
-    expect(requests[0]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "resource_script", "prompt"]);
+    expect(requests[0]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "resource_call_text", "resource_script", "prompt"]);
     expect(allowed.tools[0]).toMatchObject({ kind: "succeeded", implementation: { id: declaration.id }, data: "Answer: Hello",
       model: [{ kind: "text", text: '{"answer":"Answer: Hello"}' }] });
     expect(cached.data).toEqual({ answer: "Answer: Hello" });
     expect(allowed.tools[0]).not.toHaveProperty("resource");
     expect(notices).toMatchObject([{ source: { plugin: ns.id, resource: object }, data: { title: "Counter", kind: "attention" } }]);
     const denied = await run([]);
-    expect(requests[1]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "resource_script"]);
+    expect(requests[1]!.tools.map(tool => tool.name)).toEqual(["resource_list", "resource_inspect", "resource_call", "resource_call_text", "resource_script"]);
     expect(denied.tools[0]?.kind).toBe("rejected");
     expect(notices).toHaveLength(1);
     expect(invoked).toBe(1);
@@ -545,8 +545,8 @@ describe("Host implementation of the workbench SDK", () => {
     const { service, sessionId } = open([c.plugin, plugin], () => ({ format: () => "test/1", validate() {}, prepare() {
       return { async *stream() {
         if (calls++ === 0) {
-          yield { type: "part.start", part: { id: "u", kind: "toolcall", name: "use", callId: "use" } };
-          yield { type: "part.end", partId: "u", arguments: {} };
+          yield { type: "part.start", part: { id: "u", kind: "toolcall", inputKind: "structured", name: "use", callId: "use" } };
+          yield { type: "part.end", partId: "u", input: { kind: "structured", value: {} } };
           yield { type: "finish", reason: "tool-calls", usage: null };
         } else {
           yield { type: "part.start", part: { id: "t", kind: "text" } };
@@ -605,8 +605,8 @@ describe("Host implementation of the workbench SDK", () => {
       format: () => "test/1", validate() {}, prepare(input) {
         requests.push(input);
         return { async *stream() {
-          yield { type: "part.start", part: { id: "q", kind: "toolcall", name: "ask_user", callId: "question" } };
-          yield { type: "part.end", partId: "q", arguments: (state === "loaded" ? { prompt: "Hello" } : { number: 42 }) as Json };
+          yield { type: "part.start", part: { id: "q", kind: "toolcall", inputKind: "structured", name: "ask_user", callId: "question" } };
+          yield { type: "part.end", partId: "q", input: { kind: "structured", value: (state === "loaded" ? { prompt: "Hello" } : { number: 42 }) as Json } };
           yield { type: "finish", reason: "tool-calls", usage: null };
         } };
       },
@@ -1292,8 +1292,8 @@ describe("Host implementation of the workbench SDK", () => {
     const { service, sessionId } = open([plugin], () => ({ validate() {}, format: () => "test-adapter", prepare(input) {
       inputs.push(structuredClone(input));
       return { async *stream() {
-        yield { type: "part.start", part: { id: "c", kind: "toolcall", callId: "c", name: "resource_list" } };
-        yield { type: "part.end", partId: "c", arguments: {} };
+        yield { type: "part.start", part: { id: "c", kind: "toolcall", inputKind: "structured", callId: "c", name: "resource_list" } };
+        yield { type: "part.end", partId: "c", input: { kind: "structured", value: {} } };
         yield { type: "finish", reason: "tool-calls", usage: null };
       } };
     } }));
@@ -1321,7 +1321,7 @@ describe("Host implementation of the workbench SDK", () => {
     const saved = object.session.snapshot();
     expect(saved.position.nodeId).toBe(operationId);
     expect(saved.records.query(ToolOperation, { scope: "timeline" })).toMatchObject([{
-      status: "known", record: { id: operationId, pending: false }, data: { input: { callId: "c", arguments: {} }, output: { kind: "succeeded" } },
+      status: "known", record: { id: operationId, pending: false }, data: { input: { callId: "c", input: { kind: "structured", value: {} } }, output: { kind: "succeeded" } },
     }]);
     const count = service.sessions.tree.nodes(sessionId).map(flat).length;
     await c.context().execution.run({ access: object.ref, interactive: true, requestParentId: object.session.snapshot().position.nodeId,

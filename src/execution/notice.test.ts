@@ -16,7 +16,7 @@ const contract = defineImplementation({
     argsSchema: z.strictObject({}).describe("No arguments."), requiresNotice: true }),
   targetSchema: z.null().describe("The whole item."), effect: "read", execution: "sequential",
 });
-const direct: PendingCall = { callId: "call", name: "resource_call", arguments: { resource_id: resource.id, tool: "prompt", args: {} } };
+const direct: PendingCall = { callId: "call", name: "resource_call", input: { kind: "structured" as const, value: { resource_id: resource.id, tool: "prompt", args: {} } } };
 function setup(options: { requiresNotice?: boolean; topLevel?: boolean; execute?: () => Promise<void> } = {}) {
   const order: string[] = [];
   const tool = { ...contract.tool, requiresNotice: options.requiresNotice ?? true };
@@ -30,7 +30,7 @@ function setup(options: { requiresNotice?: boolean; topLevel?: boolean; execute?
   const tools: BoundTopLevelTool[] = options.topLevel ? [{ tool, available: true,
     resolve: () => ({ effect: "read", execution: "sequential", execute: async (_signal, publish) => execute(data => publish?.(data)) }),
   }] : [];
-  const call = options.topLevel ? { callId: "call", name: tool.name, arguments: {} } : direct;
+  const call = options.topLevel ? { callId: "call", name: tool.name, input: { kind: "structured" as const, value: {} } } : direct;
   const notice = vi.fn(() => { order.push("notice"); });
   const observer: ToolObserver = {
     started: () => { order.push("started"); },
@@ -59,9 +59,9 @@ describe("Tool attention at execution start", () => {
     const f = setup({ topLevel: mode === "invalid-top-level-args", requiresNotice: mode !== "ordinary" });
     const controller = new AbortController();
     if (mode === "cancelled") controller.abort();
-    const call: PendingCall = mode === "invalid-resource-args" ? { ...direct, arguments: { resource_id: resource.id, tool: "prompt", args: { extra: true } } }
-      : mode === "invalid-top-level-args" ? { ...f.call, arguments: { extra: true } }
-        : mode === "unknown-resource" ? { ...direct, arguments: { resource_id: "missing", tool: "prompt", args: {} } } : f.call;
+    const call: PendingCall = mode === "invalid-resource-args" ? { ...direct, input: { kind: "structured" as const, value: { resource_id: resource.id, tool: "prompt", args: { extra: true } } } }
+      : mode === "invalid-top-level-args" ? { ...f.call, input: { kind: "structured" as const, value: { extra: true } } }
+        : mode === "unknown-resource" ? { ...direct, input: { kind: "structured" as const, value: { resource_id: "missing", tool: "prompt", args: {} } } } : f.call;
     const result = (await f.run([call], controller.signal))[0]!;
     expect(result.kind).toBe(mode === "ordinary" ? "succeeded" : mode === "cancelled" ? "cancelled" : "rejected");
     expect(f.notice).not.toHaveBeenCalled();
@@ -85,9 +85,9 @@ describe("Tool attention at execution start", () => {
   // Script children use local progress observers but still share the same host notice sink as direct operations.
   it("notices script child operations without requiring a direct model call", async () => {
     const f = setup();
-    const outcomes = await f.run([{ callId: "script", name: "resource_script", arguments: {
+    const outcomes = await f.run([{ callId: "script", name: "resource_script", input: { kind: "structured" as const, value: {
       code: 'return await resources.get("r").prompt({ args: {} });',
-    } }]);
+    } } }]);
     expect(outcomes[0]?.kind).toBe("succeeded");
     expect(f.notice).toHaveBeenCalledTimes(1);
   });

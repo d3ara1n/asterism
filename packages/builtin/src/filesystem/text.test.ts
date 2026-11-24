@@ -50,7 +50,7 @@ function setup() {
   const capabilities = new AgentCapabilities(modules.resources, modules.tools, [resource], () => true, caller);
   const call = async (tool: string, target: Json, args: Json = {}, cap = capabilities, signal = new AbortController().signal, resourceId = resource.id) => {
     const results: ToolOutcome[] = [];
-    await executeCoreBatch([{ callId: "call", name: "resource_call", arguments: { resource_id: resourceId, tool, target, args } }], cap, signal, (_call, outcome) => results.push(outcome));
+    await executeCoreBatch([{ callId: "call", name: "resource_call", input: { kind: "structured", value: { resource_id: resourceId, tool, target, args } } }], cap, signal, (_call, outcome) => results.push(outcome));
     return results[0];
   };
   return { root, directory, outside, resource, modules, call, caller, consumer };

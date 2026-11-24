@@ -32,7 +32,7 @@ function addItem(item: ModelItem, inputCategory: "user" | "agentMessage" | "even
   for (const part of item.parts) {
     if (part.kind === "text") target.characters.assistant += characters(part.text);
     else if (part.kind === "thinking") target.characters.thinking += characters(part.text || part.summary);
-    else target.characters.toolcall += characters(JSON.stringify(part.arguments));
+    else target.characters.toolcall += characters(part.input.kind === "structured" ? JSON.stringify(part.input.value) : part.input.text);
   }
 }
 
