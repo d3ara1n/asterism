@@ -29,8 +29,8 @@ describe("Per-turn conversation measurements", () => {
       node("r3", "follow2", text("a", "r3", 0, "Next answer", { completion: completion(300, 40, 200, 1000) })),
     ];
     expect(turnMetrics(records(path), "a", false)).toMatchObject([
-      { inputId: "u1", nextInputId: "follow1", incomplete: false, metrics: { count: 2, usage: { input: { value: 300 } } } },
-      { inputId: "follow1", nextInputId: null, incomplete: false, metrics: { count: 1 } },
+      { inputId: "u1", nextInputId: "follow1", outcome: "completed", metrics: { count: 2, usage: { input: { value: 300 } } } },
+      { inputId: "follow1", nextInputId: null, outcome: "completed", metrics: { count: 1 } },
     ]);
     expect(turnMetrics(records(path), "a", true)).toHaveLength(1);
   });
@@ -44,7 +44,7 @@ describe("Per-turn conversation measurements", () => {
     expect(turnMetrics(records(path), "a", true)).toEqual([]);
     expect(turnMetrics(records(path), "a", false)[0]?.metrics.count).toBe(1);
     path.push(node("u2", "r1", message("a", "Next")));
-    expect(turnMetrics(records(path), "a", true)).toMatchObject([{ inputId: "u1", nextInputId: "u2", incomplete: false, metrics: { count: 1 } }]);
+    expect(turnMetrics(records(path), "a", true)).toMatchObject([{ inputId: "u1", nextInputId: "u2", outcome: "completed", metrics: { count: 1 } }]);
     expect(turnMetrics(records(path), "a", false)).toHaveLength(1);
   });
 
@@ -77,7 +77,7 @@ describe("Per-turn conversation measurements", () => {
       node("partial", "u", text("a", "interrupted", 0, "Partial", { complete: false })),
     ];
     const interruptedTurn = turnMetrics(records(path), "a", false)[0]!;
-    expect(interruptedTurn.incomplete).toBe(true);
+    expect(interruptedTurn.outcome).toBe("incomplete");
     expect(interruptedTurn.replyMarkdown).toBeNull();
     expect(interruptedTurn.replyCreatedAt).toBeNull();
     const interrupted = interruptedTurn.metrics;
@@ -87,7 +87,7 @@ describe("Per-turn conversation measurements", () => {
     path.push(node("resumed", "partial", text("a", "resumed", 0, "Done", { completion: completion(100, 20, 50, 2000) })));
     expect(turnMetrics(records(path), "a", true)).toEqual([]);
     const resumedTurn = turnMetrics(records(path), "a", false)[0]!;
-    expect(resumedTurn.incomplete).toBe(false);
+    expect(resumedTurn.outcome).toBe("completed");
     expect(resumedTurn.replyMarkdown).toBe("Done");
     const resumed = resumedTurn.metrics;
     expect(resumed.count).toBe(2);

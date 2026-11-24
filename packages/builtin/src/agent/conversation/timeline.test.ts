@@ -21,7 +21,7 @@ describe("Agent typed record views", () => {
     ];
     const snapshot = sessionSnapshot(nodeView("s", "", path, "thinking"));
     const items = savedTimeline(snapshot.records.all({ scope: "timeline" }), "a", false, [{
-      id: "live-error", afterNodeId: "thinking", responseId: "r", origin, level: "error", code: "provider_error", message: "Disconnected",
+      id: "live-error", afterNodeId: "thinking", form: "incident", responseId: "r", origin, code: "provider_error", message: "Disconnected",
     }]).items;
     expect(items.find(item => item.kind === "text")).not.toHaveProperty("partialContext");
     expect(items.find(item => item.kind === "text")).not.toHaveProperty("failed");
@@ -80,9 +80,9 @@ describe("Agent typed record views", () => {
     const retried = node("retried", block.id, text("a", "next-response", 0, "Retried", { requestParentId: block.id }));
     const nodes = [message, block, retried];
     const feedback: InlineFeedback[] = [
-      { id: "early", afterNodeId: message.id, origin: "model", code: "provider_error", level: "error", message: "HTTP 429" },
-      { id: "interrupted", afterNodeId: block.id, origin: "model", code: "interrupted", level: "error", message: "Interrupted" },
-      { id: "other", afterNodeId: "other-branch", origin: "model", code: "provider_error", level: "error", message: "Other branch" },
+      { id: "early", afterNodeId: message.id, form: "incident", origin: "model", code: "provider_error", message: "HTTP 429" },
+      { id: "interrupted", afterNodeId: block.id, form: "incident", origin: "model", code: "interrupted", message: "Interrupted" },
+      { id: "other", afterNodeId: "other-branch", form: "incident", origin: "model", code: "provider_error", message: "Other branch" },
     ];
     const snapshot = sessionSnapshot(nodeView("s", "", nodes, retried.id));
     const items = savedTimeline(snapshot.records.all({ scope: "timeline" }), "a", false, feedback).items;

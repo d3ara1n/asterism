@@ -1,17 +1,28 @@
 import { z } from "zod";
 import { errorDetailsSchema } from "@asterism-app/sdk/contracts";
 
-/** message is the producer's summary; details preserve raw diagnostics without being copied into message. */
-export const agentFeedbackSchema = z.strictObject({
+/**
+ * Feedback inside a turn has two forms. An incident is a failure: the request or the software around it went wrong and the
+ * diagnostics stay reachable. An occurrence happened without failing: content was left out, or background work ran and
+ * stopped. Neither describes how the turn itself ended; that is the turn outcome.
+ */
+export const incidentSchema = z.strictObject({
+  form: z.literal("incident"),
   origin: z.enum(["model", "software"]), code: z.string(), message: z.string(),
-  level: z.enum(["warning", "error"]), details: errorDetailsSchema.optional(),
+  details: errorDetailsSchema.optional(),
   responseId: z.string().optional(),
+});
+export const occurrenceSchema = z.strictObject({
+  form: z.literal("occurrence"),
+  code: z.string(), message: z.string(),
   omittedFiles: z.array(z.string()).optional(),
 });
+export const agentFeedbackSchema = z.discriminatedUnion("form", [incidentSchema, occurrenceSchema]);
 export type AgentFeedback = z.infer<typeof agentFeedbackSchema>;
-export const inlineFeedbackSchema = agentFeedbackSchema.extend({
-  id: z.string(), afterNodeId: z.string().nullable(),
-});
+export const inlineFeedbackSchema = z.discriminatedUnion("form", [
+  incidentSchema.extend({ id: z.string(), afterNodeId: z.string().nullable() }),
+  occurrenceSchema.extend({ id: z.string(), afterNodeId: z.string().nullable() }),
+]);
 export type InlineFeedback = z.infer<typeof inlineFeedbackSchema>;
 
 /** Compression activity is runtime feedback; a persistent summary record takes over on success, and a failure carries its error details. */
@@ -28,6 +39,6 @@ export const agentActivitySchema = z.strictObject({
 export type AgentActivity = z.infer<typeof agentActivitySchema>;
 
 /** Model adapters explicitly mark the source; other local exceptions are software processing failures. */
-export function feedbackOrigin(error: unknown): AgentFeedback["origin"] {
+export function feedbackOrigin(error: unknown): z.infer<typeof incidentSchema>["origin"] {
   return error && typeof error === "object" && "origin" in error && error.origin === "model" ? "model" : "software";
 }

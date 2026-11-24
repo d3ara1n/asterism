@@ -60,7 +60,7 @@ describe("Conversation process folding by input groups", () => {
       node("reply", "tool", text("a", "final", 0, "Done", { completion })),
     ];
     const feedback: InlineFeedback[] = [
-      { id: "error", afterNodeId: "progress", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
+      { id: "error", afterNodeId: "progress", form: "incident", origin: "model", code: "provider_error", message: "HTTP 429" },
     ];
     const grouped = project(path, false, [], feedback);
     expect(ids(grouped)).toEqual(["u", "conversation-process:work", "error", "steer", "conversation-process:final", "reply", "turn-metrics:u"]);
@@ -169,12 +169,14 @@ describe("Conversation process folding by input groups", () => {
       } })),
     ];
     const feedback: InlineFeedback[] = [
-      { id: "earlier-error", afterNodeId: "progress", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
+      { id: "earlier-error", afterNodeId: "progress", form: "incident", origin: "model", code: "provider_error", message: "HTTP 429" },
     ];
     const grouped = project(path, false, [], feedback);
-    expect(ids(grouped)).toEqual(["u", "reply1", "steer", "conversation-process:failed", "response-error:failed", "turn-metrics:u"]);
+    expect(ids(grouped)).toEqual(["u", "reply1", "steer", "conversation-process:failed", "response-error:failed",
+      "turn-outcome:u", "turn-metrics:u"]);
     expect(ids(grouped, ["conversation-process:failed"]))
-      .toEqual(["u", "reply1", "steer", "progress", "earlier-error", "partial", "conversation-process:failed", "response-error:failed", "turn-metrics:u"]);
+      .toEqual(["u", "reply1", "steer", "progress", "earlier-error", "partial", "conversation-process:failed", "response-error:failed",
+        "turn-outcome:u", "turn-metrics:u"]);
     expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ incomplete: true });
   });
 
@@ -211,7 +213,7 @@ describe("Conversation process folding by input groups", () => {
       node("partial", "u", text("a", "cut", 0, "Partial", { complete: false })),
     ];
     const feedback: InlineFeedback[] = [
-      { id: "stopped", afterNodeId: "partial", origin: "model", level: "error", code: "interrupted", message: "Stopped" },
+      { id: "stopped", afterNodeId: "partial", form: "incident", origin: "model", code: "interrupted", message: "Stopped" },
     ];
     const stopped = project(path, false, [], feedback);
     expect(ids(stopped)).toEqual(["u", "conversation-process:cut", "stopped", "turn-metrics:u"]);
@@ -229,7 +231,7 @@ describe("Conversation process folding by input groups", () => {
         tokensBefore: 1000, completion }, { source: agentSource("a") })),
     ];
     const feedback: InlineFeedback[] = [
-      { id: "error", afterNodeId: "summary", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
+      { id: "error", afterNodeId: "summary", form: "incident", origin: "model", code: "provider_error", message: "HTTP 429" },
     ];
     expect(ids(project(path, true, [], feedback))).toEqual(["u", "summary", "error"]);
     expect(ids(project(path, false, [], feedback))).toEqual(["u", "summary", "error"]);
@@ -248,7 +250,7 @@ describe("Conversation process folding by input groups", () => {
       node("reply", "tool", text("a", "final", 0, "Done", { completion })),
     ];
     const feedback: InlineFeedback[] = [
-      { id: "error", afterNodeId: "u", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
+      { id: "error", afterNodeId: "u", form: "incident", origin: "model", code: "provider_error", message: "HTTP 429" },
     ];
     expect(ids(project(path, false, [], feedback))).toEqual(["u", "error", "next", "conversation-process:final", "reply", "turn-metrics:next"]);
   });
@@ -262,8 +264,8 @@ describe("Conversation process folding by input groups", () => {
       node("reply", "before", text("a", "final", 0, "Done", { completion })),
     ];
     const feedback: InlineFeedback[] = [
-      { id: "retry", afterNodeId: "tool", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
-      { id: "error", afterNodeId: "reply", origin: "software", level: "error", code: "execution_failed", message: "Could not save the summary" },
+      { id: "retry", afterNodeId: "tool", form: "incident", origin: "model", code: "provider_error", message: "HTTP 429" },
+      { id: "error", afterNodeId: "reply", form: "incident", origin: "model", code: "execution_failed", message: "Could not save the summary" },
     ];
     const grouped = project(path, false, [], feedback, [{ id: "failed", afterNodeId: "reply", status: "failed" }]);
     expect(ids(grouped)).toEqual(["u", "conversation-process:final", "reply", "failed", "error", "turn-metrics:u"]);

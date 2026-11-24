@@ -480,6 +480,8 @@
   "turnMetrics.cacheBasis": "{read} 缓存 / {input} 输入 toks",
   "turnMetrics.tps": "{value} t/s",
   "conversation.output.incomplete": "未完成",
+  "conversation.turn.cancelled": "已停止",
+  "conversation.turn.failed": "本轮失败",
   "conversation.participant.you": "你",
   "conversation.creation.chooseAgent": "选择助手角色",
   "filesystem.creation.browse": "浏览…",

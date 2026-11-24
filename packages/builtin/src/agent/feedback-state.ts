@@ -2,6 +2,7 @@ import type { ErrorDetails } from "@asterism-app/sdk/contracts";
 import type { ObjectExecutor, ObjectReader } from "@asterism-app/sdk/runtime";
 import type { AgentFeedback, InlineFeedback, CompressionActivity, AgentActivity } from "./feedback.ts";
 
+/** interruptions are the nodes this runtime saw a task stop after; they carry no inline feedback of their own. */
 type FeedbackState = { inline: readonly InlineFeedback[]; interruptions: readonly (string | null)[]; compressions: readonly CompressionActivity[]; activity: AgentActivity | null };
 const empty: FeedbackState = { inline: [], interruptions: [], compressions: [], activity: null };
 
@@ -27,6 +28,13 @@ export function createAgentFeedback() {
         inline: [...previous.inline, { ...value, id: `feedback:${++nextId}`, afterNodeId }],
         interruptions: interrupted ? [...previous.interruptions, afterNodeId] : previous.interruptions,
       });
+      object.invalidate();
+    },
+    /** A stop produces no inline feedback; it ends the turn, and the turn boundary carries the reason. */
+    interrupt(object: ObjectExecutor): void {
+      const afterNodeId = object.session.snapshot().position.nodeId;
+      const previous = states.get(object.ref.id) ?? empty;
+      states.set(object.ref.id, { ...previous, interruptions: [...previous.interruptions, afterNodeId] });
       object.invalidate();
     },
     beginCompression(object: ObjectExecutor) {

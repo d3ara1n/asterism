@@ -59,12 +59,13 @@ export function createAgentController(deps: AgentControllerDependencies) {
     });
   };
   const report = (object: ObjectExecutor, error: unknown, signal: AbortSignal, interrupted: boolean) => {
+    // A stop is not an incident: it ends the turn, and the turn boundary states it.
     if (signal.aborted) {
-      if (interrupted) deps.feedback.report(object, { origin: "model", level: "warning", code: "cancelled", message: "Execution was cancelled." }, true);
+      if (interrupted) deps.feedback.interrupt(object);
       return;
     }
     const details = describeError(error);
-    deps.feedback.report(object, { origin: feedbackOrigin(error), level: "error",
+    deps.feedback.report(object, { form: "incident", origin: feedbackOrigin(error),
       code: error instanceof PluginApiError ? error.code : "execution_failed",
       message: errorMessage(error, "Agent execution failed."), details }, interrupted);
   };
@@ -191,10 +192,13 @@ export function createAgentController(deps: AgentControllerDependencies) {
               event(event) {
                 if (event.type === "progress") return;
                 if (event.type === "diagnostic") {
-                  deps.feedback.report(object, { origin: event.origin, code: event.code, message: event.message, level: event.level,
-                    ...(event.details ? { details: event.details } : {}),
-                    ...(event.responseId ? { responseId: event.responseId } : {}),
-                    ...(event.omittedFiles ? { omittedFiles: [...event.omittedFiles] } : {}) }, event.level === "error" || event.code === "cancelled");
+                  // A recorded level picks the form: a failure stays an incident, anything else merely happened.
+                  deps.feedback.report(object, event.level === "error"
+                    ? { form: "incident", origin: event.origin, code: event.code, message: event.message,
+                        ...(event.details ? { details: event.details } : {}),
+                        ...(event.responseId ? { responseId: event.responseId } : {}) }
+                    : { form: "occurrence", code: event.code, message: event.message,
+                        ...(event.omittedFiles ? { omittedFiles: [...event.omittedFiles] } : {}) });
                   return;
                 }
                 object.commit(writer => {
@@ -231,7 +235,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
             } finally { run.request = null; }
             if (result.response) deps.usage?.consume(result.response);
             if (result.reason === "failed" && result.code === "event_delivery") {
-              deps.feedback.report(object, { origin: "software", level: "error", code: "event_delivery",
+              deps.feedback.report(object, { form: "incident", origin: "software", code: "event_delivery",
                 message: "The model response could not be saved to the timeline. Execution stopped.",
                 ...(result.details ? { details: result.details } : {}) }, true);
               return { reason: "failed", hasTools: false, halt: true };
@@ -242,7 +246,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
         }, signal);
       }, (reason, entered) => {
         if (!entered && reason === "cancelled")
-          deps.feedback.report(object, { origin: "model", level: "warning", code: "cancelled", message: "Execution was cancelled." }, true);
+          deps.feedback.interrupt(object);
         deps.feedback.activity(object, null);
         const ended = boundary();
         return () => {

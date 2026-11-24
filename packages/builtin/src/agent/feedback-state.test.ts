@@ -11,7 +11,7 @@ it("Keeps model and software feedback at their occurrence positions and releases
     invalidate: vi.fn(), events: { publish }, commit,
   } as unknown as ObjectExecutor;
   const state = createAgentFeedback();
-  const model = { origin: "model" as const, code: "provider_error", level: "error" as const, message: "HTTP 429" };
+  const model = { form: "incident" as const, origin: "model" as const, code: "provider_error", message: "HTTP 429" };
   state.report(object, { ...model, origin: "software", code: "execution_failed", message: "fetch failed" }, true);
   state.report(object, model, true);
   state.report(object, { ...model, message: "HTTP 500" }, true);
@@ -38,7 +38,7 @@ it("Hands off compression activity according to outcome; successful retries do n
   const state = createAgentFeedback();
   const fail = state.beginCompression(object);
   expect(state.get(object).compressions.map(value => [value.afterNodeId, value.status])).toEqual([["input", "running"]]);
-  state.report(object, { origin: "software", code: "context_compression_failed", level: "warning", message: "Failed" });
+  state.report(object, { form: "occurrence", code: "context_compression_failed", message: "Failed" });
   fail("failed");
   nodeId = "next";
   state.beginCompression(object)("completed");

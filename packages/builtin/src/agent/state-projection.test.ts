@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ModelCompletion } from "@asterism-app/sdk/contracts";
-import { projectAgentTurnState } from "./state-projection.ts";
+import { projectAgentTurnOutcome } from "./state-projection.ts";
 import { agentExecutionState } from "./state.ts";
 import { sessionView } from "../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../src/session/view.ts";
@@ -13,7 +13,7 @@ const completion = (finishReason = "stop"): ModelCompletion => ({
 const answer = (responseId = "r1") => text("a", responseId, 0, "Done", { completion: completion() });
 function project(values: NewNode[], running = false, interruptions: readonly (string | null)[] = []) {
   const path = values.map((value, index) => node(String(index), index ? String(index - 1) : null, value));
-  return agentExecutionState(projectAgentTurnState(sessionView(nodeView("s", "", path, path.at(-1)?.id ?? null)), "a", interruptions), running);
+  return agentExecutionState(projectAgentTurnOutcome(sessionView(nodeView("s", "", path, path.at(-1)?.id ?? null)), "a", interruptions), running);
 }
 
 // Execution-state projection; verifies domain decisions only, without simulating components or a transient state bus.

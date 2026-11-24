@@ -17,5 +17,7 @@ export const AgentView = builtin.data("agent.card", z.strictObject({
   drafts: z.array(agentDraftSchema),
   feedback: z.array(inlineFeedbackSchema),
   compressions: z.array(compressionActivitySchema),
+  /** Nodes this runtime saw a task stop after; a stop between requests has no record of its own. */
+  interruptions: z.array(z.string().nullable()).default([]),
   activity: agentActivitySchema.nullable().default(null),
 }));

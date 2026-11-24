@@ -1,6 +1,6 @@
 import { implementTool, type ObjectReader } from "@asterism-app/sdk/runtime";
 import { AgentWait, type AgentWaitResult } from "./contract.ts";
-import { projectAgentTurnState } from "../state-projection.ts";
+import { projectAgentTurnOutcome } from "../state-projection.ts";
 import { agentExecutionState } from "../state.ts";
 
 interface AgentSettling {
@@ -15,7 +15,7 @@ export function createWaitTool(loop: AgentSettling) {
       const started = performance.now();
       const result = (): AgentWaitResult => ({
         name: object.snapshot()?.title ?? "Agent",
-        executionState: agentExecutionState(projectAgentTurnState(object.session.snapshot(), object.ref.id), loop.running(object)),
+        executionState: agentExecutionState(projectAgentTurnOutcome(object.session.snapshot(), object.ref.id), loop.running(object)),
         elapsedMs: Math.round(performance.now() - started),
       });
       if (caller.ref.id === object.ref.id)

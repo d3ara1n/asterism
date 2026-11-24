@@ -67,7 +67,7 @@ describe("Conversation display reads", () => {
     const result = await readConversation(remote, new ConversationHistoryWindow("a"));
     expect(new Set(reads)).toEqual(new Set(["input", "operation", "reply"]));
     const timeline = withLive(conversationTimeline(result.projection, false, [
-      { id: "notice", afterNodeId: "unrelated", origin: "software", code: "info", level: "warning", message: "At this position" },
+      { id: "notice", afterNodeId: "unrelated", form: "occurrence", code: "info", message: "At this position" },
     ], [{ id: "compression-failed", afterNodeId: "other", status: "failed" }]), []);
     expect(timeline.map(item => item.id)).toEqual(["input", "operation", "notice", "compression-failed", "reply", "turn-metrics:input"]);
     expect(timeline.at(-1)).toMatchObject({ incomplete: false, replyMarkdown: "Done", metrics: { count: 2, usage: { input: { value: 100 } } } });
@@ -130,7 +130,7 @@ describe("Conversation display reads", () => {
     const running = withLive(conversationTimeline(result.projection, true), []);
     expect(running.map(item => item.id)).toEqual(["input", "reply"]);
     const settled = withLive(conversationTimeline(result.projection, false, [
-      { id: "late", afterNodeId: "reply", origin: "software", code: "info", level: "warning", message: "New feedback" },
+      { id: "late", afterNodeId: "reply", form: "occurrence", code: "info", message: "New feedback" },
     ]), []);
     expect(settled.map(item => item.id)).toEqual(["input", "reply", "late", "turn-metrics:input"]);
     expect(settled.at(-1)).toMatchObject({ replyMarkdown: "Answer", metrics: { count: 1, usage: { input: { value: 100 } } } });

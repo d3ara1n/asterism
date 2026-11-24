@@ -3,7 +3,8 @@ import { AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { diagnosticRecords, type DiagnosticRequest } from "../diagnostics/history";
 import { performanceOverview } from "../diagnostics/performance";
 import { cacheUsage } from "../diagnostics/usage";
-import { projectTurnState } from "../state-projection";
+import { projectTurnOutcome } from "../state-projection";
+import type { TurnOutcome } from "../state";
 
 export const usageFields = ["input", "output", "cacheRead", "cacheWrite", "reasoning"] as const satisfies readonly (keyof Usage)[];
 
@@ -22,14 +23,15 @@ export type TurnMetricsData = ReturnType<typeof summarizeRequests>;
 export interface TurnMeasurement {
   inputId: string;
   nextInputId: string | null;
-  incomplete: boolean;
+  outcome: TurnOutcome;
   metrics: TurnMetricsData;
   replyMarkdown: string | null;
   replyCreatedAt: string | null;
 }
 
 /** Preserves historical turns; consecutive input in a batch and steer messages belong to the same turn, and only the currently running turn is hidden. */
-export function turnMetrics(path: readonly SessionRecord[], agentId: string, running: boolean): TurnMeasurement[] {
+export function turnMetrics(path: readonly SessionRecord[], agentId: string, running: boolean,
+  interruptions: readonly (string | null)[] = []): TurnMeasurement[] {
   const starts = path.flatMap((record, index) => {
     if (record.source?.resource?.id !== agentId) return [];
     const message = AgentInputMessage.decode(record);
@@ -41,14 +43,14 @@ export function turnMetrics(path: readonly SessionRecord[], agentId: string, run
     if (!next && running) return [];
     const current = requests.filter(request => request.sequence > start.record.sequence && (!next || request.sequence < next.record.sequence));
     if (!current.length) return [];
-    const incomplete = projectTurnState(path.slice(start.index, next?.index), agentId) !== "completed";
-    // Requests are ordered newest first and blocks by ordinal; take only the final response, without falling back to intermediate body text before tool execution.
+    const outcome = projectTurnOutcome(path.slice(start.index, next?.index), agentId, interruptions);
+    // Only a completed turn reproduced its reply; a stopped or failed one keeps the partial output in the body.
     const final = current[0]!;
-    const reply = incomplete ? "" : final.blocks.flatMap(({ block }) =>
-      block.kind === "text" ? [block.text] : []).join("\n\n");
+    const reply = outcome === "completed" ? final.blocks.flatMap(({ block }) =>
+      block.kind === "text" ? [block.text] : []).join("\n\n") : "";
     return [{
       inputId: start.record.id, nextInputId: next?.record.id ?? null,
-      incomplete,
+      outcome,
       metrics: summarizeRequests(current),
       replyMarkdown: reply.trim() ? reply : null,
       // Blocks are ordered by ordinal; the terminal record timestamps the final response, not an intermediate request or later input.

@@ -12,7 +12,7 @@ import { AgentDrafts, AgentSelection } from "./data.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
 import { projectForAgent } from "./projection.ts";
 import { createSelection } from "./selection.ts";
-import { projectAgentTurnState } from "./state-projection.ts";
+import { projectAgentTurnOutcome } from "./state-projection.ts";
 
 function deferred() {
   let resolve!: () => void;
@@ -123,7 +123,7 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
     prepareRequest: { estimate: prepare, forRequest: async () => prepare },
   });
   return { activities: () => activities, controller, object, path, snapshot, driver, feedback, stream, execution, publish,
-    turn: () => projectAgentTurnState(snapshot(), "a", feedback.get(object).interruptions),
+    turn: () => projectAgentTurnOutcome(snapshot(), "a", feedback.get(object).interruptions),
     notices: () => publish.mock.calls.filter(([contract]) => contract === ResourceNoticeRaised).map(([, value]) => value.kind),
     turnEnds: () => publish.mock.calls.filter(([contract]) => contract === AgentTurnEnded),
   };

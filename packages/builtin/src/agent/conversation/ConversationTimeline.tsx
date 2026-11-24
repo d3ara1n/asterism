@@ -4,7 +4,8 @@ import { memo, useLayoutEffect, useMemo, useState, type ReactNode, type Ref, typ
 import { AnimatePresence, motion } from "motion/react";
 import { Virtualizer, type VirtualizerHandle } from "virtua";
 
-import { ExecutionNotice } from "./Notice";
+import { FeedbackNotice } from "./Notice";
+import { TurnOutcomeMarker } from "./TurnOutcomeMarker";
 import { cn } from "@asterism-app/ui/utils";
 import { conversationMessages } from "../../messages/conversation";
 import { Markdown } from "@asterism-app/ui/markdown";
@@ -111,7 +112,8 @@ function NodeContent({ node }: { node: TimelineItem }) {
     case "compression-summary": return <CompressionSummary text={node.text} />;
     case "compression": return <CompressionMarker node={node} />;
     case "turn-metrics": return <TurnFooter inputId={node.inputId} metrics={node.metrics} incomplete={node.incomplete} replyMarkdown={node.replyMarkdown} replyCreatedAt={node.replyCreatedAt} />;
-    case "notice": return <ExecutionNotice node={node} />;
+    case "notice": return <FeedbackNotice node={node} />;
+    case "turn-outcome": return <TurnOutcomeMarker node={node} />;
     default: return null;
   }
 }

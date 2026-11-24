@@ -44,7 +44,8 @@ function MarkerIcon({ className, ...props }: React.ComponentProps<"span">) {
       data-slot="marker-icon"
       aria-hidden="true"
       className={cn(
-        "size-4 shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        // A smaller icon keeps its place: the box centers it instead of leaving it on the text baseline.
+        "inline-flex size-4 shrink-0 items-center justify-center [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}

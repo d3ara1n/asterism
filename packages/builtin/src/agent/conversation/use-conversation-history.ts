@@ -8,9 +8,10 @@ import { displayedTimeline, liveTimeline, conversationTimeline, withLive } from 
 
 /** Owns the reading window and the handoff from live output to saved records. */
 export function useConversationHistory(snapshot: RendererSessionSnapshot | null, window: ConversationHistoryWindow,
-  blocks: readonly ModelLiveBlock[], running: boolean, feedback: readonly InlineFeedback[], compressions: readonly CompressionActivity[]) {
+  blocks: readonly ModelLiveBlock[], running: boolean, feedback: readonly InlineFeedback[],
+  compressions: readonly CompressionActivity[], interruptions: readonly (string | null)[]) {
   const read = useSessionRead(snapshot,
-    useCallback((snapshot, signal) => readConversation(snapshot, window, signal), [window]),
+    useCallback((snapshot, signal) => readConversation(snapshot, window, signal, interruptions), [window, interruptions]),
     { keepPrevious: true });
   const saved = useMemo(() => read.data ? conversationTimeline(read.data.projection, running, feedback, compressions) : null,
   [read.data, running, feedback, compressions]);
