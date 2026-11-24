@@ -38,7 +38,8 @@ describe("models.dev parameter lookup", () => {
 
   it("imports native media independently of the mandatory text modality", () => {
     const result = modelParameters(catalog({ ...entry, modalities: { input: ["text", "image", "pdf", "video"], output: ["audio"] } }), "test-model");
-    expect(result.parameters.capabilities.inputModalities).toEqual(["image", "pdf", "video"]);
+    // The catalog names a file format; the modality it belongs to is the document class.
+    expect(result.parameters.capabilities.inputModalities).toEqual(["image", "document", "video"]);
   });
 
   // Reference parameters for a model ID do not vary by connection; relay records are excluded and ambiguous IDs do not arbitrarily select the first match.

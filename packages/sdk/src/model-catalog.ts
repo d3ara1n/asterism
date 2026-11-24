@@ -3,7 +3,7 @@ import { defineData } from "./presentation.ts";
 import { modelCostSchema } from "./model-cost.ts";
 import { thinkingSchema } from "./model-selection.ts";
 
-export const modelMediaModalities = ["image", "audio", "video", "pdf"] as const;
+export const modelMediaModalities = ["image", "audio", "video", "document"] as const;
 export const modelMediaModalitySchema = z.enum(modelMediaModalities);
 export type ModelMediaModality = z.infer<typeof modelMediaModalitySchema>;
 export const modelInputModalitiesSchema = z.array(modelMediaModalitySchema);

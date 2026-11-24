@@ -28,7 +28,7 @@ it("streams unsupported and oversized uploads to stable local paths while keepin
     for (let remaining = size(ref); remaining > 0; remaining -= 64 * 1024) yield Buffer.alloc(Math.min(remaining, 64 * 1024), 42);
   });
   const original: ModelItem[] = [{ kind: "input", parts: [pdf, xlsx, large] }];
-  const [item] = await project(original, "s1", { read, size, open }, ["pdf"], signal);
+  const [item] = await project(original, "s1", { read, size, open }, ["document"], signal);
   expect(item?.kind).toBe("input");
   if (item?.kind !== "input") throw new Error("Expected input");
   expect(item.parts[0]).toEqual(pdf);
@@ -38,7 +38,7 @@ it("streams unsupported and oversized uploads to stable local paths while keepin
     const bytes = await readFile(envelope.path);
     expect({ filename: envelope.filename, size: bytes.length, firstByte: bytes[0] }).toEqual({ filename: ["sheet.xlsx", "large.pdf"][index], size: sizes[index + 1], firstByte: 42 });
   }
-  expect(await project(original, "s1", { read, size, open }, ["pdf"], signal)).toEqual([item]);
+  expect(await project(original, "s1", { read, size, open }, ["document"], signal)).toEqual([item]);
   expect(open).toHaveBeenCalledTimes(2);
   expect(read).not.toHaveBeenCalled();
   expect(original[0]).toEqual({ kind: "input", parts: [pdf, xlsx, large] });

@@ -11,7 +11,6 @@ export const modelCatalogMessages = pluginNamespace("asterism.host").messages("e
   output: { id: "modelCatalog.output", defaultMessage: "{count} output" },
   openWeights: { id: "modelCatalog.openWeights", defaultMessage: "Open weights" },
   released: { id: "modelCatalog.released", defaultMessage: "Released {date}" },
-  pdf: { id: "modelCatalog.pdf", defaultMessage: "PDF" },
   failed: { id: "modelCatalog.failed", defaultMessage: "Could not reach models.dev. Try again." },
   timeout: { id: "modelCatalog.timeout", defaultMessage: "models.dev timed out. Try again." },
   invalid: { id: "modelCatalog.invalid", defaultMessage: "models.dev returned invalid data for this model." },

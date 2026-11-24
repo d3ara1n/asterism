@@ -95,8 +95,12 @@ function modelCost(raw: unknown): ModelCost | null {
   return result.success ? result.data : null;
 }
 
-const isInputModality = (value: string): value is CatalogModelInfo["inputModalities"][number] =>
-  (catalogInputModalities as readonly string[]).includes(value);
+/** The catalog names input kinds, including file formats such as PDF; Asterism declares the modality, which covers the whole class of documents. */
+const catalogModalities: Readonly<Record<string, CatalogModelInfo["inputModalities"][number]>> = {
+  text: "text", image: "image", audio: "audio", video: "video", pdf: "document",
+};
+const modalityOf = (value: string) => Object.hasOwn(catalogModalities, value) ? catalogModalities[value] : undefined;
+const inputModalities = (entry: Entry) => [...new Set((entry.modalities?.input ?? []).flatMap(value => modalityOf(value) ?? []))];
 
 /** Map effort options to Asterism levels; toggles, budgets, and `default` cannot determine a fixed level list. */
 function thinkingLevels(entry: Entry): ModelParameters["capabilities"]["thinkingLevels"] {
@@ -114,7 +118,7 @@ const present = <T extends object>(value: T) =>
 function modelInfo(id: string, entry: Entry): CatalogModelInfo {
   return {
     id, name: entry.name, ...present({ releaseDate: entry.release_date, openWeights: entry.open_weights }),
-    inputModalities: entry.modalities?.input.filter(isInputModality) ?? [],
+    inputModalities: inputModalities(entry),
   };
 }
 
@@ -127,8 +131,8 @@ export function modelParameters(catalog: Catalog, modelId: string): ModelParamet
   const fields = {
     contextWindow: entry.limit?.context || undefined, maxOutputTokens: entry.limit?.output || undefined,
     reasoning: entry.reasoning, tools: entry.tool_call, thinkingLevels: thinkingLevels(entry),
-    inputModalities: entry.modalities?.input.some(isInputModality)
-      ? [...new Set(entry.modalities.input.filter(isInputModality).filter(modality => modality !== "text"))] : undefined,
+    inputModalities: entry.modalities?.input.some(value => modalityOf(value) !== undefined)
+      ? inputModalities(entry).filter(modality => modality !== "text") : undefined,
     cost: modelCost(entry.cost) ?? undefined,
   } satisfies Record<ModelParameterField, unknown>;
   const unfilled = modelParameterFields.filter(field => fields[field] === undefined);

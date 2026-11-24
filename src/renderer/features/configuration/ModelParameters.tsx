@@ -22,7 +22,7 @@ const fieldLabels: Record<ModelParameterField, UiMessage> = {
 };
 const modalityLabels = {
   text: modelCostMessages.text, image: modelCostMessages.image, audio: modelCostMessages.audio,
-  video: modelCostMessages.video, pdf: messages.pdf,
+  video: modelCostMessages.video, document: providersMessages.documentInput,
 };
 
 /** The applied catalog model: identity, notable facts, and fields left unchanged because the catalog lacks them. */
