@@ -122,7 +122,7 @@ export class ContentStore {
     // Crashes can occur between sealing and indexing; clean up only files owned by this module.
     const known = new Set((db.prepare("SELECT id FROM contents").all() as { id: string }[]).map(row => row.id));
     const sealed = join(root, applicationStorage.sealedContentDirectory);
-    for (const name of readdirSync(sealed)) if (!known.has(name)) rmSync(join(sealed, name), { force: true });
+    for (const name of readdirSync(sealed)) if (!known.has(name)) this.candidates.add(name);
     for (const { id } of db.prepare(`SELECT id FROM contents
       WHERE NOT EXISTS (SELECT 1 FROM content_roots r WHERE r.content_id = contents.id)
       AND NOT EXISTS (SELECT 1 FROM template_content_roots r WHERE r.content_id = contents.id)`).all() as { id: string }[])
@@ -159,10 +159,14 @@ export class ContentStore {
     if (this.db.isTransaction) return;
     for (const id of [...this.candidates]) {
       if (this.pins.has(id)) continue;
-      if (this.db.prepare("SELECT 1 FROM content_roots WHERE content_id = ? UNION ALL SELECT 1 FROM template_content_roots WHERE content_id = ? LIMIT 1").get(id, id)) { this.candidates.delete(id); continue; }
-      try { rmSync(this.path(id), { force: true }); this.db.prepare("DELETE FROM contents WHERE id = ?").run(id); }
-      catch { console.error("Unreferenced content could not be removed."); }
-      this.candidates.delete(id);
+      try {
+        if (!this.db.prepare("SELECT 1 FROM content_roots WHERE content_id = ? UNION ALL SELECT 1 FROM template_content_roots WHERE content_id = ? LIMIT 1").get(id, id)) {
+          // Remove the digest lookup first: a failed unlink leaves an orphan, not a broken deduplication hit.
+          this.db.prepare("DELETE FROM contents WHERE id = ?").run(id);
+          rmSync(this.path(id), { force: true });
+        }
+        this.candidates.delete(id);
+      } catch (error) { console.error("Unreferenced content could not be removed.", error); }
     }
   }
   private stored(ref: ContentRef): Stored {
@@ -290,13 +294,17 @@ export class ContentStore {
       await upload.file.sync(); await upload.file.close(); scope.check();
       const digest = upload.hash.digest("hex");
       const existing = this.db.prepare("SELECT id, size FROM contents WHERE digest = ?").get(digest) as Stored | undefined;
-      let contentId = existing?.id ?? randomUUID();
+      const contentId = existing?.id ?? randomUUID();
       if (existing) {
         if (existing.size !== upload.size) throw new Error("Content digest collision.");
         rmSync(upload.path, { force: true });
       } else {
         renameSync(upload.path, this.path(contentId));
-        this.db.prepare("INSERT INTO contents VALUES (?, ?, ?)").run(contentId, digest, upload.size);
+        try { this.db.prepare("INSERT INTO contents VALUES (?, ?, ?)").run(contentId, digest, upload.size); }
+        catch (error) {
+          this.candidates.add(contentId); this.scheduleCollection();
+          throw error;
+        }
       }
       scope.add(contentId); this.uploads.delete(id);
       return { "$asterism.content": contentId };
@@ -308,9 +316,13 @@ export class ContentStore {
     if (!upload || upload.scope !== scope) return;
     await upload.tail.catch(() => {});
     await upload.file?.close().catch(() => {});
-    rmSync(upload.path, { force: true }); this.uploads.delete(id);
+    try { rmSync(upload.path, { force: true }); }
+    finally { this.uploads.delete(id); }
   }
-  async abortScope(scope: ContentLease): Promise<void> { await Promise.all([...this.uploads.values()].filter(u => u.scope === scope).map(u => this.abort(scope, u.id))); }
+  async abortScope(scope: ContentLease): Promise<void> {
+    const results = await Promise.allSettled([...this.uploads.values()].filter(u => u.scope === scope).map(u => this.abort(scope, u.id)));
+    for (const result of results) if (result.status === "rejected") console.error("Temporary content could not be removed.", result.reason);
+  }
   private range(row: Stored, range: ContentRange = {}): { offset: number; length: number } {
     const offset = range.offset ?? 0, length = range.length ?? Math.max(0, row.size - offset);
     if (!Number.isSafeInteger(offset) || offset < 0 || offset > row.size || !Number.isSafeInteger(length) || length < 0) invalid("Invalid content read range.");
