@@ -77,7 +77,7 @@ export function bindObjects(owner: string, host: PluginHostServices, sessionRuns
   };
   const unavailable = async (): Promise<never> => { throw new PluginApiError("unavailable", "Content storage is unavailable."); };
   const missing: ContentScope = Object.freeze({ read: unavailable, async *open() { await unavailable(); }, stage: unavailable });
-  const readOnly = (source: ContentReader): ContentReader => Object.freeze({ read: source.read, open: source.open });
+  const readOnly = (source: ContentReader): ContentReader => Object.freeze({ read: source.read, open: source.open, ...(source.size ? { size: source.size } : {}) });
   const content = (lease?: ContentLease, ref?: ResourceRef, signal?: AbortSignal): ContentScope => {
     if (signal) linkAbort(lease, signal);
     const context = access(ref?.sessionId, ref?.id, lease || ref ? { active: true, content: lease, provisional: !ref || !host.refOf(ref.id) } : undefined);

@@ -35,6 +35,7 @@ export const applicationStorage = {
   pluginInstallationsDirectory: "installations", // Within pluginPackagesDirectory.
   pluginInstallationRecordsDirectory: "records", // Reproducibility metadata, within pluginPackagesDirectory.
   pluginDataDirectory: "extensions",
+  pluginWorkingCacheDirectory: "extension-cache",
   credentialsDirectory: "credentials", // Legacy encrypted values retained for migration and recovery.
   configurationFile: "configuration.json",
   appearanceStore: "appearance",

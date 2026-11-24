@@ -124,6 +124,8 @@ Global configuration survives replacement of the session database. Host connecti
 
 SQLite has one runtime writer, WAL, and foreign keys. Session deletion cascades its history, cursor selections, current data, views, and content roots. Templates own separate content roots. Folder deletion clears the membership of its sessions and templates.
 
+Native attachment bytes and tool-produced media are backed by the same immutable content store. The host records declared model modalities, while the Agent paradigm chooses what to send natively for each request. Local copies for non-native input are reconstructible paths in a plugin cache, not owners of original content. Do not back up these copies or persist them into the original message.
+
 Application metadata and historical records share synchronous transactions. Filesystem effects do not participate in a cross-medium transaction. Current local writes use processing order and last-write-wins semantics, without revision-based conflict protocols.
 
 ## Data preparation

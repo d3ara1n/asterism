@@ -65,7 +65,7 @@ describe("Message file drafts", () => {
     expect(closed).toBe(1);
     await draft.add([new File(["webp"], "scan.webp")]);
     expect(scopes).toBe(2);
-    expect(draft.parts()).toEqual([{ kind: "file", file: ref, mediaType: "image/webp", filename: "scan.webp" }]);
+    expect(draft.parts()).toEqual([{ kind: "file", file: ref, mediaType: "image/webp", filename: "scan.webp", size: 4 }]);
     await draft.close();
   });
   it("Late upload results after cancellation do not enter the pending message; the body is preserved and can be uploaded again", async () => {
@@ -92,7 +92,7 @@ describe("Message file drafts", () => {
     await draft.add([new File(["ok"], "ok.png", { type: "image/png" }), new File(["bad"], "failed.png", { type: "image/png" })], onError);
     expect(onError).toHaveBeenCalledTimes(1);
     expect(draft.getSnapshot()).toMatchObject({ uploading: false, uploads: [], error: null });
-    expect(draft.parts()).toEqual([{ kind: "text", text: "Keep this text" }, { kind: "file", file: ref, mediaType: "image/png", filename: "ok.png" }]);
+    expect(draft.parts()).toEqual([{ kind: "text", text: "Keep this text" }, { kind: "file", file: ref, mediaType: "image/png", filename: "ok.png", size: 2 }]);
     await draft.close();
   });
   // A card must not remount when its upload completes, and a file withdrawn before staging must never reach the hold.

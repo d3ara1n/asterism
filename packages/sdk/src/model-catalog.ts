@@ -3,11 +3,16 @@ import { defineData } from "./presentation.ts";
 import { modelCostSchema } from "./model-cost.ts";
 import { thinkingSchema } from "./model-selection.ts";
 
+export const modelMediaModalities = ["image", "audio", "video", "pdf"] as const;
+export const modelMediaModalitySchema = z.enum(modelMediaModalities);
+export type ModelMediaModality = z.infer<typeof modelMediaModalitySchema>;
+export const modelInputModalitiesSchema = z.array(modelMediaModalitySchema);
+
 export const catalogModelSchema = z.object({
   providerId: z.string(), modelId: z.string(), name: z.string(), enabled: z.boolean(),
   contextWindow: z.number().nullable(), cost: modelCostSchema.nullable(),
   generation: z.object({ maxOutputTokens: z.number().nullable() }),
-  capabilities: z.object({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema) }),
+  capabilities: z.object({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema), inputModalities: modelInputModalitiesSchema.optional() }),
 });
 /** Enabled model metadata available to runtime consumers; model is the complete provider/model expression. */
 export const modelInfoSchema = catalogModelSchema.omit({ providerId: true, modelId: true, enabled: true }).extend({

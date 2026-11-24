@@ -86,7 +86,7 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
           // A file removed or cancelled while staging does not enter the editor, even if staging finished anyway.
           if (controller.signal.aborted) continue;
           change({
-            files: [...state.files, { id: entry.id, size: entry.size, part: { kind: "file", file: ref, mediaType: entry.mediaType, ...(entry.name ? { filename: entry.name } : {}) } }],
+            files: [...state.files, { id: entry.id, size: entry.size, part: { kind: "file", file: ref, mediaType: entry.mediaType, size: entry.size, ...(entry.name ? { filename: entry.name } : {}) } }],
             uploads: state.uploads.filter(item => item.id !== entry.id),
           });
         }

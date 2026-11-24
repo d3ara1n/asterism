@@ -3,7 +3,9 @@ import { useId, useMemo, useState } from "react";
 
 import { applyModelParameters, canEditModelProviderField, createModelInput, modelProviderComplete, modelProviderSchema, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ProviderModel, type TestError } from "../../../shared/configuration";
 import { modelProviderPresetDraft, type ModelProviderPreset, type ModelProviderDraft } from "../../../shared/provider-presets";
+import { modelMediaModalities } from "@asterism-app/sdk/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
+import { modelCostMessages } from "../../messages/model-cost";
 import { providersMessages } from "../../messages/providers";
 import { thinkingLabels } from "@asterism-app/ui/messages/model-selection";
 import { getI18n, useI18n } from "../../shared/i18n";
@@ -386,6 +388,18 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
               </Field>
             </FieldGroup>
           </div>
+        </FieldSet>
+        <FieldSet className="gap-3">
+          <FieldLegend variant="label">{i18n.text(providersMessages.inputModalities)}</FieldLegend>
+          <FieldDescription>{i18n.text(providersMessages.inputModalitiesHint)}</FieldDescription>
+          <FieldGroup className="grid grid-cols-2 gap-x-4 gap-y-3">
+            {modelMediaModalities.map(modality => <Field key={modality} orientation="horizontal">
+              <Checkbox id={`${form}-input-${modality}`} checked={value.capabilities.inputModalities?.includes(modality) ?? false}
+                onCheckedChange={checked => set("capabilities", { ...value.capabilities,
+                  inputModalities: modelMediaModalities.filter(item => item === modality ? checked === true : value.capabilities.inputModalities?.includes(item)) })} />
+              <FieldLabel htmlFor={`${form}-input-${modality}`}>{i18n.text(modality === "pdf" ? providersMessages.documentInput : modelCostMessages[modality])}</FieldLabel>
+            </Field>)}
+          </FieldGroup>
         </FieldSet>
         <FieldGroup>
           <NumberField label={i18n.formatMessage(providersMessages.contextWindow)} value={value.contextWindow} onChange={next => set("contextWindow", next)} min={1} integer />

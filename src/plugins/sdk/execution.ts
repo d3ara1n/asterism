@@ -1,4 +1,4 @@
-import { ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
+import { formatModelExpression, ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ExecutionServices, type ResourceRef, type ToolCaller } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../lifecycle.ts";
 import type { PluginHostServices } from "../loader.ts";
@@ -77,11 +77,13 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
       const allowedResources = request.resources?.allow ? new Set(request.resources.allow) : null;
       const excludedResources = new Set(request.resources?.exclude ?? []);
       const resourcePolicy = (kind: string) => (allowedResources === null || allowedResources.has(kind)) && !excludedResources.has(kind);
-      const caller: ToolCaller = Object.freeze({ ref, title: source.title, ...(request.agent === undefined ? {} : { agent: request.agent }) });
       const interactive = request.interactive;
       const { target, messages, userAgent, requestParentId, purpose } = structuredClone({
         target: request.target, messages: request.messages, userAgent: request.userAgent, requestParentId: request.requestParentId, purpose: request.purpose,
       });
+      const inputModalities = host.models.list().find(model => model.model === formatModelExpression(target))?.capabilities.inputModalities;
+      const caller: ToolCaller = Object.freeze({ ref, title: source.title, ...(request.agent === undefined ? {} : { agent: request.agent }),
+        modelInputModalities: Object.freeze([...(inputModalities ?? [])]) });
       const usage = request.usage;
       const subjects = typeof usage === "function" ? [] : declaredSubjects(usage, owner);
       const system = typeof request.system === "function" ? request.system : structuredClone(request.system);

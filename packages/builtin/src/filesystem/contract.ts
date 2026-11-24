@@ -92,7 +92,7 @@ export const DirectorySee = defineImplementation({
     image: contentRefSchema.describe("Immutable content captured when the image was viewed."),
   }).describe("The viewed image, attached to the result for the model.")),
   resource: Directory, tool: See,
-  targetSchema: z.strictObject({ path: filePath }).describe("Select one image with {\"path\":\"relative/image.png\"}. Supported formats are PNG, JPEG, GIF and WebP."),
+  targetSchema: z.strictObject({ path: filePath }).describe("Select one image with {\"path\":\"relative/image.png\"}. Supported formats are PNG, JPEG, GIF and WebP, up to 8 MiB."),
   effect: "read", execution: "parallel",
 });
 

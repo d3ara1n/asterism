@@ -332,6 +332,7 @@ export class ContentStore {
   }
   reader(access: ContentAccess): ContentReader {
     const reader: ContentReader = {
+      size: ref => this.assert(ref, access).size,
       read: (ref, range) => {
         const row = this.assert(ref, access), part = this.range(row, range);
         access.scope?.add(row.id);

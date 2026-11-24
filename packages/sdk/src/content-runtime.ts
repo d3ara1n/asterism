@@ -3,6 +3,8 @@ import type { Json } from "./json.ts";
 
 /** Read complete content or a byte range; open streams the selected bytes in chunks. */
 export interface ContentReader {
+  /** Validated byte length when the backing store exposes metadata without opening the stream. */
+  size?(ref: ContentRef): number;
   read(ref: ContentRef, range?: ContentRange): Promise<Uint8Array>;
   open(ref: ContentRef, range?: ContentRange): AsyncIterable<Uint8Array>;
 }

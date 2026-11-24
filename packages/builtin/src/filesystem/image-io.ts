@@ -1,4 +1,6 @@
-import { readFile, stat } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { stat } from "node:fs/promises";
+import { MAX_INLINE_FILE_BYTES } from "../shared/model-media.ts";
 import { TextError } from "../shared/text.ts";
 import { FilesystemError, failed } from "./errors.ts";
 import { withinDirectory } from "./paths.ts";
@@ -17,7 +19,18 @@ export async function readImageFile(root: string, rel: string, signal: AbortSign
   const path = await withinDirectory(root, rel);
   const info = await stat(path);
   if (!info.isFile()) throw new FilesystemError(failed("not_file", "The target requires a regular image file."));
-  const bytes = new Uint8Array(await readFile(path, { signal }));
+  const tooLarge = () => new TextError("file_too_large", "The image exceeds the 8 MiB limit for see.");
+  if (info.size > MAX_INLINE_FILE_BYTES) throw tooLarge();
+  signal.throwIfAborted();
+  const chunks: Buffer[] = [];
+  let size = 0;
+  // The end offset is inclusive: one extra byte detects growth without an unbounded read.
+  for await (const chunk of createReadStream(path, { end: MAX_INLINE_FILE_BYTES, signal })) {
+    size += chunk.length;
+    if (size > MAX_INLINE_FILE_BYTES) throw tooLarge();
+    chunks.push(chunk);
+  }
+  const bytes = Buffer.concat(chunks, size);
   const mediaType = imageMediaType(bytes);
   if (!mediaType) throw new TextError("unsupported_image", "Supported image formats are PNG, JPEG, GIF, and WebP.");
   return { bytes, mediaType };

@@ -126,13 +126,16 @@ export function modelParameters(catalog: Catalog, modelId: string): ModelParamet
   const entry = parsed.data;
   const fields = {
     contextWindow: entry.limit?.context || undefined, maxOutputTokens: entry.limit?.output || undefined,
-    reasoning: entry.reasoning, tools: entry.tool_call, thinkingLevels: thinkingLevels(entry), cost: modelCost(entry.cost) ?? undefined,
+    reasoning: entry.reasoning, tools: entry.tool_call, thinkingLevels: thinkingLevels(entry),
+    inputModalities: entry.modalities?.input.some(isInputModality)
+      ? [...new Set(entry.modalities.input.filter(isInputModality).filter(modality => modality !== "text"))] : undefined,
+    cost: modelCost(entry.cost) ?? undefined,
   } satisfies Record<ModelParameterField, unknown>;
   const unfilled = modelParameterFields.filter(field => fields[field] === undefined);
   if (unfilled.length === modelParameterFields.length) throw new ConfigurationError("unavailable", "No usable catalog parameters were found.", messages.invalid);
   const parameters = modelParametersSchema.safeParse({
     ...present({ contextWindow: fields.contextWindow, cost: fields.cost }),
-    capabilities: present({ reasoning: fields.reasoning, tools: fields.tools, thinkingLevels: fields.thinkingLevels }),
+    capabilities: present({ reasoning: fields.reasoning, tools: fields.tools, thinkingLevels: fields.thinkingLevels, inputModalities: fields.inputModalities }),
     generation: present({ maxOutputTokens: fields.maxOutputTokens }),
   });
   if (!parameters.success) throw new ConfigurationError("unavailable", "Invalid model catalog data.", messages.invalid);

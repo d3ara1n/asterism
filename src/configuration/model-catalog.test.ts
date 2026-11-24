@@ -33,7 +33,12 @@ describe("models.dev parameter lookup", () => {
       unfilled: [],
     });
     const disabled = modelParameters(catalog({ ...entry, reasoning: false, tool_call: false, reasoning_options: undefined }), "test-model");
-    expect(disabled.parameters.capabilities).toEqual({ reasoning: false, tools: false, thinkingLevels: [] });
+    expect(disabled.parameters.capabilities).toEqual({ reasoning: false, tools: false, thinkingLevels: [], inputModalities: [] });
+  });
+
+  it("imports native media independently of the mandatory text modality", () => {
+    const result = modelParameters(catalog({ ...entry, modalities: { input: ["text", "image", "pdf", "video"], output: ["audio"] } }), "test-model");
+    expect(result.parameters.capabilities.inputModalities).toEqual(["image", "pdf", "video"]);
   });
 
   // Reference parameters for a model ID do not vary by connection; relay records are excluded and ambiguous IDs do not arbitrarily select the first match.
@@ -74,7 +79,7 @@ describe("models.dev parameter lookup", () => {
     } };
     const result = modelParameters(data, "test-model");
     expect(result.parameters).toEqual({ capabilities: { reasoning: true, tools: false }, generation: {} });
-    expect(result.unfilled).toEqual(["contextWindow", "maxOutputTokens", "thinkingLevels", "cost"]);
+    expect(result.unfilled).toEqual(["contextWindow", "maxOutputTokens", "thinkingLevels", "inputModalities", "cost"]);
     const budget = modelParameters(catalog({ ...entry, reasoning_options: [{ type: "budget_tokens", min: 1024 }, { type: "toggle" }] }), "test-model");
     expect(budget.unfilled).toEqual(["thinkingLevels"]);
     const partial = modelParameters(catalog({ ...entry, reasoning_options: [{ type: "effort", values: ["default", "high"] }] }), "test-model");

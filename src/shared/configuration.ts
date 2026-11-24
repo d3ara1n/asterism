@@ -1,6 +1,6 @@
 import {
   mcpSettingsSchema, shellSettingsSchema, modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
-  thinkingLevels, modelCostSchema, uiTextSchema,
+  thinkingLevels, modelCostSchema, uiTextSchema, modelMediaModalities, modelInputModalitiesSchema,
   modelProviderFixedFields, modelProtocolIds, providerUsageIdSchema, usageProviderInfoSchema, modelProviderPresetSchema,
 } from "@asterism-app/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@asterism-app/sdk/contracts";
@@ -46,8 +46,8 @@ export const modelInputSchema = z.strictObject({
   providerId: modelProviderIdSchema, name, modelId: serverModelId, enabled: z.boolean(),
   contextWindow: z.number().int().positive().nullable(),
   cost: modelCostSchema.nullable().default(null),
-  // Retain only capabilities that change requests; servers decide whether files are accepted.
-  capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema) }),
+  // Missing input modalities on existing models declare no native media.
+  capabilities: z.strictObject({ reasoning: z.boolean(), tools: z.boolean(), thinkingLevels: z.array(thinkingSchema), inputModalities: modelInputModalitiesSchema.optional() }),
   generation: z.strictObject({
     temperature: z.number().nullable(), topP: z.number().nullable(),
     maxOutputTokens: z.number().int().positive().nullable(),
@@ -151,9 +151,9 @@ export function applyModelParameters(draft: ProviderModel, parameters: ModelPara
     generation: { ...draft.generation, ...parameters.generation },
   };
 }
-export const modelParameterFields = ["contextWindow", "maxOutputTokens", "reasoning", "tools", "thinkingLevels", "cost"] as const;
+export const modelParameterFields = ["contextWindow", "maxOutputTokens", "reasoning", "tools", "thinkingLevels", "inputModalities", "cost"] as const;
 export type ModelParameterField = typeof modelParameterFields[number];
-export const catalogInputModalities = ["text", "image", "audio", "video", "pdf"] as const;
+export const catalogInputModalities = ["text", ...modelMediaModalities] as const;
 /** The catalog model whose parameters were applied, identified by its catalog ID rather than the user's server model ID. */
 export const catalogModelInfoSchema = z.strictObject({
   id: z.string(), name: z.string(), releaseDate: z.string().optional(),

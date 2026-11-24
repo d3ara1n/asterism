@@ -16,7 +16,7 @@ Input acceptance, execution ending, and acceptance of the deliverable are separa
 
 Drop a local file as an attachment to include its contents in a model request, or insert its path to name the file in the draft without attaching it. A local path is ordinary message text; it does not give the Agent access to the file. If the Agent needs to open the file itself, it needs an appropriate linked resource or tool.
 
-Moving a conversation to a different model can change which earlier attachments it can use. When the request adapter can identify an attachment it cannot encode, the Agent can continue with a text notice in its place. The original file remains in history. The notice means the model did not receive that file's contents, even if it answered the rest of the message. Other request failures can still stop execution.
+Moving a conversation to a different model can change how earlier attachments are used. Supported media within the inline limit goes directly to the model; other message attachments appear as local file paths the Agent can open through a Directory resource. A path by itself does not mean the model has read the file. Changing models does not change the original attachments in history.
 
 ### Running work is broader than a model response
 

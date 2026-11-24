@@ -11,6 +11,7 @@ import {
 } from "@asterism-app/builtin-api/contracts";
 import { createSelection, selectionOf } from "./selection.ts";
 import { generateAgentName } from "./name.ts";
+import { agentAttachmentProjection } from "./attachments.ts";
 import { createAgentController } from "./controller.ts";
 import { createAgentStateTool } from "./self-state/runtime.ts";
 import { CompactAgentConversation } from "./compression-contract.ts";
@@ -42,7 +43,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
     const feedback = createAgentFeedback();
     plugin.lifetime.defer(feedback.clear);
     const controller = createAgentController({ selection, tasks: plugin.tasks, models: plugin.models, execution: plugin.execution, prepareRequest, projectMessages, userAgent: application.userAgent,
-      usage, feedback });
+      projectAttachments: agentAttachmentProjection(plugin), usage, feedback });
     const admission = createAdmission({ selection, validate: plugin.models.validate, running: controller.running, systemPrompt, projectMessages });
     const agentObject = (ref: ResourceRef) => {
       if (ref.kind !== Agent.kind) throw new PluginApiError("invalid_argument", "The target is not an Agent.");

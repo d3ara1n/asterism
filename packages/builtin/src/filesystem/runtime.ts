@@ -9,6 +9,7 @@ import { TextError, readToModel, editText, textChange, writeToModel, editToModel
 import { Directory, ReadDirectoryDefaults, DirectoryView, DirectoryList, DirectoryMetadata, DirectoryRead, DirectoryEdit, DirectoryWrite, DirectorySave, DirectoryReplace, DirectorySee, DirectoryChildren, DirectoryWatch } from "./contract.ts";
 import { saveFileContent } from "./save.ts";
 import { replaceText, replaceToModel } from "../shared/replace.ts";
+import { acceptsModelMedia } from "../shared/model-media.ts";
 import { readImageFile } from "./image-io.ts";
 import { withinDirectory, writableTarget } from "./paths.ts";
 import { failed, filesystemFailure } from "./errors.ts";
@@ -161,9 +162,13 @@ export function createFilesystemModule(shell: ShellServices) {
       },
     }),
     implementTool(DirectorySee, {
-      async call(directory, target, _args, { object, signal }) {
+      async call(directory, target, _args, { object, caller, signal }) {
         try {
+          if (caller.modelInputModalities && !caller.modelInputModalities.includes("image"))
+            throw new TextError("unsupported_image_input", "The current model is not configured for image input.");
           const image = await readImageFile(directory.path, target.path, signal);
+          if (caller.modelInputModalities && !acceptsModelMedia(caller.modelInputModalities, image.mediaType, true))
+            throw new TextError("unsupported_image_input", "The current model is not configured for this image format.");
           const ref = await object.content.stage(image.bytes);
           return { kind: "succeeded", data: { path: target.path, mediaType: image.mediaType, size: image.bytes.length, image: ref } };
         } catch (error) { return textFailure(error, signal, "View target image"); }

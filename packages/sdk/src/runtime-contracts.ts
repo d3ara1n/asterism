@@ -11,6 +11,7 @@ import type { RecordContract, SessionRecord } from "./records.ts";
 import type { EventContract, PluginEvents } from "./events.ts";
 import type { ToolCompletion, ToolInvocationInfo, ToolModelOutput } from "./tool-result.ts";
 import type { PluginConfig, PluginLogger, PluginSecrets, PluginTasks } from "./runtime.ts";
+import type { ModelMediaModality } from "./model-catalog.ts";
 import type { ModelServices } from "./models.ts";
 import type { ResourceRef, ResourceSnapshot, SessionSnapshot, SessionDirectory } from "./workspace.ts";
 import type { ActionContract, CreationContract } from "./commands.ts";
@@ -50,6 +51,8 @@ export interface PluginContext {
   readonly sessions: SessionDirectory;
   readonly createSession: SessionCreation;
   readonly dir: string;
+  /** Reconstructible data in the application data root, excluded from recovery points. */
+  readonly cacheDir: string;
   /** Resolve a package-relative asset, independently of writable plugin data. */
   readonly assets: { path(relativePath: string): string };
   readonly agentCatalog: AgentCatalog;
@@ -162,7 +165,7 @@ export type CallResult<D extends Json = Json> =
   | OptionalData<Exclude<ToolCompletion, { kind: "succeeded" | "partial" }>, D>;
 export type PreparedResult = CallResult & ToolInvocationInfo;
 /** Tool caller identity captured at the request boundary; carries neither private resource state nor operation permissions. */
-export type ToolCaller = Readonly<Pick<ResourceSnapshot, "ref" | "title"> & { agent?: string }>;
+export type ToolCaller = Readonly<Pick<ResourceSnapshot, "ref" | "title"> & { agent?: string; modelInputModalities?: readonly ModelMediaModality[] }>;
 export interface ToolInvocation extends ToolInvocationInfo {
   effect: "read" | "write";
   /** Sequential operations share submission order; parallel operations can overlap either lane. */

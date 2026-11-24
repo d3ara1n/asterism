@@ -17,7 +17,7 @@ import { useConfigurationAction } from "./state";
 
 const fieldLabels: Record<ModelParameterField, UiMessage> = {
   contextWindow: providersMessages.contextWindow, maxOutputTokens: providersMessages.maximumOutputTokens,
-  reasoning: providersMessages.reasoning, tools: providersMessages.toolCalls, thinkingLevels: providersMessages.availableThinkingLevels,
+  reasoning: providersMessages.reasoning, tools: providersMessages.toolCalls, thinkingLevels: providersMessages.availableThinkingLevels, inputModalities: providersMessages.inputModalities,
   cost: modelCostMessages.title,
 };
 const modalityLabels = {

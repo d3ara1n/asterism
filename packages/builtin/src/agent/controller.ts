@@ -7,6 +7,7 @@ import { agentRequestExtensions } from "./request-context.ts";
 import { feedbackOrigin } from "./feedback.ts";
 import type { createAgentFeedback } from "./feedback-state.ts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
+import type { createAttachmentProjection } from "./attachments.ts";
 import type { createRequestAssembly } from "./preparation.ts";
 import { projectAgentContext, projectForAgent } from "./projection.ts";
 import type { WorkMessages } from "./work-projection.ts";
@@ -25,6 +26,7 @@ interface AgentControllerDependencies {
   execution: ExecutionServices;
   prepareRequest: ReturnType<typeof createRequestAssembly>;
   projectMessages?: WorkMessages;
+  projectAttachments?: ReturnType<typeof createAttachmentProjection>;
   userAgent: string;
   usage?: Pick<ProviderUsage, "consume">;
   feedback: ReturnType<typeof createAgentFeedback>;
@@ -206,9 +208,13 @@ export function createAgentController(deps: AgentControllerDependencies) {
             const run = active.get(object.ref.id)!;
             try {
               const target = deps.selection.target(selection);
-              run.request = { role: agent.id, model: formatModelExpression(target), thinking: target.thinking ?? null };
+              const model = formatModelExpression(target);
+              run.request = { role: agent.id, model, thinking: target.thinking ?? null };
               const prepare = deps.prepareRequest(agent);
               let prepared: ReturnType<typeof prepare>;
+              const projected = (deps.projectMessages ?? projectForAgent)(snapshot, object.ref.id);
+              const modalities = deps.models.list().find(entry => entry.model === model)?.capabilities.inputModalities ?? [];
+              const messages = deps.projectAttachments ? await deps.projectAttachments(projected, snapshot.id, object.content, modalities, current) : projected;
               result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
                 agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },
                 userAgent: deps.userAgent, purpose: "conversation", completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
@@ -216,7 +222,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
                   if (index === 0) turn = readRecords(turnStartRead(object.ref.id), snapshot.records.all)?.id ?? null;
                   return [agentTurnUsage(agent.id, object.ref.id, turn), ...skillCatalogUsage(prepared.catalogBlock)];
                 },
-                target, system: files => { prepared = prepare(files); return prepared.system; }, messages: (deps.projectMessages ?? projectForAgent)(snapshot, object.ref.id), signal: current,
+                target, system: files => { prepared = prepare(files); return prepared.system; }, messages, signal: current,
                 observer: { event(event) { progress.event(event); return observer.event(event); } },
               }));
             } catch (error) {
