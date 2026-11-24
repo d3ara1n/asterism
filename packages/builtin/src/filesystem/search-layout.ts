@@ -9,29 +9,11 @@ export function displayPath(base: string, path: string): string {
   if (path === prefix) return path.slice(path.lastIndexOf("/") + 1);
   return path.startsWith(`${prefix}/`) ? path.slice(prefix.length + 1) : path;
 }
-export function splitPath(path: string): { directory: string; name: string } {
-  const index = path.lastIndexOf("/");
-  return index < 0 ? { directory: "", name: path } : { directory: path.slice(0, index), name: path.slice(index + 1) };
-}
-const compare = (a: string, b: string) => a < b ? -1 : a > b ? 1 : 0;
-/** Sorts by (directory, filename), keeping each directory contiguous and root-level entries first. */
-function byLocation(a: string, b: string): number {
-  const left = splitPath(a), right = splitPath(b);
-  return compare(left.directory, right.directory) || compare(left.name, right.name);
-}
-
-export interface DirectoryGroup<T> { directory: string; entries: { name: string; item: T }[] }
-/** ripgrep's parallel traversal order is nondeterministic; display sorts by location, takes entries within budget, then groups by directory. */
-export function groupByDirectory<T>(items: readonly T[], pathOf: (item: T) => string, limit: number) {
-  const sorted = [...items].sort((a, b) => byLocation(pathOf(a), pathOf(b)));
-  const groups: DirectoryGroup<T>[] = [];
-  for (const item of sorted.slice(0, limit)) {
-    const { directory, name } = splitPath(pathOf(item));
-    const last = groups.at(-1);
-    if (last?.directory === directory) last.entries.push({ name, item });
-    else groups.push({ directory, entries: [{ name, item }] });
-  }
-  return { groups, omitted: Math.max(0, sorted.length - limit) };
+export interface SearchEntry<T> { path: string; item: T }
+/** ripgrep's parallel traversal order is nondeterministic; display sorts by path and applies the budget after sorting. */
+export function searchEntries<T>(items: readonly T[], pathOf: (item: T) => string, limit: number) {
+  const sorted = [...items].sort((a, b) => pathOf(a) < pathOf(b) ? -1 : pathOf(a) > pathOf(b) ? 1 : 0);
+  return { entries: sorted.slice(0, limit).map(item => ({ path: pathOf(item), item })), omitted: Math.max(0, sorted.length - limit) };
 }
 
 type Row = GrepResult["rows"][number];

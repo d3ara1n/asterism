@@ -4,7 +4,7 @@ import { findOutput, grepOutput, referencePathOutput, SearchRecords } from "./se
 import { excerptWindow } from "../shared/text-row.ts";
 import { computeLineHash } from "../shared/hashline/hash.ts";
 import { findToModel, grepToModel, searchSummary } from "./search-presentation.ts";
-import { displayPath, grepFiles, groupByDirectory, searchFilters, searchOptions } from "./search-layout.ts";
+import { displayPath, grepFiles, searchEntries, searchFilters, searchOptions } from "./search-layout.ts";
 import { executablePath, searchArguments } from "./search-process.ts";
 import type { SearchStopReason } from "./search-contract.ts";
 
@@ -244,12 +244,10 @@ describe("Search result UI layout", () => {
     expect(displayPath("src", "srcx/a.ts")).toBe("srcx/a.ts");
   });
 
-  // rg parallel output order is nondeterministic; plain string sorting can place root-level files between subdirectories and split one directory into multiple groups.
-  it("Groups entries from the same directory contiguously, places root-level entries first, and applies the budget after sorting", () => {
-    const { groups, omitted } = groupByDirectory(["b/z.ts", "a.ts", "b/c/d.ts", "b/a.ts", "b.ts"], path => path, 4);
-    expect(groups.map(group => [group.directory, group.entries.map(entry => entry.name)])).toEqual([
-      ["", ["a.ts", "b.ts"]], ["b", ["a.ts", "z.ts"]],
-    ]);
+  // rg parallel output order is nondeterministic, and every file is listed at the same depth in sorted order.
+  it("Sorts entries by path, keeps files from different directories in one flat list, and applies the budget after sorting", () => {
+    const { entries, omitted } = searchEntries(["b/z.ts", "a.ts", "b/c/d.ts", "b/a.ts", "b.ts"], path => path, 4);
+    expect(entries.map(entry => entry.path)).toEqual(["a.ts", "b.ts", "b/a.ts", "b/c/d.ts"]);
     expect(omitted).toBe(1);
   });
 

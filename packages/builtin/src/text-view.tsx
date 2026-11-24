@@ -6,10 +6,10 @@ import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@ast
 import type { Json, ToolResult } from "@asterism-app/sdk/contracts";
 import { useMemo } from "react";
 import type { TextRead, TextChange, TextReplace } from "@asterism-app/builtin-api/contracts";
-import { inputField, inputText, characterCount, toolTextTail, editPreviewText } from "./shared/tool-preview";
+import { inputField, inputText, characterCount, toolTextTail, editPreviewText, editIntents } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
-import { displayText } from "./shared/text-row";
-import { CodeDiff, CodeRows } from "@asterism-app/ui/code-view";
+import { displayLine, displayText } from "./shared/text-row";
+import { CodeDiff, CodeRows, CodeText } from "@asterism-app/ui/code-view";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
@@ -43,8 +43,8 @@ function TextEditHeader({ target, args, invocation, result }: ToolRenderProps<Te
   return <ToolHeader label={i18n.formatMessage(textMessages.toolTextEdit)}
     subject={useToolResourceSubject(invocation.resource)}
     summary={path && <TooltipHint content={path}><span className="font-mono">{path}</span></TooltipHint>}
-    meta={<>{data && <>+{data.added} −{data.removed}{Array.isArray(edits) && " · "}</>}
-      {Array.isArray(edits) && i18n.formatMessage(textMessages.toolTextEdits, { count: edits.length })}</>} />;
+    meta={<>{data && <>+{data.added} −{data.removed}</>}
+      {Array.isArray(edits) && <>{data && " · "}{i18n.formatMessage(textMessages.toolTextEdits, { count: edits.length })}</>}</>} />;
 }
 
 function TextReplaceHeader({ target, args, invocation, result }: ToolRenderProps<TextReplace>) {
@@ -99,8 +99,25 @@ function TextWriteBody(props: ToolRenderProps<TextChange>) {
   return props.result?.data ? <TextChangeBody result={props.result} />
     : content !== undefined ? <TextBodyPreview text={content} filename={filename} /> : null;
 }
+/** Edit input is complete once the call is submitted, so a failed attempt still states every operation the model requested. */
+function EditIntents({ args }: { args: Json }) {
+  const intents = useMemo(() => editIntents(args), [args]);
+  if (!intents.length) return null;
+  return <ToolScrollArea className="max-h-80"><div className="flex min-w-0 flex-col gap-3">
+    {intents.map(intent => <div key={intent.index} className="flex min-w-0 flex-col gap-1">
+      <p className="type-caption flex min-w-0 items-baseline gap-1.5 font-mono">
+        <span className="shrink-0 text-muted-foreground">#{intent.index}</span>
+        <span className="shrink-0">{intent.op}</span>
+        {intent.anchor && <span className="shrink-0 text-muted-foreground">L{intent.anchor.line}</span>}
+        {intent.end && intent.end.line !== intent.anchor?.line && <span className="shrink-0 text-muted-foreground">–L{intent.end.line}</span>}
+      </p>
+      {intent.body.length > 0 && <CodeText contents={intent.body.map(displayLine).join("\n")} language="text" overflow="wrap" />}
+    </div>)}
+  </div></ToolScrollArea>;
+}
 function TextEditBody(props: ToolRenderProps<TextChange>) {
-  return props.result?.data ? <TextChangeBody result={props.result} /> : <EditPreview args={props.args} />;
+  if (props.result?.data) return <TextChangeBody result={props.result} />;
+  return props.result ? <EditIntents args={props.args} /> : <EditPreview args={props.args} />;
 }
 
 /** User views consume saved text and diffs without displaying or regenerating model anchors. */
@@ -135,13 +152,11 @@ function TextBodyPreview({ text, filename }: { text: string; filename?: string }
     <OmittedLines count={preview.omitted} />
   </div>;
 }
+/** Every hunk reaches the diff control, which folds unchanged regions itself; the body bounds height instead of dropping changes. */
 function DiffBodyPreview({ diff }: { diff: string }) {
   const preview = useMemo(() => diffBodyPreview(diff), [diff]);
   if (!preview) return <TextBodyPreview text={diff} />;
-  return <div className="space-y-2">
-    <ToolScrollArea><CodeDiff diff={preview.fileDiff} /></ToolScrollArea>
-    <OmittedLines count={preview.omitted} />
-  </div>;
+  return <ToolScrollArea className="max-h-80"><CodeDiff diff={preview} /></ToolScrollArea>;
 }
 
 const readView = { headerRenderer: TextReadHeader, bodyRenderer: TextReadBody };

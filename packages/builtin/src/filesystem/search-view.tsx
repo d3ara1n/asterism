@@ -1,20 +1,17 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
-import { ChevronRight, FileSearch, TextSearch } from "lucide-react";
-import { toolRenderer, useI18n, useRendererViewState, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { FileSearch, TextSearch } from "lucide-react";
+import { toolRenderer, useI18n, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
-import { Button } from "@asterism-app/ui/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@asterism-app/ui/ui/collapsible";
-import { cn } from "@asterism-app/ui/utils";
-import { CodeRows } from "@asterism-app/ui/code-view";
+import { CodeSections } from "@asterism-app/ui/code-sections";
 import { filesystemMessages as messages } from "../messages/filesystem";
 import { textMessages } from "../messages/text";
 import { inputText, searchHeaderSummary } from "../shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT } from "../shared/tool-body";
 import { DirectoryFind, DirectoryGrep, type FindResult, type GrepResult, type SearchStopReason } from "./search-contract";
 import { searchSummary } from "./search-presentation";
-import { displayPath, grepFiles, groupByDirectory, searchFilters, searchOptions, type DirectoryGroup, type GrepFile, type SearchOption } from "./search-layout";
+import { displayPath, grepFiles, searchEntries, searchFilters, searchOptions, type GrepFile, type SearchOption } from "./search-layout";
 
 type Props = ToolRenderProps<FindResult | GrepResult>;
 
@@ -66,38 +63,17 @@ export function SearchOptions({ args, target }: { args: Props["args"]; target: P
   </p>;
 }
 
-/** Flat directory grouping: directory headings use secondary text and entries beneath are indented; root-level entries have no heading. */
-function DirectoryGroups<T>({ groups, children }: { groups: DirectoryGroup<T>[]; children: (entry: { name: string; item: T }) => ReactNode }) {
-  return <div className="flex flex-col gap-1.5">
-    {groups.map(group => <div key={group.directory} className="flex flex-col">
-      {group.directory && <p className="type-caption break-all font-mono text-muted-foreground">{group.directory}/</p>}
-      <ul className={cn("type-code flex flex-col", group.directory && "pl-3")}>
-        {group.entries.map(entry => <li key={entry.name} className="min-w-0">{children(entry)}</li>)}
-      </ul>
-    </div>)}
-  </div>;
-}
-
-/** File rows expand to show matching excerpts; expansion is saved by file path in conversation-item view state, and code excerpts mount only while expanded. */
-function GrepFileRow({ file, name, initialOpen }: { file: GrepFile; name: string; initialOpen: boolean }) {
+/** Every file is one row at the same depth: the relative path names its location, so nesting would only repeat it. */
+function GrepFileRow({ file, name }: { file: GrepFile; name: string }) {
   const i18n = useI18n();
-  const [open, setOpen] = useRendererViewState(`asterism.builtin/search-file:${file.path}`, initialOpen);
-  return <Collapsible open={open} onOpenChange={setOpen}>
-    <CollapsibleTrigger asChild>
-      <Button variant="ghost" size="xs" className="h-auto min-h-6 w-full justify-start px-1 font-mono font-normal">
-        <ChevronRight className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform motion-reduce:transition-none", open && "rotate-90")} />
-        <TooltipHint content={file.path}><span className="min-w-0 truncate">{name}</span></TooltipHint>
-        <span className="ml-auto shrink-0 type-caption tabular-nums text-muted-foreground">{file.matches}</span>
-      </Button>
-    </CollapsibleTrigger>
-    <CollapsibleContent className="flex flex-col gap-2 py-1.5 pl-5">
-      {open && <>
-        {file.segments.map(segment => <CodeRows key={segment.rows[0].line} rows={segment.rows} filename={file.path}
-          dimmed={segment.rows.flatMap((row, index) => row.match ? [] : [index])} />)}
-        {file.omitted > 0 && <p className="type-caption">{i18n.formatMessage(textMessages.toolTextPreviewOmitted, { count: file.omitted })}</p>}
-      </>}
-    </CollapsibleContent>
-  </Collapsible>;
+  return <div className="flex min-w-0 flex-col gap-1">
+    <p className="flex min-w-0 items-baseline gap-2 px-1 font-mono">
+      <TooltipHint content={file.path}><span className="min-w-0 truncate">{name}</span></TooltipHint>
+      <span className="ml-auto shrink-0 type-caption tabular-nums text-muted-foreground">{file.matches}</span>
+    </p>
+    <CodeSections sections={file.segments} filename={file.path} className="pl-3" />
+    {file.omitted > 0 && <p className="type-caption pl-3">{i18n.formatMessage(textMessages.toolTextPreviewOmitted, { count: file.omitted })}</p>}
+  </div>;
 }
 
 function Results({ data, selection }: { data: FindResult | GrepResult; selection: Props["target"] }) {
@@ -107,25 +83,26 @@ function Results({ data, selection }: { data: FindResult | GrepResult; selection
   const filters = searchFilters(selection);
   let content: ReactNode, omitted = 0;
   if ("rows" in data && data.mode === "content") {
-    const files = grepFiles(data.rows, TOOL_BODY_LINE_LIMIT);
-    const grouped = groupByDirectory(files, file => path(file.path), TOOL_BODY_LINE_LIMIT);
-    omitted = grouped.omitted;
-    content = <DirectoryGroups groups={grouped.groups}>
-      {({ name, item }) => <GrepFileRow file={item} name={name} initialOpen={files.length === 1} />}
-    </DirectoryGroups>;
+    const listing = searchEntries(grepFiles(data.rows, TOOL_BODY_LINE_LIMIT), file => path(file.path), TOOL_BODY_LINE_LIMIT);
+    omitted = listing.omitted;
+    content = <div className="flex flex-col gap-3">
+      {listing.entries.map(entry => <GrepFileRow key={entry.path} file={entry.item} name={entry.path} />)}
+    </div>;
   } else if ("rows" in data) {
-    const grouped = groupByDirectory(data.files, file => path(file.path), TOOL_BODY_LINE_LIMIT);
-    omitted = grouped.omitted;
-    content = <DirectoryGroups groups={grouped.groups}>
-      {({ name, item }) => <div className="flex min-w-0 items-baseline gap-2">
-        <span className="min-w-0 break-all">{name}</span>
-        {item.count !== null && <span className="ml-auto shrink-0 type-caption tabular-nums text-muted-foreground">{item.count}</span>}
-      </div>}
-    </DirectoryGroups>;
+    const listing = searchEntries(data.files, file => path(file.path), TOOL_BODY_LINE_LIMIT);
+    omitted = listing.omitted;
+    content = <div className="flex flex-col gap-1.5">
+      {listing.entries.map(entry => <div key={entry.path} className="flex min-w-0 items-baseline gap-2">
+        <span className="min-w-0 break-all">{entry.path}</span>
+        {entry.item.count !== null && <span className="ml-auto shrink-0 type-caption tabular-nums text-muted-foreground">{entry.item.count}</span>}
+      </div>)}
+    </div>;
   } else {
-    const grouped = groupByDirectory(data.files, path, TOOL_BODY_LINE_LIMIT);
-    omitted = grouped.omitted;
-    content = <DirectoryGroups groups={grouped.groups}>{({ name }) => <span className="break-all">{name}</span>}</DirectoryGroups>;
+    const listing = searchEntries(data.files, path, TOOL_BODY_LINE_LIMIT);
+    omitted = listing.omitted;
+    content = <div className="flex flex-col gap-1">
+      {listing.entries.map(entry => <span key={entry.path} className="break-all">{entry.path}</span>)}
+    </div>;
   }
   return <>
     {summary.empty === null ? <ToolScrollArea className="max-h-80">{content}</ToolScrollArea> : <p className="type-caption">{i18n.text(summary.empty === "incomplete"

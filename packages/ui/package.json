@@ -34,6 +34,8 @@
     "./reference-chip": "./src/reference-chip.tsx",
     "./references": "./src/references.ts",
     "./tool-content": "./src/tool-content.tsx",
+    "./tool-failure": "./src/tool-failure.tsx",
+    "./code-sections": "./src/code-sections.tsx",
     "./tool-outcome": "./src/tool-outcome.ts",
     "./messages/common": "./src/messages/common.ts",
     "./messages/tools": "./src/messages/tools.ts",

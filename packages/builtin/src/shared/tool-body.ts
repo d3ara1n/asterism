@@ -1,10 +1,10 @@
 import { parsePatchFiles, type FileDiffMetadata } from "@pierre/diffs";
-import { formatPatch, parsePatch, type StructuredPatchHunk } from "diff";
+import { formatPatch, parsePatch } from "diff";
 
 import { splitLines } from "./hashline/lines.ts";
 import { displayLine } from "./text-row.ts";
 
-/** Logical-line budget for built-in plugin bodies; does not constrain the tool shell, raw details, or model output. */
+/** Logical-line budget for built-in plugin text bodies; does not constrain the tool shell, raw details, or model output. */
 export const TOOL_BODY_LINE_LIMIT = 120;
 
 export function textBodyPreview(text: string) {
@@ -15,35 +15,29 @@ export function textBodyPreview(text: string) {
   };
 }
 
-/** Preserves actual excerpt positions and passes only the preview patch within budget to Pierre for line numbers and metadata. */
-export function diffBodyPreview(diff: string): { fileDiff: FileDiffMetadata; omitted: number } | null {
+/**
+ * Passes every hunk to the diff control, which folds unchanged regions itself and preserves each hunk's absolute line numbers.
+ * The body bounds the control's height instead of dropping hunks, so distant changes stay reachable.
+ */
+export function diffBodyPreview(diff: string): FileDiffMetadata | null {
   try {
     const patches = parsePatch(diff);
     if (patches.length !== 1 || !patches[0].hunks.length) return null;
     const patch = patches[0];
-    const hunks: StructuredPatchHunk[] = [];
-    let shown = 0, omitted = 0;
     for (const hunk of patch.hunks) {
-      const lines: string[] = [];
-      let oldLines = 0, newLines = 0, previousShown = false;
       for (const line of hunk.lines) {
         const prefix = line[0];
-        if (prefix === "\\") {
-          if (previousShown) lines.push(line);
-          continue;
-        }
+        if (prefix === "\\") continue;
         if (prefix !== " " && prefix !== "+" && prefix !== "-") return null;
-        previousShown = shown < TOOL_BODY_LINE_LIMIT;
-        if (!previousShown) { omitted++; continue; }
-        lines.push(`${prefix}${displayLine(line.slice(1))}`);
-        shown++;
-        if (prefix !== "+") oldLines++;
-        if (prefix !== "-") newLines++;
       }
-      if (lines.length) hunks.push({ ...hunk, lines, oldLines, newLines });
     }
+    // Display-only clipping bounds single long lines; it never removes rows.
+    const hunks = patch.hunks.map(hunk => ({
+      ...hunk,
+      lines: hunk.lines.map(line => line[0] === "\\" ? line : `${line[0]}${displayLine(line.slice(1))}`),
+    }));
     const fileDiff = parsePatchFiles(formatPatch({ ...patch, hunks }), undefined, true)[0]?.files[0];
-    return fileDiff ? { fileDiff: { ...fileDiff, lang: "text" }, omitted } : null;
+    return fileDiff ? { ...fileDiff, lang: "text" } : null;
   } catch {
     return null;
   }
