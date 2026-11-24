@@ -4,15 +4,15 @@ export const lineAnchorSchema = z.strictObject({
   line: z.number().int().positive().describe("1-based line number copied from an anchored read, grep, edit, or replace result."),
   hash: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{4}$/).describe("The exact four-character content hash after # in an anchored read, grep, edit, or replace result."),
 }).describe("A LINE#HASH reference to the current content at one line.");
-const body = z.array(z.string().regex(/^[^\r\n]*$/).describe("One content line without a line terminator; an empty string represents a blank line."))
+const body = z.array(z.string().regex(/^[^\r\n]*$/).describe("One line of new content without the LINE#HASH prefix or a line terminator. An empty string represents a blank line."))
   .min(1).describe("New text lines to insert or use as replacement content.");
 const anchor = lineAnchorSchema.describe("The first affected line, or the preserved line next to an insertion.");
-const end = lineAnchorSchema.optional().describe("Inclusive last line for replace/delete. Required for a multi-line range; omission selects only the anchor line. Validation checks the cited endpoints.");
+const end = lineAnchorSchema.optional().describe("Inclusive last line for replace/delete. Omit only for a single-line edit: without end, even a multi-line body replaces only the anchor line and leaves following lines in place.");
 export const editOperationSchema = z.discriminatedUnion("op", [
   z.strictObject({ op: z.literal("replace").describe("Replace the selected lines with body."), anchor, end, body }),
   z.strictObject({ op: z.literal("delete").describe("Delete the selected lines."), anchor, end }),
-  z.strictObject({ op: z.literal("insert_after").describe("Insert body after the preserved anchor line. body contains only new lines."), anchor, body }),
-  z.strictObject({ op: z.literal("insert_before").describe("Insert body before the preserved anchor line. body contains only new lines."), anchor, body }),
+  z.strictObject({ op: z.literal("insert_after").describe("Insert only new lines after the anchor line. The existing anchor line stays in place."), anchor, body }),
+  z.strictObject({ op: z.literal("insert_before").describe("Insert only new lines before the anchor line. The existing anchor line stays in place."), anchor, body }),
   z.strictObject({ op: z.literal("append").describe("Append body to the target's text."), body }),
   z.strictObject({ op: z.literal("prepend").describe("Prepend body to the target's text."), body }),
 ]).describe("Replace/delete an inclusive anchored range, insert beside a preserved anchor, or append/prepend without anchors.");

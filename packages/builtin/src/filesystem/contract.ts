@@ -28,9 +28,9 @@ export const DirectoryList = defineImplementation({
   targetSchema: z.union([
     z.null().describe("Select the directory resource root."),
     z.strictObject({
-      path: z.string().min(1).max(4096).describe("Directory path relative to the resource root, for example 'src'; absolute paths and paths resolving outside the root are rejected."),
+      path: z.string().min(1).max(4096).describe("Directory path relative to the resource root; absolute paths and paths resolving outside the root are rejected."),
     }),
-  ]).describe("Pass null for the resource root or an object such as {\"path\":\"subdir\"} for a subdirectory. Symbolic links must resolve inside the resource root."),
+  ]).describe("Null selects the resource root; path selects a subdirectory. Symbolic links must resolve inside the resource root."),
   effect: "read", execution: "parallel",
 });
 
@@ -44,16 +44,16 @@ export const DirectoryMetadata = defineImplementation({
   resource: Directory, tool: Metadata,
   targetSchema: z.strictObject({
     path: z.string().min(1).max(4096).describe("File or directory path relative to the resource root; '.' selects the root. Absolute paths and paths resolving outside the root are rejected. Symbolic links are followed within the root; missing targets and broken links return path_not_found."),
-  }).describe("Select one filesystem entry with {\"path\":\"relative/path\"}; '.' selects the resource root."),
+  }).describe("Select one filesystem entry by path; '.' selects the resource root."),
   effect: "read", execution: "parallel",
 });
 
-const filePath = z.string().min(1).max(4096).describe("File path relative to the linked directory root, e.g. 'src/main.ts'. Absolute paths and targets escaping the root through .. or symlinks are rejected.");
+const filePath = z.string().min(1).max(4096).describe("File path relative to the linked directory root. Absolute paths and targets escaping the root through .. or symlinks are rejected.");
 const fileTarget = z.strictObject({ path: filePath })
-  .describe("Select one UTF-8 text file with {\"path\":\"relative/file.txt\"}. Content operations are limited to 8 MiB. edit and replace require an existing file; write can create missing parents inside the root.");
+  .describe("Select one UTF-8 text file by path. Content operations are limited to 8 MiB. edit and replace require an existing file; write can create missing parents inside the root.");
 export const directoryReadTargetSchema = textReadTargetSchema.extend({
   path: filePath,
-}).describe('Select file content, its line range, and reading view, e.g. {"path":"src/main.ts","offset":100,"limit":80}. Content is UTF-8 text; nextOffset marks the start of remaining lines.');
+}).describe('Select file content, its line range, and reading view, using path, offset, limit, and anchored. Content is UTF-8 text; nextOffset marks the start of remaining lines.');
 export const DirectoryRead = defineImplementation({
   ...builtin.data("directory.read", textReadSchema.extend({ path: filePath })
     .describe("Complete selected file lines with absolute line numbers, optional hashes, final-newline state and the next unread line.")),
@@ -92,7 +92,7 @@ export const DirectorySee = defineImplementation({
     image: contentRefSchema.describe("Immutable content captured when the image was viewed."),
   }).describe("The viewed image, attached to the result for the model.")),
   resource: Directory, tool: See,
-  targetSchema: z.strictObject({ path: filePath }).describe("Select one image with {\"path\":\"relative/image.png\"}. Supported formats are PNG, JPEG, GIF and WebP, up to 8 MiB."),
+  targetSchema: z.strictObject({ path: filePath }).describe("Select one image by path. Supported formats are PNG, JPEG, GIF and WebP, up to 8 MiB."),
   effect: "read", execution: "parallel",
 });
 

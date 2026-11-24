@@ -43,4 +43,4 @@ export function resourceValidationMessage(error: z.ZodError, field: "args" | "ta
   });
 }
 
-export const jsonArgumentHint = 'target and args are JSON objects or null matching their schemas. Example: target: {"path":"README.md"}, args: {}.';
+export const jsonArgumentHint = 'target and args are JSON objects or null matching their schemas.';

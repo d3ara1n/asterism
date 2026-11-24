@@ -7,7 +7,7 @@ const selection = {
   limit: z.number().int().positive().max(2000).optional().describe("Maximum returned matching lines, or entries in another resource-specific view; defaults to 500, maximum 2000. Context lines are bounded only by the output-byte budget."),
 };
 const globGuidelines = [
-  "Globs use ripgrep semantics. A pattern without '/' such as '*.md' matches filenames at any depth.",
+  "Globs use ripgrep semantics. A pattern without '/' matches filenames at any depth.",
   "Positive globs override hidden and ignore rules for entries they match. A directory that remains excluded is skipped with its descendants.",
 ];
 
@@ -19,7 +19,7 @@ export const Find = defineTool({
     "target selects the search scope and resource-specific file filtering according to the resource implementation's schema.",
   ],
   argsSchema: z.strictObject({
-    pattern: pattern.describe("File glob relative to the selected search directory, using '/' separators; for example '**/*.ts' or '**/package.json'."),
+    pattern: pattern.describe("File glob relative to the selected search directory, using '/' separators."),
     ...selection,
   }).describe("A file glob and search selection options."),
 });

@@ -46,8 +46,8 @@ export const ResourceScript = defineTool({
   description: "Compose tool calls in JavaScript using their results, conditional logic, loops, and concurrency. Return selected values to the model.",
   guidelines: [
     "code is an async JavaScript function body with top-level await and return. Intermediate values are available to the script as local variables.",
-    "tools.<name>(args) calls a structured top-level tool; tools.<name>(text) calls a freeform top-level tool. Object.keys(tools) lists these bindings. For example: const r = await tools.resource_inspect({ resource_id }); on success, r.data contains state and tools.",
-    "resources.get(resource_id) creates a local call handle, separate from tool discovery. Invoke handle.read({ target, args }) or select a tool dynamically with handle[name]({ target, args }). For a freeform resource tool, invoke handle[name](text) with a string. resource_inspect reports each tool’s input kind and the target and args schemas for structured tools. Handle properties then and toJSON are reserved.",
+    "The tools object exposes top-level calls by name. Structured calls take their declared argument object; freeform calls take a string.",
+    "resources.get selects a resource by ID and returns a handle with methods keyed by tool name. Structured methods take one object with target and args fields; freeform methods take a string. resource_inspect reports each tool’s input kind and the target and args schemas for structured tools. Handle properties then and toJSON are reserved.",
     "Each call resolves to { kind, data } with error: { code, message } for rejected and failed, or message for partial, cancelled, and unknown. kind is succeeded for success and partial for partial success; unknown means effects may have occurred. data is the encoded result and may be null. The result schema from resource_inspect with detail: \"schema\" describes data, not the envelope.",
     "All tool outcome kinds fulfill the promise, including failures. Branch on result.kind; try/catch handles JavaScript exceptions. An unsuccessful child outcome alone leaves the script and other calls running.",
     "text(result) returns the text of the tool's model-facing view. It takes the original result object from a call in the current script. File parts, such as images, are outside this text view.",
@@ -103,7 +103,6 @@ export const ResourceCall = defineTool({
     "resource_inspect returns both schemas for the selected resource and tool. Each field goes in the object whose schema declares it.",
     "Domain qualifiers in tool names describe the operation's scope, such as terminal_input for terminal interaction.",
     "Omitting target is equivalent to null; this is valid only when the implementation accepts null.",
-    "If the outer resource_call arguments repeatedly fail schema validation, resource_script offers a different call format for non-interactive resource tools, even for a single call. The script handle binds the resource ID and tool name; target and args still follow the schemas from resource_inspect.",
   ],
   argsSchema: z.strictObject({
     resource_id: z.string().min(1).describe("The opaque ID of a resource currently linked to this agent."),

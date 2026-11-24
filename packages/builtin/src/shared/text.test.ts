@@ -43,10 +43,10 @@ describe("text tool contracts", () => {
     const edits = Array.from({ length: 50 }, (_, i) => ({ op: "delete" as const, anchor: { line: i + 1, hash: computeLineHash(i + 1, `old-${i}`) } }));
     let message = "";
     try { editText(before, edits); } catch (error) { message = (error as Error).message; }
-    expect(message).toContain(`current line: 1#${computeLineHash(1, long)}│${"😀".repeat(80)}…`);
-    expect(message).toContain(`current line: 50#${computeLineHash(50, long)}│…`);
+    expect(message).toContain(`Current line: 1#${computeLineHash(1, long)}│${"😀".repeat(80)}…`);
+    expect(message).toContain(`Current line: 50#${computeLineHash(50, long)}│…`);
     expect([...message.matchAll(/😀/gu)]).toHaveLength(320);
-    expect(message).toContain("An anchored read");
+    expect(message).toContain("Use an anchored read of the affected region");
   });
 
   it("validates every anchor in a batch, uses shifts only for retry information, and requires reconfirmation for duplicate candidates", () => {
@@ -56,8 +56,8 @@ describe("text tool contracts", () => {
       { op: "replace", anchor: anchor(0), body: ["A"] },
       { op: "replace", anchor: anchor(1), body: ["B"] },
     ])).toThrow("original content preserved");
-    expect(() => editText("prefix\na\nb\nc", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow(`matching nearby line: 3#${computeLineHash(3, "b")}`);
-    expect(() => editText("prefix\na\nb\nb", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow(`several nearby lines match: 3#${computeLineHash(3, "b")}, 4#${computeLineHash(4, "b")}`);
+    expect(() => editText("prefix\na\nb\nc", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow(`Set this field to {"line":3,"hash":"${computeLineHash(3, "b")}"}`);
+    expect(() => editText("prefix\na\nb\nb", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow(`ambiguous. Confirm the intended line before choosing a candidate: {"line":3,"hash":"${computeLineHash(3, "b")}"} or {"line":4,"hash":"${computeLineHash(4, "b")}"}`);
   });
 
   it("preserves mixed line endings and missing final newlines, returning reusable anchors and an actual applicable diff", () => {
@@ -68,6 +68,7 @@ describe("text tool contracts", () => {
     const change = textChange(before, edited.text, "text.txt", edited.touchedLines);
     expect(change).toMatchObject({ added: 1, removed: 1, anchors: [{ line: 2, hash: computeLineHash(2, "B") }] });
     expect(applyPatch(before, change.diff)).toBe(edited.text);
+    expect(editToModel(change).split("\n")).toContain(`2#${computeLineHash(2, "B")}│B`);
     expect(editText(edited.text, [{ op: "insert_after", anchor: { line: 2, hash: change.anchors[0].hash! }, body: ["new"] }]).text).toBe("a\r\nB\nnew\r\nc");
     const loneCr = readText("a\nlast\r", true).rows[0];
     expect(editText("a\nlast\r", [{ op: "replace", anchor: { line: 1, hash: loneCr.hash! }, body: ["A"] }]).text).toBe("A\nlast\r");
@@ -198,7 +199,7 @@ describe("text tool contracts", () => {
     expect(applyPatch(before, change.diff)).toBe("a\nB\n");
   });
 
-  it("keeps the full patch in the edit result without echoing old or new text to the model", () => {
+  it("keeps the full patch and omits oversized line content rather than presenting it as a complete line", () => {
     const before = "surrounding context\nold body\nlast";
     const replacement = "new body ".repeat(2000);
     const edited = editText(before, [{ op: "replace", anchor: { line: 2, hash: computeLineHash(2, "old body") }, body: [replacement] }]);
@@ -220,7 +221,7 @@ describe("text tool contracts", () => {
     const model = editToModel(change);
     expect(model).toContain(`40#${computeLineHash(40, rows[39])}`);
     expect(model).not.toContain(`41#${computeLineHash(41, rows[40])}`);
-    expect(model).toContain("Some updated anchors were omitted.");
+    expect(model).toContain("Some line content or anchors were omitted.");
   });
   it("the user body-preview budget does not limit content returned to the model by read", () => {
     const text = Array.from({ length: 200 }, (_, index) => `line ${index + 1}`).join("\n");

@@ -70,8 +70,8 @@ describe("bulk text replacement", () => {
     const data = textChange(before, text, "note", "diff");
     const model = replaceToModel({ ...data, matches });
     expect(model).toContain("Matched 1 occurrence.");
-    expect(model).toContain(`2#${computeLineHash(2, "last")}`);
-    expect(model).not.toMatch(/@@|first|last|xxx/);
+    expect(model).toContain(`2#${computeLineHash(2, "last")}│last`);
+    expect(model).not.toMatch(/@@|first|xxx/);
     expect(applyPatch(before, data.diff)).toBe("first\nlast");
   });
 

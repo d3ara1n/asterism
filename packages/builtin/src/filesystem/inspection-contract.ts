@@ -2,9 +2,9 @@ import { z } from "zod";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 
 export const inspectPathInputSchema = z.strictObject({
-  path: z.string().min(1).max(4096).describe("Absolute local path or current-user home shorthand (~ or ~/path); for example ~/Projects."),
+  path: z.string().min(1).max(4096).describe("Absolute local path or a path relative to the current user’s home directory prefixed by ~/; ~ selects the home directory itself."),
   list: z.boolean().default(false).describe("Include up to 500 direct entries when the path is a directory. Defaults to false."),
-}).describe('A local path and optional listing, for example {"path":"~/Projects","list":true}.');
+}).describe('A local path and whether to list its contents.');
 
 export const InspectPathResult = builtin.data("filesystem.inspect-path", z.strictObject({
   path: z.string().describe("Absolute path after home expansion and lexical normalization, usable as the path for Directory creation. Symbolic links are not rewritten to their real paths."),

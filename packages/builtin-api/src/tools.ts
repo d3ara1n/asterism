@@ -45,18 +45,12 @@ export const Edit = defineTool({
   name: "edit",
   description: "Edit selected lines in existing text using hashline operations. LINE#HASH anchors come from the latest read, grep, edit, or replace result.",
   guidelines: [
-    "target selects existing editable text according to the resource implementation's schema. args.edits contains the operations.",
-    'For a line shown as 12#ABCD│old, a single-line replacement is args.edits=[{"op":"replace","anchor":{"line":12,"hash":"ABCD"},"body":["new"]}].',
-    "replace/delete affect the inclusive anchor..end range. An omitted end selects one line. Validation checks the cited endpoints.",
-    "insert_before/insert_after preserve the anchor line. body contains the new lines.",
-    "append/prepend take body. Each body item is one text line; an empty string represents a blank line.",
-    "All operations refer to the same pre-edit content and commit as one batch. Anchor or overlap failures preserve the original text.",
-    "Replace/delete ranges conflict when they share original lines. Insertions can share range boundaries; an insertion strictly inside a replaced or deleted range conflicts. Insertions at the same original gap appear in edits array order.",
-    "A successful edit reports the line counts and fresh LINE#HASH anchors for subsequent edits. The user-facing result contains the diff.",
-    "Anchor mismatch results include current-line or shifted candidates.",
+    "args.edits can group several changes to the same target in one call. Every operation uses coordinates from the same pre-edit text. Copy anchor and end line numbers and hashes from the latest anchored tool output.",
+    "A successful edit returns updated anchors for subsequent edits. Pre-edit anchors below an insertion or deletion may be stale even if the line content did not change.",
+    "The batch commits only if all anchors and ranges validate. Replace/delete ranges cannot share original lines. Insertions can share range boundaries but cannot fall inside a replaced or deleted range. Insertions at the same gap follow array order.",
   ],
   argsSchema: z.strictObject({
-    edits: z.array(editOperationSchema).min(1).max(500).describe("One to 500 hashline operations referring to the same current text. Replace/delete ranges have no shared lines; insertions may share boundaries and use array order at the same gap."),
+    edits: z.array(editOperationSchema).min(1).max(500).describe("One to 500 operations on the same pre-edit text."),
   }).describe("A complete batch of line-based edit operations. The target is selected separately."),
 });
 
@@ -90,7 +84,7 @@ export const Replace = defineTool({
     "Literal mode matches find as text and inserts replace verbatim. Regex mode uses JavaScript regular expressions and replacement syntax.",
     "All non-overlapping matches are replaced. flags applies in both modes; global matching is always enabled.",
     "No matches returns an error without changing the target. Matches that produce identical content succeed without writing.",
-    "The receipt reports the match count and fresh anchors for edit. The user-facing result contains the diff.",
+    "The receipt reports the match count and updated anchors for subsequent edits.",
   ],
   argsSchema: z.strictObject({
     find: z.string().min(1).describe("Non-empty text to find, or a JavaScript regular expression source when regex is true."),

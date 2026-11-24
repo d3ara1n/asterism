@@ -18,7 +18,6 @@ export const directoryGrepTargetSchema = directoryFindTargetSchema.extend({
 });
 const target = directoryFindTargetSchema.nullable()
   .describe("Null selects the resource root. glob selects a directory; grep selects a directory or one file. Selected symbolic links resolve inside the resource root; recursive traversal skips symbolic links. Git metadata entries are excluded from search targets.");
-export const fileGlobTargetExample = 'Example: {"args":{"pattern":"**/*.md"},"target":{"path":".","noIgnore":true}} searches from the root without applying ignore-file rules.';
 export const stopReasonSchema = z.enum(["limit", "output_bytes", "record_bytes"]).nullable()
   .describe("Null means the search completed. Otherwise it stopped at the requested limit of matching lines or files, the 64 KiB result budget, or the 1 MiB process-record limit. Total matching rows or files are unknown after an early stop.");
 const common = {
@@ -37,7 +36,7 @@ export const DirectoryFind = defineImplementation({
   ...builtin.data("directory.find", z.strictObject({
     ...common, files: z.array(path).describe("Returned regular-file paths, up to the requested limit and 64 KiB of result data. Order is unspecified; the array length is the returned count."),
   }).describe("A bounded file search result. Hidden and ignore-file filtering follows ripgrep, with explicit globs taking precedence; recursive searches exclude .git entries.")),
-  resource: Directory, tool: Find, targetSchema: target.describe(`${target.description} ${fileGlobTargetExample}`), effect: "read", execution: "parallel",
+  resource: Directory, tool: Find, targetSchema: target, effect: "read", execution: "parallel",
 });
 export const DirectoryGrep = defineImplementation({
   ...builtin.data("directory.grep", z.strictObject({

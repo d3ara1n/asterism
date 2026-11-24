@@ -13,7 +13,7 @@ export const CreateSubagentPool = defineCreation(SubagentPool, {
   id: builtin.name("subagent-pool.create"),
   schema: createPoolSchema,
 });
-export const taskIdSchema = z.string().regex(/^sub-[1-9]\d*$/u).describe("A task ID within this pool, such as sub-1.");
+export const taskIdSchema = z.string().regex(/^sub-[1-9]\d*$/u).describe("A task ID returned by this pool.");
 export const modelOverrideSchema = z.strictObject({
   model: modelExpressionSchema.describe("Model as provider/model."),
   thinking: thinkingSchema.nullable().describe("Thinking level for this model. Null uses the provider default."),
@@ -79,7 +79,7 @@ export const PoolList = defineImplementation({
   effect: "read", execution: "parallel",
 });
 
-const taskTargetSchema = z.strictObject({ id: taskIdSchema }).describe('Select one task, for example {"id":"sub-1"}.');
+const taskTargetSchema = z.strictObject({ id: taskIdSchema }).describe('Select one task by ID.');
 const empty = z.strictObject({}).describe("No operation parameters.");
 const define = <T extends ToolInput, A extends ToolInput, D extends Json>(
   name: string, description: string, guidelines: string[], target: z.ZodType<T>, args: z.ZodType<A>, result: z.ZodType<D>, effect: "read" | "write",
@@ -107,7 +107,7 @@ export const Wait = define("wait",
   [
     "Reports are returned by subagent_check after the wait.",
   ],
-  z.strictObject({ ids: z.array(taskIdSchema).min(1) }).describe('Select tasks to wait for, for example {"ids":["sub-1","sub-2"]}.'), empty,
+  z.strictObject({ ids: z.array(taskIdSchema).min(1) }).describe('Select tasks to wait for by ID.'), empty,
   z.strictObject({ tasks: z.array(waitEntrySchema) }).describe("Status, recent process steps, and usage for each selected task."), "read");
 export const Steer = define("steer",
   "Append instructions or background to a queued or running task. The task receives its whole input queue at the next request boundary and keeps its progress. Steering that arrives after the final response began is returned as undelivered with the result.",

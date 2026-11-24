@@ -38,7 +38,7 @@ The harness describes primitives. Host prompts, tool descriptions, and feedback 
 
 A model must be able to understand and call a tool through discovery alone. In the tool contract, explain how to interpret results and reuse outputs as inputs where needed.
 
-Organize tool guidance around purpose and data flow, call shape and result handling, then execution boundaries. Short examples illustrate contracts without prescribing a task workflow. Role instructions and skills carry user-selected responsibilities and procedures.
+Organize tool guidance around purpose and data flow, call shape and result handling, then execution boundaries. Describe parameters and formats without sample invocations or placeholder argument values. Role instructions and skills carry user-selected responsibilities and procedures.
 
 ## Documentation ownership
 

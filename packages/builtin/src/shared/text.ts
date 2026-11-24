@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { structuredPatch, formatPatch, type StructuredPatchHunk } from "diff";
+import { structuredPatch, formatPatch, parsePatch, type StructuredPatchHunk } from "diff";
 import { applyEdits } from "./hashline/apply.ts";
 import { computeLineHash } from "./hashline/hash.ts";
 import { hasFinalNewline, splitLines } from "./hashline/lines.ts";
@@ -9,6 +9,7 @@ import type { TextRead, TextChange } from "@asterism-app/builtin-api/contracts";
 import type { CallResult } from "@asterism-app/sdk/runtime";
 
 const MAX_ANCHOR_LINES = 40;
+const MAX_ANCHOR_CONTENT_BYTES = 8 * 1024;
 const MAX_RECOVERY_PREVIEW_PER_LINE = 80;
 const MAX_RECOVERY_PREVIEW_CHARS = 320;
 
@@ -49,12 +50,18 @@ export function readToModel(data: TextRead, offsetField = "target.offset"): stri
 function failureMessage(failure: ApplyFailure): string {
   if (failure.kind !== "anchor") return failure.message;
   let remaining = MAX_RECOVERY_PREVIEW_CHARS;
-  let shortened = false;
+  let reread = 0;
   const details = failure.failures.map(f => {
     const prefix = `edits[${f.opIndex}].${f.which} (${f.cited.line}#${f.cited.hash})`;
-    if (f.recovery.kind === "found") return `${prefix}: matching nearby line: ${f.recovery.newLine}#${f.recovery.newHash}`;
-    if (f.recovery.kind === "ambiguous") return `${prefix}: several nearby lines match: ${f.recovery.candidates.map(c => `${c.line}#${c.hash}`).join(", ")}`;
-    if (!f.current) return `${prefix}: line is out of range.`;
+    if (f.recovery.kind === "found") {
+      const { newLine, newHash } = f.recovery;
+      return `${prefix}: line moved. Set this field to ${JSON.stringify({ line: newLine, hash: newHash })}.`;
+    }
+    if (f.recovery.kind === "ambiguous") {
+      return `${prefix}: ambiguous. Confirm the intended line before choosing a candidate: ${f.recovery.candidates.map(c => JSON.stringify(c)).join(" or ")}.`;
+    }
+    reread++;
+    if (!f.current) return `${prefix}: line is out of range and no nearby line matches.`;
     let preview = "", limit = Math.min(remaining, MAX_RECOVERY_PREVIEW_PER_LINE);
     for (const character of f.current.content) {
       if (limit === 0) break;
@@ -62,12 +69,10 @@ function failureMessage(failure: ApplyFailure): string {
       limit--;
       remaining--;
     }
-    const excerpt = preview.length < f.current.content.length;
-    shortened ||= excerpt;
-    return `${prefix}: current line: ${f.cited.line}#${f.current.hash}│${preview}${excerpt ? "…" : ""}`;
+    return `${prefix}: no nearby match. Current line: ${f.cited.line}#${f.current.hash}│${preview}${preview.length < f.current.content.length ? "…" : ""}`;
   });
-  return ["Anchor mismatch; original content preserved.", ...details,
-    ...(shortened ? ["An anchored read can inspect the current lines shown as excerpts (…)."] : []),
+  return ["Anchor mismatch; no edits applied, original content preserved.", ...details,
+    ...(reread ? ["Use an anchored read of the affected region for fields with no match."] : []),
   ].join("\n");
 }
 export function editText(text: string, edits: Edit[]): { text: string; touchedLines: readonly number[] } {
@@ -117,10 +122,48 @@ export function textChange(before: string, after: string, label: string, touched
 export function writeToModel(data: TextChange): string {
   return data.changed ? `Content saved (+${data.added} -${data.removed}).` : "Content was already identical; no change was needed.";
 }
+/** Use new-side hunk rows for anchor content without persisting another copy of the edited text. */
+function changedAnchorContent(data: TextChange): Map<number, string> {
+  const contents = new Map<number, string>();
+  if (!data.diff || !data.anchors.length) return contents;
+  const hashes = new Map(data.anchors.map(({ line, hash }) => [line, hash]));
+  for (const hunk of parsePatch(data.diff)[0].hunks) {
+    let line = hunk.newStart;
+    for (const row of hunk.lines) {
+      if (row[0] !== " " && row[0] !== "+") continue;
+      const hash = hashes.get(line);
+      if (hash !== undefined) {
+        const raw = row.slice(1);
+        // Unified diff retains CR in CRLF rows. The hash distinguishes it from a literal trailing CR.
+        const content = raw.endsWith("\r") && computeLineHash(line, raw.slice(0, -1)) === hash ? raw.slice(0, -1) : raw;
+        if (computeLineHash(line, content) === hash) contents.set(line, content);
+      }
+      line++;
+    }
+  }
+  return contents;
+}
+
 export function editToModel(data: TextChange): string {
+  const contents = changedAnchorContent(data);
+  let remaining = MAX_ANCHOR_CONTENT_BYTES;
+  let contentOmitted = false;
+  const rows = data.anchors.map(({ line, hash }) => {
+    const anchor = `${line}#${hash}`;
+    const content = contents.get(line);
+    if (content !== undefined) {
+      const cost = Buffer.byteLength(content) + 1;
+      if (cost <= remaining) {
+        remaining -= cost;
+        return `${anchor}│${content}`;
+      }
+    }
+    contentOmitted = true;
+    return anchor;
+  });
   return [
     writeToModel(data),
-    ...(data.anchors.length ? ["Updated anchors:", ...data.anchors.map(({ line, hash }) => `${line}#${hash}`)] : []),
-    ...(data.anchorsTruncated ? ["Some updated anchors were omitted."] : []),
+    ...(rows.length ? ["Updated anchors:", ...rows] : []),
+    ...(contentOmitted || data.anchorsTruncated ? ["Some line content or anchors were omitted. An anchored read can return the omitted lines."] : []),
   ].join("\n");
 }

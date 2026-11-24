@@ -12,7 +12,7 @@ Directory and note reads select a starting line and line limit, with bounded out
 
 Edit validates a batch against one current text value. Replace and delete ranges include both endpoints; insertion retains the anchor line. Append and prepend need no anchor. Operations use original text coordinates: range edits conflict when they consume the same original lines, and insertions conflict only when strictly inside a consumed range. Boundary insertions are allowed, and multiple insertions at the same gap follow input array order. A stale anchor or range conflict rejects the batch without writing. Suggested moved-line matches remain retry information rather than silently retargeting an edit.
 
-Successful edits retain the actual unified diff and new anchors. Model feedback can shorten the diff and anchors with explicit omission information. Display budgets do not rewrite the saved result.
+Successful edits retain the actual unified diff and new anchors. Model feedback gives a summary and reusable anchors with bounded line content, rather than repeating those lines in a diff. Omission notices identify when an anchored read is needed for more content. The full diff remains available to the user.
 
 Write creates or replaces complete text. Identical text is a no-op. Directory writes can create missing parent directories inside the root.
 
