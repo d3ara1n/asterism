@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
-import { BarChart3, Check, ChevronRight, Search } from "lucide-react";
+import { Check, ChevronRight, Search } from "lucide-react";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import {
   RendererPreferencesProvider,
@@ -15,7 +15,6 @@ import type { AppSnapshot } from "../../../shared/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { SessionGlyph } from "../../app/SessionStatus";
 import { appMessages } from "../../messages/app";
-import { dashboardMessages } from "../../messages/dashboard";
 import { useFolders } from "../folders/context";
 import { commandsMessages as messages } from "../../messages/commands";
 import { usePluginCommands, type RegisteredCommandGroup } from "../../modules/commands";
@@ -142,8 +141,8 @@ function PluginSection({ group, context, navigation }: {
 }
 
 /** One opening owns the page stack and search; dismissal disposes plugin calls, but not application services. */
-function CommandContent({ session, ready, sessions, close, onOpenDashboard }: {
-  session: RendererSessionSnapshot | null; ready: boolean; sessions: SessionNavigation; close(): void; onOpenDashboard?: () => void;
+function CommandContent({ session, ready, sessions, close }: {
+  session: RendererSessionSnapshot | null; ready: boolean; sessions: SessionNavigation; close(): void;
 }) {
   const i18n = useI18n();
   const groups = usePluginCommands();
@@ -176,13 +175,6 @@ function CommandContent({ session, ready, sessions, close, onOpenDashboard }: {
         <div ref={body} className="p-1.5">
           <CommandEmpty className={commandEmpty}>{i18n.text(messages.empty)}</CommandEmpty>
           <SessionSection sessions={sessions} navigation={navigation} close={close} />
-          {!page && onOpenDashboard && <CommandGroup className="p-0 [&_[cmdk-group-heading]]:p-0">
-            <CommandItem value="host/dashboard" keywords={[i18n.text(dashboardMessages.title), i18n.text(dashboardMessages.openDashboard)]}
-              className={commandRow} onSelect={() => { close(); onOpenDashboard(); }}>
-              <BarChart3 aria-hidden="true" className="shrink-0 text-muted-foreground" />
-              <div className="min-w-0 flex-1 truncate">{i18n.text(dashboardMessages.openDashboard)}</div>
-            </CommandItem>
-          </CommandGroup>}
           <CommandSection group={settingsCommands} context={context} namespace="host/settings" navigation={navigation} />
           {groups.map(group => <PluginSection key={JSON.stringify([group.pluginId, group.id])} group={group} context={context} navigation={navigation} />)}
         </div>
@@ -201,9 +193,9 @@ function isApplicationChord(event: KeyboardEvent) {
 }
 
 /** Application modal opened from the menu or the application chord. */
-export function ApplicationCommands({ open, onOpenChange, session, ready, sessions, returnFocus, onOpenDashboard }: {
+export function ApplicationCommands({ open, onOpenChange, session, ready, sessions, returnFocus }: {
   open: boolean; onOpenChange(open: boolean): void; session: RendererSessionSnapshot | null; ready: boolean;
-  sessions: SessionNavigation; returnFocus: RefObject<HTMLElement | null>; onOpenDashboard?: () => void;
+  sessions: SessionNavigation; returnFocus: RefObject<HTMLElement | null>;
 }) {
   const i18n = useI18n();
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
@@ -224,7 +216,7 @@ export function ApplicationCommands({ open, onOpenChange, session, ready, sessio
       onCloseAutoFocus={event => { event.preventDefault(); if (returnFocus.current?.isConnected) returnFocus.current.focus({ preventScroll: true }); }}>
       <DialogTitle className="sr-only">{i18n.text(messages.title)}</DialogTitle>
       {/* Content mounts and unmounts with the dialog's presence, so the exit animation keeps its rows. */}
-      <CommandContent session={session} ready={ready} sessions={sessions} close={close} onOpenDashboard={onOpenDashboard} />
+      <CommandContent session={session} ready={ready} sessions={sessions} close={close} />
     </DialogContent>
   </Dialog>;
 }

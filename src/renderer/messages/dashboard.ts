@@ -2,7 +2,6 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const dashboardMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   title: { id: "dashboard.title", defaultMessage: "Usage" },
-  openDashboard: { id: "dashboard.command.open", defaultMessage: "Open usage statistics" },
   views: { id: "dashboard.views", defaultMessage: "Usage views" },
   viewOverview: { id: "dashboard.view.overview", defaultMessage: "Overview" },
   viewAttribution: { id: "dashboard.view.attribution", defaultMessage: "Attribution" },

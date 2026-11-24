@@ -1106,7 +1106,6 @@
   "plugins.undoRemove": "撤销",
   "plugins.undoRemoveLabel": "保留 {plugin_name}",
   "dashboard.title": "用量",
-  "dashboard.command.open": "打开用量统计",
   "dashboard.views": "用量视图",
   "dashboard.view.overview": "总览",
   "dashboard.view.attribution": "归因",
