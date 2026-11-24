@@ -1,7 +1,7 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { defineCreation, pluginNamespace, thinkingLevels, type Json, type ResourceRef } from "@asterism-app/sdk/contracts";
 import { definePlugin, implementCreation, implementResource, type PluginContext } from "@asterism-app/sdk/runtime";
@@ -9,6 +9,7 @@ import { builtin } from "@asterism-app/builtin-api/contracts";
 import { BuiltinApplicationService, configureBuiltin } from "../../packages/builtin/src/testing.ts";
 import { CreateSubagentPool, Delegation, snapshotSchema, type TaskSnapshot } from "../../packages/builtin/src/subagents/contract.ts";
 import { CreateNote } from "../../packages/builtin/src/notes/contract.ts";
+import { applicationTempRoot } from "../storage/temporary.ts";
 import type { ModelEvent, ModelInput } from "../model/contract.ts";
 
 const namespace = pluginNamespace("test.pool-caller");
@@ -18,6 +19,8 @@ const CreateActor = defineCreation(Actor, { id: namespace.name("create"), schema
 const roots: string[] = [], apps: BuiltinApplicationService[] = [];
 afterEach(async () => {
   for (const app of apps.splice(0)) await app.close();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 function gate() {
@@ -51,6 +54,11 @@ function inputText(input: ModelInput) {
 }
 async function fixture(child: (input: ModelInput, signal: AbortSignal) => AsyncIterable<ModelEvent>) {
   const root = mkdtempSync(join(tmpdir(), "asterism-pool-")); roots.push(root);
+  const systemTemp = join(root, "temp");
+  mkdirSync(systemTemp);
+  for (const name of ["TMPDIR", "TEMP", "TMP"]) vi.stubEnv(name, systemTemp);
+  const auditRoot = join(applicationTempRoot(root), builtin.id, "subagent-audits");
+  const auditPath = (runId: string) => join(auditRoot, runId, "audit.jsonl");
   let context!: PluginContext;
   const caller = definePlugin({ namespace, setup(plugin) {
     context = plugin;
@@ -100,7 +108,7 @@ async function fixture(child: (input: ModelInput, signal: AbortSignal) => AsyncI
     expect(result.kind).toBe("succeeded");
     return snapshotSchema.parse(result.data);
   };
-  return { root, get app() { return app; }, get context() { return context; }, sessionId, actor, createPool, invoke, delegate,
+  return { systemTemp, auditPath, get app() { return app; }, get context() { return context; }, sessionId, actor, createPool, invoke, delegate,
     async check(pool: ResourceRef, id: string): Promise<TaskSnapshot> { return snapshotSchema.parse((await invoke(pool, "check", { id })).data); },
     async restart() {
       await app.close(); apps.splice(apps.indexOf(app), 1);
@@ -237,7 +245,7 @@ describe("Shared Subagent Pool", () => {
     expect((await f.invoke(pool, "steer", { id: tasks[5]!.input.id }, { message: "Never delivered" })).kind).toBe("succeeded");
     expect(await f.invoke(pool, "cancel", { id: tasks[5]!.input.id })).toMatchObject({ kind: "succeeded", data: { status: { outcome: "cancelled" } } });
     expect((await f.check(pool, tasks[5]!.input.id)).output).toMatchObject({ undelivered: ["Never delivered"], usage: { requests: 0 } });
-    expect(existsSync(join(f.root, "extensions", builtin.id, "subagent-audits", `${tasks[5]!.input.runId}.jsonl`))).toBe(false);
+    expect(existsSync(dirname(f.auditPath(tasks[5]!.input.runId)))).toBe(false);
     const cancelledWait = new AbortController();
     const waiting = f.invoke(pool, "wait", { ids: tasks.map(task => task.input.id) }, {}, cancelledWait.signal);
     cancelledWait.abort(); await waiting;
@@ -256,6 +264,21 @@ describe("Shared Subagent Pool", () => {
     expect(completed).toMatchObject({ status: { outcome: "succeeded" }, output: { result: "Task report", usage: { model: "test/test", requests: 1 } } });
   });
 
+  it("preserves the saved task result when the audit cannot be written", async () => {
+    const f = await fixture(async function* () { yield* report("Report without an audit"); });
+    const pool = await f.createPool();
+    const warn = vi.spyOn(console, "warn");
+    // Replace the captured temporary root with a file so directory creation fails without relying on permissions.
+    rmSync(f.systemTemp, { recursive: true });
+    writeFileSync(f.systemTemp, "Not a directory");
+    const task = await f.delegate(pool, "Inspect");
+    await f.invoke(pool, "wait", { ids: [task.input.id] });
+    expect(await f.check(pool, task.input.id)).toMatchObject({
+      status: { outcome: "succeeded", code: null }, output: { result: "Report without an audit" },
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(`Could not write subagent audit for ${task.input.runId}`));
+  });
+
   it("persists task names and reports through rewind and restart, and resolves abandoned pending records without replay", async () => {
     let requests = 0;
     const f = await fixture(async function* () { requests++; yield* report("Persistent report"); });
@@ -266,10 +289,11 @@ describe("Shared Subagent Pool", () => {
     await f.invoke(pool, "wait", { ids: [task.input.id] });
     const delegated = f.context.session(f.sessionId).snapshot().records.first(Delegation, { scope: "timeline" })!;
     expect(delegated.record.pending).toBe(false);
-    const audit = readFileSync(join(f.root, "extensions", builtin.id, "subagent-audits", `${task.input.runId}.jsonl`), "utf8");
+    const audit = readFileSync(f.auditPath(task.input.runId), "utf8");
     expect(audit).toContain("Persistent report");
     expect(audit.trim().split("\n").map(line => JSON.parse(line)).find(entry => entry.type === "input").messages)
       .toEqual([{ kind: "input", parts: [{ kind: "text", text: "Inspect" }] }]);
+    rmSync(dirname(f.auditPath(task.input.runId)), { recursive: true });
     await f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: before });
     expect((await f.invoke(pool, "check", { id: task.input.id })).kind).toBe("rejected");
     await f.app.sessions.execute({ type: "select", sessionId: f.sessionId, nodeId: delegated.record.id });
@@ -397,7 +421,7 @@ describe("Shared Subagent Pool", () => {
     await entered.promise;
     f.context.session(f.sessionId).remove(pool);
     await f.app.close(); apps.splice(apps.indexOf(f.app), 1);
-    const audit = readFileSync(join(f.root, "extensions", builtin.id, "subagent-audits", `${running.input.runId}.jsonl`), "utf8");
+    const audit = readFileSync(f.auditPath(running.input.runId), "utf8");
     expect(audit).toContain('"outcome":"cancelled"');
   });
 });

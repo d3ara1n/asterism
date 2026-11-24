@@ -16,7 +16,7 @@ import {
 } from "./contract.ts";
 import { SubagentPoolRuntime } from "./service.ts";
 import { executeSubagent } from "./execution.ts";
-import { AuditLog } from "./audit.ts";
+import { AuditLog, subagentAuditFile } from "./audit.ts";
 import { currentActivity } from "./activity.ts";
 
 /** Measurements the delegating model can act on; detailed token fields remain in the saved record. */
@@ -38,7 +38,7 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
   return defineModule(plugin => {
     const pools = new Map<string, { ref: ResourceRef; runtime: SubagentPoolRuntime }>();
     const prepare = createRequestAssembly(plugin, skills);
-    const auditDirectory = join(plugin.dir, "subagent-audits");
+    const auditRoot = join(plugin.tempDir, "subagent-audits");
     const pool = (ref: ResourceRef) => {
       if (ref.kind !== SubagentPool.kind) throw new PluginApiError("invalid_argument", "The target is not a Subagent Pool.");
       const runtime = pools.get(ref.id);
@@ -74,8 +74,9 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
               access: object.ref, configuration: () => builtinConfiguration(plugin), prepare,
               execution: plugin.execution, content: plugin.content, usage, userAgent: application.userAgent,
               changed: () => runtime.changed(),
+              auditFailed: (runId, error) => plugin.log.warn(`Could not write subagent audit for ${runId}: ${String(error)}`),
             }),
-            audit: runId => new AuditLog(auditDirectory, runId),
+            audit: runId => new AuditLog(auditRoot, runId),
             changed() {
               if (!object.snapshot()) return;
               timer ??= setTimeout(() => { timer = undefined; if (object.snapshot()) object.invalidate(); }, 40);
@@ -96,6 +97,10 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
         inspect: async (_data, object) => ({
           tasks: pool(object.ref).taskCount,
           parallelism: subagentParallelism,
+          audit: {
+            path: subagentAuditFile(auditRoot, "{runId}"),
+            description: "Temporary diagnostic JSONL for an executed task. {runId} is the run ID returned by subagent_check. Copied attachments are in the adjacent attachments directory. Audit files may be missing or incomplete; this is normal and independent of the saved task result.",
+          },
         }),
         disposalWarnings: () => [...pools.values()].flatMap(({ ref, runtime }) =>
           runtime.working ? [{ resource: ref, warning: subagentMessages.runningWarning }] : []),
@@ -112,9 +117,9 @@ export function createSubagentPoolModule(application: ApplicationIdentity, usage
           return operation(signal, () => pool(object.ref).check(target.id));
         }, toModel: task => {
           const current = currentActivity(task);
-          const { id, name, role } = task.input;
+          const { id, name, role, runId } = task.input;
           return JSON.stringify({
-            id, name, role, status: task.status, usage: modelUsage(task.output.usage),
+            id, name, role, runId, status: task.status, usage: modelUsage(task.output.usage),
             ...(current ? { current } : {}),
             ...(task.status.phase === "finished" ? { result: task.output.result } : {}),
             ...(task.output.undelivered.length ? { undelivered: task.output.undelivered } : {}),

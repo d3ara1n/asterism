@@ -2,7 +2,7 @@
 // Requires local rsvg-convert (Homebrew librsvg) and macOS iconutil; rerun only after changing the icon.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { applicationTempRoot } from "../src/storage/temporary.ts";
 import { join, resolve } from "node:path";
 import { brandStarPath, brandStars } from "../packages/ui/src/brand/geometry.ts";
 
@@ -98,7 +98,9 @@ for (const [name, content] of Object.entries(sources)) {
   rasterize(join(output, name), join(output, name.replace(/\.svg$/u, ".png")), 1024);
 }
 
-const work = mkdtempSync(join(tmpdir(), "asterism-icon-"));
+const temporaryRoot = join(applicationTempRoot(), "dev", "build");
+mkdirSync(temporaryRoot, { recursive: true, mode: 0o700 });
+const work = mkdtempSync(join(temporaryRoot, "icon-"));
 try {
   // macOS: pass all iconset sizes to iconutil for packaging.
   const iconset = join(work, "asterism.iconset");

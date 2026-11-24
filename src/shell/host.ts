@@ -12,9 +12,9 @@ export class ShellHost implements ShellServices {
   private readonly execution: ShellExecutor;
   readonly terminals: TerminalSessions;
   readonly calls: readonly CallContribution[];
-  constructor(private readonly settings: () => ShellSettings, integrationRoot: string) {
+  constructor(private readonly settings: () => ShellSettings, integrationRoot: string, private readonly temporaryRoot?: string) {
     this.profiles = { get: settings, list: () => listShellProfiles(settings()) };
-    this.execution = new ShellExecutor(settings, this.closing.signal);
+    this.execution = new ShellExecutor(settings, this.closing.signal, this.temporaryRoot);
     this.terminals = { create: (config, events) => {
       const terminal: InteractiveTerminal = new SharedTerminal(config, settings, integrationRoot, events, () => this.live.delete(terminal));
       this.live.add(terminal);
@@ -26,7 +26,7 @@ export class ShellHost implements ShellServices {
 
   capture(): ShellExecution {
     const settings = structuredClone(this.settings());
-    return new ShellExecutor(() => settings, this.closing.signal);
+    return new ShellExecutor(() => settings, this.closing.signal, this.temporaryRoot);
   }
 
   /** Ends commands and reaps terminals that their owners did not release. */

@@ -1,4 +1,5 @@
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { applicationTempRoot } from "../storage/temporary.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { belongsTo, ResourcePresenceChanged, type ActionContract, type ResourceCall, type ResourceSnapshot, type SessionRecord, type SessionSnapshot, type ToolContract } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type PluginDefinition, type PluginLogger, type PluginTasks,
@@ -186,7 +187,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
       const taskHost = new TaskHost(log, lifecycle.group("task"));
       const eventScope = new PluginEventScope(events, id, lifecycle.group("event"));
       const sdk = createSdkContext({ id, lifetime, dir: storage.dir,
-        cacheDir: join(services.extensionsDirectory, "..", applicationStorage.pluginWorkingCacheDirectory, id), log, config: contract => storage.config(contract),
+        cacheDir: join(services.extensionsDirectory, "..", applicationStorage.pluginWorkingCacheDirectory, id),
+        tempDir: join(applicationTempRoot(dirname(services.extensionsDirectory)), id), log, config: contract => storage.config(contract),
         secrets: storage.secrets, db: () => storage.db(), tasks: taskHost }, services, lifecycle.group("model"), lifecycle.group("action"), directory, eventScope,
         calls.client(id, lifecycle.group("call")), (caller, policy, linked, interactive, resourceToolRestriction) => bindTopLevelTools(topLevelTools, caller, policy, linked, interactive, resourceToolRestriction),
         () => resourceRegistry);

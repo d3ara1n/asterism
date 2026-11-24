@@ -1,5 +1,5 @@
-import { mkdtemp, open, type FileHandle } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, open, type FileHandle } from "node:fs/promises";
+import { applicationTempRoot } from "../storage/temporary.ts";
 import { join } from "node:path";
 import { OUTPUT_CHAR_LIMIT, type ShellOutput } from "@asterism-app/sdk/contracts";
 
@@ -39,7 +39,7 @@ export class ShellOutputBuffer {
   private retainedChars = 0;
   private file: FileHandle | null = null;
   private path: string | null = null;
-  constructor(private readonly temporaryRoot = tmpdir()) {}
+  constructor(private readonly temporaryRoot = join(applicationTempRoot(), "host", "shell")) {}
 
   async append(stream: "stdout" | "stderr", bytes: Uint8Array): Promise<void> {
     await this.text(this.display[stream].push(this.decoders[stream].decode(bytes, { stream: true })));
@@ -48,7 +48,8 @@ export class ShellOutputBuffer {
     if (!text) return;
     const chars = Array.from(text);
     if (!this.file && this.totalChars + chars.length > OUTPUT_CHAR_LIMIT) {
-      const directory = await mkdtemp(join(this.temporaryRoot, "asterism-exec-"));
+      await mkdir(this.temporaryRoot, { recursive: true, mode: 0o700 });
+      const directory = await mkdtemp(join(this.temporaryRoot, "exec-"));
       this.path = join(directory, "output.log");
       this.file = await open(this.path, "wx", 0o600);
       await this.file.writeFile(this.tail);

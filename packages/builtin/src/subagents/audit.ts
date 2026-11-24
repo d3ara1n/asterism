@@ -1,7 +1,7 @@
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { contentRefSchema, type ContentRef, type ModelItem, type ModelRunEvent, type ModelTarget, type SystemPrompt } from "@asterism-app/sdk/contracts";
 import type { ContentReader } from "@asterism-app/sdk/runtime";
 import type { DelegationInput, TaskCompletion } from "./contract.ts";
@@ -29,8 +29,11 @@ function delivered(entry: AuditEntry): ContentRef[] {
   return [...attachments(entry.event.block.outcome).values()];
 }
 
+export const subagentAuditFile = (temporaryRoot: string, runId: string) =>
+  join(temporaryRoot, runId, "audit.jsonl");
+
 /**
- * Append-only JSONL process record named by run ID. Writes queue in order, each line before its attachment copies.
+ * Append-only JSONL process record in a temporary directory named by run ID. Writes queue in order, each line before its attachment copies.
  * Normal close awaits the queue; interruption can leave an incomplete line and omit multiple queued entries or copies.
  * Nothing is written for a run that never starts.
  */
@@ -42,9 +45,9 @@ export class AuditLog {
   private content: ContentReader | null = null;
   private writing: Promise<void> = Promise.resolve();
 
-  constructor(private readonly directory: string, runId: string) {
-    this.file = join(directory, `${runId}.jsonl`);
-    this.files = join(directory, runId);
+  constructor(temporaryRoot: string, runId: string) {
+    this.file = subagentAuditFile(temporaryRoot, runId);
+    this.files = join(dirname(this.file), "attachments");
   }
 
   append(entry: AuditEntry): void {
@@ -55,8 +58,10 @@ export class AuditLog {
   start(content: ContentReader): void {
     this.content = content;
     this.enqueue(async () => {
-      await mkdir(this.directory, { recursive: true });
-      await writeFile(this.file, "", { flag: "wx" });
+      const directory = dirname(this.file);
+      await mkdir(dirname(directory), { recursive: true, mode: 0o700 });
+      await mkdir(directory, { mode: 0o700 });
+      await writeFile(this.file, "", { flag: "wx", mode: 0o600 });
     });
     for (const entry of this.buffered.splice(0)) this.append(entry);
   }

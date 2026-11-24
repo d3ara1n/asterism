@@ -30,8 +30,8 @@ it("copies delivered attachments once while preserving rejected argument referen
   audit.append({ type: "execution", event });
   await audit.close();
   expect(reads).toEqual([file]);
-  expect(readFileSync(join(root, "run", file["$asterism.content"]))).toEqual(Buffer.from(bytes));
-  const lines = readFileSync(join(root, "run.jsonl"), "utf8").trimEnd().split("\n").map(line => JSON.parse(line));
+  expect(readFileSync(join(root, "run", "attachments", file["$asterism.content"]))).toEqual(Buffer.from(bytes));
+  const lines = readFileSync(join(root, "run", "audit.jsonl"), "utf8").trimEnd().split("\n").map(line => JSON.parse(line));
   expect(lines).toHaveLength(2);
   expect(lines[0].event.block.arguments).toEqual({ unknown: invalid });
 });
@@ -42,11 +42,11 @@ it("writes nothing for an unstarted run and snapshots buffered entries when they
   const unstarted = new AuditLog(root, "queued");
   unstarted.append({ type: "steering-delivered", messages });
   await unstarted.close();
-  expect(existsSync(join(root, "queued.jsonl"))).toBe(false);
+  expect(existsSync(join(root, "queued"))).toBe(false);
   const audit = new AuditLog(root, "run");
   audit.append({ type: "steering-delivered", messages });
   messages.push("later");
   audit.start({ async read() { throw new Error("unused"); }, async *open() {} });
   await audit.close();
-  expect(JSON.parse(readFileSync(join(root, "run.jsonl"), "utf8"))).toEqual({ type: "steering-delivered", messages: ["first"] });
+  expect(JSON.parse(readFileSync(join(root, "run", "audit.jsonl"), "utf8"))).toEqual({ type: "steering-delivered", messages: ["first"] });
 });

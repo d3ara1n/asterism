@@ -20,7 +20,7 @@ import { bindShellServices } from "./sdk/shell.ts";
 import { bindFiles } from "./sdk/files.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 
-type PluginServices = Pick<PluginContext, "id" | "dir" | "cacheDir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
+type PluginServices = Pick<PluginContext, "id" | "dir" | "cacheDir" | "tempDir" | "log" | "config" | "secrets" | "db" | "tasks" | "lifetime">;
 /** Assemble plugin-facing capabilities; each domain adapter owns its data and execution boundaries. */
 export function createSdkContext(internal: PluginServices, host: PluginHostServices, modelRuns: RunGroup, sessionRuns: RunGroup, directory: SessionDirectory, eventScope: PluginEventScope,
   calls: PluginCalls, topLevelTools: (caller: ToolCaller, policy: (name: string) => boolean, linked: readonly ResourceRef[], interactive: boolean, resourceToolRestriction: (kind: string) => string | null) => BoundTopLevelTool[],
@@ -83,7 +83,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     application: Object.freeze({ name: applicationBrand.en, userAgent: applicationUserAgent }),
     manual: { sources() { checkAvailable(); return structuredClone(shared.manualSources()); } },
     ipc: { events: eventScope.api, calls },
-    id: internal.id, lifetime: internal.lifetime, sessions: directory, dir: internal.dir, cacheDir: internal.cacheDir, log: internal.log,
+    id: internal.id, lifetime: internal.lifetime, sessions: directory, dir: internal.dir, cacheDir: internal.cacheDir, tempDir: internal.tempDir, log: internal.log,
     createSession: objects.createSession,
     assets: { path(relativePath) {
       checkAvailable();

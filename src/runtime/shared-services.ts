@@ -1,3 +1,4 @@
+import { applicationTempRoot } from "../storage/temporary.ts";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { McpChanged, ReadUsage, UsageChanged, SystemResumed, ReadResourceActivities, ResourceActivitiesChanged, ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
@@ -36,7 +37,8 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
   const deadlines = new DeadlineScheduler(error => console.error("Deadline callback failed.", error));
   const resume = events.listen(SystemResumed, {}, () => deadlines.recheck());
   const mcp = new McpApplication(options.db, configuration, () => events.publish(McpChanged, null, {}));
-  const shell = new ShellHost(() => configuration.shellSettings(), join(options.dataRoot, applicationStorage.shellIntegrationDirectory));
+  const shell = new ShellHost(() => configuration.shellSettings(), join(options.dataRoot, applicationStorage.shellIntegrationDirectory),
+    join(applicationTempRoot(options.dataRoot), "host", "shell"));
   const agentCatalog = new AgentCatalogService(options.skillDirectories);
   const stopCatalog = agentCatalog.subscribe(() => events.publish(SkillsChanged, null, agentCatalog.skills()));
   const models = createModelProviderServices(configuration), usages = createUsageProviderServices(configuration);

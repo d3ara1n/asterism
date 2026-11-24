@@ -53,6 +53,8 @@ export interface PluginContext {
   readonly dir: string;
   /** Reconstructible data in the application data root, excluded from recovery points. */
   readonly cacheDir: string;
+  /** Plugin-specific system temporary path. Create it as needed; files may disappear and are not backed up. */
+  readonly tempDir: string;
   /** Resolve a package-relative asset, independently of writable plugin data. */
   readonly assets: { path(relativePath: string): string };
   readonly agentCatalog: AgentCatalog;

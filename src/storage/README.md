@@ -25,6 +25,10 @@ Host layout names are centralized in the application identity definition. Plugin
 
 Configuration and authorization state have different lifecycles even where they share a file. Host connection credentials and MCP OAuth state are saved in configuration; plugin secrets are saved in plugin storage. Values may be literal credentials or credential-command expressions. Configuration files and recovery points can therefore contain sensitive data and are not sanitized exports. The legacy credentials directory is not the destination for new credentials.
 
+## System temporary files
+
+Asterism-owned system temporary files share an `asterism/` directory beneath the operating system’s temporary directory (`asterism-<uid>/` on Linux). Development uses its `dev/` subtree. The plugin runtime SDK exposes the plugin-ID subdirectory as `plugin.tempDir`; the plugin creates it as needed and treats its contents as disposable. Host shell output spills belong to `host/shell/`. These files are outside recovery points and may be removed by the operating system. Content upload staging and atomic replacement files stay on the destination filesystem so they can be renamed into place.
+
 ## Preparation and recovery
 
 Prepare persistent formats before starting business services. Preparation decides from format versions; business readers own payload validation. Missing files remain absent until their owner creates them.

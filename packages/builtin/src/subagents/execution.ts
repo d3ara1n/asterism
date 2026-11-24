@@ -35,6 +35,7 @@ export interface ExecutionDependencies {
   usage: Pick<ProviderUsage, "consume">;
   userAgent: string;
   changed(): void;
+  auditFailed(runId: string, error: unknown): void;
 }
 
 function resolveAgent(configuration: ReturnType<ExecutionDependencies["configuration"]>, role: string): AgentConfiguration {
@@ -216,7 +217,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
     const completion: TaskCompletion = { status: classify(ending, interruption), output: snapshot.output, finishedAt: new Date().toISOString() };
     run.audit.append({ type: "finished", completion });
     try { await run.audit.close(); }
-    catch (error) { completion.status = ended("failed", "audit_failed", error instanceof Error ? error.message : String(error)); }
+    catch (error) { deps.auditFailed(snapshot.input.runId, error); }
     return completion;
   });
 }
