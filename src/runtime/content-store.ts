@@ -67,6 +67,11 @@ export class ContentLease {
   constructor(readonly store: ContentStore, readonly target?: ContentTarget) {}
   check(): void { if (this.closed || this.controller.signal.aborted) unavailable("The content scope is closed or cancelled."); }
   add(id: string): void { this.check(); if (!this.refs.has(id)) { this.refs.add(id); this.store.pin(id); } }
+  release(ref: ContentRef): void {
+    this.check();
+    const id = ref["$asterism.content"];
+    if (this.refs.delete(id)) this.store.unpin(id);
+  }
   track<T>(work: Promise<T>): Promise<T> {
     this.pending.add(work);
     void work.finally(() => this.pending.delete(work)).catch(() => {});

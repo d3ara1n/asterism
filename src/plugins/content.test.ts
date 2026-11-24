@@ -76,7 +76,8 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
   const service = new ApplicationService(root, { plugins: [plugin, ...options.extra ?? []], adapterFactory: options.adapter ? () => options.adapter! : undefined }); services.push(service);
   const sessionId = service.sessions.tree.create("Content");
   const store = service.sessions.content;
-  const input = () => service.sessions.openContentInput({ kind: "resource", contractId: Create.id, resourceKind: Document.kind, sessionId });
+  const inputTarget = { kind: "resource", contractId: Create.id, resourceKind: Document.kind, sessionId } as const;
+  const input = () => service.sessions.openContentInput(inputTarget);
   const create = async (file: ContentRef, scopeId?: string, rest: { history?: boolean; fail?: boolean } = {}) => {
     await service.sessions.execute({ type: "resource.create", sessionId, kind: Document.kind, creation: { id: Create.id }, input: { file, ...rest }, contentScopeId: scopeId, position: { x: 0, y: 0 } });
     return service.sessions.current(sessionId).workbench.objects.at(-1)!.id;
@@ -84,7 +85,7 @@ function fixture(options: { prepare?: (content: ContentScope, signal: AbortSigna
   const object = (id: string) => context.object(sessionId, Document, id);
   const replace = (id: string, value: z.input<typeof Replace.schema>, scopeId?: string) => service.sessions.execute({ type: "resource.command", sessionId, objectId: id,
     command: resourceCall(Replace, value), contentScopeId: scopeId });
-  return { root, service, sessionId, store, input, create, object, replace, context };
+  return { root, service, sessionId, store, input, inputTarget, create, object, replace, context };
 }
 const bytes = (text: string) => new TextEncoder().encode(text);
 const text = (data: Uint8Array) => new TextDecoder().decode(data);
@@ -444,6 +445,22 @@ describe("Host immutable content", () => {
     const id = await f.create(sealed.ref, opened.scopeId);
     await f.service.content.execute({ type: "input.close", scopeId: opened.scopeId });
     expect(await f.object(id).content.read(sealed.ref)).toEqual(new Uint8Array());
+  });
+  it("releases only the draft's hold, preserving independent attempts until they finish", async () => {
+    const f = fixture();
+    const draft = await f.service.content.execute({ type: "input.open", target: f.inputTarget });
+    if (draft.kind !== "input") throw new Error("Expected input.");
+    const scope = f.store.getScope(draft.scopeId);
+    const writer = f.store.writer({ scope });
+    const held = await writer.stage(bytes("attempt")), discarded = await writer.stage(bytes("discard"));
+    const captured = f.store.capture([held], { scope });
+    for (const ref of [held, discarded]) await f.service.content.execute({ type: "input.release", scopeId: scope.id, ref });
+    const read = (ref: ContentRef) => serveContent(f.service, { type: "read.open", source: { scopeId: scope.id }, ref });
+    expect(await read(held)).toMatchObject({ ok: false, error: { code: "foreign_resource" } });
+    expect(await read(discarded)).toMatchObject({ ok: false, error: { code: "unavailable" } });
+    expect(text(await captured.reader.read(held))).toBe("attempt");
+    await captured.close();
+    expect(await read(held)).toMatchObject({ ok: false, error: { code: "unavailable" } });
   });
   // Readers retained across archival share the session availability gate with sleep.
   it("rejects retained content readers after archival without deleting content", async () => {

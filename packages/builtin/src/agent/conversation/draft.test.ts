@@ -4,12 +4,12 @@ import type { RendererContentInput } from "@asterism-app/sdk/renderer";
 import type { ContentRef } from "@asterism-app/sdk/contracts";
 
 const ref: ContentRef = { "$asterism.content": "00000000-0000-4000-8000-000000000001" };
-const reader = { read: async () => new Uint8Array(), async *open() {} };
+const reader = { release: async () => {}, read: async () => new Uint8Array(), async *open() {} };
 describe("Message file drafts", () => {
   it("retrieves and resends references without reading or staging their content", async () => {
     const forbidden = async (): Promise<never> => { throw new Error("References must not access content storage."); };
     const content: RendererContentInput = { read: forbidden, open: () => { throw new Error("Unexpected read."); },
-      stage: forbidden, close: async () => {} };
+      stage: forbidden, release: forbidden, close: async () => {} };
     const parts = [{ kind: "file-reference" as const, filename: "report.pdf",
       ref: { source: { sessionId: "other", id: "directory", kind: "example/directory" }, locator: { path: "report.pdf" } } }];
     const draft = createMessageDraft(() => content);
@@ -71,15 +71,33 @@ describe("Message file drafts", () => {
   it("Late upload results after cancellation do not enter the pending message; the body is preserved and can be uploaded again", async () => {
     let finish!: (ref: ContentRef) => void;
     const pending = new Promise<ContentRef>(resolve => { finish = resolve; });
-    const draft = createMessageDraft(() => ({ ...reader, stage: async () => pending, close: async () => {} }));
+    const release = vi.fn(async (_ref: ContentRef) => {});
+    const draft = createMessageDraft(() => ({ ...reader, stage: async () => pending, release, close: async () => {} }));
     draft.setText("Keep this text");
     const uploading = draft.add([new File(["image"], "shot.png", { type: "image/png" })]);
     expect(draft.getSnapshot().uploading).toBe(true);
     draft.cancelUpload(); finish(ref); await uploading;
+    expect(release).toHaveBeenCalledWith(ref);
     expect(draft.parts()).toEqual([{ kind: "text", text: "Keep this text" }]);
     expect(draft.getSnapshot()).toMatchObject({ uploading: false, error: null });
     await draft.add([new File(["image"], "shot.png", { type: "image/png" })]);
     expect(draft.getSnapshot().files).toHaveLength(1);
+    await draft.close();
+  });
+  it("releases a removed attachment only when the draft no longer uses its deduplicated reference", async () => {
+    const other: ContentRef = { "$asterism.content": "00000000-0000-4000-8000-000000000002" };
+    const release = vi.fn(async (_ref: ContentRef) => {});
+    const close = vi.fn(async () => {});
+    const draft = createMessageDraft(() => ({ ...reader, release, close, async stage(file) {
+      return (file as File).name === "other" ? other : ref;
+    } }));
+    await draft.add([new File(["same"], "first"), new File(["same"], "second"), new File(["other"], "other")]);
+    draft.remove(0);
+    expect(release).not.toHaveBeenCalled();
+    draft.remove(0);
+    expect(release).toHaveBeenCalledExactlyOnceWith(ref);
+    expect(close).not.toHaveBeenCalled();
+    expect(draft.parts()).toMatchObject([{ kind: "file", file: other }]);
     await draft.close();
   });
   it("Reports a failed addition once without leaving an inline error or discarding staged files", async () => {

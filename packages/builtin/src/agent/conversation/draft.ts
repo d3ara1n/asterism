@@ -49,6 +49,10 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
   const listeners = new Set<() => void>();
   const change = (value: Partial<DraftState>) => { state = { ...state, ...value }; for (const listener of listeners) listener(); };
   const input = () => content ??= createContent();
+  const releaseUnused = (hold: RendererContentInput, ref: ContentRef) => {
+    if (content === hold && !state.files.some(({ part }) => part.kind === "file" && part.file["$asterism.content"] === ref["$asterism.content"]))
+      void hold.release(ref).catch(() => {});
+  };
   const cancelUpload = () => {
     if (!upload) return;
     upload.cancelled = true; upload.staging?.controller.abort();
@@ -79,12 +83,13 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
           if (current.cancelled) break;
           if (!state.uploads.some(item => item.id === entry.id)) continue;
           const controller = new AbortController(); current.staging = { id: entry.id, controller };
+          const hold = input();
           let ref: ContentRef;
-          try { ref = await input().stage(file, { signal: controller.signal }); }
+          try { ref = await hold.stage(file, { signal: controller.signal }); }
           catch (error) { if (controller.signal.aborted) continue; throw error; }
           finally { current.staging = null; }
           // A file removed or cancelled while staging does not enter the editor, even if staging finished anyway.
-          if (controller.signal.aborted) continue;
+          if (controller.signal.aborted) { releaseUnused(hold, ref); continue; }
           change({
             files: [...state.files, { id: entry.id, size: entry.size, part: { kind: "file", file: ref, mediaType: entry.mediaType, size: entry.size, ...(entry.name ? { filename: entry.name } : {}) } }],
             uploads: state.uploads.filter(item => item.id !== entry.id),
@@ -102,8 +107,10 @@ export function createMessageDraft(createContent: () => RendererContentInput) {
     },
     remove(index: number) {
       if (state.locked || state.uploading) return;
+      const removed = state.files[index]?.part;
       change({ files: state.files.filter((_, i) => i !== index), error: null });
       if (!state.files.length) { void content?.close(); content = undefined; }
+      else if (content && removed?.kind === "file") releaseUnused(content, removed.file);
     },
     accepted(text = "") {
       void content?.close(); content = undefined;

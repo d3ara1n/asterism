@@ -37,6 +37,9 @@ export class ContentTransferService {
         const scope = this.inputs.get(command.scopeId); this.inputs.delete(command.scopeId);
         await scope?.close(); return { kind: "done" };
       }
+      case "input.release": {
+        this.scope(command.scopeId).release(command.ref); return { kind: "done" };
+      }
       case "upload.begin": {
         const scope = this.scope(command.scopeId);
         const uploadId = await scope.track(store.begin(scope)); return { kind: "upload", uploadId };

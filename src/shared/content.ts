@@ -23,6 +23,7 @@ const source = z.union([
 export const contentCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("input.open"), target: contentTargetSchema }),
   z.strictObject({ type: z.literal("input.close"), scopeId: id }),
+  z.strictObject({ type: z.literal("input.release"), scopeId: id, ref: contentRefSchema }),
   z.strictObject({ type: z.literal("upload.begin"), scopeId: id }),
   z.strictObject({ type: z.literal("upload.write"), scopeId: id, uploadId: id, offset: z.number().int().nonnegative(), data: z.instanceof(Uint8Array).refine(bytes => bytes.byteLength <= contentChunkSize) }),
   z.strictObject({ type: z.literal("upload.seal"), scopeId: id, uploadId: id }),

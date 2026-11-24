@@ -10,7 +10,7 @@ function setup() {
   const holds: { closed: boolean }[] = [];
   const content = (): RendererContentInput => {
     const hold = { closed: false }; holds.push(hold);
-    return { ...reader, stage: async () => ref, close: async () => { hold.closed = true; } };
+    return { ...reader, stage: async () => ref, release: async () => {}, close: async () => { hold.closed = true; } };
   };
   return { input: new ConversationInput(content), content, holds };
 }

@@ -16,7 +16,7 @@ The public identity contains no physical path, filename, media type, or authoriz
 
 Input drafts bind to a typed creation or action contract. Each submission attempt captures an independent lease before asynchronous preparation. Subsequent draft changes do not expand that attempt’s eligible content.
 
-Drafts and attempts retain their own leases. A failed attempt can leave its draft available for retry. Closing a draft prevents new uploads and attempts while existing attempts finish under their own lifetime.
+Drafts and attempts retain their own leases. A failed attempt can leave its draft available for retry. A renderer draft can release an individual reference once it no longer uses it. Closing a draft prevents new uploads and attempts while existing attempts finish under their own lifetime.
 
 Cancellation bindings last only as long as their lease. Closing a lease aborts its own controller and detaches upstream cancellation listeners without cancelling the caller or other leases. Pending IO still settles before content holds and registrations are released.
 

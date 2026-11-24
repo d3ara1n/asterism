@@ -78,6 +78,10 @@ export function contentInput(target: Target): RendererContentInput {
         await execute({ type: "upload.abort", scopeId, uploadId }, "done").catch(() => {}); throw error;
       }
     },
+    async release(ref) {
+      checkOpen();
+      if (scope) await request({ type: "input.release", scopeId: await scope, ref }, "done");
+    },
     async close() {
       if (closed) return; closed = true;
       if (scope) { const scopeId = await scope.catch(() => undefined); if (scopeId) await execute({ type: "input.close", scopeId }, "done").catch(() => {}); }
