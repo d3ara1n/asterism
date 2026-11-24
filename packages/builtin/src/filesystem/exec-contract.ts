@@ -9,7 +9,7 @@ export const Exec = defineTool({
   description: "Execute a shell command starting in the directory resource and return its output and exit status.",
   guidelines: [
     "Each invocation starts a fresh non-interactive shell process in the directory resource. Shell syntax, cd, pipelines and redirection are interpreted by that shell.",
-    "shell_list_profile reports the host platform, shared shell profiles, resolved executable paths, and the default selection used by directory exec.",
+    "Commands use the shared shell selection. With 'auto', execution checks profiles in platform preference order, then remaining configured profiles. shell_list_profile reports the shared selection and executable availability.",
     "Normally omit timeout and let the command finish or be cancelled. Specify it only when the task has an explicit time limit.",
     "Shell profile selection, arguments and environment overrides are captured for the model request; executable discovery and external files are resolved when each command executes.",
     "Timeout and cancellation remain active through output settlement, including after the foreground shell exits. They stop output collection and terminate the owned process group on POSIX; Windows uses parent-based taskkill tree termination.",
