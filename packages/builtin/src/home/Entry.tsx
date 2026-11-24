@@ -6,7 +6,7 @@ import type { ThinkingLevel, UiText } from "@asterism-app/sdk/contracts";
 import { createMessageDraft, type MessageDraft } from "../agent/conversation/draft";
 import { SubmissionIdentity } from "../agent/conversation/submission";
 import { AttachFiles, DraftFiles, DraftFileError, fileInputEvents } from "../agent/conversation/Files";
-import { ModelChoices } from "../agent/conversation/configuration/ModelChoices";
+import { ModelChoices } from "../configuration/ModelChoices";
 import { useSettingsConfiguration } from "../configuration/renderer-state";
 import { agentsMessages } from "../messages/agents";
 import { homeMessages } from "../messages/home";

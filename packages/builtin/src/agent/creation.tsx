@@ -16,7 +16,7 @@ import { useState } from "react";
 import type { ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { type AgentSelection } from "@asterism-app/builtin-api/contracts";
 import { useSettingsConfiguration } from "../configuration/renderer-state";
-import { ModelChoices } from "./conversation/configuration/ModelChoices";
+import { ModelChoices } from "../configuration/ModelChoices";
 
 
 /**
