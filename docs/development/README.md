@@ -6,7 +6,11 @@ Documents cover the object model, historical records, execution, plugin hosting,
 
 Implementation details are discovered from the current code when needed. Stable directory maps can explain responsibilities; per-file source indexes, API inventories, version catalogs, and duplicate feature checklists are unnecessary.
 
-Explain generalized design results directly. Research provenance, inspected versions, and review evidence are temporary working material managed with tasks, not part of the engineering explanation. A design remains understandable without access to its original investigation.
+## Writing design documentation
+
+Write for the next design decision. State the user need, the constraint, and the tradeoff when they help a future maintainer choose between plausible alternatives. Before adding a paragraph, ask what decision it would change. A change in code alone is not a reason to add prose. Revise or remove guidance that no longer applies instead of appending an account of what changed.
+
+The design system and design direction guide choices; citing them or editing them alongside a patch does not approve the patch. Assess the proposal against concrete user scenarios and engineering constraints. Use independent review and user feedback to judge whether it works. Keep change history in commits and investigation, review, and acceptance evidence in `plans/`. The design docs should stand on their own without those records.
 
 ## Documentation ownership
 
@@ -36,5 +40,5 @@ Manual and engineering topics include enough context to stand alone without cros
 
 1. **Classify each claim.** Separate current state, operational contracts, user-selected procedures, and conceptual explanations. For example, a schedule's activation requirements belong in its contract; how session sleep affects reminders can also belong in the manual as a user-facing caveat.
 2. **Verify the owner.** Read the implementation and relevant creation, resource, or tool projections. Check what the reader can actually discover, not just whether a schema or manual section exists. Source code, types, schemas, configuration, and executable examples own current behavior; proposals and old acceptance records do not.
-3. **Keep the distinct explanation.** Retain prose that explains a choice, expectation, or observed outcome beyond discoverable facts. Put missing operational facts in the owning contract. Implementation changes alone do not require a manual update unless they affect what the reader should understand or expect.
+3. **Keep the distinct explanation.** Apply the [design writing guidance](#writing-design-documentation) to design docs. Elsewhere, retain prose that explains a choice, expectation, or observed outcome beyond discoverable facts. Put missing operational facts in the owning contract. Implementation changes alone do not require a manual update unless they affect what the reader should understand or expect.
 4. **Account for removals.** Identify obsolete and redundant material. Preserve any unique, necessary guidance in its proper home before removing it, and verify it is discoverable there. Check for both duplicate facts and missing conceptual coverage across resources.
