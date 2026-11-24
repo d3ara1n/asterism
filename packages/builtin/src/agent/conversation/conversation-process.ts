@@ -7,20 +7,13 @@ export interface ProcessTimeline {
   processIds: ReadonlySet<string>;
 }
 
-/**
- * Consecutive inputs share a conversation group. Any input after model content closes that group, independently of execution turns.
- *
- * Folding follows one rule: whatever occurred while a group succeeded folds with it. Notices and compaction markers are not
- * judged by importance or origin, because a group that truly blocked never succeeds and never folds, so its notices stay
- * visible. The summary row reports what it hides, so the account survives without occupying the reading flow.
- */
+/** An input after model content closes the current process group, independently of execution turns. */
 export function groupConversationProcesses(items: readonly TimelineItem[], running: boolean): ProcessTimeline {
   const result: TimelineItem[] = [];
   const owners = new Map<string, string>();
   const processIds = new Set<string>();
   let pending: TimelineItem[] = [];
   let lastBlock: Extract<TimelineItem, { ordinal: number }> | null = null;
-  // A group keeps its fold only when its last response completed; unfinished work stays open for reading.
   const finish = (settled: boolean) => {
     if (!lastBlock || !settled) {
       result.push(...pending);
@@ -30,29 +23,32 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
     }
     // The last response is stable when earlier history is loaded, even if the group's inputs are outside the reading window.
     const id = `conversation-process:${lastBlock.responseId}`;
-    const completed = "responseCompleted" in lastBlock && lastBlock.responseCompleted === true;
+    const replyCompleted = "responseCompleted" in lastBlock && lastBlock.responseCompleted === true;
     const final: Extract<TimelineItem, { kind: "text" }>[] = [];
     const body: TimelineItem[] = [];
     let lastProcess = -1;
     let finalPosition = -1;
     const content = new Set<"text" | "thinking">();
     const tools: Extract<TimelineItem, { kind: "toolcall" }>[] = [];
-    const events: TimelineItem[] = [];
+    const foldableEvents: Extract<TimelineItem, { kind: "notice" | "compression" }>[] = [];
+    // Only events bracketed by model output belong to the process. In particular, a standalone compaction can follow the reply.
+    let betweenBlocks = false;
     for (const entry of pending) {
-      if (entry.kind === "text" && completed && entry.responseId === lastBlock.responseId) {
+      const modelBlock = isModelBlock(entry);
+      if (modelBlock) betweenBlocks = entry !== lastBlock;
+      if (entry.kind === "text" && replyCompleted && entry.responseId === lastBlock.responseId) {
         if (finalPosition < 0) finalPosition = body.length;
         final.push(entry);
         continue;
       }
       body.push(entry);
-      if (isModelBlock(entry)) {
+      if (modelBlock) {
         owners.set(timelineKey(entry), id);
         lastProcess = body.length - 1;
         if (entry.kind === "toolcall") tools.push(entry);
         else if ((entry.kind === "text" || entry.kind === "thinking") && entry.text.trim()) content.add(entry.kind);
-      } else if (completed && (entry.kind === "notice" || entry.kind === "compression")) {
-        // Events fold only together with the process that owns them; the summary row reports each count.
-        events.push(entry);
+      } else if (betweenBlocks && (entry.kind === "notice" || entry.kind === "compression")) {
+        foldableEvents.push(entry);
       }
     }
     // The final reply keeps its position relative to the body it answered, whatever the folding order.
@@ -60,10 +56,14 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
     if (final.length) body.splice(Math.max(finalPosition, lastProcess + 1), 0, ...final);
     if (lastProcess >= 0) {
       processIds.add(id);
-      body.splice(lastProcess + 1, 0, { kind: "conversation-process", id, tools, content: [...content], incomplete: !completed,
-        notices: events.filter(entry => entry.kind === "notice").length,
-        compressions: events.filter(entry => entry.kind === "compression").length, open: false });
-      for (const entry of events) owners.set(timelineKey(entry), id);
+      let notices = 0, compressions = 0;
+      for (const event of foldableEvents) {
+        owners.set(timelineKey(event), id);
+        if (event.kind === "notice") notices++;
+        else compressions++;
+      }
+      body.splice(lastProcess + 1, 0, { kind: "conversation-process", id, tools, content: [...content],
+        incomplete: !replyCompleted, notices, compressions, open: false });
     }
     result.push(...body);
     pending = [];

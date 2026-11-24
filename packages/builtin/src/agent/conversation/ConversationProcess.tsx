@@ -31,7 +31,6 @@ function toolGroups(tools: readonly ToolCallNode[]) {
   return [...groups.values()];
 }
 
-/** The summary sits at the end of the process; expanded original items appear above the button. */
 export function ConversationProcess({ node, onToggle, onMount }: {
   node: Extract<TimelineItem, { kind: "conversation-process" }>;
   onToggle(): void;

@@ -6,11 +6,6 @@ import { ExecutionErrorDetails } from "../ErrorDetails";
 import { BlockStateLine } from "./Disclosure";
 import type { TimelineItem } from "./timeline";
 
-/**
- * A failure keeps the block tone of the content it belongs to: the red state line and the faint red tone carry it,
- * as on a failed process block. A warning is an occurrence such as a cancellation or an omitted attachment rather
- * than a state, so it stays a marker row without a surface of its own.
- */
 export function ExecutionNotice({ node }: { node: Extract<TimelineItem, { kind: "notice" }> }) {
   const i18n = useI18n();
   const message = node.omittedFiles
@@ -21,7 +16,7 @@ export function ExecutionNotice({ node }: { node: Extract<TimelineItem, { kind: 
     <MarkerContent>{message}</MarkerContent>
     {node.details && <ExecutionErrorDetails code={node.code} details={node.details} />}
   </Marker>;
-  return <div role="alert" data-tone="failed" className="surface-block px-3 py-2 text-sm">
+  return <div data-tone="failed" className="surface-block px-3 py-2 text-sm">
     <BlockStateLine state="failed" />
     <div className="flex min-w-0 items-start gap-2">
       <StatusIcon tone="error" className="mt-0.5 size-3.5 shrink-0" />

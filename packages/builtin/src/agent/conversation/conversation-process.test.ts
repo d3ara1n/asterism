@@ -4,15 +4,17 @@ import { ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { sessionSnapshot } from "../../../../../src/plugins/records";
 import { nodeView } from "../../../../../src/session/view";
 import { agentSource, call, event, message, node, text, thinking } from "../../../../../src/session/test-nodes";
-import type { InlineFeedback } from "../feedback";
+import type { CompressionActivity, InlineFeedback } from "../feedback";
 import { displayedTimeline, savedTimeline, withLive } from "./timeline";
 import { groupConversationProcesses, visibleConversationProcesses } from "./conversation-process";
 
 const completion = { finishReason: "stop", rawFinishReason: null, providerResponseId: null,
   usage: { input: 100, output: 20, total: 120, cacheRead: null, cacheWrite: null, reasoning: null } } satisfies ModelCompletion;
-function project(path: ReturnType<typeof node>[], running = false, live: readonly ModelLiveBlock[] = [], feedback: readonly InlineFeedback[] = []) {
+function project(path: ReturnType<typeof node>[], running = false, live: readonly ModelLiveBlock[] = [],
+  feedback: readonly InlineFeedback[] = [], compressions: readonly CompressionActivity[] = []) {
   const snapshot = sessionSnapshot(nodeView("s", "", path, path.at(-1)?.id ?? null));
-  return groupConversationProcesses(displayedTimeline(withLive(savedTimeline(snapshot.records.all({ scope: "timeline" }), "a", running, feedback), live)), running);
+  const saved = savedTimeline(snapshot.records.all({ scope: "timeline" }), "a", running, feedback, { compressions });
+  return groupConversationProcesses(displayedTimeline(withLive(saved, live)), running);
 }
 const ids = (grouped: ReturnType<typeof project>, open: readonly string[] = []) =>
   visibleConversationProcesses(grouped, new Set(open)).map(item => item.id);
@@ -48,7 +50,7 @@ describe("Conversation process folding by input groups", () => {
       .toMatchObject({ content: ["thinking"], tools: [] });
   });
 
-  // Steer splits presentation without splitting execution measurements. This group never completed, so its error stays visible instead of folding.
+  // Steer splits presentation without splitting execution measurements.
   it("Supplemental inputs create separate processes while errors and a single turn footer remain visible", () => {
     const path = [
       node("u", null, message("a", "Work")),
@@ -61,7 +63,6 @@ describe("Conversation process folding by input groups", () => {
       { id: "error", afterNodeId: "progress", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
     ];
     const grouped = project(path, false, [], feedback);
-    // The work group ended without a completed response, so folding never happens and its error stays where it occurred.
     expect(ids(grouped)).toEqual(["u", "conversation-process:work", "error", "steer", "conversation-process:final", "reply", "turn-metrics:u"]);
     expect(ids(grouped, [...grouped.processIds]))
       .toEqual(["u", "progress", "conversation-process:work", "error", "steer", "tool", "conversation-process:final", "reply", "turn-metrics:u"]);
@@ -167,8 +168,14 @@ describe("Conversation process folding by input groups", () => {
         termination: { reason: "failed", origin: "model", code: "provider_error", message: "Disconnected", retryable: true },
       } })),
     ];
-    expect(ids(project(path))).toEqual(["u", "reply1", "steer", "conversation-process:failed", "response-error:failed", "turn-metrics:u"]);
-    expect(project(path).items.find(item => item.kind === "conversation-process")).toMatchObject({ incomplete: true });
+    const feedback: InlineFeedback[] = [
+      { id: "earlier-error", afterNodeId: "progress", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
+    ];
+    const grouped = project(path, false, [], feedback);
+    expect(ids(grouped)).toEqual(["u", "reply1", "steer", "conversation-process:failed", "response-error:failed", "turn-metrics:u"]);
+    expect(ids(grouped, ["conversation-process:failed"]))
+      .toEqual(["u", "reply1", "steer", "progress", "earlier-error", "partial", "conversation-process:failed", "response-error:failed", "turn-metrics:u"]);
+    expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ incomplete: true });
   });
 
   // Hidden empty thinking still contributes to a response's ordinal count when establishing normal completion.
@@ -198,7 +205,6 @@ describe("Conversation process folding by input groups", () => {
     expect(grouped.owners.has(JSON.stringify(["work", 1]))).toBe(false);
   });
 
-  // Stopping leaves no final reply; resuming continues the original turn, and stopping's own notice folds once that turn finally succeeds.
   it("Interruption collapses process items and preserves feedback; resuming restores the original stream without presenting partial output as a final reply", () => {
     const path = [
       node("u", null, message("a", "Work")),
@@ -216,7 +222,6 @@ describe("Conversation process folding by input groups", () => {
     expect(project(path, false, [], feedback).items.find(item => item.kind === "conversation-process")).toMatchObject({ notices: 1 });
   });
 
-  // Compression markers represent events and do not participate in process folding; a fold button should not appear out of nowhere when there is no body text.
   it("A turn containing only compression retains its independent marker and errors, and the next turn does not absorb it", () => {
     const path = [
       node("u", null, message("a", "Work")),
@@ -235,21 +240,36 @@ describe("Conversation process folding by input groups", () => {
     expect(grouped.processIds.size).toBe(0);
   });
 
-  // Compaction markers fold as events of a successful group, and their count is reported once by the summary row.
-  it("Compaction markers inside a successful group fold with it and the summary row counts them", () => {
-    const summary = (keptFrom: string) => event(ContextSummary.id, { summary: "Internal summary", keptFrom,
-      model: "p/m", tokensBefore: 1000, completion }, { source: agentSource("a") });
+  it("A request that fails before producing output keeps its error when a later input gets an answer", () => {
+    const path = [
+      node("u", null, message("a", "First")),
+      node("next", "u", message("a", "Next")),
+      node("tool", "next", call("a", "work", 0, "read")),
+      node("reply", "tool", text("a", "final", 0, "Done", { completion })),
+    ];
+    const feedback: InlineFeedback[] = [
+      { id: "error", afterNodeId: "u", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
+    ];
+    expect(ids(project(path, false, [], feedback))).toEqual(["u", "error", "next", "conversation-process:final", "reply", "turn-metrics:next"]);
+  });
+
+  it("Folds feedback between model blocks, not the error or standalone compaction after the reply", () => {
     const path = [
       node("u", null, message("a", "Work")),
       node("tool", "u", call("a", "work", 0, "read")),
-      node("before", "tool", summary("u")),
+      node("before", "tool", event(ContextSummary.id, { summary: "Internal summary", keptFrom: "u",
+        model: "p/m", tokensBefore: 1000, completion }, { source: agentSource("a") })),
       node("reply", "before", text("a", "final", 0, "Done", { completion })),
-      node("after", "reply", summary("reply")),
     ];
-    expect(ids(project(path))).toEqual(["u", "conversation-process:final", "reply", "turn-metrics:u"]);
-    expect(ids(project(path), ["conversation-process:final"]))
-      .toEqual(["u", "tool", "conversation-process:final", "before", "reply", "after", "turn-metrics:u"]);
-    expect(project(path).items.find(item => item.kind === "conversation-process")).toMatchObject({ notices: 0, compressions: 2 });
+    const feedback: InlineFeedback[] = [
+      { id: "retry", afterNodeId: "tool", origin: "model", level: "error", code: "provider_error", message: "HTTP 429" },
+      { id: "error", afterNodeId: "reply", origin: "software", level: "error", code: "execution_failed", message: "Could not save the summary" },
+    ];
+    const grouped = project(path, false, [], feedback, [{ id: "failed", afterNodeId: "reply", status: "failed" }]);
+    expect(ids(grouped)).toEqual(["u", "conversation-process:final", "reply", "failed", "error", "turn-metrics:u"]);
+    expect(ids(grouped, ["conversation-process:final"]))
+      .toEqual(["u", "tool", "conversation-process:final", "retry", "before", "reply", "failed", "error", "turn-metrics:u"]);
+    expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ notices: 1, compressions: 1 });
   });
 
   // A direct answer has nothing to hide, while a thinking-only completion has no final body; neither may generate fabricated output.
