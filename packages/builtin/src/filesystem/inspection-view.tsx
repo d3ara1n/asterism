@@ -17,7 +17,7 @@ const kindMessages = {
 const kindIcons = { directory: Folder, file: File, other: FileQuestion } as const;
 
 type Props = ToolRenderProps<z.infer<typeof InspectPathResult.schema>>;
-type Inspection = NonNullable<Props["result"]>["data"] & object;
+type Inspection = z.infer<typeof InspectPathResult.schema>;
 
 /** The kind reads first, because it decides which of the remaining facts mean anything. */
 function Kind({ data }: { data: Inspection }) {
