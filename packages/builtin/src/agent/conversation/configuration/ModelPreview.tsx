@@ -4,9 +4,9 @@ import type { CatalogModel } from "@asterism-app/builtin-api/contracts";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { Separator } from "@asterism-app/ui/ui/separator";
 import { formatCount } from "@asterism-app/ui/format-count";
-import { configurationMessages as messages } from "../../messages/configuration";
-import { diagnosticMessages } from "../../messages/diagnostics";
-import { formatPrice } from "../diagnostics/format";
+import { configurationMessages as messages } from "../../../messages/configuration";
+import { diagnosticMessages } from "../../../messages/diagnostics";
+import { formatPrice } from "../../diagnostics/format";
 
 /** Reads only current catalog data; the output limit is configured, and reference prices do not represent actual account charges. */
 export function ModelPreview({ model, providerName }: { model: CatalogModel; providerName: string }) {

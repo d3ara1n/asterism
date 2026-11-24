@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { sessionSnapshot } from "../../../../../src/plugins/records";
-import { nodeView } from "../../../../../src/session/view";
-import { call, message, node, text, thinking } from "../../../../../src/session/test-nodes";
+import { sessionSnapshot } from "../../../../../../src/plugins/records";
+import { nodeView } from "../../../../../../src/session/view";
+import { call, message, node, text, thinking } from "../../../../../../src/session/test-nodes";
 import { initialShareSelection, prependEarlierShareMessages, shareMessages, shareTurnGroups, toggleShareSelection, type ShareMessage } from "./share-content";
 import { shareImageScale } from "./share-image";
-import { savedTimeline, withLive } from "./timeline";
+import { savedTimeline, withLive } from "../timeline";
 
 const completion = { finishReason: "stop", rawFinishReason: null, providerResponseId: null, usage: null } as const;
 function messages(path: ReturnType<typeof node>[], from?: string) {

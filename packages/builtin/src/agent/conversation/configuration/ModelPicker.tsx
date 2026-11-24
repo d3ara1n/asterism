@@ -4,7 +4,7 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import type { CatalogModel, ModelConfigurationSnapshot } from "@asterism-app/builtin-api/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { Separator } from "@asterism-app/ui/ui/separator";
-import { configurationMessages as messages } from "../../messages/configuration";
+import { configurationMessages as messages } from "../../../messages/configuration";
 import { ConfigurationOptions, type ConfigurationChoice } from "./ConfigurationOptions";
 import { ModelPreview } from "./ModelPreview";
 

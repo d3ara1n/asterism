@@ -5,7 +5,7 @@ import { useI18n } from "@asterism-app/sdk/renderer";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@asterism-app/ui/ui/command";
 import { cn } from "@asterism-app/ui/utils";
-import { configurationMessages } from "../../messages/configuration";
+import { configurationMessages } from "../../../messages/configuration";
 
 export interface ConfigurationChoice {
   value: string;

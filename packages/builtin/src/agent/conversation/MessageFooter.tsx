@@ -12,7 +12,7 @@ import { conversationMessages as messages } from "../../messages/conversation";
 import type { TimelineItem } from "./timeline";
 import { MessageTimestamp } from "./MessageTimestamp";
 
-import { ConversationShareContext } from "./share-context";
+import { ConversationShareContext } from "./share/share-context";
 import { shareMessages } from "../../messages/share";
 
 type Message = Extract<TimelineItem, { kind: "message" }>;

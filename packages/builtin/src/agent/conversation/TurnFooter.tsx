@@ -8,7 +8,7 @@ import type { TurnMetricsData } from "./turn-metrics";
 import { TurnMetrics } from "./TurnMetrics";
 import { MessageTimestamp } from "./MessageTimestamp";
 
-import { ConversationShareContext } from "./share-context";
+import { ConversationShareContext } from "./share/share-context";
 import { shareMessages } from "../../messages/share";
 
 export function TurnFooter({ inputId, metrics, incomplete, replyMarkdown, replyCreatedAt }: {

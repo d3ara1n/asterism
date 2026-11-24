@@ -1,5 +1,5 @@
 import { AgentToolbarItem, useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
-import { AgentConfigurationPicker } from "./ConfigurationPicker";
+import { AgentConfigurationPicker } from "./configuration/ConfigurationPicker";
 import { ContextUsage } from "./ContextUsage";
 import { useConversationInteraction } from "./interaction";
 

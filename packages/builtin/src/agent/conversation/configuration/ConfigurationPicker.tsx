@@ -4,7 +4,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { availableThinkingLevels, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { useI18n } from "@asterism-app/sdk/renderer";
 import { type AgentSelection, resolveAgentModelSelection } from "@asterism-app/builtin-api/contracts";
-import { useSettingsConfiguration } from "../../configuration/renderer-state";
+import { useSettingsConfiguration } from "../../../configuration/renderer-state";
 import { useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { modelSelectionMessages, thinkingLabels } from "@asterism-app/ui/messages/model-selection";
@@ -15,7 +15,7 @@ import { Separator } from "@asterism-app/ui/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { StatusText } from "@asterism-app/ui/ui/status";
-import { configurationMessages } from "../../messages/configuration";
+import { configurationMessages } from "../../../messages/configuration";
 import { ConfigurationOptions, type ConfigurationChoice } from "./ConfigurationOptions";
 import { ProviderOptions, ProviderModels } from "./ModelPicker";
 

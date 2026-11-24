@@ -14,16 +14,16 @@ import { StatusText } from "@asterism-app/ui/ui/status";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { useLifetimeSignal } from "@asterism-app/ui/use-lifetime";
 import { cn } from "@asterism-app/ui/utils";
-import { shareMessages as messages } from "../../messages/share";
-import { conversationMessages } from "../../messages/conversation";
-import { commonMessages } from "../../messages/common";
-import { messageAppearance, messageSenderLabel } from "../message-presentation";
-import { messageTimeOptions } from "./message-time";
+import { shareMessages as messages } from "../../../messages/share";
+import { conversationMessages } from "../../../messages/conversation";
+import { commonMessages } from "../../../messages/common";
+import { messageAppearance, messageSenderLabel } from "../../message-presentation";
+import { messageTimeOptions } from "../message-time";
 import { initialShareSelection, prependEarlierShareMessages, shareMarkdown, shareMessages, shareTurnGroups, toggleShareSelection,
   type ShareMessage } from "./share-content";
-import { readConversation } from "./read-history";
-import { conversationTimeline } from "./timeline";
-import type { ConversationHistoryWindow } from "./history-window";
+import { readConversation } from "../read-history";
+import { conversationTimeline } from "../timeline";
+import type { ConversationHistoryWindow } from "../history-window";
 import { shareImage, shareImageScale, ShareImageSizeError } from "./share-image";
 import "./share.css";
 

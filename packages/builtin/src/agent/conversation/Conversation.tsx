@@ -5,7 +5,7 @@ import { AnimatePresence, motion, useMotionValue, useReducedMotion } from "motio
 import { Button } from "@asterism-app/ui/ui/button";
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { VirtualConversationTimeline } from "./ConversationTimeline";
-import { ConversationSharing } from "./ConversationSharing";
+import { ConversationSharing } from "./share/ConversationSharing";
 import { ConversationNavigation, type ConversationNavigationHandle } from "./ConversationNavigation";
 import { ConversationSeam } from "./ConversationSeam";
 import { IconSwap } from "./IconSwap";
@@ -25,7 +25,7 @@ import { TimelineViewState } from "./view-state";
 
 import { useConversationInteraction } from "./interaction";
 import { AgentToolbar, AgentUIRegion, useComposerHidden } from "../ui/AgentUI";
-import { AgentDraftsPanel } from "./Drafts";
+import { AgentDraftsPanel } from "./drafts/Drafts";
 import type { AgentExecutionState } from "../state";
 import type { AgentActivity, CompressionActivity, InlineFeedback } from "../feedback";
 import { useConversationProcesses } from "./use-conversation-processes";

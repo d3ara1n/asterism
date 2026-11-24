@@ -33,5 +33,5 @@ export default defineRendererPlugin({
 
 export { createMessageDraft, type MessageDraft } from "./agent/conversation/draft";
 export { AttachFiles, DraftFiles, DraftFileError, fileInputEvents } from "./agent/conversation/Files";
-export { ModelChoices } from "./agent/conversation/ModelChoices";
+export { ModelChoices } from "./agent/conversation/configuration/ModelChoices";
 export { SubmissionIdentity } from "./agent/conversation/submission";

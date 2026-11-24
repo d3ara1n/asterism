@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useRendererObject } from "@asterism-app/sdk/renderer";
-import type { TimelineItem } from "./timeline";
-import type { ConversationHistoryWindow } from "./history-window";
+import type { TimelineItem } from "../timeline";
+import type { ConversationHistoryWindow } from "../history-window";
 import { ConversationShareContext } from "./share-context";
 import { shareMessages } from "./share-content";
 import type { ShareDialogProps } from "./ShareDialog";

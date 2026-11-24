@@ -1,5 +1,5 @@
 import { displayInputParts, inputFileName, type AgentMessageSender } from "@asterism-app/builtin-api/contracts";
-import type { TimelineItem } from "./timeline";
+import type { TimelineItem } from "../timeline";
 
 export interface ShareMessage {
   id: string;

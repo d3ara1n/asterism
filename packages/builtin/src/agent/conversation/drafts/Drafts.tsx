@@ -25,12 +25,12 @@ import {
 } from "@asterism-app/ui/ui/alert-dialog";
 import { StatusText } from "@asterism-app/ui/ui/status";
 import { cn } from "@asterism-app/ui/utils";
-import { conversationMessages as messages } from "../../messages/conversation";
-import { useConversationInteraction } from "./interaction";
-import { conversationEase, conversationTransition, immediateTransition } from "./motion";
+import { conversationMessages as messages } from "../../../messages/conversation";
+import { useConversationInteraction } from "../interaction";
+import { conversationEase, conversationTransition, immediateTransition } from "../motion";
 import { commonMessages } from "@asterism-app/ui/messages/common";
-import type { AgentDraft, DraftMode } from "../drafts-contract";
-import { messageAppearance, messageSenderLabel } from "../message-presentation";
+import type { AgentDraft, DraftMode } from "../../drafts-contract";
+import { messageAppearance, messageSenderLabel } from "../../message-presentation";
 
 /** Draft box panel; mounted while items or an unconfirmed exchange exist, and folds away as one motion when the last item leaves. */
 export function AgentDraftsPanel({ onTake }: { onTake(): void }) {
