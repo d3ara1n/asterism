@@ -28,7 +28,9 @@ The open Directory browser watches for changes, but that view is not a backgroun
 
 A Directory location refers to an actual file or folder. Its ability to open in a system application does not depend on whether Asterism can preview its contents. An unsupported preview format therefore does not make the file inaccessible; use the source's system-opening action when another application is better suited to it. Opening the containing folder locates a file in the system file manager, while a folder target opens that folder itself.
 
-These actions act on the current saved filesystem content. They neither export the editor's unsaved draft nor automatically save it. A virtual source, such as the Manual, can offer an internal view without offering system-file actions, even when its implementation stores material on disk.
+A directory reference to a text file can point to a line. A link ending in `#17` moves the cursor to the start of line 17. A link ending in `#14-34` selects from the start of line 14 through the end of line 34, ready to copy. If the file is already open, navigation uses the current draft, including unsaved edits. An invalid or out-of-range line does not prevent the file from opening. System applications and the file manager receive only the file path.
+
+System actions act on the current saved filesystem content. They neither export the editor's unsaved draft nor automatically save it. A virtual source, such as the Manual, can offer an internal view without offering system-file actions, even when its implementation stores material on disk.
 
 ### Git views answer a particular comparison
 

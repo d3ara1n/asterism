@@ -7,17 +7,18 @@ import { parseModelExpression, type ModelExpression } from "./model-selection.ts
  * name something that does not exist; parsing checks only the format.
  */
 
-/** `resource:<resourceId>/<location>`: the authority is the resource ID and the resource interprets the location. */
-export interface ResourceUrl { readonly resourceId: string; readonly location: string }
+/** `resource:<resourceId>/<location>[#<fragment>]`: the resource interprets the location and optional navigation fragment. */
+export interface ResourceUrl { readonly resourceId: string; readonly location: string; readonly fragment?: string }
 /** `skill:<name>[/<path>]`: the skill name and an optional package-relative file; undefined means SKILL.md. */
 export interface SkillUrl { readonly name: string; readonly path: string | undefined }
 
 const encodePath = (path: string) => path.split("/").map(encodeURIComponent).join("/");
 const decodePath = (path: string) => path.split("/").map(decodeURIComponent).join("/");
 
-export function resourceUrl(resourceId: string, location: string): string {
+export function resourceUrl(resourceId: string, location: string, fragment?: string): string {
+  const suffix = fragment === undefined ? "" : `#${encodeURIComponent(fragment)}`;
   // Parentheses are URI-safe but delimit the Markdown destination used by references.
-  return `resource:${encodeURIComponent(resourceId)}/${encodePath(location)}`.replaceAll("(", "%28").replaceAll(")", "%29");
+  return `resource:${encodeURIComponent(resourceId)}/${encodePath(location)}${suffix}`.replaceAll("(", "%28").replaceAll(")", "%29");
 }
 
 export function parseResourceUrl(value: string): ResourceUrl | null {
@@ -25,7 +26,14 @@ export function parseResourceUrl(value: string): ResourceUrl | null {
   if (!match) return null;
   try {
     const resourceId = decodeURIComponent(match[1]!);
-    return resourceId ? { resourceId, location: decodePath(match[2]!) } : null;
+    if (!resourceId) return null;
+    const address = match[2]!;
+    const hash = address.indexOf("#");
+    if (hash < 0) return { resourceId, location: decodePath(address) };
+    const location = decodePath(address.slice(0, hash));
+    // A malformed navigation hint does not invalidate the resource location.
+    try { return { resourceId, location, fragment: decodeURIComponent(address.slice(hash + 1)) }; }
+    catch { return { resourceId, location }; }
   } catch { return null; }
 }
 

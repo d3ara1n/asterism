@@ -2,7 +2,7 @@ import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 
 import { createContext, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
 import type { UiText } from "@asterism-app/sdk/contracts";
-import { useI18n } from "@asterism-app/sdk/renderer";
+import { useI18n, type RendererIslandNavigation, type RendererIslandOpenOptions } from "@asterism-app/sdk/renderer";
 import { windowGeometry } from "../../../shared/desktop";
 import type { IslandView } from "../../../shared/workbench";
 import { cn } from "@asterism-app/ui/utils";
@@ -22,7 +22,7 @@ export interface IslandSpec {
   key: string;
   width: IslandWidth;
   label: UiText;
-  render: () => ReactNode;
+  render: (navigation?: RendererIslandNavigation) => ReactNode;
   /** False omits the shell; transparent retains its border, clipping, and focus highlight without a background fill. Defaults to a card surface. */
   surface?: boolean | "transparent";
   origin?: HTMLElement | null;
@@ -34,7 +34,11 @@ export interface IslandSpec {
 type IslandContent = Omit<IslandSpec, "key">;
 
 /** Ordinary island state: owner is the island that opened it; size is a fixed width chosen through the island menu, or null for the declared width. */
-export interface StripIsland { id: string; key: string; owner: string | null; size: number | null; spec: IslandContent }
+export interface StripIsland {
+  id: string; key: string; owner: string | null; size: number | null; spec: IslandContent;
+  /** Live activation only; restoration uses spec.restore, not this request. */
+  navigation?: RendererIslandNavigation;
+}
 /**
  * focus null means the root. scope names the context the islands belong to, such as a session;
  * an owner persists the arrangement only while the scope is its own, so clearing islands for navigation is not recorded.
@@ -101,7 +105,7 @@ export interface IslandApi {
   /** Rebind this instance in place. An occupied key is reported and leaves the binding unchanged; absent instances return false. */
   bindKey: (key: string) => boolean;
   /** Open at the right end or locate by content key. Returns the shown instance and whether it was created, or null when the owner is absent. */
-  open: (spec: IslandSpec) => Promise<{ id: string; opened: boolean } | null>;
+  open: (spec: IslandSpec, options?: RendererIslandOpenOptions) => Promise<{ id: string; opened: boolean } | null>;
   /** Close this island and the islands it opened, transitively (no effect on the root). force skips guards for invalid content. Resolves to whether it closed. */
   close: (options?: { force?: boolean }) => Promise<boolean>;
   /** Close the islands this island opened, transitively; with target, only that directly owned island and the islands it opened. */
@@ -235,8 +239,11 @@ export function Screen({ label, root, strip: external, className, ref }: {
       return true;
     } finally { pending.current = false; }
   };
-  const focusElement = (id: string) => requestAnimationFrame(() =>
-    viewport.current?.querySelector<HTMLElement>(`[data-island="${CSS.escape(id)}"]`)?.focus({ preventScroll: true }));
+  const focusElement = (id: string) => requestAnimationFrame(() => {
+    const element = viewport.current?.querySelector<HTMLElement>(`[data-island="${CSS.escape(id)}"]`);
+    // The destination may already have focused a control while handling navigation.
+    if (element && !element.contains(element.ownerDocument.activeElement)) element.focus({ preventScroll: true });
+  });
   const known = (id: string) => latest.current.order.includes(id);
   /** Remove ordinary islands and settle focus on the composed order before removal. */
   const remove = (removed: readonly string[], settle = false) => {
@@ -245,12 +252,15 @@ export function Screen({ label, root, strip: external, className, ref }: {
     strip.set({ islands: removeIslands(current.islands, removed),
       focus: focusAfterClose(latest.current.order, removed, focused, latest.current.root.key), settle });
   };
-  const open = async (owner: string, spec: IslandSpec) => {
+  const open = async (owner: string, spec: IslandSpec, options?: RendererIslandOpenOptions) => {
     if (!known(owner)) return null;
     const current = strip.getSnapshot();
     const { key, ...content } = spec;
     const next = openIsland(current.islands, { id: crypto.randomUUID(), key, owner, size: null, spec: content });
-    strip.set({ islands: next.islands, focus: next.island.id });
+    const target = options?.navigation;
+    const islands = target === undefined ? next.islands : next.islands.map(island => island === next.island
+      ? { ...island, navigation: { target } } : island);
+    strip.set({ islands, focus: next.island.id });
     // A located island receives focus here; a new one focuses itself after mounting.
     if (!next.opened) focusElement(next.island.id);
     return { id: next.island.id, opened: next.opened };
@@ -349,11 +359,11 @@ export function Screen({ label, root, strip: external, className, ref }: {
         const hidden = overflow && (visibleRight <= 0 || visibleLeft >= width);
         const peek = overflow && !hidden && (visibleLeft < -1 || visibleRight > width + 1);
         const position = island ? ordinaries.indexOf(island) : -1;
-        return <Island key={id} spec={spec} width={span.width} x={span.left + shift} viewportWidth={width} settle={state.settle} hidden={hidden} peek={peek}
+        return <Island key={id} spec={spec} navigation={island?.navigation} width={span.width} x={span.left + shift} viewportWidth={width} settle={state.settle} hidden={hidden} peek={peek}
           focused={islands.length > 1 && id === focus}
           api={{
             id, key: island?.key ?? null, has, bindKey: key => bindKey(id, key),
-            open: next => open(id, next),
+            open: (next, options) => open(id, next, options),
             close: options => close(id, options?.force),
             closeOwned: options => closeOwned(id, options?.force, options?.target),
             guard: fn => guard(id, fn),
@@ -392,14 +402,14 @@ function useStableIsland(api: IslandApi): IslandApi {
   return useMemo(() => ({
     get id() { return latest.current.id; }, get key() { return latest.current.key; }, get arrangement() { return latest.current.arrangement; },
     has: key => latest.current.has(key), bindKey: key => latest.current.bindKey(key),
-    open: spec => latest.current.open(spec), close: options => latest.current.close(options),
+    open: (spec, options) => latest.current.open(spec, options), close: options => latest.current.close(options),
     closeOwned: options => latest.current.closeOwned(options), guard: fn => latest.current.guard(fn),
     onCancel: action => latest.current.onCancel(action),
   }), []);
 }
 
-function Island({ ref, spec, width, x, viewportWidth, settle, hidden, peek, focused, api, onFocus }: {
-  ref?: React.Ref<HTMLElement>; spec: IslandContent; width: number; x: number; viewportWidth: number; settle: boolean; hidden: boolean; peek: boolean; focused: boolean; api: IslandApi; onFocus: () => void;
+function Island({ ref, spec, navigation, width, x, viewportWidth, settle, hidden, peek, focused, api, onFocus }: {
+  ref?: React.Ref<HTMLElement>; spec: IslandContent; navigation?: RendererIslandNavigation; width: number; x: number; viewportWidth: number; settle: boolean; hidden: boolean; peek: boolean; focused: boolean; api: IslandApi; onFocus: () => void;
 }) {
   const i18n = useI18n();
   const element = useRef<HTMLElement>(null);
@@ -426,6 +436,6 @@ function Island({ ref, spec, width, x, viewportWidth, settle, hidden, peek, focu
     className="island"
     onFocusCapture={focusSelf} onPointerDownCapture={focusSelf}>
     {surface && <div className="island-backdrop" aria-hidden="true" />}
-    <div className="island-body"><IslandContext.Provider value={stable}>{spec.render()}</IslandContext.Provider></div>
+    <div className="island-body"><IslandContext.Provider value={stable}>{spec.render(navigation)}</IslandContext.Provider></div>
   </motion.section>;
 }

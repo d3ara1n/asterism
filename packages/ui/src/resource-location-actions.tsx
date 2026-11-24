@@ -7,7 +7,7 @@ import { IconButton } from "./ui/icon-button";
 import { Spinner } from "./ui/spinner";
 
 /** Resolve capabilities when the surface opens; actions resolve their actual targets when clicked. */
-export function useResourceLocationActions(resource: Pick<ResourceRef, "sessionId" | "id">, location: string, enabled = true) {
+export function useResourceLocationActions(resource: Pick<ResourceRef, "sessionId" | "id">, location: string, enabled = true, fragment?: string) {
   const navigation = useRendererResourceNavigation();
   const { sessionId, id } = resource;
   const [actions, setActions] = useState<readonly RendererResourceLocationAction[]>([]);
@@ -19,12 +19,12 @@ export function useResourceLocationActions(resource: Pick<ResourceRef, "sessionI
     if (!enabled) return;
     let active = true;
     setLoading(true); setActions([]); setError(null);
-    navigation.actions({ sessionId, id }, location).then(
+    navigation.actions({ sessionId, id }, location, { fragment }).then(
       value => { if (active) { setActions(value); setLoading(false); } },
       failure => { if (active) { setError(failureDisplay(failure, commonMessages.referenceUnavailable)); setLoading(false); } },
     );
     return () => { active = false; };
-  }, [navigation, sessionId, id, location, enabled]);
+  }, [navigation, sessionId, id, location, enabled, fragment]);
   const run = async (action: RendererResourceLocationAction, origin?: HTMLElement | null) => {
     if (running.current) return;
     running.current = true;

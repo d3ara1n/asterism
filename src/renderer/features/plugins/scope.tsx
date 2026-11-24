@@ -1,7 +1,7 @@
 import { Component, useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   RendererCallsProvider, RendererIslandPanelProvider, RendererIslandProvider, RendererPreferencesProvider, RendererResourceNavigationProvider, useRendererCalls, useRendererApplication,
-  type RendererIsland, type RendererIslandSpec, type RendererCalls, type RendererReceipt, type RendererResourceIdentity, type RendererResourceNavigation,
+  type RendererIsland, type RendererIslandSpec, type RendererIslandNavigation, type RendererCalls, type RendererReceipt, type RendererResourceIdentity, type RendererResourceNavigation,
 } from "@asterism-app/sdk/renderer";
 import { pluginOf } from "@asterism-app/sdk/contracts";
 import { AppWindow } from "lucide-react";
@@ -24,7 +24,7 @@ import { pluginPreferences } from "../creation/preferences";
 function pluginIslandSpec(pluginId: string, spec: RendererIslandSpec, restore?: IslandView): IslandSpec {
   return { key: `plugin-island:${pluginId}:${spec.key}`, label: spec.label,
     width: spec.size === "content" ? { min: 560, grow: 2 } : panelIslandWidth, origin: spec.origin, restore,
-    render: () => <PluginIslandContent pluginId={pluginId} spec={spec} /> };
+    render: navigation => <PluginIslandContent pluginId={pluginId} spec={spec} navigation={navigation} /> };
 }
 
 /** restore tags the first island opened through this adapter: a resource opener shows its location there. */
@@ -34,9 +34,9 @@ function pluginIsland(island: IslandApi, pluginId: string, restore?: IslandView,
   return {
     has: key => island.has(prefix + key),
     bindKey: key => island.key?.startsWith(prefix) ? island.bindKey(prefix + key) : false,
-    open: async spec => {
+    open: async (spec, options) => {
       const next = pluginIslandSpec(pluginId, spec, tag); tag = undefined;
-      const opened = await island.open(next);
+      const opened = await island.open(next, options);
       if (opened?.opened) owned?.add(opened.id);
       return opened !== null;
     },
@@ -130,7 +130,7 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
       if (!read.ok) throw Object.assign(new Error(read.error.message), read.error);
       return read.resource;
     },
-    async actions(target, location) {
+    async actions(target, location, options) {
       const read = await readResource(target);
       if (!read.ok) throw Object.assign(new Error(read.error.message), read.error);
       if (!read.resource) return [];
@@ -138,7 +138,7 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
       const descriptor = registry.resource(resource.kind);
       const actions = [...(descriptor.actions?.(location, { resource, calls, application }) ?? [])];
       if (descriptor.open) actions.unshift({ id: "open", label: commonMessages.openInApp, icon: <AppWindow />,
-        run: options => navigation.open(target, location, options) });
+        run: activation => navigation.open(target, location, { ...options, ...activation }) });
       return actions.map(action => ({ ...action, async run(options) {
         try { return await action.run(options); }
         catch (error) {
@@ -156,7 +156,7 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
         const { ref: resource } = read.resource;
         const descriptor = registry.resource(resource.kind);
         if (!descriptor.open) { toast.error(i18n.text(objectsMessages.resourceOpenUnsupported)); return false; }
-        return await descriptor.open(location, { resource, calls, origin: options?.origin,
+        return await descriptor.open(location, { ...options, resource, calls,
           island: pluginIsland(island, pluginOf(resource.kind)!, { kind: "resource", resourceId: resource.id, location }, owned) });
       } catch (error) {
         console.error("Resource location could not be opened.", error);
@@ -197,9 +197,11 @@ export function PluginRegion({ pluginId, page = false, fallback, children }: { p
 }
 
 /** Plugin island content renders within the host screen, outside the page that opened it, so it forms its own region. */
-function PluginIslandContent({ pluginId, spec }: { pluginId: string; spec: RendererIslandSpec }) {
+function PluginIslandContent({ pluginId, spec, navigation }: {
+  pluginId: string; spec: RendererIslandSpec; navigation?: RendererIslandNavigation;
+}) {
   const i18n = useI18n();
   return <PluginRegion pluginId={pluginId} fallback={<IslandPanel title={i18n.text(spec.label)}>
     <Alert variant="destructive"><AlertDescription>{i18n.text(messages.pageFailed)}</AlertDescription></Alert>
-  </IslandPanel>}><Render render={spec.render} /></PluginRegion>;
+  </IslandPanel>}><Render render={() => spec.render(navigation)} /></PluginRegion>;
 }

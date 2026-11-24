@@ -14,7 +14,14 @@ export interface RendererIslandSpec {
   origin?: HTMLElement | null;
   /** Content surfaces grow wider than the default form panel. */
   size?: "panel" | "content";
-  render: () => ReactNode;
+  /** Receives the latest navigation for this live instance, including when its key is reused. Consume it once per request object. */
+  render: (navigation?: RendererIslandNavigation) => ReactNode;
+}
+/** An in-memory navigation request. Only the owning plugin interprets its target. */
+export interface RendererIslandNavigation { readonly target: unknown }
+export interface RendererIslandOpenOptions {
+  /** When supplied, send a fresh request to the shown island without replacing its content. */
+  readonly navigation?: unknown;
 }
 /** Explicit cancellation action of an island; cancellation may close it through the usual close guards. */
 export type RendererIslandCancel = () => void | Promise<void>;
@@ -28,7 +35,7 @@ export interface RendererIsland {
    */
   bindKey(key: string): boolean;
   /** Open an island owned by this one at the right end of the screen, or locate the open island with the same key. Resolves to whether it is shown. */
-  open(spec: RendererIslandSpec): Promise<boolean>;
+  open(spec: RendererIslandSpec, options?: RendererIslandOpenOptions): Promise<boolean>;
   /** Close this island and the islands it opened; has no effect on host-managed islands such as the one containing a plugin settings page. force skips guards. */
   close(options?: { force?: boolean }): Promise<boolean>;
   /** Close the islands this island opened, transitively. */

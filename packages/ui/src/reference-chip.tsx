@@ -135,11 +135,11 @@ export function ReferenceChip({ href, sessionId, children, openable = false, sel
   const resource = skill ? null : parseResourceUrl(href);
   const model = parseModelUrl(href);
   const card = skill ? skills && <skills.Card name={skill.name} path={skill.path} />
-    : resource && sessionId ? <ResourceCard sessionId={sessionId} id={resource.resourceId} location={resource.location} />
+    : resource && sessionId ? <ResourceCard sessionId={sessionId} id={resource.resourceId} location={resource.fragment === undefined ? resource.location : `${resource.location}#${resource.fragment}`} />
     : model ? <ModelCard model={model} /> : null;
   const activate = !openable ? null
     : skill ? skills && ((origin: HTMLElement) => skills.open(skill.name, skill.path, origin))
-    : resource && sessionId ? (origin: HTMLElement) => navigation.open({ sessionId, id: resource.resourceId }, resource.location, { origin }) : null;
+    : resource && sessionId ? (origin: HTMLElement) => navigation.open({ sessionId, id: resource.resourceId }, resource.location, { origin, fragment: resource.fragment }) : null;
   const faceProps = { href, selected, hint: card ? undefined : href, tabIndex: model ? 0 : undefined,
     className: model ? "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" : undefined };
   const face = appearance === "link" ? <ReferenceLinkFace {...faceProps}>{children}</ReferenceLinkFace>
@@ -154,7 +154,7 @@ export function ReferenceChip({ href, sessionId, children, openable = false, sel
     }}>{face}</a> : face;
   const hoverTrigger = card ? <HoverCardTrigger asChild>{trigger}</HoverCardTrigger> : trigger;
   const menuTrigger = openable && resource && sessionId
-    ? <ResourceReferenceMenu resource={{ sessionId, id: resource.resourceId }} location={resource.location}>{hoverTrigger}</ResourceReferenceMenu>
+    ? <ResourceReferenceMenu resource={{ sessionId, id: resource.resourceId }} location={resource.location} fragment={resource.fragment}>{hoverTrigger}</ResourceReferenceMenu>
     : hoverTrigger;
   if (!card) return menuTrigger;
   return <HoverCard openDelay={400} closeDelay={100}>
@@ -169,16 +169,20 @@ export function ReferenceChip({ href, sessionId, children, openable = false, sel
 }
 
 /** The menu resolves capabilities only when opened; the reference's normal click remains unchanged. */
-function ResourceReferenceMenu({ resource, location, children }: {
-  resource: Pick<ResourceRef, "sessionId" | "id">; location: string; children: ReactNode;
+function ResourceReferenceMenu({ resource, location, fragment, children }: {
+  resource: Pick<ResourceRef, "sessionId" | "id">; location: string; fragment?: string; children: ReactNode;
 }) {
   const i18n = useI18n();
   const [open, setOpen] = useState(false);
   const origin = useRef<HTMLElement | null>(null);
-  const { actions, loading, error, pending, run } = useResourceLocationActions(resource, location, open);
+  const { actions, loading, error, pending, run } = useResourceLocationActions(resource, location, open, fragment);
   return <ContextMenu onOpenChange={setOpen}>
     <ContextMenuTrigger asChild onContextMenu={event => { origin.current = event.currentTarget; }}>{children}</ContextMenuTrigger>
-    <ContextMenuContent>
+    <ContextMenuContent onCloseAutoFocus={event => {
+      // An action may have already moved focus to the opened destination.
+      const doc = origin.current?.ownerDocument;
+      if (doc?.activeElement && doc.activeElement !== doc.body) event.preventDefault();
+    }}>
       <ContextMenuGroup>
         {loading ? <ContextMenuItem disabled><Spinner />{i18n.text(commonMessages.loading)}</ContextMenuItem>
           : error ? <ContextMenuItem disabled>{i18n.text(error)}</ContextMenuItem>

@@ -13,6 +13,18 @@ describe("Resource URLs", () => {
     expect(parseResourceUrl("resource:Dir-A/reports/a%2520file.md")).toEqual({ resourceId: "Dir-A", location: "reports/a%20file.md" });
   });
 
+  it("separates navigation from the path without treating an encoded hash as a delimiter", () => {
+    expect(resourceUrl("dir", "src/main.ts#17", "14-34")).toBe("resource:dir/src/main.ts%2317#14-34");
+    expect(parseResourceUrl("resource:dir/src/main.ts%2317#14-34"))
+      .toEqual({ resourceId: "dir", location: "src/main.ts#17", fragment: "14-34" });
+    expect(parseResourceUrl("resource:dir/src/main.ts%2317"))
+      .toEqual({ resourceId: "dir", location: "src/main.ts#17" });
+  });
+
+  it("keeps the resource location when the fragment has a malformed escape", () => {
+    expect(parseResourceUrl("resource:dir/readme.md#%ZZ")).toEqual({ resourceId: "dir", location: "readme.md" });
+  });
+
   it("keeps case, punctuation and an empty resource-defined location", () => {
     expect(parseResourceUrl("resource:AbC%2F%3F%25/")).toEqual({ resourceId: "AbC/?%", location: "" });
   });

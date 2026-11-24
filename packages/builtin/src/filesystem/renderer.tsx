@@ -30,6 +30,7 @@ import { searchToolRenderers } from "./search-view";
 import { listViews } from "./list-view";
 import { inspectPathRenderer } from "./inspection-view";
 import { fileOpener } from "./open-file";
+import { parseLineFragment } from "./line-fragment";
 
 import { directoryCard as appearance } from "../shared/card-appearance.ts";
 const DirectoryFile = lazy(() => import("./DirectoryFile"));
@@ -83,7 +84,7 @@ function DirectoryTreeBody() {
 
 export default {
   prepare: prepareCodeView,
-  resources: [{ kind: Directory.kind, label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance, referenceTargets: fileReferenceProvider(SearchDirectoryReferences), open: fileOpener(DirectoryFile),
+  resources: [{ kind: Directory.kind, label: filesystemMessages.directory, icon: <Folder className="size-4" />, card: appearance, referenceTargets: fileReferenceProvider(SearchDirectoryReferences), open: fileOpener(DirectoryFile, parseLineFragment),
     actions: (location, { resource, calls, application }) => [
       { id: "open-system", label: commonMessages.openWithSystem, icon: <ExternalLink />, async run() {
         const file = await calls.invoke(ResolveDirectoryLocation, { path: location }, { object: resource });

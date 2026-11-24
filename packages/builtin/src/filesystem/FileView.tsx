@@ -11,17 +11,19 @@ import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { failureDisplay } from "@asterism-app/ui/error-display";
 import { ResourceSourceChip } from "@asterism-app/ui/reference-chip";
+import type { TextEditorNavigation } from "../editor/navigation";
 import type { ReadDirectoryFile } from "./editor-contract";
 import { editorMessages as messages } from "../messages/editor";
 
 const ImageViewer = lazy(() => import("./ImageViewer"));
 
 /** Resources supply their read contract, text surface, and location actions; preview availability does not determine external opening. */
-export function FileView({ resource, path, readFile, TextView }: {
+export function FileView({ resource, path, readFile, TextView, navigation }: {
   resource: ResourceRef;
   path: string;
   readFile: typeof ReadDirectoryFile;
-  TextView: ComponentType<{ resource: ResourceRef; path: string; text: string; source: ReactNode; actions?: ReactNode }>;
+  TextView: ComponentType<{ resource: ResourceRef; path: string; text: string; source: ReactNode; actions?: ReactNode; navigation?: TextEditorNavigation }>;
+  navigation?: TextEditorNavigation;
 }) {
   const i18n = useI18n();
   const calls = useRendererCalls();
@@ -54,7 +56,7 @@ export function FileView({ resource, path, readFile, TextView }: {
   </IslandPanel>;
   if (file) return <Suspense fallback={loading}>{file.kind === "image"
     ? <ImageViewer path={path} mediaType={file.mediaType} base64={file.base64} source={source} actions={actions} />
-    : <TextView resource={resource} path={path} text={file.text} source={source} actions={actions} />}</Suspense>;
+    : <TextView resource={resource} path={path} text={file.text} source={source} actions={actions} navigation={navigation} />}</Suspense>;
   return error ? <IslandPanel title={path} source={source} action={actions}>
     <Alert variant="destructive"><AlertDescription>{i18n.text(error)}
       <Button variant="outline" size="sm" onClick={() => setAttempt(value => value + 1)}>{i18n.text(commonMessages.retry)}</Button>

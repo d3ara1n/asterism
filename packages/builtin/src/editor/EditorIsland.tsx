@@ -9,10 +9,11 @@ import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { failureDisplay } from "@asterism-app/ui/error-display";
 import { TextEditor, type TextEditorHandle } from "./TextEditor";
+import type { TextEditorNavigation } from "./navigation";
 import { editorMessages as messages } from "../messages/editor";
 
 /** The island owns the buffer; its caller supplies persistence and optional source metadata. */
-export function EditorIsland({ title, source, actions, filename, text, onSave, gitBase = null, status, format }: {
+export function EditorIsland({ title, source, actions, filename, text, onSave, gitBase = null, status, format, navigation }: {
   title: string;
   source?: ReactNode;
   actions?: ReactNode;
@@ -22,6 +23,7 @@ export function EditorIsland({ title, source, actions, filename, text, onSave, g
   gitBase?: string | null;
   status?: ReactNode;
   format?: ReactNode;
+  navigation?: TextEditorNavigation;
 }) {
   const i18n = useI18n();
   const [initial] = useState(text);
@@ -57,7 +59,7 @@ export function EditorIsland({ title, source, actions, filename, text, onSave, g
     {actions}
   </>}>
     {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
-    <TextEditor ref={editor} filename={filename} initialText={initial} gitBase={gitBase} lineWrapping={lineWrapping}
+    <TextEditor ref={editor} filename={filename} initialText={initial} gitBase={gitBase} lineWrapping={lineWrapping} navigation={navigation}
       onChange={setContent} onSave={() => void save()} onPosition={setPosition}
       onLanguageError={failure => {
         console.error("Editor language support could not be loaded.", failure);

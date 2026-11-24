@@ -15,18 +15,20 @@ import { gitGutter, setGitBaseline } from "./git-gutter";
 import { createHintPortals, type HintPortal } from "./hint-portals";
 import { HintPortals } from "./HintPortals";
 import { editorSetup } from "./setup";
+import { resolveLineSelection, type TextEditorNavigation } from "./navigation";
 import { editorMessages as messages } from "../messages/editor";
 
 export interface TextEditorHandle { find(): void }
 
 /** A text editing surface independent of files, resource identity, and island placement. */
-export function TextEditor({ ref, filename, initialText, readOnly = false, lineWrapping = false, gitBase = null, onChange, onSave, onPosition, onLanguageError }: {
+export function TextEditor({ ref, filename, initialText, readOnly = false, lineWrapping = false, gitBase = null, navigation, onChange, onSave, onPosition, onLanguageError }: {
   ref?: Ref<TextEditorHandle>;
   filename: string;
   initialText: string;
   readOnly?: boolean;
   lineWrapping?: boolean;
   gitBase?: string | null;
+  navigation?: TextEditorNavigation;
   onChange?(text: string): void;
   onSave?(): void;
   onPosition(position: { line: number; column: number }): void;
@@ -121,6 +123,15 @@ export function TextEditor({ ref, filename, initialText, readOnly = false, lineW
       added: i18n.text(messages.lineAdded), modified: i18n.text(messages.lineModified), removed: i18n.text(messages.linesRemoved),
     } }) });
   }, [gitBase, i18n, filename, initialText]);
+
+  useEffect(() => {
+    const view = editor.current;
+    if (!view || !navigation) return;
+    const selection = resolveLineSelection(view.state.doc, navigation);
+    if (!selection) return;
+    view.dispatch({ selection, effects: EditorView.scrollIntoView(selection.anchor, { y: navigation.endLine === undefined ? "center" : "start" }) });
+    view.focus();
+  }, [navigation]);
 
   return <><div ref={container} className="min-h-0 flex-1 overflow-hidden text-sm" />
     {panel && createPortal(<SearchPanel view={panel.view} query={panel.query} readOnly={readOnly} />, panel.dom)}
