@@ -3,7 +3,7 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdir
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { jsonStorage, sqliteStorage, type StorageDefinition } from "./migrations.ts";
+import { jsonStorage, sqliteStorage, type StorageDefinition } from "./migrations/engine.ts";
 import { clearPause, listRecoveryPoints, prepareData, recoveryPointDirectory, restorePoint, startFresh, type DataPath } from "./preparation.ts";
 import { readJson, writeJson } from "./files.ts";
 

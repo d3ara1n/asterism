@@ -54,7 +54,7 @@ try {
     plugins: packages.flatMap(item => item.definition ? [item.definition] : []),
     pluginDependencies: runtimeDependencies(packages),
     preparedStorage: { failures: storageFailures,
-      declarations: new Map(packages.flatMap(item => item.manifest && item.storage ? [[item.manifest.id, item.storage] as const] : [])) },
+      declarations: new Map(packages.flatMap(item => item.manifest && item.preparedStorage ? [[item.manifest.id, item.preparedStorage] as const] : [])) },
     onConfigurationChanged: () => broadcast({ kind: "configuration.changed" }),
     onSessionChanged: event => broadcast({ kind: "session", event }),
     onPluginConfigurationChanged: id => broadcast({ kind: "plugin-configuration.changed", id }),

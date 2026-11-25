@@ -20,7 +20,9 @@ Read another domain's history through its original public contract. Unreadable e
 
 ## Evolve a saved format without changing the fact
 
-Use a codec when the stored representation differs from what domain code should see. Check that round trips preserve meaning. When an older encoding is still straightforward to read, compatible decoding can leave the saved bytes alone. When an incompatible representation must be converted together before the plugin runs, declare a startup migration instead of scattering repairs through readers and service startup. If the meaning changes rather than just the encoding, give the new fact a new contract.
+Use a codec when the current stored representation differs from what domain code should see. Check that round trips preserve meaning. If a distributed encoding needs to change, prefer a startup migration over keeping old encodings in the codec, even when those encodings are easy to decode. A migration converts the saved data before plugin setup so ordinary readers and writers need only the current format.
+
+Declare migrations for plugin-private JSON and SQLite files and for groups of owned timeline contracts in the plugin's storage entry with `defineStorage`. A record migration does not upgrade current session data, saved templates, or another plugin's records. If the meaning changes rather than just the encoding, give the new fact a new contract instead of rewriting the old one to mean something it did not.
 
 Version private formats independently of session history. A record group is for owned timeline contracts that must evolve together. Keep its identity and membership stable; do not move existing contracts between groups or assume a changed member inherits the correct version. Convert only the recorded data, using rules tied to the old format rather than today's business defaults. Preserve source, position, and the content the fact retains. Migration changes the persisted format; readers remain responsible for interpreting and validating the content. Do not revise past decisions, recreate resources, or repeat external effects.
 

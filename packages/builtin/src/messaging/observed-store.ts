@@ -3,16 +3,6 @@ import { MessagingError } from "@asterism-app/sdk/runtime";
 import { messageSchema, type ConversationAddress, type ConversationList, type ConversationQuery, type Json, type MessageList, type MessageQuery, type MessagingConversation, type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { ensureMessagingSchema } from "./storage-schema.ts";
 
-/** Decode retained text-only observations without changing their identity or polling position. */
-function storedMessage(data: string): MessagingMessage {
-  const value = JSON.parse(data);
-  if (!value.parts && typeof value.text === "string") {
-    const { text, ...rest } = value;
-    return messageSchema.parse({ ...rest, parts: [{ kind: "text", text }] });
-  }
-  return messageSchema.parse(value);
-}
-
 interface Row { data: string; sequence: number; discovered?: number }
 function encodeObservedCursor(scope: string, sequence: number): string {
   return Buffer.from(JSON.stringify([scope, sequence])).toString("base64url");
@@ -67,7 +57,7 @@ export class ObservedMessages {
     return row?.message_id ?? id;
   }
   private decode(chat: string, data: string): MessagingMessage {
-    const message = storedMessage(data);
+    const message = messageSchema.parse(JSON.parse(data));
     return message.replyTo ? { ...message, replyTo: this.resolveId(chat, message.replyTo) } : message;
   }
   message(chat: string, id: string): MessagingMessage | undefined {

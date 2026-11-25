@@ -6,6 +6,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { applicationStorage } from "../shared/application.ts";
 import { belongsTo, contentRefSchema, type ContentRef, type ContentRange, type Json } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ContentReader, type ContentScope } from "@asterism-app/sdk/runtime";
+import { contentReferences } from "../storage/content-references.ts";
 import { contentChunkSize, sameContentTarget, type ContentTarget } from "../shared/content.ts";
 
 export const contentSchemaSql = `
@@ -34,26 +35,6 @@ interface Stored { id: string; size: number; digest: string }
 interface Upload { id: string; scope: ContentLease; file: FileHandle; path: string; size: number; hash: Hash; tail: Promise<unknown>; sealed: boolean }
 const unavailable = (message: string): never => { throw new PluginApiError("unavailable", message); };
 const invalid = (message: string): never => { throw new PluginApiError("invalid_argument", message); };
-
-/** Recognize complete SDK reference values only; continue recursively scanning ordinary JSON such as schema field definitions. */
-export function contentReferences(value: Json): ContentRef[] {
-  const refs = new Map<string, ContentRef>();
-  const pending: Json[] = [value];
-  while (pending.length) {
-    const item = pending.pop()!;
-    if (item === null || typeof item !== "object") continue;
-    if (Array.isArray(item)) { for (const value of item) pending.push(value); continue; }
-    if (Object.hasOwn(item, "$asterism.content")) {
-      const parsed = contentRefSchema.safeParse(item);
-      if (parsed.success) {
-        refs.set(parsed.data["$asterism.content"], parsed.data);
-        continue;
-      }
-    }
-    for (const value of Object.values(item)) pending.push(value);
-  }
-  return [...refs.values()];
-}
 
 /** Drafts and attempts hold independently; close releases holds only after actual IO finishes. */
 export class ContentLease {

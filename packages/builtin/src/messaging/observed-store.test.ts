@@ -1,4 +1,5 @@
 import { DatabaseSync } from "node:sqlite";
+import { messagingDatabaseStorage } from "../storage/messaging.ts";
 import { afterEach, describe, expect, it } from "vitest";
 import { messagingText, type MessagingEvent, type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { ObservedMessages, forgetObservedConnection } from "./observed-store.ts";
@@ -36,14 +37,16 @@ describe("Observed messaging events", () => {
     expect(next.truncated).toBe(false);
     expect(() => store.read({ conversationId: "chat", threadId: "other", since: page.cursor })).toThrow("cursor");
   });
-  it("reads text-only persisted observations without advancing their cursor", () => {
+  it("migrates text-only persisted observations without changing cursors or current messages", () => {
     const { db, store } = setup(), conversation = { conversationId: "chat", title: "Chat", kind: "channel" };
     store.observe(conversation, message("1", "retained"));
-    db.prepare("UPDATE messaging_messages SET data = ?").run(JSON.stringify({
+    store.observe(conversation, message("2", "already current"));
+    const before = store.read({ conversationId: "chat" });
+    db.prepare("UPDATE messaging_messages SET data = ? WHERE id = '1'").run(JSON.stringify({
       id: "1", text: "retained", sender: { id: "person", name: "Person", role: "participant" }, sentAt: "2026-01-01T00:00:00Z",
     }));
-    const before = store.read({ conversationId: "chat" });
-    expect(before.messages[0]?.parts).toEqual([{ kind: "text", text: "retained" }]);
+    messagingDatabaseStorage.migrations[2](db);
+    expect(store.read({ conversationId: "chat" })).toEqual(before);
     store.observe(conversation, message("1", "retained"));
     expect(store.read({ conversationId: "chat", since: before.cursor }).messages).toEqual([]);
   });

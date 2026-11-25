@@ -12,7 +12,7 @@ import { parseCall, applyPreparation, type ParsedCall } from "./commands.ts";
 import { synchronous } from "./synchronous.ts";
 import type { ObjectScope } from "./host.ts";
 import type { ContentLease } from "../runtime/content-store.ts";
-import { contentReferences } from "../runtime/content-store.ts";
+import { contentReferences } from "../storage/content-references.ts";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { encodePluginData } from "./data-encoding.ts";
 

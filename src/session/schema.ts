@@ -8,7 +8,7 @@ export const keepAwakeColumnSql = "keep_awake INTEGER NOT NULL DEFAULT 0 CHECK (
 export const folderSchemaSql = `
   CREATE TABLE folders (id TEXT PRIMARY KEY, name TEXT NOT NULL, color TEXT NOT NULL, created_at TEXT NOT NULL) STRICT;
 `;
-/** Membership column shared by new schemas and the format migration; null means the row belongs to no folder. */
+/** Membership column shared by sessions and templates; null means the row belongs to no folder. */
 export const folderColumnSql = "folder_id TEXT REFERENCES folders(id) ON DELETE SET NULL";
 
 export const completedColumnSql = "completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1))";

@@ -1,8 +1,8 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { applicationStorage } from "../shared/application.ts";
-import { readJson, writeJson } from "../storage/files.ts";
+import { applicationStorage } from "../../shared/application.ts";
+import { readJson, writeJson } from "../files.ts";
 
 type Decrypt = (ciphertext: string) => Promise<string>;
 type References = Record<string, string>;

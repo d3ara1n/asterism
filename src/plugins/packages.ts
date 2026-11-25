@@ -5,7 +5,7 @@ import { extname, join, resolve, posix, win32 } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { z } from "zod";
-import type { PluginDefinition, PluginStorageDeclaration, ManualSource } from "@asterism-app/sdk/runtime";
+import type { PluginDefinition, ManualSource } from "@asterism-app/sdk/runtime";
 import { applicationDirectory, unpackedArchivePath } from "./package-modules.ts";
 import { captureArtifact, artifactPath } from "./artifact-resolver.ts";
 import { registerArtifactModules, rendererImportMap, artifactRoots } from "./native-modules.ts";
@@ -13,12 +13,13 @@ import { artifactSchema, type PluginArtifact } from "@asterism-app/plugin-build/
 export { rendererImportMap, artifactRoots };
 import { loadCatalogs } from "./catalogs.ts";
 import { localeSchema, uiTextSchema, pluginMetadataSchema, type PluginMetadata } from "@asterism-app/sdk/contracts";
-import { jsonStorage } from "../storage/migrations.ts";
+import { packageListVersion } from "../storage/formats.ts";
 import { hostPackageNames, isHostModule } from "../shared/host-modules.ts";
 import { randomUUID } from "node:crypto";
 import { translationCatalogSchema } from "../shared/language.ts";
 import { pluginDiagnosticSchema, pluginErrorMessage, type PluginCandidate } from "../shared/plugin-startup.ts";
 import { PluginAvailability } from "./availability.ts";
+import { currentPluginStorageSchema } from "./storage-declaration.ts";
 
 /** Plugin package manifest: the asterism field in package.json, shared by source and release artifacts. */
 export const manifestSchema = z.strictObject({
@@ -69,12 +70,7 @@ export const packageEntrySchema = z.strictObject({
   enabled: z.boolean(),
 });
 export type PackageEntry = z.infer<typeof packageEntrySchema>;
-/** Plugin list format; increment on changes and append migrations to `packageListStorage`. */
-const packageListVersion = 2;
 const listSchema = z.strictObject({ version: z.literal(packageListVersion), packages: z.array(packageEntrySchema) });
-export function packageListStorage(root: string) {
-  return jsonStorage({ id: "plugins", file: join(root, applicationStorage.pluginListFile), version: packageListVersion, migrations: {} });
-}
 
 export class PluginPackageError extends Error {
   constructor(readonly code: "not_a_package" | "invalid_manifest" | "duplicate" | "build_failed" | "invalid_entry", message: string) { super(message); }
@@ -218,13 +214,13 @@ export const builtPackageSchema = z.object({
   manualSources: z.array(z.object({ path: z.string(), directory: z.string() })).optional(),
   catalogs: z.array(translationCatalogSchema).optional(),
   runtime: z.string().optional(), storageEntry: z.string().optional(),
+  preparedStorage: z.array(currentPluginStorageSchema).optional(),
   renderer: z.string().optional(), stylesheet: z.string().optional(), stylesheets: z.array(z.string()).default([]),
   artifact: artifactSchema.optional(), artifactRoot: z.string().optional(), artifactKey: z.string().optional(),
 });
 export type BuiltPackage = z.infer<typeof builtPackageSchema>;
 export interface ResolvedPackage extends BuiltPackage {
   definition?: PluginDefinition;
-  storage?: readonly PluginStorageDeclaration[];
 }
 
 export function packageCandidates(packages: readonly BuiltPackage[]): PluginCandidate[] {
@@ -248,7 +244,7 @@ function applyAvailability(packages: BuiltPackage[], availability: PluginAvailab
   }
 }
 /** Import a built entry; individual plugin imports have a fixed deadline. */
-async function importEntry(id: string, file: string, label: string): Promise<unknown> {
+export async function importEntry(id: string, file: string, label: string): Promise<unknown> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const module = await Promise.race([
     import(pathToFileURL(file).href) as Promise<{ default?: unknown }>,
@@ -256,16 +252,6 @@ async function importEntry(id: string, file: string, label: string): Promise<unk
   ]).finally(() => clearTimeout(timer));
   return module.default;
 }
-/** Storage declarations check structural shape only; migration chains and plugins own format contents. */
-function storageDeclarations(id: string, value: unknown): readonly PluginStorageDeclaration[] {
-  if (!Array.isArray(value) || value.some(item => !item || typeof item !== "object" || (!["json", "sqlite", "records"].includes(item.kind))
-    || (item.kind === "records"
-      ? typeof item.id !== "string" || !Array.isArray(item.contracts) || item.contracts.some((contract: unknown) => typeof contract !== "string")
-      : typeof item.path !== "string") || !Number.isSafeInteger(item.version) || item.version < 1 || !item.migrations || typeof item.migrations !== "object"))
-    throw new PluginPackageError("invalid_entry", `Storage entry of ${id} must default-export defineStorage([...]).`);
-  return value as readonly PluginStorageDeclaration[];
-}
-
 /** Capture completed builds once per startup. This stage executes no plugin entries and performs no source transformation. */
 export async function buildPackages(list: PackageList, npmRoot: string, reserved: readonly string[] = [],
   progress: (id: string) => void = () => {}): Promise<BuiltPackage[]> {
@@ -339,15 +325,15 @@ export async function buildPackages(list: PackageList, npmRoot: string, reserved
   return result;
 }
 
-/** Import the captured artifacts; storage admission applies to every package, including packages without runtime entries. */
-export async function importPackages(packages: readonly BuiltPackage[], hostModules: Readonly<Record<string, string>>,
-  options: { runtime?: boolean; storageFailures?: ReadonlyMap<string, string>; progress?: (id: string) => void } = {}): Promise<ResolvedPackage[]> {
-  const result: ResolvedPackage[] = structuredClone([...packages]);
+/** Plugin entry loaders share module identity, dependency order, and failure propagation. */
+export async function loadPackageEntries<T extends BuiltPackage>(packages: readonly BuiltPackage[], hostModules: Readonly<Record<string, string>>,
+  stage: "storage" | "import", load: (item: T, id: string) => Promise<void>, storageFailures?: ReadonlyMap<string, string>): Promise<T[]> {
+  const result = structuredClone([...packages]) as T[];
   registerArtifactModules(result, hostModules);
   const availability = packageAvailability(result);
-  for (const [id, message] of options.storageFailures ?? []) availability.fail(id, { stage: "storage", message });
+  for (const [id, message] of storageFailures ?? []) availability.fail(id, { stage: "storage", message });
   const visited = new Set<string>();
-  const visit = async (item: ResolvedPackage): Promise<void> => {
+  const visit = async (item: T): Promise<void> => {
     if (!item.manifest || visited.has(item.manifest.id)) return;
     const id = item.manifest.id;
     visited.add(id); // Native ESM handles module cycles; service setup ordering is checked separately.
@@ -356,26 +342,28 @@ export async function importPackages(packages: readonly BuiltPackage[], hostModu
       if (provider) await visit(provider);
     }
     if (item.status !== "ready" || availability.get(id)) return;
-    let stage: "storage" | "import" = "storage";
-    try {
-      if (item.storageEntry) item.storage = storageDeclarations(id, await importEntry(id, item.storageEntry, "storage"));
-      if (options.runtime === false) return;
-      stage = "import";
-      if (!item.runtime) return;
-      options.progress?.(id);
-      const definition = await importEntry(id, item.runtime, "runtime") as PluginDefinition | undefined;
-      if (!definition || typeof definition !== "object" || definition.namespace?.id !== id
-        || (definition.setup !== undefined && typeof definition.setup !== "function")
-        || (definition.modules !== undefined && (!Array.isArray(definition.modules) || definition.modules.some(module => !module || typeof module.setup !== "function"))))
-        throw new PluginPackageError("invalid_entry", `Runtime entry of ${id} must default-export definePlugin(...) with namespace ${id}.`);
-      item.definition = definition;
-    } catch (error) {
-      availability.fail(id, { stage, message: pluginErrorMessage(error) });
-    }
+    try { await load(item, id); }
+    catch (error) { availability.fail(id, { stage, message: pluginErrorMessage(error) }); }
   };
   for (const item of result) await visit(item);
   applyAvailability(result, availability);
-  for (const item of result) if (item.status !== "ready") { delete item.definition; delete item.storage; }
+  return result;
+}
+
+/** Load business entries only. Storage failures and current declarations were captured during preparation. */
+export async function importPackages(packages: readonly BuiltPackage[], hostModules: Readonly<Record<string, string>>,
+  { storageFailures, progress }: { storageFailures?: ReadonlyMap<string, string>; progress?: (id: string) => void } = {}): Promise<ResolvedPackage[]> {
+  const result = await loadPackageEntries<ResolvedPackage>(packages, hostModules, "import", async (item, id) => {
+    if (!item.runtime) return;
+    progress?.(id);
+    const definition = await importEntry(id, item.runtime, "runtime") as PluginDefinition | undefined;
+    if (!definition || typeof definition !== "object" || definition.namespace?.id !== id
+      || (definition.setup !== undefined && typeof definition.setup !== "function")
+      || (definition.modules !== undefined && (!Array.isArray(definition.modules) || definition.modules.some(module => !module || typeof module.setup !== "function"))))
+      throw new PluginPackageError("invalid_entry", `Runtime entry of ${id} must default-export definePlugin(...) with namespace ${id}.`);
+    item.definition = definition;
+  }, storageFailures);
+  for (const item of result) if (item.status !== "ready") { delete item.definition; delete item.preparedStorage; }
   return result;
 }
 

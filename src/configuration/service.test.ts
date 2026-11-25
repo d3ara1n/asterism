@@ -7,7 +7,7 @@ import { createModelInput, type ModelProvider, type ModelProviderInput } from ".
 import { modelProviderPresetDraft } from "../shared/provider-presets.ts";
 import { modelProviderPresets } from "../../packages/builtin/src/providers/presets.ts";
 import { ConfigurationService } from "./service.ts";
-import { configurationStorage } from "./store.ts";
+import { configurationStorage } from "../storage/migrations/configuration.ts";
 import type { ConnectionProbe } from "./probe.ts";
 import type { ModelCompatibility } from "../shared/model-compatibility.ts";
 import type { DiscoverModels } from "./discovery.ts";

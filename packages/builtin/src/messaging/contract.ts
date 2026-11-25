@@ -22,12 +22,7 @@ export const chatImageSchema = chatFileLocatorSchema.extend({
   file: contentRefSchema, ref: fileRefSchema, mediaType: z.string(), filename: z.string().optional(), size: z.number().int().nonnegative(),
 });
 export type ChatImage = z.infer<typeof chatImageSchema>;
-export const ChatMessageSent = defineRecord(builtin.name("chat.message-sent"), { schema: z.codec(
-  z.union([chatMessageSchema, messageSchema.omit({ parts: true, quote: true }).extend({ text: z.string() })]), chatMessageSchema, {
-    decode: value => "parts" in value ? value : (({ text, ...rest }) => ({ ...rest, parts: [{ kind: "text" as const, text }] }))(value),
-    encode: value => chatMessageSchema.parse(value),
-  }),
-});
+export const ChatMessageSent = defineRecord(builtin.name("chat.message-sent"), { schema: chatMessageSchema });
 export const CreateConversations = defineCreation(Conversations, {
   id: builtin.name("conversations.create"), schema: z.strictObject({}).describe("Create a list of configured messaging connections and their conversations."),
 });

@@ -2,16 +2,14 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { sessionSchemaSql, pendingRecordsIndexSql, folderSchemaSql, folderColumnSql, completedColumnSql, keepAwakeColumnSql, sleepingColumnSql, lastOpenedColumnSql } from "../session/schema.ts";
+import { sessionSchemaSql } from "../session/schema.ts";
 import { applicationStorage } from "../shared/application.ts";
 import { contentSchemaSql } from "./content-store.ts";
-import { templateLastUsedColumnSql, templateSchemaSql } from "./templates.ts";
+import { templateSchemaSql } from "./templates.ts";
 import { recordStorageSchemaSql } from "../storage/record-storage.ts";
-import { sqliteStorage } from "../storage/migrations.ts";
+import { workspaceDatabaseVersion, workspaceDatabasePath } from "../storage/formats.ts";
 import { mcpSchemaSql } from "../mcp/storage.ts";
 import { tutorialTemplate } from "./tutorial-template.ts";
-
-export const workspaceDatabaseVersion = 36;
 
 /** Business database opening consumes prepared formats only; pre-window data preparation handles upgrades. */
 export class DatabaseVersionError extends Error {
@@ -22,7 +20,7 @@ export class DatabaseVersionError extends Error {
 
 export function openDatabase(root: string): DatabaseSync {
   mkdirSync(join(root, applicationStorage.databaseDirectory), { recursive: true });
-  const db = new DatabaseSync(join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile));
+  const db = new DatabaseSync(workspaceDatabasePath(root));
   try {
     db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;");
     // New databases are created and stamped only here; pre-window preparation upgrades existing databases.
@@ -83,30 +81,6 @@ const islandsTableSql = `
         islands_json TEXT NOT NULL
       ) STRICT;`;
 
-/** Explicit format transitions preserve supported data; only openDatabase creates new databases. */
-export function workspaceStorage(root: string) {
-  return sqliteStorage({ id: "workspace", file: join(root, applicationStorage.databaseDirectory, applicationStorage.databaseFile),
-    version: workspaceDatabaseVersion, migrations: {
-      35: db => { db.exec(recordStorageSchemaSql); },
-      // Earlier starts were not recorded; existing templates begin without a use time.
-      34: db => { db.exec(`ALTER TABLE templates ADD COLUMN ${templateLastUsedColumnSql};`); },
-      // Existing sessions get a fresh inactivity baseline instead of inheriting their historical creation time.
-      33: db => {
-        db.exec(`ALTER TABLE sessions ADD COLUMN ${sleepingColumnSql};
-          ALTER TABLE sessions ADD COLUMN ${lastOpenedColumnSql} DEFAULT '';
-          ALTER TABLE sessions ADD COLUMN ${keepAwakeColumnSql};`);
-        db.prepare("UPDATE sessions SET last_opened_at = ?").run(new Date().toISOString());
-      },
-      // The single focus island became an island arrangement; a focused object is not carried over as an island.
-      32: db => { db.exec(`DROP TABLE workbench_focus; ${islandsTableSql}`); },
-      31: db => { db.exec(`ALTER TABLE sessions ADD COLUMN ${completedColumnSql};`); },
-      29: db => { db.exec(pendingRecordsIndexSql); },
-      // Existing sessions and templates start without a folder; no membership is invented for them.
-      30: db => { db.exec(`${folderSchemaSql}
-        ALTER TABLE sessions ADD COLUMN ${folderColumnSql};
-        ALTER TABLE templates ADD COLUMN ${folderColumnSql};`); },
-    } });
-}
 /** Startup cleanup hard-deletes archived sessions past retention, cascades associated rows through foreign keys, and leaves orphan content for the subsequently constructed store. */
 export function collectExpiredSessions(db: DatabaseSync, now: number, retentionDays: number | null): number {
   if (retentionDays === null) return 0;

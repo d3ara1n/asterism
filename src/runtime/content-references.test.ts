@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentReferences } from "./content-store.ts";
+import { contentReferences } from "../storage/content-references.ts";
 import { schemaOf } from "../tools/definition.ts";
 import { TerminalSee } from "../../packages/builtin/src/terminal/contract.ts";
 

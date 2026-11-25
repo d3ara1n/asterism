@@ -1,11 +1,7 @@
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { applicationStorage } from "../shared/application.ts";
-import { sqliteStorage } from "../storage/migrations.ts";
-
-/** Ledger format; increment on changes and append an n → n+1 step to `telemetryStorage`. */
-export const telemetryDatabaseVersion = 2;
+import { telemetryDatabasePath, telemetryDatabaseVersion } from "../storage/formats.ts";
 
 /**
  * Subjects that plugins declared for a model request or one of its tool calls: what the work used, such as a skill it read.
@@ -109,18 +105,6 @@ const schemaSql = `
   CREATE INDEX external_usage_recorded ON external_usage_events(recorded_at);
 `;
 
-export function telemetryDatabasePath(root: string): string {
-  return join(root, applicationStorage.telemetryDirectory, applicationStorage.telemetryDatabaseFile);
-}
-
-/** Pre-window preparation migrates the ledger with host storage; the ledger stays outside recovery points. */
-export function telemetryStorage(root: string) {
-  return sqliteStorage({ id: "telemetry", file: telemetryDatabasePath(root), version: telemetryDatabaseVersion, migrations: {
-    // Declared subjects start with this format; earlier requests have none.
-    1: db => { db.exec(subjectsSql); },
-  } });
-}
-
 export class TelemetryVersionError extends Error {
   constructor(found: number) {
     super(`Usage ledger format ${found} does not match this build (${telemetryDatabaseVersion}). Prepare the data before opening the ledger.`);
@@ -129,7 +113,7 @@ export class TelemetryVersionError extends Error {
 
 /** Create the ledger on first use; existing ledgers must already have the current format. */
 export function openTelemetryDatabase(root: string): DatabaseSync {
-  mkdirSync(join(root, applicationStorage.telemetryDirectory), { recursive: true });
+  mkdirSync(dirname(telemetryDatabasePath(root)), { recursive: true });
   const db = new DatabaseSync(telemetryDatabasePath(root));
   try {
     db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;");

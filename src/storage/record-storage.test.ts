@@ -5,9 +5,12 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, expect, it } from "vitest";
 import type { Json } from "@asterism-app/sdk/contracts";
 import type { PluginRecordStorageDeclaration } from "@asterism-app/sdk/runtime";
+import { messagingHistoryStorage } from "../../packages/builtin/src/storage/messaging.ts";
+import { ChatMessageSent } from "../../packages/builtin/src/messaging/contract.ts";
 import { agentToolHistoryStorage } from "../../packages/builtin/src/storage/agent-tool-history.ts";
 import { SessionTree } from "../session/tree.ts";
-import { openDatabase, workspaceStorage } from "../runtime/storage.ts";
+import { openDatabase } from "../runtime/storage.ts";
+import { workspaceStorage } from "./migrations/workspace.ts";
 import { pluginStorages } from "./application.ts";
 import { listRecoveryPoints, prepareData, recoveryPointDirectory } from "./preparation.ts";
 import { initializePluginRecordStorage } from "./record-storage.ts";
@@ -74,6 +77,28 @@ it("migrates only owned, declared timeline records, keeps session positions, and
   const v3 = { ...declaration, version: 3, migrations: { ...declaration.migrations, 2: (_contract: string, data: Json) => ({ updated: data }) } };
   expect(await prepare(root, v3)).toEqual({ ok: true, plugins: [] });
   expect(listRecoveryPoints(root)[0]?.changes).toEqual([{ id: `records:${owner}/history`, from: 2, to: 3 }]);
+});
+
+it("prepares text-only sent messages for the current contract without changing their history", async () => {
+  const root = setup(), db = openDatabase(root);
+  const author = "asterism.builtin";
+  const tree = new SessionTree(db), sessionId = tree.create("Messages");
+  const message = { id: "msg", sender: { id: "bot", name: "Bot", role: "self" as const }, sentAt: "2026-01-01T00:00:00Z", replyTo: "original" };
+  const old = add(tree, sessionId, { ...message, text: "" }, ChatMessageSent.id, author);
+  const current = add(tree, sessionId, { ...message, id: "next", parts: [{ kind: "text", text: "current" }] }, ChatMessageSent.id, author);
+  db.close();
+
+  expect(await prepare(root, messagingHistoryStorage, author)).toEqual({ ok: true, plugins: [] });
+  const after = openDatabase(root);
+  try {
+    const reopened = new SessionTree(after);
+    const [sent, latest] = reopened.nodes(sessionId);
+    const converted = { ...message, parts: [{ kind: "text", text: "" }] };
+    expect(sent).toEqual({ ...old, data: converted });
+    expect(ChatMessageSent.schema.parse(sent!.data)).toEqual(converted);
+    expect(latest).toEqual(current);
+    expect(reopened.cursor(sessionId)).toBe(current.id);
+  } finally { after.close(); }
 });
 
 it("prepares interleaved Agent responses without qualifying an orphaned thought from another response or session", async () => {

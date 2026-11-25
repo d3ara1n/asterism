@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { SessionTree } from "../session/tree.ts";
 import { created, event, removed } from "../session/test-nodes.ts";
-import { collectExpiredSessions, openDatabase, workspaceStorage } from "./storage.ts";
+import { collectExpiredSessions, openDatabase } from "./storage.ts";
+import { workspaceStorage } from "../storage/migrations/workspace.ts";
 import { FolderStore } from "../session/folders.ts";
 import { SessionWorkbench } from "./workbench.ts";
 

@@ -1,7 +1,7 @@
 import { defineStorage } from "@asterism-app/sdk/runtime";
 import { jsonSchema } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
-import { ensureMessagingSchema } from "./messaging/storage-schema.ts";
+import { messagingDatabaseStorage, messagingHistoryStorage } from "./storage/messaging.ts";
 import { agentToolHistoryStorage } from "./storage/agent-tool-history.ts";
 
 const settingsV2 = z.object({
@@ -31,6 +31,7 @@ export default defineStorage([
       return settings;
     },
   } },
-  { kind: "sqlite", path: ".asterism/db.sqlite", version: 2, migrations: { 1: ensureMessagingSchema } },
+  messagingDatabaseStorage,
+  messagingHistoryStorage,
   agentToolHistoryStorage,
 ]);

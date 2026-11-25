@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { configurationStorage, ConfigurationStore } from "./store.ts";
+import { ConfigurationStore } from "./store.ts";
+import { configurationStorage } from "../storage/migrations/configuration.ts";
 import { PluginStorage } from "../plugins/storage.ts";
 import { prepareData, listRecoveryPoints, recoveryPointDirectory } from "../storage/preparation.ts";
 

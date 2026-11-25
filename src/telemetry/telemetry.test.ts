@@ -7,7 +7,9 @@ import { bucketKey, bucketKeys, dateKeyStart } from "../shared/telemetry-time.ts
 import type { QueryResultOf, TelemetryFilter, TelemetryQuery } from "../shared/telemetry.ts";
 import { bucketSql } from "./queries.ts";
 import { TelemetryService } from "./service.ts";
-import { openTelemetryDatabase, telemetryDatabasePath, telemetryDatabaseVersion, telemetryStorage } from "./storage.ts";
+import { openTelemetryDatabase } from "./storage.ts";
+import { telemetryDatabasePath, telemetryDatabaseVersion } from "../storage/formats.ts";
+import { telemetryStorage } from "../storage/migrations/telemetry.ts";
 import type { LiveFolder, LiveSession, ModelUsageRecord, UsageSubjectRecord, WorkspaceLookup } from "./types.ts";
 import { DatabaseSync } from "node:sqlite";
 

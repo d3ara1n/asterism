@@ -30,12 +30,12 @@ import { PluginEventScope } from "./event-scope.ts";
 import { CallRegistry } from "./calls.ts";
 import { bindTopLevelTools, type RegisteredTopLevelTool } from "./top-level-tools.ts";
 import { resolveToolContributions, validateToolContributions, type ToolImplementationStatus } from "./tool-contributions.ts";
-import type { PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
+import type { CurrentPluginStorage } from "./storage-declaration.ts";
 import { PluginAvailability } from "./availability.ts";
 import { pluginErrorMessage, type PluginCandidate, type PluginDiagnostic, type PluginOutcome } from "../shared/plugin-startup.ts";
 
 export interface PreparedPluginStorage {
-  declarations: ReadonlyMap<string, readonly PluginStorageDeclaration[]>;
+  declarations: ReadonlyMap<string, readonly CurrentPluginStorage[]>;
   failures: ReadonlyMap<string, string>;
 }
 export interface PluginHostServices {

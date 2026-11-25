@@ -51,7 +51,7 @@ it("envelope version mismatches fall back to defaults", () => {
 // Stamp managed databases on first open so later preparation can use user_version to determine migration needs.
 it("managed databases write declared versions on first open", () => {
   const directory = root();
-  const storage = new PluginStorage(join(directory, "extensions"), "acme.notes", () => {}, [{ kind: "sqlite", path: ".asterism/db.sqlite", version: 3, migrations: {} }]);
+  const storage = new PluginStorage(join(directory, "extensions"), "acme.notes", () => {}, [{ kind: "sqlite", path: ".asterism/db.sqlite", version: 3 }]);
   try { expect(storage.db().prepare("PRAGMA user_version").get()).toMatchObject({ user_version: 3 }); }
   finally { storage.close(); }
 });

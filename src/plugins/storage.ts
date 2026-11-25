@@ -3,8 +3,9 @@ import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { jsonSchema, type Json, type ConfigContract } from "@asterism-app/sdk/contracts";
-import { PluginApiError, type PluginConfig, type PluginSecrets, type PluginStorageDeclaration } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type PluginConfig, type PluginSecrets } from "@asterism-app/sdk/runtime";
 import type { PluginConfiguration } from "../shared/plugin-configuration.ts";
+import type { CurrentPluginStorage } from "./storage-declaration.ts";
 import { encodePluginData } from "./data-encoding.ts";
 
 /** Host-managed directory name; plugins may freely write elsewhere in their directories. */
@@ -37,7 +38,7 @@ export class PluginStorage {
     encode(value: Json): Json;
   } | null = null;
   constructor(extensionsDirectory: string, pluginId: string, private readonly warn: (message: string, error?: unknown) => void,
-    private readonly declarations: readonly PluginStorageDeclaration[] = []) {
+    private readonly declarations: readonly CurrentPluginStorage[] = []) {
     this.dir = join(extensionsDirectory, pluginId);
     this.managed = join(this.dir, managedDirectory);
   }

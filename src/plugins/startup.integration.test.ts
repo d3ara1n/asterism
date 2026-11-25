@@ -40,20 +40,25 @@ it("blocks storage-rejected public-only providers and consumers before runtime i
   await f.plugin("independent", {});
   await f.run(`add('provider');add('consumer');add('independent');
     const built=await loader.buildPackages(list,root);
-    const storage=await loader.importPackages(built,hostModules,{runtime:false});assert.equal(storage[0].storage[0].version,2);
+    const storage=await loader.importStorageEntries(built,hostModules);assert.equal(storage[0].storage[0].version,2);
     const items=await loader.importPackages(built,hostModules,{storageFailures:new Map([['fixture.provider','Migration failed.']])});
     assert.deepEqual(items.map(item=>[item.status,item.diagnostic?.stage]),[['failed','storage'],['failed','dependency'],['ready',undefined]]);
     assert.equal(items[1].definition,undefined);`);
 });
 
-it("shares storage, runtime, and public graph state within a process without promising cross-process memory", async () => {
+it("runs the storage entry only in preparation and gives runtime the captured current format", async () => {
   const f = await setup();
-  await f.plugin("state", { runtime: "runtime.ts", storage: "storage.ts", provides: { runtime: { "@fixture/state/contracts": "state.ts" } } }, {
-    "state.ts": "export const state=new Map();",
-    "storage.ts": "import {state} from '@fixture/state/contracts';export default [{kind:'json',path:'state.json',version:2,migrations:{1:()=>state}}];",
-    "runtime.ts": "import {state} from '@fixture/state/contracts';export default {namespace:{id:'fixture.state'},probe:state};",
+  await f.plugin("state", { runtime: "runtime.ts", storage: "storage.ts" }, {
+    "storage.ts": `if (process.env.ASTERISM_PHASE !== 'prepare') throw new Error('Storage entry executed in runtime');
+      export default [{kind:'json',path:'state.json',version:2,migrations:{1:()=> 'converted'}}];`,
+    "runtime.ts": source("runtime", "state"),
   });
-  await f.run(`add('state');const [item]=await loader.loadPackages(list,root,hostModules);
-    assert.equal(item.status,'ready',item.diagnostic?.message);
-    assert.equal(item.storage[0].migrations[1](),item.definition.probe);`);
+  await f.run(`add('state');process.env.ASTERISM_PHASE='prepare';
+    const [item]=await loader.importStorageEntries(await loader.buildPackages(list,root),hostModules);
+    assert.equal(item.storage[0].migrations[1](),'converted');
+    const { storage, ...built }=item;
+    loader.savePluginBuild(cache,[{...built,preparedStorage:loader.currentStorage(storage)}]);`);
+  await f.run(`const [item]=await loader.importPackages(loader.readPluginBuild(join(cache,'startup.json')),hostModules);
+    assert.equal(item.definition.probe,'runtime');
+    assert.deepEqual(item.preparedStorage,[{kind:'json',path:'state.json',version:2}]);`);
 });

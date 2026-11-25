@@ -50,7 +50,7 @@ export async function fixture() {
   const root = mkdtempSync(join(tmpdir(), "asterism-artifact-"));
   // Tests explicitly build a host entry, just as application packaging does. Production startup has no compiler dependency.
   const loaderSource = join(root, "loader-source.ts");
-  put(root, "loader-source.ts", `export * from ${JSON.stringify(resolve("src/plugins/packages.ts"))}; export * from ${JSON.stringify(resolve("src/plugins/artifacts.ts"))};`);
+  put(root, "loader-source.ts", `export * from ${JSON.stringify(resolve("src/plugins/packages.ts"))}; export * from ${JSON.stringify(resolve("src/plugins/artifacts.ts"))}; export * from ${JSON.stringify(resolve("src/storage/migrations/plugin-entries.ts"))};`);
   const hostModuleUrls = await buildHost(join(root, "host"), { loader: loaderSource });
   const loader = join(root, "host/loader.mjs");
   const plugin = async (name: string, config: FixtureConfig, files: Record<string, string> = {}, metadata: object = {}) => {

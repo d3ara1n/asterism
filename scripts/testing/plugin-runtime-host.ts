@@ -10,6 +10,7 @@ import { nodeView } from "../../src/session/view.ts";
 import * as sdkRuntime from "@asterism-app/sdk/runtime";
 import * as zod from "zod";
 import { savePluginBuild, readPluginBuild } from "../../src/plugins/artifacts.ts";
+import { currentStorage, importStorageEntries } from "../../src/storage/migrations/plugin-entries.ts";
 import { createNpmProcess, pnpmLauncher } from "../../src/plugins/npm-process.ts";
 
 assert.ok(process.versions.electron, "The harness must execute inside the actual Electron Node runtime.");
@@ -27,7 +28,10 @@ async function load(): Promise<ResolvedPackage[]> {
   const built = await buildPackages(list, root!);
   for (const item of built) assert.equal(item.status, "ready", JSON.stringify(item.diagnostic));
   // Exercise the compiled preparation -> runtime serialization boundary as well as native entry imports.
-  const items = await importPackages(readPluginBuild(savePluginBuild(cache, built)), hostModules);
+  const prepared = await importStorageEntries(built, hostModules);
+  for (const item of prepared) assert.equal(item.status, "ready", JSON.stringify(item.diagnostic));
+  const captured = prepared.map(({ storage, storageEntry: _entry, ...item }) => ({ ...item, preparedStorage: currentStorage(storage ?? []) }));
+  const items = await importPackages(readPluginBuild(savePluginBuild(cache, captured)), hostModules);
   for (const item of items) assert.equal(item.status, "ready", `${item.manifest?.id}: ${JSON.stringify(item.diagnostic)}`);
   return items;
 }
@@ -49,10 +53,7 @@ if (mode === "fixtures") {
   assert.deepEqual([...p.evidence.registry], ["electron"]);
   a.increment();
   assert.equal(b.count, 1, "Public re-exports must retain live bindings in Electron's native module graph.");
-  const storage = provider.storage![0]!;
-  assert.equal(storage.kind, "json");
-  assert.ok(storage.kind === "json");
-  assert.equal(storage.migrations[1]!({}), p.evidence.stored);
+  assert.equal(provider.preparedStorage?.[0]?.kind, "json");
   assert.equal(a.evidence.PluginApiError, sdkRuntime.PluginApiError, "Plugins must share the host's own SDK instance.");
   assert.equal(a.evidence.zString, zod.string);
   assert.equal(a.evidence.requiredZod, zod.string, "Plugin code requiring a host module must reach the host instance.");
@@ -66,7 +67,7 @@ if (mode === "fixtures") {
   const builtin = items.find(item => item.manifest?.id === "asterism.builtin")!;
   const consumer = items.find(item => item.manifest?.id === "fixture.builtin-consumer")!;
   assert.ok(builtin.definition);
-  assert.ok(builtin.storage?.length, "The distributed built-in storage entry must execute too.");
+  assert.ok(builtin.preparedStorage?.length, "The distributed built-in storage entry must execute too.");
   const { evidence } = await entry(consumer);
   assert.equal(builtin.definition.namespace, evidence.builtin, "Builtin runtime and consumers must share the provider-owned public graph.");
   const publicEntry = builtin.artifact!.public.runtime["@asterism-app/builtin-api/runtime"]!;

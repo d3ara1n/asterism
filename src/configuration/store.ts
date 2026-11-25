@@ -9,11 +9,8 @@ import { canEditModelProviderField, modelReference, modelSchema, modelProviderSc
 import { mcpSettingsSchema, defaultMcpSettings, shellSettingsSchema, defaultShellSettings, modelCostSchema, webProviderStateSchema, type WebProviderState, messagingConnectionSchema, type MessagingConnection } from "@asterism-app/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
-import { jsonStorage } from "../storage/migrations.ts";
-import { migrateConfiguration13 } from "./credential-migration.ts";
+import { configurationVersion } from "../storage/formats.ts";
 
-/** Global configuration format; increment on changes and append an n → n+1 migration to `configurationStorage`. */
-export const configurationVersion = 17;
 const storedProviderSchema = modelProviderSchema.strip();
 const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
 /** Models use `<providerId>/<modelId>` identities; other entries use id. */
@@ -58,25 +55,6 @@ function initialConfiguration(): ConfigurationDocument {
     shell: structuredClone(defaultShellSettings), messagingConnections: [], modelProviders: [], webProviders: [], models: [],
     sessionEntry: null, sessionLifecycle: structuredClone(defaultSessionLifecycle), showUsage: true, usageBudget: null };
 }
-/**
- * v12 web providers held one API key reference; v13 stores provider settings and secret references by setting key,
- * and adds messaging connections.
- */
-export function migrateConfiguration12(value: unknown): unknown {
-  const document = value as { webProviders?: { id: string; enabled: boolean; credentialRef: string | null }[] };
-  return { ...document, messagingConnections: [], webProviders: (document.webProviders ?? []).map(({ credentialRef, ...provider }) => ({
-    ...provider, settings: {}, secretRefs: credentialRef ? { apiKey: credentialRef } : {},
-  })) };
-}
-/** Append conversions for released formats here; business reads and writes always consume the current document. */
-export function configurationStorage(root: string, decrypt?: (ciphertext: string) => Promise<string>) {
-  return jsonStorage({ id: "configuration", file: join(root, applicationStorage.configurationFile), version: configurationVersion,
-    migrations: { 12: migrateConfiguration12, 13: value => migrateConfiguration13(root, value, decrypt),
-      14: value => ({ ...(value as object), sessionLifecycle: structuredClone(defaultSessionLifecycle) }),
-      15: value => ({ ...(value as object), showUsage: true }),
-      16: value => ({ ...(value as object), usageBudget: null }) } });
-}
-
 /** Locate by old identity and replace; reject new identities that conflict with other entries. */
 function upsert<T extends { id: string } | { providerId: string; modelId: string }>(items: T[], previous: string | null, item: T): void {
   const index = previous === null ? -1 : items.findIndex(value => keyOf(value) === previous);

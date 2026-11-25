@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { readJson, writeJson } from "./files.ts";
+import { readJson, writeJson } from "../files.ts";
 
 export interface StorageChange { id: string; from: number; to: number }
 /** An outdated storage unit; `apply` executes the full migration chain and commits the new version. */

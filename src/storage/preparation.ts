@@ -5,7 +5,7 @@ import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
 import { recoveryPointSchema, type PluginStorageFailure, type PreparationProgress, type PreparationResult, type RecoveryPoint } from "../shared/recovery.ts";
 import { readJson, writeJson } from "./files.ts";
-import type { StorageChange, StorageDefinition, StoragePlan } from "./migrations.ts";
+import type { StorageChange, StorageDefinition, StoragePlan } from "./migrations/engine.ts";
 
 /** One application data item in recovery points; `link` marks immutable files written once and shared by hard links. */
 export interface DataPath { path: string; link?: boolean }
