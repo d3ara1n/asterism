@@ -47,8 +47,8 @@ describe("Agent model projection", () => {
     const common = { kind: "toolcall", name: "example_text", responseId: "r", requestParentId: "0",
       complete: false, outcome: null, continuation: null, source: { model: "p/m", adapter: "test", scope: "scope" } };
     const path = records(message("a", "go"),
-      event(Execution.id, { type: "block", block: { ...common, ordinal: 0, callId: "closed", input: { kind: "freeform", text: body }, draft: null } }, { source: agentSource("a") }),
-      event(Execution.id, { type: "block", block: { ...common, ordinal: 1, callId: "unfinished", input: null, draft: { kind: "structured", text: '{"value":' } } }, { source: agentSource("a") }));
+      event(Execution.id, { type: "block", block: { ...common, ordinal: 0, phantom: false, callId: "closed", input: { kind: "freeform", text: body }, draft: null } }, { source: agentSource("a") }),
+      event(Execution.id, { type: "block", block: { ...common, ordinal: 1, phantom: true, callId: "unfinished", input: null, draft: { kind: "structured", text: '{"value":' } } }, { source: agentSource("a") }));
     const items = project(path);
     expect(items.map(item => item.kind)).toEqual(["input", "output", "result"]);
     expect(items[1]).toMatchObject({ parts: [{ kind: "toolcall", callId: "closed", input: { kind: "freeform", text: body } }] });

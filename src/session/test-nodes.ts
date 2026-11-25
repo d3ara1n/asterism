@@ -6,13 +6,13 @@ import type { NewNode, SessionNode } from "../shared/session.ts";
 export const agentSource = (id: string) => ({ plugin: "asterism.builtin", resource: { sessionId: "s", id, kind: "asterism.builtin/agent" } });
 export const hostSource = null;
 const modelSource = { model: "p/m", adapter: "test/1", scope: "s" };
-type BlockOptions = { requestParentId?: string | null; complete?: boolean; continuation?: Json; completion?: ModelCompletion | null };
+type BlockOptions = { requestParentId?: string | null; complete?: boolean; phantom?: boolean; continuation?: Json; completion?: ModelCompletion | null };
 
 const record = (contract: string, data: Json, source: NewNode["source"]): NewNode =>
   ({ contract, data, source, model: null, recipient: null });
 function block(agentId: string, responseId: string, ordinal: number, body: Record<string, Json>, options: BlockOptions = {}): NewNode {
   const complete = options.complete ?? true;
-  return record(Execution.id, { type: "block", block: { responseId, ordinal, complete, requestParentId: options.requestParentId ?? null,
+  return record(Execution.id, { type: "block", block: { responseId, ordinal, complete, phantom: options.phantom ?? !complete, requestParentId: options.requestParentId ?? null,
     continuation: options.continuation ?? null, source: modelSource, ...(options.completion ? { completion: options.completion } : {}), ...body } } as Json,
     agentSource(agentId));
 }
@@ -23,7 +23,7 @@ export const thinking = (agentId: string, responseId: string, ordinal: number, v
 export const call = (agentId: string, responseId: string, ordinal: number, callId: string, extra: { name?: string; arguments?: Json; outcome?: ToolOutcome | null } & BlockOptions = {}) =>
   block(agentId, responseId, ordinal, { kind: "toolcall", callId, name: extra.name ?? "read", draft: null, input: { kind: "structured", value: extra.arguments ?? {} },
     outcome: (extra.outcome === undefined ? { kind: "succeeded", model: [{ kind: "text", text: callId }], data: null } : extra.outcome) as Json },
-    { ...extra, complete: extra.complete ?? (extra.outcome !== null) });
+    { ...extra, complete: extra.complete ?? (extra.outcome !== null), phantom: extra.phantom ?? false });
 export const message = (agentId: string, value: string, startsTurn = true, sender: AgentMessageSender = { kind: "user" }): NewNode =>
   record(AgentInputMessage.id, { startsTurn, parts: [{ kind: "text", text: value }], sender }, agentSource(agentId));
 export const event = (type: string, data: Json, options: { source?: NewNode["source"]; model?: string | null; recipient?: string | null } = {}): NewNode =>

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { defineRecord, defineOperationRecord, modelBlockSchema, modelToolCallBlockSchema, modelCompletionSchema, toolOutcomeSchema,
-  type Decoded, type SessionRecord, type ModelBlock } from "@asterism-app/sdk/contracts";
+  type Decoded, type SessionRecord } from "@asterism-app/sdk/contracts";
 import { builtin } from "./identity.ts";
 import { agentMessageSenderSchema } from "./messaging.ts";
 import { agentInputPartSchema } from "./input.ts";
@@ -9,19 +9,21 @@ import { agentInputPartSchema } from "./input.ts";
 export const AgentInputMessage = defineRecord(builtin.name("agent.input-message"), {
   schema: z.object({ parts: z.array(agentInputPartSchema).min(1), startsTurn: z.boolean(), sender: agentMessageSenderSchema }),
 });
+export const agentResponseBlockSchema = modelBlockSchema.and(z.object({ phantom: z.boolean() }));
+export type AgentResponseBlock = z.infer<typeof agentResponseBlockSchema>;
 export const Execution = defineRecord(builtin.name("agent.execution"), {
-  schema: z.strictObject({ type: z.literal("block"), block: modelBlockSchema }),
+  schema: z.strictObject({ type: z.literal("block"), block: agentResponseBlockSchema }),
 });
 /** Tool inputs keep their model-order position; execution fills the outcome once. */
 export const ToolExecution = defineOperationRecord(builtin.name("agent.tool-execution"), {
-  input: modelToolCallBlockSchema.refine(block => !block.complete && block.outcome === null && block.input !== null && block.draft === null,
+  input: modelToolCallBlockSchema.extend({ phantom: z.boolean() }).refine(block => !block.complete && block.outcome === null && block.input !== null && block.draft === null,
     "Tool operation input must have complete input and a pending outcome."),
   output: toolOutcomeSchema,
 });
 export const executionRecordIds = [Execution.id, ToolExecution.id];
 /** Read both immutable blocks and tool operations through the same historical block projection.
  * submitted marks a tool call handed to execution; without an outcome its effects are unknown rather than absent. */
-export function decodeExecution(record: SessionRecord): Decoded<{ type: "block"; block: ModelBlock; submitted?: true }> | null {
+export function decodeExecution(record: SessionRecord): Decoded<{ type: "block"; block: AgentResponseBlock; submitted?: true }> | null {
   const operation = ToolExecution.decode(record);
   if (!operation) return Execution.decode(record);
   if (operation.status === "unknown") return operation;

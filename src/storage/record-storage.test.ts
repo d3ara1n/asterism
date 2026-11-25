@@ -5,6 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { afterEach, expect, it } from "vitest";
 import type { Json } from "@asterism-app/sdk/contracts";
 import type { PluginRecordStorageDeclaration } from "@asterism-app/sdk/runtime";
+import { agentToolHistoryStorage } from "../../packages/builtin/src/storage/agent-tool-history.ts";
 import { SessionTree } from "../session/tree.ts";
 import { openDatabase, workspaceStorage } from "../runtime/storage.ts";
 import { pluginStorages } from "./application.ts";
@@ -25,12 +26,12 @@ const declaration: PluginRecordStorageDeclaration = {
   kind: "records", id: "history", contracts: [contract], version: 2,
   migrations: { 1: (_contract, data) => ({ input: data }) },
 };
-function prepare(root: string, storage: PluginRecordStorageDeclaration | null = declaration) {
+function prepare(root: string, storage: PluginRecordStorageDeclaration | null = declaration, pluginId = owner) {
   return prepareData(root, {
     version: "test", stores: [workspaceStorage(root)], paths: [{ path: "db" }],
     discover: async () => {
-      try { return [{ id: owner, stores: pluginStorages(root, owner, storage ? [storage] : []) }]; }
-      catch (error) { return [{ id: owner, stores: [], error: (error as Error).message }]; }
+      try { return [{ id: pluginId, stores: pluginStorages(root, pluginId, storage ? [storage] : []) }]; }
+      catch (error) { return [{ id: pluginId, stores: [], error: (error as Error).message }]; }
     },
   });
 }
@@ -73,6 +74,43 @@ it("migrates only owned, declared timeline records, keeps session positions, and
   const v3 = { ...declaration, version: 3, migrations: { ...declaration.migrations, 2: (_contract: string, data: Json) => ({ updated: data }) } };
   expect(await prepare(root, v3)).toEqual({ ok: true, plugins: [] });
   expect(listRecoveryPoints(root)[0]?.changes).toEqual([{ id: `records:${owner}/history`, from: 2, to: 3 }]);
+});
+
+it("prepares interleaved Agent responses without qualifying an orphaned thought from another response or session", async () => {
+  const root = setup(), builtin = "asterism.builtin";
+  const db = openDatabase(root), tree = new SessionTree(db);
+  const first = tree.create("Interrupted"), second = tree.create("Complete");
+  const source = { model: "p/m", adapter: "test", scope: "test" };
+  const part = (kind: string, responseId: string, ordinal: number, complete: boolean, body: Record<string, Json>) =>
+    ({ kind, responseId, ordinal, complete, requestParentId: null, source, continuation: null, ...body });
+  function legacy(session: string, block: Json, published = false) {
+    return published ? add(tree, session, { input: block, output: null }, `${builtin}/agent.tool-execution`, builtin)
+      : add(tree, session, { type: "block", block }, `${builtin}/agent.execution`, builtin);
+  }
+  const orphan = legacy(first, part("thinking", "one", 0, true, { text: "orphan", summary: "" }));
+  const thought = legacy(first, part("thinking", "two", 0, true, { text: "keep with tool", summary: "" }));
+  const partial = legacy(first, part("text", "one", 1, false, { text: "partial" }));
+  const tool = legacy(first, part("toolcall", "two", 1, false,
+    { name: "read", callId: "read", arguments: { path: "note" }, argumentsText: null, outcome: null }), true);
+  const other = legacy(second, part("text", "one", 1, true, { text: "different session" }));
+  tree.select(first, orphan.id);
+  db.close();
+
+  expect(await prepare(root, agentToolHistoryStorage, builtin)).toEqual({ ok: true, plugins: [] });
+  const [point] = listRecoveryPoints(root);
+  expect(point?.changes).toEqual([{ id: `records:${builtin}/agent-tool-history`, from: 1, to: 3 }]);
+  const prepared = openDatabase(root);
+  try {
+    const view = new SessionTree(prepared);
+    expect(view.nodes(first)).toMatchObject([
+      { id: orphan.id, data: { block: { complete: true, phantom: true } } },
+      { id: thought.id, data: { block: { complete: true, phantom: false } } },
+      { id: partial.id, data: { block: { complete: false, phantom: true } } },
+      { id: tool.id, data: { input: { complete: false, phantom: false, input: { kind: "structured", value: { path: "note" } } }, output: null } },
+    ]);
+    expect(view.nodes(second)).toMatchObject([{ id: other.id, data: { block: { phantom: false } } }]);
+    expect(view.cursor(first)).toBe(orphan.id);
+  } finally { prepared.close(); }
 });
 
 it("rolls back earlier updates and leaves the version unstamped if a later record transform violates content ownership", async () => {

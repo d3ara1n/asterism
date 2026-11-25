@@ -198,10 +198,13 @@ export function createAgentController(deps: AgentControllerDependencies) {
                         ...(event.omittedFiles ? { omittedFiles: [...event.omittedFiles] } : {}) });
                   return;
                 }
+                const { type, block } = event;
+                const { phantom } = block;
+                if (phantom === undefined) throw new Error("An Agent response must select its context before publication.");
                 object.commit(writer => {
-                  if (event.type === "tool.begin") toolRecords.set(event.block.callId, writer.begin(ToolExecution, event.block));
-                  else if (event.type === "tool.complete") writer.complete(ToolExecution, toolRecords.get(event.block.callId)!, event.block.outcome!);
-                  else writer.append(Execution, event);
+                  if (type === "tool.begin") toolRecords.set(block.callId, writer.begin(ToolExecution, { ...block, phantom }));
+                  else if (type === "tool.complete") writer.complete(ToolExecution, toolRecords.get(block.callId)!, block.outcome!);
+                  else writer.append(Execution, { type, block: { ...block, phantom } });
                 });
               },
             };

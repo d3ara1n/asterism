@@ -1,9 +1,9 @@
 import {
-  formatModelExpression, modelBlockSchema, parseModelExpression, type ModelBlock, type ModelItem, type ModelLiveBlock,
+  formatModelExpression, parseModelExpression, type ModelBlock, type ModelItem, type ModelLiveBlock,
   type ModelRunEvent, type ModelTarget, type ResourceRef, type Usage,
 } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type ContentServices, type ExecutionServices, type ProviderUsage } from "@asterism-app/sdk/runtime";
-import type { AgentConfiguration, ModelRole } from "@asterism-app/builtin-api/contracts";
+import { agentResponseBlockSchema, type AgentConfiguration, type AgentResponseBlock, type ModelRole } from "@asterism-app/builtin-api/contracts";
 import { resolveRoleTarget } from "../configuration/runtime.ts";
 import type { createRequestAssembly } from "../agent/preparation.ts";
 import { runAgentLoop, type AgentLoopStatus } from "../agent/loop.ts";
@@ -141,7 +141,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
         consume,
         nextTurn: () => false,
         async request(index) {
-          const blocks: ModelBlock[] = [];
+          const blocks: AgentResponseBlock[] = [];
           const submitted = new Set<string>();
           const currentAgent = resolveAgent(deps.configuration(), snapshot.input.role);
           const prepare = await deps.prepare.forRequest({ ...currentAgent, systemPrompt: [
@@ -159,9 +159,9 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
             } else {
               run.audit.append({ type: "execution", event });
               if (event.type === "block" || event.type === "tool.begin" || event.type === "tool.complete") {
+                const block = agentResponseBlockSchema.parse(event.block);
                 const replace = (items: ModelBlock[]) => {
                   const at = items.findIndex(block => block.responseId === event.block.responseId && block.ordinal === event.block.ordinal);
-                  const block = modelBlockSchema.parse(event.block);
                   if (at < 0) items.push(block); else items[at] = block;
                 };
                 replace(blocks); replace(run.blocks);

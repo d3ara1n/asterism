@@ -68,7 +68,7 @@ Each Agent response records the path endpoint captured when its request began. T
 
 The Agent decides which blocks can enter model context when generation closes, before publishing the records. A failed attempt may preserve usable content through its last generated body block, including complete tool input even if no outcome is recorded. Unfinished generation and trailing thinking that has no usable body in its own response are recorded as `phantom`. These blocks remain readable in history but never reenter context, even after a retry supplies new output. This decision is independent of block completion and tool results.
 
-Projection consumes the recorded decision. Older records without it use their own response's generation facts. A rewind into a response may hide the body that originally followed some thinking; the selected path must not end that response on thinking alone. Neither case lets a later response qualify any previously excluded thinking.
+Persisted Agent blocks carry this decision explicitly; storage preparation supplies it for older formats from each original response. Projection filters on the recorded value. Rewinding into a response may hide the body that originally followed some thinking; the selected path must not end that response on thinking alone. A later response never makes a previously excluded block eligible.
 
 ## Coordinate cursor changes
 

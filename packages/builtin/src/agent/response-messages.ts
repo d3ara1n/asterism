@@ -1,18 +1,10 @@
 import type { ModelBlock, ModelGeneratedBlock, ModelItem, ModelPart, ToolOutcome } from "@asterism-app/sdk/contracts";
+import type { AgentResponseBlock } from "@asterism-app/builtin-api/contracts";
 
 /** Keep generated content through the last reusable body block. A complete tool input counts before it has an outcome. */
 export function contextPhantoms(blocks: readonly ModelGeneratedBlock[]): ReadonlySet<number> {
   const end = blocks.findLastIndex(block => block.generated && block.kind !== "thinking");
   return new Set(blocks.flatMap((block, index) => !block.generated || index > end ? [index] : []));
-}
-
-function legacyGenerated(block: ModelBlock): boolean {
-  return block.kind === "toolcall" ? block.input !== null && block.draft === null : block.complete;
-}
-
-/** A complete response's recorded selection is authoritative. Old records did not store a selection. */
-export function hasModelContent(block: ModelBlock): boolean {
-  return !(block.phantom ?? !legacyGenerated(block));
 }
 
 /** A final reply has visible text, every block of a normally stopped response, and no tool calls. */
@@ -25,10 +17,9 @@ export function isFinalReply(blocks: readonly ModelBlock[]): boolean {
     && blocks.some(block => block.kind === "text" && block.text.trim() !== "");
 }
 
-function participatingBlocks(blocks: readonly ModelBlock[]): ModelBlock[] {
-  const ordered = blocks.filter(hasModelContent).sort((a, b) => a.ordinal - b.ordinal);
-  // Old records and a rewind into a response may expose thinking without the body that followed it.
-  // This guard can only remove a block from the selected path; it never re-admits a recorded phantom.
+function participatingBlocks(blocks: readonly AgentResponseBlock[]): AgentResponseBlock[] {
+  const ordered = blocks.filter(block => !block.phantom).sort((a, b) => a.ordinal - b.ordinal);
+  // Rewinding into a response may hide the body that originally followed some thinking.
   while (ordered.at(-1)?.kind === "thinking") ordered.pop();
   return ordered;
 }
@@ -42,7 +33,7 @@ const unrecorded = missingResult("unknown", "This tool call was submitted for ex
 
 /** One response and its tool outcomes project together, independent of timeline or temporary conversation storage.
  * submitted lists call IDs handed to execution; other calls without an outcome never ran. */
-export function responseMessages(blocks: readonly ModelBlock[], submitted: ReadonlySet<string> = new Set()): ModelItem[] {
+export function responseMessages(blocks: readonly AgentResponseBlock[], submitted: ReadonlySet<string> = new Set()): ModelItem[] {
   const ordered = participatingBlocks(blocks);
   const first = ordered[0];
   if (!first) return [];

@@ -1,8 +1,8 @@
-import type { SessionRecord, SessionSnapshot, ModelBlock, ModelItem, RecordInfo, Decoded } from "@asterism-app/sdk/contracts";
+import type { SessionRecord, SessionSnapshot, ModelItem, RecordInfo, Decoded } from "@asterism-app/sdk/contracts";
 import type { z } from "zod";
-import { decodeExecution, ContextSummary, AgentInputMessage } from "@asterism-app/builtin-api/contracts";
+import { decodeExecution, ContextSummary, AgentInputMessage, type AgentResponseBlock } from "@asterism-app/builtin-api/contracts";
 import { projectInputMessage } from "./input-message.ts";
-import { responseMessages, hasModelContent } from "./response-messages.ts";
+import { responseMessages } from "./response-messages.ts";
 import { readRecords, type RecordRead } from "../shared/record-reading.ts";
 
 /** Projection depends only on pure contracts; background requests and the frontend context panel share the same rules, and the background entry point converts failures to plugin errors. */
@@ -65,7 +65,7 @@ function boundaryPrelude(index: readonly RecordInfo[], path: readonly SessionRec
   for (const record of path) {
     if (record.source?.resource?.id !== agentId) continue;
     const execution = decodeExecution(record);
-    if (execution?.status !== "known" || !hasModelContent(execution.data.block)) continue;
+    if (execution?.status !== "known" || execution.data.block.phantom) continue;
     const origin = execution.data.block.requestParentId;
     const position = origin === null ? -1 : positions.get(origin);
     if (position !== undefined) start = Math.min(start, position + 1);
@@ -78,7 +78,7 @@ function projectContextRecords(path: readonly SessionRecord[], agentId: string, 
   index: readonly RecordInfo[]): AgentContext {
   const positions = new Map(index.map((record, position) => [record.id, position]));
   const local = new Map(path.map((record, position) => [record.id, position]));
-  const responses = new Map<string, { record: SessionRecord; block: ModelBlock }[]>();
+  const responses = new Map<string, { record: SessionRecord; block: AgentResponseBlock }[]>();
   const submitted = new Set<string>();
   for (const record of path) {
     if (record.source?.resource?.id !== agentId) continue;
@@ -89,7 +89,7 @@ function projectContextRecords(path: readonly SessionRecord[], agentId: string, 
     const blocks = responses.get(block.responseId) ?? [];
     blocks.push({ record, block }); responses.set(block.responseId, blocks);
   }
-  const after = new Map<string | null, { record: SessionRecord; block: ModelBlock }[][]>();
+  const after = new Map<string | null, { record: SessionRecord; block: AgentResponseBlock }[][]>();
   for (const blocks of responses.values()) {
     const origin = blocks[0]!.block.requestParentId;
     const position = origin === null ? -1 : positions.get(origin);

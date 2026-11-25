@@ -107,6 +107,7 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
               events.publish(ResourceNoticeRaised, { title: source.title, kind: "attention" }, { plugin: owner, resource: ref });
             }, settled => settledTools.push(settled)),
             completionExtensions: request.completionExtensions,
+            contextPhantoms: request.contextPhantoms,
             content: values => options?.content
               ? host.content?.captureReader(inputReferences(values), options.content, owner)
               : host.content?.capture(inputReferences(values), contentAccess),

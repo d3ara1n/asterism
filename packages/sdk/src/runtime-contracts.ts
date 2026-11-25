@@ -217,6 +217,18 @@ export type PluginStorageDeclaration = {
   kind: "sqlite"; path: string; version: number;
   migrations: Readonly<Record<number, (db: DatabaseSync) => void>>;
 } | PluginRecordStorageDeclaration;
+/** Encoded input to a grouped record migration. The host retains record identity and provenance. */
+export interface RecordMigrationEntry {
+  readonly contract: string;
+  readonly data: Json;
+}
+export type PluginRecordMigration = ((contract: string, data: Json) => Json) | {
+  /** Equal keys group records within one session. Null leaves this record unchanged. */
+  groupBy(record: RecordMigrationEntry): string | null;
+  /** Receive a group in processing order and return one new payload per entry, in the same order. */
+  migrate(records: readonly RecordMigrationEntry[]): readonly Json[];
+};
+
 /** A versioned set of owned session record contracts. The host migrates encoded data before plugin setup. */
 export interface PluginRecordStorageDeclaration {
   kind: "records";
@@ -226,7 +238,7 @@ export interface PluginRecordStorageDeclaration {
   contracts: readonly string[];
   version: number;
   /** Synchronous transforms of encoded record data. Identity, provenance, and content reference membership stay fixed. */
-  migrations: Readonly<Record<number, (contract: string, data: Json) => Json>>;
+  migrations: Readonly<Record<number, PluginRecordMigration>>;
 }
 /** Default export of the storage entry point (manifest `asterism.storage`); the host imports it separately before the plugin runtime. */
 export function defineStorage(declarations: readonly PluginStorageDeclaration[]): readonly PluginStorageDeclaration[] {

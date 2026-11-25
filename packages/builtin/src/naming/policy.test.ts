@@ -11,7 +11,7 @@ function record(id: string, contract: string, data: SessionRecord["data"], agent
 const input = (id: string, agentId: string, text: string) => record(id, AgentInputMessage.id, { sender: { kind: "user" }, startsTurn: true, parts: [{ kind: "text", text }] }, agentId);
 function output(id: string, agentId: string, origin: string, text: string, extra: Partial<ModelBlock> = {}) {
   return record(id, Execution.id, jsonSchema.parse({ type: "block", block: {
-    kind: "text", text, responseId: id, requestParentId: origin, ordinal: 0, complete: true,
+    kind: "text", text, responseId: id, requestParentId: origin, ordinal: 0, complete: true, phantom: extra.phantom ?? extra.complete === false,
     continuation: null, source: { model: "test", adapter: "test", scope: "test" }, ...extra,
   } }), agentId);
 }
