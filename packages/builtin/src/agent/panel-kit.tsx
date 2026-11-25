@@ -21,7 +21,7 @@ export function PanelBody({ children }: { children: ReactNode }) {
 export function Section({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
   return <section className="space-y-3">
     <div className="flex items-baseline justify-between gap-3"><h4 className="type-label">{title}</h4>
-      {aside && <span className="type-caption tabular-nums">{aside}</span>}</div>
+      {aside && <div className="type-caption tabular-nums">{aside}</div>}</div>
     {children}
   </section>;
 }

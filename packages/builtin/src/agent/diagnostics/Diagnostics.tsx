@@ -1,5 +1,5 @@
 import { ArrowLeft, FileText, MessagesSquare } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useI18n, type I18n } from "@asterism-app/sdk/renderer";
 import type { UiMessage, Usage, CostIssue } from "@asterism-app/sdk/contracts";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
@@ -10,6 +10,8 @@ import { commonMessages } from "@asterism-app/ui/messages/common";
 import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@asterism-app/ui/ui/tabs";
+import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
+import { JsonView } from "@asterism-app/ui/json-view";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { diagnosticMessages as messages } from "../../messages/diagnostics";
 import { ConversationTimeline } from "../conversation/ConversationTimeline";
@@ -56,6 +58,10 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
   if (request.relatedInput) content.push({ kind: "message", ...request.relatedInput });
   content.push(...request.blocks.map(({ record, block }) => savedTimelineBlock(record, block)));
   if (request.summary) content.push({ kind: "summary", id: request.id, text: request.summary });
+  const [contentView, setContentView] = useState<"rendered" | "raw">("rendered");
+  const raw = useMemo(() => request.kind === "compression"
+    ? { input: request.relatedInput, summary: request.summary, tokensBefore: request.tokensBefore, completion: request.completion }
+    : { input: request.relatedInput, blocks: request.blocks.map(({ record, block }) => ({ record: record.id, block })) }, [request]);
   const metadata: [UiMessage, string][] = [
     [messages.model, request.model],
     [messages.recordedAt, i18n.formatDate(Date.parse(request.createdAt), { dateStyle: "short", timeStyle: "medium" })],
@@ -108,8 +114,14 @@ function RequestDetails({ request, onBack }: { request: PricedRequest; onBack():
         {!estimate.lines.some(line => line.item === "reasoning") && <p className="type-caption">{i18n.text(messages.reasoningIncluded)}</p>}
       </div>
     </Section>
-    <Section title={i18n.text(messages.contents)}>
-      {content.length > 0 ? <div className="space-y-4"><ConversationTimeline items={content} /></div> : <p className="type-caption">{i18n.text(messages.noContent)}</p>}
+    <Section title={i18n.text(messages.contents)} aside={content.length > 0 && <ToggleGroup type="single" variant="segmented" size="sm"
+      value={contentView} onValueChange={value => { if (value === "rendered" || value === "raw") setContentView(value); }} aria-label={i18n.text(messages.contentView)}>
+      <ToggleGroupItem value="rendered" className="h-6 px-2 type-caption">{i18n.text(messages.contentRendered)}</ToggleGroupItem>
+      <ToggleGroupItem value="raw" className="h-6 px-2 type-caption">{i18n.text(messages.contentRaw)}</ToggleGroupItem>
+    </ToggleGroup>}>
+      {content.length === 0 ? <p className="type-caption">{i18n.text(messages.noContent)}</p>
+        : contentView === "raw" ? <JsonView scrollable={false} className="select-text" value={raw} />
+        : <div className="space-y-4"><ConversationTimeline items={content} /></div>}
     </Section>
   </>;
 }
