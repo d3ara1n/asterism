@@ -23,7 +23,7 @@ A plugin that needs a group uses the shell tone rather than adding a border; the
 
 ## Use lines only when they mean something
 
-Users learn that a line in Asterism tells them something: where focus is, what is selected, where a drop will land, or the state of a piece of work. A moving dashed outline means content is still forming, a still dashed outline means it ended incomplete, and a red line means the request that produced it failed. Hairlines between rows are the one structural line.
+Users learn that a line in Asterism tells them something: where focus is, what is selected, where a drop will land, or the state of a piece of work. Only tool calls use a moving dashed outline, while input is forming or ready to run. Unfinished content keeps a still dashed outline, red if a generation error left it unfinished. Hairlines between rows are the one structural line.
 
 Tool views receive their state outline from the host's process block. When showing status within your own content, pair color with an icon or label rather than relying on color alone.
 

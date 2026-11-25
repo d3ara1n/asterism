@@ -84,7 +84,7 @@ Lines in use fall into three roles. The tables record current uses rather than a
 | Edge | Floating edge | Menus, popovers, and dialogs over arbitrary content |
 | Edge | Light sheet edge in the dark scheme | Raised sheets where a shadow does not read |
 | State | Ring or border in the ring tone | Keyboard focus, or the focused island, dock, or tray |
-| State | Moving dashed outline | Content still forming, or a tool call ready to run |
+| State | Moving dashed outline | Only for a tool call whose input is being filled or is ready to run |
 | State | Still dashed outline | Content that ended incomplete, regardless of its use in model context |
 | State | Red dashed outline | A generation error left this block unfinished |
 | State | Red line on a faint red tone | A standalone incident with its own diagnostic |
@@ -93,7 +93,7 @@ Lines in use fall into three roles. The tables record current uses rather than a
 
 Persistent selection uses the `selected` fill rather than an outline.
 
-Process blocks draw their state line along their rounded outline. Reduced motion keeps the moving dash still. A one-time warning ripple marks a newly raised notice and then disappears.
+Block state lines follow the rounded outline. Reduced motion keeps the tool call's moving dash still. A one-time warning ripple marks a newly raised notice and then disappears.
 
 A rejected or failed tool call carries an error, so it takes a light red fill rather than a red outline. Every outcome other than success is named by trailing header text in its status color, without a badge: red for failed, rejected, and unknown outcomes; the warning color for partial completion; muted text for cancellation. An unknown outcome means the result was lost rather than reported as an error, so it keeps the default fill. Expanded diagnostics show the code and the operation's own explanation without a second colored panel.
 
@@ -144,7 +144,7 @@ When a choice determines which fields a new provider connection needs, the creat
 
 ### Process blocks and tool views
 
-Tone groups thinking, tool calls, and summaries without a default border. Text, thinking, and tool calls share the outline rules in [Lines](#lines): the outline reports completion and generation error, not whether the block will be reused in model context. Completed thinking that stays in history only has no outline. A tool's outcome determines its fill and trailing result text independently of its outline. Focus and disclosure describe interaction; they do not change any block's execution appearance. Keep these mappings separate rather than inventing combined states.
+Tone groups thinking, tool calls, and summaries without a default border. The moving dashed outline is a tool-call cue, not a general process-block style. While thinking streams, the spinner indicates activity; reply text simply streams without a separate in-progress cue. Both keep the static outlines in [Lines](#lines) if generation ends incomplete. Those outlines report how generation ended, not whether the block will be reused in model context. A tool's outcome determines its fill and trailing result text independently of its outline. Focus and disclosure describe interaction; they do not change any block's execution appearance. Keep these mappings separate rather than inventing combined states.
 
 A folded process row summarizes what happened inside it. Each folded item counts once by its outcome: failed, rejected, and unknown tool calls, request incidents, and failed compactions count as errors in the error color; partial tool results count in the warning color; occurrences and cancelled compactions count as notices; and completed compactions count as compactions. A failed compaction or tool call is therefore not also counted as a compaction. Tool icons list every call regardless of outcome.
 
