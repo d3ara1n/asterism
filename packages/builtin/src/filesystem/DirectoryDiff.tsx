@@ -1,9 +1,8 @@
 import { useIsPresent } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
-import { IslandPanel, useI18n, useRendererCalls, useRendererEvents, useRendererIsland } from "@asterism-app/sdk/renderer";
+import { useEffect, useState } from "react";
+import { Diff, IslandPanel, useI18n, useRendererCalls, useRendererEvents, useRendererIsland } from "@asterism-app/sdk/renderer";
 import { ResourcePresenceChanged, type ResourceRef, type UiText } from "@asterism-app/sdk/contracts";
 import type { z } from "zod";
-import { CodeDiff, CodeText, parseFileDiff } from "@asterism-app/ui/code-view";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { ResourceSourceChip } from "@asterism-app/ui/reference-chip";
@@ -58,8 +57,6 @@ export default function DirectoryDiff({ resource, path, store }: { resource: Res
     const unsubscribe = store.onGitRefresh(() => read(true));
     return () => { unsubscribe(); controller.abort(); };
   }, [present, calls, resource, path, store, attempt]);
-  const parsed = useMemo(() => data?.kind === "patch" ? parseFileDiff(data.patch) : null, [data]);
-  const overflow = lineWrapping ? "wrap" : "scroll";
   return <IslandPanel title={path} source={<ResourceSourceChip resource={resource} />} description={i18n.text(messages.diffBase)} action={<>
     <IconButton label={i18n.text(commonMessages.wordWrap)} aria-pressed={lineWrapping} disabled={data?.kind !== "patch"}
       variant={lineWrapping ? "selected" : "ghost"} onClick={() => setLineWrapping(value => !value)}><WrapText /></IconButton>
@@ -69,9 +66,7 @@ export default function DirectoryDiff({ resource, path, store }: { resource: Res
     <ResourceLocationActions resource={resource} location={path} />
   </>}>
     {error && <Alert variant="destructive"><AlertDescription>{i18n.text(error)}</AlertDescription></Alert>}
-    {data?.kind === "patch" ? parsed?.hunks.length
-      ? <CodeDiff diff={parsed} overflow={overflow} lineDiffType="word-alt" />
-      : <CodeText contents={data.patch} language="diff" overflow={overflow} />
+    {data?.kind === "patch" ? <Diff diff={data.patch} wrap={lineWrapping} highlightChanges="word" />
       : data ? <p className="type-caption text-muted-foreground">{i18n.text(data.kind === "binary" ? messages.diffBinary : messages.diffEmpty)}</p>
       : loading ? <Spinner /> : null}
   </IslandPanel>;

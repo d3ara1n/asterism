@@ -19,7 +19,6 @@
     "@lezer/highlight": "^1.2.5",
     "@parcel/watcher": "2.6.0",
     "@perplexity-ai/perplexity_ai": "0.41.0",
-    "@pierre/diffs": "1.6.2",
     "@slack/socket-mode": "3.1.1",
     "@slack/web-api": "8.3.0",
     "@tencent-connect/qqbot-nodejs": "1.0.5",

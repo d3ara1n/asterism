@@ -1,25 +1,26 @@
 # Make the shared UI package internal
 
 Filed: 2026-11-25
-Status: Deferred. The user decided that plugins depend only on the SDK and that `@asterism-app/ui` becomes an internal package; the migration is scheduled separately.
+Status: In progress. The directory diff panel and text-tool diff preview use the SDK `Diff`. Other builtin views still use the private UI package.
+
+## Boundary
+
+The SDK defines how plugins contribute to workbench surfaces such as islands and tool views. Shared controls are optional, composable capabilities, not plugin-specific views or a required UI library. A control owns generic behavior such as diff highlighting; its consumer owns the toolbar, preferences, and layout. Plugins can supply their own controls, dependencies, and scoped styles. The host's UI implementation and CSS build are not plugin interfaces.
 
 ## Current state
 
 - The plugin builder treats every `@asterism-app/ui/*` subpath as a renderer host module (`packages/plugin-build/src/artifact.ts`, `sharedUiPackage`), so any plugin that declares the package as a peer can import its internals.
-- The builtin plugin is built like any other plugin and declares `@asterism-app/ui` as a peer. It imports about 50 subpaths; the most frequent are `ui/button`, `tooltip-hint`, `utils`, `ui/spinner`, `messages/common`, `ui/status`, `tool-header`, `ui/icon-button`, `tool-content`, and `code-view`.
-- The package exports `.tsx` sources with extensionless relative imports, so a plugin type-checked with `nodenext` cannot consume it; only the host's bundler-mode renderer config can.
-- The SDK renderer exposes host-bound controls through `RendererUiProvider`: `HeaderExcerpt`, `StreamingScrollArea`, `ToolHeader`, `ToolResourceSubject`, `ToolScrollArea`, and `CodeDiff`. Their props are SDK-owned and do not expose Pierre, Radix, or Tailwind types.
+- Builtin is built like any other plugin and still declares `@asterism-app/ui` as a peer. Its source is also included in the host's Tailwind scan; this is not how separately built plugins get styles.
 
 ## Work
 
-1. Inventory the controls builtin uses and decide which become SDK renderer controls, which builtin should own privately, and which the host shell should own instead.
-2. Add the SDK controls with SDK-owned props, shaped by builtin's actual usage, and bind them in the host.
-3. Move builtin to the SDK controls and drop its `@asterism-app/ui` peer.
-4. Remove `sharedUiPackage` from the builder's host modules and the generated shared UI module table, and update the builder integration fixtures and `docs/development/architecture.md`.
-5. Mark `@asterism-app/ui` internal in its README and in `docs/development/design-system.md`.
+1. Classify remaining builtin imports: workbench mechanisms, useful generic controls, and UI that belongs to the plugin. Promote controls on their merits, not to reproduce the private export list.
+2. Migrate real consumers in groups, preserving their behavior. Use SDK-owned props for shared controls, and use plugin-owned components and styles where appropriate.
+3. Once builtin no longer imports the private package, drop its `@asterism-app/ui` peer. Remove the generated shared UI module table. Keep `@asterism-app/ui` reserved in the builder but provide no plugin entry points for it. Update builder integration fixtures and `docs/development/architecture.md`.
 
 ## Acceptance
 
-- A plugin importing `@asterism-app/ui/*` fails to build with a diagnostic.
-- Builtin builds and loads with only SDK and builtin-api peers.
-- Typechecks, unit tests, and the opt-in plugin integration suite pass; the user accepts the tool and card views visually.
+- A plugin importing `@asterism-app/ui/*` fails to build with a diagnostic, whether declared as a peer or a regular dependency.
+- Builtin builds and loads without private Asterism UI imports. The directory diff keeps wrap control and word-level highlighting.
+- A separately built plugin can use workbench mechanisms and mix SDK controls with its own controls and styles.
+- Typechecks, focused tests, and the opt-in plugin integration suite pass; the user accepts the migrated views visually.

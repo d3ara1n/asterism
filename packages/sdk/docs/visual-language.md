@@ -1,6 +1,8 @@
 # Fit plugin views into the workbench
 
-A plugin's views appear beside the host's own and other plugins' views. Users read them as one application when they share its layering, the meaning of its lines and motion, and its controls for each kind of choice. This guide explains that visual language and the choices it implies for plugin authors. The shared controls carry the exact appearance; using them is how a plugin stays consistent as the application's styling evolves.
+A plugin's views appear beside the host's own and other plugins' views. The SDK provides Asterism-specific ways to register tool and card views, open islands, and use workbench navigation. Within those views, you choose the controls.
+
+Choose controls that meet your view's requirements. You can use a third-party library, write your own controls, or use the SDK's shared controls. When an SDK control fits and you want the same appearance and interaction as the workbench, it saves you that work. If it doesn't fit, use another control without cutting features to match the SDK. You can mix these choices in the same view.
 
 ## Start from the host's containers
 
@@ -23,7 +25,7 @@ A plugin that needs a group uses the shell tone rather than adding a border; the
 
 Users learn that a line in Asterism tells them something: where focus is, what is selected, where a drop will land, or the state of a piece of work. A moving dashed outline means content is still forming, a still dashed outline means it ended incomplete, and a red line means the request that produced it failed. Hairlines between rows are the one structural line.
 
-A plugin that draws decorative borders dilutes those meanings. Prefer the host's state presentation: tool views receive their state outline from the shared process block, and status uses the shared status badge, text, and icon components, which always pair color with an icon or label.
+Tool views receive their state outline from the host's process block. When showing status within your own content, pair color with an icon or label rather than relying on color alone.
 
 ## Let motion explain a change
 
@@ -33,25 +35,25 @@ Plugin views should use the same motion cues and timing. Shared controls already
 
 ## Choose controls by the kind of choice
 
-The shared controls encode what a choice is, so the same kind of choice looks the same everywhere:
+Use the same interaction for the same kind of choice, whichever library supplies the controls:
 
 - A single choice among a few short options is a segmented toggle group.
 - An immediate on/off setting is a switch; a choice inside a form or a multi-selection is a checkbox; an explained single choice is a radio group.
-- A choice among many options, or one that needs search, uses the shared command and popover combination.
-- Icon-only actions use the shared icon button, which supplies the accessible label and tooltip.
+- A choice among many options, or one that needs search, uses a searchable picker in a popover.
+- Icon-only actions have an accessible label and a tooltip.
 - A short name or explanation on hover is a tooltip; a preview read while hovering is a hover card; content the user opens on purpose, scrolls, or acts on is a popover behind a button.
 - Button variants carry roles: one default button for the primary action in a region, outline for supporting actions, ghost for compact and row actions, destructive for irreversible confirmation.
 
-Tooltips share the popover tone, so their content uses the same color tokens as any sheet content. The shared tooltip supplies its own delay, placement, and width; passing only a side and the content keeps every hint in the application on one rhythm. Disabled controls still show their tooltips, which is the natural place to say why an action is unavailable.
+Tooltips share the popover tone. Keep their delay, placement, and width consistent. If a tooltip explains why an action is unavailable, make the explanation reachable even when the control is disabled.
 
-Building a lookalike control loses these meanings and the accessibility the shared one provides. Shared controls also follow the user's appearance settings for color, radius, density, and fonts without extra work.
+## Use shared readers when they fit
 
-## Render content through the shared readers
+The host supplies optional presentation controls through the SDK renderer. Tool titles can use `ToolHeader` with a subject, summary, and metadata. `ToolResourceSubject` puts the resource recorded with the call in the subject slot, and `HeaderExcerpt` shortens long inputs without truncating the operation name. `ToolScrollArea` provides a default height for settled results; `StreamingScrollArea` follows growing content. A view can use its own layout when those defaults do not fit.
 
-The SDK renderer supplies the host's own presentation controls; the host binds them, so they follow the application's styling as it evolves. Tool titles use `ToolHeader` with a subject, summary, and metadata. `ToolResourceSubject` puts the resource recorded with the call in the subject slot, and `HeaderExcerpt` shortens long inputs in the summary rather than truncating the title. A settled body that can outgrow its space goes in `ToolScrollArea`, whose height the host owns; content still growing goes in `StreamingScrollArea`. `CodeDiff` renders a unified diff of one file in the shared code presentation; turn its line numbers off when the hunk positions are not real file positions. Using these controls keeps a plugin's views reading like every other plugin's views.
+`Diff` renders a unified diff of one file. Set wrapping or word-level change highlighting as needed, and turn line numbers off when hunk positions are not real file positions. The view owns its toolbar, preferences, and scroll layout. A plugin can also use its own diff viewer or other controls without changing how it connects to islands, cards, or tool views.
 
 ## Keep custom styling local
 
-A plugin can style what is genuinely its own: a domain visualization, a canvas, a media viewer. Build that styling from the semantic color tokens and type roles so it follows the user's theme and both color schemes. CSS Modules keep plugin styles from leaking, while global styles share the document cascade with the host and every other plugin; avoid global selectors that would restyle shared controls or another plugin's views.
+For third-party or custom controls, use the workbench's semantic color tokens and type roles when you want the view to follow the user's theme in both color schemes. CSS Modules keep plugin styles local, while global styles share the document cascade with the host and every other plugin. Avoid global selectors that would restyle shared controls or another plugin's views.
 
 Check a view in light and dark modes, at each density, and with reduced motion before release. A typecheck cannot tell whether a view belongs in the workbench; looking at it beside the host's own views can.

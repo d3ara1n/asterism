@@ -1,4 +1,3 @@
-import { parsePatchFiles, type FileDiffMetadata } from "@pierre/diffs";
 import { formatPatch, parsePatch } from "diff";
 
 import { splitLines } from "./hashline/lines.ts";
@@ -19,7 +18,7 @@ export function textBodyPreview(text: string) {
  * Passes every hunk to the diff control, which folds unchanged regions itself and preserves each hunk's absolute line numbers.
  * The body bounds the control's height instead of dropping hunks, so distant changes stay reachable.
  */
-export function diffBodyPreview(diff: string): FileDiffMetadata | null {
+export function diffBodyPreview(diff: string): string | null {
   try {
     const patches = parsePatch(diff);
     if (patches.length !== 1 || !patches[0].hunks.length) return null;
@@ -36,8 +35,7 @@ export function diffBodyPreview(diff: string): FileDiffMetadata | null {
       ...hunk,
       lines: hunk.lines.map(line => line[0] === "\\" ? line : `${line[0]}${displayLine(line.slice(1))}`),
     }));
-    const fileDiff = parsePatchFiles(formatPatch({ ...patch, hunks }), undefined, true)[0]?.files[0];
-    return fileDiff ? { ...fileDiff, lang: "text" } : null;
+    return formatPatch({ ...patch, hunks });
   } catch {
     return null;
   }

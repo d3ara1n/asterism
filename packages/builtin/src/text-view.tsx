@@ -2,14 +2,14 @@ import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { textMessages } from "./messages/text";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { toolsMessages } from "@asterism-app/ui/messages/tools";
-import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
+import { Diff, useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import type { Json, ToolResult } from "@asterism-app/sdk/contracts";
 import { useMemo } from "react";
 import type { TextRead, TextChange, TextReplace } from "@asterism-app/builtin-api/contracts";
 import { inputField, inputText, characterCount, toolTextTail, editPreviewText, editIntents } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
 import { displayLine, displayText } from "./shared/text-row";
-import { CodeDiff, CodeRows, CodeText } from "@asterism-app/ui/code-view";
+import { CodeRows, CodeText } from "@asterism-app/ui/code-view";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
@@ -156,7 +156,7 @@ function TextBodyPreview({ text, filename }: { text: string; filename?: string }
 function DiffBodyPreview({ diff }: { diff: string }) {
   const preview = useMemo(() => diffBodyPreview(diff), [diff]);
   if (!preview) return <TextBodyPreview text={diff} />;
-  return <ToolScrollArea className="max-h-80"><CodeDiff diff={preview} /></ToolScrollArea>;
+  return <ToolScrollArea className="max-h-80"><Diff diff={preview} syntax="plain" /></ToolScrollArea>;
 }
 
 const readView = { headerRenderer: TextReadHeader, bodyRenderer: TextReadBody };

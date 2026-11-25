@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { DiffProps } from "@asterism-app/sdk/renderer";
 import { File, FileDiff, type FileDiffOptions, type FileOptions } from "@pierre/diffs/react";
 import { parsePatchFiles, preloadHighlighter, type BaseCodeOptions, type FileDiffMetadata, type SupportedLanguages } from "@pierre/diffs";
 import { codeViewThemeOptions } from "./code-theme";
@@ -91,29 +92,28 @@ export function CodeText({ contents, language, lineNumbers = false, overflow = "
   </div>;
 }
 
-export const diffViewOptions = {
-  ...codeViewOptions, diffStyle: "unified", diffIndicators: "bars", lineDiffType: "none",
+const diffViewOptions = {
+  ...codeViewOptions, diffStyle: "unified", diffIndicators: "bars",
   hunkSeparators: "simple", expandUnchanged: false,
 } as const satisfies FileDiffOptions<undefined, undefined>;
 
-/** Parses a single-file unified patch; null when the text is not one parseable file diff. */
-export function parseFileDiff(patch: string): FileDiffMetadata | null {
+/** Only a single file with hunks can use the structured view. Keep header-only patches readable in the text view. */
+function parseFileDiff(patch: string): FileDiffMetadata | null {
   try {
     const files = parsePatchFiles(patch, undefined, true).flatMap(entry => entry.files);
-    return files.length === 1 ? files[0]! : null;
+    return files.length === 1 && files[0]?.hunks.length ? files[0] : null;
   } catch {
     return null;
   }
 }
 
-/** Unified diff of one file. A patch string that does not parse as a single file diff renders as plain diff text. */
-export function CodeDiff({ diff, overflow = diffViewOptions.overflow, lineDiffType = diffViewOptions.lineDiffType, lineNumbers = true }: {
-  diff: FileDiffMetadata | string;
-  /** Hide line numbers when hunk positions are not real file positions. */
-  lineNumbers?: boolean;
-} & Pick<FileDiffOptions<undefined, undefined>, "overflow" | "lineDiffType">) {
-  const fileDiff = useMemo(() => typeof diff === "string" ? parseFileDiff(diff) : diff, [diff]);
-  const options = useMemo(() => ({ ...diffViewOptions, overflow, lineDiffType, disableLineNumbers: !lineNumbers }), [overflow, lineDiffType, lineNumbers]);
-  if (!fileDiff) return <CodeText contents={typeof diff === "string" ? diff : ""} language="diff" overflow={overflow} />;
+export function Diff({ diff, wrap = true, highlightChanges = "none", syntax = "auto", lineNumbers = true }: DiffProps) {
+  const parsed = useMemo(() => parseFileDiff(diff), [diff]);
+  const fileDiff = useMemo(() => parsed && syntax === "plain" ? { ...parsed, lang: "text" } : parsed, [parsed, syntax]);
+  const overflow = wrap ? "wrap" : "scroll";
+  const options = useMemo<FileDiffOptions<undefined, undefined>>(() => ({
+    ...diffViewOptions, overflow, lineDiffType: highlightChanges === "word" ? "word-alt" : "none", disableLineNumbers: !lineNumbers,
+  }), [overflow, highlightChanges, lineNumbers]);
+  if (!fileDiff) return <CodeText contents={diff} language="diff" overflow={overflow} />;
   return <FileDiff fileDiff={fileDiff} options={options} className="pierre-code type-code" disableWorkerPool />;
 }

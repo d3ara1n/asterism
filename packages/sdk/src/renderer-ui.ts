@@ -41,9 +41,15 @@ export interface ToolScrollAreaProps {
   label: string;
 }
 
-export interface CodeDiffProps {
-  /** Unified diff text of one file, with `---`/`+++` headers and `@@ -a,b +c,d @@` hunk headers. The file name selects highlighting. */
+export interface DiffProps {
+  /** Unified diff text of one file, with `---`/`+++` headers and `@@` hunks. */
   diff: string;
+  /** Wrap long lines instead of scrolling horizontally. Defaults to true. */
+  wrap?: boolean;
+  /** Emphasize changed words within changed lines, in addition to marking the lines themselves. Defaults to "none". */
+  highlightChanges?: "none" | "word";
+  /** Infer syntax highlighting from the filename, or render hunk contents as plain text. Defaults to "auto". */
+  syntax?: "auto" | "plain";
   /** Show old and new line numbers; defaults to true. Turn them off when the hunk positions are not real file positions. */
   lineNumbers?: boolean;
 }
@@ -54,7 +60,7 @@ interface RendererUi {
   ToolHeader: ComponentType<ToolHeaderProps>;
   ToolResourceSubject: ComponentType<ToolResourceSubjectProps>;
   ToolScrollArea: ComponentType<ToolScrollAreaProps>;
-  CodeDiff: ComponentType<CodeDiffProps>;
+  Diff: ComponentType<DiffProps>;
 }
 
 const Ui = createContext<RendererUi | null>(null);
@@ -86,12 +92,12 @@ export function ToolResourceSubject(props: ToolResourceSubjectProps) {
   return createElement(useRendererUi().ToolResourceSubject, props);
 }
 
-/** A bounded reading region for settled content; the host owns its height, and content beyond it scrolls inside. */
+/** The default bounded reading region for settled tool content. Use your own layout when it doesn't fit the view. */
 export function ToolScrollArea(props: ToolScrollAreaProps) {
   return createElement(useRendererUi().ToolScrollArea, props);
 }
 
-/** Unified diff of one file in the shared code presentation. Text that does not parse as one file diff renders as plain diff text. */
-export function CodeDiff(props: CodeDiffProps) {
-  return createElement(useRendererUi().CodeDiff, props);
+/** Optional single-file diff viewer. The caller owns its controls and layout. Patches without renderable hunks display as diff text. */
+export function Diff(props: DiffProps) {
+  return createElement(useRendererUi().Diff, props);
 }
