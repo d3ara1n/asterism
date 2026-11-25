@@ -189,24 +189,32 @@ function fixed(renderer: ToolRenderer, props: ToolRenderProps): ResolvedToolView
   const view = !identity || identity.id === renderer.contract.id ? renderer.resolve(props) : null;
   return { label: renderer.label, icon: renderer.icon, ...view, props };
 }
+/** An implementation still owns the call's label and icon if its renderer declines invalid arguments. */
+function registeredTool(props: AnyToolRenderProps, registry: ViewRegistry): ResolvedToolView {
+  const implementation = props.invocation.implementation;
+  const view = registry.tool(implementation, props);
+  return { ...view, props,
+    label: view?.label ?? (implementation && registry.toolLabel(implementation.id)),
+    icon: view?.icon ?? (implementation && registry.toolIcon(implementation.id)) ?? <Wrench className="size-3.5" /> };
+}
 /** The fixed entry's own adapter handles forwarding; the shared shell does not know the resource tool protocol. */
 function resourceCall(props: ToolRenderProps, registry: ViewRegistry): ResolvedToolView {
   if (props.phase === "input") {
     const args = props.args;
     if (!args || typeof args !== "object" || Array.isArray(args) || typeof args.tool !== "string") return { props };
     const inner = { ...props, draft: null, name: args.tool, target: args.target ?? null, args: args.args ?? null };
-    return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
+    return registeredTool(inner, registry);
   }
   const parsed = ResourceCall.argsSchema.safeParse(props.args);
   if (!parsed.success) return { props, label: toolsMessages.toolResourceCall };
   const inner = { ...props, name: parsed.data.tool, target: parsed.data.target, args: parsed.data.args };
-  return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
+  return registeredTool(inner, registry);
 }
 function resourceCallText(props: FreeformToolRenderProps, registry: ViewRegistry): ResolvedToolView {
   const selection = props.text !== null ? parseResourceCallText(props.text) : null;
   if (!selection) return { props, label: toolsMessages.toolResourceCall };
   const inner = { ...props, name: selection.tool, text: selection.body };
-  return { props: inner, ...registry.tool(props.invocation.implementation, inner) };
+  return registeredTool(inner, registry);
 }
 export function toolPreparation(name: string): string {
   return getI18n().text(fixedTools.get(name)?.preparation ?? toolsMessages.toolPreparing);
@@ -229,9 +237,5 @@ export function resolveToolView(props: AnyToolRenderProps, registry: ViewRegistr
     if (entry) return fixed(entry.renderer, props);
     if (props.name === ResourceCall.name) return resourceCall(props, registry);
   }
-  // A view declines arguments that fail its contract, but the implementation still owns the name and icon shown for the call.
-  const identity = props.invocation.implementation?.id ?? null;
-  return { props, label: identity ? registry.toolLabel(identity) : undefined,
-    icon: (identity ? registry.toolIcon(identity) : undefined) ?? <Wrench className="size-3.5" />,
-    ...registry.tool(props.invocation.implementation, props) };
+  return registeredTool(props, registry);
 }

@@ -95,9 +95,8 @@ function TextWriteBody(props: ToolRenderProps<TextChange>) {
   const content = inputText(props.args, "content");
   const filename = inputText(props.target, "path");
   if (props.phase === "input") return <InputTail text={content ?? ""} filename={filename} />;
-  if (props.result?.kind === "succeeded" && content !== undefined) return <TextBodyPreview text={content} filename={filename} />;
-  return props.result?.data ? <TextChangeBody result={props.result} />
-    : content !== undefined ? <TextBodyPreview text={content} filename={filename} /> : null;
+  if (props.result?.data?.diff) return <DiffBodyPreview diff={props.result.data.diff} />;
+  return content !== undefined ? <TextBodyPreview text={content} filename={filename} /> : <TextChangeBody result={props.result} />;
 }
 /** Edit input is complete once the call is submitted, so a failed attempt still states every operation the model requested. */
 function EditIntents({ args }: { args: Json }) {

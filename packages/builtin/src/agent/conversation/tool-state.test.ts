@@ -45,6 +45,17 @@ describe("Tool call display projection", () => {
     expect(view.props).toMatchObject({ name: "list", target: { path: "src" }, args: {}, result: { kind: "running", data } });
   });
 
+  it("keeps the registered label and icon when a forwarded Directory call has invalid arguments", () => {
+    const registry = new ViewRegistry([filesystem]);
+    const props: ToolRenderProps = { phase: "settled", name: "resource_call", target: null, invocation,
+      args: { ...args, target: { path: 123 } },
+      result: { kind: "rejected", data: null, error: { code: "invalid_arguments", message: "Invalid path" } } };
+    const view = resolveToolView(props, registry);
+    expect(view.label).toBe(registry.toolLabel(DirectoryList.id));
+    expect(view.icon).toBe(registry.toolIcon(DirectoryList.id));
+    expect(view.header).toBeUndefined();
+  });
+
   it("Preserves cancelled results, saved resource identity and incomplete history state", () => {
     const node: Extract<TimelineItem, { kind: "toolcall"; createdAt: string }> = {
       id: "saved", createdAt: "2026-10-01", kind: "toolcall",
