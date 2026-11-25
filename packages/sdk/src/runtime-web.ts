@@ -9,6 +9,8 @@ export interface WebProviderInstance {
 export interface WebProviderDefinition {
   id: string;
   label: UiText;
+  /** Optional host-bundled brand icon for settings lists. */
+  iconId?: string;
   search: boolean;
   fetch: boolean;
   /** Glob for the complete URL, with * matching any characters; fetch routing matches in declaration order. */

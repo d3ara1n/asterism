@@ -58,7 +58,7 @@ export function deepseekFetchResponse(raw: unknown, url: string, query?: string)
 }
 
 export const deepseekWebProvider: WebProviderDefinition = {
-  id: "deepseek", label: "DeepSeek", search: true, fetch: true, urlPatterns: ["*"],
+  id: "deepseek", label: "DeepSeek", iconId: "deepseek", search: true, fetch: true, urlPatterns: ["*"],
   settings: [{ kind: "secret", key: "apiKey", label: messages.apiKey, required: true, helpUrl: "https://platform.deepseek.com/api_keys" }],
   create({ settings }) {
     return {

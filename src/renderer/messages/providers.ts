@@ -101,6 +101,10 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     id: "provider.connections.summary",
     defaultMessage: "Connections, credentials, and the models they provide.",
   },
+  brandNotice: {
+    id: "provider.connections.brandNotice",
+    defaultMessage: "Provider names and logos identify third-party services. Their display does not imply affiliation, sponsorship, or endorsement.",
+  },
   addProvider: {
     id: "provider.add.action",
     defaultMessage: "Add model provider",

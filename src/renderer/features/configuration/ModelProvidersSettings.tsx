@@ -8,6 +8,7 @@ import { commonMessages } from "@asterism-app/ui/messages/common";
 import { providersMessages } from "../../messages/providers";
 import { thinkingLabels } from "@asterism-app/ui/messages/model-selection";
 import { getI18n, useI18n } from "../../shared/i18n";
+import { ProviderIcon } from "../../shared/ui/ProviderIcon";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "@asterism-app/ui/ui/empty";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { StatusText } from "@asterism-app/ui/ui/status";
@@ -87,6 +88,7 @@ function useQuickActions() {
 const providerValue = (provider: ModelProvider): ProviderValue => ({
   id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth, apiKey: provider.apiKey,
   compatibility: structuredClone(provider.compatibility),
+  ...(provider.iconId !== undefined && { iconId: provider.iconId }),
   ...(provider.usage !== undefined && { usage: provider.usage }),
   ...(provider.fixedFields && { fixedFields: [...provider.fixedFields] }),
 });
@@ -120,7 +122,7 @@ function ProviderRow({ provider, snapshot, selected, onOpen }: {
   const i18n = useI18n();
   const quick = useQuickActions();
   const count = snapshot.models.filter(model => model.providerId === provider.id).length;
-  return <ListRow mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{provider.name.trim().charAt(0).toUpperCase() || "?"}</span>}
+  return <ListRow mediaVariant="icon" media={<ProviderIcon name={provider.name} iconId={provider.iconId} />}
     title={provider.name} selected={selected} inactive={!provider.enabled} onOpen={onOpen}
     description={<>{canEditModelProviderField(provider, "protocol") && <>{protocolLabel(provider.protocol)} · </>}{i18n.formatMessage(providersMessages.modelCount, { count })}</>}
     actions={<>
@@ -171,9 +173,12 @@ function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null)
         {items.map(preset => {
           const description = presetDescription(preset, modelProviderPresets, false);
           return <div key={preset.id} className="flex flex-col gap-1">
-            <Item asChild className={cn(tile, "bg-card-shell")}><button type="button" onClick={() => onPick(preset)}>
-              <span className="type-section max-w-full truncate">{preset.name}</span>
-              {description && <span className="type-caption">{description}</span>}
+            <Item asChild className="min-h-16 flex-nowrap gap-2 bg-card-shell px-3 py-2 text-left hover:bg-accent"><button type="button" onClick={() => onPick(preset)}>
+              <span className="flex size-5 shrink-0 items-center justify-center"><ProviderIcon name={preset.name} iconId={preset.iconId} /></span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="type-section truncate">{preset.name}</span>
+                {description && <span className="type-caption">{description}</span>}
+              </span>
             </button></Item>
             {preset.keyUrl && <ProviderKeyLink href={preset.keyUrl}>{i18n.formatMessage(providersMessages.getKey)}</ProviderKeyLink>}
           </div>;

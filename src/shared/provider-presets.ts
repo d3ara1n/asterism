@@ -3,11 +3,14 @@ import { modelProviderInputSchema, type ModelProviderInput } from "./configurati
 export type { ModelProviderPreset } from "@asterism-app/sdk/contracts";
 export type ModelProviderDraft = Omit<ModelProviderInput, "enabled">;
 
-/** Deep-copy configuration and editing rules; catalog identity and metadata stay outside saved connections. */
+/** Copy connection defaults and presentation independently of the catalog entry. */
 export function modelProviderPresetDraft(preset: ModelProviderPreset, occupiedIds: readonly string[] = []): ModelProviderDraft {
   let id = preset.id;
   for (let suffix = 2; occupiedIds.includes(id); suffix++) id = `${preset.id}-${suffix}`;
-  const { enabled: _, ...draft } = modelProviderInputSchema.parse({ id, name: preset.name, ...structuredClone(preset.connection), enabled: true });
+  const { enabled: _, ...draft } = modelProviderInputSchema.parse({
+    id, name: preset.name, ...structuredClone(preset.connection), enabled: true,
+    ...(preset.iconId !== undefined && { iconId: preset.iconId }),
+  });
   return draft;
 }
 

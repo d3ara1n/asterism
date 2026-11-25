@@ -85,6 +85,7 @@ export class WebProviderRegistry implements WebProviderServices, WebServices {
       if (typeof definition.create !== "function") throw new Error("A web provider supplies a synchronous factory.");
       const info = webProviderTypeSchema.parse({
         id: definition.id, label: definition.label, owner,
+        ...(definition.iconId !== undefined && { iconId: definition.iconId }),
         search: definition.search, fetch: definition.fetch, urlPatterns: [...definition.urlPatterns],
         settings: structuredClone(definition.settings),
       });

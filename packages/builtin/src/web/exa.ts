@@ -121,7 +121,7 @@ export function exaSearchOptions(request: WebSearchRequest, searchType = "auto")
 }
 
 export const exaWebProvider: WebProviderDefinition = {
-  id: "exa", label: "Exa", search: true, fetch: true, urlPatterns: ["*"],
+  id: "exa", label: "Exa", iconId: "exa", search: true, fetch: true, urlPatterns: ["*"],
   settings: [
     { kind: "secret", key: "apiKey", label: messages.apiKey, required: true, helpUrl: "https://dashboard.exa.ai/api-keys" },
     { kind: "choice", key: "searchType", label: messages.exaSearchType, description: messages.exaSearchTypeHint, default: "auto", options: [

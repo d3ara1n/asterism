@@ -79,7 +79,7 @@ export function firecrawlFetchResponse(raw: unknown, requestedUrl: string, query
 }
 
 export const firecrawlWebProvider: WebProviderDefinition = {
-  id: "firecrawl", label: "Firecrawl", search: true, fetch: true, urlPatterns: ["*"],
+  id: "firecrawl", label: "Firecrawl", iconId: "firecrawl", search: true, fetch: true, urlPatterns: ["*"],
   settings: [{ kind: "secret", key: "apiKey", label: messages.apiKey, required: true, helpUrl: "https://www.firecrawl.dev/app/api-keys" }],
   create({ settings }) {
     return {

@@ -1,7 +1,7 @@
 import {
   mcpSettingsSchema, shellSettingsSchema, modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema, modelMediaModalities, modelInputModalitiesSchema,
-  modelProviderFixedFields, modelProtocolIds, providerUsageIdSchema, usageProviderInfoSchema, modelProviderPresetSchema,
+  modelProviderFixedFields, modelProtocolIds, providerUsageIdSchema, usageProviderInfoSchema, modelProviderPresetSchema, providerIconIdSchema,
 } from "@asterism-app/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
@@ -25,6 +25,7 @@ const endpoint = z.string().trim().url().pipe(z.string().refine(value => {
 export const modelProviderInputSchema = z.strictObject({
   id: modelProviderIdSchema, name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none"]),
   compatibility: modelCompatibilitySchema,
+  iconId: providerIconIdSchema.optional(),
   usage: providerUsageIdSchema.nullable().optional(),
   fixedFields: z.array(modelProviderFixedFieldSchema).refine(fields => new Set(fields).size === fields.length,
     "Fixed fields must be unique.").optional(),

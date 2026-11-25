@@ -6,6 +6,7 @@ import type { ProviderSetting, WebProviderType } from "@asterism-app/sdk/contrac
 import { webProviderMessages as messages } from "../../messages/web-providers";
 import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
+import { ProviderIcon } from "../../shared/ui/ProviderIcon";
 import { useIsland, useIslandCancel, useIslandKey } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Badge } from "@asterism-app/ui/ui/badge";
@@ -37,8 +38,6 @@ function useProviderIssue() {
   return (type: WebProviderType | undefined): { tone: StatusTone; label: string } | null =>
     type ? null : { tone: "error", label: i18n.text(messages.unavailable) };
 }
-const initial = (label: string) => label.trim().charAt(0).toUpperCase() || "?";
-
 export function WebProvidersSettings() {
   const i18n = useI18n(), island = useIsland();
   const capabilities = useCapabilities(), issueOf = useProviderIssue();
@@ -95,7 +94,7 @@ export function WebProvidersSettings() {
           {handle => <>
             {index > 0 && <ItemSeparator />}
             <ListRow leadingActions={handle} className="rounded-none" disabled={busy} inactive={!state.enabled}
-              mediaVariant="icon" media={<span className="text-sm font-medium text-muted-foreground">{initial(label)}</span>}
+              mediaVariant="icon" media={<ProviderIcon name={label} iconId={type?.iconId} />}
               title={label} description={type && capabilities(type)}
               selected={island.has(webProviderIslandKey(state.id))} onOpen={origin => open(state.id, origin)}
               trailing={issue && <StatusBadge tone={issue.tone}>{issue.label}</StatusBadge>}
@@ -142,22 +141,26 @@ function WebProviderCreation() {
   if (picked) return <WebProviderEditor typeId={picked} />;
   const types = snapshot?.webProviderTypes ?? [];
   const added = new Set((snapshot?.webProviders ?? []).map(state => state.id));
-  const tile = "min-h-16 flex-col items-start justify-center gap-1 px-3 py-2 text-left";
+  const tile = "min-h-16 flex-nowrap gap-2 bg-card-shell px-3 py-2 text-left";
   return <Editor form={form} title={i18n.text(messages.add)} dirty={false} busy={false} error={null}>
     <div className="flex flex-col gap-5">
       <p className="type-caption">{i18n.text(messages.pickerHint)}</p>
       <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9rem, 1fr))" }}>
         {types.map(type => {
           const exists = added.has(type.id);
+          const label = i18n.text(type.label);
           const help = type.settings.find((setting): setting is SecretSetting => setting.kind === "secret" && !!setting.helpUrl);
           return <div key={type.id} className="flex flex-col gap-1">
-            <Item asChild className={cn(tile, "bg-card-shell", exists ? "opacity-60" : "hover:bg-accent")}>
+            <Item asChild className={cn(tile, exists ? "opacity-60" : "hover:bg-accent")}>
               <button type="button" disabled={exists} onClick={() => setPicked(type.id)}>
-                <span className="flex w-full min-w-0 items-center justify-between gap-2">
-                  <span className="type-section truncate">{i18n.text(type.label)}</span>
-                  {exists && <Badge variant="secondary" className="font-normal">{i18n.text(messages.added)}</Badge>}
+                <span className="flex size-5 shrink-0 items-center justify-center"><ProviderIcon name={label} iconId={type.iconId} /></span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="flex min-w-0 items-center justify-between gap-1.5">
+                    <span className="type-section truncate">{label}</span>
+                    {exists && <Badge variant="secondary" className="font-normal">{i18n.text(messages.added)}</Badge>}
+                  </span>
+                  <span className="type-caption">{capabilities(type)}</span>
                 </span>
-                <span className="type-caption">{capabilities(type)}</span>
               </button>
             </Item>
             {!exists && help?.helpUrl && <ProviderKeyLink href={help.helpUrl}>{i18n.text(providersMessages.getKey)}</ProviderKeyLink>}

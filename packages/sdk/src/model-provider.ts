@@ -2,6 +2,7 @@ import { z } from "zod";
 import { uiTextSchema, type UiText } from "./i18n.ts";
 import { jsonSchema, type Json } from "./json.ts";
 import { providerUsageIdSchema } from "./provider-usage.ts";
+import { providerIconIdSchema } from "./provider-icon.ts";
 
 /** Host-owned model wire protocols; plugins select one and cannot register their own. */
 export const modelProtocolIds = ["openai-responses", "openai-chat", "anthropic"] as const;
@@ -19,6 +20,7 @@ export interface ModelProviderPreset {
   id: string;
   /** Provider or product brand; region, plan, billing, and protocol distinctions remain separate from the name. */
   name: string;
+  iconId?: string;
   billing: "usage" | "subscription" | "none";
   region?: UiText;
   plan?: UiText;
@@ -37,7 +39,7 @@ export const modelProviderConnectionSchema = z.strictObject({
   fixedFields: z.array(z.enum(modelProviderFixedFields)).optional(),
 });
 export const modelProviderPresetSchema = z.strictObject({
-  id: z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u), name: z.string().trim().min(1).max(160),
+  id: z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u), name: z.string().trim().min(1).max(160), iconId: providerIconIdSchema.optional(),
   billing: z.enum(["usage", "subscription", "none"]), region: uiTextSchema.optional(), plan: uiTextSchema.optional(),
   connection: modelProviderConnectionSchema, keyUrl: webUrl.optional(),
   sources: z.tuple([webUrl]).rest(webUrl), verifiedOn: z.iso.date(), keywords: z.array(z.string()).optional(),

@@ -66,7 +66,7 @@ Text uses the shared display, page, section, body, caption, label, and code role
 
 Density scales the root size, so spacing and type scale together without component changes. Resizing a card or island changes its content area, never its typography or control size.
 
-Icons come from Lucide. Read-only abbreviated counts use the common formatter; editable and raw values stay complete.
+Interface icons come from Lucide. Model and web provider lists use selected, bundled brand marks alongside the visible provider name. A missing or unknown icon key uses the name's initial in the same slot. Read-only abbreviated counts use the common formatter; editable and raw values stay complete.
 
 File size labels use the shared file size formatter. It scales byte counts by powers of 1024, so labels use the same IEC units as file limits. Only the number is localized; a localized count abbreviation such as `万` is not a byte unit.
 

@@ -40,7 +40,7 @@ export function perplexityResponse(raw: unknown, hints: WebHint[] = []): WebResp
 }
 
 export const perplexityWebProvider: WebProviderDefinition = {
-  id: "perplexity", label: "Perplexity", search: true, fetch: false, urlPatterns: [],
+  id: "perplexity", label: "Perplexity", iconId: "perplexity", search: true, fetch: false, urlPatterns: [],
   settings: [{ kind: "secret", key: "apiKey", label: messages.apiKey, required: true, helpUrl: "https://www.perplexity.ai/account/api/keys" }],
   create({ settings }) {
     const client = new Perplexity({ apiKey: settings.apiKey!, baseURL: "https://api.perplexity.ai" });

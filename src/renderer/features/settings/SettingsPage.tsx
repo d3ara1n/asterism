@@ -28,6 +28,7 @@ import { Screen, useIsland, useIslandCancel, type IslandSpec, type ScreenHandle 
 import { exitTransition, fadeTransition } from "../../shared/weave/motion";
 import { indicatorItem, SelectionIndicator } from "../../shared/selection-indicator";
 import { settingsMessages } from "../../messages/settings";
+import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type ComponentType, type ReactNode, type Ref, type RefObject } from "react";
 import type { UiText } from "@asterism-app/sdk/contracts";
@@ -41,10 +42,20 @@ type SettingsIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean 
 interface SettingsCategory { id: SettingsCategoryId; title: UiText; summary: UiText; icon: SettingsIcon; content: (manager: PluginManager) => ReactNode }
 interface SettingsEntry { id: string; title: UiText; summary: UiText; icon: SettingsIcon; source?: { pluginId: string; name: UiText }; content: () => ReactNode }
 
+function ProvidersSettings() {
+  const i18n = useI18n();
+  return <>
+    <ModelProvidersSettings />
+    <WebProvidersSettings />
+    <MessagingSettings />
+    <p className="type-caption mt-3 px-1">{i18n.text(providersMessages.brandNotice)}</p>
+  </>;
+}
+
 const categories: SettingsCategory[] = [
   { id: "general", title: settingsMessages.generalTitle, summary: settingsMessages.generalSummary, icon: SlidersHorizontal, content: () => <><InterfaceSettings /><NetworkSettings /><SessionsSettings /><UsageSettings /></> },
   { id: "appearance", title: settingsMessages.appearance, summary: settingsMessages.appearanceSummary, icon: Palette, content: () => <AppearanceSettings /> },
-  { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <><ModelProvidersSettings /><WebProvidersSettings /><MessagingSettings /></> },
+  { id: "providers", title: settingsMessages.providers, summary: settingsMessages.providersSummary, icon: PlugZap, content: () => <ProvidersSettings /> },
   { id: "skills", title: skillsMessages.title, summary: skillsMessages.summary, icon: BookOpen, content: manager => <SkillSettings plugins={manager.list} /> },
   { id: "shell", title: shellMessages.title, summary: shellMessages.summary, icon: Terminal, content: () => <ShellSettingsPage /> },
   { id: "mcp", title: mcpMessages.settings, summary: mcpMessages.summary, icon: Network, content: () => <McpSettings /> },

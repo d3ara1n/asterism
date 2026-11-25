@@ -63,7 +63,7 @@ export function tavilyResponse(raw: unknown, mode: "search" | "body" | "excerpt"
 }
 
 export const tavilyWebProvider: WebProviderDefinition = {
-  id: "tavily", label: "Tavily", search: true, fetch: true, urlPatterns: ["*"],
+  id: "tavily", label: "Tavily", iconId: "tavily", search: true, fetch: true, urlPatterns: ["*"],
   settings: [
     { kind: "secret", key: "apiKey", label: messages.apiKey, required: true, helpUrl: "https://app.tavily.com" },
     { kind: "choice", key: "searchDepth", label: messages.tavilySearchDepth, description: messages.tavilySearchDepthHint, default: "basic", options: [

@@ -682,6 +682,7 @@
   "provider.label": "模型提供商",
   "provider.connections.title": "模型提供商",
   "provider.connections.summary": "管理连接、凭据及其提供的具体模型。",
+  "provider.connections.brandNotice": "提供商名称和图标仅用于识别第三方服务，不表示 Asterism 与相关厂商存在合作、赞助或背书关系。",
   "provider.add.action": "添加模型提供商",
   "provider.connections.empty": "添加连接后即可开始使用模型。",
   "provider.add.emptyAction": "添加模型提供商",

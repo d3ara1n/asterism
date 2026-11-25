@@ -95,6 +95,7 @@
   "devDependencies": {
     "@asterism-app/plugin-build": "*",
     "@formatjs/cli": "6.16.36",
+    "@lobehub/icons-static-svg": "1.106.0",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "^26.6.6",
     "@types/react": "19.3.0",

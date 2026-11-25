@@ -2,6 +2,7 @@ import { z } from "zod";
 import { presentationSchema } from "./presentation.ts";
 import { uiTextSchema } from "./i18n.ts";
 import { providerSettingsSchema } from "./provider-settings.ts";
+import { providerIconIdSchema } from "./provider-icon.ts";
 
 export const webUrlSchema = z.string().url().refine(value => {
   const url = URL.parse(value);
@@ -53,7 +54,7 @@ export const webProviderStateSchema = z.strictObject({
   settings: z.record(z.string(), z.string()),
 });
 export const webProviderTypeSchema = z.object({
-  id: z.string().min(1), label: uiTextSchema, owner: z.string(),
+  id: z.string().min(1), label: uiTextSchema, owner: z.string(), iconId: providerIconIdSchema.optional(),
   search: z.boolean(), fetch: z.boolean(), urlPatterns: z.array(z.string().min(1)),
   settings: providerSettingsSchema,
 });
