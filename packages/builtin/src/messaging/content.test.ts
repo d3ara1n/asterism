@@ -81,10 +81,19 @@ describe("Chat attachment content", () => {
     expect(files[captured]).toEqual(png);
     expect(parts[captured]).toMatchObject({ mediaType: "image/png", ref: image.ref });
     const texts = parts.flatMap(part => part.kind === "text" ? [part.text] : []);
-    expect(texts).toEqual(["Describe the quoted image", "Quoted content (unseen-original):", "Quoted caption", "End quoted content."]);
+    expect(texts).toEqual(["Describe the quoted image\n\n> Reply to `unseen-original`\n>\n> Quoted caption\n>\n> *Attachment: image\\.png*"]);
     const projected = chatMessagesToModel([read]);
     expect(projected.some(part => part.kind === "file")).toBe(false);
     expect(projected.some(part => part.kind === "text" && part.text.includes('"messageId":"message"'))).toBe(true);
+  });
+  it("preserves nested Markdown and separates the reply from its quotation", () => {
+    const message = chatMessage({ sessionId: "s", id: "chat", kind: Chat.kind }, {
+      id: "reply", sentAt: "2026-01-01T00:00:00Z", sender: { id: "user", name: "Ada", role: "participant" },
+      parts: [{ kind: "text", text: "My answer" }],
+      quote: { parts: [{ kind: "text", text: "**Earlier message**\n\n> Nested quote\n\n```\nsample\n```" }] },
+    });
+    expect(chatMessageParts(message, "**Ada**")).toEqual([{ kind: "text",
+      text: "**Ada**\n\nMy answer\n\n> **Earlier message**\n>\n> > Nested quote\n>\n> ```\n> sample\n> ```" }]);
   });
   it("keeps the reference and states the failure when retrieval fails or the bytes are not a supported image", async () => {
     const f = await setup();

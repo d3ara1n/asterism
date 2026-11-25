@@ -25,7 +25,7 @@ export const inputMessageDescription = [
   "Conversation inputs have three sources: user messages, Agent messages, and resource event messages.",
   "The runtime wraps Agent messages in agent-message envelopes with sender-name and a sender address. Direct messages use a resource sender-id; Mesh messages use channel and a numeric sender-id, or sender-visible=\"false\" when the sender is not exposed.",
   "The runtime wraps resource event messages in resource-event envelopes with source-id and source-name identifying the emitting resource. Their bodies describe facts formatted by that resource's plugin. An event body can begin with YAML frontmatter between --- lines carrying structured metadata such as event kind and identifiers; the Markdown after it is the readable message. The interface shows only the Markdown.",
-  "Envelope attributes and text bodies use XML escaping. User messages retain their original text.",
+  "Envelope attributes and text bodies use XML escaping, with Markdown quote prefixes in resource event bodies preserved. User messages retain their original text.",
   "Attachment envelopes are metadata in place of native media. The reason explains why the file was not sent natively. When present, path names an absolute local cache path; its parent can be opened as a directory resource. An error describes a preparation failure and carries no usable path.",
   "File references are JSON addresses of content provided by resources. They can be passed to operations that accept references; their bytes are fetched only when an operation consumes them.",
 ].join("\n");
@@ -34,6 +34,8 @@ const escape = (text: string) => text.replace(/[&<>"']/g, char =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[char]!);
 /** Text content needs only markup characters escaped; quotes stay literal so JSON and YAML metadata remain readable. */
 const escapeText = (text: string) => text.replace(/[&<>]/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[char]!);
+/** A leading Markdown quote marker cannot form an XML tag. Keep it while escaping the content it introduces. */
+const escapeEventText = (text: string) => text.replace(/(^[ \t]*(?:>[ \t]*)+)|[&<>]/gmu, (token, prefix) => prefix ?? escapeText(token));
 
 /** The envelope participates only in model projection; persisted body text, attachments, and the editor remain unchanged. */
 export function projectInputMessage(message: { sender: AgentMessageSender; parts: readonly AgentInputPart[] }): { kind: "input"; parts: ModelInputPart[] } {
@@ -52,7 +54,7 @@ export function projectInputMessage(message: { sender: AgentMessageSender; parts
   }
   return { kind: "input", parts: [
     { kind: "text", text: `<${tag} ${attributes}>` },
-    ...parts.map(part => part.kind === "text" ? { ...part, text: escapeText(part.text) } : part),
+    ...parts.map(part => part.kind === "text" ? { ...part, text: sender.kind === "event" ? escapeEventText(part.text) : escapeText(part.text) } : part),
     { kind: "text", text: `</${tag}>` },
   ] };
 }

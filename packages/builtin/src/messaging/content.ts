@@ -5,6 +5,7 @@ import type { AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { imageMediaType } from "../filesystem/image-io.ts";
 import { inputPartsToModel } from "../shared/file-parts.ts";
 import { chatFileLocatorSchema, type ChatFilePart, type ChatMessage, type chatBindingSchema } from "./contract.ts";
+import { markdownCode, markdownLabel, markdownQuote } from "./markdown.ts";
 
 type Binding = z.infer<typeof chatBindingSchema>;
 
@@ -18,13 +19,28 @@ export function chatMessage(source: ResourceRef, { parts, quote, ...message }: M
   return { ...message, parts: address(parts), ...(quote ? { quote: { parts: address(quote.parts) } } : {}) };
 }
 
-/** Delimit quoted content so its text and files remain distinct from the reply's own body. */
-export function chatMessageParts(message: ChatMessage): ChatMessage["parts"] {
-  return [...message.parts, ...(message.quote ? [
-    { kind: "text" as const, text: `Quoted content${message.replyTo ? ` (${message.replyTo})` : ""}:` },
-    ...message.quote.parts,
-    { kind: "text" as const, text: "End quoted content." },
-  ] : [])];
+/** Keep contiguous Markdown together for display; quoted files stay real attachments with a label inside the quote. */
+export function chatMessageParts(message: ChatMessage, heading?: string): ChatMessage["parts"] {
+  const parts: ChatMessage["parts"] = [];
+  const text: string[] = heading ? [heading] : [];
+  const flush = () => {
+    if (text.length) parts.push({ kind: "text", text: text.join("\n\n") });
+    text.length = 0;
+  };
+  for (const part of message.parts) {
+    if (part.kind === "text") text.push(part.text);
+    else { flush(); parts.push(part); }
+  }
+  if (message.quote?.parts.length) {
+    const quote: string[] = message.replyTo ? [`Reply to ${markdownCode(message.replyTo)}`] : [];
+    for (const part of message.quote.parts)
+      quote.push(part.kind === "text" ? part.text : `*Attachment: ${markdownLabel(part.filename ?? part.mediaType)}*`);
+    text.push(markdownQuote(quote.join("\n\n")));
+    flush();
+    parts.push(...message.quote.parts.filter((part): part is ChatFilePart => part.kind === "file"));
+  }
+  flush();
+  return parts;
 }
 
 /** Chat file provider: the locator selects an attachment within the bound conversation. */
@@ -80,9 +96,9 @@ export async function messageInputParts(messageParts: readonly ChatMessage["part
 }
 
 const messageHeader = (message: ChatMessage) =>
-  `Message ${message.id} · ${message.sender.name} (${message.sender.role}) · ${message.sentAt}${message.replyTo ? ` · reply to ${message.replyTo}` : ""}${message.groupId ? ` · group ${message.groupId}` : ""}`;
+  `Message ${message.id} · ${markdownLabel(message.sender.name)} (${message.sender.role}) · ${message.sentAt}${message.replyTo && !message.quote?.parts.length ? ` · reply to ${message.replyTo}` : ""}${message.groupId ? ` · group ${message.groupId}` : ""}`;
 /** Read and send results present attachments as references; `see` supplies image content on request. */
 export function chatMessagesToModel(messages: readonly ChatMessage[]): ModelInputPart[] {
-  return messages.flatMap(message => [{ kind: "text" as const, text: messageHeader(message) },
-    ...inputPartsToModel(chatMessageParts(message).map(part => part.kind === "text" ? part : reference(part)))]);
+  return messages.flatMap(message =>
+    inputPartsToModel(chatMessageParts(message, messageHeader(message)).map(part => part.kind === "text" ? part : reference(part))));
 }

@@ -18,6 +18,7 @@ import { slackProvider } from "./slack.ts";
 import { qqProvider } from "./qq.ts";
 import { messagingFailure, messagingOutcome, messagingUiCall, PartialMessageDelivery } from "./outcome.ts";
 import { conversationsCard, chatCard } from "../shared/card-appearance.ts";
+import { markdownLabel } from "./markdown.ts";
 
 type ListTarget = { connectionId: string; since?: string } | null;
 const objectKey = (ref: ResourceRef) => JSON.stringify([ref.sessionId, ref.id]);
@@ -25,7 +26,6 @@ const messageMetadata = (message: MessagingMessage): Json => ({
   id: message.id, sender: message.sender, sentAt: message.sentAt,
   ...(message.replyTo ? { replyTo: message.replyTo } : {}), ...(message.groupId ? { groupId: message.groupId } : {}),
 });
-const escapeMarkdown = (text: string) => text.replace(/[\\*_`[\]<>#|]/gu, "\\$&");
 /**
  * Frontmatter carries the addresses and message identities tools need; the body is what people read.
  * A Conversations event summarizes who wrote; a Chat event has no body here and follows with each sender and message content.
@@ -34,11 +34,11 @@ function eventText({ connectionId, event }: ConnectionEvent, chat: boolean): str
   const { conversation } = event;
   const metadata = { event: event.kind, connectionId, conversationId: conversation.conversationId,
     ...(conversation.threadId ? { threadId: conversation.threadId } : {}), kind: conversation.kind };
-  const title = `**${escapeMarkdown(conversation.title)}**`;
+  const title = `**${markdownLabel(conversation.title)}**`;
   if (event.kind === "conversation.discovered") return resourceEventText(metadata, `New conversation ${title}`);
   const messages = { messages: event.messages.map(messageMetadata) };
   if (chat) return resourceEventText({ ...metadata, ...messages }, "");
-  const senders = [...new Set(event.messages.map(message => escapeMarkdown(message.sender.name)))].join(", ");
+  const senders = [...new Set(event.messages.map(message => markdownLabel(message.sender.name)))].join(", ");
   return resourceEventText({ ...metadata, ...messages },
     `${title} · ${event.messages.length} new ${event.messages.length === 1 ? "message" : "messages"} from ${senders}`);
 }
@@ -115,9 +115,8 @@ export default defineModule(plugin => {
           const binding = source.kind === Chat.kind ? chatBinding(source) : null;
           const parts: AgentInputPart[] = [{ kind: "text", text: eventText(event, !!binding) }];
           // Captured images are staged for this input only; its record retains them.
-          if (binding && event.event.kind === "messages.received") parts.push(...await messageInputParts(event.event.messages.flatMap(message => [
-            { kind: "text" as const, text: `**${escapeMarkdown(message.sender.name)}**` }, ...chatMessageParts(chatMessage(source, message)),
-          ]),
+          if (binding && event.event.kind === "messages.received") parts.push(...await messageInputParts(event.event.messages.flatMap(message =>
+            chatMessageParts(chatMessage(source, message), `**${markdownLabel(message.sender.name)}**`)),
             async function* (part) { yield* openChatFile(await plugin.messaging.resolve(binding.connectionId, { signal }), binding, part.ref.locator, signal); },
             content, signal));
           await plugin.session(source.sessionId).invoke(SubmitAgentInput, recipient.ref, {
