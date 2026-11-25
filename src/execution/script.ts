@@ -124,10 +124,15 @@ export async function executeResourceScript(options: ScriptOptions): Promise<Cal
   return { ...completion, data: { ...snapshot(), ...(value === undefined ? {} : { value }) } };
 }
 
-/** Explicit logs precede the return value; child call summaries remain in history. */
+/** Project diagnostics from the settled summaries without exposing child data or changing the stored result. */
 export function scriptToModel(data: Json): string {
-  const result = ResourceScriptResult.schema.parse(data);
-  const value = result.value === undefined ? "" : defaultToolModel(result.value);
-  if (!result.logs.length) return value;
-  return `Logs:\n${result.logs.map(defaultToolModel).join("\n")}${result.value === undefined ? "" : `\n\nReturn value:\n${value}`}`;
+  const { calls, logs, value } = ResourceScriptResult.schema.parse(data);
+  const errors = calls
+    .filter(call => call.kind !== "succeeded" && call.kind !== "running" && call.kind !== "queued")
+    .map(({ id, name, tool, resource, kind, error, message }) => ({
+      callId: id, tool: tool ?? name, kind,
+      ...(resource ? { resource: { id: resource.id, title: resource.title } } : {}),
+      ...(error ? { code: error.code, message: error.message } : message !== undefined ? { message } : {}),
+    }));
+  return defaultToolModel({ result: value ?? null, logs, errors });
 }

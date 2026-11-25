@@ -34,6 +34,11 @@ async function script(code: string, cap = capabilities(async value => ({ kind: "
   return outcome!;
 }
 const modelText = (result: ToolOutcome) => result.model.flatMap(part => part.kind === "text" ? [part.text] : []).join("\n");
+function modelEnvelope(outcome: ToolOutcome) {
+  const part = outcome.model.at(-1);
+  if (part?.kind !== "text") throw new Error("Expected the script's JSON projection.");
+  return JSON.parse(part.text);
+}
 
 describe("Resource script execution", () => {
   it("returns selected JSON once, with native data and the ordinary model text available independently", async () => {
@@ -50,7 +55,7 @@ describe("Resource script execution", () => {
       { value: 2, text: "visible 2", kind: "succeeded" },
     ];
     expect(result.kind).toBe("succeeded");
-    expect(modelText(result)).toBe(JSON.stringify(expected));
+    expect(modelEnvelope(result)).toEqual({ result: expected, logs: [], errors: [] });
     const saved = ResourceScriptResult.schema.parse(result.data);
     expect(saved.value).toEqual(expected);
     expect(saved.calls.map(call => [call.tool, call.kind, call.resource?.title])).toEqual([
@@ -103,7 +108,7 @@ describe("Resource script execution", () => {
       const retained = [result];
       return { first, second: text(retained[0]), value: result.data.value };
     `, capabilities(execute, project));
-    expect(modelText(result)).toBe('{"first":"Captured 8","second":"Captured 8","value":99}');
+    expect(modelEnvelope(result).result).toEqual({ first: "Captured 8", second: "Captured 8", value: 99 });
     expect(execute).toHaveBeenCalledTimes(1);
     expect(project).toHaveBeenCalledExactlyOnceWith({ value: 8 });
   });
@@ -119,7 +124,7 @@ describe("Resource script execution", () => {
       });
       return { rejected, original: text(original) };
     `);
-    expect(modelText(result)).toBe('{"rejected":[true,true,true,true,true,true],"original":"visible 5"}');
+    expect(modelEnvelope(result).result).toEqual({ rejected: [true, true, true, true, true, true], original: "visible 5" });
   });
 
   // Empty projections remain valid associated values; they are not mistaken for a missing result.
@@ -158,7 +163,7 @@ describe("Resource script execution", () => {
     const result = await running;
     expect(result.kind).toBe("succeeded");
     expect(ResourceScriptResult.schema.parse(result.data).logs).toEqual(["Reading", { path: "README.md" }, "visible 3"]);
-    expect(modelText(result)).toBe('Logs:\nReading\n{"path":"README.md"}\nvisible 3\n\nReturn value:\n{"count":3}');
+    expect(modelEnvelope(result)).toEqual({ result: { count: 3 }, logs: ["Reading", { path: "README.md" }, "visible 3"], errors: [] });
   });
 
   it.each([
@@ -170,7 +175,8 @@ describe("Resource script execution", () => {
     const saved = ResourceScriptResult.schema.parse(result.data);
     expect(saved.logs).toEqual(["Recorded"]);
     expect(saved).not.toHaveProperty("value");
-    expect(modelText(result)).toMatch(/^failed \(script_failed\): .+\nLogs:\nRecorded$/);
+    expect(modelText(result)).toMatch(/^failed \(script_failed\): /);
+    expect(modelEnvelope(result)).toEqual({ result: null, logs: ["Recorded"], errors: [] });
   });
 
   // Missing fields must remain observable, including inside objects where JSON would otherwise omit them.
@@ -186,11 +192,10 @@ describe("Resource script execution", () => {
       logs: ["[undefined]", { missing: "[undefined]", nested: { value: "[undefined]" }, values: ["[undefined]", null, 0] }],
       value: "visible 2",
     });
-    expect(modelText(result)).toBe([
-      "Logs:", "[undefined]",
-      '{"missing":"[undefined]","nested":{"value":"[undefined]"},"values":["[undefined]",null,0]}',
-      "", "Return value:", "visible 2",
-    ].join("\n"));
+    expect(modelEnvelope(result)).toEqual({
+      logs: ["[undefined]", { missing: "[undefined]", nested: { value: "[undefined]" }, values: ["[undefined]", null, 0] }],
+      result: "visible 2", errors: [],
+    });
   });
 
   it.each([
@@ -228,7 +233,7 @@ describe("Resource script execution", () => {
   it("retains logs alongside the existing null result for an omitted return", async () => {
     const result = await script('log("Completed");');
     expect(ResourceScriptResult.schema.parse(result.data)).toMatchObject({ logs: ["Completed"], value: null });
-    expect(modelText(result)).toBe("Logs:\nCompleted\n\nReturn value:\nnull");
+    expect(modelEnvelope(result)).toEqual({ result: null, logs: ["Completed"], errors: [] });
   });
 
   it("keeps structured rejection and failure results available for script branching", async () => {
@@ -245,6 +250,25 @@ describe("Resource script execution", () => {
       text: "failed (unavailable): Unavailable.",
     });
     expect(ResourceScriptResult.schema.parse(result.data).calls.map(call => call.kind)).toEqual(["rejected", "rejected", "failed"]);
+    expect(modelEnvelope(result).errors).toMatchObject([
+      { kind: "rejected", tool: "step", code: "access_denied" },
+      { kind: "rejected", tool: "step", code: "invalid_arguments" },
+      { kind: "failed", tool: "step", resource: { id: "r", title: "Captured" }, code: "unavailable", message: "Unavailable." },
+    ]);
+  });
+
+  it("surfaces an ignored uncertain send even when the script returns no value or logs", async () => {
+    const result = await script(`
+      await resources.get("r").step({ args: { value: 42 } });
+    `, capabilities(async () => ({ kind: "unknown", message: "The message may have been sent." })));
+    expect(result.kind).toBe("succeeded");
+    expect(modelEnvelope(result)).toEqual({
+      result: null, logs: [],
+      errors: [{
+        callId: expect.any(String), tool: "step", resource: { id: "r", title: "Captured" },
+        kind: "unknown", message: "The message may have been sent.",
+      }],
+    });
   });
 
   it("preserves a partial result's message and data alongside its saved text", async () => {
@@ -256,6 +280,7 @@ describe("Resource script execution", () => {
       result: { kind: "partial", data: { value: 6 }, message: "Incomplete work." },
       text: "partial: Incomplete work.\nvisible 6",
     });
+    expect(modelEnvelope(result).errors).toMatchObject([{ kind: "partial", message: "Incomplete work." }]);
   });
 
   it("preserves completed effects and their summaries when later script code throws", async () => {
@@ -283,7 +308,7 @@ describe("Resource script execution", () => {
       }, { once: true });
     })));
     expect(cleaned).toBe(true);
-    expect(modelText(result)).toBe("selected");
+    expect(modelEnvelope(result)).toMatchObject({ result: "selected", logs: [], errors: [{ kind: "cancelled", message: "Stopped." }] });
     expect(ResourceScriptResult.schema.parse(result.data).calls[0]).toMatchObject({ kind: "cancelled", message: "Stopped." });
   });
 
@@ -293,8 +318,8 @@ describe("Resource script execution", () => {
       return [typeof process, typeof require, typeof fetch, typeof setTimeout, typeof session,
         typeof tools.resource_script, typeof tools.resource_call, typeof globalThis.__invoke, typeof globalThis.__log];
     `);
-    expect(modelText(first)).toBe(JSON.stringify(Array(9).fill("undefined")));
-    expect(modelText(await script("return typeof privateValue;"))).toBe("undefined");
+    expect(modelEnvelope(first).result).toEqual(Array(9).fill("undefined"));
+    expect(modelEnvelope(await script("return typeof privateValue;")).result).toBe("undefined");
   });
 
   it("keeps resource handles inert during promise assimilation and JSON serialization", async () => {
@@ -303,7 +328,7 @@ describe("Resource script execution", () => {
       const called = await resource.step({ args: { value: 5 } });
       return { handle: resource, value: called.data.value };
     `);
-    expect(modelText(result)).toBe('{"handle":{},"value":5}');
+    expect(modelEnvelope(result).result).toEqual({ handle: {}, value: 5 });
     expect(ResourceScriptResult.schema.parse(result.data).calls.map(call => call.tool)).toEqual(["step"]);
   });
 
@@ -337,7 +362,10 @@ describe("Resource script execution", () => {
     expect(saved.calls[1]).not.toHaveProperty("startedAt");
     expect(saved).not.toHaveProperty("value");
     expect(saved.logs).toEqual(["Waiting for steps"]);
-    expect(modelText(outcome!)).toBe("cancelled: Script execution was cancelled.\nLogs:\nWaiting for steps");
+    expect(modelText(outcome!)).toMatch(/^cancelled: Script execution was cancelled\./);
+    expect(modelEnvelope(outcome!)).toMatchObject({
+      result: null, logs: ["Waiting for steps"], errors: [{ kind: "cancelled" }, { kind: "cancelled" }],
+    });
   });
 
   it("fails a promise with no tool capable of settling it and rejects non-JSON return values", async () => {
@@ -375,7 +403,7 @@ describe("Shared tool scheduling", () => {
     try {
       const result = await scriptDone.promise;
       expect(started).toEqual([1]);
-      expect(modelText(result)).toBe("selected");
+      expect(modelEnvelope(result).result).toBe("selected");
       const [child] = ResourceScriptResult.schema.parse(result.data).calls;
       expect(child?.kind).toBe("cancelled");
       expect(child).not.toHaveProperty("startedAt");
