@@ -1,6 +1,7 @@
 import headless from "@xterm/headless";
 import serialize from "@xterm/addon-serialize";
 import type { TerminalImage } from "@asterism-app/sdk/contracts";
+import type { TerminalReadSource } from "@asterism-app/sdk/runtime";
 import { RawBuffer } from "./raw-buffer.ts";
 
 const { Terminal } = headless;
@@ -36,18 +37,20 @@ export class HeadlessScreen {
     return { ...this.size, data: this.serializer.serialize() };
   }
 
-  read(source: "screen" | "history" | "raw", offset?: number, limit?: number) {
+  read(source: TerminalReadSource, offset?: number, limit?: number) {
     const buffer = this.terminal.buffer.active;
-    const content = source === "raw" ? this.raw.read(offset, limit) : this.readLines(source, offset, limit);
+    const content = source === "raw" ? this.raw.read(offset, limit)
+      : this.readLines(buffer, source === "screen", offset, limit);
     return { source, ...content, ...this.size, cursor: { x: buffer.cursorX, y: buffer.cursorY } };
   }
 
-  private readLines(source: "screen" | "history", offset?: number, limit = 100) {
-    const buffer = this.terminal.buffer.active;
-    const from = source === "screen" ? buffer.baseY : Math.max(0, Math.min(offset ?? Math.max(0, buffer.length - limit), buffer.length));
-    const to = Math.min(buffer.length, from + (source === "screen" ? this.terminal.rows : Math.min(limit, 2000)));
-    const text = Array.from({ length: to - from }, (_, row) => buffer.getLine(from + row)?.translateToString(source !== "screen") ?? "").join("\n");
-    return { text, offset: from, nextOffset: to, truncated: source === "history" && (from > 0 || to < buffer.length) };
+  private readLines(buffer: HeadlessScreen["terminal"]["buffer"]["active"], screenOnly: boolean, offset?: number, limit = 100) {
+    const pageSize = screenOnly ? this.terminal.rows : Math.min(limit, 2000);
+    const from = screenOnly ? buffer.baseY : Math.max(0, Math.min(offset ?? buffer.length - pageSize, buffer.length));
+    const to = Math.min(buffer.length, from + pageSize);
+    const text = Array.from({ length: to - from }, (_, row) => buffer.getLine(from + row)?.translateToString(!screenOnly) ?? "").join("\n");
+    return { text, offset: from, nextOffset: to, truncated: !screenOnly && (from > 0 || to < buffer.length),
+      ...(!screenOnly ? { buffer: buffer.type, totalRows: buffer.length, screenOffset: buffer.baseY } : {}) };
   }
 
   image(): TerminalImage {

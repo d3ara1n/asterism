@@ -37,18 +37,25 @@ const Input = defineTool({ id: builtin.name("tool.terminal_input"), name: "termi
   argsSchema: terminalInputSchema });
 export const TerminalInput = defineImplementation({ ...builtin.data("terminal.input-result", terminalStatusSchema.describe("Terminal status observed after input was delivered and shell feedback was collected for 250 ms.")),
   resource: TerminalResource, tool: Input, targetSchema: z.null().describe("Select the terminal itself."), effect: "write", execution: "sequential" });
-/** Terminal read content selection: null is the current screen; history is retained buffer lines; raw is the original output stream. */
+/** Screen and buffer address the same parsed grid; raw addresses the original output stream. */
 export const terminalReadTargetSchema = z.union([
-  z.null().describe("Select the visible screen: the parsed character grid with spaces and cursor coordinates."),
+  z.null().describe("Read the current screen as a parsed character grid. It takes no range input; the result's offset is the first screen row in the active buffer."),
   z.strictObject({
-    source: z.enum(["history", "raw"]).describe("history: retained terminal rows; raw: original output with control sequences, escaped in the JSON result."),
-    offset: z.number().int().nonnegative().optional().describe("Zero-based row for history, or stream character offset (UTF-16 code units) for raw. Raw offsets inside a surrogate pair align to its start. Omitted selects the most recent content."),
-    limit: z.number().int().positive().max(65536).optional().describe("Maximum rows (history, default 100, maximum 2000) or UTF-16 code units (raw, default 16384). Raw reads may include one extra code unit to complete a surrogate pair; nextOffset continues after the returned text."),
+    source: z.enum(["buffer", "raw", "history"]).describe("buffer: parsed rows of the active buffer, including any retained scrollback (history is a compatibility alias). raw: original output with control sequences, escaped in the JSON result."),
+    offset: z.number().int().nonnegative().optional().describe("Zero-based row for buffer, or stream offset (UTF-16 code units) for raw. Omitted selects the most recent content. An offset beyond the available range ends at the last boundary; raw offsets inside a surrogate pair align to its start."),
+    limit: z.number().int().positive().max(65536).optional().describe("Maximum rows (buffer, default 100, capped at 2000) or UTF-16 code units (raw, default 16384). Raw reads may include one extra code unit to complete a surrogate pair."),
   }),
-]).describe("Null selects the current screen; source selects retained history or raw output, with an optional range. Reads observe the current shell instance, including the final screen of an exited shell; buffers are retained only during this application run.");
+]).describe("Screen and buffer reads use the same zero-based row positions in the live active buffer. A buffer result reports the returned range as [offset, nextOffset), the buffer length as totalRows, and the current screen's first row as screenOffset, independent of viewer scrolling. nextOffset can be passed as offset to read the following range. User or program activity can rewrite rows; clearing, scrollback eviction, resizing, or switching buffers can move or remove them. The same range can return different text or no rows. Reads keep no per-caller position and observe the current shell instance, including the final screen of an exited shell.");
 export const terminalReadResultSchema = terminalStatusSchema.extend({
-  source: z.enum(["screen", "history", "raw"]), text: z.string(), cols: z.number(), rows: z.number(),
-  cursor: z.strictObject({ x: z.number(), y: z.number() }), offset: z.number(), nextOffset: z.number(), truncated: z.boolean(),
+  source: z.enum(["screen", "buffer", "raw", "history"]), text: z.string(), cols: z.number(), rows: z.number(),
+  cursor: z.strictObject({ x: z.number(), y: z.number() }),
+  offset: z.number().describe("Actual start of the returned range."),
+  nextOffset: z.number().describe("Exclusive end of the returned range, reusable as offset for buffer or raw reads."),
+  truncated: z.boolean().describe("For buffer, the range does not cover the entire active buffer at read time. For raw, the requested start was evicted or more output follows the returned range."),
+  // Optional so saved read results without buffer coordinates remain decodable.
+  buffer: z.enum(["normal", "alternate"]).optional().describe("For buffer reads, the active buffer at read time."),
+  totalRows: z.number().int().nonnegative().optional().describe("For buffer reads, the number of rows in the active buffer at read time, including the screen."),
+  screenOffset: z.number().int().nonnegative().optional().describe("For buffer reads, the first row of the current screen in the same coordinates as offset, at read time. Independent of viewer scrolling."),
 }).describe("Observed terminal content, cursor, dimensions, state and retained range.");
 export const TerminalRead = defineImplementation({ ...builtin.data("terminal.read-result", terminalReadResultSchema), resource: TerminalResource,
   tool: Read, targetSchema: terminalReadTargetSchema, effect: "read", execution: "parallel" });

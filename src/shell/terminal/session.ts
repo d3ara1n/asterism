@@ -4,7 +4,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 import { descendantsOf } from "../process-tree.ts";
-import type { TerminalSessions } from "@asterism-app/sdk/runtime";
+import type { TerminalReadSource, TerminalSessions } from "@asterism-app/sdk/runtime";
 import type { ShellSettings } from "@asterism-app/sdk/contracts";
 import { resolveShell } from "../profiles.ts";
 import { prepareLaunch, type IntegrationMode } from "./integration.ts";
@@ -227,7 +227,7 @@ export class ShellInstance {
     return this.screen.snapshot();
   }
 
-  read(source: "screen" | "history" | "raw", offset?: number, limit?: number) {
+  read(source: TerminalReadSource, offset?: number, limit?: number) {
     return this.enqueue(() => ({ ...this.status, ...this.screen.read(source, offset, limit) }));
   }
   image() {
@@ -450,7 +450,7 @@ export class SharedTerminal {
     if (!this.instance) throw new TerminalError("terminal_inactive", "The terminal has not been started.");
     return this.instance;
   }
-  read(source: "screen" | "history" | "raw", offset?: number, limit?: number) { return this.require().read(source, offset, limit); }
+  read(source: TerminalReadSource, offset?: number, limit?: number) { return this.require().read(source, offset, limit); }
   image() { return this.require().image(); }
   async waitIdle(timeout: number | undefined, signal: AbortSignal) {
     const started = performance.now();

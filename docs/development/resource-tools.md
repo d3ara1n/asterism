@@ -80,7 +80,9 @@ Prompt integration distinguishes idle, running, unknown, and terminal lifecycle 
 
 Injected integration authenticates its markers with an instance nonce and leaves user shell startup files unchanged. Platform scripts and shell-specific login handling belong to the terminal module.
 
-Read can return the parsed screen, retained history, or raw output. Raw output is not a screen snapshot. Ranges describe retained data and truncation explicitly, preserving character boundaries.
+The current screen is a region of the live active terminal buffer, so screen reads and buffer reads use the same row coordinates. A buffer read reports where the screen starts in the same observation, regardless of where a viewer has scrolled. Row positions are useful for paging through content that stays in place, but have no identity across reads: clearing, scrollback eviction, resize reflow, and alternate-screen applications can change what a range refers to. The shell keeps its buffers, not a read position for each caller.
+
+Raw reads address the original output stream rather than the parsed grid. Raw ranges describe retained data and truncation explicitly, preserving character boundaries.
 
 See renders a captured backend screen snapshot into immutable image content through the frontend rendering service. It is independent of whether a terminal card is mounted; unavailable rendering fails explicitly.
 
