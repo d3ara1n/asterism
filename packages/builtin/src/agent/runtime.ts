@@ -41,15 +41,15 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
       utility: () => resolveRoleTarget(builtinConfiguration(plugin).roles, "utility") };
     const feedback = createAgentFeedback();
     plugin.lifetime.defer(feedback.clear);
-    const controller = createAgentController({ selection, tasks: plugin.tasks, models: plugin.models, execution: plugin.execution, prepareRequest, projectMessages, userAgent: application.userAgent,
-      projectAttachments: agentAttachmentProjection(plugin), usage, feedback });
-    const admission = createAdmission({ selection, validate: plugin.models.validate, running: controller.running, systemPrompt, projectMessages });
     const agentObject = (ref: ResourceRef) => {
       if (ref.kind !== Agent.kind) throw new PluginApiError("invalid_argument", "The target is not an Agent.");
       const object = plugin.object(ref.sessionId, Agent, ref.id);
       if (!object.snapshot()) throw new PluginApiError("not_found", "The Agent is unavailable on its current session path.");
       return object;
     };
+    const controller = createAgentController({ selection, tasks: plugin.tasks, models: plugin.models, execution: plugin.execution, prepareRequest, projectMessages, userAgent: application.userAgent,
+      requestObject: agentObject, projectAttachments: agentAttachmentProjection(plugin), usage, feedback });
+    const admission = createAdmission({ selection, validate: plugin.models.validate, running: controller.running, systemPrompt, projectMessages });
     const peekAgent = (ref: ResourceRef) => createPeekClient(peek, () => agentObject(ref), plugin.lifetime.signal);
     registerAgentServices(plugin, {
       get defaultAgentId() { return plugin.config(BuiltinSettings).get().paradigm.defaultAgentId; },

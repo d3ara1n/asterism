@@ -120,7 +120,7 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
   });
   const prepare = () => ({ blocks: [], skills: [], catalogBlock: null, system: { blocks: [] } });
   const controller = createAgentController({ selection, tasks: driver.tasks, models, execution, feedback, userAgent: "test",
-    prepareRequest: { estimate: prepare, forRequest: async () => prepare },
+    requestObject: () => object, prepareRequest: { estimate: prepare, forRequest: async () => prepare },
   });
   return { activities: () => activities, controller, object, path, snapshot, driver, feedback, stream, execution, publish,
     turn: () => projectAgentTurnState(snapshot(), "a"),

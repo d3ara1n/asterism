@@ -1,5 +1,5 @@
 import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices, type ExecutionServices, type ProviderUsage } from "@asterism-app/sdk/runtime";
-import { ResourceNoticeRaised, describeError, errorMessage, formatModelExpression, type ResourceNotice, type ModelRunObserver, type ModelRunResult } from "@asterism-app/sdk/contracts";
+import { ResourceNoticeRaised, describeError, errorMessage, formatModelExpression, type ResourceRef, type ResourceNotice, type ModelRunObserver, type ModelRunResult } from "@asterism-app/sdk/contracts";
 import { Execution, ToolExecution, AgentTurnEnded, type AgentTurnEndReason } from "@asterism-app/builtin-api/contracts";
 import { runAgentLoop } from "./loop.ts";
 import { agentRequestRetries } from "./retry.ts";
@@ -25,6 +25,7 @@ interface AgentControllerDependencies {
   tasks: PluginTasks;
   models: ModelServices;
   execution: ExecutionServices;
+  requestObject(ref: ResourceRef): ObjectReader;
   prepareRequest: ReturnType<typeof createRequestAssembly>;
   projectMessages?: WorkMessages;
   projectAttachments?: ReturnType<typeof createAttachmentProjection>;
@@ -183,7 +184,9 @@ export function createAgentController(deps: AgentControllerDependencies) {
             // Preparation failures end execution before consuming another input.
             await maybeCompact(object, current);
             const selection = selectionOf(object).selection, agent = deps.selection.agent(selection);
-            const snapshot = object.session.snapshot();
+            // A turn can append inputs after the task's object handle captured its content path.
+            const requestObject = deps.requestObject(object.ref);
+            const snapshot = requestObject.session.snapshot(), content = requestObject.content;
             const toolRecords = new Map<string, string>();
             const observer: ModelRunObserver = {
               event(event) {
@@ -218,7 +221,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
               let prepared: ReturnType<typeof prepare>;
               const projected = (deps.projectMessages ?? projectForAgent)(snapshot, object.ref.id);
               const modalities = deps.models.list().find(entry => entry.model === model)?.capabilities.inputModalities ?? [];
-              const messages = deps.projectAttachments ? await deps.projectAttachments(projected, snapshot.id, object.content, modalities, current) : projected;
+              const messages = deps.projectAttachments ? await deps.projectAttachments(projected, snapshot.id, content, modalities, current) : projected;
               result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
                 agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },
                 userAgent: deps.userAgent, purpose: "conversation", contextPhantoms,
@@ -229,7 +232,7 @@ export function createAgentController(deps: AgentControllerDependencies) {
                 },
                 target, system: files => { prepared = prepare(files); return prepared.system; }, messages, signal: current,
                 observer: { event(event) { progress.event(event); return observer.event(event); } },
-              }));
+              }, { content }));
             } catch (error) {
               report(object, error, current);
               return { reason: current.aborted ? "cancelled" : "failed", hasTools: false };

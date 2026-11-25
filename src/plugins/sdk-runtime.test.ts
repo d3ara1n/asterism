@@ -1,5 +1,5 @@
 import { nanoid } from "nanoid";
-import { thinkingLevels, modelToolCallBlockSchema, toolOutcomeSchema, ResourceNoticeRaised, ReadResourceActivities, ResourceActivitiesChanged, type EventEnvelope, type ResourceNotice, type Json } from "@asterism-app/sdk/contracts";
+import { thinkingLevels, modelToolCallBlockSchema, toolOutcomeSchema, ResourceNoticeRaised, ReadResourceActivities, ResourceActivitiesChanged, type EventEnvelope, type ResourceNotice, type Json, type ModelMediaModality } from "@asterism-app/sdk/contracts";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -59,12 +59,12 @@ function open(plugins: PluginDefinition[], adapterFactory?: () => ModelAdapter, 
   const sessionId = service.sessions.tree.create("Counter");
   return { root, service, sessionId };
 }
-async function configureModel(service: ApplicationService) {
+async function configureModel(service: ApplicationService, inputModalities?: ModelMediaModality[]) {
   await service.configuration.execute({ type: "modelProvider.save", id: null,
     value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [], apiKey: "" } });
   const result = await service.configuration.execute({ type: "model.save", id: null, value: {
     providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
-    capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
+    capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels], ...(inputModalities ? { inputModalities } : {}) }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
   return { provider: "test", model: "test" };
 }
@@ -833,6 +833,58 @@ describe("Host implementation of the workbench SDK", () => {
     expect(preparedRef).toEqual({ sessionId: result.sessionId, id: view.workbench.objects[0]!.id, kind: "asterism.builtin/agent" });
     expect(validated[0]).toContain("Prepared");
     expect(validated[0]).not.toContain("Original");
+  });
+
+  it("delivers a newly committed image on the next model request without granting access off that path", async () => {
+    let context!: PluginContext;
+    const settled = [deferred<void>(), deferred<void>()];
+    let turn = 0;
+    const listener = definePlugin({ namespace: pluginNamespace("test.image-input"), setup(plugin) {
+      context = plugin;
+      plugin.ipc.events.subscribe(AgentTurnEnded, {}, event => {
+        if (event.data.settled) settled[turn++]?.resolve();
+      });
+      return {};
+    } });
+    const requests: ModelInput["messages"][] = [];
+    const { service } = open([listener], () => ({
+      format: () => "test", validate() {},
+      prepare(input) {
+        if (input.tools.length) requests.push(input.messages);
+        return { async *stream() {
+          yield { type: "part.start", part: { id: "body", kind: "text" } } as const;
+          yield { type: "part.delta", partId: "body", delta: "Received." } as const;
+          yield { type: "part.end", partId: "body" } as const;
+          yield { type: "finish", reason: "stop", usage: null } as const;
+        } };
+      },
+    }));
+    const target = await configureModel(service, ["image"]);
+    const { sessionId } = await service.sessions.calls.invoke(StartAgentSession.id, {
+      submissionId: nanoid(16), selection: { agent: "general", model: `${target.provider}/${target.model}`, thinking: null },
+      parts: [{ kind: "text", text: "Start a conversation" }], folderId: null,
+    }, {}, null) as { sessionId: string };
+    await settled[0]!.promise;
+    const session = context.session(sessionId);
+    const beforeImage = session.snapshot();
+    const agent = beforeImage.resources.all().find(resource => resource.ref.kind === "asterism.builtin/agent")!.ref;
+    const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jr6sAAAAASUVORK5CYII=", "base64");
+    const ref = await context.content.withScope(async content => {
+      const file = await content.stage(png);
+      await session.invoke(SubmitAgentInput, agent, { submissionId: nanoid(16), mode: "follow", sender: { kind: "user" },
+        parts: [{ kind: "text", text: "Look at this screenshot" }, { kind: "file", file, mediaType: "image/png", filename: "screenshot.png" }],
+      }, { content });
+      return file;
+    });
+    await settled[1]!.promise;
+    expect(requests.at(-1)?.at(-1)).toEqual({ kind: "input", parts: [
+      { kind: "text", text: "Look at this screenshot" },
+      { kind: "file", data: new Uint8Array(png), mediaType: "image/png", filename: "screenshot.png" },
+    ] });
+    await vi.waitFor(() => expect(service.sessions.running).toBe(false));
+    await service.sessions.execute({ type: "select", sessionId, nodeId: beforeImage.position.nodeId });
+    await expect(service.content.execute({ type: "read.open", source: { sessionId, objectId: agent.id }, ref }))
+      .rejects.toMatchObject({ code: "foreign_resource" });
   });
 
   it("observes accepted inputs independently of delivery and reports turn boundaries without splitting steering", async () => {
