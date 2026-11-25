@@ -1,7 +1,14 @@
 import { MessagingError, PluginApiError, type CallResult } from "@asterism-app/sdk/runtime";
-import type { Json } from "@asterism-app/sdk/contracts";
+import type { Json, MessagingMessage } from "@asterism-app/sdk/contracts";
 
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
+
+/** A multi-message delivery stopped after the platform confirmed at least one message. */
+export class PartialMessageDelivery extends Error {
+  constructor(readonly first: MessagingMessage, message: string, cause: unknown) {
+    super(message, { cause });
+  }
+}
 
 /** Renderer calls and actions expose expected messaging failures through the plugin error transport. */
 export async function messagingUiCall<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
@@ -48,7 +55,7 @@ export function definitelyNotSent(error: unknown): boolean {
  * Report a messaging failure with its code and cause instead of the host's generic tool failure.
  * Reads fail; writes fail only when nothing was sent, and otherwise report an unknown outcome with the cause.
  */
-export function messagingFailure(error: unknown, effect: "read" | "write", aborted: boolean): CallResult<Json> {
+export function messagingFailure(error: unknown, effect: "read" | "write", aborted: boolean): Extract<CallResult<never>, { kind: "cancelled" | "unknown" | "failed" }> {
   if (aborted) return { kind: "cancelled", message: "The messaging operation was cancelled." };
   if (effect === "write" && !definitelyNotSent(error))
     return { kind: "unknown", message: `The message may have been sent: ${message(error)}` };
@@ -59,5 +66,5 @@ export async function messagingOutcome<T extends Json>(effect: "read" | "write",
   try {
     signal.throwIfAborted();
     return { kind: "succeeded", data: await work() };
-  } catch (error) { return messagingFailure(error, effect, signal.aborted) as CallResult<T>; }
+  } catch (error) { return messagingFailure(error, effect, signal.aborted); }
 }

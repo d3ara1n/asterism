@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { nanoid } from "nanoid";
 import { defineModule, implementResource, implementCreation, implementTool, implementAction, implementCall,
-  MessagingError, type Lifetime, type ObjectExecutor, type ObjectReader, type ToolContribution, type MessagingHandle } from "@asterism-app/sdk/runtime";
+  MessagingError, type CallResult, type Lifetime, type ObjectExecutor, type ObjectReader, type ToolContribution, type MessagingHandle } from "@asterism-app/sdk/runtime";
 import type { ConnectionEvent, ConversationAddress, Json, MessagingConnectionInfo, MessagingMessage, ResourceRef } from "@asterism-app/sdk/contracts";
 import { Agent, SubmitAgentInput, resourceEventText, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { defineAgentCreation } from "@asterism-app/builtin-api/runtime";
 import { Conversations, Chat, CreateConversations, CreateChat, chatCreateSchema, ConversationsView, ChatView,
   ConversationsList, ConversationsSubscribe, ConfigureSubscription, SubscriptionChanged, ChatRead, ChatSend,
-  BrowseConversations, listResultSchema, ReadChat, SendChat, ChatMessageSent,
-  ChatSee, type SubscriptionTarget, type ViewConnection } from "./contract.ts";
+  BrowseConversations, listResultSchema, ReadChat, SendChat, ChatMessageSent, chatReadDefaultLimit,
+  ChatSee, type ChatMessage, type SubscriptionTarget, type ViewConnection } from "./contract.ts";
 import { captureImage, chatFileRef, chatMessage, chatMessageParts, chatMessagesToModel, messageInputParts, openChatFile } from "./content.ts";
 import { inputPartsToModel } from "../shared/file-parts.ts";
 import { coversAddress, foldSubscriptions, matchesSubscription } from "./subscriptions.ts";
@@ -16,7 +16,7 @@ import { telegramProvider } from "./telegram.ts";
 import { discordProvider } from "./discord.ts";
 import { slackProvider } from "./slack.ts";
 import { qqProvider } from "./qq.ts";
-import { messagingOutcome, messagingUiCall } from "./outcome.ts";
+import { messagingFailure, messagingOutcome, messagingUiCall, PartialMessageDelivery } from "./outcome.ts";
 import { conversationsCard, chatCard } from "../shared/card-appearance.ts";
 
 type ListTarget = { connectionId: string; since?: string } | null;
@@ -217,7 +217,8 @@ export default defineModule(plugin => {
         call(data, target, _args, { signal, object }) {
           const { connectionId, ...address } = data;
           return messagingOutcome("read", signal, async () => {
-            const result = await (await captured().get(connectionId)).readMessages({ ...address, ...target }, { signal });
+            const query = target && "messageIds" in target ? target : { limit: chatReadDefaultLimit, ...target };
+            const result = await (await captured().get(connectionId)).readMessages({ ...address, ...query }, { signal });
             return { ...result, messages: result.messages.map(message => chatMessage(object.ref, message)) };
           });
         },
@@ -234,13 +235,20 @@ export default defineModule(plugin => {
         toModel: image => inputPartsToModel([{ kind: "file", file: image.file, ref: image.ref, mediaType: image.mediaType, size: image.size }]),
       })),
       capturedTool(captured => implementTool(ChatSend, {
-        call(data, target, { parts }, { signal, object }) {
+        async call(data, target, { parts }, { signal, object }): Promise<CallResult<ChatMessage>> {
           const { connectionId, ...address } = data;
-          return messagingOutcome("write", signal, async () => {
+          try {
+            signal.throwIfAborted();
             const message = chatMessage(object.ref, await (await captured().get(connectionId)).sendMessage({ ...address, ...target, parts }, { signal }));
             sent(connectionId, address, message);
-            return message;
-          });
+            return { kind: "succeeded", data: message };
+          } catch (error) {
+            if (error instanceof PartialMessageDelivery) {
+              sent(connectionId, address, error.first);
+              return { kind: "partial", data: chatMessage(object.ref, error.first), message: error.message };
+            }
+            return messagingFailure(error, "write", signal.aborted);
+          }
         },
         toModel: data => chatMessagesToModel([data]),
       })),

@@ -1,7 +1,8 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, dispatchEvent } from "@tencent-connect/qqbot-nodejs/protocol";
-import { qqMessage, qqTarget } from "./qq.ts";
+import type { FileReferencePart } from "@asterism-app/sdk/contracts";
+import { qqMessage, qqProvider, qqTarget } from "./qq.ts";
 import { QQApi, qqApiError, qqResponse } from "./qq-api.ts";
 import { definitelyNotSent } from "./outcome.ts";
 import { ObservedMessages } from "./observed-store.ts";
@@ -118,6 +119,92 @@ describe("QQ conversation addressing", () => {
     }), "bot")!.message;
     expect(empty.replyTo).toBe("REFIDX_unavailable");
     expect(empty.quote).toBeUndefined();
+  });
+});
+
+describe("QQ outbound parts", () => {
+  const signal = new AbortController().signal;
+  const png = Buffer.from("89504e470d0a1a0a", "hex");
+  const image = (filename: string): FileReferencePart => ({
+    kind: "file-reference", filename, ref: { source: { sessionId: "session", id: "directory", kind: "directory" }, locator: filename },
+  });
+
+  async function connect(db: DatabaseSync, transmit: (path: string, body: Record<string, unknown>) => Response) {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, init) => {
+      const path = new URL(String(url)).pathname;
+      if (path === "/app/getAppAccessToken") return Response.json({ access_token: "test-token", expires_in: 7200 });
+      if (path === "/users/@me") return Response.json({ id: "bot", username: "Bot" });
+      return transmit(path, JSON.parse(String(init?.body)));
+    });
+    return qqProvider({
+      db: () => db,
+      files: { async *open() { yield png; } },
+    }).create({ connectionId: "test", settings: { appId: "app", appSecret: "secret" }, signal, publish() {} });
+  }
+
+  it("uploads privately and delivers image, Markdown, image as separate ordered group replies", async () => {
+    const db = new DatabaseSync(":memory:");
+    try {
+      let sent = 0, uploaded = 0;
+      const transmit = vi.fn<(path: string, body: Record<string, unknown>) => Response>(path => path.endsWith("/files")
+        ? Response.json({ file_info: `upload-${++uploaded}` })
+        : Response.json({ id: `sent-${++sent}`, timestamp }));
+      const bot = await connect(db, transmit);
+      const receipt = await bot.sendMessage({ conversationId: "group:group", replyTo: "original",
+        parts: [image("first.png"), { kind: "text", text: "**Caption**" }, image("second.png")] }, { signal });
+      const upload = { file_type: 1, file_data: png.toString("base64"), srv_send_msg: false };
+      expect(transmit.mock.calls).toMatchObject([
+        ["/v2/groups/group/files", upload],
+        ["/v2/groups/group/files", upload],
+        ["/v2/groups/group/messages", { msg_type: 7, media: { file_info: "upload-1" }, msg_id: "original" }],
+        ["/v2/groups/group/messages", { msg_type: 2, markdown: { content: "**Caption**" }, msg_id: "original" }],
+        ["/v2/groups/group/messages", { msg_type: 7, media: { file_info: "upload-2" }, msg_id: "original" }],
+      ]);
+      expect(new Set(transmit.mock.calls.slice(2).map(([, body]) => body?.msg_seq)).size).toBe(3);
+      expect(receipt.id).toBe("sent-1");
+      const { messages } = await bot.readMessages({ conversationId: "group:group" }, { signal });
+      expect(messages.map(message => ({ id: message.id, parts: message.parts }))).toMatchObject([
+        { id: "sent-1", parts: [{ kind: "file", filename: "first.png", mediaType: "image/png" }] },
+        { id: "sent-2", parts: [{ kind: "text", text: "**Caption**" }] },
+        { id: "sent-3", parts: [{ kind: "file", filename: "second.png", mediaType: "image/png" }] },
+      ]);
+    } finally { db.close(); }
+  });
+
+  it("reports the confirmed prefix and stops after an uncertain private send", async () => {
+    const db = new DatabaseSync(":memory:");
+    try {
+      let sent = 0;
+      const transmit = vi.fn((path: string) => {
+        if (path.endsWith("/files")) return Response.json({ file_info: "upload" });
+        if (++sent === 1) return Response.json({ id: "confirmed", timestamp });
+        throw new TypeError("Connection lost");
+      });
+      const bot = await connect(db, transmit);
+      await expect(bot.sendMessage({ conversationId: "c2c:user", parts: [
+        image("first.png"), { kind: "text", text: "Caption" }, image("last.png"),
+      ] }, { signal })).rejects.toMatchObject({
+        first: { id: "confirmed" },
+        message: expect.stringContaining("QQ confirmed 1 of 3 messages (confirmed). Message 2 may have been sent; later messages were not attempted."),
+      });
+      expect(transmit.mock.calls.map(([path]) => path)).toEqual([
+        "/v2/users/user/files", "/v2/users/user/files", "/v2/users/user/messages", "/v2/users/user/messages",
+      ]);
+      expect((await bot.readMessages({ conversationId: "c2c:user" }, { signal })).messages.map(message => message.id)).toEqual(["confirmed"]);
+    } finally { db.close(); }
+  });
+
+  it("does not send even the initial text when upload preparation fails", async () => {
+    const db = new DatabaseSync(":memory:");
+    try {
+      const transmit = vi.fn(() => Response.json({ message: "Upload unavailable" }, { status: 503 }));
+      const bot = await connect(db, transmit);
+      const failure = await bot.sendMessage({ conversationId: "c2c:user", parts: [
+        { kind: "text", text: "Caption" }, image("first.png"),
+      ] }, { signal }).catch(error => error);
+      expect(definitelyNotSent(failure)).toBe(true);
+      expect(transmit).toHaveBeenCalledExactlyOnceWith("/v2/users/user/files", expect.any(Object));
+    } finally { db.close(); }
   });
 });
 

@@ -62,15 +62,17 @@ export const ConversationsList = defineImplementation({
   effect: "read", execution: "parallel",
 });
 export const chatReadTargetSchema = messageReadTargetSchema.nullable();
+export const chatReadDefaultLimit = 10;
 export const ChatRead = defineImplementation({
   ...builtin.data("chat.read", chatMessageListSchema.describe("Messages with attachment file references and any quoted content supplied with a reply. Quoted files belong to the enclosing reply's messageId. ID queries return found messages in requested order, once per resolved message, and missingIds. Page queries return a reusable cursor.")),
-  resource: Chat, tool: Read, targetSchema: chatReadTargetSchema.describe("Null reads recent messages; since continues from a returned cursor. messageIds reads specific retained messages within this Chat's conversation and thread."),
+  resource: Chat, tool: Read, targetSchema: chatReadTargetSchema.describe(
+    `Null or a page without since reads the latest observed messages each time. Page limit defaults to ${chatReadDefaultLimit}. Pass the returned cursor as since to read only messages observed after that position in this Chat. For an incremental page with truncated=true, pass its cursor as since to continue reading remaining changes. messageIds instead selects specific retained messages in this Chat's conversation and thread.`),
   effect: "read", execution: "parallel",
 });
 export const ChatSend = defineImplementation({
-  ...builtin.data("chat.send", chatMessageSchema.describe("The message accepted by the external messaging service. Telegram album sends return the first item's receipt; all sent items remain available in Chat reads.")),
+  ...builtin.data("chat.send", chatMessageSchema.describe("The message accepted by the external messaging service. When QQ sends multiple messages or Telegram sends an album, the receipt represents the first accepted message; all confirmed messages appear in Chat reads. A partial QQ outcome identifies the confirmed messages and whether delivery of the next message is uncertain.")),
   resource: Chat, tool: Send,
-  targetSchema: z.strictObject({ replyTo: z.string().min(1).optional() }).nullable().describe("Send to this conversation. Null sends a message; replyTo quotes a message ID. QQ sends text as Markdown and requires the bot's platform Markdown permission. Telegram converts Markdown to supported formatting in message bodies and attachment captions; tables use text rows and image markup becomes a link."),
+  targetSchema: z.strictObject({ replyTo: z.string().min(1).optional() }).nullable().describe("Send to this conversation. Null sends without a reply; replyTo quotes a message ID. QQ sends contiguous text as Markdown and each file reference as a separate media message, in parts order. Markdown requires the bot's platform Markdown permission. Telegram converts Markdown to supported formatting in message bodies and attachment captions; tables use text rows and image markup becomes a link."),
   effect: "write", execution: "sequential",
 });
 export const ChatSee = defineImplementation({

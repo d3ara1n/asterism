@@ -1,11 +1,15 @@
-import { GatewayConnection, GatewayCloseCode, RATE_LIMIT_DELAY, messagePath, getNextMsgSeq,
-  type InboundMessage, type InboundAttachment, type PersistedSession, type ChatScope, type MessageResponse } from "@tencent-connect/qqbot-nodejs/protocol";
+import { GatewayConnection, GatewayCloseCode, RATE_LIMIT_DELAY, messagePath, mediaUploadPath, getNextMsgSeq, getMimeType,
+  MediaFileType, MAX_UPLOAD_SIZE, sanitizeFileName,
+  type InboundMessage, type InboundAttachment, type PersistedSession, type ChatScope, type MessageResponse,
+  type UploadMediaResponse } from "@tencent-connect/qqbot-nodejs/protocol";
 import { MessagingError, type MessagingProviderDefinition, type PluginContext } from "@asterism-app/sdk/runtime";
-import { fileMediaType, type MessagingPart, type SendMessage } from "@asterism-app/sdk/contracts";
+import { fileMediaType, type FileReferencePart, type MessagingPart, type MessagingFilePart, type MessagingMessage, type SendMessage } from "@asterism-app/sdk/contracts";
+import { imageMediaType } from "../filesystem/image-io.ts";
 import { messagingMessages as messages } from "../messages/messaging.ts";
 import { ObservedMessages, forgetObservedConnection } from "./observed-store.ts";
-import { messageObserver, outgoingMessage, receiveConnection, observedFile, downloadFile, type ObservedMessage } from "./provider-shared.ts";
+import { messageObserver, receiveConnection, observedFile, downloadFile, type ObservedMessage } from "./provider-shared.ts";
 import { QQApi } from "./qq-api.ts";
+import { definitelyNotSent, PartialMessageDelivery, prepareSend } from "./outcome.ts";
 
 /** Scope is part of the address: a user openid and a group openid are separate identities. */
 export function qqTarget(input: Pick<SendMessage, "conversationId" | "threadId" | "replyTo">) {
@@ -42,7 +46,34 @@ export function qqMessage(input: InboundMessage, selfId: string): ObservedMessag
   };
 }
 
-export function qqProvider(plugin: PluginContext): MessagingProviderDefinition {
+const uploadPrefix = "qq-upload:";
+type QQSendPart = { kind: "text"; text: string } | { kind: "media"; info: string; file: Omit<MessagingFilePart, "id"> };
+
+async function qqUpload(plugin: Pick<PluginContext, "files">, api: QQApi, path: string, part: FileReferencePart,
+  signal: AbortSignal): Promise<Extract<QQSendPart, { kind: "media" }>> {
+  const filename = sanitizeFileName(part.filename ?? "file");
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for await (const chunk of plugin.files.open(part.ref, { signal })) {
+    size += chunk.byteLength;
+    if (size > MAX_UPLOAD_SIZE) throw new MessagingError("invalid_input", `File '${filename}' exceeds the QQ direct upload limit of ${MAX_UPLOAD_SIZE / (1024 * 1024)} MiB.`);
+    chunks.push(chunk);
+  }
+  if (!size) throw new MessagingError("invalid_input", `File '${filename}' is empty.`);
+  const bytes = Buffer.concat(chunks, size);
+  const mime = fileMediaType({ name: filename, type: part.mediaType ?? "" });
+  const mediaType = imageMediaType(bytes) ?? (mime === "application/octet-stream" ? getMimeType(filename) : mime);
+  const fileType = mediaType.startsWith("image/") ? MediaFileType.IMAGE
+    : mediaType.startsWith("video/") ? MediaFileType.VIDEO : mediaType.startsWith("audio/") ? MediaFileType.VOICE : MediaFileType.FILE;
+  const upload = await api.request<UploadMediaResponse>("POST", path, signal, {
+    file_type: fileType, file_data: bytes.toString("base64"), srv_send_msg: false,
+    ...(fileType === MediaFileType.FILE ? { file_name: filename } : {}),
+  });
+  if (typeof upload.file_info !== "string" || !upload.file_info) throw new Error(`QQ did not return a media reference for '${filename}'.`);
+  return { kind: "media", info: upload.file_info, file: { kind: "file", mediaType, filename, size } };
+}
+
+export function qqProvider(plugin: Pick<PluginContext, "db" | "files">): MessagingProviderDefinition {
   return {
     id: "qq-bot", label: messages.qq,
     settings: [
@@ -89,26 +120,62 @@ export function qqProvider(plugin: PluginContext): MessagingProviderDefinition {
         async *openFile(query, { signal }) {
           qqTarget(query);
           const { file } = observedFile(store, query);
+          if (file.id.startsWith(uploadPrefix))
+            throw new MessagingError("unavailable", "QQ did not return a download URL for this outgoing attachment.");
           yield* downloadFile(file.id.startsWith("//") ? `https:${file.id}` : file.id, signal);
         },
         async sendMessage(message, { signal }) {
           signal.throwIfAborted();
-          const input = outgoingMessage(message), target = qqTarget(input);
-          if (input.files.length) throw new MessagingError("unsupported", "The QQ provider currently sends text messages only.");
-          const sent = await api.send<MessageResponse>(messagePath(target.scope, encodeURIComponent(target.targetId)), signal, {
-            markdown: { content: input.text }, msg_type: 2,
-            ...(target.msgId ? { msg_id: target.msgId, msg_seq: getNextMsgSeq(target.msgId) } : {}),
+          const { scope, targetId, msgId } = qqTarget(message);
+          const encoded = encodeURIComponent(targetId), path = messagePath(scope, encoded);
+          // Prepare all media without sending it; a broken attachment must not leave a delivered prefix.
+          const parts = await prepareSend(signal, async () => {
+            const parts: QQSendPart[] = [];
+            let text: string[] = [];
+            const flush = () => {
+              if (text.some(value => value.trim())) parts.push({ kind: "text", text: text.join("\n") });
+              text = [];
+            };
+            for (const part of message.parts) {
+              if (part.kind === "text") { text.push(part.text); continue; }
+              flush();
+              parts.push(await qqUpload(plugin, api, mediaUploadPath(scope, encoded), part, signal));
+            }
+            flush();
+            return parts;
           });
-          if (!sent.id) throw new Error("QQ accepted the message without returning its identity.");
-          const sentAt = new Date(typeof sent.timestamp === "number" ? sent.timestamp * 1000 : sent.timestamp).toISOString();
-          const previous = store.conversation(input);
-          return observe({
-            ...(sent.ext_info?.ref_idx ? { aliases: [sent.ext_info.ref_idx] } : {}),
-            conversation: { conversationId: input.conversationId, title: previous?.title ?? target.targetId,
-              kind: target.scope === "c2c" ? "private" : "group", activity: sentAt },
-            message: { id: sent.id, sender: { id: self.id, name: self.username, role: "self" },
-              parts: [{ kind: "text", text: input.text }], sentAt, ...(input.replyTo ? { replyTo: input.replyTo } : {}) },
-          }, false);
+          const confirmed: MessagingMessage[] = [];
+          // QQ deduplicates reply messages by sequence. Allocate distinct values within this send.
+          const seq = msgId ? getNextMsgSeq(msgId) : 1;
+          for (const [index, part] of parts.entries()) {
+            const stoppedBeforeSend = signal.aborted;
+            try {
+              signal.throwIfAborted();
+              const delivery = part.kind === "text" ? { markdown: { content: part.text }, msg_type: 2 }
+                : { media: { file_info: part.info }, msg_type: 7 };
+              const sent = await api.send<MessageResponse & { attachments?: InboundAttachment[] }>(path, signal, {
+                ...delivery, ...(msgId ? { msg_id: msgId, msg_seq: (seq + index) & 0xffff } : part.kind === "media" ? { msg_seq: 1 } : {}),
+              });
+              if (!sent.id) throw new Error("QQ accepted a message without returning its identity.");
+              const sentAt = new Date(typeof sent.timestamp === "number" ? sent.timestamp * 1000 : sent.timestamp).toISOString();
+              const attachments = part.kind === "media" ? sent.attachments?.filter(file => file.url) : undefined;
+              const sentMessage = observe({
+                ...(sent.ext_info?.ref_idx ? { aliases: [sent.ext_info.ref_idx] } : {}),
+                conversation: { conversationId: message.conversationId, title: store.conversation(message)?.title ?? targetId,
+                  kind: scope === "c2c" ? "private" : "group", activity: sentAt },
+                message: { id: sent.id, sender: { id: self.id, name: self.username, role: "self" }, sentAt, ...(msgId ? { replyTo: msgId } : {}),
+                  parts: part.kind === "text" ? [part] : attachments?.length ? qqParts(undefined, attachments) : [{ ...part.file, id: `${uploadPrefix}${sent.id}` }] },
+              }, false);
+              confirmed.push(sentMessage);
+            } catch (error) {
+              if (!confirmed.length) throw error;
+              const detail = error instanceof Error ? error.message : String(error);
+              const status = stoppedBeforeSend ? "was not attempted" : definitelyNotSent(error) ? "was not sent" : "may have been sent";
+              throw new PartialMessageDelivery(confirmed[0]!,
+                `QQ confirmed ${confirmed.length} of ${parts.length} messages (${confirmed.map(item => item.id).join(", ")}). Message ${index + 1} ${status}; later messages were not attempted. ${detail}`, error);
+            }
+          }
+          return confirmed[0]!;
         },
       };
     },

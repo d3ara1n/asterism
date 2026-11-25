@@ -3,7 +3,7 @@ import { cn } from "./utils";
 import { TooltipHint } from "./tooltip-hint";
 import { Badge } from "./ui/badge";
 
-/** Optional rich-content slots provide defaults, not content restrictions: a subject badge, a shrinkable summary, and trailing metadata. */
+/** A subject badge and summary hold the operation's details; trailing metadata is for short status or counts. */
 export function ToolHeader({ label, subject, summary, meta }: {
   label: string;
   subject?: ReactNode;

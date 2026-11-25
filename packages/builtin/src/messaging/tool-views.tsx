@@ -179,8 +179,8 @@ type SendProps = ToolRenderProps<z.infer<typeof ChatSend.schema>>;
 function SendHeader({ phase, target, invocation, result }: SendProps) {
   const i18n = useI18n(), replyTo = inputText(target, "replyTo");
   return <ToolHeader label={i18n.text(messages.send)} subject={useToolResourceSubject(invocation.resource)}
-    meta={[replyTo && i18n.formatMessage(messages.replyToId, { id: replyTo }),
-      phase === "settled" && result.kind === "succeeded" && i18n.text(messages.sent)].filter(Boolean).join(" · ")} />;
+    summary={replyTo && i18n.formatMessage(messages.replyToId, { id: replyTo })}
+    meta={phase === "settled" && result.kind === "succeeded" ? i18n.text(messages.sent) : undefined} />;
 }
 function SendBody({ args, result, phase }: SendProps) {
   const object = useRendererObject(), data = result?.data;

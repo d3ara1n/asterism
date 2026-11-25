@@ -50,6 +50,8 @@ QQ and Telegram outgoing text is interpreted as Markdown, including text sent fr
 
 QQ Markdown delivery requires the bot's platform Markdown permission. A bot can connect and receive messages while still lacking permission to send this format; a rejected send reports the platform error rather than resending the message as plain text.
 
+QQ delivers each attachment as a separate message and preserves its position relative to text. A send can therefore reach the conversation in several messages. If one delivery cannot be confirmed, the result distinguishes confirmed messages from the one that stopped delivery. QQ direct uploads accept files up to 20 MiB each; an outgoing attachment can be downloaded from Chat only if QQ supplies a download URL.
+
 ## Account for attachment availability
 
 An attachment may be visible now but depend on an external service for later retrieval. Passing its reference preserves an address, not permanent possession of the content. Preserve a stable copy when the work needs evidence or a deliverable that outlives the conversation's platform access.
