@@ -236,7 +236,7 @@
 .block-state[data-state="generation-error"] rect { stroke: var(--destructive); stroke-dasharray: 4 4; }
 .block-state[data-state="incident"] rect { stroke: var(--destructive); }
 @keyframes block-state-trace { to { stroke-dashoffset: -8; } }
-.surface-block[data-tone="failed"] { background-color: color-mix(in oklab, var(--destructive) 6%, var(--card-shell)); }
+.surface-block[data-tone="failed"] { background-color: color-mix(in oklab, var(--destructive) 12%, var(--card-shell)); }
 @media (prefers-reduced-motion: reduce) { .block-state rect { animation: none; } }
 /* Provider marks: brand marks sit on a raised sheet plate (the sheet shadow supplies the dark scheme's light edge); the initial
    fallback and non-service glyphs sit on the recessed muted plate. The status dot cuts out of the group tone rows sit on. */

@@ -18,8 +18,10 @@ export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "compression-summary"; id: string; text: string }
   | { kind: "compression"; id: string; status: Exclude<CompressionActivity["status"], "running"> | "completed"; details?: CompressionActivity["details"] }
   | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null; replyCreatedAt: string | null }
-  | { kind: "conversation-process"; id: string; content: readonly ("text" | "thinking")[]; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; notices: number; compressions: number; open: boolean }
+  | { kind: "conversation-process"; id: string; content: readonly ("text" | "thinking")[]; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; summary: ProcessSummary; open: boolean }
   | ({ kind: "notice" } & InlineFeedback);
+/** Folded items by what happened; each item counts in exactly one field, and successful tool calls appear only as tools. */
+export interface ProcessSummary { errors: number; partial: number; notices: number; compressions: number }
 /** Saved and live model blocks; notices may carry a responseId but are not blocks. */
 export function isModelBlock(item: TimelineItem): item is SavedBlock | ModelLiveBlock {
   return "ordinal" in item;

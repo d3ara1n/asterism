@@ -3,7 +3,8 @@ import { retainExitingItems } from "./timeline-presence";
 import { timelineKey, type TimelineItem } from "./timeline";
 
 const text = (id: string): TimelineItem => ({ kind: "text", id, responseId: id, ordinal: 0, text: id, endedAt: 1 });
-const process: TimelineItem = { kind: "conversation-process", id: "process", open: false, notices: 0, compressions: 0, tools: [], content: [] };
+const process: TimelineItem = { kind: "conversation-process", id: "process", open: false,
+  summary: { errors: 0, partial: 0, notices: 0, compressions: 0 }, tools: [], content: [] };
 
 describe("Exiting item order in the virtual list", () => {
   // Automatic folding adds a new summary row; retained visible process items should stay above it, while offscreen content occupies no exit position.

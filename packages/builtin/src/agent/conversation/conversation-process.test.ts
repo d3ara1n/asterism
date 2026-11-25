@@ -66,7 +66,8 @@ describe("Conversation process folding by input groups", () => {
     expect(ids(grouped)).toEqual(["u", "conversation-process:work", "error", "steer", "conversation-process:final", "reply", "turn-metrics:u"]);
     expect(ids(grouped, [...grouped.processIds]))
       .toEqual(["u", "progress", "conversation-process:work", "error", "steer", "tool", "conversation-process:final", "reply", "turn-metrics:u"]);
-    expect(grouped.items.find(item => item.id === "conversation-process:work")).toMatchObject({ notices: 0, compressions: 0 });
+    expect(grouped.items.find(item => item.id === "conversation-process:work"))
+      .toMatchObject({ summary: { errors: 0, partial: 0, notices: 0, compressions: 0 } });
   });
 
   // The boundary follows input position, including when the previous response completed before steer arrived.
@@ -221,7 +222,8 @@ describe("Conversation process folding by input groups", () => {
     expect(ids(project(path, true, [], feedback))).toEqual(["u", "partial", "stopped"]);
     path.push(node("done", "partial", text("a", "resumed", 0, "Done", { completion })));
     expect(ids(project(path, false, [], feedback))).toEqual(["u", "conversation-process:resumed", "done", "turn-metrics:u"]);
-    expect(project(path, false, [], feedback).items.find(item => item.kind === "conversation-process")).toMatchObject({ notices: 1 });
+    expect(project(path, false, [], feedback).items.find(item => item.kind === "conversation-process"))
+      .toMatchObject({ summary: { errors: 1, notices: 0 } });
   });
 
   it("A turn containing only compression retains its independent marker and errors, and the next turn does not absorb it", () => {
@@ -273,7 +275,36 @@ describe("Conversation process folding by input groups", () => {
       .toEqual(["u", "conversation-process:final", "reply", "turn-metrics:u"]);
     expect(ids(grouped, ["conversation-process:final"]))
       .toEqual(["u", "tool", "conversation-process:final", "retry", "before", "reply", "failed", "error", "turn-metrics:u"]);
-    expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ notices: 1, compressions: 1 });
+    expect(grouped.items.find(item => item.kind === "conversation-process"))
+      .toMatchObject({ summary: { errors: 1, notices: 0, compressions: 1 } });
+  });
+
+  // Each folded item counts once by what happened: a failed compaction or tool call is an error, not also a compaction or call.
+  it("Summarizes folded items by outcome, counting each item in exactly one category", () => {
+    const model = [{ kind: "text" as const, text: "result" }];
+    const error = { code: "e", message: "Broken" };
+    const path = [
+      node("u", null, message("a", "Work")),
+      node("failed", "u", call("a", "work", 0, "failed", { outcome: { kind: "failed", data: null, error, model } })),
+      node("rejected", "failed", call("a", "work", 1, "rejected", { outcome: { kind: "rejected", data: null, error, model } })),
+      node("unknown", "rejected", call("a", "work", 2, "unknown", { outcome: { kind: "unknown", data: null, message: "Lost", model } })),
+      node("partial", "unknown", call("a", "work", 3, "partial", { outcome: { kind: "partial", data: null, message: "Some", model } })),
+      node("cancelled", "partial", call("a", "work", 4, "cancelled", { outcome: { kind: "cancelled", data: null, message: "Stopped", model } })),
+      node("ok", "cancelled", call("a", "work", 5, "ok")),
+      node("compacted", "ok", event(ContextSummary.id, { summary: "Context", keptFrom: "u", model: "p/m",
+        tokensBefore: 1000, completion }, { source: agentSource("a") })),
+      node("reply", "compacted", text("a", "final", 0, "Done", { completion })),
+    ];
+    const feedback: InlineFeedback[] = [
+      { id: "incident", afterNodeId: "failed", form: "incident", origin: "model", code: "provider_error", message: "HTTP 429" },
+      { id: "occurrence", afterNodeId: "rejected", form: "occurrence", code: "omitted", message: "Left out" },
+    ];
+    const compressions: CompressionActivity[] = [
+      { id: "compression-failed", afterNodeId: "unknown", status: "failed" },
+      { id: "compression-cancelled", afterNodeId: "partial", status: "cancelled" },
+    ];
+    expect(project(path, false, [], feedback, compressions).items.find(item => item.kind === "conversation-process"))
+      .toMatchObject({ summary: { errors: 5, partial: 1, notices: 2, compressions: 1 } });
   });
 
   // A direct answer has nothing to hide, while a thinking-only completion has no final body; neither may generate fabricated output.

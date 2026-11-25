@@ -325,7 +325,7 @@
   "conversation.process.title": "执行过程",
   "conversation.process.text": "文本输出",
   "conversation.process.toolCount": "{count} 次工具调用",
-  "conversation.process.failedCount": "{count} 个工具错误",
+  "conversation.process.errorCount": "{count} 个错误",
   "conversation.process.partialCount": "{count} 个部分完成",
   "conversation.process.noticeCount": "{count} 条提示",
   "conversation.process.compressionCount": "{count} 次压缩",

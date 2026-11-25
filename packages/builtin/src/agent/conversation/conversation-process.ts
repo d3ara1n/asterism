@@ -1,10 +1,35 @@
-import { isModelBlock, timelineKey, type TimelineItem } from "./timeline";
+import { toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
+import { isModelBlock, timelineKey, type ProcessSummary, type TimelineItem } from "./timeline";
 
 export interface ProcessTimeline {
   items: readonly TimelineItem[];
   /** Maps collapsed items to the trailing summary row, also supporting reading-position navigation after folding. */
   owners: ReadonlyMap<string, string>;
   processIds: ReadonlySet<string>;
+}
+
+type ToolCallItem = Extract<TimelineItem, { kind: "toolcall" }>;
+type FoldedEvent = Extract<TimelineItem, { kind: "notice" | "compression" }>;
+
+/**
+ * Each folded item counts once, by what actually happened: any failure is an error whatever produced it, so a failed
+ * compaction or tool call is not also counted as a compaction or a call. Tool outcomes follow their header tone.
+ */
+export function processSummary(tools: readonly ToolCallItem[], events: readonly FoldedEvent[]): ProcessSummary {
+  const summary = { errors: 0, partial: 0, notices: 0, compressions: 0 };
+  for (const tool of tools) {
+    const kind = "outcome" in tool ? tool.outcome?.kind : undefined;
+    const tone = kind ? toolOutcomeTone(kind) : null;
+    if (tone === "error") summary.errors++;
+    else if (tone === "warning") summary.partial++;
+  }
+  for (const event of events) {
+    if (event.kind === "notice") event.form === "incident" ? summary.errors++ : summary.notices++;
+    else if (event.status === "failed") summary.errors++;
+    else if (event.status === "cancelled") summary.notices++;
+    else summary.compressions++;
+  }
+  return summary;
 }
 
 /** An input after model content closes the current process group, independently of execution turns. */
@@ -29,8 +54,8 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
     let lastProcess = -1;
     let finalPosition = -1;
     const content = new Set<"text" | "thinking">();
-    const tools: Extract<TimelineItem, { kind: "toolcall" }>[] = [];
-    const foldableEvents: Extract<TimelineItem, { kind: "notice" | "compression" }>[] = [];
+    const tools: ToolCallItem[] = [];
+    const foldableEvents: FoldedEvent[] = [];
     // Only events bracketed by model output belong to the process. In particular, a standalone compaction can follow the reply.
     let betweenBlocks = false;
     for (const entry of pending) {
@@ -56,14 +81,9 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
     if (final.length) body.splice(Math.max(finalPosition, lastProcess + 1), 0, ...final);
     if (lastProcess >= 0) {
       processIds.add(id);
-      let notices = 0, compressions = 0;
-      for (const event of foldableEvents) {
-        owners.set(timelineKey(event), id);
-        if (event.kind === "notice") notices++;
-        else compressions++;
-      }
+      for (const event of foldableEvents) owners.set(timelineKey(event), id);
       body.splice(lastProcess + 1, 0, { kind: "conversation-process", id, tools, content: [...content],
-        notices, compressions, open: false });
+        summary: processSummary(tools, foldableEvents), open: false });
     }
     result.push(...body);
     pending = [];

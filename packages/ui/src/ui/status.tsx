@@ -39,3 +39,11 @@ export function StatusText({ tone, icon, children, className }: { tone: StatusTo
     <StatusIcon tone={tone} icon={icon} className="size-3 shrink-0" /><span className="min-w-0 break-words">{children}</span>
   </span>;
 }
+
+/**
+ * Quiet status metadata in a row: the label alone in its status color, where a badge or icon would outweigh the content it annotates.
+ * Typography comes from the surrounding row or the caller.
+ */
+export function StatusLabel({ tone, children, className }: { tone: StatusTone; children: ReactNode; className?: string }) {
+  return <span className={cn(colors[tone], className)}>{children}</span>;
+}

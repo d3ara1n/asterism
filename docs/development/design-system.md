@@ -95,7 +95,7 @@ Persistent selection uses the `selected` fill rather than an outline.
 
 Process blocks draw their state line along their rounded outline. Reduced motion keeps the moving dash still. A one-time warning ripple marks a newly raised notice and then disappears.
 
-A rejected or failed tool call uses a faint red fill, not a red outline. Its outcome uses the same quiet trailing text as other tool metadata, without a badge. Expanded diagnostics remain readable without adding a second colored panel.
+A rejected or failed tool call carries an error, so it takes a light red fill rather than a red outline. Every outcome other than success is named by trailing header text in its status color, without a badge: red for failed, rejected, and unknown outcomes; the warning color for partial completion; muted text for cancellation. An unknown outcome means the result was lost rather than reported as an error, so it keeps the default fill. Expanded diagnostics show the code and the operation's own explanation without a second colored panel.
 
 ## Motion
 
@@ -144,7 +144,9 @@ When a choice determines which fields a new provider connection needs, the creat
 
 ### Process blocks and tool views
 
-Tone groups thinking, tool calls, and summaries without a default border. Text, thinking, and tool calls share the outline rules in [Lines](#lines): the outline reports completion and generation error, not whether the block will be reused in model context. Completed thinking that stays in history only has no outline. A tool's outcome determines its fill and trailing result text independently of its outline. Focus, disclosure, and a folded group's counts describe interaction or reading structure; they do not change any block's execution appearance. Keep these mappings separate rather than inventing combined states.
+Tone groups thinking, tool calls, and summaries without a default border. Text, thinking, and tool calls share the outline rules in [Lines](#lines): the outline reports completion and generation error, not whether the block will be reused in model context. Completed thinking that stays in history only has no outline. A tool's outcome determines its fill and trailing result text independently of its outline. Focus and disclosure describe interaction; they do not change any block's execution appearance. Keep these mappings separate rather than inventing combined states.
+
+A folded process row summarizes what happened inside it. Each folded item counts once by its outcome: failed, rejected, and unknown tool calls, request incidents, and failed compactions count as errors in the error color; partial tool results count in the warning color; occurrences and cancelled compactions count as notices; and completed compactions count as compactions. A failed compaction or tool call is therefore not also counted as a compaction. Tool icons list every call regardless of outcome.
 
 A tool header is one line: the operation name, then optional subject, summary, and trailing metadata. The subject is a low-emphasis badge naming the operation's focus, the summary is muted text that yields space first, and metadata stays visible. Resource creation and creation-entry inspection use the resource type as the subject, with an instance title in the summary when one exists; operations on an existing resource use its recorded name and kind icon, with paths, queries, or other details in the summary. Separate slots replace punctuation that would only join an object and its details. Unbounded inputs such as questions and commands appear as a single-line excerpt, with the full text in the body. Input, execution, and result reuse one block, so the reader's place survives each phase; content still being composed shows a bounded tail preview, and stable inputs and controls stay outside any live-output region.
 

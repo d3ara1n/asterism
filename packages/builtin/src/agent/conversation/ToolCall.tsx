@@ -6,7 +6,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { JsonView } from "@asterism-app/ui/json-view";
 import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
-import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
+import { StatusIcon, StatusLabel } from "@asterism-app/ui/ui/status";
 import { isToolError, toolOutcomeLabels, toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
 import { ToolOutcomeNotice } from "@asterism-app/ui/tool-failure";
 import { toolsMessages } from "../../messages/tools";
@@ -52,8 +52,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
       : !filling || view.header !== undefined || view.body !== undefined || view.label !== undefined ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
         : <ToolHeader label={state.phase === "incomplete" ? tools.label(node.name, node.invocation?.implementation?.id ?? null) ?? node.name : tools.preparation(node.name)} />}
     </span>
-    {status && settled && (toolError ? <span className="shrink-0 type-caption">{status}</span>
-      : <StatusBadge tone={toolOutcomeTone(settled)}>{status}</StatusBadge>)}
+    {status && settled && <StatusLabel tone={toolOutcomeTone(settled)} className="shrink-0 type-caption">{status}</StatusLabel>}
     {state.phase === "settled" && settled === "succeeded" && <span className="sr-only">{i18n.text(toolOutcomeLabels.succeeded)}</span>}
   </>;
   return <Disclosure header={header} {...disclosure} line={blockLine(node)} tone={toolError ? "failed" : undefined}

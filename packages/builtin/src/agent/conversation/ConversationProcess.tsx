@@ -7,16 +7,13 @@ import type { TimelineItem } from "./timeline";
 import { ConversationSeam } from "./ConversationSeam";
 import { IconSwap } from "./IconSwap";
 import type { ToolCallNode } from "./tool-state";
-import { isToolError } from "@asterism-app/ui/tool-outcome";
+import { StatusLabel } from "@asterism-app/ui/ui/status";
 
 /** Distinct tools shown before the remainder collapses into a count. */
 const visibleTools = 5;
 
 function implementation(node: ToolCallNode): string | null {
   return ("outcome" in node ? node.outcome?.implementation?.id : undefined) ?? node.invocation?.implementation?.id ?? null;
-}
-function resultKind(node: ToolCallNode) {
-  return "outcome" in node ? node.outcome?.kind ?? null : node.result?.kind ?? null;
 }
 
 /** Calls grouped by tool identity in first-use order. */
@@ -39,9 +36,7 @@ export function ConversationProcess({ node, onToggle, onMount }: {
   const i18n = useI18n();
   const tools = useRendererTools();
   const groups = toolGroups(node.tools);
-  const results = node.tools.map(resultKind);
-  const failed = results.filter(kind => kind !== null && kind !== "running" && isToolError(kind)).length;
-  const partial = results.filter(kind => kind === "partial").length;
+  const { errors, partial, notices, compressions } = node.summary;
   return <ConversationSeam open={node.open} aria-expanded={node.open} onClick={onToggle} className="h-6"
     ref={button => { if (button) onMount(node.id, button); }}>
     <IconSwap swapKey={node.open ? "open" : "folded"}>{node.open ? <ChevronsDownUp className="size-3.5" /> : <ChevronsUpDown className="size-3.5" />}</IconSwap>
@@ -63,9 +58,9 @@ export function ConversationProcess({ node, onToggle, onMount }: {
         {groups.length > visibleTools && <span className="shrink-0 tabular-nums">+{groups.length - visibleTools}</span>}
       </span>
     </>}
-    {failed > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processFailedCount, { count: failed })}</span>}
-    {partial > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processPartialCount, { count: partial })}</span>}
-    {node.notices > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processNoticeCount, { count: node.notices })}</span>}
-    {node.compressions > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processCompressionCount, { count: node.compressions })}</span>}
+    {errors > 0 && <span className="shrink-0">· <StatusLabel tone="error">{i18n.formatMessage(conversationMessages.processErrorCount, { count: errors })}</StatusLabel></span>}
+    {partial > 0 && <span className="shrink-0">· <StatusLabel tone="warning">{i18n.formatMessage(conversationMessages.processPartialCount, { count: partial })}</StatusLabel></span>}
+    {notices > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processNoticeCount, { count: notices })}</span>}
+    {compressions > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processCompressionCount, { count: compressions })}</span>}
   </ConversationSeam>;
 }
