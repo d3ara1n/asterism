@@ -2,7 +2,8 @@ import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useState, type ReactNode } from "react";
 import type { z } from "zod";
 import { motion } from "motion/react";
-import { Brain, Check, Minus, Wrench } from "lucide-react";
+import { AudioLines, Brain, Check, FileText, Image, Minus, Video, Wrench } from "lucide-react";
+import { modelMediaModalities, type ModelMediaModality } from "@asterism-app/sdk/contracts";
 import { useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ToolScrollArea } from "@asterism-app/ui/tool-content";
@@ -114,6 +115,24 @@ function Row({ label, value, children }: { label: string; value: string; childre
 }
 
 const modalityLabels = { text: messages.text, image: messages.image, audio: messages.audio, video: messages.video } satisfies Record<PriceModality, unknown>;
+const inputModalities = {
+  image: { label: messages.image, icon: Image }, audio: { label: messages.audio, icon: AudioLines },
+  video: { label: messages.video, icon: Video }, document: { label: messages.document, icon: FileText },
+} satisfies Record<ModelMediaModality, unknown>;
+
+/** Every media modality with configured ones filled, matching the thinking level scale; text input is always accepted and not listed. */
+function InputModalityChips({ supported }: { supported: readonly ModelMediaModality[] }) {
+  const i18n = useI18n();
+  return <ul className="flex flex-wrap gap-1">{modelMediaModalities.map(modality => {
+    const on = supported.includes(modality), { label, icon: Icon } = inputModalities[modality];
+    return <li key={modality} className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 type-caption leading-none",
+      on ? "border-transparent bg-secondary text-secondary-foreground" : "border-dashed text-muted-foreground/60")}>
+      <Icon aria-hidden="true" className="size-3 shrink-0" />
+      <span className={cn(!on && "line-through")}>{i18n.text(label)}</span>
+      {!on && <span className="sr-only"> · {i18n.text(configurationMessages.unsupported)}</span>}
+    </li>;
+  })}</ul>;
+}
 const itemLabels = {
   input: diagnosticMessages.input, cacheRead: diagnosticMessages.cacheRead, cacheWrite: diagnosticMessages.cacheWrite,
   output: diagnosticMessages.output, reasoning: diagnosticMessages.reasoning,
@@ -172,6 +191,10 @@ function GetBody({ result }: GetProps) {
       <h4 className="type-label">{i18n.text(messages.thinkingLevels)}</h4>
       <ThinkingLevelChips supported={model.capabilities.thinkingLevels} />
     </section>}
+    <section className="space-y-2">
+      <h4 className="type-label">{i18n.text(messages.inputModalities)}</h4>
+      <InputModalityChips supported={model.capabilities.inputModalities ?? []} />
+    </section>
     <section className="space-y-2">
       <h4 className="type-label">{i18n.text(messages.capacity)}</h4>
       <ul className="space-y-1.5">

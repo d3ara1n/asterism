@@ -25,6 +25,9 @@ export default defineModule(plugin => ({
       guidelines: [
         "model is an exact string from list_models. The first slash separates the provider ID from the model ID; the model ID can contain further slashes.",
         "Returns local metadata, including configured USD prices and maximum output tokens; null means unknown. No model request or provider discovery is performed.",
+        "All metadata is user configuration and can differ from what the provider's service actually supports or charges.",
+        "capabilities.thinkingLevels lists the levels offered in thinking menus for this model; a selected level outside the list is still sent, and an empty list offers none.",
+        "capabilities.inputModalities lists media sent natively besides text, which is always accepted; an omitted or empty list means text only. Files in unlisted modalities are not sent natively to this model.",
         "Unknown models and models with a disabled model or provider return not_found.",
       ],
       argsSchema: z.strictObject({
