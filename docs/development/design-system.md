@@ -66,7 +66,7 @@ Text uses the shared display, page, section, body, caption, label, and code role
 
 Density scales the root size, so spacing and type scale together without component changes. Resizing a card or island changes its content area, never its typography or control size.
 
-Interface icons come from Lucide. Model and web provider lists use selected, bundled brand marks alongside the visible provider name. A missing or unknown icon key uses the name's initial in the same slot. Read-only abbreviated counts use the common formatter; editable and raw values stay complete.
+Interface icons come from Lucide. Model and web provider lists use selected, bundled brand marks alongside the visible provider name. A missing or unknown icon key uses the name's initial in the same slot. Messaging platform choices use text labels. Read-only abbreviated counts use the common formatter; editable and raw values stay complete.
 
 File size labels use the shared file size formatter. It scales byte counts by powers of 1024, so labels use the same IEC units as file limits. Only the number is localized; a localized count abbreviation such as `万` is not a byte unit.
 
@@ -136,6 +136,8 @@ An island whose whole content is a list uses the shared panel list body flush in
 ### Settings and forms
 
 Settings rows and fields sit in groups on the page sheet, with hairlines between rows and the control at the row's end. Related fields and operations share a section, and values that override a baseline expose a reset. Every size-adjustment handle restores the default geometry on double-click and has a keyboard-accessible reset elsewhere.
+
+When a choice determines which fields a new provider connection needs, the creation panel presents that choice before the form. The form then edits one connection with a stable set of fields.
 
 ### Process blocks and tool views
 
