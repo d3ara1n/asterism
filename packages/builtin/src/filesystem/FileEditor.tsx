@@ -3,7 +3,7 @@ import { useI18n, useRendererCalls } from "@asterism-app/sdk/renderer";
 import type { ResourceRef } from "@asterism-app/sdk/contracts";
 import { EditorIsland } from "../editor/EditorIsland";
 import type { TextEditorNavigation } from "../editor/navigation";
-import { parseEditorText, serializeEditorText } from "../editor/text-format";
+import { editorDocument, parseEditorText, serializeEditorText } from "../editor/text-format";
 import { editorMessages as messages } from "../messages/editor";
 import { ReadDirectoryGitBase, SaveDirectoryText } from "./editor-contract";
 
@@ -13,15 +13,18 @@ export default function FileEditor({ resource, path, text, source, actions, navi
 }) {
   const i18n = useI18n();
   const calls = useRendererCalls();
-  const [initial] = useState(() => parseEditorText(text));
-  const [saved, setSaved] = useState(initial.content);
+  const [initial] = useState(() => {
+    const { content, format } = parseEditorText(text, "lf");
+    return { doc: editorDocument(content), format };
+  });
+  const [saved, setSaved] = useState(() => initial.doc.toString());
   const [gitBase, setGitBase] = useState<string | null>(null);
   const [gitFailed, setGitFailed] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     void calls.invoke(ReadDirectoryGitBase, { path }, { object: resource, signal: controller.signal }).then(result => {
       if (controller.signal.aborted) return;
-      setGitBase(result.text === null ? null : parseEditorText(result.text).content);
+      setGitBase(result.text === null ? null : parseEditorText(result.text, "lf").content);
       setGitFailed(false);
     }).catch(failure => {
       if (controller.signal.aborted) return;
@@ -30,7 +33,7 @@ export default function FileEditor({ resource, path, text, source, actions, navi
     });
     return () => controller.abort();
   }, [calls, resource, path, saved]);
-  return <EditorIsland title={path} source={source} actions={actions} filename={path} text={initial.content} gitBase={gitBase} navigation={navigation}
+  return <EditorIsland title={path} source={source} actions={actions} filename={path} text={initial.doc} gitBase={gitBase} navigation={navigation}
     status={gitFailed ? i18n.text(messages.gitFailed) : null}
     format={<>UTF-8 · {initial.format.lineSeparator === "\r\n" ? "CRLF" : initial.format.lineSeparator === "\r" ? "CR" : "LF"}</>}
     onSave={async content => {

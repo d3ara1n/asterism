@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
+import type { Text } from "@codemirror/state";
 import { IslandPanel, useI18n, useRendererCloseGuard } from "@asterism-app/sdk/renderer";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { Save, Search, WrapText } from "lucide-react";
@@ -18,7 +19,7 @@ export function EditorIsland({ title, source, actions, filename, text, onSave, g
   source?: ReactNode;
   actions?: ReactNode;
   filename: string;
-  text: string;
+  text: string | Text;
   onSave(text: string): Promise<void>;
   gitBase?: string | null;
   status?: ReactNode;
@@ -27,8 +28,8 @@ export function EditorIsland({ title, source, actions, filename, text, onSave, g
 }) {
   const i18n = useI18n();
   const [initial] = useState(text);
-  const [content, setContent] = useState(initial);
-  const [saved, setSaved] = useState(initial);
+  const [content, setContent] = useState(() => initial.toString());
+  const [saved, setSaved] = useState(content);
   const [saving, setSaving] = useState(false);
   const [lineWrapping, setLineWrapping] = useState(false);
   const pending = useRef(false);

@@ -49,14 +49,16 @@ describe("text tool contracts", () => {
     expect(message).toContain("Use an anchored read of the affected region");
   });
 
-  it("validates every anchor in a batch, uses shifts only for retry information, and requires reconfirmation for duplicate candidates", () => {
+  it("validates every anchor in a batch and requires reconfirmation even for a single nearby match", () => {
     const rows = readText("a\nb\nc", true).rows;
     const anchor = (i: number) => ({ line: rows[i].line, hash: rows[i].hash! });
     expect(() => editText("a\nchanged\nc", [
       { op: "replace", anchor: anchor(0), body: ["A"] },
       { op: "replace", anchor: anchor(1), body: ["B"] },
     ])).toThrow("original content preserved");
-    expect(() => editText("prefix\na\nb\nc", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow(`Set this field to {"line":3,"hash":"${computeLineHash(3, "b")}"}`);
+    const deleted = readText("first\n}\nsecond\n}\nend", true).rows[1];
+    expect(() => editText("first\nsecond\n}\nend", [{ op: "replace", anchor: { line: deleted.line, hash: deleted.hash! }, body: ["B"] }]))
+      .toThrow(`one nearby match. Confirm the intended line before using {"line":3,"hash":"${computeLineHash(3, "}")}"}`);
     expect(() => editText("prefix\na\nb\nb", [{ op: "replace", anchor: anchor(1), body: ["B"] }])).toThrow(`ambiguous. Confirm the intended line before choosing a candidate: {"line":3,"hash":"${computeLineHash(3, "b")}"} or {"line":4,"hash":"${computeLineHash(4, "b")}"}`);
   });
 

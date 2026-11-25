@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { parseLineFragment } from "./line-fragment.ts";
+import { directoryFileLocation, parseLineFragment } from "./line-fragment.ts";
+
+it("gives portable relative aliases one editor location without rewriting absolute or parent paths", () => {
+  expect(directoryFileLocation("./src//./main.ts")).toBe("src/main.ts");
+  expect(directoryFileLocation("./")).toBe(".");
+  expect(directoryFileLocation("/src//main.ts")).toBe("/src//main.ts");
+  expect(directoryFileLocation("../src//main.ts")).toBe("../src//main.ts");
+});
 
 describe("Directory line fragments", () => {
   it("distinguishes cursor and range requests, even for a one-line range", () => {

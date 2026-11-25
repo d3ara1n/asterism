@@ -1,7 +1,7 @@
 import { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { Compartment, EditorState, Prec, type Text } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
 import { indentWithTab } from "@codemirror/commands";
 import { LanguageDescription, syntaxHighlighting } from "@codemirror/language";
@@ -24,7 +24,7 @@ export interface TextEditorHandle { find(): void }
 export function TextEditor({ ref, filename, initialText, readOnly = false, lineWrapping = false, gitBase = null, navigation, onChange, onSave, onPosition, onLanguageError }: {
   ref?: Ref<TextEditorHandle>;
   filename: string;
-  initialText: string;
+  initialText: string | Text;
   readOnly?: boolean;
   lineWrapping?: boolean;
   gitBase?: string | null;

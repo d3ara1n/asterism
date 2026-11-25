@@ -55,7 +55,7 @@ function failureMessage(failure: ApplyFailure): string {
     const prefix = `edits[${f.opIndex}].${f.which} (${f.cited.line}#${f.cited.hash})`;
     if (f.recovery.kind === "found") {
       const { newLine, newHash } = f.recovery;
-      return `${prefix}: line moved. Set this field to ${JSON.stringify({ line: newLine, hash: newHash })}.`;
+      return `${prefix}: one nearby match. Confirm the intended line before using ${JSON.stringify({ line: newLine, hash: newHash })}.`;
     }
     if (f.recovery.kind === "ambiguous") {
       return `${prefix}: ambiguous. Confirm the intended line before choosing a candidate: ${f.recovery.candidates.map(c => JSON.stringify(c)).join(" or ")}.`;
