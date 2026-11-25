@@ -1,19 +1,19 @@
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { useId, useRef, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, Globe, GripVertical, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, FileDown, Globe, GripVertical, Plus, Search } from "lucide-react";
 import { Reorder, useDragControls } from "motion/react";
-import type { ProviderSetting, WebProviderType } from "@asterism-app/sdk/contracts";
+import type { WebProviderType } from "@asterism-app/sdk/contracts";
 import { webProviderMessages as messages } from "../../messages/web-providers";
 import { providersMessages } from "../../messages/providers";
 import { useI18n } from "../../shared/i18n";
-import { ProviderIcon } from "../../shared/ui/ProviderIcon";
+import { ProviderMark } from "../../shared/ui/ProviderMark";
 import { useIsland, useIslandCancel, useIslandKey } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "@asterism-app/ui/ui/empty";
-import { ListRow } from "@asterism-app/ui/ui/list-row";
-import { Item, ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
+import { ListRow, ListRowAction } from "@asterism-app/ui/ui/list-row";
+import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { Switch } from "@asterism-app/ui/ui/switch";
 import { Field, FieldDescription, FieldLabel } from "@asterism-app/ui/ui/field";
 import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
@@ -21,13 +21,20 @@ import { cn } from "@asterism-app/ui/utils";
 import { Editor } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 import { Section } from "@asterism-app/ui/settings-layout";
-import { ProviderKeyLink } from "./ProviderKeyLink";
+import { ServicePicker } from "./ServicePicker";
 import { ProviderSettingFields } from "./ProviderSettingFields";
 import { settingValues, settingsComplete } from "./provider-settings";
 
 const webProviderIslandKey = (id: string | null) => id === null ? "web-provider:create" : `web-provider:item:${id}`;
 
-type SecretSetting = Extract<ProviderSetting, { kind: "secret" }>;
+/** Capability marks: what the service answers, as compact neutral chips beside each other. */
+function Capabilities({ type }: { type: WebProviderType }) {
+  const i18n = useI18n();
+  return <span className="inline-flex gap-1 align-middle">
+    {type.search && <Badge variant="secondary" className="font-normal"><Search />{i18n.text(messages.search)}</Badge>}
+    {type.fetch && <Badge variant="secondary" className="font-normal"><FileDown />{i18n.text(messages.fetch)}</Badge>}
+  </span>;
+}
 function useCapabilities() {
   const i18n = useI18n();
   return (type: WebProviderType) => [type.search && i18n.text(messages.search), type.fetch && i18n.text(messages.fetch)].filter(Boolean).join(" · ");
@@ -66,7 +73,7 @@ export function WebProvidersSettings() {
     void saveOrder(ids);
   };
   const open = (id: string | null, origin: HTMLElement) => island.open({
-    key: webProviderIslandKey(id), label: messages.edit, width: panelIslandWidth, origin,
+    key: webProviderIslandKey(id), label: id === null ? messages.add : messages.edit, width: panelIslandWidth, origin,
     render: () => id === null ? <WebProviderCreation /> : <WebProviderEditor key={id} typeId={id} />,
   });
   return <Section title={i18n.text(messages.title)} hint={i18n.text(messages.hint)}
@@ -86,7 +93,7 @@ export function WebProvidersSettings() {
         const issue = issueOf(type);
         const moveUpLabel = i18n.formatMessage(messages.moveUp, { provider: label });
         const moveDownLabel = i18n.formatMessage(messages.moveDown, { provider: label });
-        return <SortableProvider key={state.id} id={state.id} label={label} disabled={action.busy || states.length < 2}
+        return <SortableProvider key={state.id} id={state.id} label={label} rank={index + 1} reorderable={states.length > 1} disabled={action.busy}
           onDragStart={() => setDragging(true)} onDragEnd={() => {
             setDragging(false);
             void saveOrder(latestOrder.current ?? states.map(item => item.id));
@@ -94,15 +101,15 @@ export function WebProvidersSettings() {
           {handle => <>
             {index > 0 && <ItemSeparator />}
             <ListRow leadingActions={handle} className="rounded-none" disabled={busy} inactive={!state.enabled}
-              mediaVariant="icon" media={<ProviderIcon name={label} iconId={type?.iconId} />}
-              title={label} description={type && capabilities(type)}
+              media={<ProviderMark name={label} iconId={type?.iconId} />}
+              title={label} description={type && <Capabilities type={type} />}
               selected={island.has(webProviderIslandKey(state.id))} onOpen={origin => open(state.id, origin)}
               trailing={issue && <StatusBadge tone={issue.tone}>{issue.label}</StatusBadge>}
               actions={<>
-                <IconButton variant="ghost" size="icon-sm" disabled={busy || index === 0}
-                  label={moveUpLabel} onClick={() => move(index, -1)}><ArrowUp /></IconButton>
-                <IconButton variant="ghost" size="icon-sm" disabled={busy || index === ordered.length - 1}
-                  label={moveDownLabel} onClick={() => move(index, 1)}><ArrowDown /></IconButton>
+                {ordered.length > 1 && <>
+                  <ListRowAction disabled={busy || index === 0} aria-label={moveUpLabel} onClick={() => move(index, -1)}><ArrowUp /></ListRowAction>
+                  <ListRowAction disabled={busy || index === ordered.length - 1} aria-label={moveDownLabel} onClick={() => move(index, 1)}><ArrowDown /></ListRowAction>
+                </>}
                 {/* Saving validates against the type declaration, so unavailable types cannot be toggled. */}
                 <Switch aria-label={i18n.formatMessage(messages.enableProvider, { provider: label })} checked={state.enabled} disabled={busy || !type}
                   onCheckedChange={enabled => void action.run({ type: "webProvider.save", id: state.id, enabled,
@@ -115,25 +122,33 @@ export function WebProvidersSettings() {
   </Section>;
 }
 
-function SortableProvider({ id, label, disabled, onDragStart, onDragEnd, children }: {
-  id: string; label: string; disabled: boolean; onDragStart: () => void; onDragEnd: () => void;
+/**
+ * The leading slot shows the provider's place in the trial order. A reorderable list turns the rank into a drag handle on
+ * row hover; keyboard users move providers with the row's arrow actions. The list item itself conveys position to assistive technology.
+ */
+function SortableProvider({ id, label, rank, reorderable, disabled, onDragStart, onDragEnd, children }: {
+  id: string; label: string; rank: number; reorderable: boolean; disabled: boolean; onDragStart: () => void; onDragEnd: () => void;
   children: (handle: ReactNode) => ReactNode;
 }) {
   const controls = useDragControls(), i18n = useI18n();
   const dragLabel = i18n.formatMessage(messages.reorder, { provider: label });
-  return <Reorder.Item as="div" role="listitem" value={id} className="relative bg-card" dragListener={false} dragControls={controls}
+  const number = <span aria-hidden="true" className={cn("text-xs font-medium tabular-nums", reorderable && "group-hover/list-row:hidden")}>{rank}</span>;
+  return <Reorder.Item as="div" role="listitem" value={id} className="relative bg-card-shell" dragListener={false} dragControls={controls}
     onDragStart={onDragStart} onDragEnd={onDragEnd}>
-    {children(<IconButton variant="ghost" size="icon-sm" disabled={disabled} tabIndex={-1}
-      className="touch-none cursor-grab active:cursor-grabbing"
-      label={dragLabel}
-      onPointerDown={event => { if (!disabled) controls.start(event); }}><GripVertical /></IconButton>)}
+    {children(reorderable
+      ? <IconButton variant="ghost" size="icon-xs" tabIndex={-1} label={dragLabel} disabled={disabled}
+        className="touch-none cursor-grab text-muted-foreground active:cursor-grabbing"
+        onPointerDown={event => { if (!disabled) controls.start(event); }}>
+        {number}<GripVertical className="hidden group-hover/list-row:block" />
+      </IconButton>
+      : <span className="flex size-6 items-center justify-center text-muted-foreground">{number}</span>)}
   </Reorder.Item>;
 }
 
-/* ---------- Service selection: every registered service, with added ones marked ---------- */
+/* ---------- Service selection: every registered service; each can be added once ---------- */
 
 function WebProviderCreation() {
-  const i18n = useI18n(), capabilities = useCapabilities(), form = useId();
+  const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   const [picked, setPicked] = useState<string | null>(null);
   const island = useIsland();
@@ -141,34 +156,14 @@ function WebProviderCreation() {
   if (picked) return <WebProviderEditor typeId={picked} />;
   const types = snapshot?.webProviderTypes ?? [];
   const added = new Set((snapshot?.webProviders ?? []).map(state => state.id));
-  const tile = "min-h-16 flex-nowrap gap-2 bg-card-shell px-3 py-2 text-left";
-  return <Editor form={form} title={i18n.text(messages.add)} dirty={false} busy={false} error={null}>
-    <div className="flex flex-col gap-5">
-      <p className="type-caption">{i18n.text(messages.pickerHint)}</p>
-      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9rem, 1fr))" }}>
-        {types.map(type => {
-          const exists = added.has(type.id);
-          const label = i18n.text(type.label);
-          const help = type.settings.find((setting): setting is SecretSetting => setting.kind === "secret" && !!setting.helpUrl);
-          return <div key={type.id} className="flex flex-col gap-1">
-            <Item asChild className={cn(tile, exists ? "opacity-60" : "hover:bg-accent")}>
-              <button type="button" disabled={exists} onClick={() => setPicked(type.id)}>
-                <span className="flex size-5 shrink-0 items-center justify-center"><ProviderIcon name={label} iconId={type.iconId} /></span>
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="flex min-w-0 items-center justify-between gap-1.5">
-                    <span className="type-section truncate">{label}</span>
-                    {exists && <Badge variant="secondary" className="font-normal">{i18n.text(messages.added)}</Badge>}
-                  </span>
-                  <span className="type-caption">{capabilities(type)}</span>
-                </span>
-              </button>
-            </Item>
-            {!exists && help?.helpUrl && <ProviderKeyLink href={help.helpUrl}>{i18n.text(providersMessages.getKey)}</ProviderKeyLink>}
-          </div>;
-        })}
-      </div>
-    </div>
-  </Editor>;
+  const choices = types.map(type => {
+    const label = i18n.text(type.label), exists = added.has(type.id);
+    return { key: type.id, name: label, description: <Capabilities type={type} />, disabled: exists,
+      mark: <ProviderMark name={label} iconId={type.iconId} />,
+      note: exists ? i18n.text(messages.added) : undefined,
+      onPick: () => setPicked(type.id) };
+  });
+  return <ServicePicker title={i18n.text(messages.add)} hint={i18n.text(messages.pickerHint)} groups={[{ key: "all", choices }]} />;
 }
 
 /** Read-only routing fact for fetch-capable services. */
@@ -198,7 +193,8 @@ function WebProviderEditor({ typeId }: { typeId: string }) {
   const dirty = !saved || Object.entries(values).some(([key, value]) => savedValues[key] !== value);
   const complete = !!type && settingsComplete(type.settings, values);
   const label = type ? i18n.text(type.label) : typeId;
-  return <Editor title={label} description={type ? capabilities(type) : i18n.text(messages.unavailable)}
+  return <Editor title={saved ? label : i18n.formatMessage(providersMessages.newServiceConnection, { service: label })}
+    description={type ? capabilities(type) : i18n.text(messages.unavailable)}
     form={form} dirty={dirty} busy={action.busy} error={action.error} saveDisabled={!complete}
     remove={saved ? { title: i18n.text(messages.remove), description: i18n.text(messages.removeHint), onConfirm: async () => {
       if (await action.run({ type: "remove", kind: "webProvider", id: saved.id })) void island.close({ force: true });

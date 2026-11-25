@@ -238,6 +238,21 @@
 @keyframes block-state-trace { to { stroke-dashoffset: -8; } }
 .surface-block[data-tone="failed"] { background-color: color-mix(in oklab, var(--destructive) 6%, var(--card-shell)); }
 @media (prefers-reduced-motion: reduce) { .block-state rect { animation: none; } }
+/* Provider marks: brand marks sit on a raised sheet plate (the sheet shadow supplies the dark scheme's light edge); the initial
+   fallback and non-service glyphs sit on the recessed muted plate. The status dot cuts out of the group tone rows sit on. */
+@layer components {
+  .provider-mark {
+    @apply relative inline-flex size-8 shrink-0 items-center justify-center rounded-md text-sm font-semibold leading-none select-none;
+  }
+  .provider-mark > img, .provider-mark > svg { @apply pointer-events-none size-5 object-contain; }
+  .provider-mark[data-kind="brand"] { background: var(--card); box-shadow: var(--shadow-sheet); }
+  /* The dark muted tone equals the group tone, so a hairline keeps the fallback plate's edge. */
+  .provider-mark:is([data-kind="monogram"], [data-kind="glyph"]) { @apply border bg-muted text-muted-foreground; }
+  .provider-mark-status {
+    @apply absolute -right-0.75 -bottom-0.75 size-2.5 rounded-full;
+    box-shadow: 0 0 0 2px var(--card-shell);
+  }
+}
 @layer base {
   * { box-sizing: border-box; }
   html, body, #root { height: 100%; background: transparent; }

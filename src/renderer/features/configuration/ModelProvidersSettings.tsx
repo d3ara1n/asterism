@@ -1,4 +1,4 @@
-import { Plus, Zap, Search, PlugZap } from "lucide-react";
+import { Cable, Plus, Zap, Search, PlugZap } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
 import { applyModelParameters, canEditModelProviderField, createModelInput, modelProviderComplete, modelProviderSchema, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ProviderModel, type TestError } from "../../../shared/configuration";
@@ -8,19 +8,17 @@ import { commonMessages } from "@asterism-app/ui/messages/common";
 import { providersMessages } from "../../messages/providers";
 import { thinkingLabels } from "@asterism-app/ui/messages/model-selection";
 import { getI18n, useI18n } from "../../shared/i18n";
-import { ProviderIcon } from "../../shared/ui/ProviderIcon";
+import { ProviderMark } from "../../shared/ui/ProviderMark";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia } from "@asterism-app/ui/ui/empty";
 import { ListRow } from "@asterism-app/ui/ui/list-row";
 import { StatusText } from "@asterism-app/ui/ui/status";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Checkbox } from "@asterism-app/ui/ui/checkbox";
 import { FieldGroup, Field, FieldContent, FieldLabel, FieldDescription, FieldSet, FieldLegend } from "@asterism-app/ui/ui/field";
-import { Input } from "@asterism-app/ui/ui/input";
-import { ItemGroup, ItemSeparator, Item } from "@asterism-app/ui/ui/item";
+import { ItemGroup, ItemSeparator } from "@asterism-app/ui/ui/item";
 import { Separator } from "@asterism-app/ui/ui/separator";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Switch } from "@asterism-app/ui/ui/switch";
-import { cn } from "@asterism-app/ui/utils";
 import { useIsland, useIslandCancel, useIslandKey } from "../../shared/weave/Screen";
 import { panelIslandWidth } from "../../shared/weave/IslandPanel";
 import { Section } from "@asterism-app/ui/settings-layout";
@@ -34,7 +32,7 @@ import { useModelParameters } from "./ModelParameters";
 import { settingValues, settingsComplete } from "./provider-settings";
 import { ProviderSettingFields } from "./ProviderSettingFields";
 import { modelProviderFields } from "./model-provider-fields";
-import { ProviderKeyLink } from "./ProviderKeyLink";
+import { ServicePicker } from "./ServicePicker";
 import { ProviderUsageButton } from "./ProviderUsageButton";
 
 /** Modalities name what a model accepts, independent of the file formats that carry it. */
@@ -121,10 +119,11 @@ function ProviderRow({ provider, snapshot, selected, onOpen }: {
 }) {
   const i18n = useI18n();
   const quick = useQuickActions();
-  const count = snapshot.models.filter(model => model.providerId === provider.id).length;
-  return <ListRow mediaVariant="icon" media={<ProviderIcon name={provider.name} iconId={provider.iconId} />}
+  const models = snapshot.models.filter(model => model.providerId === provider.id);
+  const enabled = models.filter(model => model.enabled).length;
+  return <ListRow media={<ProviderMark name={provider.name} iconId={provider.iconId} />}
     title={provider.name} selected={selected} inactive={!provider.enabled} onOpen={onOpen}
-    description={<>{canEditModelProviderField(provider, "protocol") && <>{protocolLabel(provider.protocol)} · </>}{i18n.formatMessage(providersMessages.modelCount, { count })}</>}
+    description={<>{canEditModelProviderField(provider, "protocol") && <>{protocolLabel(provider.protocol)} · </>}{i18n.formatMessage(providersMessages.modelCount, { count: models.length, enabled })}</>}
     actions={<>
       {provider.enabled && provider.usage && <ProviderUsageButton key={provider.usage} providerId={provider.id} />}
       <Switch aria-label={i18n.formatMessage(providersMessages.enableProvider, { provider_name: provider.name })} checked={provider.enabled} disabled={quick.busy}
@@ -159,38 +158,18 @@ function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null)
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
   const matches = modelProviderPresets.filter(preset => !q || [preset.name, preset.id, presetDescription(preset, modelProviderPresets), ...(preset.keywords ?? [])].some(word => word.toLowerCase().includes(q)));
-  const groups = billingOrder.map(billing => ({ billing, items: matches.filter(preset => preset.billing === billing) })).filter(entry => entry.items.length);
-  const tile = "min-h-16 flex-col items-start justify-center gap-0.5 px-3 py-2 text-left hover:bg-accent";
-  return <div className="flex flex-col gap-5">
-    <p className="type-caption">{i18n.formatMessage(providersMessages.presetHint)}</p>
-    {modelProviderPresets.length > searchThreshold && <div className="relative">
-      <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-      <Input autoFocus className="pl-8" placeholder={i18n.formatMessage(providersMessages.searchProviders)} aria-label={i18n.formatMessage(providersMessages.searchProvidersLabel)} value={query} onChange={event => setQuery(event.target.value)} />
-    </div>}
-    {groups.map(({ billing, items }) => <section key={billing} aria-label={i18n.text(billingLabels[billing])}>
-      <h3 className="type-label mb-2">{i18n.text(billingLabels[billing])}</h3>
-      <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(9rem, 1fr))" }}>
-        {items.map(preset => {
-          const description = presetDescription(preset, modelProviderPresets, false);
-          return <div key={preset.id} className="flex flex-col gap-1">
-            <Item asChild className="min-h-16 flex-nowrap gap-2 bg-card-shell px-3 py-2 text-left hover:bg-accent"><button type="button" onClick={() => onPick(preset)}>
-              <span className="flex size-5 shrink-0 items-center justify-center"><ProviderIcon name={preset.name} iconId={preset.iconId} /></span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="type-section truncate">{preset.name}</span>
-                {description && <span className="type-caption">{description}</span>}
-              </span>
-            </button></Item>
-            {preset.keyUrl && <ProviderKeyLink href={preset.keyUrl}>{i18n.formatMessage(providersMessages.getKey)}</ProviderKeyLink>}
-          </div>;
-        })}
-      </div>
-    </section>)}
-    {q && !groups.length && <p className="type-caption">{i18n.formatMessage(providersMessages.noMatchingProvider)}</p>}
-    <Item asChild variant="outline" className={cn(tile, "border-dashed border-input")}><button type="button" onClick={() => onPick(null)}>
-      <span className="type-section">{i18n.formatMessage(providersMessages.customConnection)}</span>
-      <span className="type-caption">{i18n.formatMessage(providersMessages.customConnectionHint)}</span>
-    </button></Item>
-  </div>;
+  const groups = billingOrder.map(billing => ({
+    key: billing, title: i18n.text(billingLabels[billing]),
+    choices: matches.filter(preset => preset.billing === billing).map(preset => ({
+      key: preset.id, name: preset.name, description: presetDescription(preset, modelProviderPresets, false) || undefined,
+      mark: <ProviderMark name={preset.name} iconId={preset.iconId} />, onPick: () => onPick(preset),
+    })),
+  })).filter(group => group.choices.length);
+  return <ServicePicker title={i18n.formatMessage(providersMessages.confirmAddProvider)} hint={i18n.formatMessage(providersMessages.presetHint)} groups={groups}
+    search={modelProviderPresets.length > searchThreshold ? { value: query, onChange: setQuery, label: i18n.formatMessage(providersMessages.searchProviders) } : undefined}
+    empty={q && <p className="type-caption">{i18n.formatMessage(providersMessages.noMatchingProvider)}</p>}
+    footer={{ key: "custom", open: true, name: i18n.formatMessage(providersMessages.customConnection), description: i18n.formatMessage(providersMessages.customConnectionHint),
+      mark: <ProviderMark name="" glyph={<Cable />} />, onPick: () => onPick(null) }} />;
 }
 
 /* ---------- Provider details ---------- */
@@ -202,23 +181,20 @@ export function slugify(name: string, options: { slash?: boolean } = {}): string
 }
 const blank: ProviderValue = { id: "", name: "", protocol: "openai-responses", baseUrl: "", auth: "api_key", apiKey: "", compatibility: [] };
 
-/** The selection entry generates configuration and editing rules; the editor receives only the key link and does not retain preset identity. */
+/** The selection entry generates configuration and editing rules; the editor receives only the service name and key link and does not retain preset identity. */
 function ProviderCreation() {
-  const i18n = useI18n(), form = useId();
   const { snapshot } = useSettingsConfiguration();
-  const [picked, setPicked] = useState<{ value: ProviderValue; keyUrl?: string } | null>(null);
+  const [picked, setPicked] = useState<{ value: ProviderValue; service?: string; keyUrl?: string } | null>(null);
   const island = useIsland();
   useIslandCancel(picked ? null : async () => { await island.close(); });
-  if (picked) return <ProviderEditor initialId={null} initialValue={picked.value} keyUrl={picked.keyUrl} />;
-  return <Editor form={form} title={i18n.formatMessage(providersMessages.confirmAddProvider)} dirty={false} busy={false} error={null}>
-    <PresetPicker onPick={preset => setPicked(preset ? { keyUrl: preset.keyUrl, value: {
-      ...modelProviderPresetDraft(preset, snapshot?.modelProviders.map(provider => provider.id)), apiKey: "",
-      name: `${preset.name} · ${presetDescription(preset, snapshot?.modelProviderPresets ?? [])}`,
-    } } : { value: structuredClone(blank) })} />
-  </Editor>;
+  if (picked) return <ProviderEditor initialId={null} initialValue={picked.value} service={picked.service} keyUrl={picked.keyUrl} />;
+  return <PresetPicker onPick={preset => setPicked(preset ? { service: preset.name, keyUrl: preset.keyUrl, value: {
+    ...modelProviderPresetDraft(preset, snapshot?.modelProviders.map(provider => provider.id)), apiKey: "",
+    name: `${preset.name} · ${presetDescription(preset, snapshot?.modelProviderPresets ?? [])}`,
+  } } : { value: structuredClone(blank) })} />;
 }
 
-function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId: string | null; initialValue?: ProviderValue; keyUrl?: string }) {
+function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { initialId: string | null; initialValue?: ProviderValue; service?: string; keyUrl?: string }) {
   const i18n = useI18n(), form = useId();
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
@@ -257,7 +233,8 @@ function ProviderEditor({ initialId, initialValue = blank, keyUrl }: { initialId
   };
   const models = snapshot?.models.filter(model => model.providerId === id) ?? [];
 
-  return <Editor form={form} title={current?.name ?? i18n.formatMessage(providersMessages.newProvider)} dirty={dirty} busy={busy} error={error} saveDisabled={!complete}
+  const title = current?.name ?? (service ? i18n.formatMessage(providersMessages.newServiceConnection, { service }) : i18n.formatMessage(providersMessages.newProvider));
+  return <Editor form={form} title={title} dirty={dirty} busy={busy} error={error} saveDisabled={!complete}
     description={canEditModelProviderField(value, "protocol") ? protocolLabel(value.protocol) : undefined}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteProviderTitle),
       description: i18n.formatMessage(providersMessages.deleteProviderDescription, { current_name: current.name, models_length: models.length }),

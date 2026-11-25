@@ -119,7 +119,7 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   modelCount: {
     id: "provider.modelCount",
-    defaultMessage: "{count} models",
+    defaultMessage: "{count, plural, =0 {No models} one {# model · {enabled} enabled} other {# models · {enabled} enabled}}",
   },
   enableProvider: {
     id: "provider.enable",
@@ -134,10 +134,6 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   noBilling: { id: "providerPreset.noBilling", defaultMessage: "No billing" },
   searchProviders: {
     id: "provider.add.search",
-    defaultMessage: "Search model providers",
-  },
-  searchProvidersLabel: {
-    id: "provider.add.searchLabel",
     defaultMessage: "Search model providers",
   },
   noMatchingProvider: {
@@ -163,6 +159,10 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   newProvider: {
     id: "provider.add.new",
     defaultMessage: "New model provider",
+  },
+  newServiceConnection: {
+    id: "provider.add.newServiceConnection",
+    defaultMessage: "New {service} connection",
   },
   deleteProviderTitle: {
     id: "provider.delete.title",

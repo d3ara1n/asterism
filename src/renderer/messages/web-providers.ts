@@ -2,7 +2,7 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 
 export const webProviderMessages = pluginNamespace("asterism.host").messages("en", defineMessages({
   title: { id: "webProviders.title", defaultMessage: "Web providers" },
-  hint: { id: "webProviders.hint", defaultMessage: "Providers are tried from top to bottom. Fetch only tries providers matching the URL. On failure, the next eligible provider is tried. Drag or use the arrows to change priority." },
+  hint: { id: "webProviders.hint", defaultMessage: "Providers are tried in order. A fetch tries only providers matching the URL; on failure, the next eligible provider is tried." },
   reorder: { id: "webProviders.reorder", defaultMessage: "Drag to reorder {provider}" },
   moveUp: { id: "webProviders.moveUp", defaultMessage: "Move {provider} up" },
   moveDown: { id: "webProviders.moveDown", defaultMessage: "Move {provider} down" },

@@ -14,7 +14,10 @@ import tavily from "@lobehub/icons-static-svg/icons/tavily-color.svg?url";
 import together from "@lobehub/icons-static-svg/icons/together-color.svg?url";
 import xai from "@lobehub/icons-static-svg/icons/xai.svg?url";
 import zai from "@lobehub/icons-static-svg/icons/zai.svg?url";
+import type { ReactNode } from "react";
+import type { StatusTone } from "@asterism-app/ui/ui/status";
 import { cn } from "@asterism-app/ui/utils";
+import { markMonogram } from "./provider-mark";
 
 /** Select bundled brand marks explicitly; an icon ID cannot resolve to an arbitrary file or URL. */
 const providerIcons = new Map(Object.entries({
@@ -36,10 +39,22 @@ const providerIcons = new Map(Object.entries({
   zai: { src: zai, mono: true },
 } satisfies Record<string, { src: string; mono?: boolean }>));
 
-/** Decorative alongside the provider's visible name. */
-export function ProviderIcon({ name, iconId }: { name: string; iconId?: string }) {
+// Static class names keep every status token visible to the Tailwind scanner.
+const statusDots: Record<StatusTone, string> = {
+  success: "bg-success", warning: "bg-warning", error: "bg-destructive",
+  progress: "bg-primary-text motion-safe:animate-pulse", neutral: "bg-muted-foreground",
+};
+
+/**
+ * A service's identity plate in lists and pickers: its bundled brand mark, or its initial when it has none. A glyph marks an
+ * entry that is not a service, such as a custom connection. Decorative beside the visible name; a status dot accompanies a
+ * visible status label.
+ */
+export function ProviderMark({ name, iconId, glyph, status }: { name: string; iconId?: string; glyph?: ReactNode; status?: StatusTone }) {
   const icon = iconId ? providerIcons.get(iconId) : undefined;
-  return icon
-    ? <img src={icon.src} alt="" draggable={false} className={cn("size-5 object-contain", icon.mono && "dark:invert")} />
-    : <span aria-hidden="true" className="text-sm font-medium text-muted-foreground">{name.trim().charAt(0).toUpperCase() || "?"}</span>;
+  const kind = glyph ? "glyph" : icon ? "brand" : "monogram";
+  return <span aria-hidden="true" data-slot="provider-mark" data-kind={kind} className="provider-mark">
+    {glyph ?? (icon ? <img src={icon.src} alt="" draggable={false} className={cn(icon.mono && "dark:invert")} /> : markMonogram(name))}
+    {status && <span className={cn("provider-mark-status", statusDots[status])} />}
+  </span>;
 }
