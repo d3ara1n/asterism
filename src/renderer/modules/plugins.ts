@@ -38,6 +38,15 @@ export function validateRendererPlugin(plugin: RendererPlugin | undefined): asse
       ids.add(entry.id);
     }
   }
+  if (plugin.mainViews !== undefined) {
+    if (!Array.isArray(plugin.mainViews)) throw new Error("Plugin main views must be an array.");
+    const ids = new Set<string>();
+    for (const view of plugin.mainViews) {
+      if (!view || typeof view.id !== "string" || !view.id.trim() || view.id !== view.id.trim() || ids.has(view.id)
+        || view.title == null || view.Body == null) throw new Error("Plugin main views need unique IDs, titles, and Body components.");
+      ids.add(view.id);
+    }
+  }
   if (plugin.commands !== undefined) {
     if (!Array.isArray(plugin.commands)) throw new Error("Plugin commands must be an array of groups.");
     const ids = new Set<string>();

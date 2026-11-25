@@ -75,7 +75,7 @@ export async function resolveResourceIsland(registry: ViewRegistry, calls: Rende
 export class SettingsBoundary extends Component<{ children: ReactNode; fallback: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch(error: Error) { console.error("Plugin settings page failed.", error); }
+  componentDidCatch(error: Error) { console.error("Plugin view failed.", error); }
   render() { return this.state.failed ? this.props.fallback : this.props.children; }
 }
 
@@ -185,7 +185,7 @@ export function PluginIslandProvider({ pluginId, page = false, children }: {
 function Render({ render }: { render: () => ReactNode }) { return render(); }
 
 /**
- * One composition for every mounted plugin region (Home entry, settings page, island).
+ * One composition for every mounted plugin region (Home entry, main view, settings page, island).
  * The boundary encloses the call scope, so a failed region also cancels the calls it started.
  */
 export function PluginRegion({ pluginId, page = false, fallback, children }: { pluginId: string; page?: boolean; fallback: ReactNode; children: ReactNode }) {

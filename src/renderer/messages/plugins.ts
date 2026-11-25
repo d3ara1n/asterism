@@ -122,6 +122,7 @@ export const pluginsMessages = pluginNamespace("asterism.host").messages("en", d
 
   // Plugin-owned settings pages and configuration
   pageFailed: { id: "plugins.pageFailed", defaultMessage: "The plugin settings page could not be displayed." },
+  mainViewFailed: { id: "plugins.mainViewFailed", defaultMessage: "The plugin page could not be displayed." },
   configurationUnavailable: { id: "plugins.configurationUnavailable", defaultMessage: "This plugin has not registered the requested configuration." },
   settingsLoadFailed: { id: "plugins.settingsLoadFailed", defaultMessage: "Plugin settings could not be loaded." },
 }));

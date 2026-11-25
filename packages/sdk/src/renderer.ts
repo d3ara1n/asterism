@@ -122,13 +122,14 @@ export interface RendererModule {
   /** Startup preparation: the host invokes modules in parallel before the first screen, and modules initialize their own internal resources; timeouts or failures are logged without blocking startup. */
   prepare?(context: RendererPrepareContext): Promise<void>;
 }
+type PluginPageIcon = ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
 export interface PluginSettingsPage {
   /** Stable page identity within the contributing plugin. */
   id: string;
   title: UiText;
   summary: UiText;
   /** Icon component drawn by the host at its own size and color; the host uses a plugin icon when omitted. */
-  icon?: ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
+  icon?: PluginPageIcon;
   /** A directly addressable location within a page; an empty location means the root page. */
   locations?: readonly string[];
   Body: ComponentType<{ location?: string }>;
@@ -151,10 +152,25 @@ export interface PluginSessionEntry {
   title: UiText;
   Body: ComponentType<SessionEntryProps>;
 }
-/** Frontend plugins own settings pages and shared service lifecycles; feature views are composed from modules. */
+export interface PluginMainViewProps {
+  /** False while another host screen, such as Settings, covers the main screen. */
+  active: boolean;
+}
+/** An application-wide destination, independent of the current session. */
+export interface PluginMainView {
+  /** Stable view identity within the contributing plugin. */
+  id: string;
+  title: UiText;
+  /** Icon drawn by the host; a plugin icon is used when omitted. */
+  icon?: PluginPageIcon;
+  /** Content of the host's main island. Use useRendererIsland to open detail islands. */
+  Body: ComponentType<PluginMainViewProps>;
+}
+/** Frontend plugins contribute application surfaces and services; resource views are composed from modules. */
 export interface RendererPlugin {
   modules?: readonly RendererModule[];
   settings?: readonly PluginSettingsPage[];
+  mainViews?: readonly PluginMainView[];
   /** Application palette groups, attributed to this plugin independently of resource views. */
   commands?: readonly RendererCommandGroup[];
   sessionEntries?: readonly PluginSessionEntry[];

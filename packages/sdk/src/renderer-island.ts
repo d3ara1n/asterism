@@ -72,14 +72,14 @@ function required<T>(value: T | null, name: string): T {
   if (value === null) throw new Error(`Renderer ${name} must be provided by the host.`);
   return value;
 }
-/** Available within resource cards, plugin settings pages, and islands they open. Opened content has its own region; pass domain inputs explicitly. */
+/** Available within resource cards, plugin main views, settings pages, and islands they open. Opened content has its own region; pass domain inputs explicitly. */
 export function useRendererIsland(): RendererIsland { return required(useContext(Island), "island"); }
 /** Keep an editor bound to its current persisted identity. Use a distinct creation key until the first successful save. */
 export function useRendererIslandKey(key: string) {
   const island = useRendererIsland();
   useLayoutEffect(() => { island.bindKey(key); }, [island, key]);
 }
-/** Register a close guard for the containing island; null guard permits closing, and the guard always uses the latest callback. */
+/** Register a close guard for the containing island, including navigation away from a plugin main view. Null permits closing; descendants are checked before their owners. */
 export function useRendererCloseGuard(guard: RendererCloseGuard | null) {
   const island = useRendererIsland();
   const latest = useRef(guard);

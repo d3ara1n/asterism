@@ -16,6 +16,8 @@ Add this package directory to Asterism, then restart the application. Register t
 
 The builder replaces `dist` only after a completed build. Asterism loads that JavaScript artifact, not the TypeScript entries in `asterism.build`.
 
+Open **Counter overview** from the main sidebar, then select **Counter step** to open its editor island. Selecting the step again focuses the existing editor. Change the step without saving, then select another main destination to try the host's discard confirmation.
+
 ## Preserve the public boundary
 
 The exact `asterism-example-counter/contracts` specifier is provided in both runtime and renderer realms. Each realm builds its own graph; the backend's runtime, storage, and public entry share that graph rather than independent copies of the contracts. `asterism.build.public` lists the specifier, and the builder resolves it through the package's `exports` entry for `./contracts`. Keep `src/contracts.ts` in the distributed package for consumers' type declarations.

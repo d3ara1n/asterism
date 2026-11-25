@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
-import { loadPluginRenderers } from "./plugins";
+import { loadPluginRenderers, validateRendererPlugin } from "./plugins";
 import { memo, forwardRef } from "react";
 
 describe("Plugin frontend entry", () => {
+  it("rejects ambiguous navigation when a plugin declares the same main view ID twice", () => {
+    const Body = memo(() => null);
+    expect(() => validateRendererPlugin({ mainViews: [{ id: "reports", title: "Reports", Body }] })).not.toThrow();
+    expect(() => validateRendererPlugin({ mainViews: [
+      { id: "reports", title: "Reports", Body },
+      { id: "reports", title: "Other reports", Body },
+    ] })).toThrow(/main views need unique IDs/);
+  });
   // ComponentType allows React-wrapped components; a runtime typeof function check must not reject the entire plugin.
   it.each([memo(() => null), forwardRef<unknown, { location?: string }>(() => null)])("accepts React-wrapped settings pages", async Body => {
     const loaded = await loadPluginRenderers([{ id: "wrapped", renderer: "wrapped", dependencies: [] }], {

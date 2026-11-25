@@ -8,6 +8,8 @@ A resource card presents an object; an operation view explains one attempt to do
 
 Use host presentation for containment and navigation. Keep the plugin's domain content within it instead of rebuilding the surrounding application. Localize the view's styling so one plugin does not redefine another's interface.
 
+Use a main view for a session-independent destination users return to directly, such as a report browser. Use a settings page to configure the plugin, a Home session entry to start a workspace, or a resource view for work tied to a particular object. A main view can open detail and editor islands with the host's island API. Switching to another main destination closes those islands rather than saving their arrangement; a close guard can keep the user on the current page to finish editing.
+
 ## Carry a tool view from input to result
 
 A tool title should identify the work before it produces output. Give long questions, commands, and other unbounded inputs a short, single-line excerpt. Let the excerpt yield to a distinct status label and make the complete input available in the expanded view.

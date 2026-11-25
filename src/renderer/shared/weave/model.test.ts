@@ -82,6 +82,10 @@ describe("ordinary islands", () => {
     expect(closure(islands, "root")).toEqual(["e", "c", "a"]);
     expect(closure([island("x", "y"), island("y", "x")], "x")).toEqual(["y", "x"]);
   });
+  it("checks descendants before their owners when closing the whole screen, including detached branches", () => {
+    const islands = [island("leaf", "editor"), island("editor", "root"), island("detached", null), island("detail", "detached")];
+    expect(closure(islands)).toEqual(["detail", "detached", "leaf", "editor"]);
+  });
   it("swaps only with an ordinary neighbor", () => {
     const islands = [island("a"), island("b"), island("c")];
     expect(moveIsland(islands, "b", -1).map(item => item.id)).toEqual(["b", "a", "c"]);

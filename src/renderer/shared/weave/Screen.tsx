@@ -120,8 +120,8 @@ export interface IslandApi {
 const IslandContext = createContext<IslandApi | null>(null);
 const StripContext = createContext<IslandStrip | null>(null);
 export interface ScreenHandle {
-  /** Close every ordinary island; any refusal cancels. */
-  closeAll(options?: CloseOptions): Promise<boolean>;
+  /** Close every ordinary island. When replacing root content, optionally check its guards last without removing the root. */
+  closeAll(options?: CloseOptions & { guardRoot?: boolean }): Promise<boolean>;
   /** Close an island of this screen as if through its own controls. */
   close(id: string, options?: CloseOptions): Promise<boolean>;
 }
@@ -298,10 +298,11 @@ export function Screen({ label, root, strip: external, className, ref }: {
     remove(owned());
     return true;
   };
-  const closeAll = async (settle?: boolean) => {
-    const all = () => strip.getSnapshot().islands.map(island => island.id).reverse();
-    if (!(await release(all()))) return false;
-    remove(all(), settle);
+  const closeAll: ScreenHandle["closeAll"] = async options => {
+    const ids = closure(strip.getSnapshot().islands);
+    if (options?.guardRoot) ids.push(latest.current.root.key);
+    if (!(await release(ids))) return false;
+    remove(strip.getSnapshot().islands.map(island => island.id), options?.settle);
     return true;
   };
   const guard = (id: string, fn: CloseGuard) => {
@@ -319,7 +320,7 @@ export function Screen({ label, root, strip: external, className, ref }: {
   const has = (id: string) => strip.has(id);
   // An identity absent from the screen has nothing to close.
   useImperativeHandle(ref, () => ({
-    closeAll: options => closeAll(options?.settle),
+    closeAll,
     close: (id, options) => known(id) ? close(id, false, options?.settle) : Promise.resolve(true),
   }));
   const latestClose = useRef(close);

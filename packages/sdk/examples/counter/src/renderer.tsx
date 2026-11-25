@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import {
   defineRendererPlugin, cardRenderer, creationEntry, toolRenderer,
-  useRendererObject, useRendererConfiguration, useRendererCalls, useI18n, type SessionEntryProps,
+  useRendererObject, useRendererConfiguration, useRendererCalls, useI18n, type SessionEntryProps, useRendererIsland, IslandPanel,
 } from "@asterism-app/sdk/renderer";
 import { ns, card, Counter, View, Create, Increment, Settings, ReadStep, ReadCounter, StartSession } from "./contracts.ts";
 import styles from "./panel.module.css";
@@ -62,7 +62,34 @@ function CounterEntry({ ready, open }: SessionEntryProps) {
   }} />;
 }
 
+function StepEditor() {
+  const settings = useRendererConfiguration(Settings);
+  const [draft, setDraft] = useState<number | null>(null);
+  const step = draft ?? settings.value.step;
+  const dirty = step !== settings.value.step;
+  return <IslandPanel title="Counter step" dirty={dirty}
+    action={<Operation label="Save" disabled={!dirty || !settings.ready} run={async () => {
+      await settings.save({ step });
+      setDraft(null);
+    }} />}>
+    <label>Increment by <input type="number" min={1} max={10} value={step}
+      onChange={event => setDraft(event.currentTarget.valueAsNumber || 1)} /></label>
+  </IslandPanel>;
+}
+
+function CounterOverview() {
+  const island = useRendererIsland();
+  const settings = useRendererConfiguration(Settings);
+  return <section className={styles.panel}>
+    <h2>Counter overview</h2>
+    <button onClick={event => void island.open({
+      key: "step-editor", label: "Counter step", origin: event.currentTarget, render: () => <StepEditor />,
+    })}>Counter step: {settings.value.step}</button>
+  </section>;
+}
+
 export default defineRendererPlugin({
+  mainViews: [{ id: "overview", title: "Counter overview", Body: CounterOverview }],
   sessionEntries: [{ id: "counter", title: "Counter workspace", Body: CounterEntry }],
   settings: [{ id: "counter", title: "Counter", summary: "Configure the counter step.", Body: SettingsPage }],
   modules: [{

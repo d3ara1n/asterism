@@ -85,19 +85,30 @@ export function bindIsland<T extends KeyedIsland>(islands: readonly T[], id: str
 }
 
 /**
- * Islands removed by closing id: the ordinary islands it opened, transitively, deepest first, followed by id itself when it is ordinary.
- * id may also name the root, which closes only what it opened. Ownership cycles terminate.
+ * Ordinary islands affected by a close, with descendants before their owners regardless of layout.
+ * An id limits the close to its subtree; omit it to include all branches, even detached ones.
  */
-export function closure(islands: readonly OwnedIsland[], id: string): string[] {
+export function closure(islands: readonly OwnedIsland[], id?: string): string[] {
+  const ordered = id === undefined ? islands.toReversed() : islands;
+  const ids = new Set<string>();
+  const children = new Map<string, string[]>();
+  for (const island of ordered) {
+    ids.add(island.id);
+    if (island.owner === null) continue;
+    const siblings = children.get(island.owner) ?? [];
+    siblings.push(island.id);
+    children.set(island.owner, siblings);
+  }
   const result: string[] = [];
   const visited = new Set<string>();
   const visit = (owner: string) => {
     if (visited.has(owner)) return;
     visited.add(owner);
-    for (const island of islands) if (island.owner === owner) visit(island.id);
-    if (islands.some(island => island.id === owner)) result.push(owner);
+    for (const child of children.get(owner) ?? []) visit(child);
+    if (ids.has(owner)) result.push(owner);
   };
-  visit(id);
+  if (id !== undefined) visit(id);
+  else for (const island of ordered) visit(island.id);
   return result;
 }
 

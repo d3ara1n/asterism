@@ -6,7 +6,7 @@ import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { ActionMenu, ActionMenuContent, ActionMenuItem, ActionMenuSeparator, ActionMenuTrigger, ActionMenuTarget } from "@asterism-app/ui/ui/action-menu";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
-import { BarChart3, ChevronRight, Folder as FolderIcon, FolderPlus, House, MoreHorizontal, PanelLeftClose, Pencil, Trash2 } from "lucide-react";
+import { BarChart3, ChevronRight, Folder as FolderIcon, FolderPlus, House, MoreHorizontal, PanelLeftClose, Pencil, Puzzle, Trash2 } from "lucide-react";
 import { cn } from "@asterism-app/ui/utils";
 
 import { appMessages } from "../messages/app";
@@ -30,6 +30,7 @@ import { DeleteFolder, FolderDialog } from "../features/folders/FolderDialog";
 import { sidebarViews, type SidebarView } from "./sidebar-state";
 import { useConfiguration } from "../features/configuration/state";
 import { sidebarListRows, type SidebarListRow } from "./sidebar-list";
+import type { RegisteredMainView } from "../features/plugins/PluginMainView";
 
 export { noFolderGroup } from "./sidebar-list";
 
@@ -42,7 +43,7 @@ type FolderAction = { kind: "edit" | "delete"; folder: Folder; trigger: HTMLButt
 const viewLabels = { folders: appMessages.sidebarViewFolders, recent: appMessages.sidebarViewRecent } as const;
 
 /** Application navigation consumes only session summaries; after selecting a session, the application layer explicitly loads the workbench. */
-export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNotices, selectedSessionId, renameDisabledSessionId, homeActive, dashboardActive, view, onViewChange, collapsed, onToggleGroup, onHome, onDashboard, onSession, onRename, onArchive, onCompletedChange, onKeepAwakeChange, onTemplateSaved, onHide, onRetry }: {
+export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNotices, selectedSessionId, renameDisabledSessionId, homeActive, dashboardActive, mainViews, selectedMainView, onMainView, view, onViewChange, collapsed, onToggleGroup, onHome, onDashboard, onSession, onRename, onArchive, onCompletedChange, onKeepAwakeChange, onTemplateSaved, onHide, onRetry }: {
   snapshot: AppSnapshot | null; status: RuntimeStatus; busy: boolean; selectedSessionId: string | null;
   resourceActivities: readonly ResourceActivity[];
   resourceNotices: readonly ResourceNoticeMark[];
@@ -55,6 +56,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
   /** Collapsed group keys: folder identities or `noFolderGroup`. */
   collapsed: ReadonlySet<string>; onToggleGroup: (key: string) => void;
   homeActive: boolean; dashboardActive: boolean; onHome: () => void; onDashboard: () => void; onSession: (id: string) => void;
+  mainViews: readonly RegisteredMainView[]; selectedMainView: string | null; onMainView: (entry: RegisteredMainView) => void;
   onHide: () => void; onRetry: () => void;
 }) {
   const i18n = useI18n();
@@ -72,7 +74,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
     else listHeading.current?.focus({ preventScroll: true });
   };
   const disabled = busy || status !== "ready";
-  // Home, usage statistics, and the open session share one selection that travels between them.
+  // Main views and the open session share one selection that travels between them.
   const selection = useId();
   // Without folders both arrangements are the same flat list, so the switch is omitted.
   const grouped = folders.length > 0 && view === "folders";
@@ -134,9 +136,20 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
       <span className="flex items-center gap-2 text-sm font-semibold"><span aria-hidden="true" className="shrink-0 text-xl leading-none font-normal text-foreground">⁂</span>{i18n.formatMessage(appMessages.appName)}</span>
       <IconButton size="icon-xs" label={i18n.formatMessage(appMessages.hideSidebar)} onClick={onHide}><PanelLeftClose /></IconButton>
     </header>
-    <nav className="flex flex-col gap-1" aria-label={i18n.formatMessage(appMessages.mainViews)}>
+    <nav className={cn("flex flex-col gap-1", mainViews.length > 0 && "max-h-[45%] overflow-y-auto")} aria-label={i18n.formatMessage(appMessages.mainViews)}>
       <span className="relative">{homeActive && <SelectionIndicator layoutId={selection} />}<Button variant="ghost" className={cn("w-full justify-start disabled:opacity-100", indicatorItem(homeActive))} aria-current={homeActive ? "page" : undefined} disabled={homeActive} onClick={onHome}><House />{i18n.formatMessage(commonMessages.home)}</Button></span>
       <span className="relative">{dashboardActive && <SelectionIndicator layoutId={selection} />}<Button variant="ghost" className={cn("w-full justify-start disabled:opacity-100", indicatorItem(dashboardActive))} aria-current={dashboardActive ? "page" : undefined} disabled={dashboardActive} onClick={onDashboard}><BarChart3 />{i18n.formatMessage(dashboardMessages.title)}</Button></span>
+      {mainViews.map(entry => {
+        const selected = selectedMainView === entry.key;
+        const Icon = entry.icon ?? Puzzle;
+        return <span className="relative" key={entry.key}>
+          {selected && <SelectionIndicator layoutId={selection} />}
+          <Button variant="ghost" className={cn("w-full justify-start disabled:opacity-100", indicatorItem(selected))}
+            aria-current={selected ? "page" : undefined} disabled={selected} onClick={() => onMainView(entry)}>
+            <Icon aria-hidden /><span className="truncate">{i18n.text(entry.title)}</span>
+          </Button>
+        </span>;
+      })}
     </nav>
     <section className="mt-6 flex min-h-0 flex-1 flex-col" aria-labelledby="conversation-list-title">
       <div className="mb-1 flex items-center justify-between gap-2 pl-2">

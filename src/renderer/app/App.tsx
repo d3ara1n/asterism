@@ -2,7 +2,7 @@ import { runtime } from "../runtime";
 import { motion, AnimatePresence } from "motion/react";
 import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuSeparator, DropdownMenuLabel, DropdownMenuShortcut } from "@asterism-app/ui/ui/dropdown-menu";
 import { Button } from "@asterism-app/ui/ui/button";
-import { PanelLeft, ArrowLeft, ChevronDown, House, BarChart3, Settings, Plus, KeyRound, ListTree, History, Command } from "lucide-react";
+import { PanelLeft, ArrowLeft, ChevronDown, House, BarChart3, Settings, Plus, KeyRound, ListTree, History, Command, Puzzle } from "lucide-react";
 
 
 import { WorkbenchSurface } from "../features/workbench/WorkbenchSurface";
@@ -18,6 +18,7 @@ import { Sidebar } from "./Sidebar";
 import { readCollapsedGroups, readSidebarView, writeCollapsedGroups, writeSidebarView, type SidebarView } from "./sidebar-state";
 
 import { HomePage } from "../features/home/HomePage";
+import { PluginMainViewContent, type RegisteredMainView } from "../features/plugins/PluginMainView";
 import { RendererSettingsNavigationProvider } from "@asterism-app/sdk/renderer";
 import { Window, Titlebar } from "./Window";
 import { UpdateIndicator } from "./UpdateIndicator";
@@ -64,14 +65,15 @@ const DashboardPage = lazy(() => import("../features/dashboard/DashboardPage").t
 const DashboardActions = lazy(() => import("../features/dashboard/DashboardActions").then(module => ({ default: module.DashboardActions })));
 
 /** Space switches the whole main page, including its docked sidebars, together; only the central Screen coordinates Islands. */
-type MainView = { kind: "home" } | { kind: "dashboard" } | { kind: "conversation"; sessionId: string; overview?: boolean };
+type MainView = { kind: "home" } | { kind: "dashboard" } | { kind: "conversation"; sessionId: string; overview?: boolean }
+  | { kind: "plugin"; entry: RegisteredMainView };
 type PageId = "settings" | "main";
 /** Workbench sidebars opened from the titlebar: one at a time, docked beside the central Screen. */
 type PanelKind = "objects" | "history" | "access";
 const idleSubscribe = () => () => {};
 const noSession = () => null;
 
-export function App({ controller }: { controller: ApplicationController }) {
+export function App({ controller, mainViews }: { controller: ApplicationController; mainViews: readonly RegisteredMainView[] }) {
   const i18n = useI18n();
   const { exiting } = useDesktopWindow();
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot);
@@ -127,6 +129,7 @@ export function App({ controller }: { controller: ApplicationController }) {
   const commandSession = useMemo(() => !inSettings ? active?.recordSnapshot() ?? null : null, [inSettings, active, sessionState]);
   const mainTitle = view.kind === "home" ? i18n.formatMessage(commonMessages.home)
     : view.kind === "dashboard" ? i18n.formatMessage(dashboardMessages.title)
+    : view.kind === "plugin" ? i18n.text(view.entry.title)
     : session?.title ?? snapshot?.sessions.find(item => item.id === view.sessionId)?.title ?? i18n.formatMessage(commonMessages.conversation);
 
   const focusMain = () => requestAnimationFrame(() => document.getElementById("screen-main")?.focus({ preventScroll: true }));
@@ -153,17 +156,18 @@ export function App({ controller }: { controller: ApplicationController }) {
     navigating.current = true;
     try {
       if (page === "settings" && !(await settingsScreen.current?.closeAll())) return false;
-      const changingSession = next.kind !== view.kind
-        || next.kind === "conversation" && view.kind === "conversation" && next.sessionId !== view.sessionId;
-      if (changingSession && mainScreen.current) {
+      const changingView = next.kind !== view.kind
+        || next.kind === "conversation" && view.kind === "conversation" && next.sessionId !== view.sessionId
+        || next.kind === "plugin" && view.kind === "plugin" && next.entry.key !== view.entry.key;
+      if (changingView && mainScreen.current) {
         // Leaving a session clears its islands from view, not from its saved arrangement; a cancelled close resumes persistence.
         const scope = mainStrip.getSnapshot().scope;
         mainStrip.set({ scope: null });
         // The root's content is replaced at the same time, so the root takes its new width at once instead of reflowing the incoming view.
-        const closed = await mainScreen.current.closeAll({ settle: true });
+        const closed = await mainScreen.current.closeAll({ settle: true, guardRoot: view.kind === "plugin" });
         if (!closed) { mainStrip.set({ scope }); return false; }
       }
-      if (changingSession) setPanel(null);
+      if (changingView) setPanel(null);
       navigation.current++;
       controller.setVisibleSession(next.kind === "conversation" ? next.sessionId : null);
       setView(next); setPage("main");
@@ -177,6 +181,9 @@ export function App({ controller }: { controller: ApplicationController }) {
   };
   const goDashboard = () => {
     void navigate({ kind: "dashboard" });
+  };
+  const goPluginView = (entry: RegisteredMainView) => {
+    void navigate({ kind: "plugin", entry });
   };
   const skillUsage = { open(skill: { id: string; source: string }) {
     dashboard.focusSkill(skill);
@@ -246,6 +253,12 @@ export function App({ controller }: { controller: ApplicationController }) {
       </Button></DropdownMenuTrigger><DropdownMenuContent align="start">
         <DropdownMenuItem onSelect={goHome}><House />{i18n.formatMessage(commonMessages.home)}</DropdownMenuItem>
         <DropdownMenuItem onSelect={goDashboard}><BarChart3 />{i18n.formatMessage(dashboardMessages.title)}</DropdownMenuItem>
+        {mainViews.map(entry => {
+          const Icon = entry.icon ?? Puzzle;
+          return <DropdownMenuItem key={entry.key} onSelect={() => goPluginView(entry)}>
+            <Icon aria-hidden /><span className="truncate">{i18n.text(entry.title)}</span>
+          </DropdownMenuItem>;
+        })}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => { commandFocus.current = menuTrigger.current; setCommandsOpen(true); }}>
           <Command />{i18n.text(commandsMessages.title)}<DropdownMenuShortcut>{applicationCommandsShortcut}</DropdownMenuShortcut>
@@ -301,6 +314,7 @@ export function App({ controller }: { controller: ApplicationController }) {
     onTemplateSaved={() => { void controller.refresh({ quiet: true }); }}
     homeActive={view.kind === "home"}
     dashboardActive={view.kind === "dashboard"}
+    mainViews={mainViews} selectedMainView={view.kind === "plugin" ? view.entry.key : null} onMainView={goPluginView}
     view={sidebarView} onViewChange={changeSidebarView}
     collapsed={collapsedGroups} onToggleGroup={toggleGroup}
     onHome={goHome} onDashboard={goDashboard} onSession={openSession} onHide={hideSidebar}
@@ -333,9 +347,14 @@ export function App({ controller }: { controller: ApplicationController }) {
             <Suspense fallback={null}>
               <DashboardPage model={dashboard} active={!inSettings} onOpenSession={openSession} />
             </Suspense></motion.div>
-          : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
-            {conversation}</motion.div>}
+          : view.kind === "plugin"
+            ? <motion.div key={view.entry.key} className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
+              <PluginMainViewContent view={view.entry} active={!inSettings} />
+            </motion.div>
+            : <motion.div key="conversation" className="h-full" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }} transition={islandTransition}>
+              {conversation}</motion.div>}
     </AnimatePresence></div>,
   };
   // The workbench persistently displays session read failures; the same entry handles backend unavailability while the workbench is visible.

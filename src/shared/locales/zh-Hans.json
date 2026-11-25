@@ -880,6 +880,7 @@
   "plugins.filter": "筛选插件",
   "plugins.availableHint": "此插件随 Asterism 提供。添加回来后，重启即可使用。",
   "plugins.noResults": "没有匹配的插件",
+  "plugins.mainViewFailed": "无法显示插件页面。",
   "plugins.pageFailed": "无法显示插件设置页面。",
   "plugins.retry": "重试",
   "plugins.removeTitle": "移除此插件？",

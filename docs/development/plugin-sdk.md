@@ -207,9 +207,11 @@ Content roots follow the actual encoded persistent JSON within the owning transa
 
 ## Renderer contributions
 
-The renderer can contribute cards, tool phases, history records, creation entries, Home session entries, and independent settings pages. Frontend preparation can establish services independently of card mounting and binds them to a cancellation scope.
+The renderer can contribute cards, tool phases, history records, creation entries, Home session entries, main views, and independent settings pages. Frontend preparation can establish services independently of card mounting and binds them to a cancellation scope.
 
 A Home session entry receives the host's folder selection and folder control. The entry renders the control where it fits its interaction and passes the selected folder to session creation; folder catalog and creation remain host behavior.
+
+A plugin main view contributes session-independent content to the host's main island. The host owns navigation and island layout; built-in destinations are composed by the host directly, not through plugin registration. Replacing a plugin main view checks descendant close guards before their owners and the main island's guard last, before removing any island.
 
 Frontend activation runs after backend publication. A stylesheet, import, or plugin preparation failure makes that frontend and its frontend dependents unavailable without deactivating accepted backend services. Module preparation failures retain the plugin's views and report partial initialization. Frontend outcomes belong to the current page and remain distinct from startup package outcomes; management presents both with stage-specific diagnostics.
 
