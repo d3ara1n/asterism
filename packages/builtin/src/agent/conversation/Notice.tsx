@@ -21,12 +21,11 @@ export function OccurrenceRow({ children, details }: { children: ReactNode; deta
 }
 
 /**
- * An incident keeps the block tone of the content it belongs to: the red state line and the faint red tone carry it, as
- * on a failed process block, and the diagnostics stay reachable beneath the message.
+ * An incident is a standalone diagnostic, not a state line on the output that preceded it.
  */
 export function IncidentBlock({ message, details }: { message: ReactNode; details?: ReactNode }) {
   return <div data-tone="failed" className="surface-block px-3 py-2 text-sm">
-    <BlockStateLine state="failed" />
+    <BlockStateLine state="incident" />
     <div className="flex min-w-0 items-start gap-2">
       <StatusIcon tone="error" className="mt-0.5 size-3.5 shrink-0" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">

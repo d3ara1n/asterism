@@ -26,7 +26,7 @@ const unavailableTools: ModelTools = {
   },
 };
 /** One completion and its entire tool batch. Buffers exist only for this call; outputs go to consumers without touching the timeline. */
-export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | "observer" | "requestParentId" | "completionExtensions">,
+export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | "observer" | "requestParentId" | "completionExtensions" | "contextPhantoms">,
   environment: Promise<ModelExecutionEnvironment>): Promise<ModelRunResult> {
   const controller = new AbortController();
   const signal = AbortSignal.any([request.signal, controller.signal]);
@@ -74,7 +74,7 @@ export async function runModelRequest(request: Pick<ModelRunRequest, "signal" | 
     const buffer = response = new ResponseBuffer({ responseId, requestParentId: request.requestParentId, source }, (block, type) => {
       if (type !== "block" && block.kind === "toolcall") emit({ type, block });
       else emit({ type: "block", block });
-    }, extensions);
+    }, extensions, request.contextPhantoms);
     const progress = () => emit({ type: "progress", blocks: buffer.live() });
     // Materialize progress once per display batch; terminal events flush before finalization.
     let progressTimer: ReturnType<typeof setTimeout> | undefined;

@@ -21,7 +21,7 @@ export const conversationMessages = pluginNamespace("asterism.builtin").messages
   compressionCancelled: { id: "conversation.compression.cancelled", defaultMessage: "Context compaction cancelled" },
   processText: { id: "conversation.process.text", defaultMessage: "Text output" },
   processToolCount: { id: "conversation.process.toolCount", defaultMessage: "{count, plural, one {# tool call} other {# tool calls}}" },
-  processFailedCount: { id: "conversation.process.failedCount", defaultMessage: "{count} failed" },
+  processFailedCount: { id: "conversation.process.failedCount", defaultMessage: "{count, plural, one {# tool error} other {# tool errors}}" },
   processPartialCount: { id: "conversation.process.partialCount", defaultMessage: "{count} partial" },
   processNoticeCount: { id: "conversation.process.noticeCount", defaultMessage: "{count, plural, one {# notice} other {# notices}}" },
   processCompressionCount: { id: "conversation.process.compressionCount", defaultMessage: "{count, plural, one {# compaction} other {# compactions}}" },

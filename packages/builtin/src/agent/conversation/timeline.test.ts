@@ -11,7 +11,7 @@ const conversationTimeline = (snapshot: SessionSnapshot, agentId: string, live: 
   withLive(savedTimeline(snapshot.records.all({ scope: "timeline" }), agentId, running), live);
 
 describe("Agent typed record views", () => {
-  it.each(["model", "software"] as const)("restores one %s error notice and marks only partial context, preserving complete text in a failed response", origin => {
+  it.each(["model", "software"] as const)("restores one %s error notice and marks the unfinished block without marking complete text", origin => {
     const completion = { usage: null, finishReason: null, rawFinishReason: null, providerResponseId: null,
       termination: { reason: "failed" as const, origin, code: "provider_error", message: "Disconnected", retryable: true } };
     const path = [
@@ -23,9 +23,8 @@ describe("Agent typed record views", () => {
     const items = savedTimeline(snapshot.records.all({ scope: "timeline" }), "a", false, [{
       id: "live-error", afterNodeId: "thinking", form: "incident", responseId: "r", origin, code: "provider_error", message: "Disconnected",
     }]).items;
-    expect(items.find(item => item.kind === "text")).not.toHaveProperty("partialContext");
-    expect(items.find(item => item.kind === "text")).not.toHaveProperty("failed");
-    expect(items.find(item => item.kind === "thinking")).toMatchObject({ partialContext: true, failed: true });
+    expect(items.find(item => item.kind === "text")).not.toHaveProperty("generationFailed");
+    expect(items.find(item => item.kind === "thinking")).toMatchObject({ generationFailed: true });
     expect(items.filter(item => item.kind === "notice")).toMatchObject([{ origin, message: "Disconnected" }]);
   });
 

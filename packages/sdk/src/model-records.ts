@@ -51,7 +51,7 @@ export const toolCallInputSchema = z.discriminatedUnion("kind", [
 export const toolInputDraftSchema = z.strictObject({ kind: z.enum(["structured", "freeform"]), text: z.string() });
 
 const block = { responseId: id, requestParentId: id.nullable(), ordinal: z.number().int().nonnegative(),
-  complete: z.boolean(), continuation: jsonSchema, source: modelSourceSchema, completion: modelCompletionSchema.nullable().optional(),
+  complete: z.boolean(), phantom: z.boolean().optional(), continuation: jsonSchema, source: modelSourceSchema, completion: modelCompletionSchema.nullable().optional(),
   /** Block generation start and end times (millisecond timestamps); blocks finalized before generation ends have a null end time, and unrecorded times are omitted. See outcome for tool execution times. */
   startedAt: z.number().nonnegative().optional(), endedAt: z.number().nonnegative().nullable().optional() };
 /** Tool call block shape without the completion invariant, for contracts that store input and outcome separately. */

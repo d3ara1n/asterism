@@ -225,14 +225,16 @@
   @apply relative rounded-lg bg-card-shell;
   transition: background-color var(--motion-fast) var(--ease-out);
 }
-/* State lines on a process block: forming blocks trace a moving dashed outline, interrupted blocks a still one, failures a red line on a faint red tone.
-   SVG draws the dash so it follows the rounded outline and can travel; reduced motion keeps the dash still. */
+/* Dashed outlines show unfinished content; motion distinguishes forming content, and red marks a generation error.
+   The fill is independent of the outline. Reduced motion keeps the dash still. */
 .block-state { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 /* Geometry is set through CSS so the outline follows the block size and the shared radius. */
+.block-state[data-outset] { inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); }
 .block-state rect { x: 0.5px; y: 0.5px; width: calc(100% - 1px); height: calc(100% - 1px); rx: calc(var(--radius) - 0.5px); fill: none; stroke-width: 1; }
-.block-state[data-state="forming"] rect, .block-state[data-state="interrupted"] rect { stroke: var(--ring); stroke-dasharray: 4 4; }
+.block-state[data-state="forming"] rect, .block-state[data-state="incomplete"] rect { stroke: var(--ring); stroke-dasharray: 4 4; }
 .block-state[data-state="forming"] rect { animation: block-state-trace 0.8s linear infinite; }
-.block-state[data-state="failed"] rect { stroke: var(--destructive); }
+.block-state[data-state="generation-error"] rect { stroke: var(--destructive); stroke-dasharray: 4 4; }
+.block-state[data-state="incident"] rect { stroke: var(--destructive); }
 @keyframes block-state-trace { to { stroke-dashoffset: -8; } }
 .surface-block[data-tone="failed"] { background-color: color-mix(in oklab, var(--destructive) 6%, var(--card-shell)); }
 @media (prefers-reduced-motion: reduce) { .block-state rect { animation: none; } }

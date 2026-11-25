@@ -12,7 +12,7 @@ import { formatElapsedTime } from "./elapsed-time";
 import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { generating, type TimelineItem } from "./timeline";
 import { viewStateKeys } from "./view-state";
-import { blockShell } from "./block-shell";
+import { blockLine } from "./block-shell";
 import { IconSwap } from "./IconSwap";
 
 type ThinkingNode = Extract<TimelineItem, { kind: "thinking" }>;
@@ -25,7 +25,7 @@ export function ThinkingBlock({ node }: { node: ThinkingNode }) {
   // Both live and formed blocks carry generation start and end times; no duration is fabricated when history has no timing.
   const startedAt = node.startedAt ?? null;
   const endedAt = node.endedAt ?? null;
-  return <Disclosure {...disclosure} {...blockShell(node)}
+  return <Disclosure {...disclosure} line={blockLine(node)}
     header={<ThinkingHeader streaming={streaming} startedAt={startedAt} endedAt={endedAt} />}>
     <ThinkingBody streaming={streaming} text={node.text} />
   </Disclosure>;

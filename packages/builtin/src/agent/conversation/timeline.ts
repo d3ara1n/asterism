@@ -3,12 +3,12 @@ import { decodeExecution, ContextSummary, AgentInputMessage, type AgentMessageSe
 import { turnMetrics, type TurnMeasurement, type TurnMetricsData } from "./turn-metrics.ts";
 import type { CompressionActivity, InlineFeedback } from "../feedback.ts";
 import type { HistoryBoundary } from "./history-window.ts";
-import { isFinalReply, participatingBlocks } from "../response-messages.ts";
+import { isFinalReply } from "../response-messages.ts";
 
 type DisplayBlock<T = ModelBlock> = T extends ModelBlock ? Omit<T, "source" | "requestParentId" | "continuation" | "completion" | "summary"> : never;
 type SavedBlock = DisplayBlock & {
-  /** partialContext: the block did not fully participate in later model input; failed: the request generating it failed before it closed. */
-  id: string; createdAt: string; partialContext?: boolean; failed?: boolean;
+  /** Generation failed before this block finished forming; a tool outcome is not a generation failure. */
+  id: string; createdAt: string; generationFailed?: true;
   /** Computed before windowing and filtering, so even a retained fragment knows whether its response is a final reply. */
   finalReply?: boolean;
 };
@@ -78,18 +78,17 @@ export function projectConversation(path: readonly RecordInfo[], agentId: string
     const blocks = responses.get(value.responseId) ?? [];
     blocks.push(value); responses.set(value.responseId, blocks);
   }
-  const presentation = new Map<string, Pick<SavedBlock, "partialContext" | "failed" | "finalReply">>();
+  const presentation = new Map<string, Pick<SavedBlock, "generationFailed" | "finalReply">>();
   const failedResponses = new Set<string>();
   const notices: Extract<TimelineItem, { kind: "notice" }>[] = [];
   for (const [responseId, blocks] of responses) {
-    const participating = new Set(participatingBlocks(blocks).map(block => block.ordinal));
     const terminal = blocks.find(block => block.completion?.termination);
     const termination = terminal?.completion?.termination;
     const finalReply = isFinalReply(blocks);
     for (const block of blocks) {
-      const partialContext = !participating.has(block.ordinal) || !block.complete;
-      const failed = !block.complete && termination?.reason === "failed";
-      presentation.set(timelineKey(block), { finalReply, ...(partialContext ? { partialContext: true } : {}), ...(failed ? { failed: true } : {}) });
+      const generationFailed = termination?.reason === "failed" && !block.complete
+        && (block.kind !== "toolcall" || block.input === null);
+      presentation.set(timelineKey(block), { finalReply, ...(generationFailed && { generationFailed: true }) });
     }
     if (termination?.reason === "failed") {
       failedResponses.add(responseId);

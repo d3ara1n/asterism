@@ -1,4 +1,4 @@
-import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ToolInvocationInfo, ToolResult, Presentation, ToolCallInput, ToolInputDraft, ModelTermination, RequestTiming, Usage } from "@asterism-app/sdk/contracts";
+import type { ModelBlock, ModelSource, ModelCompletion, ModelLiveBlock, ModelRunRequest, ToolInvocationInfo, ToolResult, Presentation, ToolCallInput, ToolInputDraft, ModelTermination, RequestTiming, Usage } from "@asterism-app/sdk/contracts";
 import { ModelFailure, type ModelEvent, type StreamPart } from "../model/contract.ts";
 import { previewArguments } from "../shared/partial-arguments.ts";
 import type { Json, ToolOutcome } from "../shared/model.ts";
@@ -30,11 +30,13 @@ export class ResponseBuffer {
   finish: Extract<ModelEvent, { type: "finish" }> | null = null;
   private finalized = false;
   private termination: ModelCompletion | null = null;
+  private phantoms?: ReadonlySet<number>;
 
   constructor(
     private readonly identity: { responseId: string; requestParentId: string | null; source: ModelSource },
     private readonly onBlock: (block: ModelBlock, type: "block" | "tool.begin" | "tool.complete") => void,
     private readonly extensions: Presentation[] = [],
+    private readonly contextPhantoms?: ModelRunRequest["contextPhantoms"],
   ) {}
 
   get empty(): boolean { return this.blocks.size === 0; }
@@ -100,6 +102,7 @@ export class ResponseBuffer {
   /** Preserve model order before any tool runs; pending inputs keep their original position when results arrive. */
   seal(completion: ModelCompletion): void {
     this.termination = completion;
+    this.selectContext();
     for (const block of this.blocks.values()) {
       if (block.part.kind === "toolcall") {
         block.published = true;
@@ -161,10 +164,18 @@ export class ResponseBuffer {
   close(completion?: ModelCompletion | null): void {
     if (this.finalized) return;
     if (completion) this.termination = completion;
+    this.selectContext();
     for (const block of this.blocks.values()) {
       if (!block.emitted && !block.published) this.emitBlock(block, block.part.kind !== "toolcall" && block.endedAt !== null);
     }
     this.finalized = true;
+  }
+
+  private selectContext(): void {
+    if (!this.contextPhantoms || this.phantoms || this.empty) return;
+    this.phantoms = new Set(this.contextPhantoms([...this.blocks.values()].map(block => ({
+      kind: block.part.kind, generated: block.endedAt !== null,
+    }))));
   }
 
   private draft(block: BufferedBlock, kind: ToolInputDraft["kind"]): ToolInputDraft | null {
@@ -175,6 +186,7 @@ export class ResponseBuffer {
     type: "block" | "tool.begin" | "tool.complete" = "block"): void {
     if (block.emitted) throw new ModelFailure("protocol", "The response block has already been emitted.");
     const common = { ...this.identity, ordinal: block.ordinal, complete, continuation: block.continuation,
+      ...(this.phantoms && { phantom: this.phantoms.has(block.ordinal) }),
       completion: block.ordinal === this.blocks.size - 1 ? this.completion : null,
       startedAt: block.startedAt, endedAt: block.endedAt };
     this.onBlock(block.part.kind === "toolcall"

@@ -13,7 +13,7 @@ import { ThinkingBlock } from "./ThinkingBlock";
 import { generating, mountedTimelineIndexes, timelineKey, type TimelineItem } from "./timeline";
 import { ToolCall } from "./ToolCall";
 import { MessageAttachments, type InputFile } from "../../shared/attachments";
-import { Disclosure } from "./Disclosure";
+import { BlockStateLine, Disclosure } from "./Disclosure";
 import { TurnFooter } from "./TurnFooter";
 import { MessageSender } from "./MessageSender";
 import { MessageFooter } from "./MessageFooter";
@@ -24,7 +24,7 @@ import { CompressionMarker } from "./CompressionMarker";
 import { CompressionSummary } from "./CompressionSummary";
 import type { useTimelinePresence } from "./timeline-presence";
 import { conversationTransition, immediateTransition } from "./motion";
-import { blockShell } from "./block-shell";
+import { blockLine } from "./block-shell";
 
 /** Item view state survives remounts when supplied by the caller; otherwise it lives with this component. */
 export function ConversationTimeline({ items, viewState }: { items: readonly TimelineItem[]; viewState?: TimelineViewState }) {
@@ -99,12 +99,15 @@ function NodeContent({ node }: { node: TimelineItem }) {
   const i18n = useI18n();
   const object = useRendererObject();
   const streaming = generating(node);
-  const shell = blockShell(node);
   switch (node.kind) {
     case "message": return <MessageNode node={node} content={object.content} />;
-    case "text": return <article className={cn("rounded-md py-1 outline-1 outline-offset-4 outline-transparent",
-      shell.dashed && "outline-dashed outline-border", shell.failed && "outline-destructive")}>
-      <Markdown streaming={streaming}>{node.text}</Markdown></article>;
+    case "text": {
+      const line = blockLine(node);
+      return <article className="relative rounded-lg py-1">
+        {line && <BlockStateLine state={line} outset />}
+        <Markdown streaming={streaming}>{node.text}</Markdown>
+      </article>;
+    }
     case "thinking": return node.text.trim() ? <ThinkingBlock node={node} /> : null;
     case "toolcall": return <ToolCall node={node} />;
     case "summary": return <Summary text={node.text} />;

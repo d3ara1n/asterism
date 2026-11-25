@@ -4,6 +4,7 @@ import { Execution, ToolExecution, AgentTurnEnded, type AgentTurnEndReason } fro
 import { runAgentLoop } from "./loop.ts";
 import { agentRequestRetries } from "./retry.ts";
 import { agentRequestExtensions } from "./request-context.ts";
+import { contextPhantoms } from "./response-messages.ts";
 import { feedbackOrigin } from "./feedback.ts";
 import type { createAgentFeedback } from "./feedback-state.ts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
@@ -217,7 +218,8 @@ export function createAgentController(deps: AgentControllerDependencies) {
               const messages = deps.projectAttachments ? await deps.projectAttachments(projected, snapshot.id, object.content, modalities, current) : projected;
               result = await deps.execution.withProgress(object.ref, progress => deps.execution.run({ access: object.ref, interactive: true, requestParentId: snapshot.position.nodeId,
                 agent: agent.id, resources: { allow: agent.resources ?? undefined, exclude: agent.excludeResources ?? undefined },
-                userAgent: deps.userAgent, purpose: "conversation", completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
+                userAgent: deps.userAgent, purpose: "conversation", contextPhantoms,
+                completionExtensions: context => agentRequestExtensions(prepared.blocks, context),
                 usage: () => {
                   if (index === 0) turn = readRecords(turnStartRead(object.ref.id), snapshot.records.all)?.id ?? null;
                   return [agentTurnUsage(agent.id, object.ref.id, turn), ...skillCatalogUsage(prepared.catalogBlock)];

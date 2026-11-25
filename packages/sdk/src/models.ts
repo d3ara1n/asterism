@@ -67,6 +67,8 @@ export type ModelCompletion = {
 /** Response blocks, including published tool inputs; consumers own timeline identity and one-time outcome persistence. */
 export type ModelBlock = {
   responseId: string; requestParentId: string | null; ordinal: number; complete: boolean; continuation: Json; source: ModelSource;
+  /** Permanently excluded from model context by the request owner, independent of block or tool completion. */
+  phantom?: boolean;
   /** Terminal state is delivered once with the actual response block having the highest ordinal; null for all other blocks. */
   completion?: ModelCompletion | null;
   /** Block generation start and end times (millisecond timestamps); blocks finalized before generation ends have a null end time, and unrecorded times are omitted. See outcome for tool execution times. */
@@ -86,6 +88,8 @@ export type ModelLiveBlock = { id: string; responseId: string; ordinal: number }
       /** One-shot attention time, present only in live execution; history does not replay notices. */
       noticeAt?: number }
 );
+/** Model generation facts, in ordinal order, before any tool outcomes are available. */
+export type ModelGeneratedBlock = { kind: ModelBlock["kind"]; generated: boolean };
 /** Diagnostic message is a failure/warning summary; raw exception text and payloads belong in details. */
 export type ModelRunEvent =
   | { type: "block"; block: ModelBlock }
@@ -138,6 +142,8 @@ export interface ModelRunRequest extends ModelRequestIdentity {
   tools?: ModelTools;
   /** Synchronously package domain data after final request preparation; delivered with the actual response's completion. */
   completionExtensions?: (context: ModelRequestContext) => readonly Presentation[];
+  /** Pure selection of permanently excluded ordinals at generation close, before publishing any blocks. */
+  contextPhantoms?: (blocks: readonly ModelGeneratedBlock[]) => ReadonlySet<number>;
   signal: AbortSignal;
   observer: ModelRunObserver;
 }

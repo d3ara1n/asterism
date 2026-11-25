@@ -84,15 +84,18 @@ Lines in use fall into three roles. The tables record current uses rather than a
 | Edge | Floating edge | Menus, popovers, and dialogs over arbitrary content |
 | Edge | Light sheet edge in the dark scheme | Raised sheets where a shadow does not read |
 | State | Ring or border in the ring tone | Keyboard focus, or the focused island, dock, or tray |
-| State | Moving dashed outline | Content still forming: a tool call receiving input or waiting to run |
-| State | Still dashed outline | Content that ended incomplete or did not enter later model context |
-| State | Red line on a faint red tone | The request that produced the content failed |
+| State | Moving dashed outline | Content still forming, or a tool call ready to run |
+| State | Still dashed outline | Content that ended incomplete, regardless of its use in model context |
+| State | Red dashed outline | A generation error left this block unfinished |
+| State | Red line on a faint red tone | A standalone incident with its own diagnostic |
 | State | Dashed target with an accent tint | Where a drop will land |
 | Structure | Hairline between rows | Rows inside one group, list, or table |
 
 Persistent selection uses the `selected` fill rather than an outline.
 
 Process blocks draw their state line along their rounded outline. Reduced motion keeps the moving dash still. A one-time warning ripple marks a newly raised notice and then disappears.
+
+A rejected or failed tool call uses a faint red fill, not a red outline. Its outcome uses the same quiet trailing text as other tool metadata, without a badge. Expanded diagnostics remain readable without adding a second colored panel.
 
 ## Motion
 
@@ -141,7 +144,9 @@ When a choice determines which fields a new provider connection needs, the creat
 
 ### Process blocks and tool views
 
-Thinking, tool calls, and summaries are process blocks: groups in the reading flow whose outline shows their state. A tool header is one line: the operation name, then optional subject, summary, and trailing metadata. The subject is a low-emphasis badge naming the operation's focus, the summary is muted text that yields space first, and metadata stays visible. Resource creation and creation-entry inspection use the resource type as the subject, with an instance title in the summary when one exists; operations on an existing resource use its recorded name and kind icon, with paths, queries, or other details in the summary. Separate slots replace punctuation that would only join an object and its details, and the block itself presents exceptional outcomes. Unbounded inputs such as questions and commands appear as a single-line excerpt, with the full text in the body. Input, execution, and result reuse one block, so the reader's place survives each phase; content still being composed shows a bounded tail preview, and stable inputs and controls stay outside any live-output region.
+Tone groups thinking, tool calls, and summaries without a default border. Text, thinking, and tool calls share the outline rules in [Lines](#lines): the outline reports completion and generation error, not whether the block will be reused in model context. Completed thinking that stays in history only has no outline. A tool's outcome determines its fill and trailing result text independently of its outline. Focus, disclosure, and a folded group's counts describe interaction or reading structure; they do not change any block's execution appearance. Keep these mappings separate rather than inventing combined states.
+
+A tool header is one line: the operation name, then optional subject, summary, and trailing metadata. The subject is a low-emphasis badge naming the operation's focus, the summary is muted text that yields space first, and metadata stays visible. Resource creation and creation-entry inspection use the resource type as the subject, with an instance title in the summary when one exists; operations on an existing resource use its recorded name and kind icon, with paths, queries, or other details in the summary. Separate slots replace punctuation that would only join an object and its details. Unbounded inputs such as questions and commands appear as a single-line excerpt, with the full text in the body. Input, execution, and result reuse one block, so the reader's place survives each phase; content still being composed shows a bounded tail preview, and stable inputs and controls stay outside any live-output region.
 
 Shared controls give code, diffs, Markdown, math, diagrams, and reference chips a consistent presentation. The containing view owns the height budget; a tool body that exceeds it scrolls inside that height. The default tool scroll region supplies a budget when the view does not need its own. A text, diff, or file control may show non-contiguous excerpts of one text: each excerpt keeps its absolute line numbers and a trimmed separator marks the gap, so distant parts of a single result stay reachable in one region rather than becoming separate regions or disappearing behind a count. Outcome feedback sits above the body, outside its scrolling content. It names the outcome and its code when present, with the operation's own explanation unedited and bounded. The body shows valid data regardless of outcome, or the submitted intent when the operation has no result to show.
 

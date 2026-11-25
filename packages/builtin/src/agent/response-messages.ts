@@ -1,11 +1,18 @@
-import type { ModelBlock, ModelItem, ModelPart, ToolCallInput, ToolOutcome } from "@asterism-app/sdk/contracts";
+import type { ModelBlock, ModelGeneratedBlock, ModelItem, ModelPart, ToolOutcome } from "@asterism-app/sdk/contracts";
 
-type ParticipatingBlock = Exclude<ModelBlock, { kind: "toolcall" }>
-  | (Extract<ModelBlock, { kind: "toolcall" }> & { input: ToolCallInput; draft: null });
+/** Keep generated content through the last reusable body block. A complete tool input counts before it has an outcome. */
+export function contextPhantoms(blocks: readonly ModelGeneratedBlock[]): ReadonlySet<number> {
+  const end = blocks.findLastIndex(block => block.generated && block.kind !== "thinking");
+  return new Set(blocks.flatMap((block, index) => !block.generated || index > end ? [index] : []));
+}
 
-/** Complete input can be paired with an unavailable result; drafts do not enter model history. */
-export function hasModelContent(block: ModelBlock): block is ParticipatingBlock {
+function legacyGenerated(block: ModelBlock): boolean {
   return block.kind === "toolcall" ? block.input !== null && block.draft === null : block.complete;
+}
+
+/** A complete response's recorded selection is authoritative. Old records did not store a selection. */
+export function hasModelContent(block: ModelBlock): boolean {
+  return !(block.phantom ?? !legacyGenerated(block));
 }
 
 /** A final reply has visible text, every block of a normally stopped response, and no tool calls. */
@@ -18,9 +25,10 @@ export function isFinalReply(blocks: readonly ModelBlock[]): boolean {
     && blocks.some(block => block.kind === "text" && block.text.trim() !== "");
 }
 
-/** Shared by model input and history shells. Each response precedes its following user/context boundary. */
-export function participatingBlocks(blocks: readonly ModelBlock[]): ParticipatingBlock[] {
+function participatingBlocks(blocks: readonly ModelBlock[]): ModelBlock[] {
   const ordered = blocks.filter(hasModelContent).sort((a, b) => a.ordinal - b.ordinal);
+  // Old records and a rewind into a response may expose thinking without the body that followed it.
+  // This guard can only remove a block from the selected path; it never re-admits a recorded phantom.
   while (ordered.at(-1)?.kind === "thinking") ordered.pop();
   return ordered;
 }
@@ -40,7 +48,10 @@ export function responseMessages(blocks: readonly ModelBlock[], submitted: Reado
   if (!first) return [];
   const parts: ModelPart[] = ordered.map(block => {
     const { continuation } = block;
-    if (block.kind === "toolcall") return { kind: "toolcall", callId: block.callId, name: block.name, input: block.input, continuation };
+    if (block.kind === "toolcall") {
+      if (!block.input) throw new Error("A reusable tool call must have a complete input.");
+      return { kind: "toolcall", callId: block.callId, name: block.name, input: block.input, continuation };
+    }
     return block.kind === "thinking" ? { kind: "thinking", text: block.text, summary: block.summary, continuation }
       : { kind: "text", text: block.text, continuation };
   });

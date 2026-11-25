@@ -7,7 +7,7 @@ import { JsonView } from "@asterism-app/ui/json-view";
 import { DefaultToolHeader, DefaultToolBody, ToolDetailsSwitcher, useToolResourceSubject } from "@asterism-app/ui/tool-content";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
-import { toolOutcomeLabels, toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
+import { isToolError, toolOutcomeLabels, toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
 import { ToolOutcomeNotice } from "@asterism-app/ui/tool-failure";
 import { toolsMessages } from "../../messages/tools";
 import { Disclosure } from "./Disclosure";
@@ -15,7 +15,7 @@ import { toolCallState, type ToolCallNode } from "./tool-state";
 import { BuiltinSettings } from "../../settings/contract";
 import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { viewStateKeys } from "./view-state";
-import { blockShell } from "./block-shell";
+import { blockLine } from "./block-shell";
 import { IconSwap } from "./IconSwap";
 import { characterCount, toolTextTail } from "../../shared/tool-preview";
 
@@ -37,7 +37,7 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
     (view.streaming === true && view.body != null) || fallbackPreview, preferences, view.attention === true && view.body != null);
   const result = state.props.result;
   const settled = result && result.kind !== "running" ? result.kind : null;
-  // Request-level failure belongs to the outer shell and notice; the badge reports how local execution ended.
+  const toolError = settled !== null && isToolError(settled);
   const status = settled && settled !== "succeeded" ? i18n.text(toolOutcomeLabels[settled]) : null;
   const icon = state.phase === "input"
     ? <motion.span className="inline-flex" animate={reducedMotion ? undefined : { opacity: [0.45, 1, 0.45] }} transition={{ duration: 1.4, repeat: Infinity }}><TextCursorInput className="size-3.5" /></motion.span>
@@ -52,11 +52,12 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
       : !filling || view.header !== undefined || view.body !== undefined || view.label !== undefined ? view.header ?? <DefaultToolHeader props={view.props} label={view.label} />
         : <ToolHeader label={state.phase === "incomplete" ? tools.label(node.name, node.invocation?.implementation?.id ?? null) ?? node.name : tools.preparation(node.name)} />}
     </span>
-    {status && settled && <StatusBadge tone={toolOutcomeTone(settled)}>{status}</StatusBadge>}
+    {status && settled && (toolError ? <span className="shrink-0 type-caption">{status}</span>
+      : <StatusBadge tone={toolOutcomeTone(settled)}>{status}</StatusBadge>)}
     {state.phase === "settled" && settled === "succeeded" && <span className="sr-only">{i18n.text(toolOutcomeLabels.succeeded)}</span>}
   </>;
-  return <Disclosure header={header} {...disclosure} {...blockShell(node)} expandable={!filling || hasInputBody}
-    pending={state.phase === "input" || state.phase === "ready"} noticeAt={"noticeAt" in node ? node.noticeAt : undefined}>
+  return <Disclosure header={header} {...disclosure} line={blockLine(node)} tone={toolError ? "failed" : undefined}
+    expandable={!filling || hasInputBody} noticeAt={"noticeAt" in node ? node.noticeAt : undefined}>
     <div className="space-y-3 [--code-font-size:var(--text-xs)]">
       <ToolOutcomeNotice result={result} />
       {view.body ?? (fallbackPreview ? <StreamingScrollArea label={i18n.formatMessage(toolsMessages.toolCallDetails)}>

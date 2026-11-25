@@ -62,11 +62,13 @@ The host reconstructs resource presence, titles, and links by replaying workbenc
 
 Presence notifications compare resource identity sets after commit. They do not replay external operations or append new creation/removal events.
 
-Views read current layout and current domain data separately. Agent UI displays recorded output in historical order. Agent model projection can group responses, filter incomplete output, and substitute summaries.
+Views read current layout and current domain data separately. Agent UI displays recorded output in historical order. Agent model projection can group responses, exclude blocks, and substitute summaries.
 
 Each Agent response records the path endpoint captured when its request began. That request parent differs from the actual append parent. Model projection groups response blocks and tool outcomes at the captured request position, then places intervening visible events after the complete response. Their relative order remains intact.
 
-Context projection may reorganize model input without changing recorded history. Trailing thinking exposed by interruption or rewind is removed at assistant boundaries, including before subsequent user input. Conversation shells share these participation rules: dashed outlines identify content that does not fully participate, and error color identifies content left unfinished by a failed request. A tool's own execution failure is an outcome reported by the tool view, not a request failure. The original content and plugin renderers remain available for inspection.
+The Agent decides which blocks can enter model context when generation closes, before publishing the records. A failed attempt may preserve usable content through its last generated body block, including complete tool input even if no outcome is recorded. Unfinished generation and trailing thinking that has no usable body in its own response are recorded as `phantom`. These blocks remain readable in history but never reenter context, even after a retry supplies new output. This decision is independent of block completion and tool results.
+
+Projection consumes the recorded decision. Older records without it use their own response's generation facts. A rewind into a response may hide the body that originally followed some thinking; the selected path must not end that response on thinking alone. Neither case lets a later response qualify any previously excluded thinking.
 
 ## Coordinate cursor changes
 

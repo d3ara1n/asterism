@@ -7,7 +7,7 @@ import type { AgentConfiguration, ModelRole } from "@asterism-app/builtin-api/co
 import { resolveRoleTarget } from "../configuration/runtime.ts";
 import type { createRequestAssembly } from "../agent/preparation.ts";
 import { runAgentLoop, type AgentLoopStatus } from "../agent/loop.ts";
-import { responseMessages } from "../agent/response-messages.ts";
+import { contextPhantoms, responseMessages } from "../agent/response-messages.ts";
 import { agentRequestRetries } from "../agent/retry.ts";
 import { ended, type DelegationInput, type FinishedStatus, type TaskCompletion, type TaskSnapshot, type ProcessBlock } from "./contract.ts";
 import type { AuditLog } from "./audit.ts";
@@ -176,7 +176,7 @@ export async function executeSubagent(run: ActiveRun, signal: AbortSignal, deps:
           const response = await deps.execution.run({
             access: deps.access, interactive: false, target, signal: current, requestParentId: parent,
             agent: currentAgent.id, resources: { allow: currentAgent.resources ?? undefined, exclude: currentAgent.excludeResources ?? undefined },
-            userAgent: deps.userAgent, purpose: "subagent", messages, observer: { event },
+            userAgent: deps.userAgent, purpose: "subagent", messages, contextPhantoms, observer: { event },
             tools: { exclude: ["resource_create", "creation_list", "creation_inspect"] },
             usage: () => [agentTurnUsage(currentAgent.id, deps.access.id, snapshot.input.runId), ...skillCatalogUsage(catalogBlock)],
             system: files => {

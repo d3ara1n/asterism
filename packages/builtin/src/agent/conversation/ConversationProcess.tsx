@@ -7,7 +7,7 @@ import type { TimelineItem } from "./timeline";
 import { ConversationSeam } from "./ConversationSeam";
 import { IconSwap } from "./IconSwap";
 import type { ToolCallNode } from "./tool-state";
-import { toolOutcomeTone } from "@asterism-app/ui/tool-outcome";
+import { isToolError } from "@asterism-app/ui/tool-outcome";
 
 /** Distinct tools shown before the remainder collapses into a count. */
 const visibleTools = 5;
@@ -39,9 +39,9 @@ export function ConversationProcess({ node, onToggle, onMount }: {
   const i18n = useI18n();
   const tools = useRendererTools();
   const groups = toolGroups(node.tools);
-  const tones = node.tools.flatMap(call => { const kind = resultKind(call); return kind && kind !== "running" ? [toolOutcomeTone(kind)] : []; });
-  const failed = tones.filter(tone => tone === "error").length;
-  const partial = tones.filter(tone => tone === "warning").length;
+  const results = node.tools.map(resultKind);
+  const failed = results.filter(kind => kind !== null && kind !== "running" && isToolError(kind)).length;
+  const partial = results.filter(kind => kind === "partial").length;
   return <ConversationSeam open={node.open} aria-expanded={node.open} onClick={onToggle} className="h-6"
     ref={button => { if (button) onMount(node.id, button); }}>
     <IconSwap swapKey={node.open ? "open" : "folded"}>{node.open ? <ChevronsDownUp className="size-3.5" /> : <ChevronsUpDown className="size-3.5" />}</IconSwap>
@@ -63,7 +63,7 @@ export function ConversationProcess({ node, onToggle, onMount }: {
         {groups.length > visibleTools && <span className="shrink-0 tabular-nums">+{groups.length - visibleTools}</span>}
       </span>
     </>}
-    {failed > 0 && <span className="shrink-0 text-destructive">· {i18n.formatMessage(conversationMessages.processFailedCount, { count: failed })}</span>}
+    {failed > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processFailedCount, { count: failed })}</span>}
     {partial > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processPartialCount, { count: partial })}</span>}
     {node.notices > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processNoticeCount, { count: node.notices })}</span>}
     {node.compressions > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processCompressionCount, { count: node.compressions })}</span>}
