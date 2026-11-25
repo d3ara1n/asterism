@@ -24,7 +24,7 @@ export function OccurrenceRow({ children, details }: { children: ReactNode; deta
  * An incident is a standalone diagnostic, not a state line on the output that preceded it.
  */
 export function IncidentBlock({ message, details }: { message: ReactNode; details?: ReactNode }) {
-  return <div data-tone="failed" className="surface-block px-3 py-2 text-sm">
+  return <div data-tone="incident" className="surface-block px-3 py-2 text-sm">
     <BlockStateLine state="incident" />
     <div className="flex min-w-0 items-start gap-2">
       <StatusIcon tone="error" className="mt-0.5 size-3.5 shrink-0" />

@@ -35,6 +35,7 @@
   --accent-foreground: #202020;
   --destructive: #ce2c31;
   --destructive-foreground: #ffffff;
+  --destructive-surface: #feebec;
   --success: #218358;
   --success-foreground: #ffffff;
   --warning: #ab6400;
@@ -85,6 +86,7 @@
     --destructive: #ff9592; --border: #3a3a3a; --input: #484848; --ring: #606060;
     --success: #3dd68c; --warning: #ffca16;
     --destructive-foreground: #111111; --success-foreground: #111111; --warning-foreground: #111111;
+    --destructive-surface: #3b1219;
     --canvas: #111111; --canvas-grid: #3a3a3a; --selection: #3a3a3a;
     --folder-red: #ec5d5e; --folder-orange: #ff801f; --folder-amber: #ffca16; --folder-green: #3dd68c;
     --folder-teal: #0bd8b6; --folder-blue: #3b9eff; --folder-violet: #9e8cfc; --folder-pink: #e66fb6;
@@ -130,6 +132,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-surface: var(--destructive-surface);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
@@ -236,7 +239,9 @@
 .block-state[data-state="generation-error"] rect { stroke: var(--destructive); stroke-dasharray: 4 4; }
 .block-state[data-state="incident"] rect { stroke: var(--destructive); }
 @keyframes block-state-trace { to { stroke-dashoffset: -8; } }
-.surface-block[data-tone="failed"] { background-color: color-mix(in oklab, var(--destructive) 12%, var(--card-shell)); }
+.surface-block[data-tone="failed"] { background-color: var(--destructive-surface); }
+/* An incident already carries a red line, so its fill stays between the status background and the block tone. */
+.surface-block[data-tone="incident"] { background-color: color-mix(in oklab, var(--destructive-surface) 50%, var(--card-shell)); }
 @media (prefers-reduced-motion: reduce) { .block-state rect { animation: none; } }
 /* Provider marks: brand marks sit on a raised sheet plate (the sheet shadow supplies the dark scheme's light edge); the initial
    fallback and non-service glyphs sit on the recessed muted plate. The status dot cuts out of the group tone rows sit on. */

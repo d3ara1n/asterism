@@ -154,6 +154,8 @@ export function themeTokens(appearance: Appearance, scheme: Scheme): Record<stri
     accent: g(4), "accent-foreground": fg,
     // Status colors consistently use step 11 with independent foregrounds for solid surfaces.
     destructive: red(11), "destructive-foreground": solidForeground(red(11)),
+    // Status backgrounds use the scale's background step rather than a mix of the text color.
+    "destructive-surface": red(3),
     success: green(11), "success-foreground": solidForeground(green(11)),
     warning: amber(11), "warning-foreground": solidForeground(amber(11)),
     border: dark ? g(6) : g(5), input: dark ? g(7) : g(6), ring: a(8),
