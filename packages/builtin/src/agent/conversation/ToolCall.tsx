@@ -17,7 +17,7 @@ import { useStreamingDisclosure } from "../../shared/use-streaming-disclosure";
 import { viewStateKeys } from "./view-state";
 import { blockLine } from "./block-shell";
 import { IconSwap } from "./IconSwap";
-import { characterCount, toolTextTail } from "../../shared/tool-preview";
+import { toolTextTail } from "../../shared/tool-preview";
 
 /** The shell manages only lifecycle and expansion; the two content entry points fall back independently, and updates or persistence do not reset expansion. */
 export function ToolCall({ node }: { node: ToolCallNode }) {
@@ -70,26 +70,18 @@ export function ToolCall({ node }: { node: ToolCallNode }) {
 function ToolCallDetails({ node }: { node: ToolCallNode }) {
   const i18n = useI18n();
   const outcome = "outcome" in node ? node.outcome : null;
-  const { call, result, model, counts } = useMemo(() => {
+  const { call, result, model } = useMemo(() => {
     const call = node.draft?.text ?? (node.input?.kind === "freeform" ? node.input.text
       : JSON.stringify({ tool: node.name, arguments: node.input?.value ?? null }, null, 2));
     // Raw result details stay reachable for every ending, including the error an unsuccessful outcome records.
     const result = outcome && outcome.model.every(part => part.kind === "text")
       ? JSON.stringify(outcome.kind === "succeeded" || outcome.kind === "partial" ? outcome.data : outcome, null, 2) : null;
     const model = outcome?.model.map(part => part.kind === "text" ? part.text : JSON.stringify(part, null, 2)) ?? [];
-    return { call, result, model, counts: {
-      call: characterCount(call),
-      result: result === null ? 0 : characterCount(result),
-      model: model.reduce((sum, text) => sum + characterCount(text), 0),
-    } };
+    return { call, result, model };
   }, [node.name, node.input, node.draft, outcome]);
   return <ToolDetailsSwitcher stateKey={viewStateKeys.toolDetails} items={[
-    { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails), characterCount: counts.call,
-      render: () => <JsonView scrollable={false} value={call} /> },
-    ...(result !== null ? [{ value: "result", label: i18n.formatMessage(toolsMessages.toolResultDetails), characterCount: counts.result,
-      render: () => <JsonView scrollable={false} value={result} /> }] : []),
-    ...(model.length > 0 ? [{ value: "model", label: i18n.formatMessage(toolsMessages.toolModelDetails), characterCount: counts.model,
-      render: () => <div className="flex flex-col gap-2">{model.map((text, index) =>
-        <JsonView key={index} scrollable={false} value={text} />)}</div> }] : []),
+    { value: "call", label: i18n.formatMessage(toolsMessages.toolCallDetails), text: call },
+    ...(result !== null ? [{ value: "result", label: i18n.formatMessage(toolsMessages.toolResultDetails), text: result }] : []),
+    ...(model.length > 0 ? [{ value: "model", label: i18n.formatMessage(toolsMessages.toolModelDetails), text: model }] : []),
   ]} />;
 }

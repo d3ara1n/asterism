@@ -1,11 +1,11 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { z } from "zod";
 import { CircleCheck, Ellipsis, Waypoints, Wrench } from "lucide-react";
 import { toolRenderer, useRendererTools, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { Json } from "@asterism-app/sdk/contracts";
 import { CodeText } from "@asterism-app/ui/code-view";
-import { JsonView } from "@asterism-app/ui/json-view";
+import { JsonView, jsonViewText } from "@asterism-app/ui/json-view";
 import { StreamingPreview } from "@asterism-app/ui/streaming-preview";
 import { ToolDetailsSwitcher, ToolScrollArea } from "@asterism-app/ui/tool-content";
 import { IconSummary } from "@asterism-app/ui/icon-summary";
@@ -118,7 +118,7 @@ function ResultScriptCode({ code }: { code: string }) {
 }
 
 /** Each entry is one log() emission; numbering keeps multiline values and repeated shapes distinct. */
-function ScriptLogs({ logs }: { logs: readonly Json[] }) {
+function ScriptLogs({ logs }: { logs: readonly string[] }) {
   return <ol className="flex min-w-0 flex-col gap-3">
     {logs.map((entry, index) => <li key={index} className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
       <span aria-hidden="true" className="font-mono text-xs leading-relaxed tabular-nums text-muted-foreground">#{index + 1}</span>
@@ -130,19 +130,19 @@ function ScriptLogs({ logs }: { logs: readonly Json[] }) {
 function Body(props: Props) {
   const i18n = useI18n();
   const code = scriptCode(props.args);
+  const logs = props.result?.data?.logs;
+  const logText = useMemo(() => logs?.map(entry => jsonViewText(entry)) ?? [], [logs]);
   if (props.phase === "input") return code ? <StreamingPreview><CodeText contents={code} language={language} lineNumbers overflow="wrap" /></StreamingPreview> : null;
-  const logs = props.result?.data?.logs ?? [];
   const value = props.phase === "settled" ? props.result.data?.value : undefined;
   return <div className="flex flex-col gap-3">
     <CallList calls={scriptCalls(props)} settled={props.phase === "settled"} />
-    {(code || logs.length > 0 || value !== undefined) && <ToolDetailsSwitcher stateKey="asterism/resource-script-details" items={[
-      ...(code ? [{ value: "code", label: i18n.text(messages.toolScriptCode),
+    {(code || logText.length > 0 || value !== undefined) && <ToolDetailsSwitcher stateKey="asterism/resource-script-details" items={[
+      ...(code ? [{ value: "code", label: i18n.text(messages.toolScriptCode), text: code,
         render: () => props.phase === "settled" ? <ResultScriptCode code={code} />
           : <CodeText contents={code} language={language} lineNumbers overflow="wrap" /> }] : []),
-      ...(logs.length > 0 ? [{ value: "logs", label: i18n.text(messages.toolScriptLogs),
-        render: () => <ScriptLogs logs={logs} /> }] : []),
-      ...(value !== undefined ? [{ value: "result", label: i18n.text(messages.toolScriptValue),
-        render: () => <JsonView value={value} scrollable={false} /> }] : []),
+      ...(logText.length > 0 ? [{ value: "logs", label: i18n.text(messages.toolScriptLogs), text: logText,
+        render: () => <ScriptLogs logs={logText} /> }] : []),
+      ...(value !== undefined ? [{ value: "result", label: i18n.text(messages.toolScriptValue), text: jsonViewText(value) }] : []),
     ]} />}
   </div>;
 }

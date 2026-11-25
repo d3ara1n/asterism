@@ -1,12 +1,12 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { textMessages } from "./messages/text";
-import { formatCount } from "@asterism-app/ui/format-count";
+import { characterCount, formatCount } from "@asterism-app/ui/format-count";
 import { toolsMessages } from "@asterism-app/ui/messages/tools";
 import { Diff, useI18n, type ToolRenderProps, type ToolRendererDefinition } from "@asterism-app/sdk/renderer";
 import type { Json, ToolResult } from "@asterism-app/sdk/contracts";
 import { useMemo } from "react";
 import type { TextRead, TextChange, TextReplace } from "@asterism-app/builtin-api/contracts";
-import { inputField, inputText, characterCount, toolTextTail, editPreviewText, editIntents } from "./shared/tool-preview";
+import { inputField, inputText, toolTextTail, editPreviewText, editIntents } from "./shared/tool-preview";
 import { TOOL_BODY_LINE_LIMIT, diffBodyPreview, textBodyPreview } from "./shared/tool-body";
 import { displayLine, displayText } from "./shared/text-row";
 import { CodeRows, CodeText } from "@asterism-app/ui/code-view";

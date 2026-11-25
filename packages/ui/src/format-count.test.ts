@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatCount } from "./format-count";
+import { characterCount, formatCount } from "./format-count";
+
+it("counts code points across detail blocks without adding characters for their visual separation", () => {
+  expect(characterCount("中😀a")).toBe(3);
+  expect(characterCount(["中😀a", "", "\nb"])).toBe(5);
+});
 
 // Read-only token/character counts use decimal k/M/G/T, with symbols independent of the UI language.
 describe("Engineering abbreviations for read-only counts", () => {

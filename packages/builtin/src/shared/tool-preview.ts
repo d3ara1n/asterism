@@ -8,11 +8,6 @@ export function inputText(value: Json, key: string): string | undefined {
   const field = inputField(value, key);
   return typeof field === "string" ? field : undefined;
 }
-export function characterCount(text: string): number {
-  let count = 0;
-  for (const _character of text) count++;
-  return count;
-}
 /** Combines a search scope with a quoted pattern inside the summary; the resource subject is rendered separately. */
 export function searchHeaderSummary(scope: string | undefined, pattern: string | undefined): string {
   return [scope, pattern !== undefined && `"${pattern}"`].filter(Boolean).join(" ");

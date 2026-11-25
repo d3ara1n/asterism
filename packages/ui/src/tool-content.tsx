@@ -1,10 +1,10 @@
 import { type AnyToolRenderProps, useI18n, useRendererResources, useRendererViewState } from "@asterism-app/sdk/renderer";
-import { useId, type ReactNode } from "react";
+import { useId, useMemo, type ReactNode } from "react";
 
 import { TooltipHint } from "./tooltip-hint";
 import { toolsMessages } from "./messages/tools";
 import { JsonView } from "./json-view";
-import { formatCount } from "./format-count";
+import { characterCount, formatCount } from "./format-count";
 import { ToolHeader } from "./tool-header";
 import { ToolScrollArea } from "./tool-scroll-area";
 import { Button } from "./ui/button";
@@ -21,9 +21,14 @@ export function ToolDetails({ label, stateKey = null, children }: { label: strin
     <CollapsibleContent className="space-y-2 pt-2">{children}</CollapsibleContent>
   </Collapsible>;
 }
-/** The selected panel owns scrolling; its blocks render without independent vertical scroll areas. */
+function ToolDetailsCount({ text }: { text: string | readonly string[] }) {
+  const count = useMemo(() => characterCount(text), [text]);
+  return <span className="text-muted-foreground tabular-nums">{formatCount(count)}</span>;
+}
+
+/** The selected panel owns scrolling. Text supplies its count and the default view; a custom render may add presentation. */
 export function ToolDetailsSwitcher({ items, stateKey = null }: {
-  items: readonly { value: string; label: string; characterCount?: number; render(): ReactNode }[]; stateKey?: string | null;
+  items: readonly { value: string; label: string; text: string | readonly string[]; render?(): ReactNode }[]; stateKey?: string | null;
 }) {
   const [value, setValue] = useRendererViewState(stateKey, "");
   const panelId = useId();
@@ -33,11 +38,12 @@ export function ToolDetailsSwitcher({ items, stateKey = null }: {
       aria-label={items.map(item => item.label).join(", ")}>
       {items.map(item => <ToggleGroupItem key={item.value} value={item.value} id={`${panelId}-${item.value}`}
         aria-controls={panelId} aria-expanded={selected === item}>{item.label}
-        {item.characterCount !== undefined && <span className="text-muted-foreground tabular-nums">{formatCount(item.characterCount)}</span>}
+        <ToolDetailsCount text={item.text} />
       </ToggleGroupItem>)}
     </ToggleGroup>
     {selected && <ToolScrollArea key={selected.value} className="max-h-80" viewportProps={{ id: panelId, role: "region", "aria-labelledby": `${panelId}-${selected.value}` }}>
-      {selected.render()}
+      {selected.render ? selected.render() : typeof selected.text === "string" ? <JsonView value={selected.text} scrollable={false} />
+        : <div className="flex flex-col gap-2">{selected.text.map((text, index) => <JsonView key={index} value={text} scrollable={false} />)}</div>}
     </ToolScrollArea>}
   </div>;
 }
