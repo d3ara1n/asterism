@@ -2,7 +2,7 @@
 import { createElement } from "react";
 import { z } from "zod";
 import { defineData, type Json } from "@asterism-app/sdk/contracts";
-import { HeaderExcerpt, StreamingScrollArea, toolRenderer, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { HeaderExcerpt, StreamingScrollArea, ToolHeader, ToolResourceSubject, toolRenderer, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 
 const Result = defineData("example.writer/write", z.object({ written: z.number() }));
 const targetSchema = z.object({ path: z.string() });
@@ -38,10 +38,14 @@ export const writerView = toolRenderer({ ...Result, targetSchema, tool: { argsSc
 const Report = defineData("example.writer/report", z.object({ text: z.string() }));
 const reportArgs = z.object({ question: z.string() });
 type ReportProps = ToolRenderProps<z.infer<typeof Report.schema>, Json, z.infer<typeof reportArgs>>;
-function ReportHeader({ args }: ReportProps) {
+function ReportHeader({ args, invocation }: ReportProps) {
   const question = args !== null && typeof args === "object" && !Array.isArray(args) && typeof args.question === "string" ? args.question : "";
-  // The excerpt belongs in a shrinkable title slot, not in a tooltip containing the complete question.
-  return createElement(HeaderExcerpt, { text: question });
+  // The excerpt belongs in the shrinkable summary slot, not in a tooltip containing the complete question.
+  return createElement(ToolHeader, {
+    label: "Report",
+    subject: invocation.resource && createElement(ToolResourceSubject, { resource: invocation.resource }),
+    summary: createElement(HeaderExcerpt, { text: question }),
+  });
 }
 function ReportBody(props: ReportProps) {
   if (props.phase === "input") return null;

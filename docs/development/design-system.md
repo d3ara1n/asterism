@@ -195,7 +195,7 @@ The Asterism identity is a triangular constellation of three rounded six-point s
 
 ## Ownership and extension
 
-The theme owns color values, palettes, radius, density, and fonts. The host stylesheet owns the layer utilities, shadow and radius tokens, process-block state lines, and motion tokens. `packages/ui/` owns shared control semantics and appearance, and plugins receive those controls from the host so every plugin shares one copy. The window, its native material, and titlebar behavior belong to the main process and window components; island layout belongs to the weave.
+The theme owns color values, palettes, radius, density, and fonts. The host stylesheet owns the layer utilities, shadow and radius tokens, process-block state lines, and motion tokens. `packages/ui/` owns shared control semantics and appearance, and plugins receive those controls from the host so every plugin shares one copy. The SDK renderer is the public surface for them: it declares each control's props, and the host binds its `packages/ui/` implementation through `RendererUiProvider`. The window, its native material, and titlebar behavior belong to the main process and window components; island layout belongs to the weave.
 
 Feature code composes these parts instead of creating parallel button, select, border, shadow, or motion styles. Put recurring Asterism-specific appearance in shared theme tokens or styles, and recurring behavior in shared controls composed from upstream primitives. As registry components are revisited, move local design out of them into those shared layers so the upstream source can remain unchanged. Where composition cannot preserve the intended behavior through supported interfaces, let a project-owned control own that behavior explicitly.
 

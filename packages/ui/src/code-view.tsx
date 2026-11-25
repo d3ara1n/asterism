@@ -107,11 +107,13 @@ export function parseFileDiff(patch: string): FileDiffMetadata | null {
 }
 
 /** Unified diff of one file. A patch string that does not parse as a single file diff renders as plain diff text. */
-export function CodeDiff({ diff, overflow = diffViewOptions.overflow, lineDiffType = diffViewOptions.lineDiffType }: {
+export function CodeDiff({ diff, overflow = diffViewOptions.overflow, lineDiffType = diffViewOptions.lineDiffType, lineNumbers = true }: {
   diff: FileDiffMetadata | string;
+  /** Hide line numbers when hunk positions are not real file positions. */
+  lineNumbers?: boolean;
 } & Pick<FileDiffOptions<undefined, undefined>, "overflow" | "lineDiffType">) {
   const fileDiff = useMemo(() => typeof diff === "string" ? parseFileDiff(diff) : diff, [diff]);
-  const options = useMemo(() => ({ ...diffViewOptions, overflow, lineDiffType }), [overflow, lineDiffType]);
+  const options = useMemo(() => ({ ...diffViewOptions, overflow, lineDiffType, disableLineNumbers: !lineNumbers }), [overflow, lineDiffType, lineNumbers]);
   if (!fileDiff) return <CodeText contents={typeof diff === "string" ? diff : ""} language="diff" overflow={overflow} />;
   return <FileDiff fileDiff={fileDiff} options={options} className="pierre-code type-code" disableWorkerPool />;
 }

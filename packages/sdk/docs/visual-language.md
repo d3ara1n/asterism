@@ -48,7 +48,7 @@ Building a lookalike control loses these meanings and the accessibility the shar
 
 ## Render content through the shared readers
 
-Markdown, code, diffs, math, diagrams, JSON, and resource or skill references have shared renderers. Using them means a plugin's output reads like every other plugin's output, including streaming behavior, copyable code, and reference navigation. Tool headers use the shared header with a subject, summary, and metadata, and long inputs use the header excerpt rather than a truncated title.
+The SDK renderer supplies the host's own presentation controls; the host binds them, so they follow the application's styling as it evolves. Tool titles use `ToolHeader` with a subject, summary, and metadata. `ToolResourceSubject` puts the resource recorded with the call in the subject slot, and `HeaderExcerpt` shortens long inputs in the summary rather than truncating the title. A settled body that can outgrow its space goes in `ToolScrollArea`, whose height the host owns; content still growing goes in `StreamingScrollArea`. `CodeDiff` renders a unified diff of one file in the shared code presentation; turn its line numbers off when the hunk positions are not real file positions. Using these controls keeps a plugin's views reading like every other plugin's views.
 
 ## Keep custom styling local
 
