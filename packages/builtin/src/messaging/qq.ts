@@ -10,6 +10,7 @@ import { ObservedMessages, forgetObservedConnection } from "./observed-store.ts"
 import { messageObserver, receiveConnection, observedFile, downloadFile, type ObservedMessage } from "./provider-shared.ts";
 import { QQApi } from "./qq-api.ts";
 import { definitelyNotSent, PartialMessageDelivery, prepareSend } from "./outcome.ts";
+import { qqForwardMarkdown } from "./qq-forward.ts";
 
 /** Scope is part of the address: a user openid and a group openid are separate identities. */
 export function qqTarget(input: Pick<SendMessage, "conversationId" | "threadId" | "replyTo">) {
@@ -21,7 +22,7 @@ export function qqTarget(input: Pick<SendMessage, "conversationId" | "threadId" 
 
 function qqParts(content?: string, attachments: readonly InboundAttachment[] = []): MessagingPart[] {
   return [
-    ...(content ? [{ kind: "text" as const, text: content }] : []),
+    ...(content ? [{ kind: "text" as const, text: qqForwardMarkdown(content) }] : []),
     ...attachments.map(file => ({ kind: "file" as const, id: file.url,
       mediaType: fileMediaType({ name: file.filename ?? "", type: file.content_type }),
       ...(file.filename ? { filename: file.filename } : {}), ...(file.size === undefined ? {} : { size: file.size }) })),
