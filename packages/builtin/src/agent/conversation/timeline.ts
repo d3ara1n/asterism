@@ -3,14 +3,14 @@ import { decodeExecution, ContextSummary, AgentInputMessage, type AgentMessageSe
 import { turnMetrics, type TurnMeasurement, type TurnMetricsData } from "./turn-metrics.ts";
 import type { CompressionActivity, InlineFeedback } from "../feedback.ts";
 import type { HistoryBoundary } from "./history-window.ts";
-import { isCompletedResponse, participatingBlocks } from "../response-messages.ts";
+import { isFinalReply, participatingBlocks } from "../response-messages.ts";
 
 type DisplayBlock<T = ModelBlock> = T extends ModelBlock ? Omit<T, "source" | "requestParentId" | "continuation" | "completion" | "summary"> : never;
 type SavedBlock = DisplayBlock & {
   /** partialContext: the block did not fully participate in later model input; failed: the request generating it failed before it closed. */
   id: string; createdAt: string; partialContext?: boolean; failed?: boolean;
-  /** Computed before windowing and display filtering, so a retained response fragment keeps its completion state. */
-  responseCompleted?: boolean;
+  /** Computed before windowing and filtering, so even a retained fragment knows whether its response is a final reply. */
+  finalReply?: boolean;
 };
 export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "message"; id: string; createdAt: string; parts: readonly AgentInputPart[]; sender: AgentMessageSender; startsTurn?: boolean }
@@ -18,7 +18,7 @@ export type TimelineItem = SavedBlock | ModelLiveBlock
   | { kind: "compression-summary"; id: string; text: string }
   | { kind: "compression"; id: string; status: Exclude<CompressionActivity["status"], "running"> | "completed"; details?: CompressionActivity["details"] }
   | { kind: "turn-metrics"; id: string; inputId: string; metrics: TurnMetricsData; incomplete: boolean; replyMarkdown: string | null; replyCreatedAt: string | null }
-  | { kind: "conversation-process"; id: string; content: readonly ("text" | "thinking")[]; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; incomplete: boolean; notices: number; compressions: number; open: boolean }
+  | { kind: "conversation-process"; id: string; content: readonly ("text" | "thinking")[]; tools: readonly Extract<SavedBlock | ModelLiveBlock, { kind: "toolcall" }>[]; notices: number; compressions: number; open: boolean }
   | ({ kind: "notice" } & InlineFeedback);
 /** Saved and live model blocks; notices may carry a responseId but are not blocks. */
 export function isModelBlock(item: TimelineItem): item is SavedBlock | ModelLiveBlock {
@@ -78,18 +78,18 @@ export function projectConversation(path: readonly RecordInfo[], agentId: string
     const blocks = responses.get(value.responseId) ?? [];
     blocks.push(value); responses.set(value.responseId, blocks);
   }
-  const presentation = new Map<string, { partialContext?: boolean; failed?: boolean; responseCompleted: boolean }>();
+  const presentation = new Map<string, Pick<SavedBlock, "partialContext" | "failed" | "finalReply">>();
   const failedResponses = new Set<string>();
   const notices: Extract<TimelineItem, { kind: "notice" }>[] = [];
   for (const [responseId, blocks] of responses) {
     const participating = new Set(participatingBlocks(blocks).map(block => block.ordinal));
     const terminal = blocks.find(block => block.completion?.termination);
     const termination = terminal?.completion?.termination;
-    const responseCompleted = isCompletedResponse(blocks);
+    const finalReply = isFinalReply(blocks);
     for (const block of blocks) {
       const partialContext = !participating.has(block.ordinal) || !block.complete;
       const failed = !block.complete && termination?.reason === "failed";
-      presentation.set(timelineKey(block), { responseCompleted, ...(partialContext ? { partialContext: true } : {}), ...(failed ? { failed: true } : {}) });
+      presentation.set(timelineKey(block), { finalReply, ...(partialContext ? { partialContext: true } : {}), ...(failed ? { failed: true } : {}) });
     }
     if (termination?.reason === "failed") {
       failedResponses.add(responseId);
@@ -147,7 +147,7 @@ export function conversationTimeline(projection: ConversationProjection, running
     if (entry.value) saved.push(entry.value);
     saved.push(...(after.get(entry.id) ?? []));
   }
-  const summaries = projection.turns.filter(turn => !running || turn.nextInputId !== null);
+  const summaries = projection.turns.filter(turn => !running || !turn.incomplete || turn.nextInputId !== null);
   const before = new Map(summaries.map(turn => [turn.nextInputId, turn]));
   const measured = (turn: TurnMeasurement): TimelineItem => ({
     kind: "turn-metrics", id: `turn-metrics:${turn.inputId}`, inputId: turn.inputId, metrics: turn.metrics,

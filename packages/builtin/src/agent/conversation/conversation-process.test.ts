@@ -34,7 +34,7 @@ describe("Conversation process folding by input groups", () => {
     expect(ids(grouped)).toEqual(["u", "conversation-process:final", "part1", "part2", "turn-metrics:u"]);
     expect(ids(grouped, [...grouped.processIds]))
       .toEqual(["u", "progress", "tool", "thinking", "conversation-process:final", "part1", "part2", "turn-metrics:u"]);
-    expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ tools: [{ name: "read" }], content: ["text", "thinking"], incomplete: false });
+    expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ tools: [{ name: "read" }], content: ["text", "thinking"] });
     expect(grouped.owners.get(JSON.stringify(["work", 1]))).toBe("conversation-process:final");
     expect(grouped.owners.has(JSON.stringify(["final", 1]))).toBe(false);
   });
@@ -99,12 +99,12 @@ describe("Conversation process folding by input groups", () => {
       node("reason2", "tool2", thinking("a", "final2", 0)),
       node("reply2", "reason2", text("a", "final2", 1, "Second answer", { completion })),
     ];
-    expect(ids(project(path, true))).toEqual([...visible, "steer", "tool2", "reason2", "reply2"]);
+    expect(ids(project(path.slice(0, -1), true))).toEqual([...visible, "steer", "tool2", "reason2"]);
     const settled = project(path);
     expect(ids(settled)).toEqual([...visible, "steer", "conversation-process:final2", "reply2", "turn-metrics:u"]);
     expect(settled.items.filter(item => item.kind === "turn-metrics")).toMatchObject([{ inputId: "u" }]);
     const second = settled.items.find(item => item.id === "conversation-process:final2");
-    expect(second).toMatchObject({ tools: [{ id: "tool2" }], incomplete: false });
+    expect(second).toMatchObject({ tools: [{ id: "tool2" }] });
     expect(ids(settled, ["conversation-process:final2"]))
       .toEqual([...visible, "steer", "tool2", "reason2", "conversation-process:final2", "reply2", "turn-metrics:u"]);
   });
@@ -177,7 +177,7 @@ describe("Conversation process folding by input groups", () => {
     expect(ids(grouped)).toEqual(["u", "reply1", "steer", "conversation-process:failed", "response-error:failed", "turn-metrics:u"]);
     expect(ids(grouped, ["conversation-process:failed"]))
       .toEqual(["u", "reply1", "steer", "progress", "earlier-error", "partial", "conversation-process:failed", "response-error:failed", "turn-metrics:u"]);
-    expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ incomplete: true });
+    expect(grouped.items.at(-1)).toMatchObject({ kind: "turn-metrics", incomplete: true, replyMarkdown: null });
   });
 
   // Hidden empty thinking still contributes to a response's ordinal count when establishing normal completion.
@@ -217,7 +217,7 @@ describe("Conversation process folding by input groups", () => {
     ];
     const stopped = project(path, false, [], feedback);
     expect(ids(stopped)).toEqual(["u", "conversation-process:cut", "stopped", "turn-metrics:u"]);
-    expect(stopped.items.find(item => item.kind === "conversation-process")).toMatchObject({ incomplete: true });
+    expect(stopped.items.at(-1)).toMatchObject({ kind: "turn-metrics", incomplete: true, replyMarkdown: null });
     expect(ids(project(path, true, [], feedback))).toEqual(["u", "partial", "stopped"]);
     path.push(node("done", "partial", text("a", "resumed", 0, "Done", { completion })));
     expect(ids(project(path, false, [], feedback))).toEqual(["u", "conversation-process:resumed", "done", "turn-metrics:u"]);
@@ -269,6 +269,8 @@ describe("Conversation process folding by input groups", () => {
     ];
     const grouped = project(path, false, [], feedback, [{ id: "failed", afterNodeId: "reply", status: "failed" }]);
     expect(ids(grouped)).toEqual(["u", "conversation-process:final", "reply", "failed", "error", "turn-metrics:u"]);
+    expect(ids(project(path, true, [], [], [{ id: "manual", afterNodeId: "reply", status: "running" }])))
+      .toEqual(["u", "conversation-process:final", "reply", "turn-metrics:u"]);
     expect(ids(grouped, ["conversation-process:final"]))
       .toEqual(["u", "tool", "conversation-process:final", "retry", "before", "reply", "failed", "error", "turn-metrics:u"]);
     expect(grouped.items.find(item => item.kind === "conversation-process")).toMatchObject({ notices: 1, compressions: 1 });

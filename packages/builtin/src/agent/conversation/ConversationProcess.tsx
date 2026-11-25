@@ -65,7 +65,6 @@ export function ConversationProcess({ node, onToggle, onMount }: {
     </>}
     {failed > 0 && <span className="shrink-0 text-destructive">· {i18n.formatMessage(conversationMessages.processFailedCount, { count: failed })}</span>}
     {partial > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processPartialCount, { count: partial })}</span>}
-    {node.incomplete && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.incomplete)}</span>}
     {node.notices > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processNoticeCount, { count: node.notices })}</span>}
     {node.compressions > 0 && <span className="shrink-0">· {i18n.formatMessage(conversationMessages.processCompressionCount, { count: node.compressions })}</span>}
   </ConversationSeam>;

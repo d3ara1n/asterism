@@ -8,13 +8,14 @@ export function hasModelContent(block: ModelBlock): block is ParticipatingBlock 
   return block.kind === "toolcall" ? block.input !== null && block.draft === null : block.complete;
 }
 
-/** A normal reply contains every block of a stopped response and no tool calls; the terminal ordinal establishes the expected block count. */
-export function isCompletedResponse(blocks: readonly ModelBlock[]): boolean {
+/** A final reply has visible text, every block of a normally stopped response, and no tool calls. */
+export function isFinalReply(blocks: readonly ModelBlock[]): boolean {
   const terminal = blocks.find(block => block.completion);
   return terminal?.completion?.finishReason === "stop"
     && (!terminal.completion.termination || terminal.completion.termination.reason === "completed")
     && terminal.ordinal + 1 === blocks.length
-    && blocks.every(block => block.ordinal < blocks.length && block.complete && block.kind !== "toolcall");
+    && blocks.every(block => block.ordinal < blocks.length && block.complete && block.kind !== "toolcall")
+    && blocks.some(block => block.kind === "text" && block.text.trim() !== "");
 }
 
 /** Shared by model input and history shells. Each response precedes its following user/context boundary. */

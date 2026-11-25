@@ -92,7 +92,7 @@ describe("Agent typed record views", () => {
   });
 
   // Multiple requests in one turn have only one trailing summary; historical summaries do not disappear when the next turn runs.
-  it("Inserts each turn's measurements at its end and hides only the current turn's summary while running", () => {
+  it("Inserts each turn's measurements at its end and keeps a recorded final reply accessible while busy", () => {
     const completion = { finishReason: "stop", rawFinishReason: null, providerResponseId: null,
       usage: { input: 100, output: 10, total: 110, cacheRead: 50, cacheWrite: null, reasoning: null } };
     const nodes = [
@@ -104,10 +104,10 @@ describe("Agent typed record views", () => {
     ];
     const snapshot = sessionSnapshot(nodeView("s", "", nodes, "a3"));
     const running = conversationTimeline(snapshot, "a", [], true);
-    expect(running.map(item => item.id)).toEqual(["u1", "a1", "a2", "turn-metrics:u1", "u2", "a3"]);
+    expect(running.map(item => item.id)).toEqual(["u1", "a1", "a2", "turn-metrics:u1", "u2", "a3", "turn-metrics:u2"]);
     expect(running.find(item => item.kind === "turn-metrics")).toMatchObject({ metrics: { count: 2, usage: { output: { value: 20 } } }, replyMarkdown: "Second part" });
     const settled = conversationTimeline(snapshot, "a", [], false);
-    expect(settled.map(item => item.id)).toEqual(["u1", "a1", "a2", "turn-metrics:u1", "u2", "a3", "turn-metrics:u2"]);
+    expect(settled).toEqual(running);
     expect(settled.at(-1)).toMatchObject({ kind: "turn-metrics", metrics: { count: 1 }, replyMarkdown: "Latest" });
   });
 

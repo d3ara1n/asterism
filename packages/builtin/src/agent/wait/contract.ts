@@ -11,6 +11,6 @@ export const agentWaitResultSchema = z.strictObject({
 export type AgentWaitResult = z.infer<typeof agentWaitResultSchema>;
 export const AgentWait = defineImplementation({
   ...builtin.data("agent.wait", agentWaitResultSchema), resource: Agent, tool: Wait,
-  targetSchema: z.null().describe("Null waits until this Agent settles: its execution loop has stopped and no accepted input remains to process. An Agent cannot wait for itself. Timeout or cancellation leaves the Agent running."),
+  targetSchema: z.null().describe("Null waits until this Agent's active task stops. The result describes whether the latest input has a final reply, not whether the draft queue is empty. An Agent cannot wait for itself. Timeout or cancellation stops the wait, not the Agent."),
   effect: "read", execution: "sequential",
 });

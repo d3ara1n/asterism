@@ -28,7 +28,7 @@ const issueMessages: Record<CostIssue, UiMessage> = {
   tier: messages.tierUnknown, invalid: messages.invalidQuantity,
 };
 function requestState(request: PricedRequest): { label: UiMessage; tone: StatusTone } {
-  const outcome = requestTiming(request)?.outcome;
+  const outcome = request.completion?.termination?.reason ?? requestTiming(request)?.outcome;
   if (outcome === "cancelled") return { label: messages.cancelled, tone: "neutral" };
   if (outcome === "failed") return { label: messages.failed, tone: "error" };
   if (!request.completion) return { label: messages.noCompletion, tone: "neutral" };

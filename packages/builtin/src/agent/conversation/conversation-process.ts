@@ -15,7 +15,8 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
   let pending: TimelineItem[] = [];
   let lastBlock: Extract<TimelineItem, { ordinal: number }> | null = null;
   const finish = (settled: boolean) => {
-    if (!lastBlock || !settled) {
+    const finalReply = lastBlock && "finalReply" in lastBlock && lastBlock.finalReply;
+    if (!lastBlock || (!settled && !finalReply)) {
       result.push(...pending);
       pending = [];
       lastBlock = null;
@@ -23,7 +24,6 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
     }
     // The last response is stable when earlier history is loaded, even if the group's inputs are outside the reading window.
     const id = `conversation-process:${lastBlock.responseId}`;
-    const replyCompleted = "responseCompleted" in lastBlock && lastBlock.responseCompleted === true;
     const final: Extract<TimelineItem, { kind: "text" }>[] = [];
     const body: TimelineItem[] = [];
     let lastProcess = -1;
@@ -36,7 +36,7 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
     for (const entry of pending) {
       const modelBlock = isModelBlock(entry);
       if (modelBlock) betweenBlocks = entry !== lastBlock;
-      if (entry.kind === "text" && replyCompleted && entry.responseId === lastBlock.responseId) {
+      if (entry.kind === "text" && finalReply && entry.responseId === lastBlock.responseId) {
         if (finalPosition < 0) finalPosition = body.length;
         final.push(entry);
         continue;
@@ -63,7 +63,7 @@ export function groupConversationProcesses(items: readonly TimelineItem[], runni
         else compressions++;
       }
       body.splice(lastProcess + 1, 0, { kind: "conversation-process", id, tools, content: [...content],
-        incomplete: !replyCompleted, notices, compressions, open: false });
+        notices, compressions, open: false });
     }
     result.push(...body);
     pending = [];

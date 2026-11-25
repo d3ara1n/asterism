@@ -40,6 +40,8 @@ describe("Agent turn state on the current path", () => {
     ["output reaches the length limit", text("a", "r1", 0, "Truncated", { completion: completion("length") })],
     ["cancelled generation with closed text", text("a", "r1", 0, "Closed text", { completion: { ...completion(), termination: { reason: "cancelled" } } })],
     ["incomplete body block", text("a", "r1", 0, "Partial", { complete: false, completion: completion() })],
+    ["thinking without a reply", thinking("a", "r1", 0, "Reasoning", { completion: completion() })],
+    ["blank reply text", text("a", "r1", 0, " \n", { completion: completion() })],
   ])("%s is not considered normally completed merely because body text exists", (_reason, block) => {
     expect(project([message("a", "Go"), block])).toBe("incomplete");
   });

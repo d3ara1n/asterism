@@ -128,7 +128,7 @@ describe("Conversation display reads", () => {
     expect(retained).not.toContain(continuation);
     expect(retained).not.toContain(diagnostics);
     const running = withLive(conversationTimeline(result.projection, true), []);
-    expect(running.map(item => item.id)).toEqual(["input", "reply"]);
+    expect(running.map(item => item.id)).toEqual(["input", "reply", "turn-metrics:input"]);
     const settled = withLive(conversationTimeline(result.projection, false, [
       { id: "late", afterNodeId: "reply", form: "occurrence", code: "info", message: "New feedback" },
     ]), []);

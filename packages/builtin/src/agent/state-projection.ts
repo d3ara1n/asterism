@@ -1,7 +1,7 @@
 import type { ModelBlock, SessionRecord, SessionSnapshot } from "@asterism-app/sdk/contracts";
 import { AgentInputMessage, decodeExecution, executionRecordIds } from "@asterism-app/builtin-api/contracts";
 import type { AgentTurnState } from "./state.ts";
-import { isCompletedResponse } from "./response-messages.ts";
+import { isFinalReply } from "./response-messages.ts";
 
 /** A turn has a final reply only if the last response answers the latest input, including a steer within the turn. */
 export function projectTurnState(records: readonly SessionRecord[], agentId: string): AgentTurnState {
@@ -10,7 +10,7 @@ export function projectTurnState(records: readonly SessionRecord[], agentId: str
     const record = records[i]!;
     if (record.source?.resource?.id !== agentId) continue;
     if (AgentInputMessage.decode(record)?.status === "known")
-      return isCompletedResponse(blocks) ? "completed" : "incomplete";
+      return isFinalReply(blocks) ? "completed" : "incomplete";
     const execution = decodeExecution(record);
     if (execution?.status !== "known") continue;
     const block = execution.data.block;
