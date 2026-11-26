@@ -1,12 +1,11 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
-import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism-app/ui/ui/tooltip";
 import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { AnimatePresence } from "motion/react";
 import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
-import { ArrowLeft, CircleSlash, Send, Square } from "lucide-react";
-import { useI18n, useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
+import { CircleSlash, Send, Square } from "lucide-react";
+import { CardHeader, useI18n, useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
 import { cn } from "@asterism-app/ui/utils";
 import { Button } from "@asterism-app/ui/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@asterism-app/ui/ui/alert";
@@ -22,7 +21,7 @@ import { SlidePage } from "../shared/slide-page";
 import { subagentMessages as messages } from "../messages/subagents";
 import { PoolChannel, CancelSubagent, SteerSubagent, type FinishedStatus, type TaskSnapshot, type TaskSummary, type ProcessFrame } from "./contract";
 import { ActivityList, InstructionList } from "./ActivityTail";
-import { TaskStatus, Usage, stateTones } from "./task-parts";
+import { TaskStatus, Usage, stateOf, stateTones } from "./task-parts";
 
 const shortcut = "⌘ / Ctrl + Enter";
 
@@ -104,19 +103,13 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
     && (task.output.activity.some(entry => entry.kind === "steer") || task.output.undelivered.length > 0);
 
   return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
-    <header className="flex min-w-0 items-center gap-2 border-b px-2 py-1.5">
-      <IconButton size="icon-sm" variant="ghost" label={i18n.text(messages.back)}
-        autoFocus={focus} onClick={back}><ArrowLeft /></IconButton>
-      {name !== undefined && <TooltipHint content={name}>
-        <bdi className="min-w-0 flex-1 truncate text-xs font-medium">{name}</bdi>
-      </TooltipHint>}
-      <span className="shrink-0 font-mono text-xs">{id}</span>
-      <span className={cn("min-w-0 truncate type-caption", name === undefined && "flex-1")}>{task?.input.role}</span>
-      {task && <TaskStatus status={task.status} />}
-      {working && <Popover open={confirming} onOpenChange={setConfirming}>
+    <CardHeader page={{ title: name ?? id, backLabel: i18n.text(messages.back), onBack: back, autoFocus: focus }}
+      summary={<>{name !== undefined && <span className="font-mono">{id}</span>}{name !== undefined && task && " · "}{task?.input.role}</>}
+      status={task ? { tone: stateTones[stateOf(task.status)], label: i18n.formatMessage(messages.state, { state: stateOf(task.status) }) } : undefined}
+      actions={working && <Popover open={confirming} onOpenChange={setConfirming}>
         <Tooltip>
           <PopoverTrigger asChild><TooltipTrigger asChild>
-            <Button size="icon-sm" variant="ghost" aria-label={i18n.text(messages.cancel)}
+            <Button size="icon-xs" variant="ghost" aria-label={i18n.text(messages.cancel)}
               disabled={blocked}><Square /></Button>
           </TooltipTrigger></PopoverTrigger>
           <TooltipContent>{i18n.text(messages.cancel)}</TooltipContent>
@@ -129,8 +122,7 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
               onClick={() => { setConfirming(false); void act("cancel"); }}>{i18n.text(messages.cancel)}</Button>
           </div>
         </PopoverContent>
-      </Popover>}
-    </header>
+      </Popover>} />
 
     <ScrollArea viewportRef={scroll} className="relative min-h-0 min-w-0 flex-1"
       viewportProps={{ onScroll: event => {
@@ -191,6 +183,17 @@ function TaskDetail({ id, back, focus }: { id: string; back(): void; focus: bool
   </div>;
 }
 
+function activeSummary(i18n: ReturnType<typeof useI18n>, tasks: readonly TaskSummary[]) {
+  const running = tasks.filter(task => task.status.phase === "running").length;
+  const queued = tasks.filter(task => task.status.phase === "queued").length;
+  return running + queued > 0 ? i18n.formatMessage(messages.active, { running, queued }) : undefined;
+}
+
+/** Collapsed title bar: active work in the pool. */
+export function PoolHeader({ data }: { data: { tasks: TaskSummary[] } }) {
+  return <CardHeader summary={activeSummary(useI18n(), data.tasks)} />;
+}
+
 export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
   const object = useRendererObject(), i18n = useI18n();
   const retained = object.retained.get("asterism.builtin/subagent-selection", () => ({ id: null as string | null }));
@@ -202,13 +205,11 @@ export function PoolCard({ data }: { data: { tasks: TaskSummary[] } }) {
     direction.current = id === null ? -1 : 1;
     retained.id = id; setSelected(id); setOpened(id !== null);
   };
-  const running = data.tasks.filter(task => task.status.phase === "running").length;
-  const queued = data.tasks.filter(task => task.status.phase === "queued").length;
   return <div className="nodrag nopan relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
     <AnimatePresence initial={false} mode="popLayout" custom={direction.current}>
       <SlidePage key={selected ? `task:${selected}` : "list"} direction={direction.current}>
         {selected ? <TaskDetail id={selected} back={() => select(null)} focus={opened} /> : <>
-          <p className="type-caption px-3 py-2" role="status" aria-atomic="true">{i18n.formatMessage(messages.active, { running, queued })}</p>
+          <CardHeader summary={activeSummary(i18n, data.tasks)} />
           {data.tasks.length ? <ItemGroup className="min-h-0 flex-1"><VirtualList data={data.tasks.toReversed()}>{task =>
               <ListRow key={task.id} title={<>
                 {task.name !== undefined && <bdi className="min-w-0 truncate">{task.name}</bdi>}

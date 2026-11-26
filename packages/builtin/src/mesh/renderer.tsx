@@ -2,7 +2,7 @@ import { List, Network, UserRound, UserRoundPen } from "lucide-react";
 import { cardRenderer, creationEntry, toolRenderer, useI18n, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { ToolScrollArea, useToolResourceSubject } from "@asterism-app/ui/tool-content";
-import { MeshActions, MeshCard } from "./MeshCard";
+import { MeshHeader, MeshCard } from "./MeshCard";
 import { CreateMesh, Mesh, MeshGetProfile, MeshList, MeshPeek, MeshSend, MeshSetProfile, MeshView } from "./contract";
 import { meshCard as appearance } from "../shared/card-appearance";
 import { meshMessages as messages } from "../messages/mesh";
@@ -38,7 +38,7 @@ function ListHeader({ invocation }: ToolRenderProps) {
 
 export default {
   resources: [{ kind: Mesh.kind, label: messages.title, icon: <Network className="size-4" />, card: appearance }],
-  cards: [cardRenderer(MeshView, { ...appearance, Body: MeshCard, Actions: MeshActions })],
+  cards: [cardRenderer(MeshView, { ...appearance, Body: MeshCard, Header: MeshHeader })],
   creations: [creationEntry(CreateMesh, {
     id: CreateMesh.id, label: messages.title, icon: <Network className="size-4" />,
     group: "resources", triggers: { menu: { initialInput: {} } },

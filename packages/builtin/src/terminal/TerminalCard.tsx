@@ -1,13 +1,12 @@
-import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
-import { useI18n, useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
+import { CardHeader, useI18n, useRendererCalls, useRendererObject } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { StatusBadge, type StatusTone } from "@asterism-app/ui/ui/status";
+import type { StatusTone } from "@asterism-app/ui/ui/status";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { Play, Power, RotateCcw } from "lucide-react";
 import { commonMessages } from "@asterism-app/ui/messages/common";
@@ -29,8 +28,8 @@ function passiveProtocol(terminal: Terminal) {
 const tones: Record<TerminalState, StatusTone> = { inactive: "neutral", starting: "progress", idle: "success", running: "progress", unknown: "neutral", exited: "neutral", failed: "error" };
 
 
-/** Card header: instance status and close action. Closing ends the shell while retaining the resource object for reopening. */
-export function TerminalActions({ data }: { data: TerminalConfig }) {
+/** Card header: instance status, working directory, and close action. Closing ends the shell while retaining the resource object for reopening. */
+export function TerminalHeader({ data }: { data: TerminalConfig }) {
   const object = useRendererObject(), calls = useRendererCalls(), i18n = useI18n();
   const { status } = useTerminalLink(object);
   const [confirming, setConfirming] = useState(false), [closing, setClosing] = useState(false);
@@ -40,8 +39,8 @@ export function TerminalActions({ data }: { data: TerminalConfig }) {
       .finally(() => { setClosing(false); setConfirming(false); });
   };
   const warn = status.state === "running" || status.state === "unknown" || status.state === "starting";
-  return <>
-    <TooltipHint content={status.cwd ?? data.cwd}><StatusBadge tone={tones[status.state]} role="status">{i18n.formatMessage(terminalMessages.state, { state: status.state })}</StatusBadge></TooltipHint>
+  return <CardHeader status={{ tone: tones[status.state], label: i18n.formatMessage(terminalMessages.state, { state: status.state }) }}
+    summary={<bdi className="font-mono">{status.cwd ?? data.cwd}</bdi>} actions={<>
     {status.state !== "inactive" && <IconButton size="icon-xs" label={i18n.formatMessage(terminalMessages.close)} disabled={closing}
       onClick={() => { if (warn) setConfirming(true); else close(); }}><Power /></IconButton>}
     <AlertDialog open={confirming} onOpenChange={open => { if (!open && !closing) setConfirming(false); }}><AlertDialogContent>
@@ -50,7 +49,7 @@ export function TerminalActions({ data }: { data: TerminalConfig }) {
       <AlertDialogFooter><AlertDialogCancel disabled={closing}>{i18n.formatMessage(commonMessages.cancel)}</AlertDialogCancel>
         <AlertDialogAction variant="destructive" disabled={closing} onClick={event => { event.preventDefault(); close(); }}>{i18n.formatMessage(terminalMessages.close)}</AlertDialogAction></AlertDialogFooter>
     </AlertDialogContent></AlertDialog>
-  </>;
+  </>} />;
 }
 
 /** Card body: terminal screen and open/reopen entry point; configuration and status appear in the header. */

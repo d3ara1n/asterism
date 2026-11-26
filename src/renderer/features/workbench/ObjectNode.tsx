@@ -84,7 +84,8 @@ const ObjectNodeContent = memo(function ObjectNodeContent({ id, data, selected }
     <ObjectActions object={object} appearance={content.view} onView={onObjectView}>{(menuTrigger, renderHeader) => <ObjectCard renderHeader={renderHeader} title={object.title} collapsed={collapsed} expandedHeight={data.expandedHeight} resizing={!!data.resizing} selected={!!selected} onView={onObjectView}
       icon={content.icon} kind={content.kind}
       panels={opened ? undefined : content.panels}
-      actions={<>{!opened && content.actions}{menuTrigger}</>}
+      header={opened ? undefined : content.header}
+      actions={menuTrigger}
       controls={opened ? undefined : <IconButton size="icon-xs" label={i18n.text(objectsMessages.openInIsland)}
         onClick={event => islands.openObject(object.id, event.currentTarget)}>
         <PanelRightOpen />

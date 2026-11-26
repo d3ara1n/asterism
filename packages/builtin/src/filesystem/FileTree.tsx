@@ -14,16 +14,21 @@ import type { TreeState, TreeStore } from "./tree-store";
 
 const DirectoryDiff = lazy(() => import("./DirectoryDiff"));
 
-/** Header actions: working-tree line changes against HEAD, when any, and a refresh of loaded directories. */
+/** Header summary: working-tree line changes against HEAD, when any. */
+export function FileTreeChanges({ state }: { state: TreeState }) {
+  const i18n = useI18n();
+  return state.changes && <span className="inline-flex items-center gap-1 tabular-nums">
+    <span className="sr-only">{i18n.formatMessage(filesystemMessages.directoryChanges, state.changes)}</span>
+    <span aria-hidden className="text-success">+{state.changes.added}</span>
+    <span aria-hidden className="text-destructive">−{state.changes.removed}</span>
+  </span>;
+}
+
+/** Header action: refresh loaded directories. */
 export function FileTreeActions({ store, state }: { store: TreeStore; state: TreeState }) {
   const i18n = useI18n();
   const busy = state.loading || state.refreshing || state.gitRefreshing;
   return <>
-    {state.changes && <span className="type-caption flex items-center gap-1 tabular-nums">
-      <span className="sr-only">{i18n.formatMessage(filesystemMessages.directoryChanges, state.changes)}</span>
-      <span aria-hidden className="text-success">+{state.changes.added}</span>
-      <span aria-hidden className="text-destructive">−{state.changes.removed}</span>
-    </span>}
     <IconButton size="icon-xs" label={i18n.text(filesystemMessages.directoryRefresh)} disabled={busy} onClick={() => void store.refresh()}>
       <RefreshCw className={cn(busy && "animate-spin")} />
     </IconButton>

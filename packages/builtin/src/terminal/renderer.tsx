@@ -13,7 +13,7 @@ import { CreationForm } from "../shared/creation-form";
 import { commonMessages } from "../messages/common";
 import { filesystemMessages } from "../messages/filesystem";
 import { terminalMessages } from "../messages/terminal";
-import { TerminalActions, TerminalCard } from "./TerminalCard";
+import { TerminalHeader, TerminalCard } from "./TerminalCard";
 import { prepareTerminalImages } from "./image-renderer";
 import { CreateTerminal, TerminalResource, TerminalView, TerminalInput, TerminalRead, TerminalWait, TerminalSee } from "./contract";
 import { ShellProfilesCatalog, type TerminalStatus } from "@asterism-app/sdk/contracts";
@@ -141,7 +141,7 @@ const imageView = { headerRenderer: header(terminalMessages.see), bodyRenderer: 
 export default {
   prepare: prepareTerminalImages,
   resources: [{ kind: TerminalResource.kind, label: terminalMessages.terminal, icon: <TerminalSquare className="size-4" />, card: appearance }],
-  cards: [cardRenderer(TerminalView, { ...appearance, Body: TerminalCard, Actions: TerminalActions })],
+  cards: [cardRenderer(TerminalView, { ...appearance, Body: TerminalCard, Header: TerminalHeader })],
   creations: [creationEntry(CreateTerminal, { id: "asterism.builtin/terminal.local", label: terminalMessages.terminal, icon: <TerminalSquare className="size-4" />, group: "resources", InputView: TerminalCreation, triggers: { menu: {} } })],
   tools: [
     toolRenderer(TerminalInput, { label: terminalMessages.input, icon: <Keyboard className="size-3.5" />, input: { ...inputBody, streaming: ({ args }) => !!sentDisplay(args) }, execution: inputBody, result: inputBody }),

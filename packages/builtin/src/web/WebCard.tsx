@@ -1,10 +1,9 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import { Download, Search } from "lucide-react";
-import { useI18n, type I18n } from "@asterism-app/sdk/renderer";
+import { CardHeader, useI18n, type I18n } from "@asterism-app/sdk/renderer";
 import { StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
-import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { cn } from "@asterism-app/ui/utils";
 import type { WebCardData } from "./contract";
 import { webMessages as messages } from "../messages/web";
@@ -37,6 +36,12 @@ function countNote(i18n: I18n, counts: Counts) {
 }
 const total = (counts: Counts) => counts.succeeded + counts.failed + counts.cancelled;
 
+/** Requests in flight are live work worth noticing while the card is collapsed. */
+export function WebHeader({ data }: { data: WebCardData }) {
+  const i18n = useI18n(), { inFlight } = data.stats;
+  return <CardHeader status={inFlight > 0 ? { tone: "progress", label: i18n.formatMessage(messages.inFlight, { count: inFlight }) } : undefined} />;
+}
+
 /** The Web card is this session's network usage panel: statistics exist only in memory for this run, and provider configuration is managed in settings. */
 export function WebCard({ data }: { data: WebCardData }) {
   const i18n = useI18n(), { stats } = data;
@@ -51,9 +56,7 @@ export function WebCard({ data }: { data: WebCardData }) {
         <Metric label={i18n.text(messages.fetches)} value={i18n.formatNumber(total(stats.fetch))} note={countNote(i18n, stats.fetch)} />
         <Metric label={i18n.text(messages.cost)} value={stats.cost.length ? cost(i18n, stats.cost) : "—"} />
       </dl>
-      <p className="type-caption flex min-w-0 items-center gap-1.5 px-0.5 tabular-nums" role="status">
-        {stats.inFlight > 0 && <><Spinner aria-hidden="true" className="size-3 motion-reduce:animate-none" />
-          <span className="shrink-0">{i18n.formatMessage(messages.inFlight, { count: stats.inFlight })}</span><span aria-hidden="true">·</span></>}
+      <p className="type-caption flex min-w-0 items-center gap-1.5 px-0.5 tabular-nums">
         <span className="truncate">{stats.averageMs === null ? i18n.text(messages.noRequests)
           : i18n.formatMessage(messages.durations, { average: duration(i18n, stats.averageMs), last: duration(i18n, stats.lastMs ?? stats.averageMs) })}</span>
       </p>

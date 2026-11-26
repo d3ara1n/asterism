@@ -7,7 +7,7 @@ import { agentStateToolRenderer } from "./self-state/view";
 import { commonMessages } from "../messages/common";
 import { Agent, builtin, CreateAgent } from "@asterism-app/builtin-api/contracts";
 import { agentUI } from "@asterism-app/builtin-api/renderer";
-import { Conversation, ConversationActions } from "./conversation/Conversation";
+import { Conversation, ConversationHeader } from "./conversation/Conversation";
 import { AgentInput } from "./creation";
 import { agentRecordViews } from "./history";
 import { agentPanels } from "./panels";
@@ -26,7 +26,7 @@ export default {
   cards: [cardRenderer(AgentView, {
     ...appearance,
     Body: AgentBody,
-    Actions: ConversationActions,
+    Header: ConversationHeader,
     panels: agentPanels,
   })],
   tools: [peekToolRenderer, sendToolRenderer, waitToolRenderer, agentStateToolRenderer],

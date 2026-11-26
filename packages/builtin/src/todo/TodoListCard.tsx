@@ -3,13 +3,12 @@ import { useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import type { VirtualizerHandle } from "virtua";
 import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
-import { Check, Plus, Trash2, Undo2, UserRoundCheck } from "lucide-react";
-import { useI18n, useRendererObject } from "@asterism-app/sdk/renderer";
+import { Check, ListFilter, ListX, Plus, Undo2, UserRoundCheck } from "lucide-react";
+import { CardHeader, useI18n, useRendererObject } from "@asterism-app/sdk/renderer";
 import { toast } from "sonner";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { ActionMenuItem } from "@asterism-app/ui/ui/action-menu";
-import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@asterism-app/ui/ui/dropdown-menu";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from "@asterism-app/ui/ui/empty";
 import { ItemGroup } from "@asterism-app/ui/ui/item";
@@ -21,7 +20,7 @@ import type { TodoList, TodoSummary } from "./model";
 import { DeleteListConfirm } from "./DeleteListConfirm";
 import { NewTaskDialog } from "./NewTaskDialog";
 import { TaskDetail } from "./TaskDetail";
-import { MenuConfirm, TodoError, TodoStatusIcon, actorName, formatMoment, useTodoMutation } from "./ui";
+import { ConfirmButton, TodoError, TodoStatusIcon, actorName, formatMoment, useTodoMutation } from "./ui";
 import { useTodoPages, type TodoFilterKey } from "./use-todo-pages";
 
 /** The row's next step in the lifecycle, revealed on hover or focus; the detail page offers every transition. */
@@ -58,20 +57,23 @@ function ListPage({ list, latest, filter, onFilter, onOpen }: {
     const handle = scroller.current;
     if (handle && handle.scrollOffset + handle.viewportSize >= handle.scrollSize - 120) loadMore();
   };
-  return <MenuConfirm blankOnly label={i18n.text(messages.listActions)} open={deleting} onOpenChange={setDeleting}
-    items={confirm => <ActionMenuItem variant="destructive" onSelect={confirm}><Trash2 />{i18n.text(messages.deleteList)}…</ActionMenuItem>}
-    confirmation={deleting && <DeleteListConfirm list={list} onClose={() => setDeleting(false)} />}>
-    {trigger => <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex shrink-0 items-center gap-1 border-b px-2 py-1.5">
-        <ToggleGroup type="single" variant="segmented" size="sm" value={filter} aria-label={i18n.text(messages.status)} className="min-w-0 flex-1"
-          onValueChange={value => { if (value) onFilter(value as TodoFilterKey); }}>
-          {(["open", "done", "all"] as const).map(key => <ToggleGroupItem key={key} value={key} className="h-7 gap-1.5 px-2 text-xs">
-            {i18n.text(messages[key])}<span className="tabular-nums text-muted-foreground">{counts[key]}</span>
-          </ToggleGroupItem>)}
-        </ToggleGroup>
+  return <div className="flex min-h-0 flex-1 flex-col">
+      <CardHeader summary={i18n.formatMessage(messages.filterSummary, { filter, count: counts[filter] })} actions={<>
+        <DropdownMenu>
+          <IconButton size="icon-xs" label={i18n.text(messages.status)} asChild><DropdownMenuTrigger><ListFilter /></DropdownMenuTrigger></IconButton>
+          <DropdownMenuContent align="end">
+            <DropdownMenuRadioGroup value={filter} onValueChange={value => onFilter(value as TodoFilterKey)}>
+              {(["open", "done", "all"] as const).map(key => <DropdownMenuRadioItem key={key} value={key}>
+                {i18n.text(messages[key])}<span className="ms-auto ps-4 tabular-nums text-muted-foreground">{counts[key]}</span>
+              </DropdownMenuRadioItem>)}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <IconButton size="icon-xs" label={i18n.text(messages.newTask)} onClick={() => setCreating(true)}><Plus /></IconButton>
-        {trigger}
-      </header>
+        <ConfirmButton label={i18n.text(messages.deleteList)} icon={<ListX />} open={deleting} onOpenChange={setDeleting}>
+          {deleting && <DeleteListConfirm list={list} onClose={() => setDeleting(false)} />}
+        </ConfirmButton>
+      </>} />
       <TodoError error={error} className="m-2 w-auto" />
       {!pages ? !error && <div className="flex justify-center py-6"><Spinner className="text-muted-foreground" /></div>
         : pages.todos.length === 0 ? <Empty className="p-6"><EmptyHeader><EmptyTitle className="text-sm">{i18n.text(messages.noTasks)}</EmptyTitle></EmptyHeader>
@@ -84,8 +86,15 @@ function ListPage({ list, latest, filter, onFilter, onOpen }: {
             {loadingMore && <Spinner className="absolute bottom-2 left-1/2 -translate-x-1/2 text-muted-foreground" />}
           </ItemGroup>}
       {creating && <NewTaskDialog onClose={() => setCreating(false)} onCreated={() => { if (filter === "done") onFilter("open"); }} />}
-    </div>}
-  </MenuConfirm>;
+    </div>;
+}
+
+/** Collapsed title bar: unfinished work, or an unavailable list. The list page replaces it with its filter and actions. */
+export function TodoListHeader({ data }: { data: TodoListCardData }) {
+  const i18n = useI18n();
+  if (!data.list) return <CardHeader status={{ tone: "warning", label: i18n.text(messages.unavailable) }} />;
+  const open = data.list.counts.pending + data.list.counts.in_progress;
+  return <CardHeader summary={i18n.formatMessage(messages.filterSummary, { filter: "open", count: open })} />;
 }
 
 export function TodoListCard({ data }: { data: TodoListCardData }) {

@@ -1,6 +1,7 @@
 import { StrictMode, useEffect } from "react";
 import { rendererFiles } from "./files";
-import { RendererEventsProvider, RendererCallsProvider, RendererApplicationProvider, RendererUiProvider } from "@asterism-app/sdk/renderer";
+import { RendererEventsProvider, RendererCallsProvider, RendererApplicationProvider, RendererUiProvider, RendererCardHeaderProvider } from "@asterism-app/sdk/renderer";
+import { CardHeaderContribution } from "./features/workbench/card-header";
 import { EventClient } from "../shared/event-client";
 import { CallClient } from "../shared/call-client";
 import { HostI18nProvider, setLanguageCatalogs } from "./shared/i18n";
@@ -138,7 +139,7 @@ export async function startApplication(root: Root, splash: StartupSplash, signal
         <ErrorBoundary>
           <MotionConfig reducedMotion="user">
             <TooltipProvider>
-              <RendererUiProvider value={rendererUi}>
+              <RendererUiProvider value={rendererUi}><RendererCardHeaderProvider value={CardHeaderContribution}>
                 <RendererEventsProvider value={events}>
                   <RendererCallsProvider value={calls}>
                     <HostConfigsProvider>
@@ -153,7 +154,7 @@ export async function startApplication(root: Root, splash: StartupSplash, signal
                     </HostConfigsProvider>
                   </RendererCallsProvider>
                 </RendererEventsProvider>
-              </RendererUiProvider>
+              </RendererCardHeaderProvider></RendererUiProvider>
             </TooltipProvider>
           </MotionConfig>
         </ErrorBoundary>

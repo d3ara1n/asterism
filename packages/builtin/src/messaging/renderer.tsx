@@ -4,8 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import type { z } from "zod";
 import type { VirtualizerHandle } from "virtua";
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
-import { ArrowLeft, Bell, BellOff, CornerUpLeft, Hash, List, MessageSquare, RefreshCw, Send, Settings, X } from "lucide-react";
-import { cardRenderer, creationEntry, recordRenderer, useI18n, useRendererCalls, useRendererObject, useRendererSettings,
+import { Bell, BellOff, CornerUpLeft, Hash, List, MessageSquare, RefreshCw, Send, Settings, X } from "lucide-react";
+import { CardHeader, cardRenderer, creationEntry, recordRenderer, useI18n, useRendererCalls, useRendererObject, useRendererSettings,
   type CreationInputProps, type I18n, type RendererModule, type RendererReceipt } from "@asterism-app/sdk/renderer";
 import { messagingText, type MessagingConversation, type MessagingConnectionInfo, type MessagingMessage } from "@asterism-app/sdk/contracts";
 import { MessageAttachments } from "../shared/attachments";
@@ -70,6 +70,17 @@ function useOperations() {
     } finally { active.current.delete(key); setPending(new Set(active.current)); }
   }
   return { pending: (key: string) => pending.has(key), error, run, clear: () => setError(null) };
+}
+/** One status line: the label, followed by failure details when present. */
+function connectionStatusText(i18n: I18n, connection: Pick<MessagingConnectionInfo, "status" | "error">) {
+  return [i18n.text(statusLabel[connection.status]), connection.error].filter(Boolean).join(" · ");
+}
+/** The Chat's connection and the account it speaks as; an unusable connection is the state to notice. */
+function ChatHeader({ data }: { data: z.infer<typeof ChatView.schema> }) {
+  const i18n = useI18n();
+  const connection = data.connection ?? { status: "unavailable" as const };
+  return <CardHeader summary={[data.connection?.name ?? data.connectionId, data.connection?.identity].filter(Boolean).join(" · ")}
+    status={connection.status === "connected" ? undefined : { tone: statusTone[connection.status], label: connectionStatusText(i18n, connection) }} />;
 }
 /** Status that explains itself: failure details follow the label when present. */
 function ConnectionStatus({ connection, showTooltip = true }: { connection: Pick<MessagingConnectionInfo, "status" | "error">; showTooltip?: boolean }) {
@@ -144,6 +155,7 @@ function ConversationsCard({ data }: { data: z.infer<typeof ConversationsView.sc
       <Page key={selected ? `connection:${selected.id}` : "list"} direction={direction.current}>
         {selected ? <ConnectionConversations connection={selected} back={() => select(null)} notify={notify} error={operations.error} />
           : <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
+            <CardHeader />
             <ItemGroup className="min-h-0 flex-1"><VirtualList data={data.connections} keepMounted={focusedIndex >= 0 ? [focusedIndex] : []}>
               {connection => <div key={connection.id} onFocusCapture={() => setFocusedId(connection.id)}>
                 <ListRow inactive={connection.status === "disabled"}
@@ -188,18 +200,15 @@ function ConnectionConversations({ connection, back, notify, error }: {
     return () => controller.abort();
   }, [calls, connection.id, connection.latest, connection.status, revision, usable]);
   return <>
-    <header className="flex min-w-0 items-center gap-1 border-b px-1.5 py-1.5">
-      <IconButton size="icon-xs" label={i18n.text(messages.back)} onClick={back}><ArrowLeft /></IconButton>
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="type-section truncate">{connection.name}</span>
-        <ConnectionStatus connection={connection} />
-      </div>
+    <CardHeader page={{ title: connection.name, backLabel: i18n.text(messages.back), onBack: back }}
+      status={connection.status === "connected" ? undefined : { tone: statusTone[connection.status], label: connectionStatusText(i18n, connection) }}
+      summary={connection.identity ?? undefined} actions={<>
       <IconButton size="icon-xs" label={i18n.text(messages.refresh)} aria-busy={loading || undefined} disabled={!usable}
         onClick={() => { if (!loading) setRevision(revision + 1); }}>
         {loading && dialogs ? <Spinner aria-hidden="true" /> : <RefreshCw />}
       </IconButton>
       {notify({ connectionId: connection.id }, connection.name, i18n.formatMessage(messages.subscribeConnection, { name: connection.name }))}
-    </header>
+    </>} />
     <div className="flex min-h-0 flex-1 flex-col gap-2 p-2">
       {loading && dialogs === null && !loadError && <div className="flex justify-center py-6"><Spinner aria-hidden="true" /></div>}
       {dialogs?.length === 0 && <p className="type-caption px-1 py-4 text-center text-balance">{i18n.text(messages.empty)}</p>}
@@ -257,12 +266,6 @@ function ChatCard({ data }: { data: z.infer<typeof ChatView.schema> }) {
   };
   const reply = (message: MessagingMessage) => { setReplyTo(message); composer.current?.focus(); };
   return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
-    <header className="flex min-w-0 flex-col border-b px-3 py-1.5">
-      <span className="type-caption truncate">
-        {[data.connection?.name ?? data.connectionId, data.connection?.identity].filter(Boolean).join(" · ")}
-      </span>
-      {status !== "connected" && <ConnectionStatus connection={data.connection ?? { status }} />}
-    </header>
     <div className="relative min-h-0 flex-1">
       {items ? <MessageScrollerProvider autoScroll defaultScrollPosition="end" scrollEdgeThreshold={liveEdgeThreshold}>
         <ChatTimeline items={items} follow={follow} usable={usable} nameOf={nameOf} onReply={reply} />
@@ -519,7 +522,7 @@ export default {
   ],
   cards: [
     cardRenderer(ConversationsView, { ...conversationsCard, Body: ConversationsCard }),
-    cardRenderer(ChatView, { ...chatCard, Body: ChatCard }),
+    cardRenderer(ChatView, { ...chatCard, Body: ChatCard, Header: ChatHeader }),
   ],
   creations: [
     creationEntry(CreateConversations, { id: CreateConversations.id, label: messages.conversations, icon: <List className="size-4" />,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChevronRight, Server, Settings } from "lucide-react";
-import { useI18n, useRendererSettings, creationEntry, cardRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererSettings, creationEntry, cardRenderer, CardHeader, type RendererModule } from "@asterism-app/sdk/renderer";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
@@ -24,9 +24,9 @@ function useOpenSettings() {
 }
 
 /** Titlebar entry point: server management is in the MCP section of the built-in plugin settings. */
-function HostActions() {
+function HostHeader() {
   const i18n = useI18n(), openSettings = useOpenSettings();
-  return <IconButton size="icon-xs" label={i18n.text(messages.openSettings)} onClick={openSettings}><Settings /></IconButton>;
+  return <CardHeader actions={<IconButton size="icon-xs" label={i18n.text(messages.openSettings)} onClick={openSettings}><Settings /></IconButton>} />;
 }
 
 type Catalog = ReturnType<typeof useMcpTools>;
@@ -130,7 +130,7 @@ export default {
       },
     },
   }],
-  cards: [cardRenderer(McpHostView, { ...appearance, Body: HostBody, Actions: HostActions })],
+  cards: [cardRenderer(McpHostView, { ...appearance, Body: HostBody, Header: HostHeader })],
   tools: mcpToolRenderers,
   creations: [creationEntry(CreateMcpHost, { id: "asterism.builtin/mcp.blank", label: messages.title, icon: <Server className="size-4" />, group: "resources", triggers: { menu: { initialInput: { title: "MCP Host" } } } })],
 } satisfies RendererModule;

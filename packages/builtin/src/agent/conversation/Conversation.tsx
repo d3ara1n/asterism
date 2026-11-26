@@ -1,4 +1,4 @@
-import { StatusBadge, StatusIcon } from "@asterism-app/ui/ui/status";
+import { StatusIcon } from "@asterism-app/ui/ui/status";
 import { ArrowDown, ChevronsUp, MessageSquare, RotateCw } from "lucide-react";
 import { Empty, EmptyHeader, EmptyMedia, EmptyDescription } from "@asterism-app/ui/ui/empty";
 import { AnimatePresence, motion, useMotionValue, useReducedMotion } from "motion/react";
@@ -13,7 +13,7 @@ import { IconSwap } from "./IconSwap";
 import { ComposerTray, MessageComposer } from "./Composer";
 import type { ComposerEditorHandle } from "./composer-editor";
 import { conversationMessages } from "../../messages/conversation";
-import { useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk/renderer";
+import { CardHeader, useI18n, useRendererObject, useRendererModels } from "@asterism-app/sdk/renderer";
 
 import { useOutputFollow } from "./output-follow";
 import { useLayoutEffect, useRef, useState } from "react";
@@ -34,15 +34,10 @@ import { conversationTransition, immediateTransition } from "./motion";
 import { ExecutionEdge, ExecutionStatus } from "./ExecutionStatus";
 
 /** Live execution status in the Agent card title bar. */
-export function ConversationActions({ data }: { data: { executionState: AgentExecutionState } }) {
+/** Only active work is announced; an idle conversation is the ordinary state. */
+export function ConversationHeader({ data }: { data: { executionState: AgentExecutionState } }) {
   const i18n = useI18n();
-  const object = useRendererObject();
-  const snapshot = object.session.snapshot();
-  const agentRunning = data.executionState === "running";
-  if (!snapshot) return null;
-  return <StatusBadge tone={agentRunning ? "progress" : "neutral"} role="status">
-    {agentRunning ? i18n.formatMessage(conversationMessages.working) : i18n.formatMessage(conversationMessages.ready)}
-  </StatusBadge>;
+  return <CardHeader status={data.executionState === "running" ? { tone: "progress", label: i18n.formatMessage(conversationMessages.working) } : undefined} />;
 }
 
 /** Item view state is retained with the agent object: virtualized item recycling, card remounts, and focus switches preserve expansion state. */

@@ -1,16 +1,12 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
-import { Tooltip, TooltipTrigger, TooltipContent } from "@asterism-app/ui/ui/tooltip";
-import { useRef, useState, type ReactElement, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { z } from "zod";
-import { MoreHorizontal } from "lucide-react";
 import { useI18n, useRendererObject, type I18n } from "@asterism-app/sdk/renderer";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { cn } from "@asterism-app/ui/utils";
 import { Alert, AlertDescription } from "@asterism-app/ui/ui/alert";
-import { Badge } from "@asterism-app/ui/ui/badge";
-import { Button } from "@asterism-app/ui/ui/button";
-import { ActionMenu, ActionMenuContent, ActionMenuGroup, ActionMenuTarget, ActionMenuTrigger } from "@asterism-app/ui/ui/action-menu";
-import { Popover, PopoverAnchor, PopoverContent } from "@asterism-app/ui/ui/popover";
+import { IconButton } from "@asterism-app/ui/ui/icon-button";
+import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { StatusIcon, type StatusTone } from "@asterism-app/ui/ui/status";
 import { failureDisplay } from "@asterism-app/ui/error-display";
 import { todoMessages as messages } from "../messages/todo";
@@ -36,18 +32,13 @@ export function formatMoment(i18n: I18n, value: string): string {
 }
 
 /** Task states are stored facts, not live work, so in-progress uses the still progress shape. */
-const tones = { pending: "neutral", in_progress: "progress", done: "success" } as const satisfies Record<Todo["status"], StatusTone>;
+export const todoTones = { pending: "neutral", in_progress: "progress", done: "success" } as const satisfies Record<Todo["status"], StatusTone>;
 export function TodoStatusIcon({ status, tooltip = true }: { status: Todo["status"]; tooltip?: boolean }) {
   const label = useI18n().text(messages[status]);
   return <TooltipHint content={tooltip ? label : undefined}><span className="inline-flex shrink-0">
-    <StatusIcon tone={tones[status]} still className="size-3.5" />
+    <StatusIcon tone={todoTones[status]} still className="size-3.5" />
     <span className="sr-only">{label}</span>
   </span></TooltipHint>;
-}
-export function TodoStatusBadge({ status }: { status: Todo["status"] }) {
-  return <Badge variant="outline" className="font-normal">
-    <StatusIcon tone={tones[status]} still className="size-3" />{useI18n().text(messages[status])}
-  </Badge>;
 }
 
 /** Each mounted entry gates only its own submission. */
@@ -70,38 +61,14 @@ export function useTodoMutation(onError?: (error: UiText) => void) {
   return { run, pending, error, clearError: () => setError(null) };
 }
 
-/**
- * An object menu whose items can open a confirmation anchored to its overflow trigger.
- * The render prop places that trigger inside the target surface. handOff keeps the menu
- * from returning focus when the selected item moves focus to a confirmation or editor.
- */
-export function MenuConfirm({ label, items, open, onOpenChange, disabled = false, blankOnly = false, confirmation, children }: {
-  label: string;
-  items: (confirm: () => void, handOff: () => void) => ReactNode;
-  open: boolean;
-  onOpenChange(open: boolean): void;
-  disabled?: boolean;
-  blankOnly?: boolean;
-  confirmation: ReactNode;
-  children: (trigger: ReactNode) => ReactElement;
+/** A destructive title bar action whose confirmation is anchored to the button itself. */
+export function ConfirmButton({ label, icon, open, onOpenChange, disabled = false, children }: {
+  label: string; icon: ReactNode; open: boolean; onOpenChange(open: boolean): void; disabled?: boolean; children: ReactNode;
 }) {
-  const keepFocus = useRef(false);
-  const handOff = () => { keepFocus.current = true; };
-  const trigger = <Tooltip>
-    <PopoverAnchor asChild><ActionMenuTrigger asChild><TooltipTrigger asChild>
-      <Button size="icon-xs" variant="ghost" disabled={disabled} aria-label={label}><MoreHorizontal /></Button>
-    </TooltipTrigger></ActionMenuTrigger></PopoverAnchor>
-    <TooltipContent>{label}</TooltipContent>
-  </Tooltip>;
   return <Popover open={open} onOpenChange={onOpenChange}>
-    <ActionMenu>
-      <ActionMenuTarget asChild disabled={disabled} blankOnly={blankOnly}>{children(trigger)}</ActionMenuTarget>
-      <ActionMenuContent align="end" onCloseAutoFocus={event => {
-        if (keepFocus.current) { event.preventDefault(); keepFocus.current = false; }
-      }}>
-        <ActionMenuGroup>{items(() => { handOff(); onOpenChange(true); }, handOff)}</ActionMenuGroup>
-      </ActionMenuContent>
-    </ActionMenu>
-    <PopoverContent align="end" className="flex w-72 flex-col gap-3 p-3 text-sm">{confirmation}</PopoverContent>
+    <IconButton size="icon-xs" label={label} disabled={disabled} className="text-destructive hover:text-destructive" asChild>
+      <PopoverTrigger>{icon}</PopoverTrigger>
+    </IconButton>
+    <PopoverContent align="end" className="flex w-72 flex-col gap-3 p-3 text-sm">{children}</PopoverContent>
   </Popover>;
 }

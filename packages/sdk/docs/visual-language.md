@@ -8,6 +8,8 @@ Choose controls that meet your view's requirements. You can use a third-party li
 
 The host already draws the outer surface of every plugin view. A resource card has its shell and header, a settings page sits on the settings sheet, and an island opened through the SDK's island panel receives the shared title bar, toolbar slot, and content sheet. Put domain content inside these containers rather than drawing another card, header, or close control around it.
 
+A card's title bar belongs to the object. Render `CardHeader` from the card's `Header` component to add a status, a muted summary, and actions after the title; that component stays mounted while the card is collapsed. A page inside the card, such as an item's details, renders its own `CardHeader` from the body with a page title and a back action, and the host replaces the title bar while that page stays mounted. Put resource operations in the actions as icon buttons, with a destructive one confirmed next to its button; the host already supplies the title bar's overflow menu, so do not add another. Name a status only for a state the reader should notice. The host decides how parts yield when the bar is narrow, so keep each part short and avoid restating it in the body.
+
 The island panel's title bar is where operations on the whole subject go: a primary action such as Save, and icon actions such as delete or restore defaults. Operations on one part of the content belong with that part, for example in a section header. A panel has no bottom action bar, because it is a non-modal workspace rather than a dialog.
 
 ## Separate regions by tone, not outlines

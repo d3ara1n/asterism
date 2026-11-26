@@ -104,7 +104,8 @@ export interface ResourceDescription {
 }
 export interface CardView extends CardAppearance {
   body: ReactNode;
-  actions?: ReactNode;
+  /** Title bar contribution that stays mounted while the card is collapsed. */
+  header?: ReactNode;
   panels?: readonly CardPanelView[];
 }
 export interface CardRenderer {
@@ -192,11 +193,12 @@ export function cardRenderer<T extends Json>(
   contract: DataContract<T>,
   definition: CardAppearance & {
     Body: ComponentType<{ data: T }>;
-    Actions?: ComponentType<{ data: T }>;
+    /** Renders `CardHeader` from the projection; it stays mounted while the card is collapsed and the body is not. */
+    Header?: ComponentType<{ data: T }>;
     panels?: readonly CardPanelDefinition<T>[];
   },
 ): CardRenderer {
-  const { Body, Actions, panels, ...appearance } = definition;
+  const { Body, Header, panels, ...appearance } = definition;
   const ids = new Set<string>();
   for (const panel of panels ?? []) {
     if (!panel.id.trim() || panel.id !== panel.id.trim()) throw new Error("Card panel IDs must be non-empty and trimmed.");
@@ -208,7 +210,7 @@ export function cardRenderer<T extends Json>(
     if (!parsed.success) return null;
     const bind = (node: ReactNode) => context ? createElement(ObjectContext.Provider, { value: context }, node) : node;
     return { ...appearance, body: bind(createElement(Body, { data: parsed.data })),
-      actions: Actions ? bind(createElement(Actions, { data: parsed.data })) : undefined,
+      header: Header ? bind(createElement(Header, { data: parsed.data })) : undefined,
       panels: panels?.map(({ Body: PanelBody, ...panel }) => ({
         ...panel, body: bind(createElement(PanelBody, { data: parsed.data })),
       })) };

@@ -1,12 +1,11 @@
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { ArrowLeft, Check, FilePenLine, MessageSquareText, Pencil, Trash2, Undo2, UserRoundCheck } from "lucide-react";
-import { IslandPanel, useI18n, useRendererCalls, useRendererIsland, useRendererObject } from "@asterism-app/sdk/renderer";
+import { ArrowLeft, Check, FilePenLine, NotebookPen, Pencil, Trash2, Undo2, UserRoundCheck } from "lucide-react";
+import { CardHeader, IslandPanel, useI18n, useRendererCalls, useRendererIsland, useRendererObject } from "@asterism-app/sdk/renderer";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { Markdown } from "@asterism-app/ui/markdown";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
-import { ActionMenuItem } from "@asterism-app/ui/ui/action-menu";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@asterism-app/ui/ui/input-group";
 import { PopoverDescription } from "@asterism-app/ui/ui/popover";
 import { Separator } from "@asterism-app/ui/ui/separator";
@@ -16,7 +15,7 @@ import { todoMessages as messages } from "../messages/todo";
 import { SkillReferences } from "../skills/references";
 import { MutateTodo, ReadTodoItem } from "./contract";
 import type { Todo } from "./model";
-import { MenuConfirm, TodoError, TodoStatusBadge, actorName, formatMoment, isNotFound, todoFailure, useTodoMutation } from "./ui";
+import { ConfirmButton, TodoError, actorName, formatMoment, isNotFound, todoFailure, todoTones, useTodoMutation } from "./ui";
 
 const EditorIsland = lazy(() => import("../editor/EditorIsland").then(module => ({ default: module.EditorIsland })));
 
@@ -38,15 +37,15 @@ function useTodo(id: string, latest: number) {
   return state.id === id ? state : { id, todo: null, gone: false, error: null };
 }
 
-/** Completion note editor that replaces the action bar; Cmd/Ctrl+Enter submits and Escape returns to the actions. */
+/** Completion note composer that replaces the action bar; Cmd/Ctrl+Enter completes the task and Escape returns to the actions. */
 function CompletionComposer({ todo, onDone }: { todo: Todo; onDone(): void }) {
   const i18n = useI18n();
-  const [note, setNote] = useState(todo.completion?.note ?? "");
+  const [note, setNote] = useState("");
   const { run, pending, error } = useTodoMutation();
   const submit = async () => {
     if (await run({ action: "complete", id: todo.id, ...(note.trim() ? { note } : {}) })) onDone();
   };
-  const label = i18n.text(todo.status === "done" ? messages.editCompletion : messages.complete);
+  const label = i18n.text(messages.complete);
   return <form className="flex flex-col gap-2 border-t p-2" onSubmit={event => { event.preventDefault(); void submit(); }}>
     <TodoError error={error} />
     <InputGroup>
@@ -89,50 +88,47 @@ export function TaskDetail({ id, latest, focus, back }: { id: string; latest: nu
   const i18n = useI18n(), object = useRendererObject(), island = useRendererIsland();
   const { todo, gone, error } = useTodo(id, latest);
   const [completing, setCompleting] = useState(false), [confirming, setConfirming] = useState(false);
-  const [opening, setOpening] = useState(false), [openError, setOpenError] = useState<UiText | null>(null);
+  const [opening, setOpening] = useState<"content" | "completion" | null>(null), [openError, setOpenError] = useState<UiText | null>(null);
   const removal = useTodoMutation();
-  const edit = async (origin: HTMLElement) => {
+  /** The description and the completion note open in the same Markdown editor island, each saving through its own mutation. */
+  const openEditor = async (origin: HTMLElement, field: "content" | "completion") => {
     if (!todo || opening) return;
-    setOpening(true); setOpenError(null);
+    setOpening(field); setOpenError(null);
+    const title = field === "content" ? todo.title : `${todo.title} · ${i18n.text(messages.completionNoteTitle)}`;
     try {
-      await island.open({ key: `todo-content:${object.ref.sessionId}:${object.ref.id}:${todo.id}`, label: todo.title, size: "content", origin,
-        render: () => <Suspense fallback={<IslandPanel title={todo.title}><Spinner /></IslandPanel>}>
-          <EditorIsland title={todo.title} filename="task.md" text={todo.content} onSave={async content => {
-            const receipt = await object.invoke(MutateTodo, { action: "write", id: todo.id, content });
-            if (!receipt.ok) throw receipt.error;
-          }} />
+      await island.open({ key: `todo-${field}:${object.ref.sessionId}:${object.ref.id}:${todo.id}`, label: title, size: "content", origin,
+        render: () => <Suspense fallback={<IslandPanel title={title}><Spinner /></IslandPanel>}>
+          <EditorIsland title={title} filename={field === "content" ? "task.md" : "completion.md"}
+            text={field === "content" ? todo.content : todo.completion?.note ?? ""} onSave={async text => {
+              const receipt = await object.invoke(MutateTodo, field === "content" ? { action: "write", id: todo.id, content: text }
+                : { action: "complete", id: todo.id, ...(text.trim() ? { note: text } : {}) });
+              if (!receipt.ok) throw receipt.error;
+            }} />
         </Suspense> });
     } catch (failure) { setOpenError(todoFailure(failure)); }
-    finally { setOpening(false); }
+    finally { setOpening(null); }
   };
-  return <MenuConfirm label={i18n.text(messages.taskActions)} disabled={!todo || gone} open={confirming} onOpenChange={setConfirming}
-    items={(confirm, handOff) => todo && <>
-      {todo.status === "done" && <ActionMenuItem onSelect={() => { handOff(); setCompleting(true); }}>
-        <MessageSquareText />{i18n.text(messages.editCompletion)}
-      </ActionMenuItem>}
-      <ActionMenuItem variant="destructive" onSelect={confirm}><Trash2 />{i18n.text(messages.deleteTask)}…</ActionMenuItem>
-    </>}
-    confirmation={todo && <>
-      <PopoverDescription>{i18n.text(messages.deleteTaskConfirm)}</PopoverDescription>
-      <TodoError error={removal.error} />
-      <div className="flex justify-end gap-2">
-        <Button size="sm" variant="ghost" disabled={removal.pending} onClick={() => setConfirming(false)}>{i18n.text(commonMessages.cancel)}</Button>
-        <Button size="sm" variant="destructive" disabled={removal.pending} aria-busy={removal.pending} onClick={async () => {
-          if (await removal.run({ action: "delete", id: todo.id })) { setConfirming(false); back(); }
-        }}>{removal.pending && <Spinner />}{i18n.text(messages.deleteTask)}</Button>
-      </div>
-    </>}>
-    {trigger => <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
-      <header className="flex min-w-0 items-center gap-1 border-b px-2 py-1.5">
-        <IconButton size="icon-xs" variant="ghost" label={i18n.text(messages.back)}
-          autoFocus={focus} onClick={back}><ArrowLeft /></IconButton>
-        <div className="min-w-0 flex-1">{todo && <TodoStatusBadge status={todo.status} />}</div>
-        {todo && <>
-          <IconButton size="icon-xs" label={i18n.text(messages.editContent)} disabled={opening}
-            onClick={event => { void edit(event.currentTarget); }}>{opening ? <Spinner /> : <Pencil />}</IconButton>
-          {trigger}
-        </>}
-      </header>
+  const edit = (origin: HTMLElement) => openEditor(origin, "content");
+  return <div className="nodrag nopan flex min-h-0 flex-1 flex-col">
+      <CardHeader page={{ title: todo?.title ?? "", backLabel: i18n.text(messages.back), onBack: back, autoFocus: focus }}
+        status={todo && !gone ? { tone: todoTones[todo.status], label: i18n.text(messages[todo.status]), still: true } : undefined}
+        actions={todo && !gone && <>
+          <IconButton size="icon-xs" label={i18n.text(messages.editContent)} disabled={!!opening}
+            onClick={event => { void edit(event.currentTarget); }}>{opening === "content" ? <Spinner /> : <Pencil />}</IconButton>
+          {todo.status === "done" && <IconButton size="icon-xs" label={i18n.text(messages.editCompletion)} disabled={!!opening}
+            onClick={event => { void openEditor(event.currentTarget, "completion"); }}>{opening === "completion" ? <Spinner /> : <NotebookPen />}</IconButton>}
+          <ConfirmButton label={i18n.text(messages.deleteTask)} icon={<Trash2 />} open={confirming}
+            onOpenChange={open => { if (open) removal.clearError(); if (open || !removal.pending) setConfirming(open); }}>
+            <PopoverDescription>{i18n.text(messages.deleteTaskConfirm)}</PopoverDescription>
+            <TodoError error={removal.error} />
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="ghost" disabled={removal.pending} onClick={() => setConfirming(false)}>{i18n.text(commonMessages.cancel)}</Button>
+              <Button size="sm" variant="destructive" disabled={removal.pending} aria-busy={removal.pending} onClick={async () => {
+                if (await removal.run({ action: "delete", id: todo.id })) { setConfirming(false); back(); }
+              }}>{removal.pending && <Spinner />}{i18n.text(messages.deleteTask)}</Button>
+            </div>
+          </ConfirmButton>
+        </>} />
 
       <ScrollArea className="min-h-0 flex-1" contentClassName="flex flex-col gap-3 p-3">
         {gone ? <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -151,7 +147,7 @@ export function TaskDetail({ id, latest, focus, back }: { id: string; latest: nu
               </div>
               {todo.content.trim()
                 ? <div className="select-text"><SkillReferences><Markdown>{todo.content}</Markdown></SkillReferences></div>
-                : <Button size="sm" variant="ghost" className="self-start text-muted-foreground" disabled={opening}
+                : <Button size="sm" variant="ghost" className="self-start text-muted-foreground" disabled={!!opening}
                   onClick={event => { void edit(event.currentTarget); }}><FilePenLine />{i18n.text(messages.noContent)}</Button>}
               {todo.completion && <>
                 <Separator />
@@ -167,6 +163,5 @@ export function TaskDetail({ id, latest, focus, back }: { id: string; latest: nu
       {todo && !gone && (completing
         ? <CompletionComposer todo={todo} onDone={() => setCompleting(false)} />
         : <ActionBar todo={todo} onComplete={() => setCompleting(true)} />)}
-    </div>}
-  </MenuConfirm>;
+    </div>;
 }

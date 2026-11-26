@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { Check, MoreHorizontal, Network, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useI18n, useRendererObject, type RendererReceipt } from "@asterism-app/sdk/renderer";
+import { CardHeader, useI18n, useRendererObject, type RendererReceipt } from "@asterism-app/sdk/renderer";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { ActionMenu, ActionMenuContent, ActionMenuGroup, ActionMenuItem, ActionMenuTarget, ActionMenuTrigger } from "@asterism-app/ui/ui/action-menu";
@@ -14,7 +14,6 @@ import { ItemGroup } from "@asterism-app/ui/ui/item";
 import { ListRow, ListRowAction } from "@asterism-app/ui/ui/list-row";
 import { Popover, PopoverAnchor, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
-import { StatusBadge } from "@asterism-app/ui/ui/status";
 import { VirtualList } from "@asterism-app/ui/ui/virtual-list";
 import { CreateMeshChannel, DeleteMeshChannel, RenameMeshChannel, SelectMeshChannel, type MeshCardData } from "./contract";
 import { meshMessages as messages } from "../messages/mesh";
@@ -94,13 +93,14 @@ function CreateChannel({ variant }: { variant: "icon" | "button" }) {
   </Popover>;
 }
 
-/** Titlebar content: the missing-channel state stays visible when the card is collapsed. */
-export function MeshActions({ data }: { data: MeshCardData }) {
+/** Title bar: the connected channel, or the missing connection, stays visible when the card is collapsed. */
+export function MeshHeader({ data }: { data: MeshCardData }) {
   const i18n = useI18n();
-  return <>
-    {data.channelId === null && <StatusBadge tone="neutral" role="status">{i18n.text(messages.disconnected)}</StatusBadge>}
-    <CreateChannel variant="icon" />
-  </>;
+  const channel = data.channels.find(item => item.id === data.channelId);
+  return <CardHeader
+    status={channel ? undefined : { tone: "warning", label: i18n.text(messages.disconnected) }}
+    summary={channel && <><bdi>{channel.title}</bdi> · {i18n.formatMessage(messages.agents, { count: channel.agents })}</>}
+    actions={<CreateChannel variant="icon" />} />;
 }
 
 /**
@@ -119,7 +119,7 @@ function ChannelRow({ channel, selected }: { channel: Channel; selected: boolean
   return <Popover open={open} onOpenChange={next => { if (!next) close(); }}>
     <ActionMenu>
       <ActionMenuTarget asChild disabled={!edit.ready}>
-        <PopoverAnchor asChild><div role="listitem" className="px-1">
+        <PopoverAnchor asChild><div role="listitem">
           <ListRow className={rowClass} contentClassName="gap-0.5" selected={selected} disabled={!selection.ready}
             title={<span className="truncate">{channel.title}</span>} tooltip={channel.title}
             description={i18n.formatMessage(messages.agents, { count: channel.agents })}

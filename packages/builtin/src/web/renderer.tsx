@@ -9,7 +9,7 @@ import { WebResource, CreateWeb, WebView, WebSearch, WebFetch } from "./contract
 import { webMessages as messages } from "../messages/web";
 import { Markdown } from "@asterism-app/ui/markdown";
 import { settledBodyViews } from "../shared/tool-views";
-import { WebCard } from "./WebCard";
+import { WebCard, WebHeader } from "./WebCard";
 
 import { webCard as appearance } from "../shared/card-appearance.ts";
 const field = (value: Json, key: string) => value && typeof value === "object" && !Array.isArray(value) && typeof value[key] === "string" ? value[key] : undefined;
@@ -76,7 +76,7 @@ function FetchHeader({ args, invocation }: ToolRenderProps) {
 }
 export default {
   resources: [{ kind: WebResource.kind, label: messages.title, icon: <Globe className="size-4" />, card: appearance }],
-  cards: [cardRenderer(WebView, { ...appearance, Body: WebCard })],
+  cards: [cardRenderer(WebView, { ...appearance, Body: WebCard, Header: WebHeader })],
   tools: [
     toolRenderer(WebSearch, { label: messages.search, icon: <Search className="size-3.5" />, ...settledBodyViews(SearchHeader, SearchBody) }),
     toolRenderer(WebFetch, { label: messages.fetch, icon: <Download className="size-3.5" />, ...settledBodyViews(FetchHeader, FetchBody) }),

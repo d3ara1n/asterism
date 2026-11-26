@@ -2,7 +2,7 @@ import { fileReferenceProvider } from "./reference-provider";
 import { SearchDirectoryReferences } from "./search-contract";
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { lazy } from "react";
-import { useI18n, useRendererApplication, useRendererObject, creationEntry, cardRenderer, toolRenderer, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
+import { useI18n, useRendererApplication, useRendererObject, creationEntry, cardRenderer, toolRenderer, CardHeader, type RendererModule, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import type { z } from "zod";
 import { ExternalLink, Eye, Folder, FolderOpen, FileText, FileDown, FilePenLine, FilePlus2, Info, ListTree, Replace } from "lucide-react";
 
@@ -25,7 +25,7 @@ import { ResolveDirectoryLocation } from "./editor-contract";
 import { DirectoryInput } from "./creation";
 import { execToolRenderer } from "./exec-view";
 import { useTreeStore } from "./tree-store";
-import { FileTreeBody, FileTreeActions } from "./FileTree";
+import { FileTreeBody, FileTreeActions, FileTreeChanges } from "./FileTree";
 import { searchToolRenderers } from "./search-view";
 import { listViews } from "./list-view";
 import { inspectPathRenderer } from "./inspection-view";
@@ -64,18 +64,18 @@ const useDirectoryTree = () => useTreeStore("asterism.builtin/directory-tree", (
   },
 }));
 
-function DirectoryTreeActions({ data }: { data: { path: string } }) {
+function DirectoryTreeHeader({ data }: { data: { path: string } }) {
   const { store, state } = useDirectoryTree();
   const i18n = useI18n();
   const application = useRendererApplication();
   const { run, busy } = useSettingsAction(filesystemMessages.directoryOpenFailed, message => { toast.error(i18n.text(message)); });
-  return <>
+  return <CardHeader summary={state.changes ? <FileTreeChanges state={state} /> : undefined} actions={<>
     <FileTreeActions store={store} state={state} />
     <IconButton size="icon-xs" label={i18n.text(filesystemMessages.directoryOpen)} disabled={busy} aria-busy={busy}
       onClick={() => { void run(() => application.openLocalFile(data.path)); }}>
       {busy ? <Spinner aria-hidden /> : <FolderOpen />}
     </IconButton>
-  </>;
+  </>} />;
 }
 
 function DirectoryTreeBody() {
@@ -101,7 +101,7 @@ export default {
   cards: [cardRenderer(DirectoryView, {
     ...appearance,
     Body: DirectoryTreeBody,
-    Actions: DirectoryTreeActions,
+    Header: DirectoryTreeHeader,
   })],
   tools: [
     inspectPathRenderer,

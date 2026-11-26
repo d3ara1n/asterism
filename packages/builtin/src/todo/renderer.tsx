@@ -6,7 +6,7 @@ import { todoListCard as appearance } from "../shared/card-appearance";
 import { textWriteViews, textEditViews } from "../text-view";
 import { BrowseTodoLists, CreateSharedTodoList, DeleteSharedTodoList, TodoListResource, TodoListView, CreateTodoListResource, TodoListItems, TodoRead, TodoGrep, TodoWrite, TodoEdit,
   ListTodoReferenceItems, todoItemLocation, TodoCreate, TodoClaim, TodoRelease, TodoComplete, TodoReopen, TodoDelete } from "./contract";
-import { TodoListCard } from "./TodoListCard";
+import { TodoListCard, TodoListHeader } from "./TodoListCard";
 import { TodoListInput } from "./creation";
 import { claimViews, completeViews, createListViews, createViews, deleteListViews, deleteViews, grepViews, listsViews, pageViews,
   readViews, releaseViews, reopenViews } from "./tool-views";
@@ -22,7 +22,7 @@ export default {
       },
     },
   }],
-  cards: [cardRenderer(TodoListView, { ...appearance, Body: TodoListCard })],
+  cards: [cardRenderer(TodoListView, { ...appearance, Body: TodoListCard, Header: TodoListHeader })],
   creations: [creationEntry(CreateTodoListResource, { id: CreateTodoListResource.id, label: messages.list, icon: <ListTodo className="size-4" />,
     group: "resources", InputView: TodoListInput, triggers: { menu: {} } })],
   tools: [

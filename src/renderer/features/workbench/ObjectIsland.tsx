@@ -52,7 +52,7 @@ function IslandObject({ object }: { object: WorkbenchObject }) {
   const i18n = useI18n();
   const island = useIsland();
   const content = useObjectView(object);
-  return <IslandMenu triggerSize="icon-xs">{(menuTrigger, renderHeader) => <ObjectSurface renderHeader={renderHeader} icon={content.icon} kind={content.kind} title={object.title} actions={content.actions} panels={content.panels}
+  return <IslandMenu triggerSize="icon-xs">{(menuTrigger, renderHeader) => <ObjectSurface renderHeader={renderHeader} icon={content.icon} kind={content.kind} title={object.title} header={content.header} panels={content.panels}
     controls={<>
       {menuTrigger}
       <IconButton size="icon-xs" label={i18n.text(objectsMessages.returnToCard)} onClick={() => { void island.close(); }}>

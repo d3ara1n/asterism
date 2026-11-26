@@ -11,7 +11,7 @@ import { fallbackCardAppearance } from "./sizing";
 import { PluginIslandProvider } from "../plugins/scope";
 
 /**
- * Resolved object content view: body, auxiliary panels, and resource actions are all bound to object capabilities and isolated by error boundaries.
+ * Resolved object content view: body, auxiliary panels, and the title bar contribution are all bound to object capabilities and isolated by error boundaries.
  * Cards and object islands share this resolution; the caller chooses which container mounts the content.
  */
 export function useObjectView(object: WorkbenchObject) {
@@ -22,7 +22,7 @@ export function useObjectView(object: WorkbenchObject) {
   const view = registry.card(object.presentation, context) ?? {
     ...fallbackCardAppearance,
     body: <div className="min-h-0 flex-1 select-text overflow-auto p-3"><JsonView scrollable={false} value={object.presentation.data} /></div>,
-    actions: undefined,
+    header: undefined,
     panels: undefined,
   };
   const bind = (node: ReactNode) => <ObjectServices object={object}>
@@ -37,6 +37,6 @@ export function useObjectView(object: WorkbenchObject) {
     kind: i18n.text(descriptor.label),
     body: <SlotBoundary key={JSON.stringify(object.presentation.contract)}>{bind(view.body)}</SlotBoundary>,
     panels,
-    actions: <SlotBoundary fallback={null}>{bind(view.actions)}</SlotBoundary>,
+    header: <SlotBoundary fallback={null}>{bind(view.header)}</SlotBoundary>,
   };
 }

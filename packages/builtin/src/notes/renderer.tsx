@@ -1,5 +1,5 @@
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
-import { useI18n, creationEntry, cardRenderer, toolRenderer, type RendererModule } from "@asterism-app/sdk/renderer";
+import { useI18n, creationEntry, cardRenderer, toolRenderer, CardHeader, type RendererModule } from "@asterism-app/sdk/renderer";
 import { FileText, FilePenLine, FilePlus2, Replace, TextSearch } from "lucide-react";
 
 import { Markdown } from "@asterism-app/ui/markdown";
@@ -21,7 +21,7 @@ export default {
   resources: [{ kind: Note.kind, label: commonMessages.kindNote, icon: <FileText className="size-4" />, card: appearance }],
   cards: [cardRenderer(NoteView, {
     ...appearance,
-    Actions: NoteActions,
+    Header: ({ data }) => <CardHeader actions={<NoteActions data={data} />} />,
     Body: ({ data }) => { const i18n = useI18n(); return <ScrollArea className="min-h-0 flex-1" viewportClassName="select-text" contentClassName="p-3">
       {data.text !== null ? <SkillReferences><Markdown>{data.text}</Markdown></SkillReferences>
         : <p className="type-body text-muted-foreground">{i18n.formatMessage(textMessages.contentUnavailable)}</p>}

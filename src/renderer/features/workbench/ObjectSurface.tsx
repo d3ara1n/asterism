@@ -3,6 +3,7 @@ import { RendererCardProvider, type CardPanelView, type RendererCard } from "@as
 import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
 import { PanelsTopLeft, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode, type RefObject } from "react";
+import { CardHeaderSlot, HeaderSurfaceProvider, HeaderTitle, useHeaderSurface } from "./card-header";
 
 import { objectsMessages } from "../../messages/objects";
 import { useI18n } from "../../shared/i18n";
@@ -18,9 +19,9 @@ const noPanels: readonly CardPanelView[] = [];
  * Shared shell for object content: titlebar, auxiliary panel container, and focus management. Cards and object islands are its two container types,
  * sharing the same content; the shell provides `@container/card`, and content adapts to its container width without knowing the container type.
  */
-export function ObjectSurface({ icon, kind, title, actions, controls, panels = noPanels, collapsed = false, expandedHeight, resizing = false, onExpand, headerClassName, renderHeader, children }: {
+export function ObjectSurface({ icon, kind, title, header, controls, panels = noPanels, collapsed = false, expandedHeight, resizing = false, onExpand, headerClassName, renderHeader, children }: {
   icon: ReactNode; kind: string; title: string;
-  /** Resource and host actions, to the left of the auxiliary panel menu. */ actions?: ReactNode;
+  /** The resource's title bar contribution; it stays mounted while the surface is collapsed. */ header?: ReactNode;
   /** Container controls (focus toggle and collapse), at the far right of the titlebar. */ controls?: ReactNode;
   panels?: readonly CardPanelView[];
   collapsed?: boolean;
@@ -68,8 +69,9 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
     wasOpen.current = activeId !== null;
   }, [activeId, collapse.interactive]);
 
-  const wrapHeader = renderHeader ?? ((header: ReactElement) => header);
-  return <RendererCardProvider value={card}>
+  const wrapHeader = renderHeader ?? ((element: ReactElement) => element);
+  const headerSurface = useHeaderSurface();
+  return <RendererCardProvider value={card}><HeaderSurfaceProvider surface={headerSurface}>
     <motion.div ref={root} className="@container/card min-w-0 overflow-hidden bg-card-shell"
       style={{ height: expandedHeight === undefined ? "100%" : collapse.height, minHeight: collapse.headerHeight ?? undefined }}
       onKeyDown={event => {
@@ -79,14 +81,11 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
       }}>
       <div className="flex min-h-0 min-w-0 flex-col" style={{ height: expandedHeight ?? "100%" }}>
         {wrapHeader(<header ref={collapse.header} className={cn("flex shrink-0 items-center gap-2 px-3 py-2", headerClassName)}>
-          {/* Narrow containers show only the type icon, leaving width for the title; the type name always remains the icon's accessible name and tooltip. */}
-          <TooltipHint content={kind}><span role="img" aria-label={kind} className="flex size-4 shrink-0 items-center justify-center text-muted-foreground [&_svg]:size-4">{icon}</span></TooltipHint>
-          <div className="flex min-w-0 flex-1 items-baseline gap-2">
-            <p aria-hidden="true" className="type-label hidden max-w-1/3 shrink-0 truncate @min-[16rem]/card:block">{kind}</p>
-            <TooltipHint content={title}><h2 className="type-section min-w-0 flex-1 truncate">{title}</h2></TooltipHint>
-          </div>
+          {/* The kind icon's accessible name and tooltip carry the type name. */}
+          <HeaderTitle surface={headerSurface} icon={icon} kind={kind} title={title} />
+          <CardHeaderSlot value="header">{header}</CardHeaderSlot>
           <div className="nodrag flex shrink-0 items-center gap-0.5">
-            {actions}
+            <div ref={headerSurface.setActions} className="contents" />
             {panels.length > 0 && <DropdownMenu>
               <IconButton ref={trigger} variant={active ? "selected" : "ghost"} size="icon-xs"
                 aria-pressed={Boolean(active)} label={i18n.text(objectsMessages.auxiliaryPanels)} asChild>
@@ -111,7 +110,9 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
         {collapse.mounted && <motion.div data-object-content="" inert={!collapse.interactive}
           style={{ opacity: collapse.opacity, y: collapse.y }}
           className="nodrag nopan surface-inset relative mx-1 mb-1 flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", active && "invisible @min-[52rem]/card:visible")}>{children}</div>
+          <div className={cn("flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden", active && "invisible @min-[52rem]/card:visible")}>
+            <CardHeaderSlot value="body">{children}</CardHeaderSlot>
+          </div>
           {/* popLayout takes a leaving panel out of flow at once, so wide cards reclaim the column while it fades and switches crossfade in place. */}
           <AnimatePresence initial={false} mode="popLayout">
             {active && <AuxiliaryPanel key={active.id} panel={active} focusRef={panelElement} reducedMotion={reducedMotion} onClose={closePanel} />}
@@ -119,7 +120,7 @@ export function ObjectSurface({ icon, kind, title, actions, controls, panels = n
         </motion.div>}
       </div>
     </motion.div>
-  </RendererCardProvider>;
+  </HeaderSurfaceProvider></RendererCardProvider>;
 }
 
 /** One mounted auxiliary panel; a leaving panel is inert and releases the focus ref to its successor. */
