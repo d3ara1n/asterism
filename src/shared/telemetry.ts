@@ -7,7 +7,7 @@ import type { Granularity } from "./telemetry-time.ts";
  * Usage statistics protocol: composable reads over the host usage ledger. Each read applies one filter and returns identities,
  * recorded snapshots, and raw sums; presentation, ratios, and localized labels belong to the renderer.
  */
-export const telemetryDimensions = ["model", "provider", "folder", "session", "purpose", "plugin", "thinking", "error"] as const;
+export const telemetryDimensions = ["modelKind", "model", "provider", "folder", "session", "purpose", "plugin", "thinking", "error"] as const;
 export type TelemetryDimension = typeof telemetryDimensions[number];
 export const telemetryGranularities = ["hour", "day", "week", "month"] as const;
 
@@ -16,6 +16,9 @@ const time = z.number().int().nonnegative();
 
 export const modelKindSchema = z.enum(["language", "decision"]);
 export type ModelKind = z.infer<typeof modelKindSchema>;
+export const modelKinds = modelKindSchema.options;
+/** Thinking levels, first output, and output speed describe language generation; the ledger counts them for this category only. */
+export const generationModelKind = "language" satisfies ModelKind;
 
 const subjectId = z.string().min(1);
 /** Match declarations by exact identity. A null source selects declarations without one. */
@@ -29,7 +32,8 @@ export type SubjectMatch = z.infer<typeof subjectMatchSchema>;
  * from/to bound event start times as [from, to); null leaves that side open. utcOffsetMinutes is positive east of UTC (+480 for UTC+8)
  * and places hour, day, weekday, and month boundaries. Optional dimensions narrow the ledger independently; null selects the absent
  * value (no folder, no purpose, the provider's default thinking level). A model ID selects it across every provider that served it,
- * while a provider narrows the same way whether or not a model is chosen.
+ * while a provider narrows the same way whether or not a model is chosen. The model category narrows both; thinking selects
+ * language requests only.
  */
 export const telemetryFilterSchema = z.strictObject({
   from: time.nullable(),
@@ -47,6 +51,10 @@ export const telemetryFilterSchema = z.strictObject({
   subject: subjectMatchSchema.optional(),
 });
 export type TelemetryFilter = z.infer<typeof telemetryFilterSchema>;
+
+/** Dimensions that only model requests carry; any of them excludes plugin-reported usage. */
+const modelOnlyFilters = ["modelKind", "providerId", "modelId", "purposeId", "thinking", "subject"] as const satisfies readonly (keyof TelemetryFilter)[];
+export const excludesExternalUsage = (filter: Partial<TelemetryFilter>) => modelOnlyFilters.some(key => filter[key] !== undefined);
 
 export const telemetryQuerySchema = z.discriminatedUnion("kind", [
   /** Filter choices and the recorded time span, independent of the filter. */
@@ -124,6 +132,7 @@ export type SessionStatus = "active" | "sleeping" | "archived" | "deleted";
  * `other` collects groups beyond a series limit.
  */
 export type TelemetryGroup =
+  | { dimension: "modelKind"; key: string; modelKind: ModelKind }
   | { dimension: "model"; key: string; modelKind: ModelKind; providerId: string; modelId: string; providerName: string }
   | { dimension: "provider"; key: string; modelKind: ModelKind; providerId: string; providerName: string }
   | { dimension: "folder"; key: string; folderId: string | null; name: string | null; color: string | null; deleted: boolean }
@@ -139,6 +148,7 @@ export interface TelemetryFacets {
   firstEventAt: number | null;
   lastEventAt: number | null;
   folders: Extract<TelemetryGroup, { dimension: "folder" }>[];
+  modelKinds: Extract<TelemetryGroup, { dimension: "modelKind" }>[];
   providers: Extract<TelemetryGroup, { dimension: "provider" }>[];
   models: Extract<TelemetryGroup, { dimension: "model" }>[];
   plugins: Extract<TelemetryGroup, { dimension: "plugin" }>[];

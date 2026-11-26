@@ -3,7 +3,7 @@ import { Search } from "lucide-react";
 import { SearchInput } from "@asterism-app/ui/ui/search-input";
 import { ToggleGroup, ToggleGroupItem } from "@asterism-app/ui/ui/toggle-group";
 import { cn } from "@asterism-app/ui/utils";
-import type { ExternalRow, ToolRow } from "../../../../shared/telemetry";
+import { excludesExternalUsage, type ExternalRow, type ToolRow } from "../../../../shared/telemetry";
 import { useI18n } from "../../../shared/i18n";
 import { dashboardMessages as msg } from "../../../messages/dashboard";
 import { DataTable, type Column } from "../DataTable";
@@ -21,7 +21,7 @@ export function ToolsView({ state, page, openGroup, openKey }: ViewProps) {
   const tools = useTelemetry(page.filter, { kind: "tools", groupBy }, state.revision);
   const purposes = useTelemetry(page.filter, { kind: "breakdown", dimension: "purpose", limit: 50, latency: false }, state.revision);
   const external = useTelemetry(page.filter, { kind: "external" }, state.revision);
-  const modelScoped = page.filter.providerId !== undefined || page.filter.purposeId !== undefined || page.filter.thinking !== undefined;
+  const modelScoped = excludesExternalUsage(page.filter);
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const all = tools.data?.rows ?? [];

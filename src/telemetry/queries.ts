@@ -1,7 +1,7 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { usageRelations, usageSubjectKinds } from "@asterism-app/sdk/contracts";
 import {
-  distributionEdges, modelKindSchema, type ModelKind, type BreakdownRow, type CurrencyAmount, type ExternalRow, type ExternalTotals, type Percentiles, type SeriesPoint,
+  distributionEdges, excludesExternalUsage, generationModelKind, modelKindSchema, type ModelKind, type BreakdownRow, type CurrencyAmount, type ExternalRow, type ExternalTotals, type Percentiles, type SeriesPoint,
   type TelemetryClearReply, type TelemetryDimension, type TelemetryEvent, type TelemetryExportReply, type TelemetryFacets, type TelemetryFilter,
   type TelemetryGroup, type TelemetryQuery, type TelemetryQueryResult, type ToolRow, type UsageMetrics, type SubjectRow, type SubjectMatch,
 } from "../shared/telemetry.ts";
@@ -16,6 +16,11 @@ export class TelemetryError extends Error {
 const maxBuckets = 1_000;
 
 interface Scope { sql: string; params: SQLInputValue[] }
+
+/** Requests whose category generates output; generation-only fields and metrics read only these. */
+const generationSql = `model_kind = '${generationModelKind}'`;
+/** First output time, counted for generation requests only. */
+const firstOutputSql = `(CASE WHEN ${generationSql} THEN first_output_ms END)`;
 
 /** Local time expression for SQLite date functions: event milliseconds shifted by the caller's offset, as Unix seconds. */
 const localTime = (column: string, offset: number) => `(${column} + ${Math.trunc(offset) * 60_000}) / 1000, 'unixepoch'`;
@@ -54,7 +59,7 @@ function modelEvents(filter: TelemetryFilter, range: { from: number | null; to: 
   if (filter.pluginId !== undefined) add("e.plugin_id = ?", filter.pluginId);
   if (filter.purposeId !== undefined) filter.purposeId === null ? add("e.purpose_id IS NULL") : add("e.purpose_id = ?", filter.purposeId);
   if (filter.thinking !== undefined) {
-    add("e.model_kind = 'language'");
+    add(`e.${generationSql}`);
     filter.thinking === null ? add("e.thinking IS NULL") : add("e.thinking = ?", filter.thinking);
   }
   if (filter.sessionId !== undefined) add("e.session_id = ?", filter.sessionId);
@@ -72,8 +77,7 @@ function modelEvents(filter: TelemetryFilter, range: { from: number | null; to: 
 
 /** External events in the filter; model-only dimensions select none of them. */
 function externalEvents(filter: TelemetryFilter, range: { from: number | null; to: number | null } = filter): Scope | null {
-  if (filter.modelKind !== undefined || filter.providerId !== undefined || filter.modelId !== undefined || filter.purposeId !== undefined || filter.thinking !== undefined
-    || filter.subject !== undefined) return null;
+  if (excludesExternalUsage(filter)) return null;
   const where: string[] = [];
   const params: SQLInputValue[] = [];
   if (range.from !== null) { where.push("x.recorded_at >= ?"); params.push(range.from); }
@@ -87,7 +91,7 @@ function externalEvents(filter: TelemetryFilter, range: { from: number | null; t
 }
 
 const tokensSql = "COALESCE(total_tokens, COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0))";
-const generationSql = "output_tokens > 0 AND duration_ms > COALESCE(first_output_ms, 0)";
+const generatedSql = `${generationSql} AND output_tokens > 0 AND duration_ms > COALESCE(first_output_ms, 0)`;
 /** Aggregates behind UsageMetrics; TOTAL yields 0 for empty groups while SUM keeps null for unpriced cost parts. */
 const metricsSql = `COUNT(*) AS m_requests,
   TOTAL(outcome = 'completed') AS m_completed, TOTAL(outcome = 'failed') AS m_failed, TOTAL(outcome = 'cancelled') AS m_cancelled,
@@ -97,8 +101,8 @@ const metricsSql = `COUNT(*) AS m_requests,
   SUM(cost_input_usd) AS m_cost_input, SUM(cost_cache_read_usd) AS m_cost_cache_read, SUM(cost_cache_write_usd) AS m_cost_cache_write,
   SUM(cost_output_usd) AS m_cost_output, SUM(cost_reasoning_usd) AS m_cost_reasoning,
   TOTAL(cache_saved_usd) AS m_cache_saved, TOTAL(tier_from_input_tokens IS NOT NULL) AS m_tiered, TOTAL(duration_ms) AS m_duration,
-  TOTAL(CASE WHEN ${generationSql} THEN duration_ms - COALESCE(first_output_ms, 0) END) AS m_generation_ms,
-  TOTAL(CASE WHEN ${generationSql} THEN output_tokens END) AS m_generated, MAX(started_at) AS m_last`;
+  TOTAL(CASE WHEN ${generatedSql} THEN duration_ms - COALESCE(first_output_ms, 0) END) AS m_generation_ms,
+  TOTAL(CASE WHEN ${generatedSql} THEN output_tokens END) AS m_generated, MAX(started_at) AS m_last`;
 
 type Row = Record<string, SQLInputValue>;
 const num = (value: SQLInputValue | undefined) => typeof value === "number" ? value : typeof value === "bigint" ? Number(value) : 0;
@@ -130,13 +134,14 @@ function percentileSql(value: string, partition: string | null, source: string):
 
 interface DimensionSpec { columns: readonly string[]; where?: string }
 const dimensionSpecs: Record<TelemetryDimension, DimensionSpec> = {
+  modelKind: { columns: ["model_kind"] },
   model: { columns: ["provider_id", "model_id", "model_kind"] },
   provider: { columns: ["provider_id", "model_kind"] },
   folder: { columns: ["folder_id"] },
   session: { columns: ["session_id"], where: "session_id IS NOT NULL" },
   purpose: { columns: ["plugin_id", "purpose_id"] },
   plugin: { columns: ["plugin_id"] },
-  thinking: { columns: ["thinking"], where: "model_kind = 'language'" },
+  thinking: { columns: ["thinking"], where: generationSql },
   error: { columns: ["error_origin", "error_code"], where: "outcome = 'failed'" },
 };
 const dimensionSelect = (spec: DimensionSpec) => spec.columns.map((column, index) => `${column} AS d${index}`).join(", ");
@@ -185,6 +190,7 @@ class Groups {
     const key = groupKey(values);
     const [first = null, second = null, third = null] = values;
     switch (dimension) {
+      case "modelKind": return { dimension, key, modelKind: modelKindSchema.parse(first) };
       case "model": {
         const modelKind = modelKindSchema.parse(third);
         return { dimension, key, modelKind, providerId: first!, modelId: second!, providerName: this.providerName(modelKind, first!) };
@@ -246,7 +252,7 @@ export class TelemetryReader {
     const scope = modelEvents(filter, range);
     const [row] = this.all([scope], `SELECT ${metricsSql}, COUNT(DISTINCT session_id) AS sessions,
       COUNT(DISTINCT ${bucketSql("started_at", "day", filter.utcOffsetMinutes)}) AS days FROM ev`);
-    const [ttft] = this.all([scope], `, ${percentileSql("first_output_ms", null, "ev")}`);
+    const [ttft] = this.all([scope], `, ${percentileSql(firstOutputSql, null, "ev")}`);
     return { metrics: readMetrics(row!), sessions: num(row!.sessions), activeDays: num(row!.days), ttft: percentiles(ttft), external: this.externalTotals(filter, range) };
   }
 
@@ -274,7 +280,7 @@ export class TelemetryReader {
     if (latency && rows.length) {
       const partition = spec.columns.length === 1 ? spec.columns[0]! : `json_array(${spec.columns.join(", ")})`;
       const source = spec.where ? `(SELECT * FROM ev WHERE ${spec.where})` : "ev";
-      for (const row of this.all([scope], `, ${percentileSql("first_output_ms", partition, source)}`)) {
+      for (const row of this.all([scope], `, ${percentileSql(firstOutputSql, partition, source)}`)) {
         const key = spec.columns.length === 1 ? groupKey([text(row.k)]) : String(row.k);
         ttft.set(key, percentiles(row));
       }
@@ -338,7 +344,7 @@ export class TelemetryReader {
   }
 
   private distribution(filter: TelemetryFilter, field: "duration" | "ttft"): TelemetryQueryResult {
-    const column = field === "duration" ? "duration_ms" : "first_output_ms";
+    const column = field === "duration" ? "duration_ms" : firstOutputSql;
     const edges = distributionEdges[field];
     const ranges = [`TOTAL(${column} < ${edges[0]})`, ...edges.slice(1).map((edge, index) => `TOTAL(${column} >= ${edges[index]} AND ${column} < ${edge})`),
       `TOTAL(${column} >= ${edges[edges.length - 1]})`];
@@ -466,6 +472,7 @@ export class TelemetryReader {
     return {
       kind: "facets", firstEventAt: nullableNum(span?.first), lastEventAt: nullableNum(span?.last),
       folders: distinct("folder").filter(group => group.dimension === "folder" && group.folderId !== null) as TelemetryFacets["folders"],
+      modelKinds: distinct("modelKind") as TelemetryFacets["modelKinds"],
       providers: distinct("provider") as TelemetryFacets["providers"],
       models: distinct("model") as TelemetryFacets["models"],
       plugins: [...plugins].map(id => this.groups.resolve("plugin", [id])) as TelemetryFacets["plugins"],

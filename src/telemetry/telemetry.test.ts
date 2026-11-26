@@ -328,4 +328,20 @@ describe("Declared usage subjects", () => {
       expect(query(service, events, { ...everything, thinking: null }).rows).toMatchObject([{ id: "generate", modelKind: "language" }]);
     } finally { service.close(); }
   });
+
+  it("counts generation timing and speed for language requests only", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      // 10 output tokens over 800 ms after a 200 ms first output.
+      service.recordModelUsage(record({ id: "generate" }));
+      // A decision response that reports output tokens and a first-output time is not generation.
+      service.recordModelUsage(record({ id: "evaluate", modelKind: "decision", durationMs: 5_000, firstOutputMs: 4_000, usage: usage(100, 50) }));
+      const summary = query(service, { kind: "summary", compare: null });
+      expect(summary.metrics).toMatchObject({ requests: 2, generationMs: 800, generatedTokens: 10, durationMs: 6_000 });
+      expect(summary.ttft).toEqual({ p50: 200, p95: 200 });
+      expect(query(service, { kind: "distribution", field: "ttft" }).counts.reduce((sum, count) => sum + count, 0)).toBe(1);
+      const rows = query(service, { kind: "breakdown", dimension: "model", limit: 10, latency: true }).rows;
+      expect(rows.find(row => row.group.dimension === "model" && row.group.modelKind === "decision")?.ttft).toEqual({ p50: null, p95: null });
+    } finally { service.close(); }
+  });
 });

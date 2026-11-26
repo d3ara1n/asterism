@@ -1,11 +1,42 @@
 import { useMemo, useSyncExternalStore } from "react";
-import { type TelemetryDimension, type TelemetryFacets, type TelemetryFilter, type TelemetryGroup } from "../../../shared/telemetry";
+import { generationModelKind, type TelemetryDimension, type TelemetryFacets, type TelemetryFilter, type TelemetryGroup } from "../../../shared/telemetry";
 import { localOffset, rangeWindow, type RangePreset, type RangeWindow } from "./range";
 
 export const dashboardViews = ["overview", "attribution", "models", "activity", "tools", "skills"] as const;
 export type DashboardView = typeof dashboardViews[number];
 export type FilterDimensions = Omit<TelemetryFilter, "from" | "to" | "utcOffsetMinutes">;
 export type FilterKey = keyof FilterDimensions;
+
+/** Dimensions whose values belong to one model category; a different category, or none, leaves them without meaning. */
+const categoryScoped = ["providerId", "modelId"] as const satisfies readonly FilterKey[];
+
+/**
+ * Narrow filters by a patch; each dimension stays independent except where a value belongs to another one. A provider or model
+ * belongs to its category, thinking belongs to the generation category, and a purpose belongs to its plugin. When the patch
+ * contradicts a current value, the patch wins and the contradicted dimensions are removed.
+ */
+export function patchFilters(current: FilterDimensions, patch: FilterDimensions): FilterDimensions {
+  const filters = { ...current, ...patch };
+  if (patch.modelKind !== undefined && current.modelKind !== undefined && patch.modelKind !== current.modelKind)
+    for (const key of categoryScoped) if (!(key in patch)) delete filters[key];
+  if (filters.modelKind !== undefined && filters.modelKind !== generationModelKind && filters.thinking !== undefined) {
+    if ("thinking" in patch && !("modelKind" in patch)) {
+      delete filters.modelKind;
+      for (const key of categoryScoped) if (!(key in patch)) delete filters[key];
+    } else delete filters.thinking;
+  }
+  if (patch.pluginId !== undefined && !("purposeId" in patch) && current.pluginId !== patch.pluginId) delete filters.purposeId;
+  return filters;
+}
+
+/** Remove one dimension together with the dimensions whose values belong to it. */
+export function withoutFilter(current: FilterDimensions, key: FilterKey): FilterDimensions {
+  const filters = { ...current };
+  delete filters[key];
+  if (key === "pluginId") delete filters.purposeId;
+  if (key === "modelKind") for (const scoped of categoryScoped) delete filters[scoped];
+  return filters;
+}
 
 export interface DashboardState {
   view: DashboardView;
@@ -48,25 +79,11 @@ export class DashboardModel {
   setAttribution(attribution: TelemetryDimension) { this.set({ attribution }); }
   setFacets(facets: TelemetryFacets) { this.set({ facets }); }
   setPending(pending: boolean) { if (this.state.pending !== pending) this.set({ pending }); }
-  /** Narrow the page by dimensions, each independent of the others. Changing a plugin clears the purpose that belonged to the previous one. */
+  /** Narrow the page by dimensions; see `patchFilters`. */
   applyFilters(patch: FilterDimensions, labels: Partial<Record<FilterKey, string>> = {}) {
-    const filters = { ...this.state.filters, ...patch };
-    if (patch.modelKind && this.state.filters.modelKind && patch.modelKind !== this.state.filters.modelKind) {
-      if (!("providerId" in patch)) delete filters.providerId;
-      if (!("modelId" in patch)) delete filters.modelId;
-      if (patch.modelKind === "decision") delete filters.thinking;
-    }
-    if (patch.pluginId !== undefined && !("purposeId" in patch) && this.state.filters.pluginId !== patch.pluginId) delete filters.purposeId;
-    this.set({ filters, labels: { ...this.state.labels, ...labels } });
+    this.set({ filters: patchFilters(this.state.filters, patch), labels: { ...this.state.labels, ...labels } });
   }
-  removeFilter(key: FilterKey) {
-    const filters = { ...this.state.filters };
-    delete filters[key];
-    if (key === "pluginId") delete filters.purposeId;
-    if (key === "modelKind") { delete filters.providerId; delete filters.modelId; }
-    if ((key === "providerId" || key === "modelId") && !filters.providerId && !filters.modelId) delete filters.modelKind;
-    this.set({ filters });
-  }
+  removeFilter(key: FilterKey) { this.set({ filters: withoutFilter(this.state.filters, key) }); }
   clearFilters() { this.set({ filters: {} }); }
   refresh() { this.set({ revision: this.state.revision + 1, now: Date.now() }); }
 }
@@ -93,6 +110,7 @@ export const groupId = (group: TelemetryGroup) => `${group.dimension}:${group.ke
 /** Filter dimensions that select exactly one dimension value. */
 export function groupFilter(group: TelemetryGroup): FilterDimensions | null {
   switch (group.dimension) {
+    case "modelKind": return { modelKind: group.modelKind };
     case "model": return { modelKind: group.modelKind, providerId: group.providerId, modelId: group.modelId };
     case "provider": return { modelKind: group.modelKind, providerId: group.providerId };
     case "folder": return { folderId: group.folderId };

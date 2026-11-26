@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "../../../shared/ui/chart";
 import { cn } from "@asterism-app/ui/utils";
-import type { BreakdownRow, TelemetryDistribution } from "../../../../shared/telemetry";
+import { generationModelKind, type BreakdownRow, type TelemetryDistribution } from "../../../../shared/telemetry";
 import { useI18n } from "../../../shared/i18n";
 import { dashboardMessages as msg } from "../../../messages/dashboard";
 import { DataTable, type Column } from "../DataTable";
@@ -14,15 +14,19 @@ import { useTelemetry } from "../use-telemetry";
 import { groupId } from "../model";
 import type { ViewProps } from "./context";
 
-/** How models perform: cost efficiency, latency, speed, and reliability side by side. */
+/**
+ * How models perform: cost efficiency, latency, speed, and reliability side by side. The performance table measures generation,
+ * so it covers the generation category within the page filter.
+ */
 export function ModelsView({ state, page, openGroup, openKey }: ViewProps) {
   const i18n = useI18n();
-  const models = useTelemetry(page.filter, { kind: "breakdown", dimension: "model", limit: 200, latency: true }, state.revision);
+  const generation = page.filter.modelKind === undefined || page.filter.modelKind === generationModelKind;
+  const models = useTelemetry({ ...page.filter, modelKind: generationModelKind }, { kind: "breakdown", dimension: "model", limit: 200, latency: true }, state.revision, generation);
   const ttft = useTelemetry(page.filter, { kind: "distribution", field: "ttft" }, state.revision);
   const duration = useTelemetry(page.filter, { kind: "distribution", field: "duration" }, state.revision);
   const thinking = useTelemetry(page.filter, { kind: "breakdown", dimension: "thinking", limit: 20, latency: false }, state.revision);
   const errors = useTelemetry(page.filter, { kind: "breakdown", dimension: "error", limit: 12, latency: false }, state.revision);
-  const rows = models.data?.rows ?? [];
+  const rows = generation ? models.data?.rows ?? [] : [];
   const fastest = Math.max(0, ...rows.map(row => outputSpeed(row.metrics) ?? 0));
   const columns = useMemo<Column<BreakdownRow>[]>(() => [
     { id: "name", label: i18n.text(msg.dimensionModel), width: "minmax(14rem, 1fr)", render: row => <GroupName group={row.group} /> },
@@ -46,7 +50,7 @@ export function ModelsView({ state, page, openGroup, openKey }: ViewProps) {
     } },
   ], [i18n, fastest]);
   return <div className="flex flex-col gap-3">
-    <Panel title={i18n.text(msg.performance)} state={models} empty={rows.length === 0 && <PanelState label={i18n.text(msg.noData)} />}>
+    <Panel title={i18n.text(msg.performance)} state={generation ? models : undefined} empty={rows.length === 0 && <PanelState label={i18n.text(msg.noData)} />}>
       <DataTable label={i18n.text(msg.performance)} columns={columns} rows={rows} rowKey={row => groupId(row.group)} selected={openKey}
         sort={{ id: "cost", desc: true }} onOpen={(row, origin) => openGroup(row.group, origin)} />
     </Panel>

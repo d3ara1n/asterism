@@ -1,12 +1,15 @@
 import type { I18n } from "@asterism-app/sdk/renderer";
+import type { UiMessage } from "@asterism-app/sdk/contracts";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { thinkingLabels } from "@asterism-app/ui/messages/model-selection";
-import type { TelemetryGroup } from "../../../shared/telemetry";
+import type { ModelKind, TelemetryGroup } from "../../../shared/telemetry";
 import { folderColorSchema, type FolderColor } from "../../../shared/folders";
 import { dashboardMessages as msg } from "../../messages/dashboard";
 import type { Measure } from "./metrics";
 
 const dash = "—";
+
+export const modelKindLabels: Record<ModelKind, UiMessage> = { language: msg.languageModelKind, decision: msg.decisionModelKind };
 
 /** USD with precision that keeps small request costs readable. */
 export function formatUsd(i18n: I18n, amount: number | null | undefined, compact = false): string {
@@ -58,6 +61,7 @@ export function folderColor(color: string | null): FolderColor | null {
 /** Display name of a dimension value; live names first, recorded snapshots after deletion. */
 export function groupLabel(i18n: I18n, group: TelemetryGroup): string {
   switch (group.dimension) {
+    case "modelKind": return i18n.text(modelKindLabels[group.modelKind]);
     case "model": return group.modelId;
     case "provider": return group.providerName;
     case "folder": return group.folderId === null ? i18n.text(msg.noFolder) : group.name ?? group.folderId.slice(0, 8);
@@ -70,9 +74,10 @@ export function groupLabel(i18n: I18n, group: TelemetryGroup): string {
     case "other": return i18n.text(msg.other);
   }
 }
-/** Secondary identification shown under or beside the label. */
-export function groupDetail(group: TelemetryGroup): string | null {
-  if (group.dimension === "model") return group.providerName;
+/** Secondary identification shown under or beside the label. Providers and models name their category, which their IDs do not imply. */
+export function groupDetail(i18n: I18n, group: TelemetryGroup): string | null {
+  if (group.dimension === "model") return `${group.providerName} · ${i18n.text(modelKindLabels[group.modelKind])}`;
+  if (group.dimension === "provider") return i18n.text(modelKindLabels[group.modelKind]);
   if (group.dimension === "session") return group.folderId === null ? null : group.folderName;
   if (group.dimension === "error") return group.origin;
   return null;

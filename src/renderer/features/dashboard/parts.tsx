@@ -57,7 +57,7 @@ export function GroupName({ group, detail = true }: { group: TelemetryGroup; det
   const i18n = useI18n();
   const color = groupColor(group);
   const label = groupLabel(i18n, group);
-  const secondary = detail ? groupDetail(group) : null;
+  const secondary = detail ? groupDetail(i18n, group) : null;
   const state = group.dimension === "folder" && group.deleted || group.dimension === "session" && group.status === "deleted" ? msg.deleted
     : group.dimension === "session" && group.status === "archived" ? msg.archived : null;
   return <span className="flex min-w-0 items-center gap-2">

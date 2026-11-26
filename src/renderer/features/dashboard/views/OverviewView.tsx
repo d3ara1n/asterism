@@ -172,8 +172,9 @@ function BalancesPanel({ offset, now, revision }: { offset: number; now: number;
   const providers = useMemo(() => (snapshot?.languageModelProviders ?? []).filter(provider => provider.enabled && provider.usage), [snapshot?.languageModelProviders]);
   const usage = useProviderUsages(useMemo(() => providers.map(provider => provider.id), [providers]), true);
   const week = useMemo(() => ({ from: now - 7 * 86_400_000, to: null, utcOffsetMinutes: offset }), [now, offset]);
-  const spend = useTelemetry(week, { kind: "breakdown", dimension: "provider", limit: 100, latency: false }, revision, providers.length > 0);
-  const daily = new Map(spend.data?.rows.map(row => [row.group.dimension === "provider" ? row.group.providerId : "", row.metrics.costUsd / 7]) ?? []);
+  // Balances belong to language model provider accounts, so spending reads the same category.
+  const spend = useTelemetry({ ...week, modelKind: "language" }, { kind: "breakdown", dimension: "provider", limit: 100, latency: false }, revision, providers.length > 0);
+  const daily = new Map(spend.data?.rows.flatMap(row => row.group.dimension === "provider" ? [[row.group.providerId, row.metrics.costUsd / 7] as const] : []) ?? []);
   return <Panel title={i18n.text(msg.balances)} icon={<Wallet />}
     actions={providers.length > 0 && <IconButton size="icon-xs" label={i18n.text(msg.refresh)} disabled={usage.refreshing} onClick={usage.refresh}>
       <RotateCw className={cn(usage.refreshing && "motion-safe:animate-spin")} /></IconButton>}

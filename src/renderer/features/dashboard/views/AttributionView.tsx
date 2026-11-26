@@ -31,7 +31,7 @@ export function AttributionView({ model, state, page, openGroup, openKey }: View
   const rows = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase(i18n.locale);
     const all = breakdown.data?.rows ?? [];
-    return needle ? all.filter(row => `${groupLabel(i18n, row.group)} ${groupDetail(row.group) ?? ""}`.toLocaleLowerCase(i18n.locale).includes(needle)) : all;
+    return needle ? all.filter(row => `${groupLabel(i18n, row.group)} ${groupDetail(i18n, row.group) ?? ""}`.toLocaleLowerCase(i18n.locale).includes(needle)) : all;
   }, [breakdown.data, query, i18n]);
   const total = breakdown.data?.rows.reduce((sum, row) => sum + row.metrics.costUsd, 0) ?? 0;
   const columns = useMemo(() => attributionColumns(i18n, dimension, total), [i18n, dimension, total]);

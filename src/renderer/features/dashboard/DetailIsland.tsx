@@ -32,7 +32,7 @@ export function detailKey(subject: DetailSubject): string {
 
 /** Breakdowns that add information for each subject: a model's folders, a folder's sessions, and so on. */
 const related: Record<TelemetryDimension | "day", readonly TelemetryDimension[]> = {
-  model: ["folder", "purpose"], provider: ["model", "folder"], folder: ["session", "model"], session: ["model", "purpose"],
+  modelKind: ["provider", "model"], model: ["folder", "purpose"], provider: ["model", "folder"], folder: ["session", "model"], session: ["model", "purpose"],
   purpose: ["model", "folder"], plugin: ["purpose", "model"], thinking: ["model", "purpose"], error: ["model"], day: ["session", "model"],
 };
 
@@ -65,7 +65,7 @@ function GroupDetail({ model, subject, onOpenSession }: { model: DashboardModel;
   const title = subject.kind === "day"
     ? i18n.formatDate(subject.start, { year: "numeric", month: "long", day: "numeric", weekday: "long" })
     : groupLabel(i18n, subject.group);
-  const description = subject.kind === "group" ? groupDetail(subject.group) ?? undefined : undefined;
+  const description = subject.kind === "group" ? groupDetail(i18n, subject.group) ?? undefined : undefined;
   const open = (group: TelemetryGroup, origin: HTMLElement) => {
     const next: DetailSubject = { kind: "group", group };
     void island.open({ key: detailKey(next), label: groupLabel(i18n, group), width: detailWidth, origin,
@@ -102,7 +102,7 @@ function GroupDetail({ model, subject, onOpenSession }: { model: DashboardModel;
       {errors.data && errors.data.rows.length > 0 && <Panel embedded title={i18n.text(msg.errors)} state={errors}>
         <ul className="flex flex-col divide-y">{errors.data.rows.map(row => <li key={row.group.key} className="flex items-center gap-3 px-4 py-2 text-sm">
           <span className="min-w-0 flex-1 truncate font-mono text-xs">{groupLabel(i18n, row.group)}</span>
-          {groupDetail(row.group) && <span className="type-caption">{groupDetail(row.group)}</span>}
+          {groupDetail(i18n, row.group) && <span className="type-caption">{groupDetail(i18n, row.group)}</span>}
           <span className="tabular-nums">{formatInteger(i18n, row.metrics.requests)}</span>
         </li>)}</ul>
       </Panel>}
