@@ -15,7 +15,7 @@ export const homeMessages = pluginNamespace("asterism.builtin").messages("en", d
   },
   setupProvider: {
     id: "home.setup.provider",
-    defaultMessage: "Add a model provider to connect Asterism to your AI service.",
+    defaultMessage: "Add a language model provider to connect Asterism to your AI service.",
   },
   openProviders: {
     id: "home.setup.openProviders",

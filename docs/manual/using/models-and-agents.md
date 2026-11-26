@@ -2,7 +2,7 @@
 
 Model choice and Agent responsibility answer different questions. The model supplies the reasoning and generation capabilities used for a request. The Agent's instructions define the work entrusted to it, the standards it should apply, and the decisions it should bring back to you.
 
-Configure shared language model connections under **Language models** in application settings. The builtin paradigm adds reusable model roles and Agent configurations. Other paradigms can organize their model choices differently.
+Configure shared language model connections under **Language model providers** in the **Providers** settings. The builtin paradigm adds reusable model roles and Agent configurations. Other paradigms can organize their model choices differently.
 
 ## Choose for the work, not just the model name
 

@@ -3,8 +3,8 @@ import { defineMessages, pluginNamespace } from "@asterism-app/sdk/contracts";
 export const configurationMessages = pluginNamespace("asterism.builtin").messages("en", defineMessages({
   selectionTitle: { id: "agent.configuration.selectionTitle", defaultMessage: "Agent, model and thinking" },
   searchModels: { id: "agent.configuration.searchModels", defaultMessage: "Search models…" },
-  languageModelProviders: { id: "agent.configuration.modelProviders", defaultMessage: "Language models" },
-  searchProviders: { id: "agent.configuration.searchProviders", defaultMessage: "Search model providers…" },
+  languageModelProviders: { id: "agent.configuration.languageModelProviders", defaultMessage: "Language model providers" },
+  searchProviders: { id: "agent.configuration.searchProviders", defaultMessage: "Search language model providers…" },
   modelCount: { id: "agent.configuration.modelCount", defaultMessage: "{count, plural, one {# model} other {# models}}" },
   modelDetails: { id: "agent.configuration.modelDetails", defaultMessage: "Model details" },
   noPreview: { id: "agent.configuration.noPreview", defaultMessage: "Browse a model to preview its details." },

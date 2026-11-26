@@ -95,11 +95,11 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   connections: {
     id: "provider.connections.title",
-    defaultMessage: "Language models",
+    defaultMessage: "Language model providers",
   },
   summary: {
     id: "provider.connections.summary",
-    defaultMessage: "Connections, credentials, and the language models they provide.",
+    defaultMessage: "Connections, credentials, and the models they provide.",
   },
   brandNotice: {
     id: "provider.connections.brandNotice",
@@ -158,7 +158,7 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   newProvider: {
     id: "provider.add.new",
-    defaultMessage: "New model provider",
+    defaultMessage: "New language model provider",
   },
   newServiceConnection: {
     id: "provider.add.newServiceConnection",
