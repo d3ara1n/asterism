@@ -22,7 +22,8 @@ export function modelProviderFields(provider: Omit<ModelProviderInput, "enabled"
     kind: "choice", key: "auth", label: messages.authentication, default: provider.auth,
     options: [{ value: "api_key", label: commonMessages.apiKey }, { value: "oauth", label: messages.oauth }, { value: "none", label: messages.noAuthenticationOption }],
   });
-  if (provider.auth === "oauth" && canEditModelProviderField(provider, "oauthProvider")) fields.push({
+  // A single OAuth implementation needs no choice; the draft already names it.
+  if (provider.auth === "oauth" && canEditModelProviderField(provider, "oauthProvider") && Object.keys(modelOAuthProviderNames).length > 1) fields.push({
     kind: "choice", key: "oauthProvider", label: messages.oauthProvider, default: provider.oauthProvider ?? "chatgpt",
     options: Object.entries(modelOAuthProviderNames).map(([value, label]) => ({ value, label })),
   });

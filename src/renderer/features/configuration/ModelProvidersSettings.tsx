@@ -28,7 +28,7 @@ import { ModelCompatibilityEditor } from "./ModelCompatibilityEditor";
 import { ModelCostEditor } from "./ModelCostEditor";
 import { modelProtocolLabels } from "./protocols";
 import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
-import { ModelOAuthField, useModelOAuth } from "./ModelOAuthField";
+import { authorizationField, ModelOAuthField, useModelOAuth } from "./ModelOAuthField";
 import { useModelParameters } from "./ModelParameters";
 import { settingValues, settingsComplete } from "./provider-settings";
 import { ProviderSettingFields } from "./ProviderSettingFields";
@@ -201,7 +201,6 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const discoveryAction = useConfigurationAction("inline");
-  const oauthAction = useConfigurationAction("inline");
   const island = useIsland();
   useIslandCancel(async () => { await island.close(); });
   const [id, setId] = useState(initialId);
@@ -215,17 +214,12 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
   const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { id: slugify(name) }) }));
 
   const oauth = useModelOAuth();
-  const authorization = oauth.draft.stage === "authorized" ? oauth.draft.id : undefined;
-  const waiting = oauth.draft.stage === "waiting";
+  const authorization = authorizationField(oauth.draft.change);
+  const waiting = oauth.draft.waiting !== null;
   const saved = current ? providerValue(current) : null;
-  const dirty = !!authorization || !saved || JSON.stringify(saved) !== JSON.stringify(value);
+  const dirty = oauth.draft.change.kind !== "keep" || !saved || JSON.stringify(saved) !== JSON.stringify(value);
   const oauthState = current?.oauthProvider === value.oauthProvider ? current?.oauthState : undefined;
   const oauthProvider = value.auth === "oauth" ? value.oauthProvider : undefined;
-  const disconnectOAuth = async () => {
-    if (!current) return;
-    await oauthAction.run({ type: "languageModelProvider.save", id: current.id,
-      value: { ...providerValue(current), enabled: current.enabled }, authorization: null });
-  };
   const fields = modelProviderFields(value, snapshot?.usageProviders ?? [], keyUrl);
   const values = settingValues(fields, {
     name: value.name, id: value.id, protocol: value.protocol, baseUrl: value.baseUrl, auth: value.auth, apiKey: value.apiKey,
@@ -233,13 +227,13 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
   });
   const complete = modelProviderSchema.safeParse({ ...value, enabled: current?.enabled ?? true }).success
     && modelProviderComplete(value) && settingsComplete(fields, values)
-    && (value.auth !== "oauth" || !!value.oauthProvider && (!!current || !!authorization));
+    && (value.auth !== "oauth" || !!value.oauthProvider && (!!current || oauth.draft.change.kind === "grant"));
   const setField = (key: string, next: string) => {
     if (key === "name") setName(next);
     else if (key === "id") { setIdEdited(true); set("id", next); }
     else if (key === "usage") set("usage", next === "off" ? null : next.slice(6));
     else if (key === "auth" || key === "oauthProvider") {
-      oauth.cancel();
+      oauth.change({ kind: "keep" });
       setValue(previous => key === "auth" ? { ...previous, auth: next as ProviderValue["auth"],
         oauthProvider: next === "oauth" ? previous.oauthProvider ?? "chatgpt" : undefined }
         : { ...previous, oauthProvider: next as ProviderValue["oauthProvider"] });
@@ -253,14 +247,14 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
   const models = snapshot?.languageModels.filter(model => model.providerId === id) ?? [];
 
   const title = current?.name ?? (service ? i18n.formatMessage(providersMessages.newServiceConnection, { service }) : i18n.formatMessage(providersMessages.newProvider));
-  return <Editor form={form} title={title} dirty={dirty} busy={busy} error={error} saveDisabled={!complete || waiting || oauthAction.busy}
+  return <Editor form={form} title={title} dirty={dirty} busy={busy} error={error} saveDisabled={!complete || waiting}
     description={canEditModelProviderField(value, "protocol") ? protocolLabel(value.protocol) : undefined}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteProviderTitle),
       description: i18n.formatMessage(providersMessages.deleteProviderDescription, { current_name: current.name, models_length: models.length }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "languageModelProvider", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
     <form id={form} onSubmit={async event => {
       event.preventDefault();
-      if (!complete || waiting || oauthAction.busy) return;
+      if (!complete || waiting) return;
       const result = await run({ type: "languageModelProvider.save", id, authorization, value: { ...value, enabled: current?.enabled ?? true } });
       if (result?.ok) {
         const persisted = result.snapshot.languageModelProviders.find(item => item.id === result.savedId);
@@ -271,10 +265,8 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
     }}><fieldset disabled={busy} className="contents">
       <EditorSection title={i18n.formatMessage(providersMessages.connection)}><FieldGroup>
         <ProviderSettingFields settings={fields} values={values} onValue={setField} />
-        {oauthProvider && <ModelOAuthField provider={oauthProvider} state={oauthState} draft={oauth.draft}
-          error={oauth.error ?? (oauthState === "connected" && oauth.draft.stage === "idle" ? oauthAction.error : null)}
-          disconnectDisabled={oauthAction.busy || dirty} onConnect={() => void oauth.start(oauthProvider, id)} onCancel={oauth.cancel}
-          onDisconnect={() => void disconnectOAuth()} />}
+        {oauthProvider && <ModelOAuthField provider={oauthProvider} state={oauthState} draft={oauth.draft} error={oauth.error}
+          onConnect={() => void oauth.start(oauthProvider, id)} onStopWaiting={oauth.stopWaiting} onChange={oauth.change} />}
       </FieldGroup></EditorSection>
       {canEditModelProviderField(value, "compatibility") && <ModelCompatibilityEditor value={value.compatibility} onChange={next => set("compatibility", next)} />}
       </fieldset></form>
