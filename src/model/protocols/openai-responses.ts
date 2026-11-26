@@ -10,12 +10,15 @@ const nativeKeys = ["itemId", "reasoningEncryptedContent", "phase"] as const;
 /** Endpoint field conventions declared by compatibility packs; defaults follow the OpenAI Responses API. */
 function responsesFields(target: CompatibilityTarget) {
   const entries = compatibility(target);
-  const reasoning = entries.value<{ content?: "array" | "object"; encryptedContent?: boolean; summary?: boolean }>("responsesReasoning") ?? {};
+  const reasoning = entries.value<{ content?: "array" | "object"; encryptedContent?: boolean; summary?: boolean;
+    requireInputSummary?: boolean }>("responsesReasoning") ?? {};
   return {
     systemMessage: entries.has("systemMessageInMessages"),
     reasoningContent: reasoning.content ?? "array",
     encryptedContent: reasoning.encryptedContent ?? true,
     reasoningSummary: reasoning.summary ?? true,
+    requireInputSummary: reasoning.requireInputSummary ?? false,
+    omitStoredItems: entries.has("responsesOmitStoredItems"),
   };
 }
 

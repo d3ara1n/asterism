@@ -60,6 +60,16 @@ export const modelCompatibilityMessages = pluginNamespace("asterism.host").messa
     id: "compatibility.responsesReasoning.summary.description",
     defaultMessage: "Defaults to true. Disable when the endpoint does not accept reasoning.summary.",
   },
+  reasoningInputSummary: { id: "compatibility.responsesReasoning.requireInputSummary.title", defaultMessage: "Always include a history summary field" },
+  reasoningInputSummaryDescription: {
+    id: "compatibility.responsesReasoning.requireInputSummary.description",
+    defaultMessage: "Send an empty summary for reasoning history items that have no summary.",
+  },
+  responsesOmitStoredItems: { id: "compatibility.responsesOmitStoredItems.title", defaultMessage: "Omit stored Responses item references" },
+  responsesOmitStoredItemsDescription: {
+    id: "compatibility.responsesOmitStoredItems.description",
+    defaultMessage: "Strip stored item IDs and references from stateless history. Tool call IDs are preserved.",
+  },
   toolFilesAsUserMessage: { id: "compatibility.toolFilesAsUserMessage.title", defaultMessage: "Tool files in a user message" },
   toolFilesAsUserMessageDescription: {
     id: "compatibility.toolFilesAsUserMessage.description",

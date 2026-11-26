@@ -4,6 +4,10 @@ import { ModelFailure } from "../contract.ts";
 
 type ResponsesModel = ReturnType<ReturnType<typeof createOpenAI>["responses"]>;
 type CallOptions = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["params"];
+type ResponsesInputFields = {
+  reasoningContent: "array" | "object"; encryptedContent: boolean; reasoningSummary: boolean;
+  requireInputSummary: boolean; omitStoredItems: boolean;
+};
 type InputStep =
   | { kind: "thinking"; item: Record<string, unknown> }
   | { kind: "message"; role: "system" | "user" | "assistant"; text?: string }
@@ -15,7 +19,7 @@ function encodingFailure(): never {
 }
 
 /** The SDK still encodes native files, tools and ordinary messages. Record the intended history before it does so. */
-function prepare(options: CallOptions, contentShape: "array" | "object"): { prompt: CallOptions["prompt"]; steps: InputStep[] } | null {
+function prepare(options: CallOptions, fields: ResponsesInputFields): { prompt: CallOptions["prompt"]; steps: InputStep[] } | null {
   const custom = new Set(options.tools?.flatMap(tool => tool.type === "provider" && tool.id === "openai.custom" ? [tool.name] : []));
   if (!options.prompt.some(message => message.role === "assistant" && message.content.some(part => part.type === "reasoning"
     || (part.type === "tool-call" && (part.providerOptions?.asterism?.freeform === true) !== custom.has(part.toolName))))) return null;
@@ -42,11 +46,14 @@ function prepare(options: CallOptions, contentShape: "array" | "object"): { prom
           } else {
             if (part.text) {
               const content = { type: "reasoning_text", text: part.text };
-              item.content = contentShape === "object" ? content : [content];
+              item.content = fields.reasoningContent === "object" ? content : [content];
             }
             if (typeof summary === "string" && summary) item.summary = [{ type: "summary_text", text: summary }];
           }
-          if (Object.keys(item).length > 1) steps.push({ kind: "thinking", item });
+          if (Object.keys(item).length > 1) {
+            if (fields.requireInputSummary && item.summary === undefined) item.summary = [];
+            steps.push({ kind: "thinking", item });
+          }
           return false;
         }
         if (part.type === "text") steps.push({ kind: "message", role: "assistant", text: part.text });
@@ -114,11 +121,10 @@ function encodeHistory(body: unknown, steps: readonly InputStep[]): unknown {
 }
 
 /** Native encoding of public reasoning and replay of calls independent of the active tools. */
-export function withResponsesInput(createModel: (transport: typeof fetch) => ResponsesModel, transport: typeof fetch,
-  fields: { reasoningContent: "array" | "object"; encryptedContent: boolean; reasoningSummary: boolean }) {
+export function withResponsesInput(createModel: (transport: typeof fetch) => ResponsesModel, transport: typeof fetch, fields: ResponsesInputFields) {
   // The SDK adds ciphertext include and default summaries itself; apply endpoint field conventions at the final request boundary.
   const wireFetch: typeof fetch = (url, init) => {
-    if (fields.encryptedContent && fields.reasoningSummary) return transport(url, init);
+    if (fields.encryptedContent && fields.reasoningSummary && !fields.omitStoredItems) return transport(url, init);
     if (typeof init?.body !== "string") encodingFailure();
     const body = JSON.parse(init.body) as Record<string, unknown>;
     if (!fields.encryptedContent && Array.isArray(body.include)) {
@@ -128,11 +134,18 @@ export function withResponsesInput(createModel: (transport: typeof fetch) => Res
     }
     if (!fields.reasoningSummary && body.reasoning && typeof body.reasoning === "object")
       delete (body.reasoning as Record<string, unknown>).summary;
+    if (fields.omitStoredItems && body.store === false && Array.isArray(body.input)) {
+      body.input = body.input.flatMap((item: unknown) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) return [item];
+        const { id: _id, ...content } = item as Record<string, unknown>;
+        return content.type === "item_reference" ? [] : [content];
+      });
+    }
     return transport(url, { ...init, body: JSON.stringify(body) });
   };
   const model = createModel(wireFetch);
   const project = (options: CallOptions) => {
-    const plan = prepare(options, fields.reasoningContent);
+    const plan = prepare(options, fields);
     if (!plan) return null;
     const projectedFetch: typeof fetch = (url, init) => {
       if (typeof init?.body !== "string") encodingFailure();

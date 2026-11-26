@@ -15,6 +15,23 @@ const zaiResponses = (baseUrl: string): ModelProviderPreset["connection"] => ({
   compatibility: [{ id: "responsesReasoning", value: { content: "object", encryptedContent: false, summary: false } }],
 });
 
+function miniMaxPreset(mainland: boolean, billing: "usage" | "subscription"): ModelProviderPreset {
+  const domain = mainland ? "minimax.cn" : "minimax.io";
+  const platform = `https://platform.${domain}`;
+  const subscription = billing === "subscription";
+  return {
+    id: `minimax${subscription ? "-plan" : ""}${mainland ? "-cn" : ""}`,
+    name: "MiniMax", iconId: "minimax", billing, region: mainland ? presetMessages.mainlandChina : presetMessages.international,
+    ...(subscription && { plan: "M Plan" }),
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: `https://api.${domain}/v1`, auth: "api_key",
+      compatibility: [{ id: "responsesReasoning", value: { encryptedContent: false, summary: false } }],
+      ...(subscription && { usage: "minimax-plan" }) },
+    keyUrl: `${platform}/user-center/${subscription ? "payment/token-plan" : "basic-information/interface-key"}`,
+    sources: [`${platform}/docs/api-reference/responses-create`, `${platform}/docs/${subscription ? "m-plan/faq" : "api-reference/api-overview"}`],
+    verifiedOn: "2026-11-26", keywords: ["minimax", "稀宇", ...(subscription ? ["token plan", "coding plan"] : [])],
+  };
+}
+
 /** Billing entries share inference endpoints and the key-selected account usage implementation. */
 function commandCodePreset(id: string, billing: "usage" | "subscription", protocol: "openai-responses" | "anthropic"): ModelProviderPreset {
   return {
@@ -63,6 +80,22 @@ export const modelProviderPresets: readonly ModelProviderPreset[] = [
     verifiedOn: "2026-10-15", keywords: ["router", "aggregator"],
   },
   {
+    id: "kilo-gateway", name: "Kilo Gateway", iconId: "kilocode", billing: "usage",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://ai-gateway.kilo.ai/api/v1", auth: "api_key",
+      compatibility: [{ id: "responsesOmitStoredItems" }], usage: "kilo-gateway" },
+    keyUrl: "https://app.kilo.ai/profile",
+    sources: ["https://kilo.ai/docs/gateway/authentication", "https://github.com/Kilo-Org/kilocode/tree/main/packages/kilo-gateway/src"],
+    verifiedOn: "2026-11-26", keywords: ["kilo code", "kilocode", "aggregator"],
+  },
+  {
+    id: "mistral", name: "Mistral", iconId: "mistral", billing: "usage",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.mistral.ai/v1", auth: "api_key",
+      compatibility: [{ id: "responsesReasoning", value: { content: "object", encryptedContent: false, summary: false, requireInputSummary: true } }] },
+    keyUrl: "https://console.mistral.ai/api-keys",
+    sources: ["https://docs.mistral.ai/inference/conversations/responses", "https://docs.mistral.ai/api/endpoint/responses"],
+    verifiedOn: "2026-11-26", keywords: ["mistral ai", "codestral", "devstral", "studio"],
+  },
+  {
     id: "together", name: "Together AI", iconId: "together", billing: "usage",
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.together.ai/v1", auth: "api_key",
       compatibility: [
@@ -108,6 +141,17 @@ export const modelProviderPresets: readonly ModelProviderPreset[] = [
   commandCodePreset("commandcode-anthropic", "usage", "anthropic"),
   commandCodePreset("commandcode-plan", "subscription", "openai-responses"),
   commandCodePreset("commandcode-plan-anthropic", "subscription", "anthropic"),
+  {
+    id: "charm-hyper", name: "Charm Hyper", iconId: "charm-hyper", billing: "usage",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://hyper.charm.land/v1", auth: "api_key", compatibility: [], usage: "charm-hyper" },
+    keyUrl: "https://hyper.charm.land/app/api-keys",
+    sources: ["https://hyper.charm.land/docs/coding-agents/codex.md", "https://hyper.charm.land/docs/api/credits.md"],
+    verifiedOn: "2026-11-26", keywords: ["hyper", "charmbracelet", "crush", "prism"],
+  },
+  miniMaxPreset(true, "usage"),
+  miniMaxPreset(false, "usage"),
+  miniMaxPreset(true, "subscription"),
+  miniMaxPreset(false, "subscription"),
   {
     id: "kimi-cn", name: "Kimi", iconId: "kimi", billing: "usage", region: presetMessages.mainlandChina,
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.moonshot.cn/v1", auth: "api_key", usage: "kimi-cn",

@@ -2,9 +2,11 @@
 
 Shared UI controls include adaptations of [shadcn/ui](https://github.com/shadcn-ui/ui) and the [Thinking Orbs](https://github.com/yogesharc/thinking-orbs) status orb. npm dependencies distribute their own license files. Provider settings bundle selected SVGs from [Lobe Icons](https://github.com/lobehub/lobe-icons).
 
-## Lobe Icons
+The Charm Hyper mark is from [Charm Hyper's official site icon](https://hyper.charm.land/app/assets/icon-192-BRwuutqA.png).
 
 Third-party marks identify the corresponding services and do not imply affiliation, sponsorship, or endorsement.
+
+## Lobe Icons
 
 MIT License
 

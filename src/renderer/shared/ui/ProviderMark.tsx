@@ -5,7 +5,10 @@ import exa from "@lobehub/icons-static-svg/icons/exa.svg?url";
 import firecrawl from "@lobehub/icons-static-svg/icons/firecrawl-color.svg?url";
 import fireworks from "@lobehub/icons-static-svg/icons/fireworks.svg?url";
 import huggingface from "@lobehub/icons-static-svg/icons/huggingface-color.svg?url";
+import kilocode from "@lobehub/icons-static-svg/icons/kilocode.svg?url";
 import kimi from "@lobehub/icons-static-svg/icons/kimi.svg?url";
+import minimax from "@lobehub/icons-static-svg/icons/minimax-color.svg?url";
+import mistral from "@lobehub/icons-static-svg/icons/mistral-color.svg?url";
 import openai from "@lobehub/icons-static-svg/icons/openai.svg?url";
 import opencode from "@lobehub/icons-static-svg/icons/opencode.svg?url";
 import openrouter from "@lobehub/icons-static-svg/icons/openrouter.svg?url";
@@ -18,17 +21,22 @@ import type { ReactNode } from "react";
 import type { StatusTone } from "@asterism-app/ui/ui/status";
 import { cn } from "@asterism-app/ui/utils";
 import { markMonogram } from "./provider-mark";
+import charmHyper from "./provider-icons/charm-hyper.png?url";
 
 /** Select bundled brand marks explicitly; an icon ID cannot resolve to an arbitrary file or URL. */
 const providerIcons = new Map(Object.entries({
   anthropic: { src: anthropic, mono: true },
+  "charm-hyper": { src: charmHyper },
   commandcode: { src: commandcode, mono: true },
   deepseek: { src: deepseek },
   exa: { src: exa, mono: true },
   firecrawl: { src: firecrawl },
   fireworks: { src: fireworks, mono: true },
   huggingface: { src: huggingface },
+  kilocode: { src: kilocode, mono: true },
   kimi: { src: kimi, mono: true },
+  minimax: { src: minimax },
+  mistral: { src: mistral },
   openai: { src: openai, mono: true },
   opencode: { src: opencode, mono: true },
   openrouter: { src: openrouter, mono: true },

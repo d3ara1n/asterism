@@ -405,6 +405,38 @@ describe("Explicit compatibility and target projection", () => {
     expect((await request(current)).input).toContainEqual({ type: "reasoning", content: { type: "reasoning_text", text: "Plain" } });
   });
 
+  it("includes the required empty input summary without requesting a summary from the Mistral endpoint", async () => {
+    const current = input();
+    current.settings.provider.compatibility = [
+      { id: "responsesReasoning", value: { content: "object", encryptedContent: false, summary: false, requireInputSummary: true } },
+    ];
+    current.messages.push({ kind: "output", adapter: "foreign", scope: "foreign", parts: [
+      { kind: "thinking", text: "Plain", summary: "", continuation: null },
+      { kind: "thinking", text: "", summary: "", continuation: null },
+      { kind: "text", text: "Answer", continuation: null },
+    ] });
+    const encoded = await request(current);
+    expect(encoded.reasoning).toEqual({ effort: "low" });
+    expect((encoded.input as Array<{ type?: string }>).filter(item => item.type === "reasoning"))
+      .toEqual([{ type: "reasoning", content: { type: "reasoning_text", text: "Plain" }, summary: [] }]);
+  });
+
+  it("omits stored item IDs from a stateless gateway request without losing its reasoning or tool call IDs", async () => {
+    const current = input();
+    current.settings.provider.compatibility = [{ id: "responsesOmitStoredItems" }];
+    current.messages = [{ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
+      { kind: "thinking", text: "", summary: "", continuation: { itemId: "rs_native", reasoningEncryptedContent: "cipher" } },
+      { kind: "toolcall", callId: "call", name: "read", input: { kind: "structured", value: {} }, continuation: { itemId: "fc_native" } },
+    ] }, { kind: "result", callId: "call", name: "read", error: false, parts: [{ kind: "text", text: "Result" }] }];
+    const encoded = await request(current);
+    expect(encoded.input).toEqual([
+      { type: "reasoning", encrypted_content: "cipher", summary: [] },
+      expect.objectContaining({ type: "function_call", call_id: "call" }),
+      expect.objectContaining({ type: "function_call_output", call_id: "call" }),
+    ]);
+    expect((encoded.input as unknown[])[1]).not.toHaveProperty("id");
+  });
+
   // Messages signatures must match original text; unsigned text encodes unchanged, summaries are not disguised as thinking, and redacted-only blocks continue normally.
   it("Messages natively supports unsigned plaintext, signatures, and redacted reasoning while preserving relative tool order", async () => {
     const current = input("anthropic");

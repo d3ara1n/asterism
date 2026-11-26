@@ -121,7 +121,17 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
       summary: z.boolean().optional().register(fieldCopy, {
         title: messages.reasoningSummary, description: messages.reasoningSummaryDescription,
       }),
+      requireInputSummary: z.boolean().optional().register(fieldCopy, {
+        title: messages.reasoningInputSummary, description: messages.reasoningInputSummaryDescription,
+      }),
     }),
+  },
+  {
+    id: "responsesOmitStoredItems",
+    kind: "tag",
+    copy: { title: messages.responsesOmitStoredItems, description: messages.responsesOmitStoredItemsDescription },
+    appliesTo: { protocols: ["openai-responses"] },
+    schema: z.undefined(),
   },
   {
     id: "toolFilesAsUserMessage",
