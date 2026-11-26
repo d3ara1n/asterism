@@ -80,6 +80,13 @@ export const modelProviderPresets: readonly ModelProviderPreset[] = [
     verifiedOn: "2026-10-15", keywords: ["router", "aggregator"],
   },
   {
+    id: "zenmux", name: "ZenMux", iconId: "zenmux", billing: "usage",
+    connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://zenmux.ai/api/v1", auth: "api_key", compatibility: [] },
+    keyUrl: "https://zenmux.ai/platform/pay-as-you-go",
+    sources: ["https://zenmux.ai/docs/guide/quickstart.html", "https://zenmux.ai/docs/api/openai/openai-responses.html"],
+    verifiedOn: "2026-11-26", keywords: ["zenmux", "zen mux", "aggregator"],
+  },
+  {
     id: "kilo-gateway", name: "Kilo Gateway", iconId: "kilocode", billing: "usage",
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://ai-gateway.kilo.ai/api/v1", auth: "api_key",
       compatibility: [{ id: "responsesOmitStoredItems" }], usage: "kilo-gateway" },

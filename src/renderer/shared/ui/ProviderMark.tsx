@@ -17,6 +17,7 @@ import tavily from "@lobehub/icons-static-svg/icons/tavily-color.svg?url";
 import together from "@lobehub/icons-static-svg/icons/together-color.svg?url";
 import xai from "@lobehub/icons-static-svg/icons/xai.svg?url";
 import zai from "@lobehub/icons-static-svg/icons/zai.svg?url";
+import zenmux from "@lobehub/icons-static-svg/icons/zenmux.svg?url";
 import type { ReactNode } from "react";
 import type { StatusTone } from "@asterism-app/ui/ui/status";
 import { cn } from "@asterism-app/ui/utils";
@@ -45,6 +46,7 @@ const providerIcons = new Map(Object.entries({
   together: { src: together },
   xai: { src: xai, mono: true },
   zai: { src: zai, mono: true },
+  zenmux: { src: zenmux, mono: true },
 } satisfies Record<string, { src: string; mono?: boolean }>));
 
 // Static class names keep every status token visible to the Tailwind scanner.
