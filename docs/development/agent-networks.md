@@ -1,12 +1,12 @@
 # Agent networks
 
-Mesh is a communication resource connecting agents across sessions. Each Mesh belongs to one session and selects a shared channel. Channels have stable internal identities and editable display names. Channel selection and task descriptions are current resource data; timeline navigation reconstructs links without restoring that data.
+Mesh is a communication resource connecting agents across sessions. Each Mesh belongs to one session and can select one shared channel. The channel directory can be empty. Channels have stable internal identities and editable display names. Channel selection and task descriptions are current resource data; timeline navigation reconstructs links without restoring that data. The selection is active only while its ID exists in the directory. Deleting the directory entry disconnects all Mesh resources selecting it without rewriting their links or data, including for sessions restored later.
 
 ## Direction and access
 
-Exposing a Mesh to an agent grants use of its supported tools. Exposing an agent to a Mesh adds that agent to the channel's reachable members. The two directions remain independent. Receiving a message neither creates a link nor grants a return route.
+Exposing a Mesh to an agent grants access to its supported tools, which require a selected channel to succeed. Exposing an agent to a connected Mesh adds that agent to the channel's reachable members. The two directions remain independent. Receiving a message neither creates a link nor grants a return route.
 
-The Mesh implementation captures its channel and member references at the model request boundary. Channel switches and membership changes affect subsequent requests. A captured reference still resolves through ordinary agent lifecycle validation: removal, session sleep, or archival can make the target unavailable. Sleeping and archived sessions have no runtime membership; wake or restoration rebuilds it from saved links. Mutable task descriptions are read at handling time from the captured exposure paths.
+The Mesh implementation captures its connection state and member references at the model request boundary. Channel switches, deletion, and membership changes affect subsequent requests. A captured reference still resolves through ordinary agent lifecycle validation: removal, session sleep, or archival can make the target unavailable. Sleeping and archived sessions have no runtime membership; wake or restoration rebuilds it from saved links. Mutable task descriptions are read at handling time from the captured exposure paths.
 
 Channel access does not grant direct access to the target agent's other resources. Mesh resolves targets before invoking public agent input or investigation capabilities. The Agent domain owns message admission, execution, and saved-record investigation.
 

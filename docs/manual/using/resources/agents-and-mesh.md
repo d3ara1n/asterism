@@ -42,9 +42,9 @@ Disabling the selected role, or deleting or renaming a selected custom role, lea
 
 ## Mesh: access and membership are different directions
 
-A Mesh resource belongs to one selected channel. Participating sessions can use separate Mesh resources with the same channel selection. Merely giving them similar card titles does not establish a shared channel.
+A new Mesh has no selected channel. Use its card to select an existing channel or create and join a new one. Participating sessions can use separate Mesh resources with the same channel selection. Merely giving them similar card titles does not establish a shared channel.
 
-Making the Mesh available to an Agent lets that Agent use the channel. Making an Agent available to the Mesh publishes the Agent as a member that other channel users can discover, message, and investigate. These directions are independent. An Agent can receive a message without having access to the Mesh needed to reply through it.
+Making the Mesh available to an Agent lets that Agent use the selected channel. Mesh tools report that the channel is not connected if none is selected. Making an Agent available to a connected Mesh publishes the Agent as a member that other channel users can discover, message, and investigate. These directions are independent. An Agent can receive a message without having access to the Mesh needed to reply through it.
 
 Membership does not share the member's underlying resources or turn the channel into one shared model context. Pass relevant findings deliberately and give participants separate access to material they must verify. Publication also permits supported investigation of saved records; it is more than opting into notifications.
 
@@ -52,7 +52,9 @@ Membership does not share the member's underlying resources or turn the channel 
 
 Hiding a Mesh card does not leave the channel. Switching its selected channel changes where its exposed Agents participate while retaining the workbench links. Removing an Agent's last exposure path to the channel, sleeping its session, or archiving it removes that membership. Waking or restoring the session rebuilds membership from the restored relationships.
 
-An in-progress request uses the channel and members captured when that request began. A channel switch or link change therefore need not affect a response already underway; subsequent requests see the new arrangement.
+Deleting a channel, including the last one, disconnects every Mesh using it across all sessions. Their workbench links remain, but no Agents are moved into another channel. Select a channel on each Mesh you want to reconnect.
+
+An in-progress request uses the channel and members captured when that request began. Deletion, a channel switch, or a link change takes effect for subsequent requests.
 
 Names and numeric disambiguators identify current members, not permanent identities for future assignments. When membership changes, establish the current recipient rather than assuming an old name-and-number pair is a durable address.
 

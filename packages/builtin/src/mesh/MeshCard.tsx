@@ -1,8 +1,10 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { useId, useLayoutEffect, useRef, useState } from "react";
 import { Virtualizer, type VirtualizerHandle } from "virtua";
-import { Pencil, Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useI18n, useRendererObject, type RendererReceipt } from "@asterism-app/sdk/renderer";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@asterism-app/ui/ui/alert-dialog";
 import { Button } from "@asterism-app/ui/ui/button";
 import { IconButton } from "@asterism-app/ui/ui/icon-button";
 import { Input } from "@asterism-app/ui/ui/input";
@@ -11,16 +13,18 @@ import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@asterism-
 import { ScrollArea } from "@asterism-app/ui/ui/scroll-area";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { cn } from "@asterism-app/ui/utils";
-import { CreateMeshChannel, RenameMeshChannel, SelectMeshChannel, type MeshCardData } from "./contract";
+import { CreateMeshChannel, DeleteMeshChannel, RenameMeshChannel, SelectMeshChannel, type MeshCardData } from "./contract";
 import { meshMessages as messages } from "../messages/mesh";
 import { channelNavigationIndex } from "./channel-navigation";
 
 export function MeshCard({ data }: { data: MeshCardData }) {
   const object = useRendererObject(), i18n = useI18n(), prefix = useId();
   const [editing, setEditing] = useState<{ channelId: string | null; title: string } | null>(null);
+  const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
   const [pending, setPending] = useState(false), [error, setError] = useState<string | null>(null);
   const disabled = pending || !object.view.ready;
   const scroll = useRef<HTMLDivElement>(null), list = useRef<VirtualizerHandle>(null);
+  const deleteTrigger = useRef<HTMLButtonElement>(null), createButton = useRef<HTMLButtonElement>(null);
   const radios = useRef(new Map<string, HTMLButtonElement>());
   const requestedFocus = useRef<string | null>(null);
   const [focusedId, setFocusedId] = useState(data.channelId);
@@ -31,24 +35,25 @@ export function MeshCard({ data }: { data: MeshCardData }) {
   };
   useLayoutEffect(focusRequested, [disabled, focusedId]);
   const keepMounted = [...new Set([data.channelId, focusedId].map(id => data.channels.findIndex(channel => channel.id === id)).filter(index => index >= 0))];
-  const run = async (work: () => Promise<RendererReceipt>) => {
+  const run = async (work: () => Promise<RendererReceipt>, onSuccess?: () => void) => {
     if (disabled) return;
     setPending(true); setError(null);
     try {
       const receipt = await work();
       if (!receipt.ok) { setError(receipt.error.display ? i18n.text(receipt.error.display) : i18n.text(messages.failed)); return; }
       setEditing(null);
+      onSuccess?.();
     } catch (error) {
       console.error("Mesh channel update failed.", error);
       setError(i18n.text(messages.failed));
     } finally { setPending(false); }
   };
-  return <ScrollArea viewportRef={scroll} className="nodrag nopan min-h-0 min-w-0 flex-1"
+  const channelSettings = <ScrollArea viewportRef={scroll} className="nodrag nopan min-h-0 min-w-0 flex-1"
     viewportClassName="[overflow-anchor:none]">
     <div className="flex min-w-0 flex-col">
-      <FieldSet disabled={disabled} className="min-w-0 gap-0">
+      {data.channels.length > 0 && <FieldSet disabled={disabled} className="min-w-0 gap-0">
         <FieldLegend variant="label" className="sr-only">{i18n.text(messages.channels)}</FieldLegend>
-        <RadioGroup value={data.channelId} disabled={disabled} aria-label={i18n.text(messages.channels)}
+        <RadioGroup value={data.channelId ?? ""} disabled={disabled} aria-label={i18n.text(messages.channels)}
           onValueChange={channelId => { void run(() => object.invoke(SelectMeshChannel, { channelId })); }} className="gap-0"
           onKeyDownCapture={event => {
             // Radix's roving collection only knows mounted radios; navigate the full channel list before it handles arrows.
@@ -85,11 +90,18 @@ export function MeshCard({ data }: { data: MeshCardData }) {
                   onClick={() => { setError(null); setEditing({ channelId: channel.id, title: channel.title }); }}>
                   <Pencil />
                 </IconButton>
+                <IconButton size="icon-xs" disabled={disabled} label={i18n.text(messages.delete)}
+                  onClick={event => {
+                    deleteTrigger.current = event.currentTarget;
+                    setError(null); setEditing(null); setDeleting(channel);
+                  }}>
+                  <Trash2 />
+                </IconButton>
               </Field>
             </div>}
           </Virtualizer>
         </RadioGroup>
-      </FieldSet>
+      </FieldSet>}
       <div className="flex flex-col gap-2 p-2">
         {editing ? <form onSubmit={event => {
           event.preventDefault();
@@ -113,12 +125,43 @@ export function MeshCard({ data }: { data: MeshCardData }) {
               </Button>
             </Field>
           </FieldGroup>
-        </form> : <Button type="button" variant="ghost" size="xs" className="self-start" disabled={disabled}
+        </form> : <Button ref={createButton} type="button" variant="ghost" size="xs" className="self-start" disabled={disabled}
           onClick={() => { setError(null); setEditing({ channelId: null, title: "" }); }}>
           {pending ? <Spinner data-icon="inline-start" /> : <Plus data-icon="inline-start" />}{i18n.text(messages.create)}
         </Button>}
-        {error && <p role="alert" className="type-caption text-destructive">{error}</p>}
+        {error && !deleting && <p role="alert" className="type-caption text-destructive">{error}</p>}
       </div>
     </div>
   </ScrollArea>;
+  return <>
+    {data.channelId === null && <p className="type-caption shrink-0 px-2 pt-2">{i18n.text(messages.disconnected)}</p>}
+    {channelSettings}
+    <AlertDialog open={deleting !== null} onOpenChange={open => {
+      if (!open && !pending) { setDeleting(null); setError(null); }
+    }}>
+      <AlertDialogContent onCloseAutoFocus={event => {
+        event.preventDefault();
+        (deleteTrigger.current?.isConnected ? deleteTrigger.current : createButton.current)?.focus();
+        deleteTrigger.current = null;
+      }}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{i18n.formatMessage(messages.deleteTitle, { title: deleting?.title ?? "" })}</AlertDialogTitle>
+          <AlertDialogDescription>{i18n.text(messages.deleteConfirm)}</AlertDialogDescription>
+        </AlertDialogHeader>
+        {error && <p role="alert" className="type-caption text-destructive">{error}</p>}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={pending}>{i18n.text(messages.cancel)}</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" disabled={disabled} onClick={event => {
+            event.preventDefault();
+            if (deleting) void run(() => object.invoke(DeleteMeshChannel, { channelId: deleting.id }), () => {
+              deleteTrigger.current = null;
+              setDeleting(null);
+            });
+          }}>
+            {pending && <Spinner data-icon="inline-start" />}{i18n.text(messages.delete)}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>;
 }

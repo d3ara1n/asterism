@@ -2,14 +2,13 @@ import { z } from "zod";
 import { defineAction, defineCreation, defineImplementation } from "@asterism-app/sdk/contracts";
 import { builtin, GetProfile, List, Peek, peekResultSchema, Send, sendResultSchema, SetProfile } from "@asterism-app/builtin-api/contracts";
 
-export const defaultChannelId = "default";
 export const Mesh = builtin.resource("mesh", z.strictObject({}));
 export const MeshState = builtin.data("mesh.state", z.strictObject({
   channelId: z.string().min(1),
   profiles: z.record(z.string(), z.string()),
 }));
 export const CreateMesh = defineCreation(Mesh, {
-  id: builtin.name("mesh.create"), schema: z.strictObject({}).describe("Create a Mesh in the default channel."),
+  id: builtin.name("mesh.create"), schema: z.strictObject({}).describe("Create a Mesh without a selected channel."),
 });
 export const SelectMeshChannel = defineAction(Mesh, {
   id: builtin.name("mesh.select-channel"), schema: z.strictObject({ channelId: z.string().min(1) }),
@@ -21,8 +20,11 @@ export const CreateMeshChannel = defineAction(Mesh, {
 export const RenameMeshChannel = defineAction(Mesh, {
   id: builtin.name("mesh.rename-channel"), schema: z.strictObject({ channelId: z.string().min(1), title: channelTitle }),
 });
+export const DeleteMeshChannel = defineAction(Mesh, {
+  id: builtin.name("mesh.delete-channel"), schema: z.strictObject({ channelId: z.string().min(1) }),
+});
 export const MeshView = builtin.data("mesh.card", z.strictObject({
-  channelId: z.string(),
+  channelId: z.string().nullable(),
   channels: z.array(z.strictObject({ id: z.string(), title: z.string(), agents: z.number().int().nonnegative() })),
 }));
 export type MeshCardData = z.infer<typeof MeshView.schema>;

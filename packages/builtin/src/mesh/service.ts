@@ -2,11 +2,10 @@ import { nanoid } from "nanoid";
 import { Agent } from "@asterism-app/builtin-api/contracts";
 import { agentServices } from "@asterism-app/builtin-api/runtime";
 import { PluginApiError, type ObjectReader, type PluginContext, type ToolCaller } from "@asterism-app/sdk/runtime";
-import { defaultChannelId, Mesh, MeshState, type MeshCardData, type MeshTarget } from "./contract.ts";
+import { Mesh, MeshState, type MeshCardData, type MeshTarget } from "./contract.ts";
 import { allocationSchema, memberKey, reconcileMembers, type Allocations, type Member, type Membership } from "./members.ts";
 
 export interface MeshAccess {
-  channelId: string;
   channelName: string;
   members: readonly Member[];
 }
@@ -25,20 +24,21 @@ export class MeshService {
       CREATE TABLE IF NOT EXISTS mesh_channels (id TEXT PRIMARY KEY, title TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS mesh_numbering (singleton INTEGER PRIMARY KEY CHECK (singleton = 1), data TEXT NOT NULL);
     `);
-    this.db.prepare("INSERT OR IGNORE INTO mesh_channels VALUES (?, ?)").run(defaultChannelId, "Default");
     const row = this.db.prepare("SELECT data FROM mesh_numbering WHERE singleton = 1").get();
     this.allocations = row ? allocationSchema.parse(JSON.parse(String(row.data))) : [];
   }
 
   state(object: ObjectReader) {
-    const state = object.get(MeshState);
-    if (!state) throw new PluginApiError("unavailable", "The Mesh state is unavailable.");
-    return state;
+    return object.get(MeshState);
   }
 
-  channels(): { id: string; title: string }[] {
+  private channels(): { id: string; title: string }[] {
     return this.db.prepare("SELECT id, title FROM mesh_channels ORDER BY rowid").all()
       .map(row => ({ id: String(row.id), title: String(row.title) }));
+  }
+  channel(object: ObjectReader, channels = this.channels()) {
+    const channelId = this.state(object)?.channelId;
+    return channels.find(channel => channel.id === channelId) ?? null;
   }
   requireChannel(id: string): void {
     if (!this.channels().some(channel => channel.id === id)) throw new PluginApiError("not_found", "The Mesh channel is unavailable.");
@@ -53,16 +53,23 @@ export class MeshService {
     this.db.prepare("UPDATE mesh_channels SET title = ? WHERE id = ?").run(title, id);
     this.refresh();
   }
+  deleteChannel(id: string): void {
+    const { changes } = this.db.prepare("DELETE FROM mesh_channels WHERE id = ?").run(id);
+    if (!changes) throw new PluginApiError("not_found", "The Mesh channel is unavailable.");
+    this.refresh();
+  }
   attach(id: string): void { this.detached.delete(id); this.refresh(); }
   detach(id: string): void { this.detached.add(id); this.refresh(); }
   view(object: ObjectReader): MeshCardData {
-    return { channelId: this.state(object).channelId,
-      channels: this.channels().map(channel => ({ ...channel, agents: this.members.filter(member => member.channelId === channel.id).length })) };
+    const channels = this.channels();
+    return { channelId: this.channel(object, channels)?.id ?? null,
+      channels: channels.map(channel => ({ ...channel, agents: this.members.filter(member => member.channelId === channel.id).length })) };
   }
 
   refresh(): void {
     if (this.plugin.lifetime.signal.aborted) return;
     const sources: Membership[] = [], meshes: ObjectReader[] = [];
+    const channelIds = new Set(this.channels().map(channel => channel.id));
     for (const session of this.plugin.sessions.list()) {
       const snapshot = this.plugin.session(session.id).snapshot();
       for (const resource of snapshot.resources.all()) {
@@ -70,7 +77,8 @@ export class MeshService {
         const object = this.plugin.object(session.id, Mesh, resource.ref.id);
         meshes.push(object);
         const state = this.state(object);
-        this.requireChannel(state.channelId);
+        // Missing or deleted selections have no membership, even when old resources are reattached.
+        if (!state || !channelIds.has(state.channelId)) continue;
         for (const agent of snapshot.resources.linkedTo(resource.ref)) {
           if (agent.ref.kind !== Agent.kind) continue;
           sources.push({ channelId: state.channelId, mesh: resource.ref, ref: agent.ref, title: agent.title,
@@ -94,11 +102,11 @@ export class MeshService {
     this.views = views;
   }
 
-  capture(object: ObjectReader): MeshAccess {
+  capture(object: ObjectReader): MeshAccess | null {
     this.refresh();
-    const channelId = this.state(object).channelId;
-    return { channelId, channelName: this.channels().find(channel => channel.id === channelId)!.title,
-      members: structuredClone(this.members.filter(member => member.channelId === channelId)) };
+    const channel = this.channel(object);
+    if (!channel) return null;
+    return { channelName: channel.title, members: structuredClone(this.members.filter(member => member.channelId === channel.id)) };
   }
   resolve(access: MeshAccess, target: MeshTarget): Member {
     const member = access.members.find(member => member.profile.title === target.title && member.profile.id === (target.id ?? 0));
@@ -108,11 +116,11 @@ export class MeshService {
   }
   profile(member: Member) {
     return { ...member.profile, descriptions: [...new Set(member.meshes.map(ref =>
-      this.state(this.plugin.object(ref.sessionId, Mesh, ref.id)).profiles[memberKey(member.ref)] ?? "").filter(Boolean))] };
+      this.state(this.plugin.object(ref.sessionId, Mesh, ref.id))?.profiles[memberKey(member.ref)] ?? "").filter(Boolean))] };
   }
   ownProfile(object: ObjectReader, caller: ToolCaller, access: MeshAccess) {
     const member = access.members.find(member => memberKey(member.ref) === memberKey(caller.ref));
-    const description = this.state(object).profiles[memberKey(caller.ref)] ?? "";
+    const description = this.state(object)?.profiles[memberKey(caller.ref)] ?? "";
     return { title: caller.title, id: member?.profile.id ?? null, type: agentServices(this.plugin).describe(caller.ref).type,
       descriptions: description ? [description] : [] };
   }

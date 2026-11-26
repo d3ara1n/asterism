@@ -6,7 +6,7 @@ import { pluginNamespace, type Json, type ResourceRef } from "@asterism-app/sdk/
 import { definePlugin, type PluginContext, type SessionExecutor } from "@asterism-app/sdk/runtime";
 import { AgentInputMessage, CreateAgent, type AgentInputPart } from "@asterism-app/builtin-api/contracts";
 import { agentServices } from "@asterism-app/builtin-api/runtime";
-import { CreateMesh, CreateMeshChannel, MeshList, MeshGetProfile, MeshView, RenameMeshChannel, SelectMeshChannel } from "../../packages/builtin/src/mesh/contract.ts";
+import { CreateMesh, CreateMeshChannel, DeleteMeshChannel, MeshList, MeshGetProfile, MeshView, RenameMeshChannel, SelectMeshChannel } from "../../packages/builtin/src/mesh/contract.ts";
 import { BuiltinApplicationService as ApplicationService, configureBuiltin } from "../../packages/builtin/src/testing.ts";
 import * as runtimeModules from "./loader.ts";
 import { AgentCapabilities } from "../execution/capabilities.ts";
@@ -46,7 +46,11 @@ function open(root = mkdtempSync(join(tmpdir(), "asterism-mesh-")), onSessionCha
   };
   const view = (ref: ResourceRef) => MeshView.schema.parse(
     app.sessions.current(ref.sessionId).workbench.objects.find(object => object.id === ref.id)!.presentation.data);
-  return { root, app, plugin, session, agent, mesh, capabilities, view };
+  const channel = async (session: SessionExecutor, mesh: ResourceRef, title = "Research") => {
+    await session.invoke(CreateMeshChannel, mesh, { title });
+    return view(mesh).channelId!;
+  };
+  return { root, app, plugin, session, agent, mesh, capabilities, view, channel };
 }
 async function call(capabilities: AgentCapabilities, mesh: ResourceRef, name: string, target: Json = null, args: Json = {}) {
   const prepared = capabilities.resolve(mesh.id, name, target, args);
@@ -56,22 +60,78 @@ const list = async (capabilities: AgentCapabilities, mesh: ResourceRef) =>
   MeshList.schema.parse((await call(capabilities, mesh, "list")).data).agents;
 const profile = async (capabilities: AgentCapabilities, mesh: ResourceRef, target: Json = null) =>
   MeshGetProfile.schema.parse((await call(capabilities, mesh, "mesh_get_profile", target)).data);
+const disconnected = { kind: "failed", error: { code: "mesh_channel_not_connected" } };
 
 describe("Mesh resource routing", () => {
+  it("links a Mesh without joining a channel and defers connection changes to the next request", async () => {
+    const f = open(), s = f.session("Setup"), a = await f.agent(s, "Ada"), mesh = await f.mesh(s);
+    expect(f.view(mesh)).toEqual({ channelId: null, channels: [] });
+    s.link(a, mesh); s.link(mesh, a);
+    const before = f.capabilities(a);
+    const target = { title: "Ada" };
+    for (const [tool, address, args] of [
+      ["list", null, {}],
+      ["mesh_get_profile", null, {}],
+      ["mesh_set_profile", null, { description: "Not yet connected" }],
+      ["send", target, { parts: [{ kind: "text", text: "Hello" }] }],
+      ["peek", target, { question: "What arrived?" }],
+    ] satisfies [string, Json, Json][]) {
+      expect(await call(before, mesh, tool, address, args)).toMatchObject(disconnected);
+    }
+
+    const channelId = await f.channel(s, mesh);
+    expect(await call(before, mesh, "list")).toMatchObject(disconnected);
+    expect(await list(f.capabilities(a), mesh)).toEqual([{ title: "Ada", id: 0, type: "general", descriptions: [] }]);
+    expect(f.view(await f.mesh(s))).toMatchObject({ channelId: null, channels: [{ id: channelId, agents: 1 }] });
+  });
+
+  it("disconnects all Meshes selecting a deleted channel without rerouting links or reviving it on restart", async () => {
+    const f = open(), left = f.session("Left"), right = f.session("Right");
+    const a = await f.agent(left, "Ada"), b = await f.agent(right, "Atlas");
+    const ma = await f.mesh(left), mb = await f.mesh(right), other = await f.mesh(left);
+    const shared = await f.channel(left, ma);
+    await right.invoke(SelectMeshChannel, mb, { channelId: shared });
+    const remaining = await f.channel(left, other, "Other");
+    left.link(a, ma); right.link(mb, b);
+    const captured = f.capabilities(a);
+    await left.invoke(DeleteMeshChannel, ma, { channelId: shared });
+    expect((await list(captured, ma)).map(agent => agent.title)).toEqual(["Atlas"]);
+    expect(await call(f.capabilities(a), ma, "list")).toMatchObject(disconnected);
+    for (const mesh of [ma, mb]) {
+      expect(f.view(mesh)).toEqual({ channelId: null, channels: [{ id: remaining, title: "Other", agents: 0 }] });
+    }
+    expect(f.view(other).channelId).toBe(remaining);
+
+    const replacement = await f.channel(left, ma);
+    expect(await list(f.capabilities(a), ma)).toEqual([]);
+    await right.invoke(SelectMeshChannel, mb, { channelId: replacement });
+    expect((await list(f.capabilities(a), ma)).map(agent => agent.title)).toEqual(["Atlas"]);
+
+    await left.invoke(DeleteMeshChannel, ma, { channelId: remaining });
+    await left.invoke(DeleteMeshChannel, ma, { channelId: replacement });
+    await f.app.close(); apps.splice(apps.indexOf(f.app), 1);
+    const restored = open(f.root);
+    expect(restored.view(mb)).toEqual({ channelId: null, channels: [] });
+    expect(await call(restored.capabilities(a), ma, "list")).toMatchObject(disconnected);
+  });
+
   it("discovers only exposed Agents across sessions and does not grant the reverse link", async () => {
     const f = open(), left = f.session("Left"), right = f.session("Right");
     const a = await f.agent(left, "Ada"), b = await f.agent(right, "Atlas", "explorer");
     const ma = await f.mesh(left), mb = await f.mesh(right);
+    const channelId = await f.channel(left, ma);
+    await right.invoke(SelectMeshChannel, mb, { channelId });
     left.link(a, ma); right.link(mb, b);
     expect(await list(f.capabilities(a), ma)).toEqual([{ title: "Atlas", id: 0, type: "explorer", descriptions: [] }]);
     expect(await call(f.capabilities(b), mb, "list")).toMatchObject({ kind: "rejected", error: { code: "access_denied" } });
     expect(await profile(f.capabilities(a), ma)).toEqual({ title: "Ada", id: null, type: "general", descriptions: [] });
-    expect(f.view(ma).channels).toEqual([{ id: "default", title: "Default", agents: 1 }]);
+    expect(f.view(ma).channels).toEqual([{ id: channelId, title: "Research", agents: 1 }]);
   });
 
   it("keeps descriptions local to each Mesh while deduplicating multiple routes and reading current values", async () => {
     const f = open(), s = f.session("Profiles"), a = await f.agent(s, "Atlas");
     const first = await f.mesh(s), second = await f.mesh(s);
+    await s.invoke(SelectMeshChannel, second, { channelId: await f.channel(s, first) });
     for (const mesh of [first, second]) { s.link(a, mesh); s.link(mesh, a); }
     const captured = f.capabilities(a);
     await call(captured, first, "mesh_set_profile", null, { description: "Investigate login" });
@@ -93,6 +153,7 @@ describe("Mesh resource routing", () => {
     const f = open(), s = f.session("Names");
     const caller = await f.agent(s, "Caller"), a = await f.agent(s, "Atlas"), b = await f.agent(s, "Atlas");
     const mesh = await f.mesh(s); s.link(caller, mesh); s.link(mesh, a); s.link(mesh, b);
+    await f.channel(s, mesh);
     expect((await list(f.capabilities(caller), mesh)).map(agent => agent.id)).toEqual([0, 1]);
     s.unlink(mesh, a);
     await expect(profile(f.capabilities(caller), mesh, { title: "Atlas" })).rejects.toThrow("id 0");
@@ -108,12 +169,14 @@ describe("Mesh resource routing", () => {
   it("captures the channel and member scope before a switch and exposes the new selection on the next request", async () => {
     const f = open(), s = f.session("Switch"), other = f.session("Other");
     const a = await f.agent(s, "Ada"), b = await f.agent(other, "Atlas"), ma = await f.mesh(s), mb = await f.mesh(other);
+    const channelId = await f.channel(s, ma);
+    await other.invoke(SelectMeshChannel, mb, { channelId });
     s.link(a, ma); other.link(mb, b);
     const captured = f.capabilities(a);
     await s.invoke(CreateMeshChannel, ma, { title: "New" });
     expect((await list(captured, ma)).map(agent => agent.title)).toEqual(["Atlas"]);
     expect(await list(f.capabilities(a), ma)).toEqual([]);
-    await s.invoke(SelectMeshChannel, ma, { channelId: "default" });
+    await s.invoke(SelectMeshChannel, ma, { channelId });
     const capturedBeforeDetach = f.capabilities(a);
     other.unlink(mb, b);
     expect((await list(capturedBeforeDetach, ma)).map(agent => agent.title)).toEqual(["Atlas"]);
@@ -125,6 +188,7 @@ describe("Mesh resource routing", () => {
     const f = open(), s = f.session("Sender"), other = f.session("Recipient");
     const a = await f.agent(s, "Ada"), b = await f.agent(other, "Atlas"), hidden = await f.agent(other, "Hidden");
     const ma = await f.mesh(s), mb = await f.mesh(other); s.link(a, ma); other.link(mb, b);
+    await other.invoke(SelectMeshChannel, mb, { channelId: await f.channel(s, ma) });
     await f.app.configuration.execute({ type: "languageModelProvider.save", id: null, value: {
       id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [], apiKey: "",
     } });
@@ -139,7 +203,7 @@ describe("Mesh resource routing", () => {
         ref: { source: { sessionId: s.id, id: "original-directory", kind: "asterism.builtin/directory" }, locator: { path: "evidence.zip" } } }];
     expect(await call(captured, ma, "send", { title: "Atlas" }, { parts })).toMatchObject({ kind: "succeeded" });
     expect(other.snapshot().records.query(AgentInputMessage, { scope: "timeline" }).map(record => record.status === "known" ? record.data : null)).toContainEqual(
-      expect.objectContaining({ parts, sender: expect.objectContaining({ name: "Ada", mesh: { channel: "Default", id: null } }) }));
+      expect.objectContaining({ parts, sender: expect.objectContaining({ name: "Ada", mesh: { channel: "Research", id: null } }) }));
     const services = agentServices(f.plugin), resolvePeek = services.peek.bind(services), inputs: unknown[] = [];
     // The service binds the target; the bound client receives the question.
     const peek = vi.spyOn(services, "peek").mockImplementation(ref => {
@@ -156,9 +220,11 @@ describe("Mesh resource routing", () => {
   it("removes archived members from card counts and resets a name only after every member leaves", async () => {
     const f = open(), left = f.session("Left"), right = f.session("Right");
     const caller = await f.agent(left, "Ada"), b = await f.agent(right, "Atlas"), ma = await f.mesh(left), mb = await f.mesh(right);
+    const channelId = await f.channel(left, ma, "Original");
+    await right.invoke(SelectMeshChannel, mb, { channelId });
     left.link(caller, ma); right.link(mb, b);
-    await left.invoke(RenameMeshChannel, ma, { channelId: "default", title: "Research" });
-    expect(f.view(mb).channels[0]).toEqual({ id: "default", title: "Research", agents: 1 });
+    await left.invoke(RenameMeshChannel, ma, { channelId, title: "Research" });
+    expect(f.view(mb).channels[0]).toEqual({ id: channelId, title: "Research", agents: 1 });
     await f.app.sessions.execute({ type: "archive", sessionId: right.id });
     expect(f.view(ma).channels[0]!.agents).toBe(0);
     const replacement = await f.agent(left, "Atlas"); left.link(ma, replacement);
@@ -173,6 +239,7 @@ describe("Mesh resource routing", () => {
     const f = open(undefined, event => { if (event.kind === "session.progress" && !event.timelineBusy) complete(); });
     const s = f.session("History"), a = await f.agent(s, "Atlas");
     const before = s.snapshot().position.nodeId, mesh = await f.mesh(s);
+    await f.channel(s, mesh);
     s.link(a, mesh); s.link(mesh, a);
     const attached = s.snapshot().position.nodeId;
     await f.app.sessions.execute({ type: "watch", sessionId: s.id });
