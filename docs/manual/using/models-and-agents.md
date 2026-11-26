@@ -4,6 +4,8 @@ Model choice and Agent responsibility answer different questions. The model supp
 
 Configure shared language model connections under **Language model providers** in the **Providers** settings. The builtin paradigm adds reusable model roles and Agent configurations. Other paradigms can organize their model choices differently.
 
+The **ChatGPT** connection uses an eligible ChatGPT account and plan; **OpenAI** uses an API key and separate API billing. After browser authorization, save the connection before discovering models. If the grant later needs authorization again, reconnect the existing connection to keep its configured models and Agent selections.
+
 ## Choose for the work, not just the model name
 
 Consider the task's demands: reasoning depth, input material, tool use, response time, and cost. A stronger model can be worthwhile for ambiguous decisions; a simpler task may not justify the same expense. A larger context can hold more material, but it does not resolve conflicting instructions or make irrelevant material useful.

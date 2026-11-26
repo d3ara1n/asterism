@@ -21,7 +21,7 @@ describe("Protocol connection tests", () => {
   it("Go connection tests use independent temporary sessions and allow compatibility settings to override the UA", async () => {
     const connection = { ...provider("openai-responses"), compatibility: [{ id: "opencodeSession" }] };
     const transport = vi.fn<typeof fetch>(async () => Response.json(responses["openai-responses"]));
-    const probe = () => runConnectionProbe({ provider: connection, model, apiKey: "", signal: new AbortController().signal }, transport);
+    const probe = () => runConnectionProbe({ provider: connection, model, credential: { kind: "none" as const }, signal: new AbortController().signal }, transport);
     await probe();
     await probe();
     const first = new Headers(transport.mock.calls[0]![1]?.headers);
@@ -32,13 +32,13 @@ describe("Protocol connection tests", () => {
     expect(first.get("x-opencode-session")).not.toBe(second.get("x-opencode-session"));
     await runConnectionProbe({ provider: connection, model: { ...model,
       compatibility: [{ id: "customUserAgent", value: { userAgent: "CustomProbe/1.0" } }] },
-      apiKey: "", signal: new AbortController().signal }, transport);
+      credential: { kind: "none" as const }, signal: new AbortController().signal }, transport);
     expect(new Headers(transport.mock.calls[2]![1]?.headers).get("user-agent")).toBe("CustomProbe/1.0");
   });
   it("never sends API keys to remote plaintext HTTP endpoints", async () => {
     const transport = vi.fn<typeof fetch>();
     await expect(runConnectionProbe({ provider: { ...provider("openai-chat"), auth: "api_key", baseUrl: "http://example.test/v1" },
-      model, apiKey: "must-not-be-sent", signal: new AbortController().signal }, transport)).rejects.toThrow();
+      model, credential: { kind: "none" as const }, signal: new AbortController().signal }, transport)).rejects.toThrow();
     expect(transport).not.toHaveBeenCalled();
   });
   it.each(["openai-responses", "openai-chat", "anthropic"] as const)("%s explicitly requests the correct endpoint and never uses environment keys without authentication", async protocol => {
@@ -50,7 +50,7 @@ describe("Protocol connection tests", () => {
       capabilities: { ...model.capabilities, reasoning: true, thinkingLevels: [] },
       compatibility: [{ id: "systemMessageInMessages" }, { id: "responsesReasoning", value: {} }, { id: "toolFilesAsUserMessage" }],
       generation: { temperature: 0.3, topP: 0.8, maxOutputTokens: 1000 } },
-      apiKey: "", signal: new AbortController().signal }, transport);
+      credential: { kind: "none" as const }, signal: new AbortController().signal }, transport);
     expect(transport).toHaveBeenCalledTimes(1);
     const [url, init] = transport.mock.calls[0]!;
     const suffix = protocol === "openai-responses" ? "/responses" : protocol === "openai-chat" ? "/chat/completions" : "/messages";
@@ -73,10 +73,19 @@ describe("Protocol connection tests", () => {
     }
     expect(init?.redirect).toBe("error");
   });
+  it("tests an OAuth Responses model with a stateless stream to completion", async () => {
+    const transport = vi.fn<typeof fetch>(async () => new Response(`data: ${JSON.stringify({ type: "response.completed", response: responses["openai-responses"] })}\n\n`,
+      { headers: { "content-type": "text/event-stream" } }));
+    await runConnectionProbe({ provider: { ...provider("openai-responses"), auth: "oauth", oauthProvider: "chatgpt" }, model,
+      credential: { kind: "oauth", provider: "chatgpt", accessToken: "test-access-token" }, signal: new AbortController().signal }, transport);
+    const [, init] = transport.mock.calls[0]!;
+    expect(JSON.parse(String(init?.body))).toMatchObject({ stream: true, store: false });
+    expect(new Headers(init?.headers).get("authorization")).toBe("Bearer test-access-token");
+  });
   it("does not retry authentication errors or return keys from server errors", async () => {
     const transport = vi.fn<typeof fetch>(async () => Response.json({ error: { message: "echoed-secret", type: "authentication_error", code: "invalid_api_key" } }, { status: 401 }));
     let failure: unknown;
-    try { await runConnectionProbe({ provider: { ...provider("openai-chat"), auth: "api_key" }, model, apiKey: "test-key", signal: new AbortController().signal }, transport); }
+    try { await runConnectionProbe({ provider: { ...provider("openai-chat"), auth: "api_key" }, model, credential: { kind: "api_key" as const, key: "test-key" }, signal: new AbortController().signal }, transport); }
     catch (error) { failure = error; }
     expect(transport).toHaveBeenCalledTimes(1);
     expect(new Headers(transport.mock.calls[0]![1]?.headers).get("authorization")).toBe("Bearer test-key");

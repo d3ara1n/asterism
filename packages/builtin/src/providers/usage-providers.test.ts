@@ -42,7 +42,7 @@ describe("built-in balance and plan queries", () => {
   it("OpenRouter queries only the budget with an ordinary key and queries account balance only with a management key", async () => {
     const transport = vi.fn<typeof fetch>(async () => Response.json({ data: { limit: 10, limit_remaining: 3, is_management_key: false } }));
     const provider = createOpenRouterUsage(transport);
-    const context = { connection: { id: "router", endpoint: "https://relay.test/api/v1" }, credential: "test-key", signal: new AbortController().signal };
+    const context = { connection: { id: "router", endpoint: "https://relay.test/api/v1" }, credential: { kind: "api_key" as const, key: "test-key" }, signal: new AbortController().signal };
     expect(await provider.query(context)).toMatchObject([{ type: "balance", scope: "key", remaining: 3, unit: { type: "currency", code: "USD" } }]);
     expect(transport).toHaveBeenCalledTimes(1);
     expect(String(transport.mock.calls[0]![0])).toBe("https://relay.test/api/v1/key");
@@ -91,7 +91,7 @@ describe("built-in balance and plan queries", () => {
     ]) {
       const transport = vi.fn<typeof fetch>(async () => Response.json(body));
       const signal = new AbortController().signal;
-      await provider(transport).query({ connection: { id: "renamed", endpoint: "https://relay.test/anything/v1" }, credential: "test-key", signal });
+      await provider(transport).query({ connection: { id: "renamed", endpoint: "https://relay.test/anything/v1" }, credential: { kind: "api_key" as const, key: "test-key" }, signal });
       expect(String(transport.mock.calls[0]![0])).toBe(`https://relay.test${path}`);
       expect(transport.mock.calls[0]![1]).toMatchObject({ signal, redirect: "error", headers: { Authorization: "Bearer test-key" } });
     }

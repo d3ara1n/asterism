@@ -49,7 +49,7 @@ describe("New API balances", () => {
   ])("derives the query URLs from %s", async (endpoint, base) => {
     const transport = vi.fn<typeof fetch>(async input => Response.json(String(input).endsWith("/api/status") ? status("USD") : token({})));
     await createNewApiUsage(transport).query({
-      connection: { id: "relay", endpoint }, credential: "test-key", signal: new AbortController().signal,
+      connection: { id: "relay", endpoint }, credential: { kind: "api_key" as const, key: "test-key" }, signal: new AbortController().signal,
     });
     expect(transport.mock.calls.map(call => String(call[0]))).toEqual([`${base}/api/usage/token/`, `${base}/api/status`]);
   });

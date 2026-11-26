@@ -56,7 +56,7 @@ async function wireRequest(value: ModelInput, frames: readonly unknown[], inspec
     inspectHeaders?.(new Headers(init?.headers));
     return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""), { headers: { "content-type": "text/event-stream" } });
   };
-  const adapter = new AiSdkAdapter(async () => "unused", undefined, transport);
+  const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "unused" }), undefined, transport);
   const events: ModelEvent[] = [];
   for await (const event of adapter.prepare(value).stream(new AbortController().signal)) events.push(event);
   return { body: body!, events };
@@ -327,7 +327,7 @@ describe("Reasoning level and budget mappings", () => {
         content: [{ type: "text", text: "OK" }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 1, output_tokens: 1 } });
     };
     const { provider, model } = current.settings;
-    const languageModel = createProviderModel(provider, model, "unused", transport);
+    const languageModel = createProviderModel(provider, model, { kind: "none" }, transport);
     await generateText({ model: languageModel, prompt: "Question", ...requestOptions(provider, model, { purpose: "execution", thinking: "low" }) });
     await generateText({ model: languageModel, prompt: "Question", ...requestOptions(provider, model, { purpose: "probe" }) });
     expect(bodies[0]).toMatchObject({ thinking: manual ? { type: "enabled", budget_tokens: 2048 } : { type: "adaptive" }, max_tokens: 10000 });

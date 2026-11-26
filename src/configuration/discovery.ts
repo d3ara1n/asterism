@@ -1,3 +1,4 @@
+import type { ModelCredential } from "@asterism-app/sdk/contracts";
 import { randomUUID } from "node:crypto";
 import type { DiscoveredModel, ModelDiscovery, ModelProvider } from "../shared/configuration.ts";
 import { validateProviderTransport, ProviderTransportError } from "../model/provider.ts";
@@ -9,16 +10,17 @@ type DiscoveryError = NonNullable<ModelDiscovery["error"]>;
 export class ModelDiscoveryError extends Error {
   constructor(readonly code: DiscoveryError) { super(`Model discovery failed: ${code}.`); }
 }
-export interface DiscoveryInput { provider: ModelProvider; apiKey: string; signal: AbortSignal }
+export interface DiscoveryInput { provider: ModelProvider; credential: ModelCredential; signal: AbortSignal }
 export type DiscoverModels = (input: DiscoveryInput) => Promise<DiscoveredModel[]>;
 
 /** Race complete catalogs at both suffixes without interpreting or changing the configured API base path. */
-export async function discoverModels({ provider, apiKey, signal }: DiscoveryInput, transport: typeof fetch = fetch): Promise<DiscoveredModel[]> {
+export async function discoverModels({ provider, credential, signal }: DiscoveryInput, transport: typeof fetch = fetch): Promise<DiscoveredModel[]> {
   validateProviderTransport(provider);
-  if (provider.auth === "api_key" && !apiKey) throw new ModelDiscoveryError("credential");
   signal.throwIfAborted();
   const base = provider.baseUrl.replace(/\/+$/, "");
-  const headers = languageModelProtocol(provider.protocol).discoveryHeaders(provider.auth, apiKey);
+  const headers = languageModelProtocol(provider.protocol).discoveryHeaders(credential.kind === "api_key" ? "api_key" : "none",
+    credential.kind === "api_key" ? credential.key : "");
+  if (credential.kind === "oauth") headers.set("authorization", `Bearer ${credential.accessToken}`);
   const controller = new AbortController();
   const candidateSignal = AbortSignal.any([signal, controller.signal]);
   try {
@@ -72,7 +74,7 @@ export class ModelDiscoveries {
     if (!entry) throw new ConfigurationError("not_found", "The model list is no longer available. Fetch models again.");
     return structuredClone(entry.value);
   }
-  start(provider: ModelProvider, credential: (signal: AbortSignal) => Promise<string>): string {
+  start(provider: ModelProvider, credential: (signal: AbortSignal) => Promise<ModelCredential>): string {
     this.clearProvider(provider.id);
     const id = randomUUID();
     const controller = new AbortController();
@@ -86,13 +88,13 @@ export class ModelDiscoveries {
     void this.run(id, provider, credential, controller.signal);
     return id;
   }
-  private async run(id: string, provider: ModelProvider, credential: (signal: AbortSignal) => Promise<string>, signal: AbortSignal): Promise<void> {
-    let apiKey: string;
-    try { apiKey = await credential(signal); }
+  private async run(id: string, provider: ModelProvider, credential: (signal: AbortSignal) => Promise<ModelCredential>, signal: AbortSignal): Promise<void> {
+    let resolved: ModelCredential;
+    try { resolved = await credential(signal); }
     catch { this.finish(id, { state: "failed", error: "credential", models: [] }); return; }
     if (signal.aborted) return;
     try {
-      const models = await this.discover({ provider, apiKey, signal });
+      const models = await this.discover({ provider, credential: resolved, signal });
       this.finish(id, { state: "succeeded", error: null, models });
     } catch (error) {
       this.finish(id, { state: "failed", models: [], error: error instanceof ModelDiscoveryError ? error.code

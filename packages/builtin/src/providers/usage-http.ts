@@ -17,9 +17,9 @@ export function parseUsageResponse<T>(schema: z.ZodType<T>, raw: unknown): T {
 export async function fetchUsageJson(context: UsageQueryContext, path: string, transport: typeof fetch = fetch,
   auth: "bearer" | "raw" = "bearer"): Promise<unknown> {
   const { connection, credential, signal } = context;
-  if (!credential) throw new UsageQueryError("credential");
+  if (credential.kind !== "api_key") throw new UsageQueryError("credential");
   const response = await transport(new URL(path, connection.endpoint), {
-    headers: { Authorization: auth === "raw" ? credential : `Bearer ${credential}`, Accept: "application/json" },
+    headers: { Authorization: auth === "raw" ? credential.key : `Bearer ${credential.key}`, Accept: "application/json" },
     signal, redirect: "error",
   });
   if (!response.ok) {

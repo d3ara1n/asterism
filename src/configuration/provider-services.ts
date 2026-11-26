@@ -14,7 +14,7 @@ export function createLanguageModelProviderServices(configuration: Configuration
       options?.signal?.throwIfAborted();
       const value = await configuration.executionCredential(id, options?.signal);
       options?.signal?.throwIfAborted();
-      return connection(id)?.auth === "none" ? null : value;
+      return value;
     },
     subscribe: listener => configuration.subscribeProviders(listener),
   };

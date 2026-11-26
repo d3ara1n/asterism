@@ -1,11 +1,11 @@
-import type { LanguageModelProviderConnection, LanguageModelProviderPreset } from "./model-provider.ts";
+import type { ModelCredential, LanguageModelProviderConnection, LanguageModelProviderPreset } from "./model-provider.ts";
 
 export interface LanguageModelProviderServices {
   presets(): readonly LanguageModelProviderPreset[];
   list(): readonly LanguageModelProviderInfo[];
   get(id: string): LanguageModelProviderInfo | null;
-  /** Backend only; reads the connection's current credentials, returning null for connections without authentication. */
-  credential(id: string, options?: { signal?: AbortSignal }): Promise<string | null>;
+  /** Backend only; reads the connection's current credentials, including an explicit none variant for unauthenticated connections. */
+  credential(id: string, options?: { signal?: AbortSignal }): Promise<ModelCredential>;
   /** Connection or preset catalog changes; returns an unsubscribe function and unsubscribes automatically when the plugin closes. */
   subscribe(listener: () => void): () => void;
 }

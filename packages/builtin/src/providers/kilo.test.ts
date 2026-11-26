@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createKiloUsage } from "./kilo.ts";
 
 describe("Kilo Gateway personal credits", () => {
-  const context = { connection: { id: "renamed", endpoint: "https://ai-gateway.kilo.ai/api/v1" }, credential: "test-key",
+  const context = { connection: { id: "renamed", endpoint: "https://ai-gateway.kilo.ai/api/v1" }, credential: { kind: "api_key" as const, key: "test-key" },
     signal: new AbortController().signal };
 
   it("only sends the bearer to Kilo's official companion API for a Kilo Gateway connection", async () => {

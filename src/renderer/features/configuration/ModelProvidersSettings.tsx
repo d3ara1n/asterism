@@ -28,6 +28,7 @@ import { ModelCompatibilityEditor } from "./ModelCompatibilityEditor";
 import { ModelCostEditor } from "./ModelCostEditor";
 import { modelProtocolLabels } from "./protocols";
 import { ModelDiscoveryPicker } from "./ModelDiscoveryPicker";
+import { ModelOAuthField, useModelOAuth } from "./ModelOAuthField";
 import { useModelParameters } from "./ModelParameters";
 import { settingValues, settingsComplete } from "./provider-settings";
 import { ProviderSettingFields } from "./ProviderSettingFields";
@@ -51,8 +52,8 @@ const latestTest = (snapshot: ConfigurationSnapshot, modelId: string): Connectio
 /** Suggest the next step by error category; original information remains displayed with the result. */
 const testHints = (): Record<TestError, string> => ({
   configuration: getI18n().formatMessage(providersMessages.invalidSettings),
-  credential: getI18n().formatMessage(providersMessages.saveApiKey),
-  authentication: getI18n().formatMessage(providersMessages.keyRejected),
+  credential: getI18n().formatMessage(providersMessages.credentialUnavailable),
+  authentication: getI18n().formatMessage(providersMessages.credentialRejected),
   model_unavailable: getI18n().formatMessage(providersMessages.modelUnavailable),
   rate_limit: getI18n().formatMessage(providersMessages.rateLimited),
   network: getI18n().formatMessage(providersMessages.networkUnavailable),
@@ -86,6 +87,7 @@ function useQuickActions() {
 const providerValue = (provider: ModelProvider): ProviderValue => ({
   id: provider.id, name: provider.name, protocol: provider.protocol, baseUrl: provider.baseUrl, auth: provider.auth, apiKey: provider.apiKey,
   compatibility: structuredClone(provider.compatibility),
+  ...(provider.oauthProvider && { oauthProvider: provider.oauthProvider }),
   ...(provider.iconId !== undefined && { iconId: provider.iconId }),
   ...(provider.usage !== undefined && { usage: provider.usage }),
   ...(provider.fixedFields && { fixedFields: [...provider.fixedFields] }),
@@ -190,7 +192,7 @@ function ProviderCreation() {
   if (picked) return <ProviderEditor initialId={null} initialValue={picked.value} service={picked.service} keyUrl={picked.keyUrl} />;
   return <PresetPicker onPick={preset => setPicked(preset ? { service: preset.name, keyUrl: preset.keyUrl, value: {
     ...modelProviderPresetDraft(preset, snapshot?.languageModelProviders.map(provider => provider.id)), apiKey: "",
-    name: `${preset.name} · ${presetDescription(preset, snapshot?.languageModelProviderPresets ?? [])}`,
+    name: [preset.name, presetDescription(preset, snapshot?.languageModelProviderPresets ?? [])].filter(Boolean).join(" · "),
   } } : { value: structuredClone(blank) })} />;
 }
 
@@ -199,6 +201,7 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
   const { snapshot } = useSettingsConfiguration();
   const { run, busy, error } = useConfigurationAction("inline");
   const discoveryAction = useConfigurationAction("inline");
+  const oauthAction = useConfigurationAction("inline");
   const island = useIsland();
   useIslandCancel(async () => { await island.close(); });
   const [id, setId] = useState(initialId);
@@ -211,20 +214,36 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
   const [idEdited, setIdEdited] = useState(!!current || !!initialValue.id);
   const setName = (name: string) => setValue(previous => ({ ...previous, name, ...(idEdited ? {} : { id: slugify(name) }) }));
 
+  const oauth = useModelOAuth();
+  const authorization = oauth.draft.stage === "authorized" ? oauth.draft.id : undefined;
+  const waiting = oauth.draft.stage === "waiting";
   const saved = current ? providerValue(current) : null;
-  const dirty = !saved || JSON.stringify(saved) !== JSON.stringify(value);
+  const dirty = !!authorization || !saved || JSON.stringify(saved) !== JSON.stringify(value);
+  const oauthState = current?.oauthProvider === value.oauthProvider ? current?.oauthState : undefined;
+  const oauthProvider = value.auth === "oauth" ? value.oauthProvider : undefined;
+  const disconnectOAuth = async () => {
+    if (!current) return;
+    await oauthAction.run({ type: "languageModelProvider.save", id: current.id,
+      value: { ...providerValue(current), enabled: current.enabled }, authorization: null });
+  };
   const fields = modelProviderFields(value, snapshot?.usageProviders ?? [], keyUrl);
   const values = settingValues(fields, {
     name: value.name, id: value.id, protocol: value.protocol, baseUrl: value.baseUrl, auth: value.auth, apiKey: value.apiKey,
-    usage: value.usage ? `usage:${value.usage}` : "off",
+    usage: value.usage ? `usage:${value.usage}` : "off", oauthProvider: value.oauthProvider ?? "",
   });
   const complete = modelProviderSchema.safeParse({ ...value, enabled: current?.enabled ?? true }).success
-    && modelProviderComplete(value) && settingsComplete(fields, values);
+    && modelProviderComplete(value) && settingsComplete(fields, values)
+    && (value.auth !== "oauth" || !!value.oauthProvider && (!!current || !!authorization));
   const setField = (key: string, next: string) => {
     if (key === "name") setName(next);
     else if (key === "id") { setIdEdited(true); set("id", next); }
     else if (key === "usage") set("usage", next === "off" ? null : next.slice(6));
-    else setValue(previous => ({ ...previous, [key]: next }));
+    else if (key === "auth" || key === "oauthProvider") {
+      oauth.cancel();
+      setValue(previous => key === "auth" ? { ...previous, auth: next as ProviderValue["auth"],
+        oauthProvider: next === "oauth" ? previous.oauthProvider ?? "chatgpt" : undefined }
+        : { ...previous, oauthProvider: next as ProviderValue["oauthProvider"] });
+    } else setValue(previous => ({ ...previous, [key]: next }));
   };
 
   const openModel = (modelId: string | null, origin?: HTMLElement | null) => {
@@ -234,23 +253,28 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
   const models = snapshot?.languageModels.filter(model => model.providerId === id) ?? [];
 
   const title = current?.name ?? (service ? i18n.formatMessage(providersMessages.newServiceConnection, { service }) : i18n.formatMessage(providersMessages.newProvider));
-  return <Editor form={form} title={title} dirty={dirty} busy={busy} error={error} saveDisabled={!complete}
+  return <Editor form={form} title={title} dirty={dirty} busy={busy} error={error} saveDisabled={!complete || waiting || oauthAction.busy}
     description={canEditModelProviderField(value, "protocol") ? protocolLabel(value.protocol) : undefined}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteProviderTitle),
       description: i18n.formatMessage(providersMessages.deleteProviderDescription, { current_name: current.name, models_length: models.length }),
       onConfirm: async () => { const result = await run({ type: "remove", kind: "languageModelProvider", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
     <form id={form} onSubmit={async event => {
       event.preventDefault();
-      if (!complete) return;
-      const result = await run({ type: "languageModelProvider.save", id, value: { ...value, enabled: current?.enabled ?? true } });
+      if (!complete || waiting || oauthAction.busy) return;
+      const result = await run({ type: "languageModelProvider.save", id, authorization, value: { ...value, enabled: current?.enabled ?? true } });
       if (result?.ok) {
         const persisted = result.snapshot.languageModelProviders.find(item => item.id === result.savedId);
         if (persisted) setValue(providerValue(persisted));
+        oauth.commit();
         setId(result.savedId);
       }
     }}><fieldset disabled={busy} className="contents">
       <EditorSection title={i18n.formatMessage(providersMessages.connection)}><FieldGroup>
         <ProviderSettingFields settings={fields} values={values} onValue={setField} />
+        {oauthProvider && <ModelOAuthField provider={oauthProvider} state={oauthState} draft={oauth.draft}
+          error={oauth.error ?? (oauthState === "connected" && oauth.draft.stage === "idle" ? oauthAction.error : null)}
+          disconnectDisabled={oauthAction.busy || dirty} onConnect={() => void oauth.start(oauthProvider, id)} onCancel={oauth.cancel}
+          onDisconnect={() => void disconnectOAuth()} />}
       </FieldGroup></EditorSection>
       {canEditModelProviderField(value, "compatibility") && <ModelCompatibilityEditor value={value.compatibility} onChange={next => set("compatibility", next)} />}
       </fieldset></form>

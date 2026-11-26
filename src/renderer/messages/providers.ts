@@ -53,13 +53,13 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     id: "provider.test.invalidSettings",
     defaultMessage: "Check the provider and model settings.",
   },
-  saveApiKey: {
+  credentialUnavailable: {
     id: "provider.test.credentialRequired",
-    defaultMessage: "Save an API key for this provider.",
+    defaultMessage: "Check the credentials in the provider connection.",
   },
-  keyRejected: {
-    id: "provider.test.keyRejected",
-    defaultMessage: "The key was rejected. Replace it in the provider connection.",
+  credentialRejected: {
+    id: "provider.test.credentialRejected",
+    defaultMessage: "The service rejected the connection credential.",
   },
   modelUnavailable: {
     id: "provider.test.modelUnavailable",
@@ -194,7 +194,7 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   httpsRequired: {
     id: "provider.httpsRequired",
-    defaultMessage: "API keys require HTTPS, except on localhost or a loopback address.",
+    defaultMessage: "Authenticated connections require HTTPS, except on localhost or a loopback address.",
   },
   authentication: {
     id: "provider.authentication.label",
@@ -204,6 +204,15 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
     id: "provider.authentication.none",
     defaultMessage: "None",
   },
+  oauth: { id: "provider.oauth", defaultMessage: "OAuth" },
+  oauthProvider: { id: "provider.oauth.provider", defaultMessage: "OAuth provider" },
+  oauthConnect: { id: "provider.oauth.connect", defaultMessage: "Continue with {provider}" },
+  oauthReconnect: { id: "provider.oauth.reconnect", defaultMessage: "Reconnect" },
+  oauthDisconnect: { id: "provider.oauth.disconnect", defaultMessage: "Disconnect" },
+  oauthConnected: { id: "provider.oauth.connected", defaultMessage: "Connected" },
+  oauthWaiting: { id: "provider.oauth.waiting", defaultMessage: "Waiting for authorization" },
+  oauthNeedsSave: { id: "provider.oauth.needsSave", defaultMessage: "Authorized · Save to connect" },
+  oauthNeedsReconnect: { id: "provider.oauth.needsReconnect", defaultMessage: "Reconnect required" },
   getKey: {
     id: "provider.credential.getKey",
     defaultMessage: "Get a key",
@@ -230,7 +239,7 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   testConnected: {
     id: "provider.test.connected",
-    defaultMessage: "Connected",
+    defaultMessage: "Test passed",
   },
   cancelTestRequest: {
     id: "model.test.quickCancel",

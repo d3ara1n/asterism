@@ -33,7 +33,7 @@ describe("Provider contribution catalog", () => {
       registry.declare("test.a", [new Balance()], [], lifecycle.group("call"));
       const provider = registry.get("balance")!;
       if (provider.source === "headers") throw new Error("Expected query provider");
-      expect(await provider.query({ connection: { id: "p", endpoint: "https://example.test" }, credential: null, signal: new AbortController().signal }))
+      expect(await provider.query({ connection: { id: "p", endpoint: "https://example.test" }, credential: { kind: "none" }, signal: new AbortController().signal }))
         .toMatchObject([{ remaining: 12 }]);
     } finally { await lifecycle.close(); }
   });

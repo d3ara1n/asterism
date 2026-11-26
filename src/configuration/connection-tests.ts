@@ -1,3 +1,4 @@
+import type { ModelCredential } from "@asterism-app/sdk/contracts";
 import { randomUUID } from "node:crypto";
 import { modelReference, type ConnectionTest, type ModelProvider, type ProviderModel } from "../shared/configuration.ts";
 import type { ConfigurationKind } from "./store.ts";
@@ -17,7 +18,7 @@ export class ModelConnectionTests {
         this.tests.delete(key);
     }
   }
-  start(provider: ModelProvider, model: ProviderModel, credential: (signal: AbortSignal) => Promise<string>): string {
+  start(provider: ModelProvider, model: ProviderModel, credential: (signal: AbortSignal) => Promise<ModelCredential>): string {
     for (const [key, test] of this.tests) {
       if (this.tests.size < 50) break;
       if (test.value.state !== "running") this.tests.delete(key);
@@ -35,19 +36,16 @@ export class ModelConnectionTests {
     void this.run(id, provider, model, credential, controller.signal);
     return id;
   }
-  private async run(id: string, provider: ModelProvider, model: ProviderModel, credential: (signal: AbortSignal) => Promise<string>, signal: AbortSignal): Promise<void> {
-    let apiKey = "";
-    if (provider.auth === "api_key") {
-      try {
-        apiKey = await credential(signal);
-      } catch {
-        this.finish(id, { state: "failed", error: "credential", message: "The credential could not be resolved. Check the saved value or credential command." });
-        return;
-      }
+  private async run(id: string, provider: ModelProvider, model: ProviderModel, credential: (signal: AbortSignal) => Promise<ModelCredential>, signal: AbortSignal): Promise<void> {
+    let resolved: ModelCredential;
+    try { resolved = await credential(signal); }
+    catch {
+      this.finish(id, { state: "failed", error: "credential", message: "The connection credential is unavailable." });
+      return;
     }
     if (signal.aborted || this.closed) return;
     try {
-      await this.probe({ provider, model, apiKey, signal });
+      await this.probe({ provider, model, credential: resolved, signal });
       this.finish(id, { state: "succeeded", error: null, message: "Connection succeeded." });
     } catch (error) {
       if (!signal.aborted) this.finish(id, { state: "failed", ...classifyProbeError(error) });

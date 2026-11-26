@@ -36,7 +36,8 @@ export const applicationStorage = {
   pluginInstallationRecordsDirectory: "records", // Reproducibility metadata, within pluginPackagesDirectory.
   pluginDataDirectory: "extensions",
   pluginWorkingCacheDirectory: "extension-cache",
-  credentialsDirectory: "credentials", // Legacy encrypted values retained for migration and recovery.
+  credentialsDirectory: "credentials", // OAuth host identity and legacy encrypted values retained for recovery.
+  modelOAuthHostFile: "model-oauth-host",
   configurationFile: "configuration.json",
   appearanceStore: "appearance",
   languageStore: "language",

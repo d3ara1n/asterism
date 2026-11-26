@@ -1,7 +1,7 @@
 import {
   mcpSettingsSchema, shellSettingsSchema, modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema, modelMediaModalities, modelInputModalitiesSchema,
-  languageModelProviderFixedFields, languageModelProtocolIds, providerUsageIdSchema, usageProviderInfoSchema, languageModelProviderPresetSchema, providerIconIdSchema,
+  languageModelProviderFixedFields, languageModelProtocolIds, oauthProviderIdSchema, providerUsageIdSchema, usageProviderInfoSchema, languageModelProviderPresetSchema, providerIconIdSchema,
 } from "@asterism-app/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
@@ -23,7 +23,7 @@ const endpoint = z.string().trim().url().pipe(z.string().refine(value => {
   return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash;
 }, "Use an HTTP(S) base URL without credentials, query, or fragment."));
 export const modelProviderInputSchema = z.strictObject({
-  id: modelProviderIdSchema, name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none"]),
+  id: modelProviderIdSchema, name, protocol: protocolSchema, baseUrl: endpoint, enabled: z.boolean(), auth: z.enum(["api_key", "none", "oauth"]), oauthProvider: oauthProviderIdSchema.optional(),
   compatibility: modelCompatibilitySchema,
   iconId: providerIconIdSchema.optional(),
   usage: providerUsageIdSchema.nullable().optional(),
@@ -39,6 +39,10 @@ export type WebProviderConfiguration = z.infer<typeof webProviderSchema>;
  * Runtime consumers receive the connection without the key and read the resolved credential separately.
  */
 export const modelProviderSchema = modelProviderInputSchema.extend({ apiKey: z.string().trim() });
+const modelOAuthStateSchema = z.enum(["connected", "disconnected", "reauthorize"]);
+export type ModelOAuthState = z.infer<typeof modelOAuthStateSchema>;
+const modelProviderViewSchema = modelProviderSchema.extend({ oauthState: modelOAuthStateSchema.optional() });
+export const modelOAuthProviderNames = { chatgpt: "ChatGPT" } satisfies Record<z.infer<typeof oauthProviderIdSchema>, string>;
 /** API-key authentication requires a key; other authentication methods carry none. */
 export function modelProviderComplete(provider: Pick<ModelProvider, "auth" | "apiKey">): boolean {
   return provider.auth !== "api_key" || provider.apiKey.trim() !== "";
@@ -109,7 +113,7 @@ export const configurationSnapshotSchema = z.strictObject({
   messagingProviderTypes: z.array(messagingProviderTypeSchema),
   webProviders: z.array(webProviderSchema),
   webProviderTypes: z.array(webProviderTypeSchema),
-  languageModelProviders: z.array(modelProviderSchema), languageModels: z.array(modelSchema),
+  languageModelProviders: z.array(modelProviderViewSchema), languageModels: z.array(modelSchema),
   tests: z.array(connectionTestSchema), discoveries: z.array(modelDiscoverySchema),
   languageModelProviderPresets: z.array(languageModelProviderPresetSchema).optional(),
   usageProviders: z.array(usageProviderInfoSchema).optional(),
@@ -128,7 +132,10 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("showUsage.set"), value: z.boolean() }),
   z.strictObject({ type: z.literal("usageBudget.set"), value: usageBudgetSchema }),
   // Save targets the current ID; a different ID in value means rename.
-  z.strictObject({ type: z.literal("languageModelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderSchema }),
+  z.strictObject({ type: z.literal("languageModelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderSchema, authorization: z.uuid().nullable().optional() }),
+  z.strictObject({ type: z.literal("languageModelProvider.oauth.start"), provider: oauthProviderIdSchema, id: z.uuid(), connectionId: modelProviderIdSchema.nullable() }),
+  z.strictObject({ type: z.literal("languageModelProvider.oauth.finish"), id: z.uuid() }),
+  z.strictObject({ type: z.literal("languageModelProvider.oauth.cancel"), id: z.uuid() }),
   z.strictObject({ type: z.literal("languageModel.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
   z.strictObject({ type: z.literal("remove"), kind: z.enum(["languageModelProvider", "webProvider", "messaging", "languageModel"]), id: z.string().min(1).max(321) }),
   z.strictObject({ type: z.literal("languageModel.test.start"), model: modelExpressionSchema }),
@@ -172,7 +179,7 @@ export const configurationErrorSchema = z.strictObject({
   code: z.enum(["invalid_request", "not_found", "conflict", "unavailable", "internal"]), message: z.string(), display: uiTextSchema.optional(),
 });
 export const configurationResultSchema = z.discriminatedUnion("ok", [
-  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional() }),
+  z.strictObject({ ok: z.literal(true), snapshot: configurationSnapshotSchema, savedId: z.string().max(321).nullable(), parameterUpdate: modelParameterUpdateSchema.optional(), authorizationUrl: z.string().url().optional() }),
   z.strictObject({ ok: z.literal(false), error: configurationErrorSchema }),
 ]);
 export type ModelProvider = z.infer<typeof modelProviderSchema>;

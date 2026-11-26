@@ -1,6 +1,5 @@
-import type { ModelResponse } from "@asterism-app/sdk/contracts";
+import type { ModelCredential, ModelResponse, ProviderUsageState } from "@asterism-app/sdk/contracts";
 import { UsageQueryError, type LanguageModelProviderInfo, type LanguageModelProviderServices, type UsageProviderServices } from "@asterism-app/sdk/runtime";
-import type { ProviderUsageState } from "@asterism-app/sdk/contracts";
 import { ProviderTransportError, validateProviderTransport } from "../model/provider.ts";
 
 interface Entry { value: ProviderUsageState; attemptedAt: number; controller: AbortController; pending?: Promise<ProviderUsageState> }
@@ -57,10 +56,9 @@ export class ProviderUsageService {
       try {
         signal.throwIfAborted();
         validateProviderTransport(connection);
-        let credential: string | null;
+        let credential: ModelCredential;
         try { credential = await waitForUsage(this.languageModelProviders.credential(connection.id, { signal }), signal); }
         catch { throw new UsageQueryError("credential"); }
-        if (connection.auth === "api_key" && !credential) throw new UsageQueryError("credential");
         signal.throwIfAborted();
         const items = await waitForUsage(provider.query({ connection: { id, endpoint: connection.baseUrl }, credential, signal }), signal);
         current.value = { ...empty, state: "ready", items, updatedAt: Date.now() };

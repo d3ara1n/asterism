@@ -77,7 +77,7 @@ describe("Sub2API usage", () => {
   ])("derives the usage URL from %s", async (endpoint, url) => {
     const transport = vi.fn<typeof fetch>(async () => Response.json(wallet));
     await createSub2ApiUsage(transport).query({
-      connection: { id: "relay", endpoint }, credential: "test-key", signal: new AbortController().signal,
+      connection: { id: "relay", endpoint }, credential: { kind: "api_key" as const, key: "test-key" }, signal: new AbortController().signal,
     });
     expect(String(transport.mock.calls[0]![0])).toBe(url);
   });

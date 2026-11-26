@@ -18,7 +18,7 @@ import { ConfigurationActionError } from "./forms";
 import { useConfigurationAction, useSettingsConfiguration } from "./state";
 
 const errors = {
-  configuration: messages.invalidSettings, credential: messages.saveApiKey, authentication: messages.keyRejected,
+  configuration: messages.invalidSettings, credential: messages.credentialUnavailable, authentication: messages.credentialRejected,
   unsupported: messages.discoveryUnsupported, rate_limit: messages.rateLimited, network: messages.networkUnavailable,
   timeout: messages.timeout, protocol: messages.unexpectedResponse, server: messages.serverError,
   cancelled: messages.discoveryCancelled,

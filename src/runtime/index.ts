@@ -1,3 +1,4 @@
+import { RuntimeCredentialProtection } from "./credential-protection.ts";
 import { ApplicationService } from "./service.ts";
 import { dispatch } from "./dispatch.ts";
 import { protocolVersion, systemResumeMessage } from "../shared/contracts.ts";
@@ -25,7 +26,8 @@ let service: ApplicationService;
 const proxy = new ProxyClient(message => port.postMessage(message));
 const network = createNetworkDispatcher(url => proxy.resolve(url));
 setGlobalDispatcher(network.dispatcher);
-port.on("message", ({ data }) => proxy.receive(data));
+const credentials = new RuntimeCredentialProtection(message => port.postMessage(message));
+port.on("message", ({ data }) => { proxy.receive(data); credentials.receive(data); });
 /** Direct renderer connections handed off by the main process; main-process-assigned numbers support explicit disconnection. */
 const connections = new Map<string, RendererConnection>();
 const broadcast = (frame: RuntimeFrame) => { for (const connection of connections.values()) connection.send(frame); };
@@ -45,7 +47,7 @@ try {
   console.info(`Plugin package preparation completed in ${Math.round(performance.now() - started)} ms.`);
   for (const item of packages) if (item.diagnostic) console.error(`Plugin package ${item.root} failed during ${item.diagnostic.stage}: ${item.diagnostic.message}`);
   port.postMessage({ kind: "startup", stage: "workspace" });
-  service = new ApplicationService(root, { catalogs: packages.flatMap(item => item.catalogs ?? []),
+  service = new ApplicationService(root, { credentialProtection: credentials, catalogs: packages.flatMap(item => item.catalogs ?? []),
     packages: packageCandidates(packages), rendererImportMap: rendererImportMap(packages), packageEntries: packages.map(item => item.entry),
     skillDirectories: [userSkillDirectory()],
     packageRoots: new Map(packages.flatMap(item => item.manifest ? [[item.manifest.id, item.root] as const] : [])),

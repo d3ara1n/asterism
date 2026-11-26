@@ -45,6 +45,12 @@ function commandCodePreset(id: string, billing: "usage" | "subscription", protoc
 
 export const languageModelProviderPresets: readonly LanguageModelProviderPreset[] = [
   {
+    id: "chatgpt", name: "ChatGPT", iconId: "openai", billing: "subscription",
+    connection: { fixedFields: [...fixedFields, "oauthProvider"], protocol: "openai-responses", baseUrl: "https://api.openai.com/v1",
+      auth: "oauth", oauthProvider: "chatgpt", compatibility: [] },
+    sources: ["https://developers.openai.com/siwc/token-sharing-open-source"], verifiedOn: "2026-11-26",
+  },
+  {
     id: "openai", name: "OpenAI", iconId: "openai", billing: "usage",
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key", compatibility: [], usage: "openai" },
     keyUrl: "https://platform.openai.com/api-keys",

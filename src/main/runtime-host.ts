@@ -1,3 +1,4 @@
+import { protectRuntimeCredential } from "./credential-protection.ts";
 import { utilityProcess, type MessagePortMain, type UtilityProcess } from "electron";
 import { applicationBrand } from "../shared/application.ts";
 import { observeProcess } from "./logging.ts";
@@ -53,6 +54,14 @@ export class RuntimeHost {
       child.on("message", raw => {
         if (raw?.kind === "proxy.request") {
           void handleProxyRequest(raw).then(response => {
+            if (response && this.child === child) {
+              try { child.postMessage(response); } catch { /* The child has exited. */ }
+            }
+          });
+          return;
+        }
+        if (raw?.kind === "credential.request") {
+          void protectRuntimeCredential(raw).then(response => {
             if (response && this.child === child) {
               try { child.postMessage(response); } catch { /* The child has exited. */ }
             }

@@ -21,7 +21,7 @@ afterEach(() => { cleanups.splice(0).reverse().forEach(cleanup => cleanup()); vi
 function setup(probe: ConnectionProbe = async () => {}, timeout = 30_000, discover?: DiscoverModels, catalog?: LoadModelCatalog) {
   const root = mkdtempSync(join(tmpdir(), "core-configuration-"));
   const changed = vi.fn();
-  const service = new ConfigurationService(root, changed, probe, timeout, discover, catalog);
+  const service = new ConfigurationService(root, changed, { probe, testTimeoutMs: timeout, discover, catalog });
   cleanups.push(() => { service.close(); rmSync(root, { recursive: true, force: true }); });
   return { root, service, changed };
 }
@@ -55,7 +55,7 @@ describe("Real configuration and consumption boundaries", () => {
     expect(resolveLanguageModel(migrated.languageModelCatalog(), "example/lab/model")?.model).toMatchObject({
       modelId: "lab/model", contextWindow: 32000, capabilities: { reasoning: false, tools: true }, generation: { temperature: 0.2 },
     });
-    expect(await migrated.executionCredential("example")).toBe("example-saved-key");
+    expect(await migrated.executionCredential("example")).toEqual({ kind: "api_key", key: "example-saved-key" });
     expect(migrated.current()).toMatchObject({ showUsage: false, sessionEntry: fixture.sessionEntry });
   });
   // The prior saved format has no lifecycle settings; migration must preserve its credentials and entry, and later reads must not reseed edited preferences.
@@ -213,7 +213,7 @@ describe("Real configuration and consumption boundaries", () => {
     await service.execute({ type: "languageModelProvider.save", id: value.id, value: renamed });
     const saved = service.current().languageModelProviders[0]!;
     expect(saved).toMatchObject(renamed);
-    expect(await service.executionCredential(saved.id)).toBe("replacement-key");
+    expect(await service.executionCredential(saved.id)).toEqual({ kind: "api_key", key: "replacement-key" });
     expect(JSON.parse(readFileSync(join(root, "configuration.json"), "utf8")).languageModelProviders[0]).not.toHaveProperty("kind");
     service.close();
     const reopened = new ConfigurationService(root);
@@ -232,7 +232,7 @@ describe("Real configuration and consumption boundaries", () => {
     await service.execute({ type: "languageModelProvider.save", id: null, value: { ...keyed, apiKey: "model-key" } });
     await expect(service.execute({ type: "languageModelProvider.save", id: keyed.id, value: { ...keyed, apiKey: " " } }))
       .rejects.toMatchObject({ code: "invalid_request" });
-    expect(await service.executionCredential(keyed.id)).toBe("model-key");
+    expect(await service.executionCredential(keyed.id)).toEqual({ kind: "api_key", key: "model-key" });
     await service.execute({ type: "languageModelProvider.save", id: keyed.id, value: { ...keyed, auth: "none", apiKey: "model-key" } });
     expect(service.current().languageModelProviders[0]).toMatchObject({ auth: "none", apiKey: "" });
     expect(readFileSync(join(root, "configuration.json"), "utf8")).not.toContain("model-key");
@@ -255,7 +255,7 @@ describe("Real configuration and consumption boundaries", () => {
     }
     expect(readFileSync(join(root, "configuration.json"), "utf8")).toBe(original);
     const saved = service.current().languageModelProviders[0]!;
-    expect(await service.executionCredential(saved.id)).toBe("original-key");
+    expect(await service.executionCredential(saved.id)).toEqual({ kind: "api_key", key: "original-key" });
     const model = createModelInput(value.id, { modelId: "test", name: "Test" });
     await expect(service.execute({ type: "languageModel.save", id: null, value: { ...model,
       compatibility: [{ id: "responsesReasoning", value: { summary: true } }] } })).rejects.toMatchObject({ code: "invalid_request" });
@@ -439,7 +439,7 @@ describe("Real configuration and consumption boundaries", () => {
       await expect(service.execute({ type: "languageModelProvider.save", id: providerId,
         value: { ...providerValue, name: "Must not commit", auth: "api_key", apiKey: "replacement-test-key" } })).rejects.toThrow();
       expect((await service.execute({ type: "read" })).snapshot.languageModelProviders).toEqual(before.languageModelProviders);
-      expect(await service.executionCredential(providerId)).toBe("test-key-not-for-network");
+      expect(await service.executionCredential(providerId)).toEqual({ kind: "api_key", key: "test-key-not-for-network" });
       expect(readdirSync(root).some(file => file.endsWith(".tmp"))).toBe(false);
     } finally {
       rmSync(path, { recursive: true });

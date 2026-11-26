@@ -13,6 +13,7 @@ const anthropicModelEntry = identity.extend({
 });
 const codexModelEntry = z.object({
   slug: discoveredModelSchema.shape.modelId,
+  visibility: z.string().optional(),
   display_name: discoveredModelSchema.shape.name.optional(),
 });
 const pageSchema = z.object({
@@ -53,16 +54,16 @@ function parseDataModel(raw: unknown): DiscoveredModel {
   return model;
 }
 
-function parseCodexModel(raw: unknown): DiscoveredModel {
+function parseCodexModel(raw: unknown): DiscoveredModel[] {
   const entry = codexModelEntry.parse(raw);
-  return { modelId: entry.slug, name: entry.display_name ?? entry.slug };
+  return entry.visibility === undefined || entry.visibility === "list" ? [{ modelId: entry.slug, name: entry.display_name ?? entry.slug }] : [];
 }
 
 /** Identify catalog formats solely by response structure; message protocol and vendor identity do not affect parsing. */
 export function parseModelListPage(raw: unknown): ModelListPage {
   const page = pageSchema.parse(raw);
   return {
-    models: page.data !== undefined ? page.data.map(parseDataModel) : page.models!.map(parseCodexModel),
+    models: page.data !== undefined ? page.data.map(parseDataModel) : page.models!.flatMap(parseCodexModel),
     hasMore: page.has_more ?? false,
     lastId: page.last_id ?? null,
   };

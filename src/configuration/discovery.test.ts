@@ -13,7 +13,7 @@ describe("Model discovery protocols and transport boundaries", () => {
     const transport = vi.fn<typeof fetch>(async () => Response.json({
       data: [{ id: "vendor/reasoner" }, { id: "vendor/reasoner" }, { id: "other", capabilities: "nonstandard" }],
     }));
-    const result = await discoverModels({ provider: { ...provider, protocol }, apiKey: "test-only", signal: new AbortController().signal }, transport);
+    const result = await discoverModels({ provider: { ...provider, protocol }, credential: { kind: "api_key" as const, key: "test-only" }, signal: new AbortController().signal }, transport);
     const [url, init] = transport.mock.calls[0]!;
     expect(String(url)).toBe("https://example.test/proxy/v1/models");
     const headers = new Headers(init?.headers);
@@ -21,6 +21,19 @@ describe("Model discovery protocols and transport boundaries", () => {
     expect(headers.get("x-api-key")).toBe(protocol === "anthropic" ? "test-only" : null);
     expect(init).toMatchObject({ method: "GET", redirect: "error" });
     expect(result).toEqual([{ modelId: "vendor/reasoner", name: "vendor/reasoner" }, { modelId: "other", name: "other" }]);
+  });
+
+  it("lists visible OAuth models from the configured gateway", async () => {
+    const transport = vi.fn<typeof fetch>(async () => Response.json({ models: [
+      { slug: "available", display_name: "Available", visibility: "list" },
+      { slug: "hidden", display_name: "Hidden", visibility: "hide" },
+    ] }));
+    const result = await discoverModels({ provider: { ...provider, auth: "oauth", oauthProvider: "chatgpt" },
+      credential: { kind: "oauth", provider: "chatgpt", accessToken: "test-access-token" }, signal: new AbortController().signal }, transport);
+    expect(result).toEqual([{ modelId: "available", name: "Available" }]);
+    const [url, init] = transport.mock.calls[0]!;
+    expect(String(url)).toBe("https://example.test/proxy/v1/models");
+    expect(new Headers(init?.headers).get("authorization")).toBe("Bearer test-access-token");
   });
 
   // Anthropic catalog metadata and pagination are independent of inference protocol; unauthenticated connections send no credentials.
@@ -41,7 +54,7 @@ describe("Model discovery protocols and transport boundaries", () => {
         has_more: true, last_id: "first",
       } : { data: [{ id: "second" }], has_more: false });
     });
-    const result = await discoverModels({ provider: { ...provider, protocol, auth: "none" }, apiKey: "must-not-send", signal: new AbortController().signal }, transport);
+    const result = await discoverModels({ provider: { ...provider, protocol, auth: "none" }, credential: { kind: "none" as const }, signal: new AbortController().signal }, transport);
     expect(calls).toEqual([
       "https://example.test/proxy/v1/models", "https://example.test/proxy/v1/v1/models",
       "https://example.test/proxy/v1/models?after_id=first",
@@ -61,7 +74,7 @@ describe("Model discovery protocols and transport boundaries", () => {
       { slug: "glm-5-turbo", supported_reasoning_levels: [] },
       { slug: "glm-5.3" },
     ] }));
-    expect(await discoverModels({ provider: { ...provider, protocol }, apiKey: "test", signal: new AbortController().signal }, transport)).toEqual([
+    expect(await discoverModels({ provider: { ...provider, protocol }, credential: { kind: "api_key" as const, key: "test" }, signal: new AbortController().signal }, transport)).toEqual([
       { modelId: "glm-5.3", name: "GLM 5.3" },
       { modelId: "glm-5-turbo", name: "glm-5-turbo" },
     ]);
@@ -76,13 +89,13 @@ describe("Model discovery protocols and transport boundaries", () => {
       expect(headers.get("authorization")).toBeNull();
       return new Response("private-test-key", { status: 401 });
     });
-    await expect(discoverModels({ provider: { ...provider, protocol: "anthropic" }, apiKey: "private-test-key", signal: new AbortController().signal }, transport))
+    await expect(discoverModels({ provider: { ...provider, protocol: "anthropic" }, credential: { kind: "api_key" as const, key: "private-test-key" }, signal: new AbortController().signal }, transport))
       .rejects.toMatchObject({ code: "authentication", message: "Model discovery failed: authentication." });
   });
 
   // A missing endpoint differs from a valid empty list; bad responses and repeated cursors cannot appear as successful partial catalogs.
   it("distinguishes empty lists, missing endpoints, and invalid pagination", async () => {
-    const input = { provider, apiKey: "test", signal: new AbortController().signal };
+    const input = { provider, credential: { kind: "api_key" as const, key: "test" }, signal: new AbortController().signal };
     expect(await discoverModels(input, async () => Response.json({ data: [] }))).toEqual([]);
     await expect(discoverModels(input, async () => new Response("", { status: 404 }))).rejects.toMatchObject({ code: "unsupported" });
     expect(await discoverModels(input, async () => Response.json({ models: [] }))).toEqual([]);
@@ -99,7 +112,7 @@ describe("Model discovery protocols and transport boundaries", () => {
     { label: "corrupt recognized Anthropic metadata", body: { data: [{ id: "model", capabilities: { thinking: { supported: "yes" } } }] } },
   ])("rejects $label", async ({ body }) => {
     const transport = vi.fn<typeof fetch>(async () => Response.json(body));
-    await expect(discoverModels({ provider, apiKey: "test", signal: new AbortController().signal }, transport))
+    await expect(discoverModels({ provider, credential: { kind: "api_key" as const, key: "test" }, signal: new AbortController().signal }, transport))
       .rejects.toMatchObject({ code: "protocol", message: "Model discovery failed: protocol." });
     expect(transport).toHaveBeenCalledTimes(2);
   });
@@ -112,7 +125,7 @@ describe("Model discovery protocols and transport boundaries", () => {
   ])("appends both candidates without rewriting $baseUrl", async ({ baseUrl, endpoints }) => {
     const transport = vi.fn<typeof fetch>(async url => String(url) === endpoints[0]
       ? Response.json({ data: [{ id: "direct" }] }) : new Response("", { status: 404 }));
-    expect(await discoverModels({ provider: { ...provider, baseUrl }, apiKey: "test", signal: new AbortController().signal }, transport))
+    expect(await discoverModels({ provider: { ...provider, baseUrl }, credential: { kind: "api_key" as const, key: "test" }, signal: new AbortController().signal }, transport))
       .toEqual([{ modelId: "direct", name: "direct" }]);
     expect(transport.mock.calls.map(([url]) => String(url))).toEqual(endpoints);
   });
@@ -126,7 +139,7 @@ describe("Model discovery protocols and transport boundaries", () => {
   ])("uses the other complete catalog after $label", async ({ response }) => {
     const transport = vi.fn<typeof fetch>(async url => String(url).endsWith("/v1/v1/models")
       ? Response.json({ data: [{ id: "valid" }] }) : response());
-    expect(await discoverModels({ provider, apiKey: "test", signal: new AbortController().signal }, transport))
+    expect(await discoverModels({ provider, credential: { kind: "api_key" as const, key: "test" }, signal: new AbortController().signal }, transport))
       .toEqual([{ modelId: "valid", name: "valid" }]);
   });
 
@@ -139,7 +152,7 @@ describe("Model discovery protocols and transport boundaries", () => {
         ? Response.json({ data: [{ id: "complete" }] })
         : Response.json({ data: [{ id: "partial" }], has_more: true, last_id: "partial" });
     });
-    expect(await discoverModels({ provider, apiKey: "test", signal: new AbortController().signal }, transport))
+    expect(await discoverModels({ provider, credential: { kind: "api_key" as const, key: "test" }, signal: new AbortController().signal }, transport))
       .toEqual([{ modelId: "complete", name: "complete" }]);
   });
 
@@ -148,14 +161,14 @@ describe("Model discovery protocols and transport boundaries", () => {
     const transport = vi.fn<typeof fetch>(async url => new Response("", {
       status: String(url).endsWith("/v1/v1/models") ? 404 : 401,
     }));
-    await expect(discoverModels({ provider, apiKey: "test", signal: new AbortController().signal }, transport))
+    await expect(discoverModels({ provider, credential: { kind: "api_key" as const, key: "test" }, signal: new AbortController().signal }, transport))
       .rejects.toMatchObject({ code: "authentication" });
   });
 
   // Discovery and execution follow the same HTTPS rules; misconfiguration cannot send keys over remote plaintext connections.
   it("rejects credentialed remote HTTP before sending a request", async () => {
     const transport = vi.fn<typeof fetch>();
-    await expect(discoverModels({ provider: { ...provider, baseUrl: "http://example.test/v1" }, apiKey: "test", signal: new AbortController().signal }, transport))
+    await expect(discoverModels({ provider: { ...provider, baseUrl: "http://example.test/v1" }, credential: { kind: "api_key" as const, key: "test" }, signal: new AbortController().signal }, transport))
       .rejects.toMatchObject({ code: "configuration" });
     expect(transport).not.toHaveBeenCalled();
   });

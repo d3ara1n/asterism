@@ -23,11 +23,11 @@ describe("Zhipu Coding Plan queries", () => {
     const transport = vi.fn<typeof fetch>(async () => Response.json(sample));
     const provider = createZhipuUsage(transport);
     const signal = new AbortController().signal;
-    await provider.query({ connection: { id: "renamed", endpoint: "https://relay.test/proxy/v1" }, credential: "test-key", signal });
+    await provider.query({ connection: { id: "renamed", endpoint: "https://relay.test/proxy/v1" }, credential: { kind: "api_key" as const, key: "test-key" }, signal });
     expect(String(transport.mock.calls[0]![0])).toBe("https://relay.test/api/monitor/usage/quota/limit");
     expect(transport.mock.calls[0]![1]).toMatchObject({ headers: { Authorization: "test-key" }, redirect: "error", signal });
     transport.mockResolvedValueOnce(new Response("private response", { status: 401 }));
-    await expect(provider.query({ connection: { id: "p", endpoint: "https://relay.test" }, credential: "test-key", signal }))
+    await expect(provider.query({ connection: { id: "p", endpoint: "https://relay.test" }, credential: { kind: "api_key" as const, key: "test-key" }, signal }))
       .rejects.toMatchObject({ code: "authentication" });
   });
 });

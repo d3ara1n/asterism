@@ -10,7 +10,7 @@ function setup(provider: UsageProvider, settings: Partial<LanguageModelProviderI
     auth: "api_key", enabled: true, compatibility: [], usage: provider.id, ...settings };
   const listeners = new Set<() => void>();
   const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
-  const credential = vi.fn(async () => "private-key");
+  const credential = vi.fn(async () => ({ kind: "api_key" as const, key: "private-key" }));
   const languageModelProviders: LanguageModelProviderServices = { list: () => [connection], get: () => connection, presets: () => [], credential, subscribe };
   const usageProviders: UsageProviderServices = { list: () => [], get: () => provider, subscribe };
   const changed = vi.fn();

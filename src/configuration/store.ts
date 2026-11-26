@@ -5,13 +5,13 @@ import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { applicationStorage } from "../shared/application.ts";
 import { canEditModelProviderField, modelReference, modelSchema, modelProviderSchema, sessionEntrySelectionSchema, usageBudgetSchema,
-  defaultSessionLifecycle, sessionLifecycleSchema, type SessionLifecycle, type ModelProvider, type ProviderModel } from "../shared/configuration.ts";
+  defaultSessionLifecycle, sessionLifecycleSchema, type SessionLifecycle, type ProviderModel } from "../shared/configuration.ts";
 import { mcpSettingsSchema, defaultMcpSettings, shellSettingsSchema, defaultShellSettings, modelCostSchema, webProviderStateSchema, type WebProviderState, messagingConnectionSchema, type MessagingConnection } from "@asterism-app/sdk/contracts";
 import { ConfigurationError } from "./errors.ts";
 import { providerEditingMessages } from "../shared/provider-editing-messages.ts";
 import { configurationVersion } from "../storage/formats.ts";
 
-const storedProviderSchema = modelProviderSchema.strip();
+const storedProviderSchema = modelProviderSchema.extend({ oauthGrant: z.string().optional(), oauthInvalid: z.boolean().optional() }).strip();
 const storedModelSchema = modelSchema.extend({ cost: modelCostSchema.nullable().default(null) }).strip();
 /** Models use `<providerId>/<modelId>` identities; other entries use id. */
 const keyOf = (item: { id: string } | { providerId: string; modelId: string }): string => "id" in item ? item.id : modelReference(item);
@@ -47,7 +47,7 @@ type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collectio
 type ConfigurationSave =
   | { kind: "messaging"; id: string | null; value: MessagingConnection }
   | { kind: "webProvider"; id: string; value: WebProviderState }
-  | { kind: "languageModelProvider"; id: string | null; value: ModelProvider }
+  | { kind: "languageModelProvider"; id: string | null; value: StoredModelProvider }
   | { kind: "languageModel"; id: string | null; value: ProviderModel };
 
 function initialConfiguration(): ConfigurationDocument {

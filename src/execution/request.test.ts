@@ -86,7 +86,7 @@ describe("Stateless single model execution", () => {
       { headers: { "content-type": "text/event-stream" } });
     const events: ModelRunEvent[] = [], request = input(events);
     const result = await runModelRequest(request, Promise.resolve({
-      adapter: new AiSdkAdapter(async () => "test-key", undefined, transport),
+      adapter: new AiSdkAdapter(async () => ({ kind: "api_key", key: "test-key" }), undefined, transport),
       settings: { ...settings, provider: { ...settings.provider, protocol: "anthropic" as const } },
       system: request.system, messages: await resolveInput(request.messages, undefined, request.signal),
     }));

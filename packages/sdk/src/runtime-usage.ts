@@ -1,3 +1,4 @@
+import type { ModelCredential } from "./model-provider.ts";
 import type { ProviderUsageError, UsageItem, UsageProviderInfo } from "./provider-usage.ts";
 import type { UiText } from "./i18n.ts";
 import type { ProviderUsageState } from "./usage-state.ts";
@@ -6,7 +7,7 @@ import type { ModelResponse } from "./models.ts";
 /** Consumers explicitly supply the connection and credentials required for the query. */
 export interface UsageQueryContext {
   readonly connection: { id: string; endpoint: string };
-  readonly credential: string | null;
+  readonly credential: ModelCredential;
   readonly signal: AbortSignal;
 }
 interface UsageProviderIdentity {

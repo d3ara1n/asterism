@@ -104,7 +104,7 @@ describe("Plugin presets and account usage", () => {
     expect(runtime.items).toEqual(items);
     expect(desktop).toEqual(runtime);
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[0]![0]).toMatchObject({ connection: { id: value.id, endpoint: value.baseUrl }, credential: "private-test-key" });
+    expect(query.mock.calls[0]![0]).toMatchObject({ connection: { id: value.id, endpoint: value.baseUrl }, credential: { kind: "api_key", key: "private-test-key" } });
     expect(JSON.stringify(desktop)).not.toContain("private-test-key");
     expect(consumer.languageModelProviders.presets().find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
   });
@@ -138,7 +138,7 @@ describe("Plugin presets and account usage", () => {
     await save(service);
     const provider = observer.usageProviders.get("test-usage")!;
     if (provider.source === "headers") throw new Error("Expected query provider");
-    const pending = provider.query({ connection: { id: value.id, endpoint: value.baseUrl }, credential: null, signal: new AbortController().signal });
+    const pending = provider.query({ connection: { id: value.id, endpoint: value.baseUrl }, credential: { kind: "none" }, signal: new AbortController().signal });
     const settled = pending.catch(() => {});
     await began;
     const closing = close();

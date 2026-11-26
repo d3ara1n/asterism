@@ -29,7 +29,7 @@ describe("AI SDK adaptation contract", () => {
       status, headers: { "content-type": "application/json", "X-Request-Id": "req-1" },
     });
     const transport = vi.fn<typeof fetch>(async () => response);
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), undefined, transport);
     const failure = await consume(adapter.prepare(transportInput).stream(new AbortController().signal)).catch(error => error);
     expect(failure).toBeInstanceOf(ModelFailure);
     expect(failure.response).toMatchObject({ connection: { id: "p" }, endpoint: input.settings.provider.baseUrl,
@@ -46,7 +46,7 @@ describe("AI SDK adaptation contract", () => {
   // Proxy gateways may return HTML directly; preserve the complete body even when it is not JSON.
   it("preserves response bodies for non-JSON HTTP errors", async () => {
     const body = "<html><body>upstream unavailable</body></html>";
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(body, { status: 502 }));
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), undefined, async () => new Response(body, { status: 502 }));
     await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
       .rejects.toMatchObject({ retryable: true, details: { statusCode: 502, httpStatus: 502, responseBody: body } });
   });
@@ -54,7 +54,7 @@ describe("AI SDK adaptation contract", () => {
   it.each(["not JSON", '{"choices":"invalid"}'])("invalid upstream response data is classified at the provider boundary: %s", async chunk => {
     const current = structuredClone(transportInput);
     current.settings.provider.protocol = "openai-chat";
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), undefined, async () => new Response(
       `data: ${chunk}\n\n`, { headers: { "content-type": "text/event-stream" } }));
     const failure = await consume(adapter.prepare(current).stream(new AbortController().signal)).catch(error => error);
     expect(failure).toMatchObject({ origin: "model", retryable: false, code: "response_parsing",
@@ -66,14 +66,14 @@ describe("AI SDK adaptation contract", () => {
   it("message-less SDK errors get a processing summary without serializing their data into it", async () => {
     const raw = { code: "adapter_failure", diagnostic: { value: [1, 2, 3] } };
     const model = new MockLanguageModelV4({ doStream: async () => { throw raw; } });
-    const adapter = new AiSdkAdapter(async () => "credential", () => model);
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "credential" }), () => model);
     await expect(consume(adapter.prepare(input).stream(new AbortController().signal)))
       .rejects.toMatchObject({ message: "Model processing failed.", details: { data: JSON.stringify(raw) } });
   });
   // The Anthropic SDK consumes the first error in doStream and trims fields; the transport prefix retains data actually received.
   it("preserves the original response when the first SSE event fails and distinguishes actual HTTP from SDK-inferred status", async () => {
     const raw = 'event: error\ndata: {"type":"error","error":{"type":"overloaded_error","message":"Server busy","extra":{"retry_after":5}}}\n\n';
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () =>
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), undefined, async () =>
       new Response(raw, { headers: { "content-type": "text/event-stream" } }));
     await expect(consume(adapter.prepare(transportInput).stream(new AbortController().signal)))
       .rejects.toMatchObject({ retryable: true, details: { message: "Server busy", statusCode: 529, httpStatus: 200, rawResponse: raw } });
@@ -87,7 +87,7 @@ describe("AI SDK adaptation contract", () => {
     const raw = { type: "error", error: { type, message: "Upstream error", extra: { request_id: "provider-1" } } };
     const start = { type: "message_start", message: { id: "m1", type: "message", role: "assistant", model: "test",
       content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 2, output_tokens: 0 } } };
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () => new Response(
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), undefined, async () => new Response(
       `event: message_start\ndata: ${JSON.stringify(start)}\n\nevent: error\ndata: ${JSON.stringify(raw)}\n\n`,
       { headers: { "content-type": "text/event-stream", "x-request-id": "stream-1" } }));
     const failure = await consume(adapter.prepare(transportInput).stream(new AbortController().signal)).catch(error => error);
@@ -115,7 +115,7 @@ describe("AI SDK adaptation contract", () => {
       } });
       return new Response(body, { headers: { "content-type": "text/event-stream" } });
     });
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), undefined, transport);
     await expect(consume(adapter.prepare(current).stream(new AbortController().signal)))
       .rejects.toMatchObject({ origin: "model", code: "provider_error", retryable, details: {
         httpStatus: 200, rawResponse: raw,
@@ -137,7 +137,7 @@ describe("AI SDK adaptation contract", () => {
         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(chunk)}\n\n`));
       },
     });
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, async () =>
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), undefined, async () =>
       new Response(body, { headers: { "content-type": "text/event-stream" } }));
     const stream = adapter.prepare(current).stream(new AbortController().signal);
     const run = async () => {
@@ -161,7 +161,7 @@ describe("AI SDK adaptation contract", () => {
           } },
         ],
       }) }) });
-      const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
+      const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), () => model);
       for await (const _event of adapter.prepare({ ...input, maxOutputTokens: requested }).stream(new AbortController().signal)) { /* Consume terminal state. */ }
       expect(model.doStreamCalls[0]!.maxOutputTokens).toBe(expected);
       expect(() => adapter.prepare({ ...input, maxOutputTokens: 0 })).toThrow("positive safe integer");
@@ -198,7 +198,7 @@ describe("AI SDK adaptation contract", () => {
       return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""),
         { headers: { "content-type": "text/event-stream" } });
     };
-    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }),
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
@@ -227,7 +227,7 @@ describe("AI SDK adaptation contract", () => {
     const original = structuredClone(current);
     const rejection = { error: { message: "This endpoint does not support MP4 files", param: "input[0].content[0].file_data" } };
     const transport = vi.fn<typeof fetch>(async () => Response.json(rejection, { status: 400 }));
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", undefined, transport);
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), undefined, transport);
     await expect(consume(adapter.prepare(current).stream(new AbortController().signal)))
       .rejects.toMatchObject({ origin: "model", code: "provider_error", message: rejection.error.message,
         retryable: false, details: { httpStatus: 400, responseBody: JSON.stringify(rejection) } });
@@ -244,7 +244,7 @@ describe("AI SDK adaptation contract", () => {
   // Request projection contract: toggles do not alter history; off does not delete reasoning; filtering must not send empty assistants or lose tool calls.
   it("only the current request reasoning toggle controls historical reasoning and reenabling sends it back completely", () => {
     const current = structuredClone(input);
-    const adapter = new AiSdkAdapter(async () => "unused");
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "unused" }));
     current.settings.thinking = "off";
     current.messages = [
       { kind: "output", adapter: adapter.format(current.settings), scope: modelScope(current.settings),
@@ -296,7 +296,7 @@ describe("AI SDK adaptation contract", () => {
       return new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""),
         { headers: { "content-type": "text/event-stream" } });
     };
-    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }),
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
@@ -340,7 +340,7 @@ describe("AI SDK adaptation contract", () => {
       { headers: { "content-type": "text/event-stream" } });
     const current = structuredClone(input);
     current.settings.provider.protocol = "openai-responses";
-    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }),
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
@@ -369,7 +369,7 @@ describe("AI SDK adaptation contract", () => {
       { headers: { "content-type": "text/event-stream" } });
     const current = structuredClone(input);
     current.settings.provider.protocol = "openai-responses";
-    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }),
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(current).stream(new AbortController().signal)) events.push(event);
@@ -392,7 +392,7 @@ describe("AI SDK adaptation contract", () => {
     ];
     const transport: typeof fetch = async () => new Response(frames.map(frame => `data: ${JSON.stringify(frame)}\n\n`).join(""),
       { headers: { "content-type": "text/event-stream" } });
-    const adapter = new AiSdkAdapter(async () => "synthetic-key",
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }),
       (value, key) => createProviderModel(value.settings.provider, value.settings.model, key, transport));
     const events: ModelEvent[] = [];
     const current = structuredClone(input);
@@ -481,7 +481,7 @@ describe("AI SDK adaptation contract", () => {
       { type: "finish", finishReason: { unified: "tool-calls", raw: "tool_use" }, usage: {
         inputTokens: { total: 3, noCache: 3, cacheRead: undefined, cacheWrite: undefined }, outputTokens: { total: 1, text: 1, reasoning: undefined } } },
     ] }) }) });
-    const adapter = new AiSdkAdapter(async () => "synthetic-key", () => model);
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "synthetic-key" }), () => model);
     const events: ModelEvent[] = [];
     for await (const event of adapter.prepare(input).stream(new AbortController().signal)) events.push(event);
     expect(events.find(e => e.type === "part.end")).toMatchObject({ input: { kind: "structured", value: { resource_id: "note" } } });
@@ -503,7 +503,7 @@ describe("AI SDK adaptation contract", () => {
       { type: "finish", finishReason: { unified: "tool-calls", raw: "tool_use" }, usage: {
         inputTokens: { total: 10, noCache: 8, cacheRead: 2, cacheWrite: undefined }, outputTokens: { total: 5, text: 3, reasoning: 2 } } },
     ] }) }) });
-    const adapter = new AiSdkAdapter(async () => "credential-not-for-history", () => model);
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "credential-not-for-history" }), () => model);
     const prepared = adapter.prepare(input);
     const events: ModelEvent[] = [];
     for await (const event of prepared.stream(new AbortController().signal)) events.push(event);
@@ -551,7 +551,7 @@ describe("AI SDK adaptation contract", () => {
   it("transport failures preserve original messages and cause without automatic retries", async () => {
     const cause = Object.assign(new Error("getaddrinfo ENOTFOUND example.invalid"), { code: "ENOTFOUND" });
     const transport = vi.fn<typeof fetch>(async () => { throw new Error("fetch failed", { cause }); });
-    const adapter = new AiSdkAdapter(async () => "credential", undefined, transport);
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "credential" }), undefined, transport);
     let failure: unknown;
     try { for await (const _event of adapter.prepare(transportInput).stream(new AbortController().signal)) { /* Consume the stream. */ } }
     catch (error) { failure = error; }
@@ -564,13 +564,13 @@ describe("AI SDK adaptation contract", () => {
 
   it("SDK-local encoding exceptions are not classified as retryable upstream errors", async () => {
     const model = new MockLanguageModelV4({ doStream: async () => { throw new Error("Unsupported local input"); } });
-    const adapter = new AiSdkAdapter(async () => "credential", () => model);
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "credential" }), () => model);
     await expect(consume(adapter.prepare(input).stream(new AbortController().signal)))
       .rejects.toMatchObject({ origin: "software", retryable: false, message: "Unsupported local input" });
   });
 
   it("model or adapter version changes do not block public text, and native data never crosses origins", () => {
-    const adapter = new AiSdkAdapter(async () => "credential");
+    const adapter = new AiSdkAdapter(async () => ({ kind: "api_key", key: "credential" }));
     const current: ModelInput = { ...input, messages: [{
       kind: "output", adapter: "older-adapter", scope: "different-provider",
       parts: [

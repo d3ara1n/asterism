@@ -1,7 +1,8 @@
+import type { ModelCredential } from "@asterism-app/sdk/contracts";
 import { jsonSchema as sdkJsonSchema, streamText, tool,
   type ModelMessage, type ToolResultPart, type ToolSet, type LanguageModel } from "ai";
 import { z } from "zod";
-import { jsonSchema, unauthenticatedApiKey, type Json, type ModelSettings } from "../shared/model.ts";
+import { jsonSchema, type Json, type ModelSettings } from "../shared/model.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent, type ModelInput, type ResolvedInputPart, type PreparedModel, type ModelValidationInput } from "./contract.ts";
 import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
@@ -99,8 +100,8 @@ function requestTools(input: ModelInput, protocol: LanguageModelProtocol): Reque
 }
 
 export class AiSdkAdapter implements ModelAdapter {
-  constructor(private readonly readCredential: (providerId: string) => Promise<string | null>,
-    private readonly languageModelFactory?: (input: ModelInput, key: string) => Exclude<LanguageModel, string>,
+  constructor(private readonly readCredential: (providerId: string) => Promise<ModelCredential | null>,
+    private readonly languageModelFactory?: (input: ModelInput, credential: ModelCredential) => Exclude<LanguageModel, string>,
     private readonly transport: typeof fetch = fetch) {}
   format(settings: ModelSettings): string {
     return languageModelProtocol(settings.provider.protocol).continuationFormat;
@@ -126,8 +127,8 @@ export class AiSdkAdapter implements ModelAdapter {
   private async *stream(input: ModelInput, messages: ModelMessage[], tools: RequestTools,
     options: ReturnType<typeof requestOptions>, protocol: LanguageModelProtocol, signal: AbortSignal): AsyncIterable<ModelEvent> {
     const { provider, model } = input.settings;
-    const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
-    if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
+    const credential = provider.auth === "none" ? { kind: "none" } as const : await this.readCredential(provider.id);
+    if (!credential) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
     const controller = new AbortController();
     const streamSignal = AbortSignal.any([signal, controller.signal]);
     let responseMetadata: ModelResponse | null = null;
@@ -166,7 +167,7 @@ export class AiSdkAdapter implements ModelAdapter {
       }
       return response;
     };
-    const languageModel = this.languageModelFactory?.(input, key) ?? createProviderModel(provider, model, key, transport, input);
+    const languageModel = this.languageModelFactory?.(input, credential) ?? createProviderModel(provider, model, credential, transport, input);
     signal.throwIfAborted();
     const timing = new RequestTimer();
     const measured = measureModel(languageModel, protocol, timing);

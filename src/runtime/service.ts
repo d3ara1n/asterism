@@ -1,3 +1,4 @@
+import type { CredentialProtection } from "../shared/credential-protection.ts";
 import type { UiText } from "@asterism-app/sdk/contracts";
 import { type PluginDefinition, PluginApiError } from "@asterism-app/sdk/runtime";
 import { join } from "node:path";
@@ -45,7 +46,7 @@ export class ApplicationService {
   private readonly started: string;
   private readonly startedEntries: readonly PackageEntry[];
   private readonly npm: NpmInstallations;
-  constructor(root: string, private readonly options: { rendererImportMap?: Record<string, string>; packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; onTelemetryChanged?: () => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage; distribution?: Distribution } = {}) {
+  constructor(root: string, private readonly options: { credentialProtection?: CredentialProtection; rendererImportMap?: Record<string, string>; packageRoots?: ReadonlyMap<string, string>; skillDirectories?: readonly string[]; catalogs?: TranslationCatalog[]; packages?: readonly PluginCandidate[]; packageEntries?: readonly PackageEntry[]; manualSources?: readonly (ManualSource & { pluginId: string })[]; onConfigurationChanged?: () => void; onSessionChanged?: (event: SessionChanged) => void; onTelemetryChanged?: () => void; adapterFactory?: (settings: ModelSettings) => ModelAdapter; plugins?: readonly PluginDefinition[]; pluginDependencies?: ReadonlyMap<string, readonly string[]>; onPluginConfigurationChanged?: (pluginId: string) => void; preparedStorage?: PreparedPluginStorage; distribution?: Distribution } = {}) {
     this.db = openDatabase(root);
     this.folders = new FolderStore(this.db);
     this.list = applicationPackages(root, options.distribution);
@@ -68,7 +69,7 @@ export class ApplicationService {
         this.sessions?.refreshSleep();
         this.sessions?.refreshArchive();
         options.onConfigurationChanged?.();
-      });
+      }, { credentialProtection: options.credentialProtection });
       // Archive cleanup releases references first; session services then explicitly reclaim content.
       collectExpiredSessions(this.db, Date.now(), this.configuration.sessionLifecycle().retentionDays);
       // Telemetry reads the workspace catalog directly so usage history keeps current names for every session, archived ones included.

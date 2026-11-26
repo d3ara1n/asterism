@@ -7,11 +7,19 @@ import { providerIconIdSchema } from "./provider-icon.ts";
 /** Host-owned model wire protocols; plugins select one and cannot register their own. */
 export const languageModelProtocolIds = ["openai-responses", "openai-chat", "anthropic"] as const;
 export type LanguageModelProtocolId = typeof languageModelProtocolIds[number];
-export const languageModelProviderFixedFields = ["protocol", "baseUrl", "auth", "compatibility", "usage"] as const;
+export const languageModelProviderFixedFields = ["protocol", "baseUrl", "auth", "oauthProvider", "compatibility", "usage"] as const;
+export const oauthProviderIdSchema = z.literal("chatgpt");
+export type OAuthProviderId = z.infer<typeof oauthProviderIdSchema>;
+export type ModelCredential =
+  | { kind: "none" }
+  | { kind: "api_key"; key: string }
+  | { kind: "oauth"; provider: OAuthProviderId; accessToken: string };
+
 export interface LanguageModelProviderConnection {
   protocol: LanguageModelProtocolId;
   baseUrl: string;
-  auth: "api_key" | "none";
+  auth: "api_key" | "none" | "oauth";
+  oauthProvider?: OAuthProviderId;
   compatibility: { id: string; value?: Json }[];
   usage?: string | null;
   fixedFields?: (typeof languageModelProviderFixedFields)[number][];
@@ -33,7 +41,7 @@ export interface LanguageModelProviderPreset {
 const webUrl = z.url({ protocol: /^https?$/ });
 export const languageModelProviderConnectionSchema = z.strictObject({
   protocol: z.enum(languageModelProtocolIds),
-  baseUrl: webUrl, auth: z.enum(["api_key", "none"]),
+  baseUrl: webUrl, auth: z.enum(["api_key", "none", "oauth"]), oauthProvider: oauthProviderIdSchema.optional(),
   compatibility: z.array(z.strictObject({ id: z.string().min(1), value: jsonSchema.optional() })),
   usage: providerUsageIdSchema.nullable().optional(),
   fixedFields: z.array(z.enum(languageModelProviderFixedFields)).optional(),

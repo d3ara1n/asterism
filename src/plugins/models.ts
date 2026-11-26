@@ -90,7 +90,10 @@ export function createLanguageModelServices(configuration: ConfigurationService,
     const { model, provider } = resolveLanguageModel(config, result.model)!;
     const { apiKey: _apiKey, ...connection } = provider;
     const settings: ModelSettings = { provider: connection, model, thinking: result.thinking };
-    const credential = adapterFactory || !execute ? null : await configuration.executionCredential(connection.id, signal);
+    const credential = adapterFactory || !execute ? null : await configuration.executionCredential(connection.id, signal).catch(error => {
+      signal?.throwIfAborted();
+      throw new ModelTargetFailure("credential_unavailable", (error as Error).message);
+    });
     const adapter = adapterFactory?.(settings)
       ?? new AiSdkAdapter(async () => credential);
     return { settings, adapter };

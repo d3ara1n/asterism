@@ -15,7 +15,7 @@ describe("Model request identity", () => {
     for (const userAgent of ["", "Agent\r\nX-Test: value", "客户端"]) {
       expect(modelCompatibilitySchema.safeParse([{ id: "customUserAgent", value: { userAgent } }]).success).toBe(false);
     }
-    const credential = vi.fn(async () => "unused");
+    const credential = vi.fn(async () => ({ kind: "api_key" as const, key: "unused" }));
     const adapter = new AiSdkAdapter(credential);
     const input: ModelInput = {
       settings: {

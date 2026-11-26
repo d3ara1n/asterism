@@ -50,7 +50,7 @@ describe("Command Code account usage", () => {
     transport.mockResolvedValueOnce(Response.json({ credits }));
     const signal = new AbortController().signal;
     const items = await createCommandCodeUsage(transport).query({
-      connection: { id: "custom-name", endpoint: "https://relay.test/provider/v1" }, credential: "test-key", signal,
+      connection: { id: "custom-name", endpoint: "https://relay.test/provider/v1" }, credential: { kind: "api_key" as const, key: "test-key" }, signal,
     });
     expect(items[0]).toMatchObject({ remaining: 62 });
     expect(transport.mock.calls.map(([url]) => String(url))).toEqual([
@@ -65,7 +65,7 @@ describe("Command Code account usage", () => {
   it("does not query personal credits when account scope resolution fails", async () => {
     const transport = vi.fn<typeof fetch>(async () => Response.json({ success: false, org: null }));
     await expect(createCommandCodeUsage(transport).query({
-      connection: { id: "custom-name", endpoint: "https://relay.test/provider/v1" }, credential: "test-key", signal: new AbortController().signal,
+      connection: { id: "custom-name", endpoint: "https://relay.test/provider/v1" }, credential: { kind: "api_key" as const, key: "test-key" }, signal: new AbortController().signal,
     })).rejects.toMatchObject({ code: "protocol" });
     expect(transport).toHaveBeenCalledTimes(1);
   });

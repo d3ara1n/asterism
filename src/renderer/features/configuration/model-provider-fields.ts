@@ -1,6 +1,6 @@
 import { withValues, type ProviderSetting, type UsageProviderInfo } from "@asterism-app/sdk/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
-import { canEditModelProviderField, type ModelProviderInput } from "../../../shared/configuration";
+import { canEditModelProviderField, modelOAuthProviderNames, type ModelProviderInput } from "../../../shared/configuration";
 import { providersMessages as messages } from "../../messages/providers";
 import { modelProtocolLabels } from "./protocols";
 
@@ -16,11 +16,15 @@ export function modelProviderFields(provider: Omit<ModelProviderInput, "enabled"
   });
   if (canEditModelProviderField(provider, "baseUrl")) fields.push({
     kind: "text", key: "baseUrl", label: commonMessages.baseUrl, required: true,
-    description: provider.auth === "api_key" ? messages.httpsRequired : undefined,
+    description: provider.auth !== "none" ? messages.httpsRequired : undefined,
   });
   if (canEditModelProviderField(provider, "auth")) fields.push({
     kind: "choice", key: "auth", label: messages.authentication, default: provider.auth,
-    options: [{ value: "api_key", label: commonMessages.apiKey }, { value: "none", label: messages.noAuthenticationOption }],
+    options: [{ value: "api_key", label: commonMessages.apiKey }, { value: "oauth", label: messages.oauth }, { value: "none", label: messages.noAuthenticationOption }],
+  });
+  if (provider.auth === "oauth" && canEditModelProviderField(provider, "oauthProvider")) fields.push({
+    kind: "choice", key: "oauthProvider", label: messages.oauthProvider, default: provider.oauthProvider ?? "chatgpt",
+    options: Object.entries(modelOAuthProviderNames).map(([value, label]) => ({ value, label })),
   });
   if (provider.auth === "api_key") fields.push({
     kind: "secret", key: "apiKey", label: commonMessages.apiKey, required: true, helpUrl: keyUrl,

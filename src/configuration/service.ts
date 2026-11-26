@@ -1,8 +1,10 @@
 import { configurationCommandSchema, createModelInput, modelReference, modelProviderComplete, resolveLanguageModel,
   type ConfigurationCommand, type ConfigurationSnapshot, type ModelProvider, type ModelParameterUpdate } from "../shared/configuration.ts";
-import { unauthenticatedApiKey } from "../shared/model.ts";
+import type { ModelCredential } from "@asterism-app/sdk/contracts";
+import type { CredentialProtection } from "../shared/credential-protection.ts";
+import { ModelOAuth } from "./oauth.ts";
 import { ConfigurationError } from "./errors.ts";
-import { ConfigurationStore } from "./store.ts";
+import { ConfigurationStore, type StoredModelProvider } from "./store.ts";
 import { CredentialResolver } from "./credentials.ts";
 import { runConnectionProbe, type ConnectionProbe } from "./probe.ts";
 import { discoverModels, ModelDiscoveries, type DiscoverModels } from "./discovery.ts";
@@ -17,6 +19,14 @@ import { MessagingRegistry } from "./messaging.ts";
 import { validateProviderSettings } from "../shared/provider-settings.ts";
 
 const saveKinds = { "languageModelProvider.save": "languageModelProvider", "languageModel.save": "languageModel" } as const;
+
+interface ConfigurationOptions {
+  probe?: ConnectionProbe;
+  testTimeoutMs?: number;
+  discover?: DiscoverModels;
+  catalog?: LoadModelCatalog;
+  credentialProtection?: CredentialProtection;
+}
 
 export class ConfigurationService {
   readonly extensions = new ModelProviderExtensions();
@@ -49,19 +59,24 @@ export class ConfigurationService {
   private readonly discoveries: ModelDiscoveries;
   private readonly shutdown = new AbortController();
   private readonly tests: ModelConnectionTests;
-  constructor(root: string, private readonly onChanged: () => void = () => {},
-    probe: ConnectionProbe = runConnectionProbe, testTimeoutMs = 30_000,
-    discover: DiscoverModels = discoverModels, private readonly catalog: LoadModelCatalog = loadModelCatalog) {
+  private readonly oauth: ModelOAuth;
+  private readonly catalog: LoadModelCatalog;
+  constructor(root: string, private readonly onChanged: () => void = () => {}, options: ConfigurationOptions = {}) {
+    const { probe = runConnectionProbe, testTimeoutMs = 30_000, discover = discoverModels, catalog = loadModelCatalog, credentialProtection } = options;
     this.store = new ConfigurationStore(root);
+    this.oauth = new ModelOAuth(root, credentialProtection, this.shutdown.signal);
     this.resolver = new CredentialResolver(this.shutdown.signal);
     this.discoveries = new ModelDiscoveries(onChanged, discover, testTimeoutMs);
     this.tests = new ModelConnectionTests(onChanged, probe, testTimeoutMs);
+    this.catalog = catalog;
   }
-  execute(raw: unknown): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate }> {
+  execute(raw: unknown): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate; authorizationUrl?: string }> {
     const parsed = configurationCommandSchema.safeParse(raw);
     if (!parsed.success) return Promise.reject(new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values."));
     if (parsed.data.type === "languageModel.parameters") return this.fetchParameters(parsed.data.modelId);
     const command = parsed.data;
+    if (command.type === "languageModelProvider.oauth.start" || command.type === "languageModelProvider.oauth.finish"
+        || command.type === "languageModelProvider.oauth.cancel") return this.authorize(command);
     return this.enqueue(async () => {
       this.assertOpen();
       const savedId = await this.perform(command);
@@ -114,21 +129,46 @@ export class ConfigurationService {
   sessionLifecycle() { this.assertOpen(); return this.store.sessionLifecycle(); }
   shellSettings() { this.assertOpen(); return this.store.shell(); }
   current(): ConfigurationSnapshot { this.assertOpen(); return this.snapshot(); }
-  async executionCredential(providerId: string, signal?: AbortSignal): Promise<string | null> {
+  private async authorize(command: Extract<ConfigurationCommand, { type: `languageModelProvider.oauth.${string}` }>) {
+    this.assertOpen();
+    let authorizationUrl: string | undefined;
+    if (command.type === "languageModelProvider.oauth.start") {
+      const previous = command.connectionId ? this.store.get("languageModelProvider", command.connectionId) : null;
+      authorizationUrl = await this.oauth.start(command.id, command.provider, command.connectionId,
+        previous?.oauthProvider === command.provider ? previous.oauthGrant : undefined);
+    } else if (command.type === "languageModelProvider.oauth.finish") await this.oauth.finish(command.id);
+    else this.oauth.cancel(command.id);
+    return { snapshot: this.snapshot(), savedId: null, ...(authorizationUrl && { authorizationUrl }) };
+  }
+  executionCredential(providerId: string, signal?: AbortSignal): Promise<ModelCredential> {
     this.assertOpen();
     const provider = this.store.get("languageModelProvider", providerId);
     if (!provider) throw new ConfigurationError("not_found", "The provider no longer exists.");
-    if (provider.auth === "none") return unauthenticatedApiKey;
-    return provider.apiKey ? this.resolver.resolve(provider.apiKey, signal) : null;
+    return this.providerCredential(provider, signal);
   }
-  /** Runtime consumers receive connections without their keys and read resolved credentials through executionCredential. */
+  private async providerCredential(provider: StoredModelProvider, signal?: AbortSignal): Promise<ModelCredential> {
+    if (provider.auth === "none") return { kind: "none" };
+    if (provider.auth === "api_key" && provider.apiKey) return { kind: "api_key", key: await this.resolver.resolve(provider.apiKey, signal) };
+    if (provider.auth === "oauth" && provider.oauthProvider && provider.oauthGrant && !provider.oauthInvalid) {
+      const accessToken = await this.oauth.access(provider.oauthProvider, provider.oauthGrant, (next, invalid) => {
+        const current = this.store.get("languageModelProvider", provider.id);
+        if (this.closed || !current || current.oauthGrant !== provider.oauthGrant) return;
+        this.store.save({ kind: "languageModelProvider", id: provider.id, value: { ...current, oauthGrant: next, oauthInvalid: invalid || undefined } });
+        if (invalid) { this.providersChanged(); this.onChanged(); }
+      }, signal);
+      return { kind: "oauth", provider: provider.oauthProvider, accessToken };
+    }
+    throw new ConfigurationError("unavailable", "The provider credential is unavailable.");
+  }
   languageModelProviders(): Omit<ModelProvider, "apiKey">[] {
     this.assertOpen();
-    return this.store.list("languageModelProvider").map(({ apiKey: _key, ...value }) => value);
+    return this.store.list("languageModelProvider").map(({ apiKey: _key, oauthGrant: _grant, oauthInvalid: _invalid, ...value }) => value);
   }
   languageModelCatalog(): Pick<ConfigurationSnapshot, "languageModelProviders" | "languageModels"> {
     this.assertOpen();
-    return { languageModelProviders: this.store.list("languageModelProvider"), languageModels: this.store.list("languageModel") };
+    return { languageModelProviders: this.store.list("languageModelProvider").map(({ oauthGrant, oauthInvalid, ...provider }) => ({ ...provider,
+      ...(provider.auth === "oauth" && { oauthState: oauthInvalid ? "reauthorize" as const : oauthGrant ? "connected" as const : "disconnected" as const }),
+    })), languageModels: this.store.list("languageModel") };
   }
   private snapshot(): ConfigurationSnapshot {
     const runtime = this.messaging.connections();
@@ -148,7 +188,7 @@ export class ConfigurationService {
       tests: this.tests.snapshot(), discoveries: this.discoveries.snapshot(),
     };
   }
-  private async perform(command: Exclude<ConfigurationCommand, { type: "languageModel.parameters" }>): Promise<string | null> {
+  private async perform(command: Exclude<ConfigurationCommand, { type: "languageModel.parameters" | `languageModelProvider.oauth.${string}` }>): Promise<string | null> {
     if (command.type === "read") return null;
     if (command.type === "messaging.save") return this.saveMessaging(command);
     if (command.type === "messaging.restart") { this.messaging.restart(command.id); return command.id; }
@@ -176,11 +216,7 @@ export class ConfigurationService {
     if (command.type === "languageModel.discovery.start") {
       const stored = this.store.get("languageModelProvider", command.providerId);
       if (!stored) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
-      return this.discoveries.start(stored, async signal => {
-        if (stored.auth === "none") return "";
-        if (!stored.apiKey) throw new Error("Credential is unavailable.");
-        return this.resolver.resolve(stored.apiKey, signal);
-      });
+      return this.discoveries.start(stored, signal => this.providerCredential(stored, signal));
     }
     if (command.type === "languageModel.discovery.cancel") { this.discoveries.cancel(command.id); return command.id; }
     if (command.type === "languageModel.discovery.add") {
@@ -215,11 +251,21 @@ export class ConfigurationService {
         return modelReference(command.value);
       case "languageModelProvider.save": break;
     }
-    // Switching to unauthenticated access drops the saved key.
-    const value = command.value.auth === "api_key" ? command.value : { ...command.value, apiKey: "" };
-    if (!modelProviderComplete(value))
-      throw new ConfigurationError("invalid_request", "An API key is required for API key authentication.");
+    const previous = command.id ? this.store.get("languageModelProvider", command.id) : null;
+    const value: StoredModelProvider = { ...command.value };
+    if (!modelProviderComplete(value)) throw new ConfigurationError("invalid_request", "An API key is required for API key authentication.");
+    if (value.auth === "oauth") {
+      if (!value.oauthProvider) throw new ConfigurationError("invalid_request", "Select an OAuth provider.");
+      if (command.authorization) value.oauthGrant = await this.oauth.savedValue(command.authorization, value.oauthProvider, command.id);
+      else if (command.authorization !== null && previous?.oauthProvider === value.oauthProvider) {
+        value.oauthGrant = previous.oauthGrant;
+        value.oauthInvalid = previous.oauthInvalid;
+      }
+      if (!previous && !value.oauthGrant) throw new ConfigurationError("invalid_request", "Connect the account before saving.");
+    } else delete value.oauthProvider;
+    if (value.auth !== "api_key") value.apiKey = "";
     this.store.save({ kind: "languageModelProvider", id: command.id, value });
+    if (command.authorization) this.oauth.cancel(command.authorization);
     this.tests.clear("languageModelProvider", command.id ?? value.id);
     return value.id;
   }
@@ -242,10 +288,8 @@ export class ConfigurationService {
     const resolved = resolveLanguageModel(this.languageModelCatalog(), modelId);
     if (!resolved) throw new ConfigurationError("not_found", "The model or provider no longer exists or is disabled. Reload settings.");
     const { model, provider } = resolved;
-    return this.tests.start(provider, model, async signal => {
-      if (!provider.apiKey) throw new Error("Credential is unavailable.");
-      return this.resolver.resolve(provider.apiKey, signal);
-    });
+    const stored = this.store.get("languageModelProvider", provider.id)!;
+    return this.tests.start(provider, model, signal => this.providerCredential(stored, signal));
   }
   close(): void {
     this.closed = true;
