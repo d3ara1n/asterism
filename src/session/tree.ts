@@ -130,6 +130,15 @@ export class SessionTree {
       { id: string; title: string; created_at: string; archived_at: string; folder_id: string | null }[])
       .map(r => ({ id: r.id, title: r.title, createdAt: r.created_at, archivedAt: r.archived_at, folderId: r.folder_id }));
   }
+  /** Sleeping sessions have already released their resources. Retention begins at collection, not at the missed deadline. */
+  archiveSleeping(now: number, days: number | null): { archived: string[]; nextAt: number | null } {
+    if (days === null) return { archived: [], nextAt: null };
+    const interval = days * 86_400_000;
+    const rows = this.db.prepare(`UPDATE sessions SET archived_at = ?
+      WHERE archived_at IS NULL AND sleeping_at <= ? RETURNING id`).all(new Date(now).toISOString(), new Date(now - interval).toISOString()) as { id: string }[];
+    const { oldest } = this.db.prepare("SELECT MIN(sleeping_at) AS oldest FROM sessions WHERE archived_at IS NULL").get() as { oldest: string | null };
+    return { archived: rows.map(row => row.id), nextAt: oldest === null ? null : Date.parse(oldest) + interval };
+  }
   /** Mark archived; subsequent reads, writes, and object identity resolution treat the session as absent. */
   archive(sessionId: string, at = new Date().toISOString()): void {
     if (!this.db.prepare("UPDATE sessions SET archived_at = ? WHERE id = ? AND archived_at IS NULL").run(at, sessionId).changes)

@@ -206,6 +206,21 @@ describe("Startup cleanup of expired archived sessions", () => {
 });
 
 describe("Sleeping session storage", () => {
+  it("archives only continuously sleeping sessions at the boundary and gives overdue history a full retention period", () => {
+    const { tree, db } = setup(), now = Date.parse("2026-10-24T00:00:00Z");
+    const overdue = tree.create("Overdue"), boundary = tree.create("Boundary"), reopened = tree.create("Reopened");
+    tree.sleep(overdue, "2020-01-01T00:00:00.000Z");
+    tree.sleep(boundary, "2026-10-17T00:00:00.000Z");
+    tree.sleep(reopened, "2020-01-01T00:00:00.000Z");
+    tree.open(reopened);
+    expect(tree.archiveSleeping(now, null)).toEqual({ archived: [], nextAt: null });
+    expect(tree.archiveSleeping(now - 1, 7)).toEqual({ archived: [overdue], nextAt: now });
+    expect(tree.archiveSleeping(now, 7)).toEqual({ archived: [boundary], nextAt: null });
+    expect(collectExpiredSessions(db, now, 7)).toBe(0);
+    expect(tree.active().map(session => session.id)).toEqual([reopened]);
+    expect(tree.archived().map(session => session.archivedAt)).toEqual([new Date(now).toISOString(), new Date(now - 1).toISOString()]);
+  });
+
   it("gates runtime content and resource identities while keeping catalog metadata writable", () => {
     const { tree } = setup();
     const session = tree.create("Session");

@@ -1030,6 +1030,7 @@
   "folders.color.plum": "梅紫色",
   "folders.color.brown": "棕色",
   "conversations.retentionDays": "归档后删除",
+  "conversations.archiveDays": "休眠后归档",
   "conversations.sleepDays": "闲置后休眠",
   "conversations.lifecycleDays": "{days} 天",
   "conversations.lifecycleNever": "永不",

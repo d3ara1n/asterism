@@ -16,7 +16,7 @@ Automatic sleep starts a fresh inactivity interval at creation or explicit resto
 
 An automatic-sleep failure is logged and suspends further automatic attempts for that session until the user opens it again or the application restarts. Other sessions continue to follow their deadlines. Replanning or changing the sleep threshold does not retry the failed operation.
 
-Automatic-sleep and recycle-bin retention thresholds are independent application preferences; either can be disabled. Only archival starts recycle-bin retention. Startup collection permanently deletes expired archived sessions with their dependent rows and content roots. Sleeping sessions do not expire. Restoring an archived session clears its unavailability and reattaches resources; external instances initialize from saved state rather than resuming suspended processes.
+Automatic sleep, archival after continuous sleep, and recycle-bin retention are independent preferences. Automatic archival is opt-in and uses the recorded start of sleep, including intervals already underway. Only archival starts recycle-bin retention. Startup collection permanently deletes expired archived sessions with their dependent rows and content roots. Restoring an archived session clears its unavailability and reattaches resources; external instances initialize from saved state rather than resuming suspended processes.
 
 ## Folders
 

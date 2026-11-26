@@ -16,7 +16,7 @@ Settings is one root island: category navigation on the card shell beside the op
 
 The Plugins page holds plugin management: a searchable list grouped into installed packages and packages included with the application, with enablement switches and a restart action when the next startup differs. Each row opens a detail island with the plugin's running state, diagnostics, package information, next-start change, and links to the configuration pages it contributes. The list keeps a removed package visible until restart, because it is still running. Settings navigation has no separate plugin list beside its page entries. Plugin management remains available when a plugin has no configuration page or fails to load.
 
-About owns version, update state, channel selection, and log access. The titlebar update indicator consumes the same state. General settings owns automatic-sleep and recycle-bin retention preferences and the recycle-bin entry. Sleeping sessions remain in the sidebar, dimmed with a moon icon; opening one renews user attention before its resources attach. Keep-awake is a per-session menu setting that prevents automatic sleep only.
+About owns version, update state, channel selection, and log access. The titlebar update indicator consumes the same state. General settings owns automatic sleep, archival, and recycle-bin retention preferences and the recycle-bin entry. Sleeping sessions remain in the sidebar, dimmed with a moon icon; opening one renews user attention before its resources attach. Keep-awake is a per-session menu setting that prevents automatic sleep only.
 
 ## Startup and failure presentation
 

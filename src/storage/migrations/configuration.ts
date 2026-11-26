@@ -24,5 +24,9 @@ export function configurationStorage(root: string, decrypt?: (ciphertext: string
       17: value => {
         const { modelProviders, models, ...document } = value as { modelProviders: unknown; models: unknown };
         return { ...document, languageModelProviders: modelProviders, languageModels: models };
+      },
+      18: value => {
+        const document = value as { sessionLifecycle: object };
+        return { ...document, sessionLifecycle: { ...document.sessionLifecycle, archiveDays: null } };
       } } });
 }

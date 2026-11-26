@@ -1,5 +1,5 @@
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
-import { createContext, useContext, useState } from "react";
+import { Fragment, createContext, useContext, useState } from "react";
 import { ArchiveRestore, Trash2 } from "lucide-react";
 import type { AppSnapshot } from "../../../shared/contracts";
 import type { SessionResult } from "../../../shared/session";
@@ -48,16 +48,13 @@ export function SessionsSettings() {
   return <Section title={i18n.text(settingsMessages.conversationsTitle)}>
     <ReadStatus loaded={!!configuration} error={readError} onRetry={() => void load()} />
     <ItemGroup className="surface-group">
-      <Row label={i18n.text(settingsMessages.retentionDays)}>
-        <LifecycleSelect value={lifecycle?.retentionDays} disabled={!lifecycle || busy}
-          label={i18n.text(settingsMessages.retentionDays)} onChange={value => save("retentionDays", value)} />
-      </Row>
-      <ItemSeparator />
-      <Row label={i18n.text(settingsMessages.sleepDays)}>
-        <LifecycleSelect value={lifecycle?.sleepDays} disabled={!lifecycle || busy}
-          label={i18n.text(settingsMessages.sleepDays)} onChange={value => save("sleepDays", value)} />
-      </Row>
-      <ItemSeparator />
+      {(["sleepDays", "archiveDays", "retentionDays"] as const).map(key => <Fragment key={key}>
+        <Row label={i18n.text(settingsMessages[key])}>
+          <LifecycleSelect value={lifecycle?.[key]} disabled={!lifecycle || busy}
+            label={i18n.text(settingsMessages[key])} onChange={value => save(key, value)} />
+        </Row>
+        <ItemSeparator />
+      </Fragment>)}
       <Row label={i18n.formatMessage(settingsMessages.conversationCount, { count: snapshot?.sessions.length ?? 0 })}
         hint={i18n.formatMessage(settingsMessages.archivedCount, { count: archived })}>
         <Button size="sm" variant="outline" disabled={!snapshot} aria-pressed={island.has("recycle-bin")}

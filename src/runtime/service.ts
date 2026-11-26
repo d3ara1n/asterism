@@ -66,6 +66,7 @@ export class ApplicationService {
       if (options.preparedStorage) initializePluginRecordStorage(this.db, options.preparedStorage);
       this.configuration = new ConfigurationService(root, () => {
         this.sessions?.refreshSleep();
+        this.sessions?.refreshArchive();
         options.onConfigurationChanged?.();
       });
       // Archive cleanup releases references first; session services then explicitly reclaim content.

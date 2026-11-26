@@ -50,4 +50,8 @@ Switching sessions does not stop their work. Use an explicit stop when the inten
 
 Sleep keeps saved work while ending its running resource lifetimes. Archiving sets a session aside and also ends its running resources. Restoring saved objects is not the same as resuming an external process from its previous instruction. If ongoing coordination depends on live participants, plan for their availability rather than relying on a session's presence in history.
 
+To clear old sessions from the sidebar without reviewing them one by one, choose how long a session can stay asleep before it moves to the recycle bin. The interval starts when the session falls asleep, so enabling automatic archival can move sessions that are already overdue. Opening a sleeping session ends that interval; if it sleeps again, it starts a new one. Time spent with Asterism closed counts, and overdue sessions move to the bin on the next startup.
+
+Time in the recycle bin starts at actual archival, regardless of how long the session slept. To tidy the sidebar but keep the history available to restore, leave automatic archival enabled and set deletion after archival to Never.
+
 Treat permanent deletion as a separate decision from ending active work. Saved history may be valuable even when the original arrangement is no longer useful; neither keeping nor deleting that history undoes external effects.

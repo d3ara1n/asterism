@@ -92,9 +92,10 @@ export const sessionLifecycleDaysSchema = z.union([...sessionLifecycleDays.map(d
 export const sessionLifecycleSchema = z.strictObject({
   retentionDays: sessionLifecycleDaysSchema,
   sleepDays: sessionLifecycleDaysSchema,
+  archiveDays: sessionLifecycleDaysSchema,
 });
 export type SessionLifecycle = z.infer<typeof sessionLifecycleSchema>;
-export const defaultSessionLifecycle: SessionLifecycle = { retentionDays: 30, sleepDays: 7 };
+export const defaultSessionLifecycle: SessionLifecycle = { retentionDays: 30, sleepDays: 7, archiveDays: null };
 /** Monthly spending target in USD for usage statistics; null shows no target. */
 export const usageBudgetSchema = z.number().positive().max(1_000_000_000).nullable();
 export const configurationSnapshotSchema = z.strictObject({

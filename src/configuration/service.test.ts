@@ -67,13 +67,13 @@ describe("Real configuration and consumption boundaries", () => {
     await configurationStorage(root).inspect()!.apply();
     const migrated = new ConfigurationService(root);
     cleanups.push(() => migrated.close());
-    expect(migrated.sessionLifecycle()).toEqual({ retentionDays: 30, sleepDays: 7 });
-    const saved = await migrated.execute({ type: "sessionLifecycle.set", value: { retentionDays: null, sleepDays: 30 } });
-    expect(saved.snapshot.sessionLifecycle).toEqual({ retentionDays: null, sleepDays: 30 });
+    expect(migrated.sessionLifecycle()).toEqual({ retentionDays: 30, sleepDays: 7, archiveDays: null });
+    const saved = await migrated.execute({ type: "sessionLifecycle.set", value: { retentionDays: null, sleepDays: 30, archiveDays: 90 } });
+    expect(saved.snapshot.sessionLifecycle).toEqual({ retentionDays: null, sleepDays: 30, archiveDays: 90 });
     migrated.close();
     const reopened = new ConfigurationService(root);
     cleanups.push(() => reopened.close());
-    expect(reopened.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 30 });
+    expect(reopened.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 30, archiveDays: 90 });
     expect(reopened.current().sessionEntry).toEqual({ pluginId: "test.plugin", entryId: "home" });
     expect(reopened.current().languageModelProviders[0]?.apiKey).toBe("example-saved-key");
     expect(reopened.mcpAuthorization("example")).toEqual({ port: 62986 });
@@ -88,13 +88,13 @@ describe("Real configuration and consumption boundaries", () => {
     const migrated = new ConfigurationService(root);
     cleanups.push(() => migrated.close());
     expect(migrated.current().showUsage).toBe(true);
-    expect(migrated.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 7 });
+    expect(migrated.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 7, archiveDays: null });
     await migrated.execute({ type: "showUsage.set", value: false });
     migrated.close();
     const reopened = new ConfigurationService(root);
     cleanups.push(() => reopened.close());
     expect(reopened.current().showUsage).toBe(false);
-    expect(reopened.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 7 });
+    expect(reopened.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 7, archiveDays: null });
     expect(configurationStorage(root).inspect()).toBeNull();
   });
   it("keeps independently named messaging connections and multiple credentials separate", async () => {

@@ -83,6 +83,7 @@ export class SessionService {
   private readonly restorePlugins: LoadedPlugins["restore"];
   /** Entry pending: sleep or archive cleanup in progress; watch waits for it and the same session cannot reenter. */
   private readonly deactivations = new Map<string, Promise<void>>();
+  private cancelArchiveDeadline?: () => void;
   /** Assigned after plugins initialize, because sleep candidates depend on plugin activity. */
   private sleepPolicy: SessionSleepPolicy | undefined;
   private readonly prepare: LoadedPlugins["prepare"];
@@ -99,6 +100,7 @@ export class SessionService {
     this.events.declarePublic(SystemResumed);
     this.shared = createSharedServices({ db, dataRoot, configuration, events: this.events, usageLedger: options.usageLedger ?? noUsageRecorder,
       manualSources: () => options.manualSources?.(this.packages) ?? [], packageRoots: options.packageRoots ?? new Map(), skillDirectories: options.skillDirectories ?? [] });
+    this.refreshArchive(false);
     this.content = new ContentStore(db, join(dataRoot, applicationStorage.contentDirectory));
     this.content.collectStartup();
     this.holds = new ResourceHolds(sessionId => this.workbenchChanged(sessionId));
@@ -187,6 +189,14 @@ export class SessionService {
       failed: error => console.error("Automatic session sleep failed.", error),
     });
     this.sleepPolicy.refresh();
+  }
+  /** Reconcile persisted sleep intervals at startup, on preference changes, and when the next one expires. */
+  refreshArchive(notify = true): void {
+    if (this.closed) return;
+    this.cancelArchiveDeadline?.();
+    const { archived, nextAt } = this.tree.archiveSleeping(Date.now(), this.configuration.sessionLifecycle().archiveDays);
+    this.cancelArchiveDeadline = nextAt === null ? undefined : this.shared.deadlines.schedule(nextAt, () => this.refreshArchive());
+    if (notify) for (const sessionId of archived) this.changed({ kind: "session.lifecycle", sessionId });
   }
   /** Inputs to the sleep deadline changed: open state, keep-awake, creation, or the configured threshold. */
   refreshSleep(): void { this.sleepPolicy?.refresh(); }
@@ -554,6 +564,7 @@ export class SessionService {
         this.watchOwners.set(command.sessionId, owners);
         this.watching.set(command.sessionId, { busyObjectIds: [], timelineBusy: false, live: [] });
         if (woke) {
+          this.refreshArchive();
           this.restorePlugins(command.sessionId);
           this.changed({ kind: "session.lifecycle", sessionId: command.sessionId });
         }
@@ -732,6 +743,12 @@ export class SessionService {
     if (this.deactivations.has(sessionId)) throw new SessionError("conflict", "This session is already being deactivated.");
     const state = this.tree.lifecycle(sessionId);
     if (!state || (reason === "sleep" && state === "sleeping")) throw new SessionError("not_found", "Session not found.");
+    if (state === "sleeping") {
+      this.tree.archive(sessionId);
+      this.refreshArchive();
+      this.changed({ kind: "session.lifecycle", sessionId });
+      return;
+    }
     const work = this.releaseSession(sessionId, reason).finally(() => this.deactivations.delete(sessionId));
     this.deactivations.set(sessionId, work);
     return work;
@@ -746,12 +763,13 @@ export class SessionService {
     await Promise.allSettled(creations.map(pending => pending.done));
     await this.releasePlugins(sessionId);
     if (reason === "archive") this.tree.archive(sessionId);
-    else this.tree.sleep(sessionId);
+    else { this.tree.sleep(sessionId); this.refreshArchive(); }
     this.changed({ kind: "session.lifecycle", sessionId });
   }
   async close(): Promise<void> {
     this.closed = true;
     this.sleepPolicy?.close();
+    this.cancelArchiveDeadline?.();
     for (const pending of this.pendingCreations.values()) pending.controller.abort();
     // Archive/sleep release still uses plugin presence and shared services. Join every accepted release before closing them.
     const deactivated = this.deactivations.size ? await Promise.allSettled(this.deactivations.values()) : [];
