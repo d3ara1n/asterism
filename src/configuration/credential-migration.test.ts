@@ -45,7 +45,7 @@ describe("Legacy credential migration", () => {
     const result = await prepareData(root, { version: "test", paths, stores: [configurationStorage(root, decrypt)] });
     expect(result).toEqual({ ok: true, plugins: [] });
     const stored = new ConfigurationStore(root);
-    expect(stored.get("modelProvider", "example")?.apiKey).toBe("model-key");
+    expect(stored.get("languageModelProvider", "example")?.apiKey).toBe("model-key");
     expect(stored.mcpAuthorization("example")).toEqual({ port: 62986 });
     expect(stored.mcp().servers[0]).toMatchObject({ env: {}, headers: {} });
     const plugin = new PluginStorage(join(root, "extensions"), "test.plugin", () => {});

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { formatModelExpression, parseModelExpression } from "@asterism-app/sdk/contracts";
-import { defineTopLevelTool, type ModelServices, type ObjectReader, type ProviderUsage } from "@asterism-app/sdk/runtime";
+import { defineTopLevelTool, type LanguageModelServices, type ObjectReader, type LanguageModelProviderUsage } from "@asterism-app/sdk/runtime";
 import { Agent } from "@asterism-app/builtin-api/contracts";
 import { selectionOf, type AgentSelectionService } from "../selection.ts";
 import { diagnosticHistory } from "../diagnostics/history.ts";
@@ -11,8 +11,8 @@ import { accountBalances, accountQuotas, agentContextUsage } from "./metrics.ts"
 export function createAgentStateTool(deps: {
   selection: AgentSelectionService;
   currentRequest(object: ObjectReader): AgentRequestState | null;
-  models: Pick<ModelServices, "list">;
-  usage: Pick<ProviderUsage, "query">;
+  models: Pick<LanguageModelServices, "list">;
+  usage: Pick<LanguageModelProviderUsage, "query">;
 }) {
   return defineTopLevelTool({
     id: GetAgentStateResult.id, name: "get_agent_state",

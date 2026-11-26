@@ -20,5 +20,9 @@ export function configurationStorage(root: string, decrypt?: (ciphertext: string
     migrations: { 12: migrateConfiguration12, 13: value => migrateConfiguration13(root, value, decrypt),
       14: value => ({ ...(value as object), sessionLifecycle: { retentionDays: 30, sleepDays: 7 } }),
       15: value => ({ ...(value as object), showUsage: true }),
-      16: value => ({ ...(value as object), usageBudget: null }) } });
+      16: value => ({ ...(value as object), usageBudget: null }),
+      17: value => {
+        const { modelProviders, models, ...document } = value as { modelProviders: unknown; models: unknown };
+        return { ...document, languageModelProviders: modelProviders, languageModels: models };
+      } } });
 }

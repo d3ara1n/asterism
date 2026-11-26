@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { jsonSchema, modelProtocolIds, thinkingLevels, type Json, type ThinkingLevel, type UiText } from "@asterism-app/sdk/contracts";
+import { jsonSchema, languageModelProtocolIds, thinkingLevels, type Json, type ThinkingLevel, type UiText } from "@asterism-app/sdk/contracts";
 import { thinkingLabels } from "@asterism-app/ui/messages/model-selection";
 import type { ModelProviderInput } from "./configuration.ts";
 import { modelCompatibilityMessages as messages } from "./model-compatibility-messages.ts";
@@ -58,7 +58,7 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
     kind: "options",
     copy: { title: messages.thinkingLevels, description: messages.thinkingLevelsDescription },
     initialValue: {},
-    appliesTo: { protocols: modelProtocolIds },
+    appliesTo: { protocols: languageModelProtocolIds },
     schema: customThinkingLevelsSchema,
   },
   {
@@ -81,7 +81,7 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
     kind: "options",
     copy: { title: messages.customUserAgent, description: messages.customUserAgentDescription },
     initialValue: { userAgent: "" },
-    appliesTo: { protocols: modelProtocolIds },
+    appliesTo: { protocols: languageModelProtocolIds },
     schema: z.strictObject({
       userAgent: z.string().trim().min(1).regex(/^[\x20-\x7e]+$/u).register(fieldCopy, {
         title: "User-Agent", description: messages.userAgent,
@@ -93,7 +93,7 @@ export const modelCompatibilityDefinitions: readonly ModelCompatibilityDefinitio
     kind: "tag",
     copy: { title: messages.opencodeSession, description: messages.opencodeSessionDescription },
     appliesTo: {
-      protocols: modelProtocolIds,
+      protocols: languageModelProtocolIds,
       endpoints: ["https://opencode.ai/inference/go/v1"],
     },
     schema: z.undefined(),

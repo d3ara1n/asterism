@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useRendererCalls, useRendererEvents } from "@asterism-app/sdk/renderer";
 import type { PluginCalls, EventSubscription } from "@asterism-app/sdk/contracts";
-import { ReadUsage, UsageChanged } from "@asterism-app/sdk/contracts";
+import { ReadLanguageModelProviderUsage, LanguageModelProviderUsageChanged } from "@asterism-app/sdk/contracts";
 import { ProviderUsageClient } from "./client";
 
 /** A single frontend communication instance shares the card cache; the last card's unmount releases subscriptions and timers. */
@@ -14,7 +14,7 @@ function acquire(calls: PluginCalls, events: ReturnType<typeof useRendererEvents
   let subscription: EventSubscription | null = null;
   const subscribe = () => {
     if (subscription) return subscription;
-    const current = events.subscribe(UsageChanged, { delivery: "latest", signal: controller.signal },
+    const current = events.subscribe(LanguageModelProviderUsageChanged, { delivery: "latest", signal: controller.signal },
       ({ data }) => { for (const listener of listeners) listener(data.providerId ?? undefined); });
     subscription = current;
     void current.ready.catch(() => {});
@@ -29,7 +29,7 @@ function acquire(calls: PluginCalls, events: ReturnType<typeof useRendererEvents
   const client = new ProviderUsageClient({
     async query(providerId, refresh) {
       await subscribe().ready;
-      return calls.invoke(ReadUsage, { providerId, refresh }, { signal: controller.signal });
+      return calls.invoke(ReadLanguageModelProviderUsage, { providerId, refresh }, { signal: controller.signal });
     },
     onChanged(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
   });

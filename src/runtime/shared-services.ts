@@ -1,11 +1,11 @@
 import { applicationTempRoot } from "../storage/temporary.ts";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { McpChanged, ReadUsage, UsageChanged, SystemResumed, ReadResourceActivities, ResourceActivitiesChanged, ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
+import { McpChanged, ReadLanguageModelProviderUsage, LanguageModelProviderUsageChanged, SystemResumed, ReadResourceActivities, ResourceActivitiesChanged, ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
 import { implementCall, PluginApiError, type ManualSource } from "@asterism-app/sdk/runtime";
 import type { ConfigurationService } from "../configuration/service.ts";
 import { ProviderUsageService } from "../configuration/usage.ts";
-import { createModelProviderServices, createUsageProviderServices } from "../configuration/provider-services.ts";
+import { createLanguageModelProviderServices, createUsageProviderServices } from "../configuration/provider-services.ts";
 import { McpApplication } from "../mcp/application.ts";
 import { AgentCatalogService, skillDocumentBody } from "../plugins/agent-catalog.ts";
 import type { EventBus } from "../plugins/events.ts";
@@ -32,7 +32,7 @@ export interface SharedServiceOptions {
 /** The single composition point for host services shared by all plugins; closing ends their connections, processes and caches. */
 export function createSharedServices(options: SharedServiceOptions): SharedServices & { close(): Promise<void> } {
   const { configuration, events } = options;
-  for (const contract of [McpChanged, SkillsChanged, UsageChanged, ResourceActivitiesChanged, ResourceNoticeRaised]) events.declarePublic(contract);
+  for (const contract of [McpChanged, SkillsChanged, LanguageModelProviderUsageChanged, ResourceActivitiesChanged, ResourceNoticeRaised]) events.declarePublic(contract);
   const activities = new ResourceActivities(() => events.publish(ResourceActivitiesChanged, null, {}));
   const deadlines = new DeadlineScheduler(error => console.error("Deadline callback failed.", error));
   const resume = events.listen(SystemResumed, {}, () => deadlines.recheck());
@@ -41,10 +41,10 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
     join(applicationTempRoot(options.dataRoot), "host", "shell"));
   const agentCatalog = new AgentCatalogService(options.skillDirectories);
   const stopCatalog = agentCatalog.subscribe(() => events.publish(SkillsChanged, null, agentCatalog.skills()));
-  const models = createModelProviderServices(configuration), usages = createUsageProviderServices(configuration);
-  const usage = new ProviderUsageService(models, usages, providerId => events.publish(UsageChanged, null, { providerId }));
+  const models = createLanguageModelProviderServices(configuration), usages = createUsageProviderServices(configuration);
+  const usage = new ProviderUsageService(models, usages, providerId => events.publish(LanguageModelProviderUsageChanged, null, { providerId }));
   return {
-    activities, mcp, shell, deadlines, usage, agentCatalog, modelProviders: models, usageProviders: usages,
+    activities, mcp, shell, deadlines, usage, agentCatalog, languageModelProviders: models, usageProviders: usages,
     webProviders: configuration.web, messaging: configuration.messaging, extensions: configuration.extensions,
     usageLedger: options.usageLedger,
     manualSources: options.manualSources, packageRoots: options.packageRoots,
@@ -58,7 +58,7 @@ export function createSharedServices(options: SharedServiceOptions): SharedServi
         if (!skill) throw new PluginApiError("rejected", `Skill "${name}" is absent from source "${source}".`, "skill_not_found");
         return { text: skillDocumentBody(await agentCatalog.read(skill, "SKILL.md", signal)) };
       }),
-      implementCall(ReadUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal })),
+      implementCall(ReadLanguageModelProviderUsage, (input, { signal }) => usage.query(input.providerId, { refresh: input.refresh, signal })),
     ],
     async close() {
       resume.close();

@@ -1,24 +1,24 @@
-import { modelReference, resolveModelSelection, type CatalogModel, type ModelCatalogSnapshot } from "@asterism-app/sdk/contracts";
+import { modelReference, resolveModelSelection, type CatalogLanguageModel, type LanguageModelCatalogSnapshot } from "@asterism-app/sdk/contracts";
 import type { AgentConfiguration, AgentSelection, ModelRole } from "./configuration.ts";
 
 /** Builtin combines host model metadata with its own effective configuration. */
-export interface ModelConfigurationSnapshot extends ModelCatalogSnapshot {
+export interface ModelConfigurationSnapshot extends LanguageModelCatalogSnapshot {
   roles: Pick<ModelRole, "id" | "enabled" | "model" | "thinking">[];
   agents: AgentConfiguration[];
 }
-export type { CatalogModel } from "@asterism-app/sdk/contracts";
+export type { CatalogLanguageModel } from "@asterism-app/sdk/contracts";
 
-export function resolveCatalogModel<M extends CatalogModel>(snapshot: Omit<ModelConfigurationSnapshot, "models"> & { models: M[] }, reference: string | null): M | null {
-  return snapshot.models.find(model => model.enabled && modelReference(model) === reference
-    && snapshot.modelProviders.some(provider => provider.id === model.providerId && provider.enabled)) ?? null;
+export function resolveCatalogModel<M extends CatalogLanguageModel>(snapshot: Omit<ModelConfigurationSnapshot, "languageModels"> & { languageModels: M[] }, reference: string | null): M | null {
+  return snapshot.languageModels.find(model => model.enabled && modelReference(model) === reference
+    && snapshot.languageModelProviders.some(provider => provider.id === model.providerId && provider.enabled)) ?? null;
 }
-export function resolveAgentModel<M extends CatalogModel>(snapshot: Omit<ModelConfigurationSnapshot, "models"> & { models: M[] }, selection: { agent: string | null; model: string | null }): M | null {
+export function resolveAgentModel<M extends CatalogLanguageModel>(snapshot: Omit<ModelConfigurationSnapshot, "languageModels"> & { languageModels: M[] }, selection: { agent: string | null; model: string | null }): M | null {
   return resolveAgentModelSelection(snapshot, { ...selection, thinking: null }).model;
 }
 
 /** Display resolution against the current catalogs; preserves raw overrides and invalid references, while requests independently use the configuration at their boundaries. */
-export function resolveAgentModelSelection<M extends CatalogModel>(
-  snapshot: Omit<ModelConfigurationSnapshot, "models"> & { models: M[] },
+export function resolveAgentModelSelection<M extends CatalogLanguageModel>(
+  snapshot: Omit<ModelConfigurationSnapshot, "languageModels"> & { languageModels: M[] },
   selection: Omit<AgentSelection, "agent"> & { agent: string | null },
 ) {
   const agent = snapshot.agents.find(item => item.id === selection.agent && item.enabled);

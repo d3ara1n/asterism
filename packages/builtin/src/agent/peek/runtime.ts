@@ -1,5 +1,5 @@
-import { formatModelExpression, type ModelItem, type ModelTarget } from "@asterism-app/sdk/contracts";
-import { PluginApiError, type ModelServices, type ObjectReader, type ProviderUsage } from "@asterism-app/sdk/runtime";
+import { formatModelExpression, type ModelItem, type LanguageModelTarget } from "@asterism-app/sdk/contracts";
+import { PluginApiError, type LanguageModelServices, type ObjectReader, type LanguageModelProviderUsage } from "@asterism-app/sdk/runtime";
 import { builtin, type PeekInput, type PeekOutcome, type PeekResult } from "@asterism-app/builtin-api/contracts";
 import { peekOutline, projectPeekRecords } from "./snapshot.ts";
 import { retrievalTools, retrieve } from "./retrieval.ts";
@@ -32,10 +32,10 @@ function estimate(value: unknown): number {
 }
 
 export interface PeekDependencies {
-  models: Pick<ModelServices, "stream" | "list">;
-  utility(): ModelTarget;
+  models: Pick<LanguageModelServices, "stream" | "list">;
+  utility(): LanguageModelTarget;
   userAgent: string;
-  usage?: Pick<ProviderUsage, "consume">;
+  usage?: Pick<LanguageModelProviderUsage, "consume">;
 }
 export async function investigateAgent(deps: PeekDependencies, object: Pick<ObjectReader, "ref"> & { session: Pick<ObjectReader["session"], "snapshot"> },
 args: PeekInput, signal: AbortSignal,
@@ -47,7 +47,7 @@ publish: (data: PeekResult) => void): Promise<PeekOutcome> {
     snapshot: { nodeId: snapshot.position.nodeId, capturedAt: new Date().toISOString(), records: records.length },
     phase: "investigating", report: "", round: 0, requests: [], queries: [],
   };
-  let target: ModelTarget;
+  let target: LanguageModelTarget;
   try { target = deps.utility(); }
   catch (error) {
     if (!(error instanceof PluginApiError)) throw error;

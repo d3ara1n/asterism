@@ -48,7 +48,7 @@ export interface UsageServices {
 }
 
 /** Host cache and shared queries; consumers supply response headers they obtained themselves. */
-export interface ProviderUsage {
+export interface LanguageModelProviderUsage {
   query(id: string, options?: { signal?: AbortSignal; refresh?: boolean }): Promise<ProviderUsageState>;
   consume(response: ModelResponse): void;
 }

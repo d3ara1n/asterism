@@ -15,7 +15,7 @@ export function ModelChoices({ configuration, agent, model, thinking, disabled, 
   onModelChange(value: string | null): void; onThinkingChange(value: ThinkingLevel | null): void;
 }) {
   const i18n = useI18n();
-  const models = configuration?.models.filter(item => resolveCatalogModel(configuration, modelReference(item))) ?? [];
+  const models = configuration?.languageModels.filter(item => resolveCatalogModel(configuration, modelReference(item))) ?? [];
   const selectedModel = configuration ? resolveCatalogModel(configuration, model) : null;
   const effectiveModel = configuration ? resolveAgentModel(configuration, { agent, model }) : null;
   const levels = availableThinkingLevels(effectiveModel);
@@ -27,7 +27,7 @@ export function ModelChoices({ configuration, agent, model, thinking, disabled, 
       value={model === null ? follow : selectedModel?.name ?? i18n.formatMessage(modelSelectionMessages.unavailable, { value: model })}
       selected={model ?? FOLLOW} onSelect={value => onModelChange(value === FOLLOW ? null : value)}
       options={[{ value: FOLLOW, label: follow }, ...models.map(item => ({ value: modelReference(item),
-        label: `${configuration?.modelProviders.find(provider => provider.id === item.providerId)?.name ?? ""} / ${item.name}` }))]} />
+        label: `${configuration?.languageModelProviders.find(provider => provider.id === item.providerId)?.name ?? ""} / ${item.name}` }))]} />
     <ConfigurationChoice icon={<Brain />} label={i18n.text(commonMessages.thinkingTitle)} disabled={disabled || !configuration || unsupported}
       value={unsupported ? i18n.text(modelSelectionMessages.thinkingUnsupported) : thinkingLabel}
       selected={thinking ?? FOLLOW} onSelect={value => onThinkingChange(value === FOLLOW ? null : value as ThinkingLevel)}

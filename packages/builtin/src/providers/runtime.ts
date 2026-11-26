@@ -1,5 +1,5 @@
 import { defineModule } from "@asterism-app/sdk/runtime";
-import { modelProviderPresets } from "./presets.ts";
+import { languageModelProviderPresets } from "./presets.ts";
 import { createZhipuUsage } from "./zhipu.ts";
 import { createDeepSeekUsage } from "./deepseek.ts";
 import { createNewApiUsage } from "./new-api.ts";
@@ -26,6 +26,6 @@ export const createBuiltinUsageProviders = (transport: typeof fetch = fetch) => 
 
 /** Presets and query providers belong to the built-in plugin; they use the same contribution registration and validation as third parties. */
 export default defineModule(() => ({
-  modelProviderPresets: modelProviderPresets.map(preset => ({ type: "add" as const, preset })),
+  languageModelProviderPresets: languageModelProviderPresets.map(preset => ({ type: "add" as const, preset })),
   usageProviders: createBuiltinUsageProviders(),
 }));

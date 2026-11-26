@@ -1,6 +1,6 @@
 import { createElement, useMemo, type ReactNode } from "react";
 import { RendererCatalogsProvider, RendererModelsProvider, RendererPreferencesProvider, RendererToolsProvider, type RendererCatalogs, type RendererObjectContext } from "@asterism-app/sdk/renderer";
-import { pluginOf, resourceCall, reference, ModelCatalog, ShellProfilesCatalog } from "@asterism-app/sdk/contracts";
+import { pluginOf, resourceCall, reference, LanguageModelCatalog, ShellProfilesCatalog } from "@asterism-app/sdk/contracts";
 import type { WorkbenchObject } from "../../shared/workbench";
 import { useWorkbench } from "../features/workbench/context";
 import { useObjectLive, useSession } from "../features/session/state";
@@ -16,7 +16,7 @@ export function RendererCatalogProvider({ ready, children }: { ready: boolean; c
   const value = useMemo<RendererCatalogs>(() => ({
     error: configuration.readError,
     get(contract) {
-      const raw = Object.is(contract, ModelCatalog) ? configuration.snapshot
+      const raw = Object.is(contract, LanguageModelCatalog) ? configuration.snapshot
         : Object.is(contract, ShellProfilesCatalog) ? configuration.snapshot?.shell : null;
       const parsed = contract.schema.safeParse(raw);
       return parsed.success ? parsed.data : null;

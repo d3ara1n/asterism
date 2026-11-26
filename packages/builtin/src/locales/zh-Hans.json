@@ -655,7 +655,7 @@
   "web.settings.parallel.basicHint": "低延迟，适合聚焦的查询。",
   "web.settings.parallel.advanced": "高级",
   "web.settings.parallel.advancedHint": "使用更高级的检索，质量更高。",
-  "agent.configuration.modelProviders": "模型提供商",
+  "agent.configuration.modelProviders": "语言模型",
   "roles.title": "模型角色",
   "settings.roles.summary": "可复用的模型角色",
   "settings.agents.summary": "角色提示词、模型和子代理设置",

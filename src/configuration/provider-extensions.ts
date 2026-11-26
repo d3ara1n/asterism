@@ -1,10 +1,10 @@
-import { modelProviderPresetSchema, usageProviderInfoSchema, usageItemsSchema, type ModelProviderPreset, type ModelProviderPresetContribution } from "@asterism-app/sdk/contracts";
+import { languageModelProviderPresetSchema, usageProviderInfoSchema, usageItemsSchema, type LanguageModelProviderPreset, type LanguageModelProviderPresetContribution } from "@asterism-app/sdk/contracts";
 import { UsageQueryError, type UsageProvider } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../plugins/lifecycle.ts";
 import { defineProviderPresets } from "../shared/provider-presets.ts";
 import { synchronous } from "../plugins/synchronous.ts";
 
-interface Layer { owner: string; changes: readonly ModelProviderPresetContribution[] }
+interface Layer { owner: string; changes: readonly LanguageModelProviderPresetContribution[] }
 /** Plugin contribution catalog: override presets in assembly order; query identities are unique, and overriding presets does not implicitly replace implementations. */
 export class ModelProviderExtensions {
   private layers: Layer[] = [];
@@ -13,7 +13,7 @@ export class ModelProviderExtensions {
   subscribe(listener: () => void): () => void { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; }
   private changed() { for (const listener of this.listeners) listener(); }
   private resolve(layers = this.layers) {
-    const presets = new Map<string, ModelProviderPreset>();
+    const presets = new Map<string, LanguageModelProviderPreset>();
     for (const layer of layers) for (const change of layer.changes) {
       if (change.type === "add") {
         if (presets.has(change.preset.id)) throw new Error(`Duplicate provider preset: ${change.preset.id}`);
@@ -30,7 +30,7 @@ export class ModelProviderExtensions {
   presets() { return this.resolve(); }
   usageProviders() { return [...this.queries.values()].map(({ owner, provider }) =>
     usageProviderInfoSchema.parse({ id: provider.id, label: provider.label, owner, source: provider.source })); }
-  declare(owner: string, providers: readonly UsageProvider[], changes: readonly ModelProviderPresetContribution[], runs: RunGroup, dependencies: readonly string[] = []): void {
+  declare(owner: string, providers: readonly UsageProvider[], changes: readonly LanguageModelProviderPresetContribution[], runs: RunGroup, dependencies: readonly string[] = []): void {
     const ids = new Set(this.queries.keys());
     const normalizedProviders = providers.map((provider): UsageProvider => {
       const info = usageProviderInfoSchema.parse({ id: provider.id, label: provider.label, owner, source: provider.source });
@@ -43,9 +43,9 @@ export class ModelProviderExtensions {
       if (typeof provider.query !== "function") throw new Error(`Usage provider ${provider.id} has no query function.`);
       return { id: info.id, label: info.label, source: "query", query: provider.query.bind(provider) };
     });
-    const normalizedChanges: ModelProviderPresetContribution[] = changes.map(change => {
-      if (change.type === "add") return { type: "add", preset: modelProviderPresetSchema.parse(change.preset) };
-      if (change.type === "patch") return { ...change, id: modelProviderPresetSchema.shape.id.parse(change.id) };
+    const normalizedChanges: LanguageModelProviderPresetContribution[] = changes.map(change => {
+      if (change.type === "add") return { type: "add", preset: languageModelProviderPresetSchema.parse(change.preset) };
+      if (change.type === "patch") return { ...change, id: languageModelProviderPresetSchema.shape.id.parse(change.id) };
       throw new Error("Invalid provider preset contribution.");
     });
     // Modifying presets added by other plugins requires a declared dependency so rollback and shutdown order are deterministic.

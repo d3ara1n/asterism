@@ -81,7 +81,7 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
       const { target, messages, userAgent, requestParentId, purpose } = structuredClone({
         target: request.target, messages: request.messages, userAgent: request.userAgent, requestParentId: request.requestParentId, purpose: request.purpose,
       });
-      const inputModalities = host.models.list().find(model => model.model === formatModelExpression(target))?.capabilities.inputModalities;
+      const inputModalities = host.languageModels.list().find(model => model.model === formatModelExpression(target))?.capabilities.inputModalities;
       const caller: ToolCaller = Object.freeze({ ref, title: source.title, ...(request.agent === undefined ? {} : { agent: request.agent }),
         modelInputModalities: Object.freeze([...(inputModalities ?? [])]) });
       const usage = request.usage;
@@ -100,7 +100,7 @@ export function bindExecution({ owner, host, events, runs, objects: { own, check
             return prepared;
           });
           const settledTools: ToolUsageRecord[] = [];
-          return await host.models.run({ target, system: preparedSystem,
+          return await host.languageModels.run({ target, system: preparedSystem,
             messages, userAgent, sessionId: ref.sessionId, requestParentId,
             telemetry: { pluginId: owner, purposeId: purpose ?? null, subjects, tools: settledTools },
             signal, tools: bindModelTools(capabilities, boundTools, handover, () => {

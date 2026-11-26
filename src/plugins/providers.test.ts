@@ -7,8 +7,8 @@ import { definePlugin, defineModule, type PluginContext, type PluginDefinition, 
 import { BuiltinApplicationService as ApplicationService } from "../../packages/builtin/src/testing.ts";
 import { modelProviderPresetDraft } from "../shared/provider-presets.ts";
 import { createModelInput } from "../shared/configuration.ts";
-import { createModelServices } from "./models.ts";
-import { ReadUsage } from "@asterism-app/sdk/contracts";
+import { createLanguageModelServices } from "./models.ts";
+import { ReadLanguageModelProviderUsage } from "@asterism-app/sdk/contracts";
 import { ProviderUsageService } from "../configuration/usage.ts";
 
 const cleanups: (() => Promise<void>)[] = [];
@@ -30,18 +30,18 @@ const items: UsageItem[] = [
 const value = { id: "my-glm", name: "My GLM", protocol: "openai-chat" as const, auth: "api_key" as const,
   baseUrl: "https://example.test/v1", enabled: true, compatibility: [], usage: "test-usage" };
 const save = (service: ApplicationService, id: string | null = null, name = "My GLM") => service.configuration.execute({
-  type: "modelProvider.save", id, value: { ...value, name, apiKey: "private-test-key" },
+  type: "languageModelProvider.save", id, value: { ...value, name, apiKey: "private-test-key" },
 });
-const read = (plugin: PluginContext, refresh = false) => plugin.ipc.calls.invoke(ReadUsage, { providerId: value.id, refresh }, {});
+const read = (plugin: PluginContext, refresh = false) => plugin.ipc.calls.invoke(ReadLanguageModelProviderUsage, { providerId: value.id, refresh }, {});
 
 describe("Plugin presets and account usage", () => {
   // Models deliver only public response metadata; calling plugins explicitly choose consumption, independently of text and token usage.
   it("calling plugins obtain and explicitly consume response headers while model services do not update other consumers automatically", async () => {
     const { service, observer } = open([]);
-    await service.configuration.execute({ type: "modelProvider.save", id: null, value: { ...value, auth: "none", usage: "openai", apiKey: "" } });
+    await service.configuration.execute({ type: "languageModelProvider.save", id: null, value: { ...value, auth: "none", usage: "openai", apiKey: "" } });
     const model = createModelInput(value.id, { name: "Test", modelId: "test" });
     model.capabilities.reasoning = false; model.capabilities.tools = false;
-    await service.configuration.execute({ type: "model.save", id: null, value: model });
+    await service.configuration.execute({ type: "languageModel.save", id: null, value: model });
     const frames = [
       { id: "response", object: "chat.completion.chunk", model: "test", created: 0,
         choices: [{ index: 0, delta: { role: "assistant", content: "OK" }, finish_reason: null }] },
@@ -52,10 +52,10 @@ describe("Plugin presets and account usage", () => {
       headers: { "content-type": "text/event-stream", "x-ratelimit-limit-tokens": "100", "x-ratelimit-remaining-tokens": "40" },
     }));
     vi.stubGlobal("fetch", transport);
-    const usage = new ProviderUsageService(observer.modelProviders, observer.usageProviders);
+    const usage = new ProviderUsageService(observer.languageModelProviders, observer.usageProviders);
     cleanups.push(async () => usage.close());
     const events: ModelEvent[] = [];
-    for await (const event of createModelServices(service.configuration).stream({
+    for await (const event of createLanguageModelServices(service.configuration).stream({
       target: { provider: value.id, model: "test" }, system: { blocks: [] },
       messages: [{ kind: "input", parts: [{ kind: "text", text: "Hello" }] }], signal: new AbortController().signal,
     })) {
@@ -77,7 +77,7 @@ describe("Plugin presets and account usage", () => {
     const { service } = open([
       definePlugin({ namespace: pluginNamespace("test.producer"), setup: () => ({
         usageProviders: [{ id: "test-usage", label: "Test", query }],
-        modelProviderPresets: [
+        languageModelProviderPresets: [
           { type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "test-usage" } } },
           { type: "add", preset: { id: "custom-plan", name: "Custom plan", billing: "subscription", connection: {
             protocol: "openai-chat", baseUrl: "https://example.test/v1", auth: "api_key", compatibility: [], usage: "test-usage",
@@ -87,18 +87,18 @@ describe("Plugin presets and account usage", () => {
       definePlugin({ namespace: pluginNamespace("test.consumer"), setup(context) { consumer = context; return {}; } }),
     ], new Map([["test.producer", ["asterism.builtin"]]]));
     const snapshot = service.configuration.current();
-    expect(snapshot.modelProviderPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
-    expect(snapshot.modelProviderPresets?.some(preset => preset.id === "custom-plan")).toBe(true);
+    expect(snapshot.languageModelProviderPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
+    expect(snapshot.languageModelProviderPresets?.some(preset => preset.id === "custom-plan")).toBe(true);
     expect(consumer.usageProviders.list().map(provider => provider.id)).toEqual(expect.arrayContaining(["zai-plan-cn", "test-usage"]));
-    const preset = consumer.modelProviders.presets().find(preset => preset.id === "zai-plan-cn")!;
+    const preset = consumer.languageModelProviders.presets().find(preset => preset.id === "zai-plan-cn")!;
     const draft = modelProviderPresetDraft(preset);
     expect(draft.usage).toBe("test-usage");
     await save(service);
-    const connection = consumer.modelProviders.get(value.id)!;
-    expect(consumer.modelProviders.list()).toContainEqual(connection);
+    const connection = consumer.languageModelProviders.get(value.id)!;
+    expect(consumer.languageModelProviders.list()).toContainEqual(connection);
     const provider = consumer.usageProviders.get(connection.usage!)!;
     if (provider.source === "headers") throw new Error("Expected query provider");
-    const credential = await consumer.modelProviders.credential(connection.id);
+    const credential = await consumer.languageModelProviders.credential(connection.id);
     expect(await provider.query({ connection: { id: connection.id, endpoint: connection.baseUrl }, credential, signal: new AbortController().signal })).toEqual(items);
     const [runtime, desktop] = await Promise.all([read(consumer), read(consumer)]);
     expect(runtime.items).toEqual(items);
@@ -106,20 +106,20 @@ describe("Plugin presets and account usage", () => {
     expect(query).toHaveBeenCalledTimes(2);
     expect(query.mock.calls[0]![0]).toMatchObject({ connection: { id: value.id, endpoint: value.baseUrl }, credential: "private-test-key" });
     expect(JSON.stringify(desktop)).not.toContain("private-test-key");
-    expect(consumer.modelProviders.presets().find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
+    expect(consumer.languageModelProviders.presets().find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("test-usage");
   });
 
   // setup failure after registration must revoke all contributions from that plugin without leaving ghost providers or preset overrides.
   it("failed plugins retract all additions and overrides and duplicate query IDs cannot replace existing implementations", () => {
     const { service } = open([definePlugin({ namespace: pluginNamespace("test.failed"),
       setup: () => ({ usageProviders: [{ id: "temporary", label: "Temporary", query: async () => [] }],
-        modelProviderPresets: [{ type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "temporary" } } }] }),
+        languageModelProviderPresets: [{ type: "patch", id: "zai-plan-cn", patch: { connection: { usage: "temporary" } } }] }),
       modules: [defineModule(() => { throw new Error("setup failed"); })],
     }), definePlugin({ namespace: pluginNamespace("test.duplicate"), setup: () => ({
       usageProviders: [{ id: "zai-plan-cn", label: "Duplicate", query: async () => [] }],
     }) })], new Map([["test.failed", ["asterism.builtin"]]]));
     expect(service.sessions.plugins.filter(plugin => ["test.failed", "test.duplicate"].includes(plugin.id)).map(plugin => plugin.status)).toEqual(["failed", "failed"]);
-    expect(service.configuration.current().modelProviderPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("zai-plan-cn");
+    expect(service.configuration.current().languageModelProviderPresets?.find(preset => preset.id === "zai-plan-cn")?.connection.usage).toBe("zai-plan-cn");
     expect(service.configuration.current().usageProviders?.map(provider => provider.id)).not.toContain("temporary");
     expect(service.configuration.current().usageProviders?.filter(provider => provider.id === "zai-plan-cn")).toHaveLength(1);
   });

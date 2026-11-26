@@ -2,7 +2,7 @@ import { createOpenAI, openai } from "@ai-sdk/openai";
 import { ModelFailure, type ModelEvent } from "../contract.ts";
 import { compatibility, thinkingMappings, type CompatibilityTarget } from "../compatibility.ts";
 import { mappedEffort, setEffort, withRequestEncoding } from "../request-encoding.ts";
-import { bearerHeaders, namespaced, pickNative, type ModelProtocol, type ProviderOptions } from "./contract.ts";
+import { bearerHeaders, namespaced, pickNative, type LanguageModelProtocol, type ProviderOptions } from "./contract.ts";
 import { withResponsesInput } from "./responses-input.ts";
 
 const nativeKeys = ["itemId", "reasoningEncryptedContent", "phase"] as const;
@@ -66,7 +66,7 @@ function decoder() {
   };
 }
 
-export const openaiResponses: ModelProtocol = {
+export const openaiResponses: LanguageModelProtocol = {
   id: "openai-responses",
   continuationFormat: "openai-responses/1",
   sdkReasoning: false,

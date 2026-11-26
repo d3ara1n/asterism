@@ -12,7 +12,7 @@ export function testHostServices(overrides: Partial<Omit<PluginHostServices, "sh
   const { shared, ...host } = overrides;
   return {
     holds: new ResourceHolds(), extensionsDirectory: "/unused", data: null as never, refOf: () => null, sessions: { progressChanged() {}, retirementChanged() {} } as never,
-    models: { list: () => [] } as never, log: () => {},
+    languageModels: { list: () => [] } as never, log: () => {},
     ...host,
     shared: {
       activities: new ResourceActivities(() => {}),

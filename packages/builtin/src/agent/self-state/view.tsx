@@ -2,7 +2,7 @@ import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import type { ReactNode } from "react";
 import type { z } from "zod";
 import { Bot, Coins, Cpu, Gauge, Timer } from "lucide-react";
-import { availableThinkingLevels, ModelCatalog, modelReference, parseModelExpression } from "@asterism-app/sdk/contracts";
+import { availableThinkingLevels, LanguageModelCatalog, modelReference, parseModelExpression } from "@asterism-app/sdk/contracts";
 import { formatUsageAmount, formatUsagePeriod, formatUsageQuantity, toolRenderer, useI18n, useRendererCatalogs, type ToolRenderProps } from "@asterism-app/sdk/renderer";
 import { ToolHeader } from "@asterism-app/ui/tool-header";
 import { Progress } from "@asterism-app/ui/ui/progress";
@@ -48,9 +48,9 @@ function Panel({ icon, title, aside, children }: { icon: ReactNode; title: strin
 function Identity({ state }: { state: State }) {
   const i18n = useI18n();
   const names = useModelNames();
-  const catalog = useRendererCatalogs().get(ModelCatalog);
+  const catalog = useRendererCatalogs().get(LanguageModelCatalog);
   const expression = parseModelExpression(state.model);
-  const model = catalog?.models.find(entry => modelReference(entry) === state.model) ?? null;
+  const model = catalog?.languageModels.find(entry => modelReference(entry) === state.model) ?? null;
   // Levels come from current configuration; without it the selected level still reads as text.
   const levels = model ? availableThinkingLevels(model) : [];
   return <Panel icon={<Bot aria-hidden="true" />} title={i18n.text(messages.identity)}>

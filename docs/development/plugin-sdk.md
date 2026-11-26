@@ -171,13 +171,15 @@ The host provides one-shot absolute deadlines and cancellable registrations. Reg
 
 ## Provider services
 
-Plugins contribute model connection presets, account usage providers, and web providers. The host owns catalog validation, shared service state, and lifecycle. Plugins choose how to compose these capabilities and present their results.
+Plugins contribute language model connection presets, account usage providers, and web providers. The host owns catalog validation, shared service state, and lifecycle. Plugins choose how to compose these capabilities and present their results.
 
 Preset additions and patches follow dependency and declaration order. Patches merge declared top-level fields and connection fields, with arrays replaced as wholes. Failed assembly removes the plugin’s contributions.
 
-Usage providers distinguish active queries from response-header interpretation. Consumers supply the selected connection and credentials or response; the generic model service does not implicitly trigger account queries.
+Usage providers distinguish active queries from response-header interpretation. Consumers supply the selected connection and credentials or response; an inference request does not implicitly trigger account queries.
 
-The host's shared usage service reads configured credentials, caches query results, and retains explicitly supplied header observations. Model requests use concrete provider/model targets. Role resolution and prompt composition belong to the requesting paradigm. The model runner accepts explicit messages and executable tools; session execution binds current resource access and linked context around it. The output observer owns recording, and workbench progress is an optional sink selected by the consumer.
+The host exposes configured connections through `languageModelProviders`, their account observations through `languageModelProviderUsage`, and inference through `languageModels`. The renderer reads `LanguageModelCatalog`. `languageModels` resolves `provider/model` in its own catalog. Role resolution and prompt composition belong to the requesting paradigm. The language runner accepts explicit messages and executable tools; session execution binds current resource access and linked context around it. The output observer owns recording, and workbench progress is an optional sink selected by the consumer.
+
+A model category is defined by the service called, not by the spelling of the target, vendor brand, or SDK used in its protocol adapters. Model execution contracts need share only concepts with the same meaning, such as target identity and request attribution. They need not share inputs, outputs, or execution methods.
 
 Backend credentials remain explicit trusted-plugin capabilities. Plugin secrets are stored as given in the plugin's managed directory. Frontend consumption uses typed domain calls.
 

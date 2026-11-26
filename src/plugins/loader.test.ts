@@ -214,7 +214,7 @@ describe("Plugin assembly", () => {
   it("later module failure cleans initialized modules in reverse order and close does not clean them twice", async () => {
     const calls: string[] = [];
     const broken = definePlugin({ namespace: pluginNamespace("acme.cleanup"), modules: [
-      defineModule(plugin => { plugin.lifetime.defer(async () => { plugin.models.list(); calls.push("first"); }); return {}; }),
+      defineModule(plugin => { plugin.lifetime.defer(async () => { plugin.languageModels.list(); calls.push("first"); }); return {}; }),
       defineModule(plugin => { plugin.lifetime.defer(async () => { calls.push("second"); }); return {}; }),
       defineModule(() => { throw new Error("setup failed"); }),
     ] });

@@ -1,6 +1,6 @@
 import type { ConfigurationOperation, ParadigmConfiguration } from "./contract.ts";
 import { normalizeOverrides } from "./layers.ts";
-import { parseModelExpression, resolveModelSelection, type ModelTarget, type ThinkingLevel } from "@asterism-app/sdk/contracts";
+import { parseModelExpression, resolveModelSelection, type LanguageModelTarget, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { PluginApiError, type PluginContext } from "@asterism-app/sdk/runtime";
 import type { AgentConfiguration, ModelRole } from "@asterism-app/builtin-api/contracts";
 import { BuiltinSettings, settingsMessages } from "../settings/contract.ts";
@@ -12,7 +12,7 @@ export function assertModelSelectableAgent(agents: readonly AgentConfiguration[]
   if (!agents.some(agent => agent.id === id && agent.enabled && agent.availableToAgents))
     throw new PluginApiError("not_found", `Agent role ${id} is unavailable.`);
 }
-export function resolveRoleTarget(roles: readonly ModelRole[], roleId: string, overrides: { model?: string | null; thinking?: ThinkingLevel | null } = {}): ModelTarget {
+export function resolveRoleTarget(roles: readonly ModelRole[], roleId: string, overrides: { model?: string | null; thinking?: ThinkingLevel | null } = {}): LanguageModelTarget {
   const role = roles.find(role => role.id === roleId && role.enabled);
   if (!role) throw new PluginApiError("unavailable", `Model role ${roleId} is unavailable.`, "role_unavailable");
   const { model, thinking } = resolveModelSelection(role, overrides);

@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import {
   defineModule, implementResource, implementCreation, implementTool, implementCall, implementChannel, PluginApiError,
-  type CallResult, type ApplicationIdentity, type ProviderUsage, type ResourceRef,
+  type CallResult, type ApplicationIdentity, type LanguageModelProviderUsage, type ResourceRef,
 } from "@asterism-app/sdk/runtime";
 import type { Json } from "@asterism-app/sdk/contracts";
 import { builtin, type AgentConfiguration } from "@asterism-app/builtin-api/contracts";
@@ -34,7 +34,7 @@ async function operation<T extends Json>(signal: AbortSignal, work: () => T | Pr
   }
 }
 
-export function createSubagentPoolModule(application: ApplicationIdentity, usage: ProviderUsage, skills: SkillCatalog) {
+export function createSubagentPoolModule(application: ApplicationIdentity, usage: LanguageModelProviderUsage, skills: SkillCatalog) {
   return defineModule(plugin => {
     const pools = new Map<string, { ref: ResourceRef; runtime: SubagentPoolRuntime }>();
     const prepare = createRequestAssembly(plugin, skills);

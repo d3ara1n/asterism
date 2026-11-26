@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { defineProviderPresets, modelProviderPresetDraft, type ModelProviderPreset } from "./provider-presets.ts";
+import { defineProviderPresets, modelProviderPresetDraft, type LanguageModelProviderPreset } from "./provider-presets.ts";
 import { canEditModelProviderField } from "./configuration.ts";
 
-const preset: ModelProviderPreset = {
+const preset: LanguageModelProviderPreset = {
   id: "example", name: "Example", billing: "none", sources: ["https://example.test/docs"], verifiedOn: "2026-10-20",
   connection: { protocol: "openai-chat", baseUrl: "https://example.test/v1", auth: "none", compatibility: [] },
 };

@@ -76,7 +76,7 @@ export class ApplicationService {
         sessions: () => new Map(this.sessions.tree.usageCatalog().map(session => [session.id, session])),
         session: id => this.sessions.tree.usageCatalog(id)[0] ?? null,
         pluginNames: () => new Map((this.sessions?.packages ?? []).flatMap(item => item.id ? [[item.id, item.metadata.name ?? null] as const] : [])),
-        providerNames: () => new Map(this.configuration.modelCatalog().modelProviders.map(provider => [provider.id, provider.name])),
+        providerNames: kind => new Map(kind === "language" ? this.configuration.languageModelCatalog().languageModelProviders.map(provider => [provider.id, provider.name]) : []),
       };
       telemetry = this.telemetry = new TelemetryService(root, lookup, options.onTelemetryChanged);
       this.sessions = new SessionService(this.db, root, this.configuration, {

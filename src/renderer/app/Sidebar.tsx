@@ -176,7 +176,7 @@ export function Sidebar({ snapshot, status, busy, resourceActivities, resourceNo
       </VirtualList>
     </section>
     {status === "ready" && configuration?.showUsage === true && <Suspense fallback={null}>
-      <UsagePanel modelProviders={configuration.modelProviders} />
+      <UsagePanel languageModelProviders={configuration.languageModelProviders} />
     </Suspense>}
     {folderAction?.kind === "edit" && <FolderDialog folder={folderAction.folder} onClose={() => setFolderAction(null)} onRestoreFocus={restoreFolderFocus} />}
     {folderAction?.kind === "delete" && <DeleteFolder folder={folderAction.folder} onClose={() => { setFolderAction(null); listHeading.current?.focus({ preventScroll: true }); }} onRestoreFocus={restoreFolderFocus} />}

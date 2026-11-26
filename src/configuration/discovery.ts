@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DiscoveredModel, ModelDiscovery, ModelProvider } from "../shared/configuration.ts";
 import { validateProviderTransport, ProviderTransportError } from "../model/provider.ts";
-import { modelProtocol } from "../model/protocols/index.ts";
+import { languageModelProtocol } from "../model/protocols/index.ts";
 import { ConfigurationError } from "./errors.ts";
 import { parseModelListPage, type ModelListPage } from "./discovery-format.ts";
 
@@ -18,7 +18,7 @@ export async function discoverModels({ provider, apiKey, signal }: DiscoveryInpu
   if (provider.auth === "api_key" && !apiKey) throw new ModelDiscoveryError("credential");
   signal.throwIfAborted();
   const base = provider.baseUrl.replace(/\/+$/, "");
-  const headers = modelProtocol(provider.protocol).discoveryHeaders(provider.auth, apiKey);
+  const headers = languageModelProtocol(provider.protocol).discoveryHeaders(provider.auth, apiKey);
   const controller = new AbortController();
   const candidateSignal = AbortSignal.any([signal, controller.signal]);
   try {

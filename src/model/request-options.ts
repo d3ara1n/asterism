@@ -1,6 +1,6 @@
 import type { ModelProviderInput, ProviderModel, ThinkingLevel } from "../shared/configuration.ts";
 import { ModelFailure } from "./contract.ts";
-import { modelProtocol } from "./protocols/index.ts";
+import { languageModelProtocol } from "./protocols/index.ts";
 import type { ProviderOptions } from "./protocols/contract.ts";
 
 type Connection = Pick<ModelProviderInput, "protocol" | "compatibility">;
@@ -17,7 +17,7 @@ interface RequestOptions {
 
 /** Sole request-option interpretation entry for connection tests and execution; probes verify basic protocol connectivity only. */
 export function requestOptions(provider: Connection, model: ProviderModel, request: RequestPurpose): RequestOptions {
-  const protocol = modelProtocol(provider.protocol);
+  const protocol = languageModelProtocol(provider.protocol);
   const target = { provider, model };
   const options: RequestOptions = {
     maxRetries: 0,

@@ -1,10 +1,10 @@
-import { UsageQueryError, type PluginContext, type ProviderUsage, type UsageProviderServices } from "@asterism-app/sdk/runtime";
+import { UsageQueryError, type PluginContext, type LanguageModelProviderUsage, type UsageProviderServices } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../lifecycle.ts";
 import type { SdkScope } from "./scope.ts";
 
 /** Usage implementations, explicit queries, and the shared cache retain their distinct responsibilities. */
-export function bindUsage(providers: UsageProviderServices, usage: ProviderUsage, sessionRuns: RunGroup, scope: SdkScope):
-  Pick<PluginContext, "usageProviders" | "usages" | "providerUsage"> {
+export function bindUsage(providers: UsageProviderServices, usage: LanguageModelProviderUsage, sessionRuns: RunGroup, scope: SdkScope):
+  Pick<PluginContext, "usageProviders" | "usages" | "languageModelProviderUsage"> {
   const { checkAvailable, subscribeRegistry } = scope;
   const outside = { affectsHistory: false } as const;
   const usageProviders: UsageProviderServices = {
@@ -26,7 +26,7 @@ export function bindUsage(providers: UsageProviderServices, usage: ProviderUsage
   };
   return {
     usageProviders,
-    providerUsage: {
+    languageModelProviderUsage: {
       query(id, options = {}) {
         checkAvailable();
         return sessionRuns.start(async signal => structuredClone(await usage.query(id, { ...options, signal })),

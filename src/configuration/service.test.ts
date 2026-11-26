@@ -3,9 +3,9 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createModelInput, type ModelProvider, type ModelProviderInput } from "../shared/configuration.ts";
+import { createModelInput, resolveLanguageModel, type ModelProvider, type ModelProviderInput } from "../shared/configuration.ts";
 import { modelProviderPresetDraft } from "../shared/provider-presets.ts";
-import { modelProviderPresets } from "../../packages/builtin/src/providers/presets.ts";
+import { languageModelProviderPresets } from "../../packages/builtin/src/providers/presets.ts";
 import { ConfigurationService } from "./service.ts";
 import { configurationStorage } from "../storage/migrations/configuration.ts";
 import type { ConnectionProbe } from "./probe.ts";
@@ -27,9 +27,9 @@ function setup(probe: ConnectionProbe = async () => {}, timeout = 30_000, discov
 }
 const providerValue = { id: "local", name: "Local", protocol: "openai-chat" as const, baseUrl: "http://127.0.0.1:1234/v1", enabled: true, auth: "none" as "none" | "api_key", compatibility: [], apiKey: "" };
 async function addModel(service: ConfigurationService, auth: "none" | "api_key" = "none") {
-  const provider = await service.execute({ type: "modelProvider.save", id: null, value: { ...providerValue, auth,
+  const provider = await service.execute({ type: "languageModelProvider.save", id: null, value: { ...providerValue, auth,
     apiKey: auth === "none" ? "" : "test-key-not-for-network" } });
-  const model = await service.execute({ type: "model.save", id: null, value: {
+  const model = await service.execute({ type: "languageModel.save", id: null, value: {
     providerId: provider.savedId!, name: "Test model", modelId: "test-model", enabled: true, contextWindow: 32000, cost: null, compatibility: [],
     capabilities: { reasoning: false, tools: true, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
@@ -37,6 +37,27 @@ async function addModel(service: ConfigurationService, auth: "none" | "api_key" 
 }
 
 describe("Real configuration and consumption boundaries", () => {
+  it("resolves the same language target and credential after moving v17 model collections", async () => {
+    const { root, service } = setup();
+    service.close();
+    const fixture = JSON.parse(readFileSync(join(import.meta.dirname, "fixtures", "configuration-v14.json"), "utf8"));
+    writeFileSync(join(root, "configuration.json"), JSON.stringify({
+      ...fixture, version: 17, sessionLifecycle: { retentionDays: null, sleepDays: 7 }, showUsage: false, usageBudget: null,
+      models: [{
+        providerId: "example", modelId: "lab/model", name: "Saved model", enabled: true, contextWindow: 32000, cost: null,
+        compatibility: [], capabilities: { reasoning: false, tools: true, thinkingLevels: [] },
+        generation: { temperature: 0.2, topP: null, maxOutputTokens: null },
+      }],
+    }));
+    await configurationStorage(root).inspect()!.apply();
+    const migrated = new ConfigurationService(root);
+    cleanups.push(() => migrated.close());
+    expect(resolveLanguageModel(migrated.languageModelCatalog(), "example/lab/model")?.model).toMatchObject({
+      modelId: "lab/model", contextWindow: 32000, capabilities: { reasoning: false, tools: true }, generation: { temperature: 0.2 },
+    });
+    expect(await migrated.executionCredential("example")).toBe("example-saved-key");
+    expect(migrated.current()).toMatchObject({ showUsage: false, sessionEntry: fixture.sessionEntry });
+  });
   // The prior saved format has no lifecycle settings; migration must preserve its credentials and entry, and later reads must not reseed edited preferences.
   it("upgrades v14 configuration without losing saved settings and preserves lifecycle edits across reopening", async () => {
     const { root, service } = setup();
@@ -54,7 +75,7 @@ describe("Real configuration and consumption boundaries", () => {
     cleanups.push(() => reopened.close());
     expect(reopened.sessionLifecycle()).toEqual({ retentionDays: null, sleepDays: 30 });
     expect(reopened.current().sessionEntry).toEqual({ pluginId: "test.plugin", entryId: "home" });
-    expect(reopened.current().modelProviders[0]?.apiKey).toBe("example-saved-key");
+    expect(reopened.current().languageModelProviders[0]?.apiKey).toBe("example-saved-key");
     expect(reopened.mcpAuthorization("example")).toEqual({ port: 62986 });
     expect(configurationStorage(root).inspect()).toBeNull();
   });
@@ -186,79 +207,79 @@ describe("Real configuration and consumption boundaries", () => {
   // Editing rules persist independently per connection; fixed authentication still permits key replacement.
   it("preset fixed fields survive reopen while connection identity and keys remain editable", async () => {
     const { service, root } = setup();
-    const value = { ...modelProviderPresetDraft(modelProviderPresets.find(preset => preset.id === "kimi")!), enabled: true, apiKey: "first-key" };
-    await service.execute({ type: "modelProvider.save", id: null, value });
+    const value = { ...modelProviderPresetDraft(languageModelProviderPresets.find(preset => preset.id === "kimi")!), enabled: true, apiKey: "first-key" };
+    await service.execute({ type: "languageModelProvider.save", id: null, value });
     const renamed = { ...value, id: "personal-kimi", name: "Personal", enabled: false, apiKey: "replacement-key" };
-    await service.execute({ type: "modelProvider.save", id: value.id, value: renamed });
-    const saved = service.current().modelProviders[0]!;
+    await service.execute({ type: "languageModelProvider.save", id: value.id, value: renamed });
+    const saved = service.current().languageModelProviders[0]!;
     expect(saved).toMatchObject(renamed);
     expect(await service.executionCredential(saved.id)).toBe("replacement-key");
-    expect(JSON.parse(readFileSync(join(root, "configuration.json"), "utf8")).modelProviders[0]).not.toHaveProperty("kind");
+    expect(JSON.parse(readFileSync(join(root, "configuration.json"), "utf8")).languageModelProviders[0]).not.toHaveProperty("kind");
     service.close();
     const reopened = new ConfigurationService(root);
     cleanups.push(() => reopened.close());
-    expect(reopened.current().modelProviders[0]).toMatchObject(renamed);
-    await reopened.execute({ type: "modelProvider.save", id: renamed.id, value: { ...renamed, enabled: true } });
-    expect(reopened.current().modelProviders[0]).toMatchObject({ enabled: true, apiKey: "replacement-key", fixedFields: value.fixedFields });
+    expect(reopened.current().languageModelProviders[0]).toMatchObject(renamed);
+    await reopened.execute({ type: "languageModelProvider.save", id: renamed.id, value: { ...renamed, enabled: true } });
+    expect(reopened.current().languageModelProviders[0]).toMatchObject({ enabled: true, apiKey: "replacement-key", fixedFields: value.fixedFields });
   });
 
   // Authentication changes must validate against the resulting connection; unauthenticated connections carry no key.
   it("requires a model API key and removes it when switching to unauthenticated access", async () => {
     const { service, root } = setup();
     const keyed = { ...providerValue, auth: "api_key" as const };
-    await expect(service.execute({ type: "modelProvider.save", id: null, value: keyed })).rejects.toMatchObject({ code: "invalid_request" });
-    expect(service.current().modelProviders).toEqual([]);
-    await service.execute({ type: "modelProvider.save", id: null, value: { ...keyed, apiKey: "model-key" } });
-    await expect(service.execute({ type: "modelProvider.save", id: keyed.id, value: { ...keyed, apiKey: " " } }))
+    await expect(service.execute({ type: "languageModelProvider.save", id: null, value: keyed })).rejects.toMatchObject({ code: "invalid_request" });
+    expect(service.current().languageModelProviders).toEqual([]);
+    await service.execute({ type: "languageModelProvider.save", id: null, value: { ...keyed, apiKey: "model-key" } });
+    await expect(service.execute({ type: "languageModelProvider.save", id: keyed.id, value: { ...keyed, apiKey: " " } }))
       .rejects.toMatchObject({ code: "invalid_request" });
     expect(await service.executionCredential(keyed.id)).toBe("model-key");
-    await service.execute({ type: "modelProvider.save", id: keyed.id, value: { ...keyed, auth: "none", apiKey: "model-key" } });
-    expect(service.current().modelProviders[0]).toMatchObject({ auth: "none", apiKey: "" });
+    await service.execute({ type: "languageModelProvider.save", id: keyed.id, value: { ...keyed, auth: "none", apiKey: "model-key" } });
+    expect(service.current().languageModelProviders[0]).toMatchObject({ auth: "none", apiKey: "" });
     expect(readFileSync(join(root, "configuration.json"), "utf8")).not.toContain("model-key");
   });
 
   // Hidden does not mean immutable: the command boundary rejects fixed-value changes and rule removal without contaminating configuration or credentials.
   it("save commands cannot rewrite fixed fields or rules and models cannot override fixed compatibility settings", async () => {
     const { service, root } = setup();
-    const value = { ...modelProviderPresetDraft(modelProviderPresets.find(preset => preset.id === "kimi")!), enabled: true, apiKey: "original-key" };
-    await service.execute({ type: "modelProvider.save", id: null, value });
+    const value = { ...modelProviderPresetDraft(languageModelProviderPresets.find(preset => preset.id === "kimi")!), enabled: true, apiKey: "original-key" };
+    await service.execute({ type: "languageModelProvider.save", id: null, value });
     const original = readFileSync(join(root, "configuration.json"), "utf8");
     const changes: Partial<ModelProviderInput>[] = [
       { protocol: "openai-chat" }, { baseUrl: "https://relay.test/v1" }, { auth: "none" },
       { compatibility: [] }, { fixedFields: [] }, { fixedFields: undefined },
     ];
     for (const change of changes) {
-      await expect(service.execute({ type: "modelProvider.save", id: value.id, value: { ...value, ...change, apiKey: "must-not-replace" } })).rejects.toMatchObject({
+      await expect(service.execute({ type: "languageModelProvider.save", id: value.id, value: { ...value, ...change, apiKey: "must-not-replace" } })).rejects.toMatchObject({
         code: "invalid_request", display: { id: "providerEditing.fixed" },
       });
     }
     expect(readFileSync(join(root, "configuration.json"), "utf8")).toBe(original);
-    const saved = service.current().modelProviders[0]!;
+    const saved = service.current().languageModelProviders[0]!;
     expect(await service.executionCredential(saved.id)).toBe("original-key");
     const model = createModelInput(value.id, { modelId: "test", name: "Test" });
-    await expect(service.execute({ type: "model.save", id: null, value: { ...model,
+    await expect(service.execute({ type: "languageModel.save", id: null, value: { ...model,
       compatibility: [{ id: "responsesReasoning", value: { summary: true } }] } })).rejects.toMatchObject({ code: "invalid_request" });
-    await service.execute({ type: "model.save", id: null, value: model });
-    await service.execute({ type: "model.save", id: `${value.id}/test`, value: { ...model, name: "Renamed model" } });
-    expect(service.current().models[0]).toMatchObject({ name: "Renamed model", compatibility: [] });
+    await service.execute({ type: "languageModel.save", id: null, value: model });
+    await service.execute({ type: "languageModel.save", id: `${value.id}/test`, value: { ...model, name: "Renamed model" } });
+    expect(service.current().languageModels[0]).toMatchObject({ name: "Renamed model", compatibility: [] });
   });
 
   // Legacy connections without rules retain custom behavior even when names or addresses match presets; existing configuration is not adopted automatically.
   it("connections without declared rules can edit all connection fields", async () => {
     const { service, root } = setup();
     const value = { ...providerValue, id: "kimi", baseUrl: "https://api.moonshot.ai/v1" };
-    await service.execute({ type: "modelProvider.save", id: null, value });
+    await service.execute({ type: "languageModelProvider.save", id: null, value });
     service.close();
     const reopened = new ConfigurationService(root);
     cleanups.push(() => reopened.close());
-    expect(reopened.current().modelProviders[0]?.fixedFields).toBeUndefined();
+    expect(reopened.current().languageModelProviders[0]?.fixedFields).toBeUndefined();
     const changed: ModelProvider = { ...value, protocol: "anthropic", baseUrl: "https://relay.test/v1", auth: "api_key", apiKey: "custom-key",
       compatibility: [{ id: "customUserAgent", value: { userAgent: "Asterism" } }] };
-    await reopened.execute({ type: "modelProvider.save", id: value.id, value: changed });
-    expect(reopened.current().modelProviders[0]).toMatchObject(changed);
+    await reopened.execute({ type: "languageModelProvider.save", id: value.id, value: changed });
+    expect(reopened.current().languageModelProviders[0]).toMatchObject(changed);
     const model = createModelInput(value.id, { modelId: "test", name: "Test" });
-    await reopened.execute({ type: "model.save", id: null, value: { ...model, compatibility: [{ id: "systemMessageInMessages" }] } });
-    expect(reopened.current().models[0]?.compatibility).toEqual([{ id: "systemMessageInMessages" }]);
+    await reopened.execute({ type: "languageModel.save", id: null, value: { ...model, compatibility: [{ id: "systemMessageInMessages" }] } });
+    expect(reopened.current().languageModels[0]?.compatibility).toEqual([{ id: "systemMessageInMessages" }]);
   });
 
   // Lookup needs only the draft's model ID; it must not create configuration records.
@@ -269,7 +290,7 @@ describe("Real configuration and consumption boundaries", () => {
     } } };
     const { service, changed } = setup(undefined, 30_000, undefined, async () => data);
     const initial = service.current();
-    const result = await service.execute({ type: "model.parameters", modelId: "route/test-model" });
+    const result = await service.execute({ type: "languageModel.parameters", modelId: "route/test-model" });
     expect(result.parameterUpdate).toEqual({
       parameters: { contextWindow: 128000, capabilities: { reasoning: true, tools: false }, generation: { maxOutputTokens: 16000 } },
       model: { id: "lab/test-model", name: "Test", inputModalities: [] }, unfilled: ["thinkingLevels", "inputModalities", "cost"],
@@ -287,12 +308,12 @@ describe("Real configuration and consumption boundaries", () => {
     const { snapshot } = await addModel(service);
     const original = readFileSync(join(root, "configuration.json"), "utf8");
     changed.mockClear();
-    await service.execute({ type: "model.parameters", modelId: "test-model" });
+    await service.execute({ type: "languageModel.parameters", modelId: "test-model" });
     expect(service.current()).toEqual(snapshot);
     expect(readFileSync(join(root, "configuration.json"), "utf8")).toBe(original);
     expect(changed).not.toHaveBeenCalled();
     catalog.mockRejectedValueOnce(new Error("Sensitive upstream diagnostic"));
-    await expect(service.execute({ type: "model.parameters", modelId: "test-model" }))
+    await expect(service.execute({ type: "languageModel.parameters", modelId: "test-model" }))
       .rejects.toMatchObject({ code: "unavailable", message: "Model catalog request failed.", display: { id: "modelCatalog.failed" } });
     expect(service.current()).toEqual(snapshot);
     expect(readFileSync(join(root, "configuration.json"), "utf8")).toBe(original);
@@ -306,12 +327,12 @@ describe("Real configuration and consumption boundaries", () => {
     service.close();
     const path = join(root, "configuration.json");
     const document = JSON.parse(readFileSync(path, "utf8"));
-    delete document.models[0].cost;
+    delete document.languageModels[0].cost;
     const original = JSON.stringify(document);
     writeFileSync(path, original);
     const reopened = new ConfigurationService(root);
     cleanups.push(() => reopened.close());
-    expect(reopened.current().models[0]?.cost).toBeNull();
+    expect(reopened.current().languageModels[0]?.cost).toBeNull();
     expect(readFileSync(path, "utf8")).toBe(original);
   });
 
@@ -320,7 +341,7 @@ describe("Real configuration and consumption boundaries", () => {
     let signal!: AbortSignal;
     const catalog: LoadModelCatalog = input => { signal = input; return new Promise(resolve => { finish = resolve; }); };
     const { service } = setup(undefined, 30_000, undefined, catalog);
-    const request = service.execute({ type: "model.parameters", modelId: "test-model" });
+    const request = service.execute({ type: "languageModel.parameters", modelId: "test-model" });
     const closed = expect(request).rejects.toMatchObject({ code: "unavailable" });
     service.close();
     expect(signal.aborted).toBe(true);
@@ -329,13 +350,13 @@ describe("Real configuration and consumption boundaries", () => {
   });
 
   // Both layers save explicit entries independently; reference protocols do not block saving, and invalid candidates cannot contaminate saved data.
-  it.each(["modelProvider", "model"] as const)("%s compatibility entries save independently and reopen; invalid entries are rejected and removed entries do not reappear", async kind => {
+  it.each(["languageModelProvider", "model"] as const)("%s compatibility entries save independently and reopen; invalid entries are rejected and removed entries do not reappear", async kind => {
     const { service, root } = setup();
     const { providerId, modelId, snapshot } = await addModel(service);
-    const value = snapshot.models[0]!;
-    const save = (target: ConfigurationService, compatibility: ModelCompatibility[]) => kind === "modelProvider"
-      ? target.execute({ type: "modelProvider.save", id: providerId, value: { ...providerValue, compatibility } })
-      : target.execute({ type: "model.save", id: modelId, value: { ...value, compatibility } });
+    const value = snapshot.languageModels[0]!;
+    const save = (target: ConfigurationService, compatibility: ModelCompatibility[]) => kind === "languageModelProvider"
+      ? target.execute({ type: "languageModelProvider.save", id: providerId, value: { ...providerValue, compatibility } })
+      : target.execute({ type: "languageModel.save", id: modelId, value: { ...value, compatibility } });
     const compatibility = [{ id: "responsesReasoning", value: {} }, { id: "systemMessageInMessages" }];
     await save(service, compatibility);
     for (const invalid of [
@@ -347,22 +368,22 @@ describe("Real configuration and consumption boundaries", () => {
     }
     const reopened = new ConfigurationService(root);
     cleanups.push(() => reopened.close());
-    expect(reopened.current()[kind === "modelProvider" ? "modelProviders" : "models"][0]?.compatibility).toEqual(compatibility);
-    expect(reopened.current()[kind === "modelProvider" ? "models" : "modelProviders"][0]?.compatibility).toEqual([]);
-    expect(reopened.current().modelProviders[0]?.protocol).toBe("openai-chat");
+    expect(reopened.current()[kind === "languageModelProvider" ? "languageModelProviders" : "languageModels"][0]?.compatibility).toEqual(compatibility);
+    expect(reopened.current()[kind === "languageModelProvider" ? "languageModels" : "languageModelProviders"][0]?.compatibility).toEqual([]);
+    expect(reopened.current().languageModelProviders[0]?.protocol).toBe("openai-chat");
     await save(reopened, []);
     const again = new ConfigurationService(root);
     cleanups.push(() => again.close());
-    expect(again.current()[kind === "modelProvider" ? "modelProviders" : "models"][0]?.compatibility).toEqual([]);
+    expect(again.current()[kind === "languageModelProvider" ? "languageModelProviders" : "languageModels"][0]?.compatibility).toEqual([]);
   });
 
   it("configuration reopens with plaintext credentials independently of the database", async () => {
     const { service, root } = setup();
     const { providerId } = await addModel(service, "api_key");
     // An empty level set is valid; saving and reopening do not rewrite configuration when the current role's level is unavailable.
-    const model = service.current().models[0]!;
+    const model = service.current().languageModels[0]!;
     const modelValue = model;
-    await service.execute({ type: "model.save", id: `${model.providerId}/${model.modelId}`,
+    await service.execute({ type: "languageModel.save", id: `${model.providerId}/${model.modelId}`,
       value: { ...modelValue, capabilities: { ...model.capabilities, reasoning: true, thinkingLevels: [] } } });
     expect(existsSync(join(root, "db"))).toBe(false);
     expect(readFileSync(join(root, "configuration.json"), "utf8")).toContain("test-key-not-for-network");
@@ -371,28 +392,28 @@ describe("Real configuration and consumption boundaries", () => {
     const reopened = new ConfigurationService(root);
     try {
       const result = await reopened.execute({ type: "read" });
-      expect(result.snapshot.modelProviders[0]).toMatchObject({ id: providerId, apiKey: "test-key-not-for-network" });
-      expect(result.snapshot.models).toHaveLength(1);
-      expect(result.snapshot.models[0]!.capabilities).toMatchObject({ reasoning: true, thinkingLevels: [] });
+      expect(result.snapshot.languageModelProviders[0]).toMatchObject({ id: providerId, apiKey: "test-key-not-for-network" });
+      expect(result.snapshot.languageModels).toHaveLength(1);
+      expect(result.snapshot.languageModels[0]!.capabilities).toMatchObject({ reasoning: true, thinkingLevels: [] });
     } finally { reopened.close(); }
   });
   it("deleting a provider and its models preserves old snapshots and makes invalid IDs fail explicitly", async () => {
     const { service } = setup();
     const { providerId, modelId, snapshot } = await addModel(service);
-    const removed = await service.execute({ type: "remove", kind: "modelProvider", id: providerId});
-    expect(removed.snapshot.models).toEqual([]);
-    expect(snapshot.models).toHaveLength(1);
-    await expect(service.execute({ type: "test.start", model: modelId })).rejects.toMatchObject({ code: "not_found" });
+    const removed = await service.execute({ type: "remove", kind: "languageModelProvider", id: providerId});
+    expect(removed.snapshot.languageModels).toEqual([]);
+    expect(snapshot.languageModels).toHaveLength(1);
+    await expect(service.execute({ type: "languageModel.test.start", model: modelId })).rejects.toMatchObject({ code: "not_found" });
   });
   it("connection tests immediately return an ID without blocking configuration reads; late success after cancellation cannot overwrite results", async () => {
     let resolveProbe!: () => void;
     const probe = vi.fn<ConnectionProbe>(async () => new Promise<void>(resolve => { resolveProbe = resolve; }));
     const { service } = setup(probe);
     const { modelId } = await addModel(service);
-    const started = await service.execute({ type: "test.start", model: modelId });
+    const started = await service.execute({ type: "languageModel.test.start", model: modelId });
     expect(started.snapshot.tests[0]?.state).toBe("running");
-    expect((await service.execute({ type: "read" })).snapshot.models).toHaveLength(1);
-    const cancelled = await service.execute({ type: "test.cancel", id: started.savedId! });
+    expect((await service.execute({ type: "read" })).snapshot.languageModels).toHaveLength(1);
+    const cancelled = await service.execute({ type: "languageModel.test.cancel", id: started.savedId! });
     expect(cancelled.snapshot.tests[0]?.state).toBe("cancelled");
     expect(probe.mock.calls[0]![0].signal.aborted).toBe(true);
     resolveProbe(); await Promise.resolve();
@@ -401,8 +422,8 @@ describe("Real configuration and consumption boundaries", () => {
   it("unauthenticated configuration discards a submitted key", async () => {
     const { service, root } = setup();
     const { providerId } = await addModel(service, "api_key");
-    const result = await service.execute({ type: "modelProvider.save", id: providerId, value: { ...providerValue, apiKey: "must-not-be-stored" } });
-    expect(result.snapshot.modelProviders[0]?.apiKey).toBe("");
+    const result = await service.execute({ type: "languageModelProvider.save", id: providerId, value: { ...providerValue, apiKey: "must-not-be-stored" } });
+    expect(result.snapshot.languageModelProviders[0]?.apiKey).toBe("");
     expect(readFileSync(join(root, "configuration.json"), "utf8")).not.toMatch(/must-not-be-stored|test-key-not-for-network/);
   });
   it("save failures preserve in-memory configuration and old credentials while cleaning up temporary files", async () => {
@@ -415,9 +436,9 @@ describe("Real configuration and consumption boundaries", () => {
     rmSync(path);
     mkdirSync(path);
     try {
-      await expect(service.execute({ type: "modelProvider.save", id: providerId,
+      await expect(service.execute({ type: "languageModelProvider.save", id: providerId,
         value: { ...providerValue, name: "Must not commit", auth: "api_key", apiKey: "replacement-test-key" } })).rejects.toThrow();
-      expect((await service.execute({ type: "read" })).snapshot.modelProviders).toEqual(before.modelProviders);
+      expect((await service.execute({ type: "read" })).snapshot.languageModelProviders).toEqual(before.languageModelProviders);
       expect(await service.executionCredential(providerId)).toBe("test-key-not-for-network");
       expect(readdirSync(root).some(file => file.endsWith(".tmp"))).toBe(false);
     } finally {
@@ -427,15 +448,15 @@ describe("Real configuration and consumption boundaries", () => {
     service.close();
     const reopened = new ConfigurationService(root);
     try {
-      expect((await reopened.execute({ type: "read" })).snapshot.modelProviders[0]).toMatchObject({ id: providerId, name: "Local" });
+      expect((await reopened.execute({ type: "read" })).snapshot.languageModelProviders[0]).toMatchObject({ id: providerId, name: "Local" });
     } finally { reopened.close(); }
   });
   it.each(["invalid JSON", "unsupported version", "missing configuration category", "duplicate identity"])("%s does not reset or overwrite original configuration", async scenario => {
     const { root, service } = setup(); await addModel(service); service.close();
     const file = join(root, "configuration.json"), document = JSON.parse(readFileSync(file, "utf8"));
     if (scenario === "unsupported version") document.version = 999;
-    else if (scenario === "missing configuration category") delete document.models;
-    else if (scenario === "duplicate identity") document.models.push(structuredClone(document.models[0]));
+    else if (scenario === "missing configuration category") delete document.languageModels;
+    else if (scenario === "duplicate identity") document.languageModels.push(structuredClone(document.languageModels[0]));
     const content = scenario === "invalid JSON" ? "{broken" : JSON.stringify(document);
     writeFileSync(file, content);
     expect(() => new ConfigurationService(root)).toThrow();
@@ -445,7 +466,7 @@ describe("Real configuration and consumption boundaries", () => {
     const probe = vi.fn<ConnectionProbe>(async ({ signal }) => new Promise<void>((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true })));
     const { service } = setup(probe);
     const { modelId } = await addModel(service);
-    await service.execute({ type: "test.start", model: modelId });
+    await service.execute({ type: "languageModel.test.start", model: modelId });
     service.close();
     expect(probe.mock.calls[0]![0].signal.aborted).toBe(true);
     await expect(service.execute({ type: "read" })).rejects.toMatchObject({ code: "unavailable" });

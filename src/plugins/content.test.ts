@@ -536,9 +536,9 @@ describe("Models consuming immutable content", () => {
     signal: new AbortController().signal,
   } satisfies StreamRequest);
   async function configure(f: ReturnType<typeof fixture>, tools = false) {
-    await f.service.configuration.execute({ type: "modelProvider.save", id: null,
+    await f.service.configuration.execute({ type: "languageModelProvider.save", id: null,
       value: { id: "media", name: "Media", protocol: "openai-responses", baseUrl: "https://example.invalid", enabled: true, auth: "none", compatibility: [], apiKey: "" } });
-    await f.service.configuration.execute({ type: "model.save", id: null, value: { providerId: "media", name: "Model", modelId: "model", enabled: true, contextWindow: null, cost: null, compatibility: [],
+    await f.service.configuration.execute({ type: "languageModel.save", id: null, value: { providerId: "media", name: "Model", modelId: "model", enabled: true, contextWindow: null, cost: null, compatibility: [],
       capabilities: { reasoning: false, tools, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null } } });
   }
   const adapter = (seen: ModelInput[]): ModelAdapter => ({ format: () => "media-test", validate() {}, prepare(input) {
@@ -554,9 +554,9 @@ describe("Models consuming immutable content", () => {
     const seen: ModelInput[] = [];
     let ref!: ContentRef;
     const f = fixture({ adapter: adapter(seen), async prepare(content) {
-      await f.context.models.validate(request(ref), { content });
+      await f.context.languageModels.validate(request(ref), { content });
       expect(seen).toHaveLength(0);
-      for await (const event of f.context.models.stream(request(ref), { content })) { expect(event.type).toBe("part.start"); break; }
+      for await (const event of f.context.languageModels.stream(request(ref), { content })) { expect(event.type).toBe("part.start"); break; }
       expect(text(await content.read(ref))).toBe("temporary");
     } });
     await configure(f);
@@ -572,7 +572,7 @@ describe("Models consuming immutable content", () => {
     const a = await f.create(file, draft.id);
     const second = f.input(), other = await f.store.writer({ scope: second }).stage(bytes("second"));
     const b = await f.create(other, second.id);
-    const models = f.context.models;
+    const models = f.context.languageModels;
     await expect(models.validate(request(file))).rejects.toMatchObject({ reason: "content_scope" });
     await expect(models.validate(request(file), { content: { read: async () => bytes("fake"), async *open() {} } })).rejects.toMatchObject({ reason: "content_scope" });
     await expect(models.validate(request(file), { content: f.object(b).content })).rejects.toMatchObject({ reason: "content_scope" });
@@ -591,7 +591,7 @@ describe("Models consuming immutable content", () => {
     const execute = f.service.configuration.execute.bind(f.service.configuration);
     let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
     const spy = vi.spyOn(f.service.configuration, "execute").mockImplementationOnce(async command => { await gate; return execute(command); });
-    const iterator = f.context.models.stream(request(file), { content: f.object(id).content })[Symbol.asyncIterator]();
+    const iterator = f.context.languageModels.stream(request(file), { content: f.object(id).content })[Symbol.asyncIterator]();
     const first = iterator.next();
     try {
       await f.replace(id, { file: null }); f.store.collect();
@@ -607,8 +607,8 @@ describe("Models consuming immutable content", () => {
     const draft = f.input(), file = await f.store.writer({ scope: draft }).stage(bytes("intact"));
     const id = await f.create(file, draft.id), content = f.object(id).content;
     writeFileSync(join(f.root, applicationStorage.contentDirectory, "sealed", file["$asterism.content"]), bytes("broken"));
-    await f.context.models.validate(request(file), { content });
-    await expect((async () => { for await (const _ of f.context.models.stream(request(file), { content })) {} })()).rejects.toMatchObject({ code: "content_unavailable" });
+    await f.context.languageModels.validate(request(file), { content });
+    await expect((async () => { for await (const _ of f.context.languageModels.stream(request(file), { content })) {} })()).rejects.toMatchObject({ code: "content_unavailable" });
     expect(seen).toHaveLength(0);
   });
 
@@ -620,8 +620,8 @@ describe("Models consuming immutable content", () => {
     const value = request(file);
     value.messages = Array.from({ length: 21 }, () => structuredClone(value.messages[0]!));
     const content = f.object(id).content;
-    await f.context.models.validate(value, { content });
-    for await (const _ of f.context.models.stream(value, { content })) { /* Consume the request. */ }
+    await f.context.languageModels.validate(value, { content });
+    for await (const _ of f.context.languageModels.stream(value, { content })) { /* Consume the request. */ }
     expect(seen[0]!.messages).toHaveLength(21);
     const files = seen[0]!.messages.flatMap(item => item.kind === "output" ? [] : item.parts.filter(part => part.kind === "file"));
     expect(files).toHaveLength(21);

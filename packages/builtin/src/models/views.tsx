@@ -74,8 +74,8 @@ export const listModelsView: ToolRendererDefinition<z.infer<typeof ListModelsRes
 
 /* ---------- get_model ---------- */
 
-type ModelInfo = z.infer<typeof GetModelResult.schema>;
-type GetProps = ToolRenderProps<ModelInfo>;
+type LanguageModelInfo = z.infer<typeof GetModelResult.schema>;
+type GetProps = ToolRenderProps<LanguageModelInfo>;
 
 function GetHeader({ args, result }: GetProps) {
   const i18n = useI18n();
@@ -141,7 +141,7 @@ const itemColors: Record<PriceItem, string> = {
   input: "bg-chart-1", cacheRead: "bg-chart-2", cacheWrite: "bg-chart-7", output: "bg-chart-4", reasoning: "bg-chart-8",
 };
 
-function Prices({ cost }: { cost: ModelInfo["cost"] }) {
+function Prices({ cost }: { cost: LanguageModelInfo["cost"] }) {
   const i18n = useI18n();
   const tables = priceTables(cost);
   const [selected, setSelected] = useState(0);
@@ -207,7 +207,7 @@ function GetBody({ result }: GetProps) {
 }
 
 const getHeader = { headerRenderer: GetHeader };
-export const getModelView: ToolRendererDefinition<ModelInfo> = {
+export const getModelView: ToolRendererDefinition<LanguageModelInfo> = {
   input: getHeader, execution: getHeader,
   result: { headerRenderer: GetHeader, bodyRenderer: GetBody },
 };

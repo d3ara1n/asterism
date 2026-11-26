@@ -60,9 +60,9 @@ function open(plugins: PluginDefinition[], adapterFactory?: () => ModelAdapter, 
   return { root, service, sessionId };
 }
 async function configureModel(service: ApplicationService, inputModalities?: ModelMediaModality[]) {
-  await service.configuration.execute({ type: "modelProvider.save", id: null,
+  await service.configuration.execute({ type: "languageModelProvider.save", id: null,
     value: { id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [], apiKey: "" } });
-  const result = await service.configuration.execute({ type: "model.save", id: null, value: {
+  const result = await service.configuration.execute({ type: "languageModel.save", id: null, value: {
     providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
     capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels], ...(inputModalities ? { inputModalities } : {}) }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
@@ -124,7 +124,7 @@ describe("Host implementation of the workbench SDK", () => {
     } }));
     const target = await configureModel(service);
     const events: ModelRunEvent[] = [];
-    const result = await c.context().models.run({ target, system: { blocks: [] }, messages: [], requestParentId: "temporary-position",
+    const result = await c.context().languageModels.run({ target, system: { blocks: [] }, messages: [], requestParentId: "temporary-position",
       signal: new AbortController().signal, observer: { event(event) { events.push(event); } },
       tools: {
         declarations: [{ kind: "structured", name: "calculate", description: "Calculate a value.", parameters: { type: "object", properties: {} } }],
@@ -1401,7 +1401,7 @@ describe("Host implementation of the workbench SDK", () => {
       target, system: { blocks: [] }, messages: [{ kind: "input" as const, parts: [{ kind: "text" as const, text: "Generate a title" }] }], signal: new AbortController().signal,
     };
     const stream = [];
-    const iterable = c.context().models.stream(streamRequest);
+    const iterable = c.context().languageModels.stream(streamRequest);
     const first = iterable[Symbol.asyncIterator]().next();
     streamRequest.messages[0]!.parts[0]!.text = "Changed after the request began";
     streamRequest.userAgent = "Changed/2.0";

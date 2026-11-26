@@ -4,7 +4,7 @@ Asterism separates application composition, generic host mechanisms, and plugin 
 
 ## Technology and processes
 
-Electron hosts a React and TypeScript interface. SQLite stores structured application data, and local files store immutable content. Zod validates boundary data. Vercel AI SDK adapts model protocols without owning conversation history.
+Electron hosts a React and TypeScript interface. SQLite stores structured application data, and local files store immutable content. Zod validates boundary data. Vercel AI SDK adapts the language model protocols without owning conversation history.
 
 The project uses npm, electron-vite for compilation, electron-builder for packages, and electron-updater for installed updates.
 

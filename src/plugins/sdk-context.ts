@@ -8,12 +8,12 @@ import type { BoundTopLevelTool } from "./top-level-tools.ts";
 import { packageAsset } from "./package-assets.ts";
 import { createSdkScope } from "./sdk/scope.ts";
 import { bindObjects } from "./sdk/objects.ts";
-import { bindModels } from "./sdk/models.ts";
+import { bindLanguageModels } from "./sdk/models.ts";
 import { bindExecution } from "./sdk/execution.ts";
 import { bindMcp } from "./sdk/mcp.ts";
 import { bindMessaging } from "./sdk/messaging.ts";
 import { bindWeb } from "./sdk/web.ts";
-import { bindModelProviders } from "./sdk/model-providers.ts";
+import { bindLanguageModelProviders } from "./sdk/model-providers.ts";
 import { bindUsage } from "./sdk/usage.ts";
 import { bindAgentCatalog } from "./sdk/agent-catalog.ts";
 import { bindShellServices } from "./sdk/shell.ts";
@@ -27,7 +27,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
   resources: () => ResourceRegistry) {
   const scope = createSdkScope(internal.lifetime), { checkAvailable } = scope;
   const objects = bindObjects(internal.id, host, sessionRuns, eventScope, checkAvailable);
-  const models = bindModels(internal.id, host, modelRuns, checkAvailable);
+  const languageModels = bindLanguageModels(internal.id, host, modelRuns, checkAvailable);
   const execution = bindExecution({ owner: internal.id, host, events: eventScope, runs: modelRuns, objects, checkAvailable, topLevelTools });
   const shared = host.shared;
   const context: PluginContext = {
@@ -45,7 +45,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
     shell: bindShellServices(shared.shell, sessionRuns, checkAvailable),
     ...bindWeb(shared.webProviders, sessionRuns, scope),
     messaging: bindMessaging(shared.messaging, sessionRuns, internal.lifetime, scope),
-    modelProviders: bindModelProviders(shared.modelProviders, sessionRuns, scope),
+    languageModelProviders: bindLanguageModelProviders(shared.languageModelProviders, sessionRuns, scope),
     ...bindUsage(shared.usageProviders, shared.usage, sessionRuns, scope),
     telemetry: {
       recordExternalUsage(record) {
@@ -66,7 +66,7 @@ export function createSdkContext(internal: PluginServices, host: PluginHostServi
       },
     },
     agentCatalog: bindAgentCatalog(shared.agentCatalog, sessionRuns, checkAvailable),
-    models,
+    languageModels,
     execution: execution.execution,
     files: bindFiles(host, resources, sessionRuns, internal.lifetime.signal, checkAvailable),
     content: {

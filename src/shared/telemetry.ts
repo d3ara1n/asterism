@@ -14,6 +14,9 @@ export const telemetryGranularities = ["hour", "day", "week", "month"] as const;
 const id = z.string().min(1).max(512);
 const time = z.number().int().nonnegative();
 
+export const modelKindSchema = z.enum(["language", "decision"]);
+export type ModelKind = z.infer<typeof modelKindSchema>;
+
 const subjectId = z.string().min(1);
 /** Match declarations by exact identity. A null source selects declarations without one. */
 const subjectMatchSchema = z.strictObject({
@@ -35,6 +38,7 @@ export const telemetryFilterSchema = z.strictObject({
   folderId: id.nullable().optional(),
   providerId: id.optional(),
   modelId: id.optional(),
+  modelKind: modelKindSchema.optional(),
   pluginId: id.optional(),
   purposeId: id.nullable().optional(),
   sessionId: id.optional(),
@@ -120,8 +124,8 @@ export type SessionStatus = "active" | "sleeping" | "archived" | "deleted";
  * `other` collects groups beyond a series limit.
  */
 export type TelemetryGroup =
-  | { dimension: "model"; key: string; providerId: string; modelId: string; providerName: string }
-  | { dimension: "provider"; key: string; providerId: string; providerName: string }
+  | { dimension: "model"; key: string; modelKind: ModelKind; providerId: string; modelId: string; providerName: string }
+  | { dimension: "provider"; key: string; modelKind: ModelKind; providerId: string; providerName: string }
   | { dimension: "folder"; key: string; folderId: string | null; name: string | null; color: string | null; deleted: boolean }
   | { dimension: "session"; key: string; sessionId: string; title: string | null; status: SessionStatus; folderId: string | null; folderName: string | null; folderColor: string | null }
   | { dimension: "purpose"; key: string; pluginId: string; purposeId: string | null }
@@ -175,6 +179,7 @@ export interface TelemetryEvent {
   firstOutputMs: number | null;
   purpose: Extract<TelemetryGroup, { dimension: "purpose" }>;
   session: Extract<TelemetryGroup, { dimension: "session" }> | null;
+  modelKind: ModelKind;
   providerId: string;
   providerName: string;
   modelId: string;

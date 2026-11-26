@@ -51,6 +51,11 @@ export class DashboardModel {
   /** Narrow the page by dimensions, each independent of the others. Changing a plugin clears the purpose that belonged to the previous one. */
   applyFilters(patch: FilterDimensions, labels: Partial<Record<FilterKey, string>> = {}) {
     const filters = { ...this.state.filters, ...patch };
+    if (patch.modelKind && this.state.filters.modelKind && patch.modelKind !== this.state.filters.modelKind) {
+      if (!("providerId" in patch)) delete filters.providerId;
+      if (!("modelId" in patch)) delete filters.modelId;
+      if (patch.modelKind === "decision") delete filters.thinking;
+    }
     if (patch.pluginId !== undefined && !("purposeId" in patch) && this.state.filters.pluginId !== patch.pluginId) delete filters.purposeId;
     this.set({ filters, labels: { ...this.state.labels, ...labels } });
   }
@@ -58,6 +63,8 @@ export class DashboardModel {
     const filters = { ...this.state.filters };
     delete filters[key];
     if (key === "pluginId") delete filters.purposeId;
+    if (key === "modelKind") { delete filters.providerId; delete filters.modelId; }
+    if ((key === "providerId" || key === "modelId") && !filters.providerId && !filters.modelId) delete filters.modelKind;
     this.set({ filters });
   }
   clearFilters() { this.set({ filters: {} }); }
@@ -86,8 +93,8 @@ export const groupId = (group: TelemetryGroup) => `${group.dimension}:${group.ke
 /** Filter dimensions that select exactly one dimension value. */
 export function groupFilter(group: TelemetryGroup): FilterDimensions | null {
   switch (group.dimension) {
-    case "model": return { providerId: group.providerId, modelId: group.modelId };
-    case "provider": return { providerId: group.providerId };
+    case "model": return { modelKind: group.modelKind, providerId: group.providerId, modelId: group.modelId };
+    case "provider": return { modelKind: group.modelKind, providerId: group.providerId };
     case "folder": return { folderId: group.folderId };
     case "session": return { sessionId: group.sessionId };
     case "purpose": return { pluginId: group.pluginId, purposeId: group.purposeId };

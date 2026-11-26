@@ -1,7 +1,7 @@
 import type { RequestTiming, Usage } from "@asterism-app/sdk/contracts";
 import { wrapLanguageModel, type LanguageModel } from "ai";
 import type { ModelEvent } from "./contract.ts";
-import type { ModelProtocol, ProviderPart } from "./protocols/contract.ts";
+import type { LanguageModelProtocol, ProviderPart } from "./protocols/contract.ts";
 
 /** From model invocation start to received terminal state; excludes subsequent caller tool execution. */
 export class RequestTimer {
@@ -38,7 +38,7 @@ export class RequestTimer {
 }
 
 /** Sample as the SDK receives provider content; consumer progress publication and stream finalization do not alter measurements. */
-export function measureModel(model: Exclude<LanguageModel, string>, protocol: ModelProtocol, timer: RequestTimer) {
+export function measureModel(model: Exclude<LanguageModel, string>, protocol: LanguageModelProtocol, timer: RequestTimer) {
   let completion: Extract<ModelEvent, { type: "finish" }> | undefined;
   let responseId: string | undefined;
   let usage: Usage | null = null;

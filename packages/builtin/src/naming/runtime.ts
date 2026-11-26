@@ -8,7 +8,7 @@ import { createSessionNaming } from "./service.ts";
 /** Builtin naming policy observes Agent input and writes through the host title capability. */
 export function createNamingModule(userAgent?: string) {
   return defineModule(plugin => {
-    const generate = createSessionNaming({ models: plugin.models, roles: () => builtinConfiguration(plugin).roles, userAgent });
+    const generate = createSessionNaming({ models: plugin.languageModels, roles: () => builtinConfiguration(plugin).roles, userAgent });
     function nameSession(sessionId: string, input: string) {
       const title = input.replace(/\s+/gu, " ").trim();
       plugin.session(sessionId).title.set(title);

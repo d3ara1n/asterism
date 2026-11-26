@@ -1,7 +1,7 @@
 import {
   mcpSettingsSchema, shellSettingsSchema, modelExpressionSchema, parseModelExpression, thinkingSchema, type ThinkingLevel,
   thinkingLevels, modelCostSchema, uiTextSchema, modelMediaModalities, modelInputModalitiesSchema,
-  modelProviderFixedFields, modelProtocolIds, providerUsageIdSchema, usageProviderInfoSchema, modelProviderPresetSchema, providerIconIdSchema,
+  languageModelProviderFixedFields, languageModelProtocolIds, providerUsageIdSchema, usageProviderInfoSchema, languageModelProviderPresetSchema, providerIconIdSchema,
 } from "@asterism-app/sdk/contracts";
 export { modelExpressionSchema, parseModelExpression, formatModelExpression, modelReference, thinkingSchema, type ModelExpression, type ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { z } from "zod";
@@ -14,9 +14,9 @@ const name = z.string().trim().min(1).max(160);
 export const modelProviderIdSchema = z.string().trim().min(1).max(160).regex(/^[^/\s]+$/u, "ModelProvider IDs cannot contain '/' or whitespace.");
 /** Server model ID: a globally recognized model name allowing `/` but no whitespace. */
 const serverModelId = z.string().trim().min(1).max(160).regex(/^\S+$/u, "Model IDs cannot contain whitespace.");
-export const protocolSchema = z.enum(modelProtocolIds);
+export const protocolSchema = z.enum(languageModelProtocolIds);
 /** Connection fields that can be fixed; authentication methods exclude credentials and compatibility settings also constrain model editing. */
-export const modelProviderFixedFieldSchema = z.enum(modelProviderFixedFields);
+export const modelProviderFixedFieldSchema = z.enum(languageModelProviderFixedFields);
 export type ModelProviderFixedField = z.infer<typeof modelProviderFixedFieldSchema>;
 const endpoint = z.string().trim().url().pipe(z.string().refine(value => {
   const url = new URL(value);
@@ -108,9 +108,9 @@ export const configurationSnapshotSchema = z.strictObject({
   messagingProviderTypes: z.array(messagingProviderTypeSchema),
   webProviders: z.array(webProviderSchema),
   webProviderTypes: z.array(webProviderTypeSchema),
-  modelProviders: z.array(modelProviderSchema), models: z.array(modelSchema),
+  languageModelProviders: z.array(modelProviderSchema), languageModels: z.array(modelSchema),
   tests: z.array(connectionTestSchema), discoveries: z.array(modelDiscoverySchema),
-  modelProviderPresets: z.array(modelProviderPresetSchema).optional(),
+  languageModelProviderPresets: z.array(languageModelProviderPresetSchema).optional(),
   usageProviders: z.array(usageProviderInfoSchema).optional(),
 });
 export const configurationCommandSchema = z.discriminatedUnion("type", [
@@ -127,15 +127,15 @@ export const configurationCommandSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("showUsage.set"), value: z.boolean() }),
   z.strictObject({ type: z.literal("usageBudget.set"), value: usageBudgetSchema }),
   // Save targets the current ID; a different ID in value means rename.
-  z.strictObject({ type: z.literal("modelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderSchema }),
-  z.strictObject({ type: z.literal("model.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
-  z.strictObject({ type: z.literal("remove"), kind: z.enum(["modelProvider", "webProvider", "messaging", "model"]), id: z.string().min(1).max(321) }),
-  z.strictObject({ type: z.literal("test.start"), model: modelExpressionSchema }),
-  z.strictObject({ type: z.literal("test.cancel"), id }),
-  z.strictObject({ type: z.literal("discovery.start"), providerId: modelProviderIdSchema }),
-  z.strictObject({ type: z.literal("discovery.cancel"), id }),
-  z.strictObject({ type: z.literal("discovery.add"), id, modelIds: z.array(serverModelId).min(1) }),
-  z.strictObject({ type: z.literal("model.parameters"), modelId: serverModelId }),
+  z.strictObject({ type: z.literal("languageModelProvider.save"), id: modelProviderIdSchema.nullable(), value: modelProviderSchema }),
+  z.strictObject({ type: z.literal("languageModel.save"), id: modelExpressionSchema.nullable(), value: modelInputSchema }),
+  z.strictObject({ type: z.literal("remove"), kind: z.enum(["languageModelProvider", "webProvider", "messaging", "languageModel"]), id: z.string().min(1).max(321) }),
+  z.strictObject({ type: z.literal("languageModel.test.start"), model: modelExpressionSchema }),
+  z.strictObject({ type: z.literal("languageModel.test.cancel"), id }),
+  z.strictObject({ type: z.literal("languageModel.discovery.start"), providerId: modelProviderIdSchema }),
+  z.strictObject({ type: z.literal("languageModel.discovery.cancel"), id }),
+  z.strictObject({ type: z.literal("languageModel.discovery.add"), id, modelIds: z.array(serverModelId).min(1) }),
+  z.strictObject({ type: z.literal("languageModel.parameters"), modelId: serverModelId }),
 ]);
 export const modelParametersSchema = z.strictObject({
   contextWindow: modelInputSchema.shape.contextWindow.unwrap().optional(),
@@ -192,12 +192,12 @@ export interface ConfigurationBridge {
 }
 
 /** Selectors and execution share this existence/enabled check without maintaining configuration references or cascaded state. */
-export function resolveProviderModel(snapshot: Pick<ConfigurationSnapshot, "modelProviders" | "models">, reference: string | null): { model: ProviderModel; provider: ModelProvider } | null {
+export function resolveLanguageModel(snapshot: Pick<ConfigurationSnapshot, "languageModelProviders" | "languageModels">, reference: string | null): { model: ProviderModel; provider: ModelProvider } | null {
   const expression = reference === null ? null : parseModelExpression(reference);
   if (!expression) return null;
-  const model = snapshot.models.find(item => item.providerId === expression.provider && item.modelId === expression.model);
+  const model = snapshot.languageModels.find(item => item.providerId === expression.provider && item.modelId === expression.model);
   if (!model?.enabled) return null;
-  const provider = snapshot.modelProviders.find(item => item.id === model.providerId);
+  const provider = snapshot.languageModelProviders.find(item => item.id === model.providerId);
   return provider?.enabled ? { model, provider } : null;
 }
 

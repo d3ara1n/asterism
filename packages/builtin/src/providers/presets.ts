@@ -1,4 +1,4 @@
-import { defineMessages, type ModelProviderPreset, type ModelProviderConnection } from "@asterism-app/sdk/contracts";
+import { defineMessages, type LanguageModelProviderPreset, type LanguageModelProviderConnection } from "@asterism-app/sdk/contracts";
 import { builtin } from "@asterism-app/builtin-api/contracts";
 
 const presetMessages = builtin.messages("en", defineMessages({
@@ -7,15 +7,15 @@ const presetMessages = builtin.messages("en", defineMessages({
 }));
 
 /** Official entry points fix connection details; the editor consumes only rules and does not recognize preset identities. */
-const fixedFields: NonNullable<ModelProviderConnection["fixedFields"]> = ["protocol", "baseUrl", "auth", "compatibility", "usage"];
+const fixedFields: NonNullable<LanguageModelProviderConnection["fixedFields"]> = ["protocol", "baseUrl", "auth", "compatibility", "usage"];
 
 /** Zhipu and Z.ai use the same Responses adapter; region selects only the address, while billing products retain separate credential guidance. */
-const zaiResponses = (baseUrl: string): ModelProviderPreset["connection"] => ({
+const zaiResponses = (baseUrl: string): LanguageModelProviderPreset["connection"] => ({
   protocol: "openai-responses", baseUrl, auth: "api_key", fixedFields,
   compatibility: [{ id: "responsesReasoning", value: { content: "object", encryptedContent: false, summary: false } }],
 });
 
-function miniMaxPreset(mainland: boolean, billing: "usage" | "subscription"): ModelProviderPreset {
+function miniMaxPreset(mainland: boolean, billing: "usage" | "subscription"): LanguageModelProviderPreset {
   const domain = mainland ? "minimax.cn" : "minimax.io";
   const platform = `https://platform.${domain}`;
   const subscription = billing === "subscription";
@@ -33,7 +33,7 @@ function miniMaxPreset(mainland: boolean, billing: "usage" | "subscription"): Mo
 }
 
 /** Billing entries share inference endpoints and the key-selected account usage implementation. */
-function commandCodePreset(id: string, billing: "usage" | "subscription", protocol: "openai-responses" | "anthropic"): ModelProviderPreset {
+function commandCodePreset(id: string, billing: "usage" | "subscription", protocol: "openai-responses" | "anthropic"): LanguageModelProviderPreset {
   return {
     id, name: "Command Code", iconId: "commandcode", billing,
     connection: { fixedFields, protocol, baseUrl: "https://api.commandcode.ai/provider/v1", auth: "api_key", compatibility: [], usage: "commandcode" },
@@ -43,7 +43,7 @@ function commandCodePreset(id: string, billing: "usage" | "subscription", protoc
   };
 }
 
-export const modelProviderPresets: readonly ModelProviderPreset[] = [
+export const languageModelProviderPresets: readonly LanguageModelProviderPreset[] = [
   {
     id: "openai", name: "OpenAI", iconId: "openai", billing: "usage",
     connection: { fixedFields, protocol: "openai-responses", baseUrl: "https://api.openai.com/v1", auth: "api_key", compatibility: [], usage: "openai" },

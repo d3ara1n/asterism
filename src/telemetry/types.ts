@@ -1,6 +1,6 @@
 import type { ModelCost, UiText, Usage } from "@asterism-app/sdk/contracts";
 import type { ExternalUsageOutcome } from "@asterism-app/sdk/runtime";
-import type { SessionStatus } from "../shared/telemetry.ts";
+import type { ModelKind, SessionStatus } from "../shared/telemetry.ts";
 
 /** A subject declared by a plugin for a model request or one of its tool calls, with the declaring plugin stamped by the host. */
 export interface UsageSubjectRecord {
@@ -35,6 +35,7 @@ export interface ModelUsageRecord {
   pluginId: string;
   purposeId: string | null;
   sessionId: string | null;
+  modelKind: ModelKind;
   providerId: string;
   providerName: string;
   modelId: string;
@@ -73,7 +74,7 @@ export interface WorkspaceLookup {
   /** Every session still in the workspace, including archived ones. */
   sessions(): ReadonlyMap<string, LiveSession>;
   session(id: string): LiveSession | null;
-  providerNames(): ReadonlyMap<string, string>;
+  providerNames(modelKind: ModelKind): ReadonlyMap<string, string>;
   pluginNames(): ReadonlyMap<string, UiText | null>;
 }
 

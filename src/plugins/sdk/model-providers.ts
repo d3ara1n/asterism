@@ -1,9 +1,9 @@
-import type { ModelProviderServices } from "@asterism-app/sdk/runtime";
+import type { LanguageModelProviderServices } from "@asterism-app/sdk/runtime";
 import type { RunGroup } from "../lifecycle.ts";
 import type { SdkScope } from "./scope.ts";
 
 /** Model connection reads and credential requests use the plugin's availability and cancellation scope. */
-export function bindModelProviders(providers: ModelProviderServices, sessionRuns: RunGroup, scope: SdkScope): ModelProviderServices {
+export function bindLanguageModelProviders(providers: LanguageModelProviderServices, sessionRuns: RunGroup, scope: SdkScope): LanguageModelProviderServices {
   const { checkAvailable, subscribeRegistry } = scope;
   const outside = { affectsHistory: false } as const;
   return {

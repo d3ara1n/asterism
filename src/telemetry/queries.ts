@@ -1,7 +1,7 @@
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { usageRelations, usageSubjectKinds } from "@asterism-app/sdk/contracts";
 import {
-  distributionEdges, type BreakdownRow, type CurrencyAmount, type ExternalRow, type ExternalTotals, type Percentiles, type SeriesPoint,
+  distributionEdges, modelKindSchema, type ModelKind, type BreakdownRow, type CurrencyAmount, type ExternalRow, type ExternalTotals, type Percentiles, type SeriesPoint,
   type TelemetryClearReply, type TelemetryDimension, type TelemetryEvent, type TelemetryExportReply, type TelemetryFacets, type TelemetryFilter,
   type TelemetryGroup, type TelemetryQuery, type TelemetryQueryResult, type ToolRow, type UsageMetrics, type SubjectRow, type SubjectMatch,
 } from "../shared/telemetry.ts";
@@ -48,11 +48,15 @@ function modelEvents(filter: TelemetryFilter, range: { from: number | null; to: 
   const add = (sql: string, value?: SQLInputValue) => { where.push(sql); if (value !== undefined) params.push(value); };
   if (range.from !== null) add("e.started_at >= ?", range.from);
   if (range.to !== null) add("e.started_at < ?", range.to);
+  if (filter.modelKind !== undefined) add("e.model_kind = ?", filter.modelKind);
   if (filter.providerId !== undefined) add("e.provider_id = ?", filter.providerId);
   if (filter.modelId !== undefined) add("e.model_id = ?", filter.modelId);
   if (filter.pluginId !== undefined) add("e.plugin_id = ?", filter.pluginId);
   if (filter.purposeId !== undefined) filter.purposeId === null ? add("e.purpose_id IS NULL") : add("e.purpose_id = ?", filter.purposeId);
-  if (filter.thinking !== undefined) filter.thinking === null ? add("e.thinking IS NULL") : add("e.thinking = ?", filter.thinking);
+  if (filter.thinking !== undefined) {
+    add("e.model_kind = 'language'");
+    filter.thinking === null ? add("e.thinking IS NULL") : add("e.thinking = ?", filter.thinking);
+  }
   if (filter.sessionId !== undefined) add("e.session_id = ?", filter.sessionId);
   if (filter.subject !== undefined) {
     const subject = subjectWhere(filter.subject);
@@ -68,7 +72,7 @@ function modelEvents(filter: TelemetryFilter, range: { from: number | null; to: 
 
 /** External events in the filter; model-only dimensions select none of them. */
 function externalEvents(filter: TelemetryFilter, range: { from: number | null; to: number | null } = filter): Scope | null {
-  if (filter.providerId !== undefined || filter.modelId !== undefined || filter.purposeId !== undefined || filter.thinking !== undefined
+  if (filter.modelKind !== undefined || filter.providerId !== undefined || filter.modelId !== undefined || filter.purposeId !== undefined || filter.thinking !== undefined
     || filter.subject !== undefined) return null;
   const where: string[] = [];
   const params: SQLInputValue[] = [];
@@ -126,13 +130,13 @@ function percentileSql(value: string, partition: string | null, source: string):
 
 interface DimensionSpec { columns: readonly string[]; where?: string }
 const dimensionSpecs: Record<TelemetryDimension, DimensionSpec> = {
-  model: { columns: ["provider_id", "model_id"] },
-  provider: { columns: ["provider_id"] },
+  model: { columns: ["provider_id", "model_id", "model_kind"] },
+  provider: { columns: ["provider_id", "model_kind"] },
   folder: { columns: ["folder_id"] },
   session: { columns: ["session_id"], where: "session_id IS NOT NULL" },
   purpose: { columns: ["plugin_id", "purpose_id"] },
   plugin: { columns: ["plugin_id"] },
-  thinking: { columns: ["thinking"] },
+  thinking: { columns: ["thinking"], where: "model_kind = 'language'" },
   error: { columns: ["error_origin", "error_code"], where: "outcome = 'failed'" },
 };
 const dimensionSelect = (spec: DimensionSpec) => spec.columns.map((column, index) => `${column} AS d${index}`).join(", ");
@@ -155,10 +159,10 @@ class Groups {
     }
     return map;
   }
-  private providerName(providerId: string): string {
-    return this.lookup.providerNames().get(providerId) ?? text(this.snapshots("provider",
-      "SELECT provider_id, provider_name_snapshot AS name, MAX(started_at) FROM model_usage_events GROUP BY provider_id",
-      row => String(row.provider_id)).get(providerId)?.name) ?? providerId;
+  providerName(modelKind: ModelKind, providerId: string, recordedName?: string): string {
+    return this.lookup.providerNames(modelKind).get(providerId) ?? recordedName ?? text(this.snapshots("provider",
+      "SELECT model_kind, provider_id, provider_name_snapshot AS name, MAX(started_at) FROM model_usage_events GROUP BY model_kind, provider_id",
+      row => groupKey([String(row.model_kind), String(row.provider_id)])).get(groupKey([modelKind, providerId]))?.name) ?? providerId;
   }
   folder(folderId: string | null): Extract<TelemetryGroup, { dimension: "folder" }> {
     const key = groupKey([folderId]);
@@ -179,10 +183,16 @@ class Groups {
   }
   resolve(dimension: TelemetryDimension, values: readonly (string | null)[]): TelemetryGroup {
     const key = groupKey(values);
-    const [first = null, second = null] = values;
+    const [first = null, second = null, third = null] = values;
     switch (dimension) {
-      case "model": return { dimension, key, providerId: first!, modelId: second!, providerName: this.providerName(first!) };
-      case "provider": return { dimension, key, providerId: first!, providerName: this.providerName(first!) };
+      case "model": {
+        const modelKind = modelKindSchema.parse(third);
+        return { dimension, key, modelKind, providerId: first!, modelId: second!, providerName: this.providerName(modelKind, first!) };
+      }
+      case "provider": {
+        const modelKind = modelKindSchema.parse(second);
+        return { dimension, key, modelKind, providerId: first!, providerName: this.providerName(modelKind, first!) };
+      }
       case "folder": return this.folder(first);
       case "session": return this.session(first!);
       case "purpose": return purposeGroup(first!, second);
@@ -345,12 +355,13 @@ export class TelemetryReader {
   }
 
   private event(row: Row): TelemetryEvent {
-    const sessionId = text(row.session_id);
+    const sessionId = text(row.session_id), modelKind = modelKindSchema.parse(row.model_kind);
     return {
       id: String(row.id), startedAt: num(row.started_at), durationMs: nullableNum(row.duration_ms), firstOutputMs: nullableNum(row.first_output_ms),
       purpose: purposeGroup(String(row.plugin_id), text(row.purpose_id)),
       session: sessionId === null ? null : this.groups.session(sessionId),
-      providerId: String(row.provider_id), providerName: this.lookup.providerNames().get(String(row.provider_id)) ?? String(row.provider_name_snapshot),
+      modelKind,
+      providerId: String(row.provider_id), providerName: this.groups.providerName(modelKind, String(row.provider_id), String(row.provider_name_snapshot)),
       modelId: String(row.model_id), thinking: text(row.thinking),
       inputTokens: nullableNum(row.input_tokens), outputTokens: nullableNum(row.output_tokens), reasoningTokens: nullableNum(row.reasoning_tokens),
       cacheReadTokens: nullableNum(row.cache_read_tokens), cacheWriteTokens: nullableNum(row.cache_write_tokens),
@@ -410,7 +421,7 @@ export class TelemetryReader {
     const match = subjectWhere(subject);
     // Use the request's time and filters, but count each matching tool call once.
     const scope = [modelEvents(filter), { sql: `calls AS (
-      SELECT ev.started_at, ev.session_id, ev.provider_id, ev.model_id, t.outcome, s.part AS file, u.subject_id AS role,
+      SELECT ev.started_at, ev.session_id, ev.provider_id, ev.model_id, ev.model_kind, t.outcome, s.part AS file, u.subject_id AS role,
         CASE WHEN u.part IS NOT NULL THEN json_array(ev.session_id, u.source_id, u.part) END AS work_unit
       FROM usage_subjects s JOIN tool_usage_events t ON t.id = s.tool_event_id JOIN ev ON ev.id = s.model_event_id
       LEFT JOIN usage_subjects u ON u.id = (
@@ -471,7 +482,7 @@ export class TelemetryReader {
         id: event.id, startedAt: new Date(event.startedAt).toISOString(), durationMs: event.durationMs, firstOutputMs: event.firstOutputMs,
         pluginId: event.purpose.pluginId, purposeId: event.purpose.purposeId,
         sessionId: event.session?.sessionId ?? null, sessionTitle: event.session?.title ?? null, folderId: folder.folderId, folderName: folder.name,
-        providerId: event.providerId, providerName: event.providerName, modelId: event.modelId, thinking: event.thinking,
+        modelKind: event.modelKind, providerId: event.providerId, providerName: event.providerName, modelId: event.modelId, thinking: event.thinking,
         inputTokens: event.inputTokens, outputTokens: event.outputTokens, reasoningTokens: event.reasoningTokens,
         cacheReadTokens: event.cacheReadTokens, cacheWriteTokens: event.cacheWriteTokens,
         costUsd: event.costUsd, costStatus: event.costStatus, cacheSavedUsd: nullableNum(row.cache_saved_usd), tierFromInputTokens: event.tierFromInputTokens,

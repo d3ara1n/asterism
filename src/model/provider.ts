@@ -3,7 +3,7 @@ import type { ModelProviderInput, ProviderModel } from "../shared/configuration.
 import { ModelFailure } from "./contract.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
 import { modelRequestHeaders } from "./request-identity.ts";
-import { modelProtocol } from "./protocols/index.ts";
+import { languageModelProtocol } from "./protocols/index.ts";
 
 export class ProviderTransportError extends ModelFailure {
   constructor() { super("configuration", "API key connections require HTTPS, except on loopback addresses."); }
@@ -24,7 +24,7 @@ export function createProviderModel(provider: ModelProviderInput, model: Provide
     if (provider.auth === "none") { headers.delete("authorization"); headers.delete("x-api-key"); }
     return transport(url, { ...init, headers, redirect: "error" });
   };
-  return modelProtocol(provider.protocol).createModel({ provider, model }, {
+  return languageModelProtocol(provider.protocol).createModel({ provider, model }, {
     baseURL: provider.baseUrl, apiKey: provider.auth === "none" ? unauthenticatedApiKey : key, fetch: scopedFetch,
   });
 }

@@ -19,7 +19,7 @@ import { commandMessages } from "../messages/command.ts";
 import { createAdmission } from "./admission.ts";
 import { projectAgentTurnState } from "./state-projection.ts";
 import type { AgentTurnState } from "./state.ts";
-import type { ProviderUsage } from "@asterism-app/sdk/runtime";
+import type { LanguageModelProviderUsage } from "@asterism-app/sdk/runtime";
 import { createPeekChannel, createPeekClient, createPeekTool } from "./peek/service.ts";
 import { createAgentFeedback } from "./feedback-state.ts";
 import { SaveAgentDraft, SetAgentDraftMode, ExchangeAgentDraft, DiscardAgentDraft, MoveAgentDraft } from "./drafts-contract.ts";
@@ -31,13 +31,13 @@ import { BuiltinSettings } from "../settings/contract.ts";
 import { builtinConfiguration, resolveRoleTarget } from "../configuration/runtime.ts";
 
 /** The resource entry point only assembles domain modules and contributions; business modules do not depend on the full plugin context. */
-export function createAgentModule(application: ApplicationIdentity, usage: ProviderUsage, skills: SkillCatalog) {
+export function createAgentModule(application: ApplicationIdentity, usage: LanguageModelProviderUsage, skills: SkillCatalog) {
   return defineModule(plugin => {
     const projectMessages = createWorkProjection(plugin);
     const prepareRequest = createRequestAssembly(plugin, skills);
     const systemPrompt = (agent: Parameters<typeof prepareRequest.estimate>[0]) => prepareRequest.estimate(agent).system;
     const selection = createSelection({ agents: () => builtinConfiguration(plugin).agents, roles: () => builtinConfiguration(plugin).roles });
-    const peek = { models: plugin.models, userAgent: application.userAgent, usage,
+    const peek = { models: plugin.languageModels, userAgent: application.userAgent, usage,
       utility: () => resolveRoleTarget(builtinConfiguration(plugin).roles, "utility") };
     const feedback = createAgentFeedback();
     plugin.lifetime.defer(feedback.clear);
@@ -47,9 +47,9 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
       if (!object.snapshot()) throw new PluginApiError("not_found", "The Agent is unavailable on its current session path.");
       return object;
     };
-    const controller = createAgentController({ selection, tasks: plugin.tasks, models: plugin.models, execution: plugin.execution, prepareRequest, projectMessages, userAgent: application.userAgent,
+    const controller = createAgentController({ selection, tasks: plugin.tasks, models: plugin.languageModels, execution: plugin.execution, prepareRequest, projectMessages, userAgent: application.userAgent,
       requestObject: agentObject, projectAttachments: agentAttachmentProjection(plugin), usage, feedback });
-    const admission = createAdmission({ selection, validate: plugin.models.validate, running: controller.running, systemPrompt, projectMessages });
+    const admission = createAdmission({ selection, validate: plugin.languageModels.validate, running: controller.running, systemPrompt, projectMessages });
     const peekAgent = (ref: ResourceRef) => createPeekClient(peek, () => agentObject(ref), plugin.lifetime.signal);
     registerAgentServices(plugin, {
       get defaultAgentId() { return plugin.config(BuiltinSettings).get().paradigm.defaultAgentId; },
@@ -80,7 +80,7 @@ export function createAgentModule(application: ApplicationIdentity, usage: Provi
         return { sessionId };
       })],
       events: [AgentInputAccepted, AgentTurnEnded],
-      topLevelTools: [createAgentStateTool({ selection, currentRequest: controller.currentRequest, models: plugin.models, usage })],
+      topLevelTools: [createAgentStateTool({ selection, currentRequest: controller.currentRequest, models: plugin.languageModels, usage })],
       tools: [createPeekTool(peekAgent), createSendTool(), createWaitTool(controller)],
       channels: [createPeekChannel(peekAgent)],
       resources: [implementResource(Agent, AgentView, {

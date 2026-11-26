@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRendererCalls, useRendererEvents } from "@asterism-app/sdk/renderer";
-import { ReadUsage, UsageChanged, type ProviderUsageState } from "@asterism-app/sdk/contracts";
+import { ReadLanguageModelProviderUsage, LanguageModelProviderUsageChanged, type ProviderUsageState } from "@asterism-app/sdk/contracts";
 import { useLifetimeSignal } from "@asterism-app/ui/use-lifetime";
 
 /** Matches the host cache freshness, so each poll finds the previous result expired. */
@@ -18,7 +18,7 @@ export function useProviderUsages(providerIds: readonly string[], poll: boolean)
   const [refreshing, setRefreshing] = useState(false);
   const read = useCallback(async (providerId: string, refresh: boolean, signal: AbortSignal) => {
     try {
-      const value = await calls.invoke(ReadUsage, { providerId, refresh }, { signal });
+      const value = await calls.invoke(ReadLanguageModelProviderUsage, { providerId, refresh }, { signal });
       if (!signal.aborted) setStates(previous => new Map(previous).set(providerId, value));
     } catch {
       if (!signal.aborted) setStates(previous => {
@@ -39,7 +39,7 @@ export function useProviderUsages(providerIds: readonly string[], poll: boolean)
       timer = poll && document.visibilityState === "visible" ? setInterval(readAll, pollInterval) : undefined;
     };
     const visibility = () => { if (document.visibilityState === "visible") readAll(); schedule(); };
-    const subscription = events.subscribe(UsageChanged, { delivery: "latest", signal: controller.signal }, ({ data }) => {
+    const subscription = events.subscribe(LanguageModelProviderUsageChanged, { delivery: "latest", signal: controller.signal }, ({ data }) => {
       for (const id of ids) if (data.providerId === null || data.providerId === id) void read(id, false, controller.signal);
     });
     void subscription.ready.then(() => {

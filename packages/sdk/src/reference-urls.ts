@@ -51,7 +51,7 @@ export function parseSkillUrl(value: string): SkillUrl | null {
   } catch { return null; }
 }
 
-/** `model:<provider>/<model>`: model IDs may contain additional slash-separated segments. */
+/** `model:<provider>/<model>` is a language model reference. Model IDs may contain further slashes. */
 export function modelUrl(expression: string): string {
   return `model:${encodePath(expression)}`;
 }

@@ -14,7 +14,7 @@ import { loadPlugins } from "../plugins/loader.ts";
 import type { ParsedCall } from "../plugins/commands.ts";
 import type { SessionHost, SessionHostWriter as SessionWriter } from "../plugins/host.ts";
 import type { PluginManifest, LoadedPlugins, PreparedPluginStorage } from "../plugins/loader.ts";
-import { createModelServices } from "../plugins/models.ts";
+import { createLanguageModelServices } from "../plugins/models.ts";
 import { createResourceId } from "../resources/id.ts";
 import type { ResourceRegistry } from "../resources/registry.ts";
 import { SessionDataStore } from "../session/data.ts";
@@ -156,10 +156,10 @@ export class SessionService {
     };
     const refOf = (objectId: string): ResourceRef | null => this.tree.resourceRef(objectId);
     const ledger = options.usageLedger ?? noUsageRecorder;
-    const models = createModelServices(configuration, options.adapterFactory, record => ledger.recordModelUsage(record));
+    const languageModels = createLanguageModelServices(configuration, options.adapterFactory, record => ledger.recordModelUsage(record));
     const modules = loadPlugins(options.plugins ?? [], { holds: this.holds, events: this.events, extensionsDirectory: join(dataRoot, applicationStorage.pluginDataDirectory), data: new SessionDataStore(db), content: this.content, refOf,
       configurationChanged: options.configurationChanged, preparedStorage: options.preparedStorage,
-      pluginDependencies: options.pluginDependencies, packages: options.packages, sessions: host, models, shared: this.shared });
+      pluginDependencies: options.pluginDependencies, packages: options.packages, sessions: host, languageModels, shared: this.shared });
     this.resources = modules.resources;
     this.calls = modules.calls;
     this.channels = modules.channels;

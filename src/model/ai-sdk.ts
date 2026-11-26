@@ -7,7 +7,7 @@ import { createProviderModel, validateProviderTransport } from "./provider.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 import { requestOptions } from "./request-options.ts";
 import { projectHistory } from "./projection.ts";
-import { modelProtocol, type ModelProtocol } from "./protocols/index.ts";
+import { languageModelProtocol, type LanguageModelProtocol } from "./protocols/index.ts";
 import { validateRequestIdentity } from "./request-identity.ts";
 import { measureModel, RequestTimer } from "./request-timing.ts";
 import { describeError, type ModelResponse, type ToolCallInput } from "@asterism-app/sdk/contracts";
@@ -16,7 +16,7 @@ import { providerFailure } from "./provider-failure.ts";
 function json(value: unknown): Json { return jsonSchema.parse(JSON.parse(JSON.stringify(value))); }
 export function sdkMessages(input: ModelInput): ModelMessage[] {
   const messages: ModelMessage[] = [];
-  const protocol = modelProtocol(input.settings.provider.protocol);
+  const protocol = languageModelProtocol(input.settings.provider.protocol);
   const filesInUserMessage = protocol.toolResultFiles(input.settings) === "user-message";
   const attachments: Extract<ResolvedInputPart, { kind: "file" }>[] = [];
   /** Files from the same batch merge into the subsequent user message when the protocol selects that representation. */
@@ -85,7 +85,7 @@ function toolCallInput(wire: WireInput, value: unknown): ToolCallInput {
 
 type RequestTools = { tools: ToolSet; textEnvelopes: ReadonlySet<string> };
 
-function requestTools(input: ModelInput, protocol: ModelProtocol): RequestTools {
+function requestTools(input: ModelInput, protocol: LanguageModelProtocol): RequestTools {
   const textEnvelopes = new Set<string>();
   const tools: ToolSet = Object.fromEntries(input.tools.map(declaration => {
     if (declaration.kind === "structured") return [declaration.name, tool({
@@ -103,7 +103,7 @@ export class AiSdkAdapter implements ModelAdapter {
     private readonly languageModelFactory?: (input: ModelInput, key: string) => Exclude<LanguageModel, string>,
     private readonly transport: typeof fetch = fetch) {}
   format(settings: ModelSettings): string {
-    return modelProtocol(settings.provider.protocol).continuationFormat;
+    return languageModelProtocol(settings.provider.protocol).continuationFormat;
   }
   validate(input: ModelValidationInput): void {
     validateProviderTransport(input.settings.provider);
@@ -119,12 +119,12 @@ export class AiSdkAdapter implements ModelAdapter {
     const options = requestOptions(input.settings.provider, input.settings.model, {
       purpose: "execution", thinking: input.settings.thinking, system, maxOutputTokens: input.maxOutputTokens,
     });
-    const protocol = modelProtocol(input.settings.provider.protocol);
+    const protocol = languageModelProtocol(input.settings.provider.protocol);
     const tools = requestTools(input, protocol);
     return { stream: signal => this.stream(input, messages, tools, options, protocol, signal) };
   }
   private async *stream(input: ModelInput, messages: ModelMessage[], tools: RequestTools,
-    options: ReturnType<typeof requestOptions>, protocol: ModelProtocol, signal: AbortSignal): AsyncIterable<ModelEvent> {
+    options: ReturnType<typeof requestOptions>, protocol: LanguageModelProtocol, signal: AbortSignal): AsyncIterable<ModelEvent> {
     const { provider, model } = input.settings;
     const key = provider.auth === "none" ? unauthenticatedApiKey : await this.readCredential(provider.id);
     if (!key) throw new ModelFailure("missing_credential", "Provider credentials are unavailable.");
@@ -209,7 +209,7 @@ export class AiSdkAdapter implements ModelAdapter {
     }
   }
   private async *decode(measured: ReturnType<typeof measureModel>, messages: ModelMessage[], { tools, textEnvelopes }: RequestTools,
-    options: ReturnType<typeof requestOptions>, protocol: ModelProtocol,
+    options: ReturnType<typeof requestOptions>, protocol: LanguageModelProtocol,
     signal: AbortSignal, classifyFailure: (error: unknown, upstream: boolean) => ModelFailure): AsyncIterable<ModelEvent> {
     const result = streamText({ model: measured.model, messages, tools,
       ...options, abortSignal: signal,

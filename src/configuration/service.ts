@@ -1,4 +1,4 @@
-import { configurationCommandSchema, createModelInput, modelReference, modelProviderComplete, resolveProviderModel,
+import { configurationCommandSchema, createModelInput, modelReference, modelProviderComplete, resolveLanguageModel,
   type ConfigurationCommand, type ConfigurationSnapshot, type ModelProvider, type ModelParameterUpdate } from "../shared/configuration.ts";
 import { unauthenticatedApiKey } from "../shared/model.ts";
 import { ConfigurationError } from "./errors.ts";
@@ -16,7 +16,7 @@ import { randomUUID } from "node:crypto";
 import { MessagingRegistry } from "./messaging.ts";
 import { validateProviderSettings } from "../shared/provider-settings.ts";
 
-const saveKinds = { "modelProvider.save": "modelProvider", "model.save": "model" } as const;
+const saveKinds = { "languageModelProvider.save": "languageModelProvider", "languageModel.save": "languageModel" } as const;
 
 export class ConfigurationService {
   readonly extensions = new ModelProviderExtensions();
@@ -60,12 +60,12 @@ export class ConfigurationService {
   execute(raw: unknown): Promise<{ snapshot: ConfigurationSnapshot; savedId: string | null; parameterUpdate?: ModelParameterUpdate }> {
     const parsed = configurationCommandSchema.safeParse(raw);
     if (!parsed.success) return Promise.reject(new ConfigurationError("invalid_request", "Invalid configuration. Check the entered values."));
-    if (parsed.data.type === "model.parameters") return this.fetchParameters(parsed.data.modelId);
+    if (parsed.data.type === "languageModel.parameters") return this.fetchParameters(parsed.data.modelId);
     const command = parsed.data;
     return this.enqueue(async () => {
       this.assertOpen();
       const savedId = await this.perform(command);
-      if (command.type === "modelProvider.save" || command.type === "remove" && command.kind === "modelProvider") this.providersChanged();
+      if (command.type === "languageModelProvider.save" || command.type === "remove" && command.kind === "languageModelProvider") this.providersChanged();
       if (command.type === "webProvider.save" || command.type === "webProvider.reorder" || command.type === "remove" && command.kind === "webProvider") this.web.changed();
       if (command.type !== "read") this.onChanged();
       return { snapshot: this.snapshot(), savedId };
@@ -116,19 +116,19 @@ export class ConfigurationService {
   current(): ConfigurationSnapshot { this.assertOpen(); return this.snapshot(); }
   async executionCredential(providerId: string, signal?: AbortSignal): Promise<string | null> {
     this.assertOpen();
-    const provider = this.store.get("modelProvider", providerId);
+    const provider = this.store.get("languageModelProvider", providerId);
     if (!provider) throw new ConfigurationError("not_found", "The provider no longer exists.");
     if (provider.auth === "none") return unauthenticatedApiKey;
     return provider.apiKey ? this.resolver.resolve(provider.apiKey, signal) : null;
   }
   /** Runtime consumers receive connections without their keys and read resolved credentials through executionCredential. */
-  modelProviders(): Omit<ModelProvider, "apiKey">[] {
+  languageModelProviders(): Omit<ModelProvider, "apiKey">[] {
     this.assertOpen();
-    return this.store.list("modelProvider").map(({ apiKey: _key, ...value }) => value);
+    return this.store.list("languageModelProvider").map(({ apiKey: _key, ...value }) => value);
   }
-  modelCatalog(): Pick<ConfigurationSnapshot, "modelProviders" | "models"> {
+  languageModelCatalog(): Pick<ConfigurationSnapshot, "languageModelProviders" | "languageModels"> {
     this.assertOpen();
-    return { modelProviders: this.store.list("modelProvider"), models: this.store.list("model") };
+    return { languageModelProviders: this.store.list("languageModelProvider"), languageModels: this.store.list("languageModel") };
   }
   private snapshot(): ConfigurationSnapshot {
     const runtime = this.messaging.connections();
@@ -143,12 +143,12 @@ export class ConfigurationService {
       messagingConnections: this.store.list("messaging").map(state => ({ ...state, runtime: runtime.find(connection => connection.id === state.id)! })),
       webProviders: this.store.list("webProvider"),
       webProviderTypes: this.web.types(),
-      ...this.modelCatalog(),
-      modelProviderPresets: this.extensions.presets(), usageProviders: this.extensions.usageProviders(),
+      ...this.languageModelCatalog(),
+      languageModelProviderPresets: this.extensions.presets(), usageProviders: this.extensions.usageProviders(),
       tests: this.tests.snapshot(), discoveries: this.discoveries.snapshot(),
     };
   }
-  private async perform(command: Exclude<ConfigurationCommand, { type: "model.parameters" }>): Promise<string | null> {
+  private async perform(command: Exclude<ConfigurationCommand, { type: "languageModel.parameters" }>): Promise<string | null> {
     if (command.type === "read") return null;
     if (command.type === "messaging.save") return this.saveMessaging(command);
     if (command.type === "messaging.restart") { this.messaging.restart(command.id); return command.id; }
@@ -171,10 +171,10 @@ export class ConfigurationService {
       this.store.save({ kind: "webProvider", id, value: { id, enabled, settings } });
       return id;
     }
-    if (command.type === "test.start") return this.startTest(command.model);
-    if (command.type === "test.cancel") { this.tests.cancel(command.id); return command.id; }
-    if (command.type === "discovery.start") {
-      const stored = this.store.get("modelProvider", command.providerId);
+    if (command.type === "languageModel.test.start") return this.startTest(command.model);
+    if (command.type === "languageModel.test.cancel") { this.tests.cancel(command.id); return command.id; }
+    if (command.type === "languageModel.discovery.start") {
+      const stored = this.store.get("languageModelProvider", command.providerId);
       if (!stored) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
       return this.discoveries.start(stored, async signal => {
         if (stored.auth === "none") return "";
@@ -182,10 +182,10 @@ export class ConfigurationService {
         return this.resolver.resolve(stored.apiKey, signal);
       });
     }
-    if (command.type === "discovery.cancel") { this.discoveries.cancel(command.id); return command.id; }
-    if (command.type === "discovery.add") {
+    if (command.type === "languageModel.discovery.cancel") { this.discoveries.cancel(command.id); return command.id; }
+    if (command.type === "languageModel.discovery.add") {
       const discovery = this.discoveries.get(command.id);
-      const provider = this.store.get("modelProvider", discovery.providerId);
+      const provider = this.store.get("languageModelProvider", discovery.providerId);
       if (!provider) throw new ConfigurationError("not_found", "The provider no longer exists.");
       if (discovery.state !== "succeeded")
         throw new ConfigurationError("invalid_request", "Model discovery has not succeeded.");
@@ -202,25 +202,25 @@ export class ConfigurationService {
       const connection = command.kind === "messaging" ? this.store.get("messaging", command.id) : null;
       this.store.remove(command.kind, command.id);
       if (command.kind !== "messaging") this.tests.clear(command.kind, command.id);
-      if (command.kind === "modelProvider") this.discoveries.clearProvider(command.id);
+      if (command.kind === "languageModelProvider") this.discoveries.clearProvider(command.id);
       if (connection) this.messaging.remove(connection.id, connection.providerId);
       return command.id;
     }
     if (command.id && !this.store.get(saveKinds[command.type as keyof typeof saveKinds], command.id)) throw new ConfigurationError("not_found", "This configuration no longer exists. Reload settings.");
     switch (command.type) {
-      case "model.save":
-        if (!this.store.get("modelProvider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
-        this.store.save({ kind: "model", id: command.id, value: command.value });
-        this.tests.clear("model", command.id ?? modelReference(command.value));
+      case "languageModel.save":
+        if (!this.store.get("languageModelProvider", command.value.providerId)) throw new ConfigurationError("not_found", "The provider no longer exists. Reload settings.");
+        this.store.save({ kind: "languageModel", id: command.id, value: command.value });
+        this.tests.clear("languageModel", command.id ?? modelReference(command.value));
         return modelReference(command.value);
-      case "modelProvider.save": break;
+      case "languageModelProvider.save": break;
     }
     // Switching to unauthenticated access drops the saved key.
     const value = command.value.auth === "api_key" ? command.value : { ...command.value, apiKey: "" };
     if (!modelProviderComplete(value))
       throw new ConfigurationError("invalid_request", "An API key is required for API key authentication.");
-    this.store.save({ kind: "modelProvider", id: command.id, value });
-    this.tests.clear("modelProvider", command.id ?? value.id);
+    this.store.save({ kind: "languageModelProvider", id: command.id, value });
+    this.tests.clear("languageModelProvider", command.id ?? value.id);
     return value.id;
   }
   private async saveMessaging(command: Extract<ConfigurationCommand, { type: "messaging.save" }>): Promise<string> {
@@ -239,7 +239,7 @@ export class ConfigurationService {
     return id;
   }
   private startTest(modelId: string): string {
-    const resolved = resolveProviderModel(this.modelCatalog(), modelId);
+    const resolved = resolveLanguageModel(this.languageModelCatalog(), modelId);
     if (!resolved) throw new ConfigurationError("not_found", "The model or provider no longer exists or is disabled. Reload settings.");
     const { model, provider } = resolved;
     return this.tests.start(provider, model, async signal => {

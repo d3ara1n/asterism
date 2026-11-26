@@ -16,7 +16,7 @@ export default defineModule(plugin => ({
       resultSchema: ListModelsResult.schema, effect: "read", execution: "parallel",
       async execute(_args, { signal }) {
         signal.throwIfAborted();
-        return { kind: "succeeded", data: plugin.models.list().map(model => model.model) };
+        return { kind: "succeeded", data: plugin.languageModels.list().map(model => model.model) };
       },
     }),
     defineTopLevelTool({
@@ -36,7 +36,7 @@ export default defineModule(plugin => ({
       resultSchema: GetModelResult.schema, effect: "read", execution: "parallel",
       async execute({ model }, { signal }) {
         signal.throwIfAborted();
-        const info = plugin.models.list().find(entry => entry.model === model);
+        const info = plugin.languageModels.list().find(entry => entry.model === model);
         return info ? { kind: "succeeded", data: info }
           : { kind: "rejected", error: { code: "not_found", message: `No enabled model ${JSON.stringify(model)} is configured. list_models returns available model expressions.` } };
       },

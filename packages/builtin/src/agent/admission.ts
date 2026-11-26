@@ -1,5 +1,5 @@
 import { AgentSelection, AgentDrafts } from "./data.ts";
-import { PluginApiError, type ModelServices, type ObjectReader, type ObjectExecutor, type ObjectInitializer, type ObjectWriter, type ContentReader } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type LanguageModelServices, type ObjectReader, type ObjectExecutor, type ObjectInitializer, type ObjectWriter, type ContentReader } from "@asterism-app/sdk/runtime";
 import { type SubmitAgentInputData, type AgentSelection as Selection, AgentInputMessage, AgentInputAccepted, type AgentConfiguration } from "@asterism-app/builtin-api/contracts";
 import { selectionOf, type AgentSelectionService } from "./selection.ts";
 import type { SystemPrompt } from "@asterism-app/sdk/contracts";
@@ -16,7 +16,7 @@ function writeInput(input: SubmitAgentInputData, object: ObjectReader, writer: O
 }
 
 /** Resource actions accept inputs independently and share model preflight checks; submission identity and persistence form one atomic acceptance. */
-export function createAdmission(deps: { selection: AgentSelectionService; validate: ModelServices["validate"]; running(object: ObjectReader): boolean; projectMessages: WorkMessages; systemPrompt: (agent: Pick<AgentConfiguration, "id" | "systemPrompt">) => SystemPrompt }) {
+export function createAdmission(deps: { selection: AgentSelectionService; validate: LanguageModelServices["validate"]; running(object: ObjectReader): boolean; projectMessages: WorkMessages; systemPrompt: (agent: Pick<AgentConfiguration, "id" | "systemPrompt">) => SystemPrompt }) {
   const idle = (object: ObjectReader) => {
     if (deps.running(object)) throw new PluginApiError("conflict", "This agent is running. Cancel or wait for it to finish.");
   };

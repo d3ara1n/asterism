@@ -2,7 +2,7 @@ import { Cable, Plus, Zap, Search, PlugZap } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
 import { applyModelParameters, canEditModelProviderField, createModelInput, modelProviderComplete, modelProviderSchema, modelReference, thinkingSchema, type ConfigurationSnapshot, type ConnectionTest, type ModelProvider, type ProviderModel, type TestError } from "../../../shared/configuration";
-import { modelProviderPresetDraft, type ModelProviderPreset, type ModelProviderDraft } from "../../../shared/provider-presets";
+import { modelProviderPresetDraft, type LanguageModelProviderPreset, type ModelProviderDraft } from "../../../shared/provider-presets";
 import { modelMediaModalities, type ModelMediaModality, type UiMessage } from "@asterism-app/sdk/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { providersMessages } from "../../messages/providers";
@@ -73,12 +73,12 @@ function useQuickActions() {
   const { run, busy } = useConfigurationAction("toast");
   return {
     busy,
-    setProviderEnabled: (provider: ModelProvider, enabled: boolean) => run({ type: "modelProvider.save", id: provider.id,
+    setProviderEnabled: (provider: ModelProvider, enabled: boolean) => run({ type: "languageModelProvider.save", id: provider.id,
       value: { ...providerValue(provider), enabled } }),
-    setModelEnabled: (model: ProviderModel, enabled: boolean) => run({ type: "model.save", id: modelReference(model), value: { ...modelValue(model), enabled } }),
+    setModelEnabled: (model: ProviderModel, enabled: boolean) => run({ type: "languageModel.save", id: modelReference(model), value: { ...modelValue(model), enabled } }),
     test: (model: ProviderModel) => {
       const running = snapshot && latestTest(snapshot, modelReference(model));
-      return running?.state === "running" ? run({ type: "test.cancel", id: running.id }) : run({ type: "test.start", model: modelReference(model) });
+      return running?.state === "running" ? run({ type: "languageModel.test.cancel", id: running.id }) : run({ type: "languageModel.test.start", model: modelReference(model) });
     },
   };
 }
@@ -100,7 +100,7 @@ export function ModelProvidersSettings() {
   const island = useIsland();
   const open = (id: string | null, origin?: HTMLElement | null) => island.open({ key: providerIslandKey(id), label: providersMessages.provider, width: panelIslandWidth, origin,
     render: () => id === null ? <ProviderCreation /> : <ProviderEditor key={id} initialId={id} /> });
-  const providers = snapshot?.modelProviders ?? [];
+  const providers = snapshot?.languageModelProviders ?? [];
   return <Section title={i18n.formatMessage(providersMessages.connections)} hint={i18n.formatMessage(providersMessages.summary)}
     action={<Button size="sm" disabled={!snapshot} onClick={event => open(null, event.currentTarget)}><Plus />{i18n.formatMessage(providersMessages.addProvider)}</Button>}>
     {snapshot && !providers.length ? <Empty className="surface-group">
@@ -119,7 +119,7 @@ function ProviderRow({ provider, snapshot, selected, onOpen }: {
 }) {
   const i18n = useI18n();
   const quick = useQuickActions();
-  const models = snapshot.models.filter(model => model.providerId === provider.id);
+  const models = snapshot.languageModels.filter(model => model.providerId === provider.id);
   const enabled = models.filter(model => model.enabled).length;
   return <ListRow media={<ProviderMark name={provider.name} iconId={provider.iconId} />}
     title={provider.name} selected={selected} inactive={!provider.enabled} onOpen={onOpen}
@@ -133,15 +133,15 @@ function ProviderRow({ provider, snapshot, selected, onOpen }: {
 
 /* ---------- Preset selection: grouped by billing method, with an adaptive grid and cross-group search ---------- */
 
-const billingOrder = ["usage", "subscription", "none"] as const satisfies readonly ModelProviderPreset["billing"][];
+const billingOrder = ["usage", "subscription", "none"] as const satisfies readonly LanguageModelProviderPreset["billing"][];
 const billingLabels = {
   usage: providersMessages.payAsYouGo,
   subscription: providersMessages.subscription,
   none: providersMessages.noBilling,
 };
-function presetDescription(preset: ModelProviderPreset, presets: readonly ModelProviderPreset[], includeBilling = true): string {
+function presetDescription(preset: LanguageModelProviderPreset, presets: readonly LanguageModelProviderPreset[], includeBilling = true): string {
   const i18n = getI18n();
-  const text = (value: ModelProviderPreset["region"]) => value ? i18n.text(value) : "";
+  const text = (value: LanguageModelProviderPreset["region"]) => value ? i18n.text(value) : "";
   // Subtitles distinguish choices rather than inventory connection attributes. Billing is already grouped;
   // region and plan distinguish endpoint/product variants. Add protocol only when those labels still collide
   // (currently Command Code). Compare the full catalog so search filtering preserves the distinction.
@@ -151,22 +151,22 @@ function presetDescription(preset: ModelProviderPreset, presets: readonly ModelP
   return [text(preset.region), text(preset.plan), showProtocol && protocolLabel(preset.connection.protocol), includeBilling && i18n.text(billingLabels[preset.billing])].filter(Boolean).join(" · ");
 }
 const searchThreshold = 8;
-function PresetPicker({ onPick }: { onPick: (preset: ModelProviderPreset | null) => void }) {
+function PresetPicker({ onPick }: { onPick: (preset: LanguageModelProviderPreset | null) => void }) {
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
-  const modelProviderPresets = snapshot?.modelProviderPresets ?? [];
+  const languageModelProviderPresets = snapshot?.languageModelProviderPresets ?? [];
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  const matches = modelProviderPresets.filter(preset => !q || [preset.name, preset.id, presetDescription(preset, modelProviderPresets), ...(preset.keywords ?? [])].some(word => word.toLowerCase().includes(q)));
+  const matches = languageModelProviderPresets.filter(preset => !q || [preset.name, preset.id, presetDescription(preset, languageModelProviderPresets), ...(preset.keywords ?? [])].some(word => word.toLowerCase().includes(q)));
   const groups = billingOrder.map(billing => ({
     key: billing, title: i18n.text(billingLabels[billing]),
     choices: matches.filter(preset => preset.billing === billing).map(preset => ({
-      key: preset.id, name: preset.name, description: presetDescription(preset, modelProviderPresets, false) || undefined,
+      key: preset.id, name: preset.name, description: presetDescription(preset, languageModelProviderPresets, false) || undefined,
       mark: <ProviderMark name={preset.name} iconId={preset.iconId} />, onPick: () => onPick(preset),
     })),
   })).filter(group => group.choices.length);
   return <ServicePicker title={i18n.formatMessage(providersMessages.confirmAddProvider)} hint={i18n.formatMessage(providersMessages.presetHint)} groups={groups}
-    search={modelProviderPresets.length > searchThreshold ? { value: query, onChange: setQuery, label: i18n.formatMessage(providersMessages.searchProviders) } : undefined}
+    search={languageModelProviderPresets.length > searchThreshold ? { value: query, onChange: setQuery, label: i18n.formatMessage(providersMessages.searchProviders) } : undefined}
     empty={q && <p className="type-caption">{i18n.formatMessage(providersMessages.noMatchingProvider)}</p>}
     footer={{ key: "custom", open: true, name: i18n.formatMessage(providersMessages.customConnection), description: i18n.formatMessage(providersMessages.customConnectionHint),
       mark: <ProviderMark name="" glyph={<Cable />} />, onPick: () => onPick(null) }} />;
@@ -189,8 +189,8 @@ function ProviderCreation() {
   useIslandCancel(picked ? null : async () => { await island.close(); });
   if (picked) return <ProviderEditor initialId={null} initialValue={picked.value} service={picked.service} keyUrl={picked.keyUrl} />;
   return <PresetPicker onPick={preset => setPicked(preset ? { service: preset.name, keyUrl: preset.keyUrl, value: {
-    ...modelProviderPresetDraft(preset, snapshot?.modelProviders.map(provider => provider.id)), apiKey: "",
-    name: `${preset.name} · ${presetDescription(preset, snapshot?.modelProviderPresets ?? [])}`,
+    ...modelProviderPresetDraft(preset, snapshot?.languageModelProviders.map(provider => provider.id)), apiKey: "",
+    name: `${preset.name} · ${presetDescription(preset, snapshot?.languageModelProviderPresets ?? [])}`,
   } } : { value: structuredClone(blank) })} />;
 }
 
@@ -203,7 +203,7 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
   useIslandCancel(async () => { await island.close(); });
   const [id, setId] = useState(initialId);
   useIslandKey(providerIslandKey(id));
-  const current = snapshot?.modelProviders.find(item => item.id === id);
+  const current = snapshot?.languageModelProviders.find(item => item.id === id);
   // Drafts omit enabled: enabling is an immediate action that always uses the snapshot, preventing mutual overwrites with the parent island's switch.
   const [value, setValue] = useState<ProviderValue>(() => current ? providerValue(current) : structuredClone(initialValue));
   const set = <K extends keyof typeof value>(field: K, next: (typeof value)[K]) => setValue(previous => ({ ...previous, [field]: next }));
@@ -231,20 +231,20 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
     if (id) island.open({ key: modelIslandKey(id, modelId), label: providersMessages.model, width: panelIslandWidth, origin,
       render: () => <ModelEditor key={modelId ?? "new"} initialId={modelId} providerId={id} /> });
   };
-  const models = snapshot?.models.filter(model => model.providerId === id) ?? [];
+  const models = snapshot?.languageModels.filter(model => model.providerId === id) ?? [];
 
   const title = current?.name ?? (service ? i18n.formatMessage(providersMessages.newServiceConnection, { service }) : i18n.formatMessage(providersMessages.newProvider));
   return <Editor form={form} title={title} dirty={dirty} busy={busy} error={error} saveDisabled={!complete}
     description={canEditModelProviderField(value, "protocol") ? protocolLabel(value.protocol) : undefined}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteProviderTitle),
       description: i18n.formatMessage(providersMessages.deleteProviderDescription, { current_name: current.name, models_length: models.length }),
-      onConfirm: async () => { const result = await run({ type: "remove", kind: "modelProvider", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
+      onConfirm: async () => { const result = await run({ type: "remove", kind: "languageModelProvider", id: current.id }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
     <form id={form} onSubmit={async event => {
       event.preventDefault();
       if (!complete) return;
-      const result = await run({ type: "modelProvider.save", id, value: { ...value, enabled: current?.enabled ?? true } });
+      const result = await run({ type: "languageModelProvider.save", id, value: { ...value, enabled: current?.enabled ?? true } });
       if (result?.ok) {
-        const persisted = result.snapshot.modelProviders.find(item => item.id === result.savedId);
+        const persisted = result.snapshot.languageModelProviders.find(item => item.id === result.savedId);
         if (persisted) setValue(providerValue(persisted));
         setId(result.savedId);
       }
@@ -261,7 +261,7 @@ function ProviderEditor({ initialId, initialValue = blank, service, keyUrl }: { 
       action={<>
         <Button size="sm" variant="outline" disabled={busy || dirty || discoveryAction.busy} onClick={async event => {
           const origin = event.currentTarget;
-          const result = await discoveryAction.run({ type: "discovery.start", providerId: current.id });
+          const result = await discoveryAction.run({ type: "languageModel.discovery.start", providerId: current.id });
           if (result?.ok) island.open({ key: discoveryIslandKey(current.id), label: providersMessages.fetchModels, width: panelIslandWidth, origin,
             render: () => <ModelDiscoveryPicker providerId={current.id} /> });
         }}><Search />{i18n.text(providersMessages.fetchModels)}</Button>
@@ -309,8 +309,8 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
   const quick = useQuickActions();
   const [id, setId] = useState(initialId);
   useIslandKey(modelIslandKey(providerId, id));
-  const current = snapshot?.models.find(model => modelReference(model) === id);
-  const provider = snapshot?.modelProviders.find(item => item.id === providerId);
+  const current = snapshot?.languageModels.find(model => modelReference(model) === id);
+  const provider = snapshot?.languageModelProviders.find(item => item.id === providerId);
   const [value, setValue] = useState<ProviderModel>(() => current ? modelValue(current) : createModelInput(providerId, { name: "", modelId: "" }));
   const set = <K extends keyof ProviderModel>(field: K, next: ProviderModel[K]) => setValue(previous => ({ ...previous, [field]: next }));
   // As with providers: the name comes first and generates the ID; stop overwriting after manual ID editing or when editing an existing model.
@@ -325,12 +325,12 @@ function ModelEditor({ initialId, providerId }: { initialId: string | null; prov
     busy={busy} error={error} disabled={parameters.pending}
     remove={current ? { title: i18n.formatMessage(providersMessages.deleteModelTitle),
       description: i18n.formatMessage(providersMessages.deleteUnusedModelDescription, { current_name: current.name }),
-      onConfirm: async () => { const result = await run({ type: "remove", kind: "model", id: modelReference(current) }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
+      onConfirm: async () => { const result = await run({ type: "remove", kind: "languageModel", id: modelReference(current) }); if (result?.ok) void island.close({ force: true }); } } : undefined}>
     <form id={form} onSubmit={async event => {
       event.preventDefault();
-      const result = await run({ type: "model.save", id, value: { ...value, enabled: current?.enabled ?? true } });
+      const result = await run({ type: "languageModel.save", id, value: { ...value, enabled: current?.enabled ?? true } });
       if (result?.ok) {
-        const persisted = result.snapshot.models.find(item => modelReference(item) === result.savedId);
+        const persisted = result.snapshot.languageModels.find(item => modelReference(item) === result.savedId);
         if (persisted) setValue(modelValue(persisted));
         setId(result.savedId);
       }

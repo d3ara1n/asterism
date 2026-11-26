@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { CatalogModel, ModelRates, UnitPrice } from "@asterism-app/sdk/contracts";
+import type { CatalogLanguageModel, ModelRates, UnitPrice } from "@asterism-app/sdk/contracts";
 import { useI18n, type I18n } from "@asterism-app/sdk/renderer";
 import { Brain, Check, Minus, Wrench } from "lucide-react";
 import { formatCount } from "./format-count";
@@ -47,7 +47,7 @@ function Rates({ rates }: { rates: ModelRates }) {
 }
 
 /** Compact, read-only projection of the configured model metadata used by selectors and model tools. */
-export function ModelReferenceDetails({ model, enabled }: { model: CatalogModel; enabled: boolean }) {
+export function ModelReferenceDetails({ model, enabled }: { model: CatalogLanguageModel; enabled: boolean }) {
   const i18n = useI18n();
   const tokens = (value: number | null) => value === null ? "—" : `${formatCount(value)} toks`;
   const cost = model.cost;

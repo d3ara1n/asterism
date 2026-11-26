@@ -2,7 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import type { ThinkingLevel } from "@asterism-app/sdk/contracts";
 import { compatibility, thinkingMappings, type ThinkingMappings } from "../compatibility.ts";
 import { mappedEffort, setEffort, withRequestEncoding, type Body } from "../request-encoding.ts";
-import { namespaced, pickNative, type ModelProtocol, type ProviderOptions } from "./contract.ts";
+import { namespaced, pickNative, type LanguageModelProtocol, type ProviderOptions } from "./contract.ts";
 import { withAnthropicThinking } from "./anthropic-thinking.ts";
 import { anthropicUsage } from "./anthropic-usage.ts";
 import { inlineBase64, projectInlineFiles } from "./inline-file-projection.ts";
@@ -52,7 +52,7 @@ function encodeRequest(body: Body, level: ThinkingLevel | null, maxOutputTokens:
   setEffort(body, "output_config", mappedEffort(level, mappings, { minimal: "low" }));
 }
 
-export const anthropicMessages: ModelProtocol = {
+export const anthropicMessages: LanguageModelProtocol = {
   id: "anthropic",
   continuationFormat: "anthropic/1",
   sdkReasoning: true,

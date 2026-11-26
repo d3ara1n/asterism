@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { AlertCircle, CircleDashed, Coins } from "lucide-react";
 import { animate, AnimatePresence, motion, useMotionValue, useReducedMotion } from "motion/react";
 import { formatUsageAmount, formatUsageQuantity, useI18n, usageItemLabel, useRendererCalls, useRendererEvents } from "@asterism-app/sdk/renderer";
-import { primaryQuota, quotaRemaining, ReadUsage, UsageChanged, usageItemLevel, usageLevel, type ProviderUsageState, type QuotaItem } from "@asterism-app/sdk/contracts";
+import { primaryQuota, quotaRemaining, ReadLanguageModelProviderUsage, LanguageModelProviderUsageChanged, usageItemLevel, usageLevel, type ProviderUsageState, type QuotaItem } from "@asterism-app/sdk/contracts";
 import { Progress } from "@asterism-app/ui/ui/progress";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
@@ -29,12 +29,12 @@ function useUsage(providerId: string) {
   const [state, setState] = useState<ProviderUsageState | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const read = useCallback(async (refresh: boolean, signal: AbortSignal) => {
-    try { const value = await calls.invoke(ReadUsage, { providerId, refresh }, { signal }); if (!signal.aborted) setState(value); }
+    try { const value = await calls.invoke(ReadLanguageModelProviderUsage, { providerId, refresh }, { signal }); if (!signal.aborted) setState(value); }
     catch { if (!signal.aborted) setState(previous => previous && { ...previous, state: "error", error: "unavailable" }); }
   }, [calls, providerId]);
   useEffect(() => {
     const controller = new AbortController();
-    const subscription = events.subscribe(UsageChanged, { delivery: "latest", signal: controller.signal }, ({ data }) => {
+    const subscription = events.subscribe(LanguageModelProviderUsageChanged, { delivery: "latest", signal: controller.signal }, ({ data }) => {
       if (data.providerId === null || data.providerId === providerId) void read(false, controller.signal);
     });
     void subscription.ready.then(() => read(false, controller.signal), () => {});

@@ -1,5 +1,5 @@
 import type { ModelResponse } from "@asterism-app/sdk/contracts";
-import { UsageQueryError, type ModelProviderInfo, type ModelProviderServices, type UsageProviderServices } from "@asterism-app/sdk/runtime";
+import { UsageQueryError, type LanguageModelProviderInfo, type LanguageModelProviderServices, type UsageProviderServices } from "@asterism-app/sdk/runtime";
 import type { ProviderUsageState } from "@asterism-app/sdk/contracts";
 import { ProviderTransportError, validateProviderTransport } from "../model/provider.ts";
 
@@ -20,19 +20,19 @@ export class ProviderUsageService {
   private entries = new Map<string, Entry>();
   private closed = false;
   private readonly unsubscribe: (() => void)[];
-  constructor(private readonly modelProviders: ModelProviderServices, private readonly usageProviders: UsageProviderServices,
+  constructor(private readonly languageModelProviders: LanguageModelProviderServices, private readonly usageProviders: UsageProviderServices,
     private readonly changed: (providerId: string | null) => void = () => {},
     private readonly timeout = 10_000, private readonly freshness = 60_000) {
-    this.unsubscribe = [modelProviders.subscribe(() => this.clear()), usageProviders.subscribe(() => this.clear())];
+    this.unsubscribe = [languageModelProviders.subscribe(() => this.clear()), usageProviders.subscribe(() => this.clear())];
   }
-  private empty(id: string, connection: ModelProviderInfo | null, source?: "query" | "headers"): ProviderUsageState {
+  private empty(id: string, connection: LanguageModelProviderInfo | null, source?: "query" | "headers"): ProviderUsageState {
     return { providerId: id, usage: connection?.usage ?? null,
       ...(source && { source }), state: "disabled", items: [], updatedAt: null, error: null };
   }
   async query(id: string, options: { signal?: AbortSignal; refresh?: boolean } = {}): Promise<ProviderUsageState> {
     options.signal?.throwIfAborted();
     if (this.closed) throw new UsageQueryError("unavailable");
-    const connection = this.modelProviders.get(id);
+    const connection = this.languageModelProviders.get(id);
     const provider = connection?.usage ? this.usageProviders.get(connection.usage) : null;
     const empty = this.empty(id, connection, provider?.source ?? (provider ? "query" : undefined));
     if (!connection?.enabled || !connection.usage) return empty;
@@ -58,7 +58,7 @@ export class ProviderUsageService {
         signal.throwIfAborted();
         validateProviderTransport(connection);
         let credential: string | null;
-        try { credential = await waitForUsage(this.modelProviders.credential(connection.id, { signal }), signal); }
+        try { credential = await waitForUsage(this.languageModelProviders.credential(connection.id, { signal }), signal); }
         catch { throw new UsageQueryError("credential"); }
         if (connection.auth === "api_key" && !credential) throw new UsageQueryError("credential");
         signal.throwIfAborted();
@@ -77,7 +77,7 @@ export class ProviderUsageService {
   /** After receiving a result, the calling Agent explicitly supplies its own response metadata. */
   consume(response: ModelResponse): void {
     if (this.closed) return;
-    const connection = this.modelProviders.get(response.connection.id);
+    const connection = this.languageModelProviders.get(response.connection.id);
     if (!connection?.enabled) return;
     const provider = connection.usage ? this.usageProviders.get(connection.usage) : null;
     if (provider?.source !== "headers") return;

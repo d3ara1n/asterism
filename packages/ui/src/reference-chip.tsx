@@ -1,7 +1,7 @@
 import { TooltipHint } from "./tooltip-hint";
 import { InlineLinkLabel } from "./inline-link-label";
 import { Children, cloneElement, createContext, isValidElement, useContext, useEffect, useRef, useState, type ComponentProps, type ComponentType, type ReactNode } from "react";
-import { ModelCatalog, formatModelExpression, parseModelUrl, parseResourceUrl, parseSkillUrl, resourceUrl, type ModelExpression, type ResourceRef, type UiText } from "@asterism-app/sdk/contracts";
+import { LanguageModelCatalog, formatModelExpression, parseModelUrl, parseResourceUrl, parseSkillUrl, resourceUrl, type ModelExpression, type ResourceRef, type UiText } from "@asterism-app/sdk/contracts";
 import { useI18n, useRendererCatalogs, useRendererResourceNavigation, useRendererResources, type RendererResourceIdentity } from "@asterism-app/sdk/renderer";
 import { BookOpen, Box, Cpu, Link2, X, type LucideIcon } from "lucide-react";
 import { cn } from "./utils";
@@ -246,10 +246,10 @@ function ResourceCard({ sessionId, id, location }: { sessionId: string; id: stri
 /** Mounted on hover and resolved from the current configuration; the chip label remains authored text. */
 function ModelCard({ model: address }: { model: ModelExpression }) {
   const catalogs = useRendererCatalogs();
-  const catalog = catalogs.get(ModelCatalog);
+  const catalog = catalogs.get(LanguageModelCatalog);
   const expression = formatModelExpression(address);
-  const provider = catalog?.modelProviders.find(entry => entry.id === address.provider);
-  const model = provider && catalog?.models.find(entry => entry.providerId === address.provider && entry.modelId === address.model);
+  const provider = catalog?.languageModelProviders.find(entry => entry.id === address.provider);
+  const model = provider && catalog?.languageModels.find(entry => entry.providerId === address.provider && entry.modelId === address.model);
   return <ReferenceCard icon={<Cpu className="text-folder-teal" />} title={model?.name ?? expression}
     loading={!catalog && !catalogs.error} missing={catalog !== null && !model} error={catalogs.error}
     description={provider?.name} details={[expression]}>

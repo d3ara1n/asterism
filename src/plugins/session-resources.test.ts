@@ -50,10 +50,10 @@ function latch() {
   return { promise, release };
 }
 async function model(app: ApplicationService) {
-  await app.configuration.execute({ type: "modelProvider.save", id: null, value: {
+  await app.configuration.execute({ type: "languageModelProvider.save", id: null, value: {
     id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [], apiKey: "",
   } });
-  const saved = await app.configuration.execute({ type: "model.save", id: null, value: {
+  const saved = await app.configuration.execute({ type: "languageModel.save", id: null, value: {
     providerId: "test", name: "Test", modelId: "test", enabled: true, contextWindow: null, cost: null, compatibility: [],
     capabilities: { tools: true, reasoning: false, thinkingLevels: [...thinkingLevels] }, generation: { temperature: null, topP: null, maxOutputTokens: null },
   } });
@@ -911,7 +911,7 @@ describe("Agent resource operation entries", () => {
       } };
     } } });
     await model(f.app);
-    await f.app.configuration.execute({ type: "modelProvider.save", id: "test", value: {
+    await f.app.configuration.execute({ type: "languageModelProvider.save", id: "test", value: {
       id: "test", name: "Test", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true,
       compatibility: [], apiKey: "", usage: "test-balance",
     } });
@@ -944,11 +944,11 @@ describe("Agent resource operation entries", () => {
     ];
     const f = open({ adapter: adapter(() => calls) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
-    await f.app.configuration.execute({ type: "modelProvider.save", id: null, value: {
+    await f.app.configuration.execute({ type: "languageModelProvider.save", id: null, value: {
       id: "other", name: "Other", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: true, compatibility: [], apiKey: "",
     } });
     for (const [providerId, modelId, name] of [["test", "nested/shared", "Nested"], ["other", "shared", "Other"]]) {
-      await f.app.configuration.execute({ type: "model.save", id: null, value: {
+      await f.app.configuration.execute({ type: "languageModel.save", id: null, value: {
         providerId, modelId, name, enabled: true, contextWindow: null, cost: null, compatibility: [],
         capabilities: { tools: true, reasoning: false, thinkingLevels: [] },
         generation: { temperature: null, topP: null, maxOutputTokens: 8192 },
@@ -965,10 +965,10 @@ describe("Agent resource operation entries", () => {
       { name: "list_models", args: {} }, { name: "get_model", args: { model: "other/hidden" } },
     ]) });
     const target = await model(f.app), actor = await f.session.create(Create, 0);
-    await f.app.configuration.execute({ type: "modelProvider.save", id: null, value: {
+    await f.app.configuration.execute({ type: "languageModelProvider.save", id: null, value: {
       id: "other", name: "Other", protocol: "openai-responses", baseUrl: "https://example.invalid", auth: "none", enabled: disabled !== "provider", compatibility: [], apiKey: "",
     } });
-    await f.app.configuration.execute({ type: "model.save", id: null, value: {
+    await f.app.configuration.execute({ type: "languageModel.save", id: null, value: {
       providerId: "other", modelId: "hidden", name: "Hidden", enabled: disabled !== "model", contextWindow: null, cost: null, compatibility: [],
       capabilities: { tools: true, reasoning: false, thinkingLevels: [] },
       generation: { temperature: null, topP: null, maxOutputTokens: null },

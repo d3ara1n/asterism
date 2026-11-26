@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { pluginNamespace, type ModelProviderPreset, type UsageItem } from "@asterism-app/sdk/contracts";
+import { pluginNamespace, type LanguageModelProviderPreset, type UsageItem } from "@asterism-app/sdk/contracts";
 import { definePlugin, UsageQueryError, type UsageProvider } from "@asterism-app/sdk/runtime";
 
 const ns = pluginNamespace("example.allowance");
@@ -23,12 +23,12 @@ const usage: UsageProvider = {
     ] satisfies UsageItem[];
   },
 };
-const preset: ModelProviderPreset = {
+const preset: LanguageModelProviderPreset = {
   id: "example-plan", name: "Example", billing: "subscription",
   connection: { protocol: "openai-responses", baseUrl: "https://example.invalid/v1", auth: "api_key", compatibility: [],
     usage: usage.id, fixedFields: ["protocol", "baseUrl", "auth", "compatibility", "usage"] },
   sources: ["https://example.invalid/docs"], verifiedOn: "2026-10-20",
 };
 export default definePlugin({ namespace: ns, setup: () => ({
-  usageProviders: [usage], modelProviderPresets: [{ type: "add", preset }],
+  usageProviders: [usage], languageModelProviderPresets: [{ type: "add", preset }],
 }) });

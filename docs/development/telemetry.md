@@ -10,13 +10,13 @@ Usage history is permanent analytical record rather than workspace state. Record
 
 ## Recording
 
-Model services record each request when it settles, including failures and cancellations; a request whose target never resolved reached no provider and is not usage. Execution requests also record every settled tool call, including calls inside scripts, keyed to the request that made them. A failed ledger write is logged and dropped; recording never changes the outcome of the work it observes.
+The host records each model request when it settles, including failures and cancellations; a request whose target never resolved reached no provider and is not usage. Execution requests also record every settled tool call, including calls inside scripts, keyed to the request that made them. A failed ledger write is logged and dropped; recording never changes the outcome of the work it observes.
 
 Cost is estimated at recording time from the configured model prices, with per-category amounts and long-context tier selection, so later price edits do not rewrite history. Requests with unknown or partial pricing keep a status that the interface reports instead of counting unknown parts as zero.
 
 Plugins can pass a purpose identifier with a model request. The host groups by plugin and purpose, displays the identifier verbatim like a tool name, and exports it as `purposeId`. The interface localizes its own labels, including the label for a missing purpose. Plugins report non-model metered usage, such as web search fees, through the telemetry service. Plugins that call external services directly remain outside the ledger.
 
-Each model record snapshots the session title, folder, and provider name at recording time. Reads prefer live workspace names and folder membership, so renaming or moving a session regroups its history; snapshots take over after deletion.
+Each model record carries its model category and snapshots the session title, folder, and provider name at recording time. Model and provider groups include the category, so matching provider and service IDs do not collapse records from different categories. Live provider names are resolved in the recorded category; workspace names and folder membership follow live sessions, with snapshots used after deletion.
 
 ## Declared subjects
 
@@ -32,7 +32,7 @@ Builtin declares a `work-unit` with each conversation or delegated request. It r
 
 ## Reading
 
-The renderer reads through composable queries over one filter: totals with an optional comparison range, time series with optional grouping and a remainder group, breakdowns by dimension, weekday-by-hour matrices, timing distributions, request logs, tool-call groupings, external usage, and declared subjects of one kind per source and identity. The filter can select requests that declared a matching subject, which narrows every other query to them and excludes plugin-reported usage. Dimensions narrow independently: a model ID selects that ID from every provider that served it, and a provider narrows on its own. Aggregation runs in SQLite inside the runtime process; results carry identities, snapshots, and raw sums, and the renderer derives ratios, labels, and localized text. Time bucketing uses the caller's UTC offset; the shared calendar helpers and the SQL bucket expressions must agree on every key.
+The renderer reads through composable queries over one filter: totals with an optional comparison range, time series with optional grouping and a remainder group, breakdowns by dimension, weekday-by-hour matrices, timing distributions, request logs, tool-call groupings, external usage, and declared subjects of one kind per source and identity. The filter can select requests that declared a matching subject, which narrows every other query to them and excludes plugin-reported usage. Dimensions narrow independently. A model ID can select that ID across providers; the model category and provider filters can narrow it further. Thinking filters select language requests only, including when filtering for the provider default. Aggregation runs in SQLite inside the runtime process; results carry identities, snapshots, and raw sums, and the renderer derives ratios, labels, and localized text. Time bucketing uses the caller's UTC offset; the shared calendar helpers and the SQL bucket expressions must agree on every key.
 
 New records and deletions notify connected renderers through a throttled change event, and open views reread.
 

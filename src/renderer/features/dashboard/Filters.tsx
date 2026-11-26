@@ -5,7 +5,7 @@ import { Button } from "@asterism-app/ui/ui/button";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@asterism-app/ui/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@asterism-app/ui/ui/popover";
 import { cn } from "@asterism-app/ui/utils";
-import type { TelemetryFacets, TelemetryGroup } from "../../../shared/telemetry";
+import type { ModelKind, TelemetryFacets, TelemetryGroup } from "../../../shared/telemetry";
 import { useI18n } from "../../shared/i18n";
 import { dashboardMessages as msg } from "../../messages/dashboard";
 import { FolderDot } from "../folders/marks";
@@ -24,26 +24,28 @@ function matches(filters: FilterDimensions, narrowing: FilterDimensions): boolea
   return Object.entries(narrowing).every(([key, value]) => filters[key as FilterKey] === value);
 }
 
-/**
- * One choice per model ID. Prices, speed, and latency belong to the connection that served a request, so the dimensions below
- * stay separate: an ID served by several providers filters across all of them, and a provider narrows on its own.
- */
-function modelChoices(models: readonly ModelGroup[], i18n: I18n): Choice[] {
-  const providers = new Map<string, string[]>();
-  for (const model of models) {
-    const names = providers.get(model.modelId);
-    if (!names) providers.set(model.modelId, [model.providerName]);
-    else if (!names.includes(model.providerName)) names.push(model.providerName);
+const kindLabel = (i18n: I18n, kind: ModelKind) => i18n.text(kind === "language" ? msg.languageModelKind : msg.decisionModelKind);
+
+/** A model selection spans providers within one category. Provider details retain the individual connection. */
+function modelChoices(models: readonly ModelGroup[], i18n: I18n, showKind: boolean): Choice[] {
+  const entries = new Map<string, { modelId: string; modelKind: ModelKind; providers: Set<string> }>();
+  for (const { modelId, modelKind, providerName } of models) {
+    const id = JSON.stringify([modelKind, modelId]);
+    const entry = entries.get(id);
+    if (entry) entry.providers.add(providerName);
+    else entries.set(id, { modelId, modelKind, providers: new Set([providerName]) });
   }
-  return [...providers].map(([modelId, names]) => ({
-    id: modelId, label: modelId, color: null, keywords: names, narrowing: { modelId },
-    detail: names.length > 1 ? i18n.formatMessage(msg.providerCount, { count: names.length }) : names[0]!,
-  }));
+  return [...entries].map(([id, { modelId, modelKind, providers }]) => {
+    const names = [...providers];
+    const detail = names.length > 1 ? i18n.formatMessage(msg.providerCount, { count: names.length }) : names[0]!;
+    return { id, label: modelId, color: null, keywords: names, narrowing: { modelId, modelKind },
+      detail: showKind ? `${kindLabel(i18n, modelKind)} · ${detail}` : detail };
+  });
 }
 
-const order: readonly FilterKey[] = ["folderId", "providerId", "modelId", "pluginId", "purposeId", "sessionId", "thinking", "subject"];
+const order: readonly FilterKey[] = ["modelKind", "folderId", "providerId", "modelId", "pluginId", "purposeId", "sessionId", "thinking", "subject"];
 const chipLabels: Record<FilterKey, UiMessage> = {
-  folderId: msg.filterFolder, providerId: msg.filterProvider, modelId: msg.filterModel, pluginId: msg.filterPlugin,
+  modelKind: msg.filterModelKind, folderId: msg.filterFolder, providerId: msg.filterProvider, modelId: msg.filterModel, pluginId: msg.filterPlugin,
   purposeId: msg.filterPurpose, sessionId: msg.filterSession, thinking: msg.filterThinking, subject: msg.filterSkill,
 };
 
@@ -52,6 +54,7 @@ export function FilterPicker({ model, facets, filters, labels }: {
   model: DashboardModel; facets: TelemetryFacets | null; filters: FilterDimensions; labels: Partial<Record<FilterKey, string>>;
 }) {
   const i18n = useI18n();
+  const showKind = facets?.providers.some(group => group.modelKind !== facets.providers[0]?.modelKind) ?? false;
   const sections = useMemo<FacetSection[]>(() => {
     if (!facets) return [];
     const choice = (group: TelemetryGroup, narrowing: FilterDimensions, detail: string | null = null): Choice => {
@@ -63,21 +66,24 @@ export function FilterPicker({ model, facets, filters, labels }: {
         { id: "none", label: i18n.text(msg.noFolder), detail: null, color: null, keywords: [], narrowing: { folderId: null } },
         ...facets.folders.map(group => choice(group, { folderId: group.folderId })),
       ] },
-      { id: "provider", label: msg.filterProvider, choices: facets.providers.map(group => choice(group, { providerId: group.providerId })) },
-      { id: "model", label: msg.filterModel, choices: modelChoices(facets.models, i18n) },
+      { id: "provider", label: msg.filterProvider, choices: facets.providers.map(group =>
+        choice(group, { modelKind: group.modelKind, providerId: group.providerId }, showKind ? kindLabel(i18n, group.modelKind) : null)) },
+      { id: "model", label: msg.filterModel, choices: modelChoices(facets.models, i18n, showKind) },
       { id: "purpose", label: msg.filterPurpose, choices: facets.purposes.map(group => choice(group, { pluginId: group.pluginId, purposeId: group.purposeId })) },
       { id: "plugin", label: msg.filterPlugin, choices: facets.plugins.length > 1 ? facets.plugins.map(group => choice(group, { pluginId: group.pluginId })) : [] },
       { id: "thinking", label: msg.filterThinking, choices: facets.thinking.map(group => choice(group, { thinking: group.level })) },
     ].filter(section => section.choices.length > 0);
-  }, [facets, i18n]);
+  }, [facets, i18n, showKind]);
   // A purpose names its plugin, so the plugin dimension reads once in the applied list.
   const applied = (Object.keys(filters) as FilterKey[])
     .filter(key => !(key === "pluginId" && filters.purposeId !== undefined))
+    .filter(key => key !== "modelKind" || showKind)
     .sort((left, right) => order.indexOf(left) - order.indexOf(right))
     .map(key => {
       // The whole narrowing must hold: a purpose also names its plugin, and must not stand in for a plugin filter.
       const found = sections.flatMap(section => section.choices).find(item => item.narrowing[key] === filters[key] && matches(filters, item.narrowing));
-      const text = i18n.formatMessage(msg.filterChip, { dimension: i18n.text(chipLabels[key]), value: found?.label ?? labels[key] ?? String(filters[key] ?? i18n.text(msg.other)) });
+      const fallback = key === "modelKind" && filters.modelKind ? kindLabel(i18n, filters.modelKind) : String(filters[key] ?? i18n.text(msg.other));
+      const text = i18n.formatMessage(msg.filterChip, { dimension: i18n.text(chipLabels[key]), value: (key === "modelKind" ? null : found?.label) ?? labels[key] ?? fallback });
       return { key, text };
     });
   return <Popover>
@@ -104,8 +110,10 @@ export function FilterPicker({ model, facets, filters, labels }: {
               const active = matches(filters, item.narrowing);
               return <CommandItem key={section.id + ":" + item.id} value={section.id + ":" + item.id} keywords={[item.label, item.detail ?? ""]}
                 onSelect={() => {
-                  if (active) for (const key of Object.keys(item.narrowing) as FilterKey[]) model.removeFilter(key);
-                  else model.applyFilters(item.narrowing);
+                  if (!active) model.applyFilters(item.narrowing);
+                  else for (const key of Object.keys(item.narrowing) as FilterKey[]) {
+                    if (key !== "modelKind") model.removeFilter(key);
+                  }
                 }}>
                 {item.color ? <FolderDot color={item.color} /> : <span className="size-2 shrink-0" />}
                 <span className="min-w-0 flex-1 truncate">{item.label}</span>

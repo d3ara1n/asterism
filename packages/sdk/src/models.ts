@@ -1,6 +1,7 @@
 /** Shared model protocol: independent of resource implementations, agent configuration, and host adapters. */
+import type { ModelTarget } from "./model-selection.ts";
 import type { Json } from "./json.ts";
-import type { ModelInfo } from "./model-catalog.ts";
+import type { LanguageModelInfo } from "./model-catalog.ts";
 import type { ModelInputPart } from "./model-input.ts";
 import type { ContentReader } from "./content-runtime.ts";
 import type { ToolOutcome, ToolInvocationInfo, ToolResult } from "./tool-result.ts";
@@ -12,7 +13,7 @@ import type { UsageSubject } from "./usage-subjects.ts";
 /** Standard levels shared across the application; protocol encoding does not change public values. */
 export const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
 export type ThinkingLevel = typeof thinkingLevels[number];
-export interface ModelTarget { provider: string; model: string; thinking?: ThinkingLevel }
+export interface LanguageModelTarget extends ModelTarget { thinking?: ThinkingLevel }
 export interface PromptBlock { id: string; text: string; source?: { id: string; plugin: string | null } }
 export interface PromptFile { readonly file: string; readonly text: string }
 export interface SystemPrompt { blocks: readonly PromptBlock[] }
@@ -136,7 +137,7 @@ export interface ModelTools {
 export interface ModelRunRequest extends ModelRequestIdentity {
   /** Opaque conversation position returned in output blocks; the caller owns its meaning. */
   requestParentId: string | null;
-  target: ModelTarget;
+  target: LanguageModelTarget;
   system: SystemPrompt;
   messages: ModelItem[];
   tools?: ModelTools;
@@ -160,7 +161,7 @@ export interface ModelRequestContext {
   tools: readonly ModelToolDeclaration[];
 }
 export interface StreamRequest extends ModelRequestIdentity {
-  target: ModelTarget;
+  target: LanguageModelTarget;
   system: SystemPrompt;
   messages: ModelItem[];
   /** The output limit for this completion; uses the smaller of this value and the model's configured limit. */
@@ -169,12 +170,12 @@ export interface StreamRequest extends ModelRequestIdentity {
   signal: AbortSignal;
 }
 export interface ModelInputOptions { content?: ContentReader }
-export interface ModelServices {
+export interface LanguageModelServices {
   /** Check explicit request input and target without sending a model request or saving state. */
   validate(request: Pick<StreamRequest, "target" | "system" | "messages" | "signal" | "userAgent" | "sessionId">, options?: ModelInputOptions): Promise<void>;
   stream(request: StreamRequest, options?: ModelInputOptions): AsyncIterable<ModelEvent>;
   /** One request and its tool batch; neither saves history nor drives the next request. */
   run(request: ModelRunRequest, options?: ModelInputOptions): Promise<ModelRunResult>;
   /** Current configured metadata for models whose model and provider are enabled; listing does not probe credentials or connectivity. */
-  list(): readonly ModelInfo[];
+  list(): readonly LanguageModelInfo[];
 }

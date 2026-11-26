@@ -2,7 +2,7 @@ import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
 import { dirname, join } from "node:path";
-import { contentRefSchema, type ContentRef, type ModelItem, type ModelRunEvent, type ModelTarget, type SystemPrompt } from "@asterism-app/sdk/contracts";
+import { contentRefSchema, type ContentRef, type ModelItem, type ModelRunEvent, type LanguageModelTarget, type SystemPrompt } from "@asterism-app/sdk/contracts";
 import type { ContentReader } from "@asterism-app/sdk/runtime";
 import type { DelegationInput, TaskCompletion } from "./contract.ts";
 
@@ -11,7 +11,7 @@ export type AuditEntry =
   | { type: "input"; messages: ModelItem[] }
   | { type: "steering-queued"; message: string }
   | { type: "steering-delivered"; messages: string[] }
-  | { type: "request"; index: number; target: ModelTarget; system: SystemPrompt }
+  | { type: "request"; index: number; target: LanguageModelTarget; system: SystemPrompt }
   | { type: "execution"; event: ModelRunEvent }
   | { type: "finished"; completion: TaskCompletion };
 

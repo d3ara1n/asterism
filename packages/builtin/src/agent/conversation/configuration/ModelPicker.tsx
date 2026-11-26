@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { modelReference } from "@asterism-app/sdk/contracts";
 import { useI18n } from "@asterism-app/sdk/renderer";
-import type { CatalogModel, ModelConfigurationSnapshot } from "@asterism-app/builtin-api/contracts";
+import type { CatalogLanguageModel, ModelConfigurationSnapshot } from "@asterism-app/builtin-api/contracts";
 import { commonMessages } from "@asterism-app/ui/messages/common";
 import { Separator } from "@asterism-app/ui/ui/separator";
 import { configurationMessages as messages } from "../../../messages/configuration";
@@ -15,13 +15,13 @@ export function ProviderOptions({ configuration, follow, selected, initialActive
   onFollow(): void; onProvider(id: string): void;
 }) {
   const i18n = useI18n();
-  const modelProviders = configuration?.modelProviders.filter(provider => provider.enabled).flatMap(provider => {
-    const count = configuration.models.filter(model => model.enabled && model.providerId === provider.id).length;
+  const languageModelProviders = configuration?.languageModelProviders.filter(provider => provider.enabled).flatMap(provider => {
+    const count = configuration.languageModels.filter(model => model.enabled && model.providerId === provider.id).length;
     return count ? [{ value: `provider:${provider.id}`, label: provider.name, navigation: true,
       description: i18n.formatMessage(messages.modelCount, { count }), keywords: [provider.id] }] : [];
   }) ?? [];
-  const options = [follow, ...modelProviders];
-  return <ConfigurationOptions label={i18n.text(messages.modelProviders)} options={options} selected={selected}
+  const options = [follow, ...languageModelProviders];
+  return <ConfigurationOptions label={i18n.text(messages.languageModelProviders)} options={options} selected={selected}
     initialActive={options.some(option => option.value === initialActive) ? initialActive : follow.value}
     searchPlaceholder={i18n.text(messages.searchProviders)} disabled={disabled}
     onSelect={value => value === follow.value ? onFollow() : onProvider(value.slice("provider:".length))} />;
@@ -29,12 +29,12 @@ export function ProviderOptions({ configuration, follow, selected, initialActive
 
 /** Browsing moves only the candidate highlight; clicking or pressing Enter commits the complete provider/model reference. */
 export function ProviderModels({ configuration, providerId, selected, effectiveModel, disabled, onSelect }: {
-  configuration: Configuration; providerId: string; selected: string | null; effectiveModel: CatalogModel | null; disabled: boolean;
+  configuration: Configuration; providerId: string; selected: string | null; effectiveModel: CatalogLanguageModel | null; disabled: boolean;
   onSelect(value: string): void;
 }) {
   const i18n = useI18n();
-  const provider = configuration?.modelProviders.find(item => item.id === providerId && item.enabled);
-  const models = configuration && provider ? configuration.models.filter(model => model.enabled && model.providerId === providerId) : [];
+  const provider = configuration?.languageModelProviders.find(item => item.id === providerId && item.enabled);
+  const models = configuration && provider ? configuration.languageModels.filter(model => model.enabled && model.providerId === providerId) : [];
   const [active, setActive] = useState(() => {
     const initial = models.find(model => modelReference(model) === selected)
       ?? models.find(model => effectiveModel && modelReference(model) === modelReference(effectiveModel)) ?? models[0];

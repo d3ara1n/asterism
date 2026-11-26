@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { ModelCatalog, type ModelCatalogSnapshot } from "@asterism-app/sdk/contracts";
+import { LanguageModelCatalog, type LanguageModelCatalogSnapshot } from "@asterism-app/sdk/contracts";
 import { useI18n, useRendererCalls, useRendererCatalogs, useRendererConfiguration } from "@asterism-app/sdk/renderer";
 import { toast } from "sonner";
 import { useSettingsAction } from "@asterism-app/ui/use-settings-action";
@@ -7,12 +7,12 @@ import { BuiltinSettings, settingsMessages } from "../settings/contract";
 import { UpdateParadigmConfiguration, type ConfigurationOperation, type ParadigmSnapshot } from "./contract";
 import { resolveParadigmConfiguration } from "./state";
 
-export type ConfigurationSnapshot = ModelCatalogSnapshot & ParadigmSnapshot;
-export type ProviderModel = ModelCatalogSnapshot["models"][number];
+export type ConfigurationSnapshot = LanguageModelCatalogSnapshot & ParadigmSnapshot;
+export type ProviderModel = LanguageModelCatalogSnapshot["languageModels"][number];
 export function useSettingsConfiguration() {
   const config = useRendererConfiguration(BuiltinSettings);
   const catalogs = useRendererCatalogs();
-  const models = useMemo(() => catalogs.get(ModelCatalog), [catalogs]);
+  const models = useMemo(() => catalogs.get(LanguageModelCatalog), [catalogs]);
   const snapshot = useMemo<ConfigurationSnapshot | null>(() => config.ready && models
     ? { ...models, ...resolveParadigmConfiguration(config.value.paradigm) } : null, [config.ready, config.value.paradigm, models]);
   return { snapshot, readError: config.error ?? catalogs.error, load: config.refresh };

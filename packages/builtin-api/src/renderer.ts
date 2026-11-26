@@ -1,7 +1,7 @@
 import { createContext, createElement, useContext, type ComponentProps, type ComponentType, type ReactNode } from "react";
 import { pluginOf, pluginNamespace, type ThinkingLevel, type UiText } from "@asterism-app/sdk/contracts";
 import type { AgentSelection } from "./configuration.ts";
-import type { CatalogModel } from "./catalogs.ts";
+import type { CatalogLanguageModel } from "./catalogs.ts";
 
 export { createPeekClient } from "./peek-renderer.ts";
 
@@ -48,7 +48,7 @@ export const agentUI = createAgentUIRegistry();
 export interface AgentModelSelection {
   readonly selection: Readonly<AgentSelection> | null;
   readonly reference: string | null;
-  readonly model: Readonly<CatalogModel> | null;
+  readonly model: Readonly<CatalogLanguageModel> | null;
   readonly thinking: ThinkingLevel | null;
 }
 const ModelSelection = createContext<AgentModelSelection | null>(null);

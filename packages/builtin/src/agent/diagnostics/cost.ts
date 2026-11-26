@@ -1,11 +1,11 @@
 import {
   thinkingLevels, modelReference, estimateUsageCost,
 } from "@asterism-app/sdk/contracts";
-import { type CatalogModel } from "@asterism-app/builtin-api/contracts";
+import { type CatalogLanguageModel } from "@asterism-app/builtin-api/contracts";
 import type { DiagnosticRequest } from "./history.ts";
 
 /** scope stores the actual model identity; older records with only an expression require a unique match, without arbitrarily stripping colons from model names. */
-export function diagnosticModel<M extends Pick<CatalogModel, "providerId" | "modelId">>(request: Pick<DiagnosticRequest, "model" | "modelScope">, models: readonly M[]): M | null {
+export function diagnosticModel<M extends Pick<CatalogLanguageModel, "providerId" | "modelId">>(request: Pick<DiagnosticRequest, "model" | "modelScope">, models: readonly M[]): M | null {
   if (request.modelScope) {
     let scope: unknown;
     try { scope = JSON.parse(request.modelScope); } catch { scope = null; }

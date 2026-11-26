@@ -2,7 +2,8 @@ import { z } from "zod";
 import { thinkingLevels, type ThinkingLevel } from "./models.ts";
 
 /** Model expression `<providerId>/<modelId>`: provider and model always appear as a pair, split at the first `/`. */
-export interface ModelExpression { provider: string; model: string }
+export interface ModelTarget { provider: string; model: string }
+export type ModelExpression = ModelTarget;
 export function parseModelExpression(value: string): ModelExpression | null {
   const index = value.indexOf("/");
   if (index <= 0 || index === value.length - 1) return null;
@@ -10,7 +11,7 @@ export function parseModelExpression(value: string): ModelExpression | null {
 }
 export function formatModelExpression(expression: ModelExpression): string { return `${expression.provider}/${expression.model}`; }
 export const modelExpressionSchema = z.string().max(321).refine(value => parseModelExpression(value) !== null, "Use a model expression such as provider/model.");
-/** A reference string for a specific model; corresponds one-to-one with model records without using random record IDs. */
+/** A reference string for a specific model; identifies a model within the catalog selected by the caller. */
 export function modelReference(model: { providerId: string; modelId: string }): string {
   return formatModelExpression({ provider: model.providerId, model: model.modelId });
 }

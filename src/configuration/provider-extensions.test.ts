@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { ModelProviderPreset, UsageItem } from "@asterism-app/sdk/contracts";
+import type { LanguageModelProviderPreset, UsageItem } from "@asterism-app/sdk/contracts";
 import type { QueryUsageProvider } from "@asterism-app/sdk/runtime";
 import { ModelProviderExtensions } from "./provider-extensions.ts";
 import { RunLifecycle } from "../plugins/lifecycle.ts";
 
-const preset: ModelProviderPreset = { id: " p ", name: "P", billing: "none", sources: ["https://example.test/docs"], verifiedOn: "2026-10-20",
+const preset: LanguageModelProviderPreset = { id: " p ", name: "P", billing: "none", sources: ["https://example.test/docs"], verifiedOn: "2026-10-20",
   connection: { protocol: "openai-chat", baseUrl: "https://example.test", auth: "none", compatibility: [] } };
 describe("Provider contribution catalog", () => {
   // The schema trims identities; deduplication, patching, and addressing must all consume the same normalized value.

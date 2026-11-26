@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { defineModule, type PluginContext, type SessionExecutor, type SessionWriter, type ModelServices } from "@asterism-app/sdk/runtime";
+import { defineModule, type PluginContext, type SessionExecutor, type SessionWriter, type LanguageModelServices } from "@asterism-app/sdk/runtime";
 import { AgentInputMessage } from "@asterism-app/builtin-api/contracts";
 import { SessionTitleAssigned, type SessionSnapshot } from "@asterism-app/sdk/contracts";
 import { BuiltinApplicationService as ApplicationService } from "../testing.ts";
@@ -41,9 +41,9 @@ function namingObserver() {
   const paradigm = structuredClone(defaultParadigmConfiguration);
   paradigm.roles.push({ id: "utility", builtin: true, overrides: { model: "test/model" } });
   const roles = vi.fn(() => ({ get: () => ({ paradigm }) }));
-  const stream = vi.fn<ModelServices["stream"]>();
+  const stream = vi.fn<LanguageModelServices["stream"]>();
   const module = createNamingModule().setup({
-    lifetime: { defer() {} }, tasks: { start }, models: { stream }, config: roles,
+    lifetime: { defer() {} }, tasks: { start }, languageModels: { stream }, config: roles,
   } as unknown as PluginContext);
   const committed = (view: SessionSnapshot) => module.observers![0]!.committed!({
     snapshot: view, session, records: [view.records.last(AgentInputMessage, { scope: "timeline" })!.record],

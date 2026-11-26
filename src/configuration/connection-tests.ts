@@ -13,7 +13,7 @@ export class ModelConnectionTests {
   clear(kind: ConfigurationKind, id: string): void {
     for (const [key, test] of this.tests) {
       if (test.value.state !== "running" &&
-          (kind === "modelProvider" && test.value.providerId === id || kind === "model" && test.value.model === id))
+          (kind === "languageModelProvider" && test.value.providerId === id || kind === "languageModel" && test.value.model === id))
         this.tests.delete(key);
     }
   }

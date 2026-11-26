@@ -3,7 +3,7 @@ import { defineCall } from "./calls.ts";
 import { defineEvent } from "./events.ts";
 import { providerUsageIdSchema, usageItemsSchema, providerUsageErrorSchema } from "./provider-usage.ts";
 
-/** Shared provider usage state; response consumption remains explicit. */
+/** Account usage state for a configured language model provider; response consumption remains explicit. */
 export const providerUsageStateSchema = z.strictObject({
   providerId: z.string(), usage: providerUsageIdSchema.nullable(),
   source: z.enum(["query", "headers"]).optional(), model: z.string().optional(),
@@ -11,10 +11,10 @@ export const providerUsageStateSchema = z.strictObject({
   items: usageItemsSchema, updatedAt: z.number().nonnegative().nullable(), error: providerUsageErrorSchema.nullable(),
 });
 export type ProviderUsageState = z.infer<typeof providerUsageStateSchema>;
-export const ReadUsage = defineCall("core.usage.read", {
+export const ReadLanguageModelProviderUsage = defineCall("core.language-model-provider-usage.read", {
   scope: "plugin", input: z.strictObject({ providerId: z.string(), refresh: z.boolean() }), output: providerUsageStateSchema,
 });
-export const UsageChanged = defineEvent("core.usage.changed", {
+export const LanguageModelProviderUsageChanged = defineEvent("core.language-model-provider-usage.changed", {
   schema: z.strictObject({ providerId: z.string().nullable() }),
   source: "host", semantics: { kind: "snapshot", key: ["providerId"] },
 });

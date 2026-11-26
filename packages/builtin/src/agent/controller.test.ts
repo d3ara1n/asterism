@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DataContract, Json, ModelCompletion, ModelEvent, ModelRunResult } from "@asterism-app/sdk/contracts";
 import { ResourceNoticeRaised } from "@asterism-app/sdk/contracts";
-import type { ExecutionServices, ModelServices, ObjectExecutor, ObjectWriter, PluginTasks } from "@asterism-app/sdk/runtime";
+import type { ExecutionServices, LanguageModelServices, ObjectExecutor, ObjectWriter, PluginTasks } from "@asterism-app/sdk/runtime";
 import { AgentTurnEnded, ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { sessionSnapshot } from "../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../src/session/view.ts";
@@ -87,7 +87,7 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
   } as unknown as ObjectExecutor;
   const driver = manualTasks();
   const feedback = createAgentFeedback();
-  const stream = vi.fn<ModelServices["stream"]>(async function* () {
+  const stream = vi.fn<LanguageModelServices["stream"]>(async function* () {
     yield { type: "part.start", part: { id: "summary", kind: "text" } } satisfies ModelEvent;
     yield { type: "part.delta", partId: "summary", delta: "Earlier goal and answer" } satisfies ModelEvent;
     yield { type: "part.end", partId: "summary" } satisfies ModelEvent;
@@ -98,7 +98,7 @@ function fixture(options: { completed?: boolean; window?: number | null; values?
       await options.summaryGate.release.promise;
     }
   });
-  const models: ModelServices = { stream, validate: vi.fn(), run: vi.fn(), list: () => options.window === undefined ? [] : [{
+  const models: LanguageModelServices = { stream, validate: vi.fn(), run: vi.fn(), list: () => options.window === undefined ? [] : [{
     model: "p/m", provider: "p", name: "Model", contextWindow: options.window, cost: null, generation: { maxOutputTokens: null },
     capabilities: { reasoning: false, tools: true, thinkingLevels: [] },
   }] };

@@ -26,7 +26,7 @@ const errors = {
 
 export function ModelDiscoveryPicker({ providerId }: { providerId: string }) {
   const { snapshot } = useSettingsConfiguration();
-  const provider = snapshot?.modelProviders.find(provider => provider.id === providerId);
+  const provider = snapshot?.languageModelProviders.find(provider => provider.id === providerId);
   const discovery = snapshot?.discoveries.find(discovery => discovery.providerId === providerId);
   return <DiscoveryContent key={discovery?.id ?? "empty"} provider={provider} discovery={discovery} />;
 }
@@ -38,20 +38,20 @@ function DiscoveryContent({ provider, discovery }: { provider: ModelProvider | u
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const running = discovery?.state === "running";
-  useIslandCancel(running && !busy ? async () => { await run({ type: "discovery.cancel", id: discovery.id }); } : null);
-  const existing = new Set(snapshot?.models.filter(model => model.providerId === provider?.id).map(model => model.modelId));
+  useIslandCancel(running && !busy ? async () => { await run({ type: "languageModel.discovery.cancel", id: discovery.id }); } : null);
+  const existing = new Set(snapshot?.languageModels.filter(model => model.providerId === provider?.id).map(model => model.modelId));
   const selectedIds = [...selected].filter(id => !existing.has(id));
   const q = query.trim().toLowerCase();
   const matches = discovery?.models.filter(model => `${model.modelId} ${model.name}`.toLowerCase().includes(q)) ?? [];
   const add = async () => {
     if (!discovery || discovery.state !== "succeeded") return;
-    const result = await run({ type: "discovery.add", id: discovery.id, modelIds: selectedIds });
+    const result = await run({ type: "languageModel.discovery.add", id: discovery.id, modelIds: selectedIds });
     if (result?.ok) { setSelected(new Set()); toast.success(i18n.formatMessage(messages.modelsAdded, { count: selectedIds.length })); }
   };
   return <IslandPanel title={i18n.text(messages.fetchModels)} description={provider?.name}
     action={<>
       <Button size="sm" variant="outline" disabled={busy || !provider}
-        onClick={() => { if (provider) void run(running ? { type: "discovery.cancel", id: discovery.id } : { type: "discovery.start", providerId: provider.id }); }}>
+        onClick={() => { if (provider) void run(running ? { type: "languageModel.discovery.cancel", id: discovery.id } : { type: "languageModel.discovery.start", providerId: provider.id }); }}>
         {running ? <><Spinner data-icon="inline-start" />{i18n.text(messages.cancelTestRequest)}</> : <><RefreshCw data-icon="inline-start" />{i18n.text(messages.refreshModels)}</>}
       </Button>
       {discovery?.state === "succeeded" && <Button size="sm" disabled={busy || !selectedIds.length} onClick={() => void add()}>

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { AutomaticSessionName } from "@asterism-app/builtin-api/contracts";
 import { SessionTitleAssigned, type ModelEvent } from "@asterism-app/sdk/contracts";
-import type { ModelServices, SessionExecutor } from "@asterism-app/sdk/runtime";
+import type { LanguageModelServices, SessionExecutor } from "@asterism-app/sdk/runtime";
 import { sessionSnapshot } from "../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../src/session/view.ts";
 import { event, message, node, text } from "../../../../src/session/test-nodes.ts";
@@ -19,7 +19,7 @@ function fixture(explicit = false, utility = true) {
   const session = { id: "s", snapshot: () => snapshot, title: { set }, commit: (work: () => undefined) => work() } as unknown as SessionExecutor;
   const config = structuredClone(defaultParadigmConfiguration);
   if (utility) config.roles.push({ id: "utility", builtin: true, overrides: { model: "test/model" } });
-  const stream = vi.fn<ModelServices["stream"]>();
+  const stream = vi.fn<LanguageModelServices["stream"]>();
   const generate = createSessionNaming({ models: { stream }, roles: () => resolveParadigmConfiguration(config).roles });
   return { snapshot, session, set, stream, generate };
 }
@@ -32,7 +32,7 @@ function response(value: string, reason: "stop" | "length" = "stop"): ModelEvent
     { type: "finish", reason, usage: null },
   ];
 }
-function emit(events: ModelEvent[]): ModelServices["stream"] {
+function emit(events: ModelEvent[]): LanguageModelServices["stream"] {
   return async function* () { yield* events; };
 }
 

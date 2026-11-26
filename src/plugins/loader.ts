@@ -13,7 +13,7 @@ import type { SessionNode, LiveBlock } from "../shared/session.ts";
 import { RunLifecycle, type RunGroup, type RunningWork } from "./lifecycle.ts";
 import { LifetimeScope } from "./lifetime.ts";
 import { PluginStorage } from "./storage.ts";
-import type { HostModels } from "./models.ts";
+import type { HostLanguageModels } from "./models.ts";
 import type { SessionHost, SharedServices } from "./host.ts";
 import { toRecord, sessionSnapshot } from "./records.ts";
 import { createSdkContext, type SdkContext } from "./sdk-context.ts";
@@ -51,7 +51,7 @@ export interface PluginHostServices {
   content?: ContentStore;
   refOf(objectId: string): ResourceRef | null;
   sessions: SessionHost;
-  models: HostModels;
+  languageModels: HostLanguageModels;
   /** Plugin configuration changes: settings saves, default restoration, and backend updates all notify here. */
   configurationChanged?: (pluginId: string) => void;
   /** Plugin storage prepared before windows: format declarations stamp managed configuration and databases; failed plugins skip setup for this startup. */
@@ -203,8 +203,8 @@ export function loadPlugins(plugins: readonly PluginDefinition[], services: Plug
         agentCatalog.register(id, sdk.context.assets, contribution.agentSkills ?? [], contribution.agentInstructions ?? []);
         if (contribution.messagingProviders?.length) messaging.declare(id, contribution.messagingProviders, lifecycle.group("call"));
         if (contribution.webProviders?.length) webProviders.declare(id, contribution.webProviders, lifecycle.group("call"));
-        if (contribution.usageProviders?.length || contribution.modelProviderPresets?.length)
-          extensions.declare(id, contribution.usageProviders ?? [], contribution.modelProviderPresets ?? [], lifecycle.group("call"), dependencies.get(id));
+        if (contribution.usageProviders?.length || contribution.languageModelProviderPresets?.length)
+          extensions.declare(id, contribution.usageProviders ?? [], contribution.languageModelProviderPresets ?? [], lifecycle.group("call"), dependencies.get(id));
         for (const call of contribution.calls ?? []) calls.declare(id, call, sdk, lifecycle.group("call"));
         for (const channel of contribution.channels ?? []) channels.declare(id, channel, sdk);
         for (const tool of contribution.topLevelTools ?? []) {

@@ -31,7 +31,7 @@ function workspace() {
   const sessions = new Map<string, LiveSession>();
   const lookup: WorkspaceLookup = {
     folders: () => folders, sessions: () => sessions, session: id => sessions.get(id) ?? null,
-    providerNames: () => new Map([["p", "Provider"]]), pluginNames: () => new Map(),
+    providerNames: kind => new Map(kind === "language" ? [["p", "Provider"]] : []), pluginNames: () => new Map(),
   };
   return { folders, sessions, lookup };
 }
@@ -39,7 +39,7 @@ let sequence = 0;
 function record(overrides: Partial<ModelUsageRecord>): ModelUsageRecord {
   return {
     id: `r${++sequence}`, startedAt: 0, durationMs: 1_000, firstOutputMs: 200, pluginId: "plugin", purposeId: null, sessionId: null,
-    providerId: "p", providerName: "Provider", modelId: "m", thinking: null, usage: usage(100, 10), cost, hasFiles: false,
+    modelKind: "language", providerId: "p", providerName: "Provider", modelId: "m", thinking: null, usage: usage(100, 10), cost, hasFiles: false,
     outcome: "completed", errorOrigin: null, errorCode: null, tools: [], subjects: [], ...overrides,
   };
 }
@@ -136,8 +136,8 @@ describe("Usage ledger queries", () => {
       for (const firstOutputMs of [100, 500, 200, 400, 300]) service.recordModelUsage(record({ modelId: "a", firstOutputMs }));
       service.recordModelUsage(record({ modelId: "b", firstOutputMs: null }));
       const rows = query(service, { kind: "breakdown", dimension: "model", limit: 10, latency: true }).rows;
-      expect(rows.find(row => row.group.key === JSON.stringify(["p", "a"]))?.ttft).toEqual({ p50: 300, p95: 500 });
-      expect(rows.find(row => row.group.key === JSON.stringify(["p", "b"]))?.ttft).toEqual({ p50: null, p95: null });
+      expect(rows.find(row => row.group.key === JSON.stringify(["p", "a", "language"]))?.ttft).toEqual({ p50: 300, p95: 500 });
+      expect(rows.find(row => row.group.key === JSON.stringify(["p", "b", "language"]))?.ttft).toEqual({ p50: null, p95: null });
     } finally { service.close(); }
   });
 
@@ -171,7 +171,7 @@ describe("Usage ledger queries", () => {
       const series = query(service, { kind: "series", granularity: "day", groupBy: "model", limit: 1 },
         { from: dateKeyStart("2026-03-01", 0), to: dateKeyStart("2026-03-04", 0), utcOffsetMinutes: 0 });
       expect(series.points.map(point => [point.key, point.metrics.requests])).toEqual([["2026-03-01", 1], ["2026-03-02", 0], ["2026-03-03", 2]]);
-      expect(series.groups.map(group => group.key)).toEqual([JSON.stringify(["p", "big"]), "other"]);
+      expect(series.groups.map(group => group.key)).toEqual([JSON.stringify(["p", "big", "language"]), "other"]);
       expect(series.points[2]!.groups.other).toMatchObject({ requests: 2 });
     } finally { service.close(); }
   });
@@ -268,7 +268,7 @@ describe("Declared usage subjects", () => {
         roles: [{ label: "worker", calls: 5 }, { label: null, calls: 1 }],
         files: [{ label: "SKILL.md", calls: 4 }, { label: "notes.md", calls: 2 }],
       });
-      expect(activity.models.map(({ group, calls }) => [group.key, calls])).toEqual([[JSON.stringify(["p", "x"]), 4], [JSON.stringify(["p", "y"]), 2]]);
+      expect(activity.models.map(({ group, calls }) => [group.key, calls])).toEqual([[JSON.stringify(["p", "x", "language"]), 4], [JSON.stringify(["p", "y", "language"]), 2]]);
       expect(activity.sessions.map(({ group, calls }) => [group.key, calls])).toEqual([[JSON.stringify(["s1"]), 5], [JSON.stringify(["s2"]), 1]]);
     } finally { service.close(); }
   });
@@ -283,29 +283,49 @@ describe("Declared usage subjects", () => {
         quantity: 1, unit: "request", currency: "usd", amount: 0.01, outcome: "succeeded", durationMs: null });
       const subject = { kind: "skill", id: "a" };
       const models = (filter: TelemetryFilter) => query(service, { kind: "breakdown", dimension: "model", limit: 10, latency: false }, filter).rows.map(row => row.group.key).sort();
-      expect(models({ ...everything, subject })).toEqual([JSON.stringify(["p", "x"]), JSON.stringify(["p", "y"])]);
-      expect(models({ ...everything, subject: { ...subject, relation: "read" } })).toEqual([JSON.stringify(["p", "x"])]);
+      expect(models({ ...everything, subject })).toEqual([JSON.stringify(["p", "x", "language"]), JSON.stringify(["p", "y", "language"])]);
+      expect(models({ ...everything, subject: { ...subject, relation: "read" } })).toEqual([JSON.stringify(["p", "x", "language"])]);
       expect(models({ ...everything, subject: { ...subject, source: null } })).toEqual([]);
       expect(query(service, { kind: "summary", compare: null }, { ...everything, subject }).external.count).toBe(0);
     } finally { service.close(); }
   });
 
-  it("migrates a version 1 ledger by adding the subject table and keeping existing records", () => {
+  it("preserves historical usage while migrating a version 1 ledger to model categories", () => {
     const directory = root();
     const service = new TelemetryService(directory, workspace().lookup);
     service.recordModelUsage(record({ id: "kept" }));
     service.close();
     const db = new DatabaseSync(telemetryDatabasePath(directory));
-    db.exec("DROP TABLE usage_subjects; PRAGMA user_version = 1;");
+    db.exec("DROP TABLE usage_subjects; DROP INDEX model_usage_model; ALTER TABLE model_usage_events DROP COLUMN model_kind; CREATE INDEX model_usage_model ON model_usage_events(provider_id, model_id, started_at); PRAGMA user_version = 1;");
     db.close();
     const plan = telemetryStorage(directory).inspect();
     expect(plan?.change).toEqual({ id: "telemetry", from: 1, to: telemetryDatabaseVersion });
     plan!.apply();
     const migrated = new TelemetryService(directory, workspace().lookup);
     try {
+      expect(query(migrated, { kind: "events", offset: 0, limit: 20, only: "all" }).rows)
+        .toMatchObject([{ id: "kept", modelKind: "language", inputTokens: 100 }]);
       migrated.recordModelUsage(record({ subjects: [skill("referenced", "a")] }));
       expect(query(migrated, { kind: "summary", compare: null }).metrics.requests).toBe(2);
       expect(query(migrated, { kind: "subjects", subject: { kind: "skill" } }).rows).toHaveLength(1);
     } finally { migrated.close(); }
+  });
+
+  it("keeps the same provider and model IDs separate across model categories", () => {
+    const service = new TelemetryService(root(), workspace().lookup);
+    try {
+      service.recordModelUsage(record({ id: "generate" }));
+      service.recordModelUsage(record({ id: "evaluate", modelKind: "decision", providerName: "Decision endpoint", firstOutputMs: null }));
+      const facets = query(service, { kind: "facets" });
+      expect(facets.models).toEqual(expect.arrayContaining([
+        expect.objectContaining({ modelKind: "language", modelId: "m", providerName: "Provider" }),
+        expect.objectContaining({ modelKind: "decision", modelId: "m", providerName: "Decision endpoint" }),
+      ]));
+      expect(new Set(facets.models.map(group => group.key)).size).toBe(2);
+      const events = { kind: "events", offset: 0, limit: 20, only: "all" } as const;
+      expect(query(service, events, { ...everything, modelKind: "decision", providerId: "p", modelId: "m" }).rows)
+        .toMatchObject([{ id: "evaluate", modelKind: "decision", providerName: "Decision endpoint" }]);
+      expect(query(service, events, { ...everything, thinking: null }).rows).toMatchObject([{ id: "generate", modelKind: "language" }]);
+    } finally { service.close(); }
   });
 });

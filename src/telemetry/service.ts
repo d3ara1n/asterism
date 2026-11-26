@@ -45,8 +45,8 @@ export class TelemetryService implements UsageRecorder {
           provider_id, provider_name_snapshot, model_id, thinking,
           input_tokens, output_tokens, total_tokens, reasoning_tokens, cache_read_tokens, cache_write_tokens, tool_calls,
           cost_usd, cost_status, cost_input_usd, cost_cache_read_usd, cost_cache_write_usd, cost_output_usd, cost_reasoning_usd,
-          cache_saved_usd, tier_from_input_tokens, outcome, error_origin, error_code)
-          VALUES (${Array(34).fill("?").join(", ")})`).run(
+          cache_saved_usd, tier_from_input_tokens, outcome, error_origin, error_code, model_kind)
+          VALUES (${Array(35).fill("?").join(", ")})`).run(
           record.id, Math.max(0, Math.round(record.startedAt)), milliseconds(record.durationMs), milliseconds(record.firstOutputMs),
           record.pluginId, record.purposeId,
           record.sessionId, session?.title ?? null, session?.folderId ?? null, folder?.name ?? null, folder?.color ?? null,
@@ -55,7 +55,7 @@ export class TelemetryService implements UsageRecorder {
           record.tools.length,
           estimate.amount, estimate.status, line("input"), line("cacheRead"), line("cacheWrite"), line("output"), line("reasoning"),
           estimateCacheSavings(record.usage, record.cost, record.hasFiles), estimate.fromInputTokens,
-          record.outcome, record.errorOrigin, record.errorCode,
+          record.outcome, record.errorOrigin, record.errorCode, record.modelKind,
         );
         const tool = this.db.prepare(`INSERT INTO tool_usage_events (id, model_event_id, started_at, duration_ms, tool_name, implementation_id, resource_kind, outcome, error_code)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);

@@ -1,5 +1,5 @@
-import { thinkingLevels, describeError, formatModelExpression, type ErrorDetails, type ModelItem, type ModelTarget, type ModelEvent } from "@asterism-app/sdk/contracts";
-import type { ModelServices, ObjectExecutor } from "@asterism-app/sdk/runtime";
+import { thinkingLevels, describeError, formatModelExpression, type ErrorDetails, type ModelItem, type LanguageModelTarget, type ModelEvent } from "@asterism-app/sdk/contracts";
+import type { LanguageModelServices, ObjectExecutor } from "@asterism-app/sdk/runtime";
 import { decodeExecution, ContextSummary } from "@asterism-app/builtin-api/contracts";
 import { summaryPrompt, summarySystemPrompt } from "./compression-prompt.ts";
 import { contextMessages, type AgentContext } from "./projection.ts";
@@ -67,8 +67,8 @@ export interface PreparedCompression { plan: CompressionPlan; tokensBefore: numb
 
 /** Runs in the caller's task and cancellation scope. The caller chooses when to compress and whether to continue afterward. */
 export async function compressContext(
-  object: ObjectExecutor, target: ModelTarget, input: PreparedCompression,
-  models: Pick<ModelServices, "stream">, signal: AbortSignal,
+  object: ObjectExecutor, target: LanguageModelTarget, input: PreparedCompression,
+  models: Pick<LanguageModelServices, "stream">, signal: AbortSignal,
   userAgent?: string,
   onStart?: () => (status: "completed" | "failed" | "cancelled", details?: ErrorDetails) => void,
 ): Promise<boolean> {
@@ -88,8 +88,8 @@ export async function compressContext(
 
 /** Returns undefined only after the complete summary is saved; a generation failure returns its details and preserves the original model projection. */
 async function summarizeContext(
-  object: ObjectExecutor, target: ModelTarget, model: string,
-  models: Pick<ModelServices, "stream">, signal: AbortSignal,
+  object: ObjectExecutor, target: LanguageModelTarget, model: string,
+  models: Pick<LanguageModelServices, "stream">, signal: AbortSignal,
   plan: CompressionPlan, tokensBefore: number, userAgent?: string,
 ): Promise<ErrorDetails | undefined> {
   let text = "";

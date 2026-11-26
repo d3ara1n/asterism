@@ -90,7 +90,8 @@ These terms distinguish the concepts used when developing Asterism. Each definit
 
 | Term | Meaning |
 | --- | --- |
-| Model provider connection | Protocol, endpoint, credentials reference, and model list |
+| Language model provider connection | Language protocol, endpoint, credentials, and callable language model list |
+| Model target | Provider/model pair; the consuming service or selector supplies the model category |
 | Provider preset | One-time template for a model connection |
 | Model expression | Provider identity plus full service model ID |
 | Model target | Role with optional model and thinking overrides |

@@ -1,4 +1,4 @@
-import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type ModelServices, type ExecutionServices, type ProviderUsage } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type ObjectExecutor, type ObjectReader, type PluginTasks, type LanguageModelServices, type ExecutionServices, type LanguageModelProviderUsage } from "@asterism-app/sdk/runtime";
 import { ResourceNoticeRaised, describeError, errorMessage, formatModelExpression, type ResourceRef, type ResourceNotice, type ModelRunObserver, type ModelRunResult } from "@asterism-app/sdk/contracts";
 import { Execution, ToolExecution, AgentTurnEnded, type AgentTurnEndReason } from "@asterism-app/builtin-api/contracts";
 import { runAgentLoop } from "./loop.ts";
@@ -23,14 +23,14 @@ import type { AgentRequestState } from "./self-state/contract.ts";
 interface AgentControllerDependencies {
   selection: AgentSelectionService;
   tasks: PluginTasks;
-  models: ModelServices;
+  models: LanguageModelServices;
   execution: ExecutionServices;
   requestObject(ref: ResourceRef): ObjectReader;
   prepareRequest: ReturnType<typeof createRequestAssembly>;
   projectMessages?: WorkMessages;
   projectAttachments?: ReturnType<typeof createAttachmentProjection>;
   userAgent: string;
-  usage?: Pick<ProviderUsage, "consume">;
+  usage?: Pick<LanguageModelProviderUsage, "consume">;
   feedback: ReturnType<typeof createAgentFeedback>;
 }
 

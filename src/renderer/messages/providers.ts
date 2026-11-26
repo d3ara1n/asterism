@@ -91,15 +91,15 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   provider: {
     id: "provider.label",
-    defaultMessage: "Model provider",
+    defaultMessage: "Language model provider",
   },
   connections: {
     id: "provider.connections.title",
-    defaultMessage: "Model providers",
+    defaultMessage: "Language models",
   },
   summary: {
     id: "provider.connections.summary",
-    defaultMessage: "Connections, credentials, and the models they provide.",
+    defaultMessage: "Connections, credentials, and the language models they provide.",
   },
   brandNotice: {
     id: "provider.connections.brandNotice",
@@ -107,7 +107,7 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   addProvider: {
     id: "provider.add.action",
-    defaultMessage: "Add model provider",
+    defaultMessage: "Add language model provider",
   },
   emptyConnections: {
     id: "provider.connections.empty",
@@ -115,7 +115,7 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   addFirstProvider: {
     id: "provider.add.emptyAction",
-    defaultMessage: "Add model provider",
+    defaultMessage: "Add language model provider",
   },
   modelCount: {
     id: "provider.modelCount",
@@ -134,7 +134,7 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   noBilling: { id: "providerPreset.noBilling", defaultMessage: "No billing" },
   searchProviders: {
     id: "provider.add.search",
-    defaultMessage: "Search model providers",
+    defaultMessage: "Search language model providers",
   },
   noMatchingProvider: {
     id: "provider.add.noMatch",
@@ -150,7 +150,7 @@ export const providersMessages = pluginNamespace("asterism.host").messages("en",
   },
   confirmAddProvider: {
     id: "provider.add.title",
-    defaultMessage: "Add model provider",
+    defaultMessage: "Add language model provider",
   },
   model: {
     id: "provider.model.label",

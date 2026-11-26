@@ -1,6 +1,6 @@
-# Model configuration
+# Language model configuration
 
-The host owns provider connections and callable model records. Paradigm plugins own reusable selections and execution configuration. Builtin implements model roles and Agent configurations in its own settings. Exact schemas and defaults belong to their owning source.
+The host owns configured language model connections and callable model records. A model category owns its catalog, protocol registry, and resolution; the provider/model pair does not identify a category. Paradigm plugins own reusable selections and execution configuration. Builtin implements model roles and Agent configurations in its own settings. Exact schemas and defaults belong to their owning source.
 
 ## Connections and presets
 
@@ -50,7 +50,7 @@ Client validation protects request structure, resource authorization, and applic
 
 A model expression identifies a provider and service model, split at the first slash. Thinking is an independent selection, though historical display expressions may append a standard level.
 
-The SDK model target names a concrete provider, service model, and optional thinking level. The host resolves that exact pair and does not interpret roles. Missing or disabled models and unavailable credentials fail explicitly.
+The shared SDK `ModelTarget` names a concrete provider and service model. `LanguageModelTarget` adds optional thinking. The host resolves the exact pair in the language model catalog; it does not interpret roles or try another category. Missing or disabled models and unavailable credentials fail explicitly. Existing `model:` links, Agent selections, and conversation history refer to the language catalog. A consumer that combines catalogs needs independent category context; it does not change the `provider/model` expression.
 
 Builtin resolves its roles and optional Agent overrides before calling the host. A missing override inherits the role. A nonempty invalid reference fails instead of falling back.
 
@@ -106,6 +106,8 @@ The host usage service shares state by connection. Query results and failures fo
 
 Every consumer presents availability with the same levels. Exhausted, shown in red, means no request can succeed: any window at zero or any balance at or below zero. Low, shown in amber, marks a window under a quarter remaining or a balance under ten. The balance threshold compares the bare number regardless of unit, because how fast work drains a balance shows in its magnitude. Query failure is a separate mark, and an item list that has not yet reported stays neutral. Consumers read the shared cache independently; a read finding a fresh result reuses it, so a refresh by one consumer serves the others without coordination.
 
+Language-provider quota observations belong to the language connection. A provider ID alone is not a cross-category account identity; if two connections explicitly share an account, a shared account view needs its own identity.
+
 The usage service preserves a previous successful result when refresh fails and labels it accordingly. A predicted reset time does not manufacture new quota. Precise refresh intervals and query paths belong to the service and provider implementations.
 
 ## Reference pricing
@@ -116,7 +118,7 @@ Rates distinguish modality, charge category, unit, and quantity basis. Missing p
 
 Input-length tiers select the highest applicable threshold using one request’s total input, including cache. The selected tier prices the whole request; it is not progressive billing. Missing tier rates do not inherit the base tier.
 
-Estimate each request using its actual recorded model identity before aggregation. Deleted or ambiguous models leave price unknown. Changing current prices changes historical estimates.
+The usage ledger records the estimate using the configured pricing at request time, before aggregation. Later edits or deletion of a model do not change that ledger estimate. A diagnostic that estimates separately from stored token counts and current configuration is a new estimate, not an account charge.
 
 Reported input already includes cache reads and writes. Reported output includes reasoning. Split only where the required quantities and prices establish a valid partition. Missing subcounts do not become zero, and inconsistent totals invalidate the split.
 

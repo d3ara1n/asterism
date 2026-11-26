@@ -37,9 +37,9 @@ const stateNote = (state: ProviderUsageState | undefined) => !state || state.sta
  * expanded lifts it into a floating panel over the conversation list with one meter per connection. Only the handle switches
  * arrangements. Reads follow mount and change notifications; expanded also polls, and its single refresh forces every query.
  */
-export function UsagePanel({ modelProviders }: { modelProviders: readonly ModelProvider[] }) {
+export function UsagePanel({ languageModelProviders }: { languageModelProviders: readonly ModelProvider[] }) {
   const i18n = useI18n();
-  const providers = modelProviders.filter(provider => provider.enabled && provider.usage);
+  const providers = languageModelProviders.filter(provider => provider.enabled && provider.usage);
   const [open, setOpen] = useState(false);
   const usage = useProviderUsages(providers.map(provider => provider.id), open);
   if (!providers.length) return null;

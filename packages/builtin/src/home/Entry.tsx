@@ -40,8 +40,8 @@ export function ConversationEntry({ ready, open, folder }: SessionEntryProps) {
   const agent = snapshot?.agents.find(agent => agent.id === agentId && agent.enabled);
   const canSend = ready && !busy && !input.uploading && !!agent && (!!input.text.trim() || !!input.files.length);
   const guidance = !snapshot ? null
-    : !snapshot.modelProviders.length ? { message: homeMessages.setupProvider, action: homeMessages.openProviders, run: () => settings.openHost("providers") }
-    : !snapshot.models.length ? { message: homeMessages.setupModel, action: homeMessages.openModels, run: () => settings.openHost("providers") }
+    : !snapshot.languageModelProviders.length ? { message: homeMessages.setupProvider, action: homeMessages.openProviders, run: () => settings.openHost("providers") }
+    : !snapshot.languageModels.length ? { message: homeMessages.setupModel, action: homeMessages.openModels, run: () => settings.openHost("providers") }
     : !snapshot.roles.some(role => role.model !== null) ? { message: homeMessages.setupRole, action: homeMessages.openRoles, run: () => settings.open("asterism.builtin", "roles") }
     : null;
   const submit = async () => {

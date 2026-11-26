@@ -1,6 +1,6 @@
 import { builtin, AutomaticSessionName, type ModelRole } from "@asterism-app/builtin-api/contracts";
-import { present, type ModelTarget, type SessionSnapshot } from "@asterism-app/sdk/contracts";
-import { PluginApiError, type ModelServices, type SessionExecutor } from "@asterism-app/sdk/runtime";
+import { present, type LanguageModelTarget, type SessionSnapshot } from "@asterism-app/sdk/contracts";
+import { PluginApiError, type LanguageModelServices, type SessionExecutor } from "@asterism-app/sdk/runtime";
 import { resolveRoleTarget } from "../configuration/runtime.ts";
 import { namingMessages } from "../messages/naming.ts";
 import { cleanTitle, collectTurns, namingInstruction, namingPrompt, namingState, userMessages, type AutomaticNamingTrigger } from "./policy.ts";
@@ -8,7 +8,7 @@ import { cleanTitle, collectTurns, namingInstruction, namingPrompt, namingState,
 const timeoutMs = 10_000;
 const responseLimit = 4000;
 
-async function generateTitle(models: Pick<ModelServices, "stream">, target: ModelTarget, prompt: string, signal: AbortSignal, sessionId: string, userAgent?: string): Promise<string> {
+async function generateTitle(models: Pick<LanguageModelServices, "stream">, target: LanguageModelTarget, prompt: string, signal: AbortSignal, sessionId: string, userAgent?: string): Promise<string> {
   let text = "", finished = false;
   const textParts = new Set<string>();
   for await (const event of models.stream({
@@ -35,7 +35,7 @@ async function generateTitle(models: Pick<ModelServices, "stream">, target: Mode
 }
 
 export interface NamingDependencies {
-  models: Pick<ModelServices, "stream">;
+  models: Pick<LanguageModelServices, "stream">;
   roles(): readonly ModelRole[];
   userAgent?: string;
 }

@@ -31,7 +31,7 @@ function WindowUsage({ insight, selection }: { insight: ContextInsight; selectio
   const { snapshot: configuration } = useSettingsConfiguration();
   const usage = insight.usage;
   if (!usage) return <Section title={i18n.text(messages.window)}><p className="type-caption">{i18n.text(messages.noUsage)}</p></Section>;
-  const measured = diagnosticModel({ model: usage.model, modelScope: usage.scope }, configuration?.models ?? []);
+  const measured = diagnosticModel({ model: usage.model, modelScope: usage.scope }, configuration?.languageModels ?? []);
   const current = configuration && selection ? resolveAgentModel(configuration, selection) : null;
   const changed = measured && current && modelReference(measured) !== modelReference(current);
   if (usage.compressedAfter) return <Section title={i18n.text(messages.window)}><p className="type-caption">{i18n.text(messages.compressed)}</p></Section>;

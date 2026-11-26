@@ -169,7 +169,7 @@ function BudgetPanel({ page, now, revision }: { page: ViewProps["page"]; now: nu
 function BalancesPanel({ offset, now, revision }: { offset: number; now: number; revision: number }) {
   const i18n = useI18n();
   const { snapshot } = useConfiguration(true);
-  const providers = useMemo(() => (snapshot?.modelProviders ?? []).filter(provider => provider.enabled && provider.usage), [snapshot?.modelProviders]);
+  const providers = useMemo(() => (snapshot?.languageModelProviders ?? []).filter(provider => provider.enabled && provider.usage), [snapshot?.languageModelProviders]);
   const usage = useProviderUsages(useMemo(() => providers.map(provider => provider.id), [providers]), true);
   const week = useMemo(() => ({ from: now - 7 * 86_400_000, to: null, utcOffsetMinutes: offset }), [now, offset]);
   const spend = useTelemetry(week, { kind: "breakdown", dimension: "provider", limit: 100, latency: false }, revision, providers.length > 0);

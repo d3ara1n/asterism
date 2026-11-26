@@ -33,14 +33,14 @@ function ModelSelect({ value, onChange, disabled }: { value: string | null; onCh
   const i18n = useI18n();
   const { snapshot } = useSettingsConfiguration();
   if (!snapshot) return null;
-  const missing = value !== null && !snapshot.models.some(model => modelReference(model) === value);
+  const missing = value !== null && !snapshot.languageModels.some(model => modelReference(model) === value);
   return <Select value={value ?? UNSET} disabled={disabled} onValueChange={next => onChange(next === UNSET ? null : next)}>
     <SelectTrigger size="sm" className="w-48" aria-invalid={missing || undefined} aria-label={i18n.formatMessage(rolesMessages.model)}><SelectValue /></SelectTrigger>
     <SelectContent>
       <SelectItem value={UNSET}>{i18n.formatMessage(rolesMessages.noModel)}</SelectItem>
       {missing && <SelectItem value={value} disabled>{i18n.formatMessage(rolesMessages.unavailableModel)}</SelectItem>}
-      {snapshot.modelProviders.map(provider => {
-        const models = snapshot.models.filter(model => model.providerId === provider.id);
+      {snapshot.languageModelProviders.map(provider => {
+        const models = snapshot.languageModels.filter(model => model.providerId === provider.id);
         if (!models.length) return null;
         return <SelectGroup key={provider.id}><SelectSeparator /><SelectLabel>{provider.name}</SelectLabel>
           {models.map(model => <SelectItem key={modelReference(model)} value={modelReference(model)} className={cn(!(model.enabled && provider.enabled) && "text-muted-foreground")}>
@@ -105,7 +105,7 @@ function RoleRow({ role, snapshot, selected, onOpen }: {
     description={role.description}
     actions={<>
       <ModelSelect value={role.model} disabled={busy} onChange={next => patch("model", next)} />
-      <ThinkingSelect value={role.thinking} model={snapshot.models.find(model => modelReference(model) === role.model) ?? null}
+      <ThinkingSelect value={role.thinking} model={snapshot.languageModels.find(model => modelReference(model) === role.model) ?? null}
         disabled={busy} onChange={next => patch("thinking", next)} />
       <Switch aria-label={i18n.formatMessage(rolesMessages.enableRole, { role_name: role.id })} checked={role.enabled} disabled={busy} onCheckedChange={next => patch("enabled", next)} />
     </>} />;

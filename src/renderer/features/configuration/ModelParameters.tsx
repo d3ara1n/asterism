@@ -66,7 +66,7 @@ export function useModelParameters(modelId: string, disabled: boolean, onFetched
   const fetchParameters = async () => {
     if (!lookupId || pending || disabled) return;
     setReport(null);
-    const response = await run({ type: "model.parameters", modelId });
+    const response = await run({ type: "languageModel.parameters", modelId });
     if (!response?.parameterUpdate) return;
     setReport(response.parameterUpdate);
     onFetched(response.parameterUpdate.parameters);

@@ -4,17 +4,17 @@ import type { PluginContext } from "@asterism-app/sdk/runtime";
 /** Example consumer: actively queries before a request and parses response headers against the current catalog for the response's connection. */
 export async function* streamWithUsage(plugin: PluginContext, connectionId: string, request: StreamRequest,
   receive: (items: UsageItem[]) => void) {
-  const connection = plugin.modelProviders.get(connectionId);
+  const connection = plugin.languageModelProviders.get(connectionId);
   const usage = connection?.enabled && connection.usage ? plugin.usageProviders.get(connection.usage) : null;
   if (connection && usage && usage.source !== "headers") {
-    const credential = await plugin.modelProviders.credential(connection.id, { signal: request.signal });
+    const credential = await plugin.languageModelProviders.credential(connection.id, { signal: request.signal });
     const items = await plugin.usages.query(usage.id, { connection: { id: connection.id, endpoint: connection.baseUrl }, credential, signal: request.signal });
     receive(items);
   }
-  for await (const event of plugin.models.stream(request)) {
+  for await (const event of plugin.languageModels.stream(request)) {
     const response = event.type === "finish" ? event.response : null;
     if (response) {
-      const current = plugin.modelProviders.get(response.connection.id);
+      const current = plugin.languageModelProviders.get(response.connection.id);
       const parser = current?.enabled && current.usage ? plugin.usageProviders.get(current.usage) : null;
       if (parser?.source === "headers") {
         try {

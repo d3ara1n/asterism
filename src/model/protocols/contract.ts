@@ -1,4 +1,4 @@
-import type { ModelPart, ModelProtocolId } from "@asterism-app/sdk/contracts";
+import type { ModelPart, LanguageModelProtocolId } from "@asterism-app/sdk/contracts";
 import type { Tool, wrapLanguageModel } from "ai";
 import type { ProtocolTarget } from "../compatibility.ts";
 import type { ModelEvent, ToolDeclaration } from "../contract.ts";
@@ -27,8 +27,8 @@ export interface ProtocolMeter {
  * history projection, tool-call pairing, cancellation, and metering; protocols own encoding, decoding,
  * and the shape of their native continuation data.
  */
-export interface ModelProtocol {
-  readonly id: ModelProtocolId;
+export interface LanguageModelProtocol {
+  readonly id: LanguageModelProtocolId;
   /** Identifies the native continuation encoding produced by this protocol; native data is reused only with an equal format. */
   readonly continuationFormat: string;
   /** Whether AI SDK reasoning-* stream parts carry this protocol's thinking blocks. */

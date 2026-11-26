@@ -3,17 +3,17 @@ import type { ConfigurationService } from "../configuration/service.ts";
 import { AiSdkAdapter } from "../model/ai-sdk.ts";
 import { ModelFailure, type ModelAdapter, type ModelEvent } from "../model/contract.ts";
 import { runModelRequest } from "../execution/request.ts";
-import { formatModelExpression, modelInfoSchema, type ModelRunRequest, type ModelRunResult, type ModelTarget, type StreamRequest, type SystemPrompt } from "@asterism-app/sdk/contracts";
-import { modelReference, parseModelExpression, resolveProviderModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
+import { formatModelExpression, languageModelInfoSchema, type ModelRunRequest, type ModelRunResult, type LanguageModelTarget, type StreamRequest, type SystemPrompt } from "@asterism-app/sdk/contracts";
+import { modelReference, parseModelExpression, resolveLanguageModel, type ConfigurationSnapshot, type ThinkingLevel } from "../shared/configuration.ts";
 import { modelExpression, modelScope, type ModelSettings } from "../shared/model.ts";
 import { PluginApiError } from "@asterism-app/sdk/runtime";
-import type { ModelServices } from "@asterism-app/sdk/runtime";
+import type { LanguageModelServices } from "@asterism-app/sdk/runtime";
 import { inputReferences, resolveInput, type ModelContent } from "../model/input.ts";
 import type { ModelItem, RequestTiming, Usage } from "@asterism-app/sdk/contracts";
 import type { ModelUsageRecord, ToolUsageRecord, UsageSubjectRecord } from "../telemetry/types.ts";
 
 /** Model targets identify concrete provider/model pairs; paradigms resolve their own configuration. */
-export type { ModelTarget, StreamRequest } from "@asterism-app/sdk/contracts";
+export type { LanguageModelTarget, StreamRequest } from "@asterism-app/sdk/contracts";
 export type ModelTargetError = "model_unavailable" | "credential_unavailable";
 export class ModelTargetFailure extends PluginApiError {
   constructor(readonly reason: ModelTargetError, message: string) { super("unavailable", message); }
@@ -40,6 +40,7 @@ function usageRecord(telemetry: ModelCallTelemetry, settings: ModelSettings, ses
   const timing = settled.timing;
   return {
     id: settled.id ?? randomUUID(), startedAt: timing ? Date.parse(timing.startedAt) : startedAt,
+    modelKind: "language",
     durationMs: timing?.durationMs ?? Date.now() - startedAt, firstOutputMs: timing?.firstOutputMs ?? null,
     pluginId: telemetry.pluginId, purposeId: telemetry.purposeId, sessionId: sessionId ?? null,
     providerId: settings.provider.id, providerName: settings.provider.name, modelId: settings.model.modelId, thinking: settings.thinking,
@@ -56,37 +57,37 @@ interface HostInputOptions {
   content?: (messages: readonly ModelItem[]) => ModelContent | undefined;
   telemetry?: ModelCallTelemetry;
 }
-export interface HostModels {
+export interface HostLanguageModels {
   stream(request: StreamRequest, options?: HostInputOptions): AsyncIterable<ModelEvent>;
   run(request: RunRequest): Promise<ModelRunResult>;
-  validate(request: Parameters<ModelServices["validate"]>[0], options?: HostInputOptions): Promise<void>;
-  list: ModelServices["list"];
+  validate(request: Parameters<LanguageModelServices["validate"]>[0], options?: HostInputOptions): Promise<void>;
+  list: LanguageModelServices["list"];
 }
 
 /** Resolve the requested provider/model pair; adapters interpret reasoning-level encoding and request filtering. */
-export function resolveTarget(snapshot: Pick<ConfigurationSnapshot, "modelProviders" | "models">, target: ModelTarget):
+export function resolveLanguageModelTarget(snapshot: Pick<ConfigurationSnapshot, "languageModelProviders" | "languageModels">, target: LanguageModelTarget):
   { ok: true; model: string; thinking: ThinkingLevel | null } | { ok: false; reason: ModelTargetError } {
   const model = formatModelExpression(target), thinking = target.thinking ?? null;
   const parsed = parseModelExpression(model);
   if (!parsed || parsed.provider !== target.provider || parsed.model !== target.model)
     return { ok: false, reason: "model_unavailable" };
-  const resolved = resolveProviderModel(snapshot, model);
+  const resolved = resolveLanguageModel(snapshot, model);
   if (!resolved) return { ok: false, reason: "model_unavailable" };
   const { provider } = resolved;
   if (provider.auth === "api_key" && !provider.apiKey) return { ok: false, reason: "credential_unavailable" };
   return { ok: true, model, thinking };
 }
 
-export function createModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter,
-  recordUsage: RecordModelUsage = () => {}): HostModels {
+export function createLanguageModelServices(configuration: ConfigurationService, adapterFactory?: (settings: ModelSettings) => ModelAdapter,
+  recordUsage: RecordModelUsage = () => {}): HostLanguageModels {
   // Capture current connection settings before requests; catalog reads remain synchronous.
-  const current = () => configuration.modelCatalog();
-  const resolve = async (target: ModelTarget, execute = true, signal?: AbortSignal): Promise<ResolvedTarget> => {
+  const current = () => configuration.languageModelCatalog();
+  const resolve = async (target: LanguageModelTarget, execute = true, signal?: AbortSignal): Promise<ResolvedTarget> => {
     await configuration.execute({ type: "read" });
     const config = current();
-    const result = resolveTarget(config, target);
+    const result = resolveLanguageModelTarget(config, target);
     if (!result.ok) throw new ModelTargetFailure(result.reason, `The model target ${target.provider}/${target.model} is unavailable (${result.reason}).`);
-    const { model, provider } = resolveProviderModel(config, result.model)!;
+    const { model, provider } = resolveLanguageModel(config, result.model)!;
     const { apiKey: _apiKey, ...connection } = provider;
     const settings: ModelSettings = { provider: connection, model, thinking: result.thinking };
     const credential = adapterFactory || !execute ? null : await configuration.executionCredential(connection.id, signal);
@@ -95,10 +96,10 @@ export function createModelServices(configuration: ConfigurationService, adapter
     return { settings, adapter };
   };
   const catalog = {
-    models: () => {
+    languageModels: () => {
       const config = current();
-      return config.models.filter(model => resolveProviderModel(config, modelReference(model))).map(model =>
-        modelInfoSchema.parse({ ...model, model: modelReference(model), provider: model.providerId }));
+      return config.languageModels.filter(model => resolveLanguageModel(config, modelReference(model))).map(model =>
+        languageModelInfoSchema.parse({ ...model, model: modelReference(model), provider: model.providerId }));
     },
   };
   const capture = (messages: readonly ModelItem[], source?: HostInputOptions["content"]) => {
@@ -112,7 +113,7 @@ export function createModelServices(configuration: ConfigurationService, adapter
     }
   };
   return {
-    list: catalog.models,
+    list: catalog.languageModels,
     async validate(request, options) {
       request.signal.throwIfAborted();
       const { target, system, messages, userAgent, sessionId } = structuredClone({

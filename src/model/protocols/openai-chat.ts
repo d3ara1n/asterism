@@ -1,11 +1,11 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { compatibility, thinkingMappings } from "../compatibility.ts";
 import { mappedEffort, withRequestEncoding } from "../request-encoding.ts";
-import { bearerHeaders, type ModelProtocol, type ProviderOptions } from "./contract.ts";
+import { bearerHeaders, type LanguageModelProtocol, type ProviderOptions } from "./contract.ts";
 import { projectChatFiles } from "./openai-chat-files.ts";
 
 /** Chat Completions has no native continuation data and no public reasoning input. */
-export const openaiChat: ModelProtocol = {
+export const openaiChat: LanguageModelProtocol = {
   id: "openai-chat",
   continuationFormat: "openai-chat/1",
   sdkReasoning: true,

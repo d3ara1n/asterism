@@ -1,8 +1,8 @@
 import {
   formatModelExpression, parseModelExpression, type ModelBlock, type ModelItem, type ModelLiveBlock,
-  type ModelRunEvent, type ModelTarget, type ResourceRef, type Usage,
+  type ModelRunEvent, type LanguageModelTarget, type ResourceRef, type Usage,
 } from "@asterism-app/sdk/contracts";
-import { PluginApiError, type ContentServices, type ExecutionServices, type ProviderUsage } from "@asterism-app/sdk/runtime";
+import { PluginApiError, type ContentServices, type ExecutionServices, type LanguageModelProviderUsage } from "@asterism-app/sdk/runtime";
 import { agentResponseBlockSchema, type AgentConfiguration, type AgentResponseBlock, type ModelRole } from "@asterism-app/builtin-api/contracts";
 import { resolveRoleTarget } from "../configuration/runtime.ts";
 import type { createRequestAssembly } from "../agent/preparation.ts";
@@ -32,7 +32,7 @@ export interface ExecutionDependencies {
   prepare: ReturnType<typeof createRequestAssembly>;
   execution: ExecutionServices;
   content: ContentServices;
-  usage: Pick<ProviderUsage, "consume">;
+  usage: Pick<LanguageModelProviderUsage, "consume">;
   userAgent: string;
   changed(): void;
   auditFailed(runId: string, error: unknown): void;
@@ -46,7 +46,7 @@ function resolveAgent(configuration: ReturnType<ExecutionDependencies["configura
 
 /** An explicit model selection replaces the role's model and thinking level; otherwise the role's ModelRole resolves, then the default ModelRole's model. */
 export function resolveTask(configuration: ReturnType<ExecutionDependencies["configuration"]>, input: Pick<DelegationInput, "role" | "model">): {
-  agent: AgentConfiguration; target: ModelTarget;
+  agent: AgentConfiguration; target: LanguageModelTarget;
 } {
   const agent = resolveAgent(configuration, input.role);
   if (input.model) {

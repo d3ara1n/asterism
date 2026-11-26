@@ -23,13 +23,13 @@ const documentSchema = z.strictObject({
   shell: shellSettingsSchema,
   webProviders: z.array(webProviderStateSchema),
   messagingConnections: z.array(messagingConnectionSchema),
-  modelProviders: z.array(storedProviderSchema), models: z.array(storedModelSchema),
+  languageModelProviders: z.array(storedProviderSchema), languageModels: z.array(storedModelSchema),
   sessionEntry: sessionEntrySelectionSchema.nullable(),
   sessionLifecycle: sessionLifecycleSchema,
   showUsage: z.boolean(),
   usageBudget: usageBudgetSchema,
 }).superRefine((document, context) => {
-  for (const key of ["modelProviders", "webProviders", "messagingConnections", "models"] as const) {
+  for (const key of ["languageModelProviders", "webProviders", "messagingConnections", "languageModels"] as const) {
     const ids = new Set<string>();
     document[key].forEach((item, index) => {
       const key_ = keyOf(item);
@@ -41,18 +41,18 @@ const documentSchema = z.strictObject({
 
 type ConfigurationDocument = z.infer<typeof documentSchema>;
 export type StoredModelProvider = z.infer<typeof storedProviderSchema>;
-const collections = { messaging: "messagingConnections", modelProvider: "modelProviders", webProvider: "webProviders", model: "models" } as const;
+const collections = { messaging: "messagingConnections", languageModelProvider: "languageModelProviders", webProvider: "webProviders", languageModel: "languageModels" } as const;
 export type ConfigurationKind = keyof typeof collections;
 type Entry = { [K in ConfigurationKind]: ConfigurationDocument[(typeof collections)[K]][number] };
 type ConfigurationSave =
   | { kind: "messaging"; id: string | null; value: MessagingConnection }
   | { kind: "webProvider"; id: string; value: WebProviderState }
-  | { kind: "modelProvider"; id: string | null; value: ModelProvider }
-  | { kind: "model"; id: string | null; value: ProviderModel };
+  | { kind: "languageModelProvider"; id: string | null; value: ModelProvider }
+  | { kind: "languageModel"; id: string | null; value: ProviderModel };
 
 function initialConfiguration(): ConfigurationDocument {
   return { version: configurationVersion, mcp: structuredClone(defaultMcpSettings), mcpAuthorizations: {},
-    shell: structuredClone(defaultShellSettings), messagingConnections: [], modelProviders: [], webProviders: [], models: [],
+    shell: structuredClone(defaultShellSettings), messagingConnections: [], languageModelProviders: [], webProviders: [], languageModels: [],
     sessionEntry: null, sessionLifecycle: structuredClone(defaultSessionLifecycle), showUsage: true, usageBudget: null };
 }
 /** Locate by old identity and replace; reject new identities that conflict with other entries. */
@@ -114,12 +114,12 @@ export class ConfigurationStore {
     switch (input.kind) {
       case "messaging": upsert(next.messagingConnections, input.id, input.value); break;
       case "webProvider": upsert(next.webProviders, input.id, input.value); break;
-      case "modelProvider":
-        upsert(next.modelProviders, id, input.value);
+      case "languageModelProvider":
+        upsert(next.languageModelProviders, id, input.value);
         // Providers own their models: renaming moves models with them without rewriting saved model references.
-        if (id !== null && id !== input.value.id) for (const model of next.models) if (model.providerId === id) model.providerId = input.value.id;
+        if (id !== null && id !== input.value.id) for (const model of next.languageModels) if (model.providerId === id) model.providerId = input.value.id;
         break;
-      case "model": upsert(next.models, id, input.value); break;
+      case "languageModel": upsert(next.languageModels, id, input.value); break;
     }
     this.commit(next);
   }
@@ -135,18 +135,18 @@ export class ConfigurationStore {
   private validateEdit(input: ConfigurationSave): void {
     const reject = () => { throw new ConfigurationError("invalid_request",
       "Fixed connection settings cannot be changed.", providerEditingMessages.fixed); };
-    if (input.kind === "modelProvider" && input.id !== null) {
-      const previous = this.get("modelProvider", input.id);
+    if (input.kind === "languageModelProvider" && input.id !== null) {
+      const previous = this.get("languageModelProvider", input.id);
       if (!previous) return;
       const fixed = previous.fixedFields ?? [];
       const nextFixed = input.value.fixedFields ?? [];
       if (fixed.length !== nextFixed.length || fixed.some(field => !nextFixed.includes(field))) reject();
       for (const field of fixed) if (!isDeepStrictEqual(previous[field], input.value[field])) reject();
     }
-    if (input.kind === "model") {
-      const provider = this.get("modelProvider", input.value.providerId);
+    if (input.kind === "languageModel") {
+      const provider = this.get("languageModelProvider", input.value.providerId);
       if (!provider || canEditModelProviderField(provider, "compatibility")) return;
-      const previous = input.id === null ? null : this.get("model", input.id);
+      const previous = input.id === null ? null : this.get("languageModel", input.id);
       const compatibility = previous?.providerId === provider.id ? previous.compatibility : [];
       if (!isDeepStrictEqual(compatibility, input.value.compatibility)) reject();
     }
@@ -160,20 +160,20 @@ export class ConfigurationStore {
     switch (kind) {
       case "messaging": next.messagingConnections = next.messagingConnections.filter(item => item.id !== id); break;
       case "webProvider": next.webProviders = next.webProviders.filter(item => item.id !== id); break;
-      case "modelProvider": next.modelProviders = next.modelProviders.filter(item => item.id !== id); next.models = next.models.filter(item => item.providerId !== id); break;
-      case "model": next.models = next.models.filter(item => modelReference(item) !== id); break;
+      case "languageModelProvider": next.languageModelProviders = next.languageModelProviders.filter(item => item.id !== id); next.languageModels = next.languageModels.filter(item => item.providerId !== id); break;
+      case "languageModel": next.languageModels = next.languageModels.filter(item => modelReference(item) !== id); break;
     }
     this.commit(next);
   }
   /** Save all selections together; existing models retain their values and retries do not overwrite user configuration. */
   addModels(models: ProviderModel[]): void {
     const next = structuredClone(this.document);
-    const existing = new Set(next.models.map(modelReference));
+    const existing = new Set(next.languageModels.map(modelReference));
     for (const model of models) if (!existing.has(modelReference(model))) {
-      next.models.push(model);
+      next.languageModels.push(model);
       existing.add(modelReference(model));
     }
-    if (next.models.length !== this.document.models.length) this.commit(next);
+    if (next.languageModels.length !== this.document.languageModels.length) this.commit(next);
   }
   private commit(raw: ConfigurationDocument): void {
     let next: ConfigurationDocument;

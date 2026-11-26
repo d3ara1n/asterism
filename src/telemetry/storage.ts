@@ -66,11 +66,12 @@ const schemaSql = `
     tier_from_input_tokens INTEGER,
     outcome TEXT NOT NULL CHECK (outcome IN ('completed', 'failed', 'cancelled')),
     error_origin TEXT,
-    error_code TEXT
+    error_code TEXT,
+    model_kind TEXT NOT NULL DEFAULT 'language' CHECK (model_kind IN ('language', 'decision'))
   ) STRICT;
   CREATE INDEX model_usage_started ON model_usage_events(started_at);
   CREATE INDEX model_usage_session ON model_usage_events(session_id, started_at);
-  CREATE INDEX model_usage_model ON model_usage_events(provider_id, model_id, started_at);
+  CREATE INDEX model_usage_model ON model_usage_events(model_kind, provider_id, model_id, started_at);
   CREATE INDEX model_usage_plugin ON model_usage_events(plugin_id, purpose_id, started_at);
 
   CREATE TABLE tool_usage_events (

@@ -1,5 +1,5 @@
 import type { ActionContract, CreationContract, Presentation, Source, DataContract, Json, ResourceRef, ResourceCreationResult, SessionDirectory } from "@asterism-app/sdk/contracts";
-import type { CallContribution, ContentReader, ContextFile, ManualSource, ModelProviderServices, ProviderUsage, ResourceActionOptions, ResourceCreationOptions, ToolCaller, SessionPreparation, PreparedCreation, UsageProviderServices } from "@asterism-app/sdk/runtime";
+import type { CallContribution, ContentReader, ContextFile, ManualSource, LanguageModelProviderServices, LanguageModelProviderUsage, ResourceActionOptions, ResourceCreationOptions, ToolCaller, SessionPreparation, PreparedCreation, UsageProviderServices } from "@asterism-app/sdk/runtime";
 import type { NewNode, SessionNode } from "../shared/session.ts";
 import type { FoldedObject, FoldedState } from "../session/fold.ts";
 import type { AgentCapabilities, ToolPolicy } from "../execution/capabilities.ts";
@@ -19,9 +19,9 @@ export interface SharedServices {
   mcp: McpApplication;
   shell: ShellServices;
   deadlines: import("@asterism-app/sdk/runtime").DeadlineServices;
-  usage: ProviderUsage;
+  usage: LanguageModelProviderUsage;
   agentCatalog: AgentCatalogService;
-  modelProviders: ModelProviderServices;
+  languageModelProviders: LanguageModelProviderServices;
   usageProviders: UsageProviderServices;
   webProviders: WebProviderRegistry;
   messaging: MessagingRegistry;

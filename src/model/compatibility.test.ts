@@ -3,7 +3,7 @@ import { generateText } from "ai";
 import { thinkingLevels } from "@asterism-app/sdk/contracts";
 import { AiSdkAdapter } from "./ai-sdk.ts";
 import { createProviderModel } from "./provider.ts";
-import { modelProtocol } from "./protocols/index.ts";
+import { languageModelProtocol } from "./protocols/index.ts";
 import { modelScope, type Json } from "../shared/model.ts";
 import { projectSystemPrompt } from "./system-prompt.ts";
 
@@ -109,7 +109,7 @@ describe("Freeform tools on the provider wire", () => {
     const end = events.find(event => event.type === "part.end" && event.partId === "tool:call_note");
     if (end?.type !== "part.end" || !end.input) throw new Error("Expected completed tool input.");
     current.messages.push(
-      { kind: "output", scope: modelScope(current.settings), adapter: modelProtocol("openai-responses").continuationFormat, parts: [
+      { kind: "output", scope: modelScope(current.settings), adapter: languageModelProtocol("openai-responses").continuationFormat, parts: [
         { kind: "toolcall", callId: item.call_id, name: item.name, input: end.input, continuation: end.continuation ?? null },
       ] },
       { kind: "result", callId: item.call_id, name: item.name, error: false, parts: [{ kind: "text", text: "Formatted" }] },
@@ -174,7 +174,7 @@ describe("Freeform tools on the provider wire", () => {
     const output = current.messages.at(-2);
     if (output?.kind !== "output") throw new Error("Expected model output.");
     output.scope = modelScope(current.settings);
-    output.adapter = modelProtocol("openai-responses").continuationFormat;
+    output.adapter = languageModelProtocol("openai-responses").continuationFormat;
     output.parts.unshift({ kind: "thinking", text: "Think", summary: "", continuation: null });
     output.parts.push({ kind: "toolcall", callId: "call_old", name: "label", input: { kind: "structured", value: { text: "note" } }, continuation: null });
     current.messages.push({ kind: "result", callId: "call_old", name: "label", error: false, parts: [{ kind: "text", text: "Labeled" }] });
@@ -370,7 +370,7 @@ describe("Explicit compatibility and target projection", () => {
   // Public contract: summaries cannot fill full text; reusable origin ciphertext takes precedence and ciphertext with empty text must survive.
   it("Responses encodes plaintext, summaries, and native ciphertext separately without changing history", async () => {
     const current = input();
-    current.messages = [{ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
+    current.messages = [{ kind: "output", adapter: languageModelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
       { kind: "thinking", text: "Plain", summary: "Summary", continuation: null },
       { kind: "thinking", text: "", summary: "Summary only", continuation: null },
       { kind: "thinking", text: "Visible full text", summary: "Opaque summary",
@@ -424,7 +424,7 @@ describe("Explicit compatibility and target projection", () => {
   it("omits stored item IDs from a stateless gateway request without losing its reasoning or tool call IDs", async () => {
     const current = input();
     current.settings.provider.compatibility = [{ id: "responsesOmitStoredItems" }];
-    current.messages = [{ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
+    current.messages = [{ kind: "output", adapter: languageModelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
       { kind: "thinking", text: "", summary: "", continuation: { itemId: "rs_native", reasoningEncryptedContent: "cipher" } },
       { kind: "toolcall", callId: "call", name: "read", input: { kind: "structured", value: {} }, continuation: { itemId: "fc_native" } },
     ] }, { kind: "result", callId: "call", name: "read", error: false, parts: [{ kind: "text", text: "Result" }] }];
@@ -440,7 +440,7 @@ describe("Explicit compatibility and target projection", () => {
   // Messages signatures must match original text; unsigned text encodes unchanged, summaries are not disguised as thinking, and redacted-only blocks continue normally.
   it("Messages natively supports unsigned plaintext, signatures, and redacted reasoning while preserving relative tool order", async () => {
     const current = input("anthropic");
-    current.messages = [{ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
+    current.messages = [{ kind: "output", adapter: languageModelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
       { kind: "thinking", text: "  Signed\n", summary: "Display only", continuation: { signature: "signed" } },
       { kind: "thinking", text: "", summary: "", continuation: { signature: "empty-signed" } },
       { kind: "toolcall", callId: "call", name: "read", input: { kind: "structured", value: {} }, continuation: null },
@@ -468,7 +468,7 @@ describe("Explicit compatibility and target projection", () => {
   // The SDK trims the last assistant's final text segment; valid leading whitespace must not invalidate reasoning insertion plans or affect original signed text.
   it("Messages accounts for SDK trimming of final text while signed reasoning retains original whitespace", async () => {
     const current = input("anthropic");
-    current.messages = [{ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
+    current.messages = [{ kind: "output", adapter: languageModelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
       { kind: "thinking", text: "  Thought\n", summary: "", continuation: { signature: "signed" } },
       { kind: "text", text: "  Indented answer\n", continuation: null },
     ] }];
@@ -589,7 +589,7 @@ describe("Explicit compatibility and target projection", () => {
     const current = input(protocol);
     const native: Json = protocol === "anthropic" ? { signature: "native-token" }
       : { itemId: "rs_native", reasoningEncryptedContent: "native-token" };
-    current.messages.push({ kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
+    current.messages.push({ kind: "output", adapter: languageModelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
       { kind: "thinking", summary: "", text: "Visible thought", continuation: native },
       { kind: "text", text: "Portable answer", continuation: null },
     ] });
@@ -603,7 +603,7 @@ describe("Explicit compatibility and target projection", () => {
     const resumed = structuredClone(current);
     const foreign: Json = other.settings.provider.protocol === "anthropic" ? { signature: "foreign-token" }
       : { itemId: "rs_foreign", reasoningEncryptedContent: "foreign-token" };
-    resumed.messages.push({ kind: "output", adapter: modelProtocol(other.settings.provider.protocol).continuationFormat, scope: modelScope(other.settings), parts: [
+    resumed.messages.push({ kind: "output", adapter: languageModelProtocol(other.settings.provider.protocol).continuationFormat, scope: modelScope(other.settings), parts: [
       { kind: "thinking", summary: "", text: "B thought", continuation: foreign },
       { kind: "text", text: "B answer", continuation: null },
     ] });
@@ -630,7 +630,7 @@ describe("Explicit compatibility and target projection", () => {
         { kind: "toolcall", callId: "same_id", name: "lookup", input: { kind: "structured", value: {} }, continuation: null },
       ] },
       { kind: "result", callId: "same_id", name: "lookup", error: false, parts: [{ kind: "text", text: "Foreign result" }] },
-      { kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
+      { kind: "output", adapter: languageModelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings), parts: [
         { kind: "toolcall", callId: "same_id", name: "lookup", input: { kind: "structured", value: {} }, continuation: null },
       ] },
       { kind: "result", callId: "same_id", name: "lookup", error: false, parts: [{ kind: "text", text: "Native result" }] },
@@ -650,7 +650,7 @@ describe("Explicit compatibility and target projection", () => {
     current.settings.thinking = null;
     current.settings.model.generation.maxOutputTokens = null;
     current.messages.push(
-      { kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings),
+      { kind: "output", adapter: languageModelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings),
         parts: ["call", "second"].map(callId => ({ kind: "toolcall", callId, name: "lookup", input: { kind: "structured", value: {} }, continuation: null })) },
       { kind: "result", callId: "call", name: "lookup", error: false, parts: [
         { kind: "text", text: "First result" },
@@ -659,7 +659,7 @@ describe("Explicit compatibility and target projection", () => {
         { kind: "text", text: "End of first result" },
       ] },
       { kind: "result", callId: "second", name: "lookup", error: false, parts: [{ kind: "text", text: "Second result" }] },
-      { kind: "output", adapter: modelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings),
+      { kind: "output", adapter: languageModelProtocol(current.settings.provider.protocol).continuationFormat, scope: modelScope(current.settings),
         parts: [{ kind: "text", text: "Following answer", continuation: null }] },
     );
     return current;

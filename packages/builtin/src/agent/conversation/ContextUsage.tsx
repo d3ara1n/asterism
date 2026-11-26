@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { modelReference } from "@asterism-app/sdk/contracts";
 import { useI18n, useRendererCatalogs, useRendererObject, useSessionRead } from "@asterism-app/sdk/renderer";
-import { ModelCatalog } from "@asterism-app/sdk/contracts";
+import { LanguageModelCatalog } from "@asterism-app/sdk/contracts";
 import { useAgentModelSelection } from "@asterism-app/builtin-api/renderer";
 import { formatCount } from "@asterism-app/ui/format-count";
 import { ProgressRing } from "@asterism-app/ui/ui/progress-ring";
@@ -18,12 +18,12 @@ export function ContextUsage() {
   const i18n = useI18n();
   const object = useRendererObject();
   const snapshot = object.session.snapshot();
-  const configuration = useRendererCatalogs().get(ModelCatalog);
+  const configuration = useRendererCatalogs().get(LanguageModelCatalog);
   const { model: current } = useAgentModelSelection();
   const read = useSessionRead(snapshot, useCallback((snapshot, signal) => readAgentMeasurements(snapshot, object.ref.id, signal), [object.ref.id]), { keepPrevious: true });
   const result = read.data;
   const usage = result?.usage;
-  const measured = usage ? diagnosticModel({ model: usage.model, modelScope: usage.scope }, configuration?.models ?? []) : null;
+  const measured = usage ? diagnosticModel({ model: usage.model, modelScope: usage.scope }, configuration?.languageModels ?? []) : null;
   const changed = measured && current && modelReference(measured) !== modelReference(current);
   const window = measured?.contextWindow ?? null;
   const input = usage && !usage.compressedAfter ? usage.input : null;

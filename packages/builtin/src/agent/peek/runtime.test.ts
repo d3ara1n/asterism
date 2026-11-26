@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ModelEvent, StreamRequest } from "@asterism-app/sdk/contracts";
-import type { ModelServices } from "@asterism-app/sdk/runtime";
+import type { LanguageModelServices } from "@asterism-app/sdk/runtime";
 import { sessionSnapshot } from "../../../../../src/plugins/records.ts";
 import { nodeView } from "../../../../../src/session/view.ts";
 import { message, node } from "../../../../../src/session/test-nodes.ts";
@@ -24,7 +24,7 @@ function* query(): Generator<ModelEvent> {
 }
 const model = { model: "p/m", provider: "p", name: "Model", contextWindow: 65536, cost: null, generation: { maxOutputTokens: null },
   capabilities: { reasoning: false, tools: true, thinkingLevels: [] } };
-const deps = (stream: ModelServices["stream"]) => ({
+const deps = (stream: LanguageModelServices["stream"]) => ({
   models: { stream, list: () => [model] }, utility: () => ({ provider: "p", model: "m" }), userAgent: "Asterism/test",
 });
 function target() {
@@ -40,7 +40,7 @@ describe("peek investigation stream", () => {
     let requestSignal: AbortSignal | undefined;
     let finishRequest!: () => void;
     const finished = new Promise<void>(resolve => { finishRequest = resolve; });
-    const stream: ModelServices["stream"] = async function* (input) {
+    const stream: LanguageModelServices["stream"] = async function* (input) {
       requestSignal = input.signal;
       try {
         await new Promise<void>(resolve => { input.signal.addEventListener("abort", () => resolve(), { once: true }); });
@@ -61,7 +61,7 @@ describe("peek investigation stream", () => {
 
   it("Keeps prior Peek exchanges separate from evidence, refreshes evidence for follow-ups, and leaves independent calls without history", async () => {
     const { object, nodes } = target(), requests: StreamRequest[] = [];
-    const stream: ModelServices["stream"] = async function* (input) {
+    const stream: LanguageModelServices["stream"] = async function* (input) {
       requests.push(input);
       yield* text("The change is still pending."); yield finish();
     };
@@ -105,7 +105,7 @@ describe("peek investigation stream", () => {
   it("Publishes the report before model finalization; subsequent retrieval rounds replace the draft while preserving protocol pairing and measurements", async () => {
     const { object, nodes } = target(), updates: PeekResult[] = [], targets: StreamRequest["target"][] = [];
     let request = 0;
-    const stream: ModelServices["stream"] = async function* (input) {
+    const stream: LanguageModelServices["stream"] = async function* (input) {
       targets.push({ ...input.target });
       request++;
       if (request === 1) {
@@ -139,7 +139,7 @@ describe("peek investigation stream", () => {
 
   it("Does not execute tool calls truncated by the output limit, and saves truncated reports as partial results", async () => {
     const { object } = target();
-    const stream: ModelServices["stream"] = async function* () {
+    const stream: LanguageModelServices["stream"] = async function* () {
       yield* text("Partial evidence");
       yield* query(); yield finish("length");
     };
@@ -149,7 +149,7 @@ describe("peek investigation stream", () => {
 
   it("Propagates cancellation to in-flight requests and preserves streamed body text; missing terminal state also prevents queries from starting", async () => {
     const { object } = target(), controller = new AbortController();
-    const cancelled: ModelServices["stream"] = async function* (request) {
+    const cancelled: LanguageModelServices["stream"] = async function* (request) {
       expect(request.signal).toBe(controller.signal);
       yield* text("Visible partial");
       controller.abort(); request.signal.throwIfAborted();
@@ -157,7 +157,7 @@ describe("peek investigation stream", () => {
     expect(await investigateAgent(deps(cancelled), object, { question: "Investigate" }, controller.signal, () => {}))
       .toMatchObject({ kind: "cancelled", data: { report: "Visible partial", requests: [] } });
     const updates: PeekResult[] = [];
-    const missing: ModelServices["stream"] = async function* () {
+    const missing: LanguageModelServices["stream"] = async function* () {
       yield* query();
       expect(updates.at(-1)).toMatchObject({ phase: "reading", report: "", queries: [] });
     };
@@ -167,7 +167,7 @@ describe("peek investigation stream", () => {
 
   it("Returns received text with the transport error when the stream fails during a text block", async () => {
     const { object } = target();
-    const stream: ModelServices["stream"] = async function* () {
+    const stream: LanguageModelServices["stream"] = async function* () {
       yield { type: "part.start", part: { id: "text", kind: "text" } };
       yield { type: "part.delta", partId: "text", delta: "Evidence received before disconnect" };
       throw new Error("Connection reset");
@@ -180,7 +180,7 @@ describe("peek investigation stream", () => {
   it("Rejects an oversized inline transcript before starting a model request", async () => {
     const { object, nodes } = target();
     nodes.push(node("long-dialogue", "saved", message("a", "Long conversation ".repeat(1000))));
-    const stream = vi.fn<ModelServices["stream"]>();
+    const stream = vi.fn<LanguageModelServices["stream"]>();
     const limited = deps(stream);
     limited.models.list = () => [{ ...model, contextWindow: 4096 }];
 
@@ -194,7 +194,7 @@ describe("peek investigation stream", () => {
   it("Asks for a final summary on round 24 while preserving tools and retrieval history", async () => {
     const { object } = target();
     let rounds = 0;
-    const stream: ModelServices["stream"] = async function* (input) {
+    const stream: LanguageModelServices["stream"] = async function* (input) {
       rounds++;
       const lastInput = JSON.stringify(input.messages.at(-1));
       if (rounds < 24) {
@@ -213,7 +213,7 @@ describe("peek investigation stream", () => {
 
   it("Fails explicitly when utility lacks tool capability, and ends the retrieval loop at the request limit", async () => {
     const { object } = target();
-    const stream = vi.fn<ModelServices["stream"]>(async function* () { yield* query(); yield finish("tool-calls"); });
+    const stream = vi.fn<LanguageModelServices["stream"]>(async function* () { yield* query(); yield finish("tool-calls"); });
     const unavailable = deps(stream);
     unavailable.models.list = () => [{ ...model, capabilities: { ...model.capabilities, tools: false } }];
     expect(await investigateAgent(unavailable, object, { question: "Investigate" }, new AbortController().signal, () => {}))

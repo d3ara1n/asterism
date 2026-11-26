@@ -43,7 +43,7 @@ export default definePlugin({ namespace: builtin,
       const application = plugin.application;
       const settings = plugin.config(BuiltinSettings);
       const skills = new SkillCatalog(plugin.agentCatalog);
-      const usage = plugin.providerUsage;
+      const usage = plugin.languageModelProviderUsage;
       return {
         calls: [
           implementCall(UpdateParadigmConfiguration, async input => {
