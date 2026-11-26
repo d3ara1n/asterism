@@ -232,7 +232,6 @@
   "usage.resetUnknown": "重置时间未知",
   "usage.loading": "正在查询额度…",
   "usage.empty": "未报告额度",
-  "usage.updated": "更新于 {time}",
   "usage.unavailable": "用量查询提供方不可用。",
   "usage.configuration": "API key 连接须使用 HTTPS，回环地址除外。",
   "usage.credential": "请在提供商设置中保存有效的 API key。",

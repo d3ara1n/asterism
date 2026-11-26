@@ -8,7 +8,9 @@ export const providerUsageStateSchema = z.strictObject({
   providerId: z.string(), usage: providerUsageIdSchema.nullable(),
   source: z.enum(["query", "headers"]).optional(), model: z.string().optional(),
   state: z.enum(["disabled", "waiting", "loading", "ready", "error"]),
-  items: usageItemsSchema, updatedAt: z.number().nonnegative().nullable(), error: providerUsageErrorSchema.nullable(),
+  items: usageItemsSchema, updatedAt: z.number().nonnegative().nullable(),
+  /** Successful query cache deadline (epoch milliseconds); passive observations have no deadline. */
+  expiresAt: z.number().nonnegative().nullable(), error: providerUsageErrorSchema.nullable(),
 });
 export type ProviderUsageState = z.infer<typeof providerUsageStateSchema>;
 export const ReadLanguageModelProviderUsage = defineCall("core.language-model-provider-usage.read", {

@@ -24,7 +24,6 @@ export const usageMessages = builtin.messages("en", defineMessages({
   resetUnknown: { id: "usage.resetUnknown", defaultMessage: "Reset time unavailable" },
   loading: { id: "usage.loading", defaultMessage: "Checking allowance…" },
   empty: { id: "usage.empty", defaultMessage: "No allowance reported" },
-  updated: { id: "usage.updated", defaultMessage: "Updated {time}" },
   unavailable: { id: "usage.unavailable", defaultMessage: "The usage provider is unavailable." },
   configuration: { id: "usage.configuration", defaultMessage: "API key connections require HTTPS except on loopback." },
   credential: { id: "usage.credential", defaultMessage: "Save a valid API key in provider settings." },

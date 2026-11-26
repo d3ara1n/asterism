@@ -8,6 +8,7 @@ import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { useLifetimeSignal } from "@asterism-app/ui/use-lifetime";
 import { usageLevelTones } from "@asterism-app/ui/usage-level";
+import { UsageReadingStatus } from "@asterism-app/ui/usage-reading-status";
 import { cn } from "@asterism-app/ui/utils";
 import { providersMessages as messages } from "../../messages/providers";
 import { fadeTransition, islandTransition } from "../../shared/weave/motion";
@@ -175,8 +176,8 @@ export function ProviderUsageButton({ providerId }: { providerId: string }) {
         : state.error === "credential" ? messages.usageCredential
         : state.error === "authentication" ? messages.usageAuthentication
         : state.error === "rate_limit" ? messages.usageRateLimited : messages.usageFailed)}</p>}
-      <p className="text-muted-foreground">{state?.updatedAt ? i18n.formatMessage(messages.usageUpdated, { time: i18n.formatDate(state.updatedAt, { hour: "numeric", minute: "2-digit" }) })
-        : i18n.text(messages.usageRefresh)}</p>
+      {state?.updatedAt != null ? <UsageReadingStatus state={state} />
+        : <p className="text-muted-foreground">{i18n.text(messages.usageRefresh)}</p>}
     </TooltipContent>
   </Tooltip>;
 }

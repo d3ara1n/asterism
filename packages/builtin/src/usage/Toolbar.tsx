@@ -7,6 +7,7 @@ import { AgentToolbarItem, useAgentModelSelection } from "@asterism-app/builtin-
 import { Progress } from "@asterism-app/ui/ui/progress";
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { usageLevelTones } from "@asterism-app/ui/usage-level";
+import { UsageReadingStatus } from "@asterism-app/ui/usage-reading-status";
 import { cn } from "@asterism-app/ui/utils";
 import { MetricCard } from "../agent/conversation/MetricCard";
 import { usageMessages as messages } from "../messages/usage";
@@ -32,7 +33,6 @@ export function UsageToolbarItem() {
   const value = primary ? percentage(quotaRemaining(primary))
     : balances.length ? balances.map(item => formatUsageAmount(i18n, item.remaining, item.unit, { compact: true })).join(" | ") : "—";
   const level = usageLevel(state.items);
-  const stale = state.updatedAt !== null && (state.state === "error" || now - state.updatedAt > 120_000);
   const countdown = (reset: number) => {
     const minutes = Math.max(1, Math.ceil((reset - now) / 60_000));
     if (minutes < 60) return `${minutes}m`;
@@ -49,7 +49,7 @@ export function UsageToolbarItem() {
         : state.state === "waiting" ? <CircleDashed />
         : state.error ? <AlertCircle /> : null}
       {level === "exhausted" ? <AlertCircle className="size-3.5 text-destructive" />
-        : (state.error || stale) && hasData && <AlertCircle className="size-3.5 text-warning" />}
+        : state.error && hasData && <AlertCircle className="size-3.5 text-warning" />}
     </>}>
     <h4 className="type-label">{i18n.text(title)}</h4>
     {state.items.map(item => <div key={item.id} className="space-y-1">
@@ -72,9 +72,6 @@ export function UsageToolbarItem() {
       : state.state === "waiting" ? messages.waiting : messages.empty)}</p>}
     {state.model && <p className="type-caption">{i18n.formatMessage(messages.reportedModel, { model: state.model })}</p>}
     {state.error && <p className="type-caption">{i18n.text(messages[state.error])}</p>}
-    {state.updatedAt !== null && <p className={cn("type-caption flex items-center gap-1", stale && "text-warning")}>
-      {stale && <AlertCircle className="size-3" aria-hidden="true" />}
-      {i18n.formatMessage(messages.updated, { time: i18n.formatDate(state.updatedAt, { hour: "numeric", minute: "2-digit" }) })}
-    </p>}
+    {state.updatedAt !== null && <div className="type-caption"><UsageReadingStatus state={state} /></div>}
   </MetricCard></AgentToolbarItem>;
 }

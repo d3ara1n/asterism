@@ -1,8 +1,12 @@
-import type { ModelCredential, ModelResponse, ProviderUsageState } from "@asterism-app/sdk/contracts";
+import { isDeepStrictEqual } from "node:util";
+import type { ModelCredential, ModelResponse, ProviderUsageState, UsageItem } from "@asterism-app/sdk/contracts";
 import { UsageQueryError, type LanguageModelProviderInfo, type LanguageModelProviderServices, type UsageProviderServices } from "@asterism-app/sdk/runtime";
 import { ProviderTransportError, validateProviderTransport } from "../model/provider.ts";
 
 interface Entry { value: ProviderUsageState; attemptedAt: number; controller: AbortController; pending?: Promise<ProviderUsageState> }
+const byId = (a: UsageItem, b: UsageItem) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+// The only ceiling is the largest epoch millisecond JavaScript can represent as a Date.
+const latestDate = 8_640_000_000_000_000;
 /** Canceling a waiter does not end a query shared by other cards. */
 export function waitForUsage<T>(work: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return work;
@@ -21,12 +25,12 @@ export class ProviderUsageService {
   private readonly unsubscribe: (() => void)[];
   constructor(private readonly languageModelProviders: LanguageModelProviderServices, private readonly usageProviders: UsageProviderServices,
     private readonly changed: (providerId: string | null) => void = () => {},
-    private readonly timeout = 10_000, private readonly freshness = 60_000) {
+    private readonly timeout = 10_000, private readonly baseFreshness = 60_000) {
     this.unsubscribe = [languageModelProviders.subscribe(() => this.clear()), usageProviders.subscribe(() => this.clear())];
   }
   private empty(id: string, connection: LanguageModelProviderInfo | null, source?: "query" | "headers"): ProviderUsageState {
     return { providerId: id, usage: connection?.usage ?? null,
-      ...(source && { source }), state: "disabled", items: [], updatedAt: null, error: null };
+      ...(source && { source }), state: "disabled", items: [], updatedAt: null, expiresAt: null, error: null };
   }
   async query(id: string, options: { signal?: AbortSignal; refresh?: boolean } = {}): Promise<ProviderUsageState> {
     options.signal?.throwIfAborted();
@@ -45,9 +49,11 @@ export class ProviderUsageService {
       return entry.value;
     }
     if (entry?.pending) return waitForUsage(entry.pending, options.signal);
-    if (entry && !options.refresh && Date.now() - entry.attemptedAt < this.freshness) return entry.value;
+    const now = Date.now();
+    if (entry && !options.refresh && (now < (entry.value.expiresAt ?? 0)
+      || (entry.value.state === "error" && now - entry.attemptedAt < this.baseFreshness))) return entry.value;
     const controller = new AbortController();
-    const current: Entry = { controller, attemptedAt: Date.now(),
+    const current: Entry = { controller, attemptedAt: now,
       value: { ...(entry?.value ?? empty), usage: provider.id, source: "query" } };
     this.entries.set(id, current);
     current.pending = Promise.resolve().then(async () => {
@@ -61,7 +67,12 @@ export class ProviderUsageService {
         catch { throw new UsageQueryError("credential"); }
         signal.throwIfAborted();
         const items = await waitForUsage(provider.query({ connection: { id, endpoint: connection.baseUrl }, credential, signal }), signal);
-        current.value = { ...empty, state: "ready", items, updatedAt: Date.now() };
+        const updatedAt = Date.now();
+        const previous = current.value;
+        const lifetime = previous.expiresAt !== null && previous.updatedAt !== null
+          && isDeepStrictEqual(previous.items.toSorted(byId), items.toSorted(byId))
+          ? 2 * (previous.expiresAt - previous.updatedAt) : this.baseFreshness;
+        current.value = { ...empty, state: "ready", items, updatedAt, expiresAt: Math.min(latestDate, updatedAt + lifetime) };
       } catch (error) {
         if (error instanceof ProviderTransportError) console.warn("Provider usage configuration rejected:", error.message);
         current.value = { ...current.value, state: "error", error: timeout.aborted ? "timeout"

@@ -54,7 +54,7 @@ export class ProviderUsageClient {
         entry.value = result;
       } catch {
         if (this.closed) return;
-        entry.value = { ...(entry.value ?? { providerId: id, usage: null, items: [], updatedAt: null }), state: "error", error: "unavailable" };
+        entry.value = { ...(entry.value ?? { providerId: id, usage: null, items: [], updatedAt: null, expiresAt: null }), state: "error", error: "unavailable" };
       } finally {
         if (!this.closed) {
           entry.pending = undefined; this.emit(entry);
@@ -80,7 +80,7 @@ export class ProviderUsageClient {
   unavailable(): void {
     if (this.closed) return;
     for (const [id, entry] of this.entries) {
-      entry.value = { ...(entry.value ?? { providerId: id, usage: null, items: [], updatedAt: null }),
+      entry.value = { ...(entry.value ?? { providerId: id, usage: null, items: [], updatedAt: null, expiresAt: null }),
         state: "error", error: "unavailable" };
       this.emit(entry);
     }

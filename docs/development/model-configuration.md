@@ -108,7 +108,9 @@ Every consumer presents availability with the same levels. Exhausted, shown in r
 
 Language-provider quota observations belong to the language connection. A provider ID alone is not a cross-category account identity; if two connections explicitly share an account, a shared account view needs its own identity.
 
-The usage service preserves a previous successful result when refresh fails and labels it accordingly. A predicted reset time does not manufacture new quota. Precise refresh intervals and query paths belong to the service and provider implementations.
+Successful active queries start with one minute of cache freshness per connection. Each identical successful result doubles the previous lifetime; a changed result resets it to one minute. Item order does not affect equality. The deadline does not start a query: the next ordinary read after it can query, and an explicit refresh can query earlier. Both produce results under the same freshness rule. This cache is in memory; passive header observations have no query deadline.
+
+Usage details show the last successful update and, for active queries, when the cache expires. An expired reading can still be displayed. Refresh failures preserve the previous successful result and its timestamps and are shown separately. A predicted quota reset time does not manufacture new quota.
 
 ## Reference pricing
 

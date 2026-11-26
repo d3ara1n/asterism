@@ -3,7 +3,7 @@ import { useRendererCalls, useRendererEvents } from "@asterism-app/sdk/renderer"
 import { ReadLanguageModelProviderUsage, LanguageModelProviderUsageChanged, type ProviderUsageState } from "@asterism-app/sdk/contracts";
 import { useLifetimeSignal } from "@asterism-app/ui/use-lifetime";
 
-/** Matches the host cache freshness, so each poll finds the previous result expired. */
+/** Renderer read cadence; the host independently decides when an upstream query is due. */
 const pollInterval = 60_000;
 
 /**

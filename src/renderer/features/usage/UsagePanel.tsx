@@ -7,6 +7,7 @@ import { quotaRemaining, usageItemLevel, usageLevel, type ProviderUsageState, ty
 import { Spinner } from "@asterism-app/ui/ui/spinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@asterism-app/ui/ui/tooltip";
 import { usageLevelTones } from "@asterism-app/ui/usage-level";
+import { UsageReadingStatus } from "@asterism-app/ui/usage-reading-status";
 import { cn } from "@asterism-app/ui/utils";
 import type { ModelProvider } from "../../../shared/configuration";
 import { useI18n } from "../../shared/i18n";
@@ -138,6 +139,7 @@ function ProviderMeter({ provider, state }: { provider: ModelProvider; state: Pr
       })}
       {note && <p className="type-caption">{i18n.text(note)}</p>}
       {state?.error && <p className="text-xs text-warning">{i18n.text(errorMessage(state.error))}</p>}
+      {state?.updatedAt != null && <div className="type-caption"><UsageReadingStatus state={state} /></div>}
     </div>
   </li>;
 }

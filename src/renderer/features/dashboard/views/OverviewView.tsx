@@ -3,6 +3,7 @@ import { CircleAlert, Gauge, RotateCw, TrendingUp, Wallet } from "lucide-react";
 import { formatUsageAmount, usageItemLabel, useRendererSettings } from "@asterism-app/sdk/renderer";
 import { quotaRemaining, usageItemLevel, usageLevel } from "@asterism-app/sdk/contracts";
 import { usageLevelTones } from "@asterism-app/ui/usage-level";
+import { UsageReadingStatus } from "@asterism-app/ui/usage-reading-status";
 import { TooltipHint } from "@asterism-app/ui/tooltip-hint";
 import { Badge } from "@asterism-app/ui/ui/badge";
 import { Button } from "@asterism-app/ui/ui/button";
@@ -13,6 +14,7 @@ import type { TelemetryDimension, UsageMetrics } from "../../../../shared/teleme
 import { localMonthStart } from "../../../../shared/telemetry-time";
 import { useI18n } from "../../../shared/i18n";
 import { dashboardMessages as msg } from "../../../messages/dashboard";
+import { providersMessages } from "../../../messages/providers";
 import { useConfiguration } from "../../configuration/state";
 import { useProviderUsages } from "../../usage/use-usage";
 import { SignalDot } from "../../usage/SignalDot";
@@ -203,6 +205,8 @@ function BalancesPanel({ offset, now, revision }: { offset: number; now: number;
               {runway !== null && <span className="type-caption tabular-nums">{i18n.formatMessage(msg.runway, { days: Math.min(9_999, runway) })}</span>}
             </div>;
           })}
+          {current?.error && <p className="type-caption text-warning">{i18n.text(providersMessages.usageFailed)}</p>}
+          {current?.updatedAt != null && <div className="type-caption"><UsageReadingStatus state={current} /></div>}
         </li>;
       })}
     </ul>

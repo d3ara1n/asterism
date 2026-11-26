@@ -50,6 +50,38 @@ describe("shared provider usage", () => {
       expect(query).toHaveBeenCalledOnce();
     } finally { fixture.usage.close(); }
   });
+  it("shares a cached reading, doubles the lifetime across identical refreshes, and returns to a minute on change", async () => {
+    const balance = { id: "balance", type: "balance", scope: "account", label: "Balance",
+      unit: { type: "currency", code: "USD" }, remaining: 25 } as const;
+    const two = [...items, balance];
+    const query = vi.fn(async (): Promise<UsageItem[]> => two)
+      .mockResolvedValueOnce(two).mockResolvedValueOnce(two.toReversed());
+    const fixture = setup({ id: "q", label: "Q", query });
+    try {
+      const first = await fixture.usage.query("p");
+      expect(first.expiresAt! - first.updatedAt!).toBe(60_000);
+      expect(await fixture.usage.query("p")).toEqual(first);
+      expect(query).toHaveBeenCalledOnce();
+      for (const minutes of [2, 4, 8, 16, 32, 64]) {
+        const next = await fixture.usage.query("p", { refresh: true });
+        expect(next.expiresAt! - next.updatedAt!).toBe(minutes * 60_000);
+      }
+      query.mockResolvedValueOnce([...items, { ...balance, remaining: 24 }]);
+      const changed = await fixture.usage.query("p", { refresh: true });
+      expect(changed.expiresAt! - changed.updatedAt!).toBe(60_000);
+    } finally { fixture.usage.close(); }
+  });
+  it("preserves the successful deadline through refresh failure without advancing the lifetime", async () => {
+    const query = vi.fn(async () => items);
+    const fixture = setup({ id: "q", label: "Q", query });
+    try {
+      const first = await fixture.usage.query("p");
+      query.mockRejectedValueOnce(new UsageQueryError("rate_limit"));
+      expect(await fixture.usage.query("p", { refresh: true })).toEqual({ ...first, state: "error", error: "rate_limit" });
+      const recovered = await fixture.usage.query("p", { refresh: true });
+      expect(recovered.expiresAt! - recovered.updatedAt!).toBe(120_000);
+    } finally { fixture.usage.close(); }
+  });
   // A remote failure is not a local transport rejection, and an unsupported operation retains its existing category.
   it.each([
     { failure: new TypeError("fetch failed"), expected: "network" },
